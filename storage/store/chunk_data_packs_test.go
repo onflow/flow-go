@@ -21,7 +21,7 @@ import (
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, _ *pebble.DB, lockManager storage.LockManager) {
-		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			require.NoError(t, chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks))
 			return chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks)
 		}))
@@ -35,7 +35,7 @@ func TestChunkDataPack_Remove(t *testing.T) {
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
 		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-		chunkDataPackStore := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+		chunkDataPackStore := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
 
 		chunkDataPacks := unittest.ChunkDataPacksFixture(10)
 		for _, chunkDataPack := range chunkDataPacks {
@@ -49,7 +49,7 @@ func TestChunkDataPack_Remove(t *testing.T) {
 			chunkIDs = append(chunkIDs, chunk.ChunkID)
 		}
 
-		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			return chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks)
 		}))
 		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
@@ -69,7 +69,7 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+		store1 := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
 
 		// attempt to get an invalid
 		_, err := store1.ByChunkID(unittest.IdentifierFixture())
@@ -84,8 +84,8 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
-		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		store1 := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			require.NoError(t, store1.StoreByChunkID(lctx, chunkDataPacks))
 
 			for _, c := range chunkDataPacks {
@@ -108,7 +108,7 @@ func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
 		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+		store1 := store.NewChunkDataPacksSimple(&metrics.NoopCollector{}, db, collections, 1)
 
 		chunkDataPacks := unittest.ChunkDataPacksFixture(chunks)
 		for _, chunkDataPack := range chunkDataPacks {

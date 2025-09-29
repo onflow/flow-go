@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -16,25 +17,25 @@ type ChunkDataPacks struct {
 	db             storage.DB
 	collections    storage.Collections
 	stored         storage.StoredChunkDataPacks
-	byChunkIDCache *Cache[flow.Identifier, *storage.StoredChunkDataPack]
+	byChunkIDCache *Cache[flow.Identifier, flow.Identifier] // cache chunkID -> storedChunkDataPackID
 }
 
 var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
 func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored storage.StoredChunkDataPacks, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
-	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val *storage.StoredChunkDataPack) error {
-		return operation.InsertChunkDataPack(lctx, rw, val)
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val flow.Identifier) error {
+		return operation.InsertChunkDataPackID(lctx, rw, key, val)
 	}
 
-	retrieve := func(r storage.Reader, key flow.Identifier) (*storage.StoredChunkDataPack, error) {
-		var c storage.StoredChunkDataPack
-		err := operation.RetrieveChunkDataPack(r, key, &c)
-		return &c, err
+	retrieve := func(r storage.Reader, key flow.Identifier) (flow.Identifier, error) {
+		var storedChunkDataPackID flow.Identifier
+		err := operation.RetrieveChunkDataPackID(r, key, &storedChunkDataPackID)
+		return storedChunkDataPackID, err
 	}
 
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
-		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byChunkIDCacheSize),
+		withLimit[flow.Identifier, flow.Identifier](byChunkIDCacheSize),
 		withStoreWithLock(storeWithLock),
 		withRetrieve(retrieve),
 	)
@@ -48,6 +49,13 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	return &ch
 }
 
+// NewChunkDataPacksSimple creates a ChunkDataPacks instance with a simple constructor for backward compatibility.
+// This constructor creates its own StoredChunkDataPacks instance internally.
+func NewChunkDataPacksSimple(collector module.CacheMetrics, db storage.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
+	stored := NewStoredChunkDataPacks(collector, db, byChunkIDCacheSize)
+	return NewChunkDataPacks(collector, db, stored, collections, byChunkIDCacheSize)
+}
+
 // Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 // No errors are expected during normal operation, even if no entries are matched.
 func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
@@ -56,19 +64,11 @@ func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
 			// ch.stored.Remove(chunkIDs)
 		})
 
-		for _, c := range chunkIDs {
-			err := ch.BatchRemove(c, rw)
-			if err != nil {
-				return fmt.Errorf("cannot remove chunk data pack: %w", err)
-			}
-		}
-
-		return nil
+		return ch.BatchRemove(chunkIDs, rw)
 	})
 }
 
-// StoreByChunkID stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
-// No errors are expected during normal operation, but it may return generic error
+// Store
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error, error) {
 	// store chunk data packs in separate storage
@@ -85,7 +85,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 			len(cs), len(storedChunkDataPackIDs), storage.ErrDataMismatch)
 	}
 
-	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+	storeChunkDataPacksFunc := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		for i, c := range cs {
 			storedChunkDataPackID := storedChunkDataPackIDs[i]
 			// index stored chunk data pack ID by chunk ID
@@ -96,22 +96,59 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 		}
 
 		return nil
-	}, nil
+	}
+	return storeChunkDataPacksFunc, nil
 }
 
 // BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	storage.OnCommitSucceed(rw, func() {
-		ch.byChunkIDCache.Remove(chunkID)
-	})
-	return operation.RemoveChunkDataPack(rw.Writer(), chunkID)
+func (ch *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.ReaderBatchWriter) error {
+	// First, collect all stored chunk data pack IDs that need to be removed
+	var storedChunkDataPackIDs []flow.Identifier
+	for _, chunkID := range chunkIDs {
+		storedChunkDataPackID, err := ch.byChunkIDCache.Get(batch.GlobalReader(), chunkID) // remove from cache optimistically
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				// If we can't find the stored chunk data pack ID, continue with other removals
+				// This handles the case where the chunk data pack was never properly stored
+				continue
+			}
+
+			return fmt.Errorf("cannot retrieve stored chunk data pack ID for chunk %x: %w", chunkID, err)
+		}
+		storedChunkDataPackIDs = append(storedChunkDataPackIDs, storedChunkDataPackID)
+	}
+
+	// Remove the stored chunk data packs
+	if len(storedChunkDataPackIDs) > 0 {
+		err := ch.stored.Remove(storedChunkDataPackIDs)
+		if err != nil {
+			return fmt.Errorf("cannot remove stored chunk data packs: %w", err)
+		}
+	}
+
+	// Remove the chunk data pack ID mappings and update cache
+	for _, chunkID := range chunkIDs {
+		storage.OnCommitSucceed(batch, func() {
+			ch.byChunkIDCache.Remove(chunkID)
+		})
+		err := operation.RemoveChunkDataPackID(batch.Writer(), chunkID)
+		if err != nil {
+			return fmt.Errorf("cannot remove chunk data pack %x: %w", chunkID, err)
+		}
+	}
+	return nil
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	StoredChunkDataPackID, err := operation.RetrieveChunkDataPackID(ch.db.Reader(), chunkID)
-	schdp, err := ch.byChunkID(chunkID)
+	// First, retrieve the stored chunk data pack ID (using cache if available)
+	storedChunkDataPackID, err := ch.byChunkIDCache.Get(ch.db.Reader(), chunkID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Then retrieve the actual stored chunk data pack using the ID
+	schdp, err := ch.stored.ByID(storedChunkDataPackID)
 	if err != nil {
 		return nil, err
 	}
@@ -126,11 +163,23 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	if !schdp.SystemChunk {
 		collection, err := ch.collections.ByID(schdp.CollectionID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrive collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
+			return nil, fmt.Errorf("could not retrieve collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
 		}
 
 		chdp.Collection = collection
 	}
 
 	return chdp, nil
+}
+
+// StoreByChunkID stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
+// This is a convenience method that wraps the Store method for backward compatibility.
+func (ch *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
+	storeFunc, err := ch.Store(cs)
+	if err != nil {
+		return err
+	}
+	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return storeFunc(lctx, rw)
+	})
 }
