@@ -310,11 +310,8 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 // CAUTION: the list of descendants is constructed for each call via database reads,
 // and may be expensive to compute, especially if the reference block is older.
 //
-// No errors are expected under normal operation.
+// No errors returns expected under normal operation.
 func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
-	// Note, the caller must have checked that the block of the snapshot does exist in the database.
-	// This is currently true, because the Snapshot instance is only created by AtBlockID and AtHeight
-	// method of State, which both check the existence of the block first.
 	descendants, err := s.descendants(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
@@ -322,9 +319,12 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 	return descendants, nil
 }
 
-func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var children flow.IdentifierList
-	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &children)
+// descendants returns a slice the IDs of all known children of the given blockID.
+// CAUTION: this function behaves only correctly for known blocks (see constructor).
+// No error returns are expected during normal operation.
+func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, error) {
+	var descendantIDs flow.IdentifierList
+	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &descendantIDs)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
@@ -337,17 +337,9 @@ func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, e
 		// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
 		// possible here, and we just return an empty list.
 	}
-	return children, nil
-}
 
-func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, error) {
-	descendantIDs, err := s.lookupChildren(blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, descendantID := range descendantIDs {
-		additionalIDs, err := s.descendants(descendantID)
+	for _, child := range descendantIDs {
+		additionalIDs, err := s.descendants(child)
 		if err != nil {
 			return nil, err
 		}

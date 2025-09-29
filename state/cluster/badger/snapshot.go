@@ -76,7 +76,8 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 }
 
 // pending returns a slice with all blocks descending from the given blockID (children, grandchildren, etc).
-// CAUTION: this function behaves only correctly for known blocks. This is the case if and only if s.err == nil.
+// CAUTION: this function behaves only correctly for known blocks, which should always be the case as
+// required by the constructor.
 // No error returns are expected during normal operation.
 func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var pendingIDs flow.IdentifierList
