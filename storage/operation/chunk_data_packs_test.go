@@ -3,7 +3,6 @@ package operation_test
 import (
 	"testing"
 
-	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +14,6 @@ import (
 
 func TestChunkDataPack(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
 		collectionID := unittest.IdentifierFixture()
 		expected := &storage.StoredChunkDataPack{
 			ChunkID:      unittest.IdentifierFixture(),
@@ -26,19 +24,17 @@ func TestChunkDataPack(t *testing.T) {
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
 			var actual storage.StoredChunkDataPack
-			err := operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err := operation.RetrieveStoredChunkDataPack(db.Reader(), expected.ID(), &actual)
 			assert.Error(t, err)
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
-				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPack(lctx, rw, expected)
-				})
+			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertStoredChunkDataPack(rw, expected.ID(), expected)
 			}))
 
 			var actual storage.StoredChunkDataPack
-			err := operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err := operation.RetrieveStoredChunkDataPack(db.Reader(), expected.ID(), &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, *expected, actual)
@@ -46,12 +42,12 @@ func TestChunkDataPack(t *testing.T) {
 
 		t.Run("Remove", func(t *testing.T) {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.RemoveChunkDataPack(rw.Writer(), expected.ChunkID)
+				return operation.RemoveStoredChunkDataPack(rw.Writer(), expected.ID())
 			})
 			require.NoError(t, err)
 
 			var actual storage.StoredChunkDataPack
-			err = operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
+			err = operation.RetrieveStoredChunkDataPack(db.Reader(), expected.ID(), &actual)
 			assert.Error(t, err)
 		})
 	})
