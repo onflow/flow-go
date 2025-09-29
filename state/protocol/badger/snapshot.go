@@ -16,12 +16,16 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-// Snapshot implements the [protocol.Snapshot] interface for KNOWN BLOCKS.
-// It represents a read-only immutable snapshot of the protocol state at the
+// A Snapshot represents a read-only immutable snapshot of the protocol state at the
 // block it is constructed with. It allows efficient access to data associated directly
 // with blocks at a given state (finalized, sealed), such as the related header, commit,
 // seed or descending blocks. A block snapshot can lazily convert to an epoch snapshot in
 // order to make data associated directly with epochs accessible through its API.
+//
+// This Snapshot implements the [protocol.Snapshot] interface for KNOWN BLOCKS.
+// Existence of the reference block is currently ensured, because Snapshot instances are
+// only created by AtBlockID and AtHeight method of State, which both check the existence
+// of the block first.
 type Snapshot struct {
 	state   *State
 	blockID flow.Identifier // reference block for this snapshot
@@ -298,10 +302,19 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	return segment, nil
 }
 
-// Note, the caller must have checked that the block of the snapshot does exist in the database.
-// This is currently true, because the Snapshot instance is only created by AtBlockID and AtHeight
-// method of State, which both check the existence of the block first.
+// Descendants returns the IDs of all descendants of the Head block.
+// The IDs are ordered such that parents are included before their children.
+// Since all blocks are fully validated before being inserted to the state,
+// all returned blocks are validated.
+//
+// CAUTION: the list of descendants is constructed for each call via database reads,
+// and may be expensive to compute, especially if the reference block is older.
+//
+// No errors are expected under normal operation.
 func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
+	// Note, the caller must have checked that the block of the snapshot does exist in the database.
+	// This is currently true, because the Snapshot instance is only created by AtBlockID and AtHeight
+	// method of State, which both check the existence of the block first.
 	descendants, err := s.descendants(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
