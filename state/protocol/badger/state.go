@@ -429,10 +429,13 @@ func bootstrapSealingSegment(
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
+			// For all but the first block in the segment, index the parent->child relationship:
 			if i > 0 {
-				// why skipping i == 0 here?
-				// because when i == 0, the block is a root block whose parent does not exist,
-				// we don't want to attempt to index children for a non-existent parent
+				// Reason for skipping block at index i == 0:
+				//  * `segment.Blocks[0]` is the node's root block, history prior to that root block is not guaranteed to be known to the node.
+				//  * For consistency, we don't want to index children for an unknown or non-existent parent.
+				//    So by convention, we start populating the parent-child relationship only for the root block's children and its descendants.
+				//    This convention also covers the genesis block, where no parent exists.
 				err = operation.IndexNewBlock(lctx, rw, blockID, proposal.Block.ParentID)
 				if err != nil {
 					return fmt.Errorf("could not index block (id=%x): %w", blockID, err)
