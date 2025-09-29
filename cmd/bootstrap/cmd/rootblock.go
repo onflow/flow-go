@@ -249,12 +249,12 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate random seed")
 	}
-	csprg, err := prg.New(randomSeed[:], prg.BootstrapClusterAssignment, nil)
+	clusteringPrg, err := prg.New(randomSeed[:], prg.BootstrapClusterAssignment, nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to initialize pseudorandom generator")
 	}
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partnerNodes), model.ToIdentityList(internalNodes), int(flagCollectionClusters), csprg)
+	assignments, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partnerNodes), model.ToIdentityList(internalNodes), int(flagCollectionClusters), clusteringPrg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
