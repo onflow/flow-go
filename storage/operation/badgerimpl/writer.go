@@ -23,7 +23,7 @@ type ReaderBatchWriter struct {
 	callbacks *operation.Callbacks
 
 	// values contains the values for this batch.
-	// The values map is set using SetValue(key, value) and retrieved using Value(key).
+	// The values map is set using SetScopedValue(key, value) and retrieved using ScopedValue(key).
 	// Initialization of the values map is deferred until it is needed, because
 	// ReaderBatchWriter is created frequently to update the database, but
 	// this values map is used infrequently to save data for batch operations.

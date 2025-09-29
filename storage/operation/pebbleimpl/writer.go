@@ -22,8 +22,15 @@ type ReaderBatchWriter struct {
 	// for executing callbacks after the batch has been flushed, such as updating caches
 	callbacks *operation.Callbacks
 
-	// values store value for this batch.
-	// NOTE: b.values is only initialized when needed.
+	// values contains the values for this batch.
+	// The values map is set using SetScopedValue(key, value) and retrieved using ScopedValue(key).
+	// Initialization of the values map is deferred until it is needed, because
+	// ReaderBatchWriter is created frequently to update the database, but
+	// this values map is used infrequently to save data for batch operations.
+	// For example, store.TransactionResults.BatchRemoveByBlockID() saves batch
+	// removed block IDs in values map, and retrieves the batch removed block
+	// IDs in OnCommitSucceed() callback.  This allows locking just once,
+	// instead of locking TransactionResults cache for every removed block ID.
 	values map[string]any
 }
 
