@@ -98,6 +98,10 @@ func TestHeaderRetrieveWithoutStore(t *testing.T) {
 	})
 }
 
+// TestHeadersByParentID tests method [Headers.ByParentID] for:
+//  1. a known parent with no children should return an empty list;
+//  2. a known parent with 3 children should return the headers of those children;
+//  3. an unknown parent should return [storage.ErrNotFound].
 func TestHeadersByParentID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -167,6 +171,13 @@ func TestHeadersByParentID(t *testing.T) {
 	})
 }
 
+// TestHeadersByParentIDChainStructure tests method [Headers.ByParentID] for a tree of blocks with
+// deeper ancestry (children and grandchildren). Specifically, we use the following fork structure,
+// which blocks denoted in square brackets:
+//
+//	                    ↙ [grandchild1]
+//	[parent] ← [child]
+//	                    ↖ [grandchild2]
 func TestHeadersByParentIDChainStructure(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
