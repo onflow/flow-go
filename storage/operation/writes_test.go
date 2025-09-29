@@ -580,114 +580,108 @@ func TestBatchValue(t *testing.T) {
 
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		t.Run("no data", func(t *testing.T) {
-			b := db.NewBatch()
-			defer b.Close()
-
+			const expectedCallbackInvocationCount = 2
 			callbackInvocationCount := 0
 
-			callbackFunc := func(error) {
-				callbackInvocationCount++
+			err := db.WithReaderBatchWriter(func(b storage.ReaderBatchWriter) error {
+				callbackFunc := func(error) {
+					callbackInvocationCount++
 
-				value, exists := b.ScopedValue(key)
-				require.Nil(t, value)
-				require.False(t, exists)
-			}
+					value, exists := b.ScopedValue(key)
+					require.Nil(t, value)
+					require.False(t, exists)
+				}
 
-			const expectedCallbackInvocationCount = 2
-			for range expectedCallbackInvocationCount {
-				b.AddCallback(callbackFunc)
-			}
+				for range expectedCallbackInvocationCount {
+					b.AddCallback(callbackFunc)
+				}
 
-			k := []byte{0x01}
-			v := []byte{0x02}
+				k := []byte{0x01}
+				v := []byte{0x02}
 
-			// Insert k and v into batch.
-			err := b.Writer().Set(k, v)
+				// Insert k and v into batch.
+				err := b.Writer().Set(k, v)
+				require.NoError(t, err)
+
+				return nil
+			})
+
 			require.NoError(t, err)
-
-			// Commit batch.
-			err = b.Commit()
-			require.NoError(t, err)
-
 			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
 		})
 
 		t.Run("store data multiple times", func(t *testing.T) {
-			b := db.NewBatch()
-			defer b.Close()
-
-			b.SetScopedValue(key, []string{"value1", "value2"})
-
-			b.SetScopedValue(key, []string{"value2", "value3"})
-
+			const expectedCallbackInvocationCount = 2
 			callbackInvocationCount := 0
 
-			callbackFunc := func(error) {
-				callbackInvocationCount++
+			err := db.WithReaderBatchWriter(func(b storage.ReaderBatchWriter) error {
+				b.SetScopedValue(key, []string{"value1", "value2"})
 
-				data, exists := b.ScopedValue(key)
-				require.Equal(t, []string{"value2", "value3"}, data.([]string))
-				require.True(t, exists)
-			}
+				b.SetScopedValue(key, []string{"value2", "value3"})
 
-			const expectedCallbackInvocationCount = 2
-			for range expectedCallbackInvocationCount {
-				b.AddCallback(callbackFunc)
-			}
+				callbackFunc := func(error) {
+					callbackInvocationCount++
 
-			k := []byte{0x01}
-			v := []byte{0x02}
+					data, exists := b.ScopedValue(key)
+					require.Equal(t, []string{"value2", "value3"}, data.([]string))
+					require.True(t, exists)
+				}
 
-			// Insert k and v into batch.
-			err := b.Writer().Set(k, v)
+				for range expectedCallbackInvocationCount {
+					b.AddCallback(callbackFunc)
+				}
+
+				k := []byte{0x01}
+				v := []byte{0x02}
+
+				// Insert k and v into batch.
+				err := b.Writer().Set(k, v)
+				require.NoError(t, err)
+
+				return nil
+			})
+
 			require.NoError(t, err)
-
-			// Commit batch.
-			err = b.Commit()
-			require.NoError(t, err)
-
 			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
 		})
 
 		t.Run("store and remove data", func(t *testing.T) {
-			b := db.NewBatch()
-			defer b.Close()
-
-			b.SetScopedValue(key, []string{"value1", "value2"})
-
+			const expectedCallbackInvocationCount = 2
 			callbackInvocationCount := 0
 
-			callbackFunc := func(error) {
-				callbackInvocationCount++
+			err := db.WithReaderBatchWriter(func(b storage.ReaderBatchWriter) error {
+				b.SetScopedValue(key, []string{"value1", "value2"})
 
-				data, exists := b.ScopedValue(key)
-				if callbackInvocationCount == 1 {
-					require.Equal(t, []string{"value1", "value2"}, data.([]string))
-					require.True(t, exists)
+				callbackFunc := func(error) {
+					callbackInvocationCount++
 
-					b.SetScopedValue(key, nil)
-				} else {
-					require.Nil(t, data)
-					require.False(t, exists)
+					data, exists := b.ScopedValue(key)
+					if callbackInvocationCount == 1 {
+						require.Equal(t, []string{"value1", "value2"}, data.([]string))
+						require.True(t, exists)
+
+						b.SetScopedValue(key, nil)
+					} else {
+						require.Nil(t, data)
+						require.False(t, exists)
+					}
 				}
-			}
 
-			const expectedCallbackInvocationCount = 2
-			for range expectedCallbackInvocationCount {
-				b.AddCallback(callbackFunc)
-			}
+				for range expectedCallbackInvocationCount {
+					b.AddCallback(callbackFunc)
+				}
 
-			k := []byte{0x01}
-			v := []byte{0x02}
+				k := []byte{0x01}
+				v := []byte{0x02}
 
-			// Insert k and v into batch.
-			err := b.Writer().Set(k, v)
+				// Insert k and v into batch.
+				err := b.Writer().Set(k, v)
+				require.NoError(t, err)
+
+				return nil
+			})
+
 			require.NoError(t, err)
-
-			// Commit batch.
-			err = b.Commit()
-			require.NoError(t, err)
-
 			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
 		})
 	})
