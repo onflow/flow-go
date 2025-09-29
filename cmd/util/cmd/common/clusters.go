@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto/random"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
@@ -21,8 +22,9 @@ import (
 // The number of nodes in each cluster is deterministic and only depends on the number of clusters
 // and the number of nodes. The repartition of internal and partner nodes is also deterministic
 // and only depends on the number of clusters and nodes.
-// The identity of internal and partner nodes in each cluster is the non-deterministic and is randomized
-// using the system entropy.
+// The identity of internal and partner nodes in each cluster is deterministically randomized
+// using the provided entropy `randomSource`. Ideally this entropy should be derived from the random beacon of the
+// previous epoch, or some other verifiable random source.
 // The function guarantees a specific constraint when partitioning the nodes into clusters:
 // Each cluster must contain strictly more than 2/3 of internal nodes. If the constraint can't be
 // satisfied, an exception is returned.
@@ -33,11 +35,12 @@ import (
 // - partnerNodes: identity list of partner nodes.
 // - internalNodes: identity list of internal nodes.
 // - numCollectionClusters: the number of clusters to generate
+// - randomSource: entropy used to randomize the assignment.
 // Returns:
 // - flow.AssignmentList: the generated assignment list.
 // - flow.ClusterList: the generate collection cluster list.
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
-func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int) (flow.AssignmentList, flow.ClusterList, error) {
+func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int, randomSource random.Rand) (flow.AssignmentList, flow.ClusterList, error) {
 
 	partnerCollectors := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	internalCollectors := internalNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
@@ -49,12 +52,17 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 			nCollectors, numCollectionClusters)
 	}
 
-	// shuffle both collector lists based on a non-deterministic algorithm
-	partnerCollectors, err := partnerCollectors.Shuffle()
+	// shuffle partner nodes in-place using the provided randomness
+	err := randomSource.Shuffle(len(partnerCollectors), func(i, j int) {
+		partnerCollectors[i], partnerCollectors[j] = partnerCollectors[j], partnerCollectors[i]
+	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle partners")
 	}
-	internalCollectors, err = internalCollectors.Shuffle()
+	// shuffle internal nodes in-place using the provided randomness
+	err = randomSource.Shuffle(len(internalCollectors), func(i, j int) {
+		internalCollectors[i], internalCollectors[j] = internalCollectors[j], internalCollectors[i]
+	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle internals")
 	}

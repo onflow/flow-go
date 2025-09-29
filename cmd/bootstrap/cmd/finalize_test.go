@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	cryptoRand "crypto/rand"
 	"encoding/hex"
 	"math/rand"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -116,16 +118,23 @@ func TestClusterAssignment(t *testing.T) {
 	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
 	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
+	// use a random seed
+	seed := make([]byte, 32)
+	_, err := cryptoRand.Read(seed)
+	require.NoError(t, err)
+	prng, err := prg.New(seed, prg.BootstrapClusterAssignment, nil)
+	require.NoError(t, err)
+
 	log := zerolog.Nop()
 	// should not error
-	_, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
+	_, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
 	require.NoError(t, err)
 	require.True(t, checkClusterConstraint(clusters, partners, internals))
 
 	// unhappy Path
 	internals = internals[:21] // reduce one internal node
 	// should error
-	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
+	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
 	require.Error(t, err)
 	// revert the flag value
 	flagCollectionClusters = tmp
