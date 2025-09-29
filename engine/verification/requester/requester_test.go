@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -66,7 +66,7 @@ func setupTest() *RequesterEngineTestSuite {
 
 // newRequesterEngine returns a requester engine for testing.
 func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.Engine {
-	net := &mocknetwork.Network{}
+	net := &mocknetwork.EngineRegistry{}
 	// mocking the network registration of the engine
 	net.On("Register", channels.RequestChunks, testifymock.Anything).
 		Return(s.con, nil).
