@@ -4,10 +4,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Snapshot represents an immutable snapshot at a specific point in the cluster
-// state history. Specifically, a valid snapshot references a [cluster.Block],
-// which designates the head of one specific cluster-consensus fork. This head
-// has
+// Snapshot pertains to a specific fork of the collector cluster consensus. Specifically,
+// it references one block denoted as the Head block. This Snapshot type is for collector
+// clusters, so we are referencing a cluster block, aka collection, here.
 type Snapshot interface {
 
 	// Collection returns the collection designated as the reference for this
