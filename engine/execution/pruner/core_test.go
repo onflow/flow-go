@@ -40,8 +40,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), 1000)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, collections, 1000)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, db, 1000)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, db, storedChunkDataPacks, collections, 1000)
 
 		lastSealedHeight := 30
 		lastFinalizedHeight := lastSealedHeight + 2 // 2 finalized but unsealed
