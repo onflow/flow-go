@@ -68,7 +68,6 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 		}
 		// insert boundary
 		err = operation.BootstrapClusterFinalizedHeight(lctx, rw, chainID, genesis.Height)
-		// insert started view for hotstuff
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
@@ -79,7 +78,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 		}
 
 		livenessData := &hotstuff.LivenessData{
-			CurrentView: genesis.View + 1,
+			CurrentView: genesis.View + 1, // starting view for hotstuff
 			NewestQC:    rootQC,
 		}
 		// insert safety data
