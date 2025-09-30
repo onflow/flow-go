@@ -49,8 +49,11 @@ func IndexClusterBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, c
 	return UpsertByKey(rw.Writer(), key, blockID)
 }
 
-// LookupClusterBlockHeight retrieves a block ID by height for the given cluster
-// (only finalized cluster blocks are indexed by height to guarantee uniqueness).
+// LookupClusterBlockHeight retrieves the ID of a finalized cluster block at the given height produced by the specified cluster.
+// Note that only finalized cluster blocks are indexed by height to guarantee uniqueness.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no finalized block from the specified cluster is known at the given height
 func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, height uint64, blockID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
 }
@@ -97,6 +100,12 @@ func UpdateClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrit
 }
 
 // RetrieveClusterFinalizedHeight retrieves the latest finalized cluster block height of the given cluster.
+// For collector nodes in the specified cluster, this value should always exist (after bootstrapping).
+// However, other nodes outside the cluster typically do not track the latest finalized heights for the
+// different collector clusters.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if the latest finalized height for the specified cluster is not present in the database
 func RetrieveClusterFinalizedHeight(r storage.Reader, clusterID flow.ChainID, height *uint64) error {
 	return RetrieveByKey(r, MakePrefix(codeClusterHeight, clusterID), height)
 }
