@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestOperationPair is a pair of indexing operation and corresponding lock to be held during the operation. 
-// The name is an auxiliary identifier, for debugging only. 
+// TestOperationPair is a pair of indexing operation and corresponding lock to be held during the operation.
+// The name is an auxiliary identifier, for debugging only.
 type TestOperationPair struct {
 	name      string
 	indexFunc func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, flow.Identifier) error
@@ -83,10 +83,8 @@ func TestIndexAndLookupChild(t *testing.T) {
 	}
 }
 
-// if two blocks connect to the same parent, indexing the second block would have
-// no effect, retrieving the child of the parent block will return the first block that
-// was indexed.
-func TestIndexTwiceAndRetrieve(t *testing.T) {
+// indexing multiple children to the same parent should be retrievable
+func TestIndexWithMultiChildrenRetrieve(t *testing.T) {
 	for _, opPair := range getTestOperationPairs() {
 		t.Run(opPair.name, func(t *testing.T) {
 			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -117,6 +115,46 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 				require.NoError(t, err)
 
 				require.ElementsMatch(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
+			})
+		})
+	}
+}
+
+// Test indexing the same child with different parents should error
+func TestIndexAgainWithDifferentParentShouldError(t *testing.T) {
+	for _, opPair := range getTestOperationPairs() {
+		t.Run(opPair.name, func(t *testing.T) {
+			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+				lockManager := storage.NewTestingLockManager()
+
+				child := unittest.IdentifierFixture()
+				parent1 := unittest.IdentifierFixture()
+				parent2 := unittest.IdentifierFixture()
+
+				// index with parent
+				err := unittest.WithLock(t, lockManager, opPair.lockType, func(lctx lockctx.Context) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return opPair.indexFunc(lctx, rw, child, parent1)
+					})
+				})
+				require.NoError(t, err)
+
+				// index with a different parent
+				err = unittest.WithLock(t, lockManager, opPair.lockType, func(lctx lockctx.Context) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return opPair.indexFunc(lctx, rw, child, parent2)
+					})
+				})
+				require.NoError(t, err)
+
+				var retrievedIDs flow.IdentifierList
+				err = operation.RetrieveBlockChildren(db.Reader(), parent1, &retrievedIDs)
+				require.NoError(t, err)
+
+				require.ElementsMatch(t, flow.IdentifierList{child}, retrievedIDs)
+
+				err = operation.RetrieveBlockChildren(db.Reader(), parent2, &retrievedIDs)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 			})
 		})
 	}
