@@ -202,7 +202,7 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 				return nil, fmt.Errorf("could not check existence of parent %x: %w", parentID, err)
 			}
 			if !exists {
-				return nil, fmt.Errorf("could not find parent %x: %w", parentID, storage.ErrNotFound)
+				return nil, fmt.Errorf("cannot retrieve children of unknown block %x: %w", parentID, storage.ErrNotFound)
 			}
 			// parent exists but has no children
 			return []*flow.Header{}, nil

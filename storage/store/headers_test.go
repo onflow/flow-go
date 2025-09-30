@@ -127,19 +127,12 @@ func TestHeadersByParentID(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, children)
 
-		// Create child blocks
-		child1 := unittest.BlockWithParentFixture(parentBlock.ToHeader())
-		child2 := unittest.BlockWithParentFixture(parentBlock.ToHeader())
-		child3 := unittest.BlockWithParentFixture(parentBlock.ToHeader())
+		// Test case 2: Parent with 3 children
+		var childProposals []*flow.Proposal
+		for i := 0; i < 3; i++ {
+			childProposal := unittest.ProposalFromBlock(unittest.BlockWithParentFixture(parentBlock.ToHeader()))
+			childProposals = append(childProposals, childProposal)
 
-		// Store child blocks
-		childProposals := []*flow.Proposal{
-			unittest.ProposalFromBlock(child1),
-			unittest.ProposalFromBlock(child2),
-			unittest.ProposalFromBlock(child3),
-		}
-
-		for _, childProposal := range childProposals {
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					// Store the block
@@ -154,19 +147,16 @@ func TestHeadersByParentID(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Test case 2: Parent with multiple children
+		// confirm correct behaviour for test case 2: we should retrieve the headers of the 3 children
 		children, err = headers.ByParentID(parentBlock.ID())
 		require.NoError(t, err)
-		require.Len(t, children, 3)
-
-		// Verify we got the correct child headers
-		childHeaders := []*flow.Header{child1.ToHeader(), child2.ToHeader(), child3.ToHeader()}
-		require.ElementsMatch(t, childHeaders, children)
+		require.ElementsMatch(t,
+			children,
+			[]*flow.Header{childProposals[0].Block.ToHeader(), childProposals[0].Block.ToHeader(), childProposals[0].Block.ToHeader()})
 
 		// Test case 3: Non-existent parent should return ErrNotFound
 		nonExistentParent := unittest.IdentifierFixture()
 		_, err = headers.ByParentID(nonExistentParent)
-		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -186,23 +176,16 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 		headers := all.Headers
 		blocks := all.Blocks
 
-		// Create a chain: parent -> child1 -> grandchild1, grandchild2
-		parentProposal := unittest.ProposalFixture()
-		parentBlock := parentProposal.Block
-
-		child1 := unittest.BlockWithParentFixture(parentBlock.ToHeader())
-		grandchild1 := unittest.BlockWithParentFixture(child1.ToHeader())
-		grandchild2 := unittest.BlockWithParentFixture(child1.ToHeader())
+		// Create child structure: parent -> child -> grandchild1, grandchild2
+		parent := unittest.BlockFixture()
+		child := unittest.BlockWithParentFixture(parent.ToHeader())
+		grandchild1 := unittest.BlockWithParentFixture(child.ToHeader())
+		grandchild2 := unittest.BlockWithParentFixture(child.ToHeader())
 
 		// Store all blocks
-		proposals := []*flow.Proposal{
-			parentProposal,
-			unittest.ProposalFromBlock(child1),
-			unittest.ProposalFromBlock(grandchild1),
-			unittest.ProposalFromBlock(grandchild2),
-		}
+		for _, b := range []*flow.Block{parent, child, grandchild1, grandchild2} {
+			proposal := unittest.ProposalFromBlock(b)
 
-		for _, proposal := range proposals {
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					// Store the block
@@ -227,12 +210,11 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 		require.Equal(t, child1.ToHeader(), children[0])
 
 		// Test that child1 returns its direct children (grandchild1, grandchild2)
-		children, err = headers.ByParentID(child1.ID())
+		// Test that child returns its direct children (grandchild1, grandchild2)
+		grandchildren, err := headers.ByParentID(child.ID())
 		require.NoError(t, err)
-		require.Len(t, children, 2)
-
-		grandchildHeaders := []*flow.Header{grandchild1.ToHeader(), grandchild2.ToHeader()}
-		require.ElementsMatch(t, grandchildHeaders, children)
+		require.ElementsMatch(t, grandchildren,
+			[]*flow.Header{grandchild1.ToHeader(), grandchild2.ToHeader()})
 
 		// Test that grandchildren have no children
 		children, err = headers.ByParentID(grandchild1.ID())
