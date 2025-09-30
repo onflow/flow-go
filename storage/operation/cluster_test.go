@@ -115,7 +115,7 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 			err       error
 		)
 
-		t.Run("retrieve non-existant", func(t *testing.T) {
+		t.Run("retrieve non-existent", func(t *testing.T) {
 			var actual uint64
 			err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterID, &actual)
 			t.Log(err)
