@@ -1,7 +1,7 @@
 package execution_data
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"math"
@@ -98,6 +98,10 @@ type Serializer interface {
 	// Deserialize decompresses and decodes the data from the given reader.
 	// No errors are expected during normal operation.
 	Deserialize(io.Reader) (interface{}, error)
+
+	// DeserializeBuffered decompresses and decodes the data from the given reader.
+	// No errors are expected during normal operation.
+	DeserializeBuffered(io.Reader) (interface{}, error)
 }
 
 // serializer implements the Serializer interface. Object are serialized by encoding and
@@ -202,10 +206,45 @@ func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create compressor reader: %w", err)
 	}
 
-	// Wrap decompressor in a greedy reader so cbor gets all data at once
-	greedy := bufio.NewReaderSize(comp, DefaultMaxBlobSize)
+	dec := s.codec.NewDecoder(comp)
 
-	dec := s.codec.NewDecoder(greedy)
+	if err := dec.Decode(v); err != nil {
+		return nil, fmt.Errorf("failed to decode data: %w", err)
+	}
+
+	return v, nil
+}
+
+// Deserialize decompresses and decodes the data from the given reader.
+// No errors are expected during normal operation.
+func (s *serializer) DeserializeBuffered(r io.Reader) (interface{}, error) {
+	v, err := s.readPrototype(r)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to read prototype: %w", err)
+	}
+
+	comp, err := s.compressor.NewReader(r)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create compressor reader: %w", err)
+	}
+	defer comp.Close()
+
+	buf := bytes.NewBuffer(make([]byte, 0, DefaultMaxBlobSize))
+	for {
+		data := make([]byte, 0, DefaultMaxBlobSize)
+		n, err := comp.Read(data)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("failed to read data: %w", err)
+		}
+		buf.Write(data[:n])
+	}
+
+	dec := s.codec.NewDecoder(buf)
 
 	if err := dec.Decode(v); err != nil {
 		return nil, fmt.Errorf("failed to decode data: %w", err)

@@ -268,7 +268,14 @@ func (d *downloader) getBlobs(ctx context.Context, blobGetter network.BlobGetter
 	blobCh, errCh := d.retrieveBlobs(ctx, blobGetter, cids)
 	bcr := blobs.NewBlobChannelReader(blobCh)
 
-	v, deserializeErr := d.serializer.Deserialize(bcr)
+	var v interface{}
+	var deserializeErr error
+
+	if len(cids) > 1 {
+		v, deserializeErr = d.serializer.Deserialize(bcr)
+	} else {
+		v, deserializeErr = d.serializer.DeserializeBuffered(bcr)
+	}
 
 	// blocks until all blobs have been retrieved or an error is encountered
 	err := <-errCh
