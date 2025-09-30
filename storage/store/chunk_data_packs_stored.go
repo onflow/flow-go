@@ -56,6 +56,8 @@ func (ch *StoredChunkDataPacks) Remove(ids []flow.Identifier) error {
 	})
 }
 
+// BatchRemove removes multiple StoredChunkDataPacks cs keyed by their IDs in a batch using the provided
+// No errors are expected during normal operation, even if no entries are matched.
 func (ch *StoredChunkDataPacks) BatchRemove(ids []flow.Identifier, rw storage.ReaderBatchWriter) error {
 	for _, id := range ids {
 		err := ch.batchRemove(id, rw)

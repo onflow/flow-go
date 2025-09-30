@@ -21,6 +21,8 @@ type StoredChunkDataPacks interface {
 	// No errors are expected during normal operation.
 	Remove(cs []flow.Identifier) error
 
+	// BatchRemove removes multiple StoredChunkDataPacks cs keyed by their IDs in a batch using the provided
+	// No errors are expected during normal operation, even if no entries are matched.
 	BatchRemove(cs []flow.Identifier, batch ReaderBatchWriter) error
 }
 
