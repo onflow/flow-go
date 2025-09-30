@@ -97,12 +97,13 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		// AccessList:        tx.AccessList(),
 		// When SkipNonceChecks is true, the message nonce is
 		// not checked against the account nonce in state.
-		// When SkipFromEOACheck is true, it disables checking
-		// that the sender is an EOA.
-		// Since we use the direct calls for COAs, we set
-		// the nonce and the COA is an smart contract.
-		SkipNonceChecks:  true,
-		SkipFromEOACheck: true,
+		SkipNonceChecks: true,
+		// When SkipTransactionChecks is true, the message is not
+		// treated as a transaction, and certain transaction-specific
+		// checks are skipped:
+		// - From is not verified to be an EOA
+		// - GasLimit is not checked against the protocol defined tx gaslimit
+		SkipTransactionChecks: true,
 	}
 }
 
