@@ -415,10 +415,23 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not store chunk data packs for block ID: %v: %w", blockID, err)
 	}
 
-	// Acquire both locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
 	return storage.WithLock(s.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-		// Save entire execution result (including all chunk data packs) within one batch to minimize
-		// the number of database interactions.
+		// The batch update writes all execution result data in a single atomic operation.
+		// Since the chunk data pack itself was already stored in a separate database
+		// during the previous step, this step stores only the mapping between chunk ID
+		// and chunk data pack ID together with the execution result data in the same batch.
+		//
+		// This design guarantees consistency in two scenarios:
+		//
+		// Case 1: If the batch update is interrupted, the mapping has not yet been saved.
+		// Later, if we attempt to store another execution result that references a
+		// different chunk data pack but the same chunk ID, there is no conflict,
+		// because no previous mapping exists.
+		//
+		// Case 2: If the batch update succeeds, the mapping is saved. Later, if we
+		// attempt to store another execution result that references a different
+		// chunk data pack with the same chunk ID, the conflict is detected, preventing
+		// overwriting of the previously stored mapping.
 		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			err := storeFunc(lctx, batch)
 			if err != nil {
