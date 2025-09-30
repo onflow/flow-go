@@ -117,11 +117,13 @@ func NewTestingLockManager() lockctx.Manager {
 
 // WithLock is a helper function that creates a new lock context, acquires the specified lock,
 // and executes the provided function within that context.
+// This function passes through any errors returned by fn.
 func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) error {
 	return WithLocks(manager, []string{lockID}, fn)
 }
 
 // WithLocks is a helper function that creates a new lock context, acquires the specified locks,
+// and executes the provided function within that context.
 // This function passes through any errors returned by fn.
 func WithLocks(manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) error {
 	lctx := manager.NewContext()
