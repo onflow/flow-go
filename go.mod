@@ -55,7 +55,6 @@ require (
 	github.com/onflow/flow-go-sdk v1.8.2
 	github.com/onflow/flow/protobuf/go/flow v0.4.15
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.7.0
 	github.com/prometheus/client_golang v1.20.5
@@ -110,6 +109,7 @@ require (
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
+	github.com/pierrec/lz4/v4 v4.1.22
 	github.com/slok/go-http-metrics v0.12.0
 	github.com/sony/gobreaker v0.5.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.21.0
