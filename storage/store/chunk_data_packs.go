@@ -80,7 +80,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 //     the caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
 //   - error: No error should be returned during normal operation. Any error indicates a failure in the first phase.
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
-	func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error, error) {
+	func(lctx lockctx.Proof, protocolDBBatch storage.ReaderBatchWriter) error, error) {
 
 	// Phase 1: Store chunk data packs in the separate stored storage layer
 	// This converts the ChunkDataPacks to StoredChunkDataPacks format and stores them
@@ -99,8 +99,8 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	}
 
 	// Phase 2: Create the function that will index chunkID -> storedChunkDataPackID mappings
-	storeChunkDataPacksFunc := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
-		rw.AddCallback(func(err error) {
+	storeChunkDataPacksFunc := func(lctx lockctx.Proof, protocolDBBatch storage.ReaderBatchWriter) error {
+		protocolDBBatch.AddCallback(func(err error) {
 			if err != nil {
 				// Rollback the stored chunk data packs if the batch operation fails
 				err := ch.stored.Remove(storedChunkDataPackIDs) // rollback stored chunk data packs on failure
@@ -114,7 +114,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 		for i, c := range cs {
 			storedChunkDataPackID := storedChunkDataPackIDs[i]
 			// Index the stored chunk data pack ID by chunk ID for fast retrieval
-			err := operation.InsertChunkDataPackID(lctx, rw, c.ChunkID, storedChunkDataPackID)
+			err := operation.InsertChunkDataPackID(lctx, protocolDBBatch, c.ChunkID, storedChunkDataPackID)
 			if err != nil {
 				return fmt.Errorf("cannot index stored chunk data pack ID by chunk ID: %w", err)
 			}

@@ -375,7 +375,7 @@ func (b BlockExecutionDataRoot) Equals(other BlockExecutionDataRoot) bool {
 		return false
 	}
 	for i, cid := range b.ChunkExecutionDataIDs {
-		if cid != other.ChunkExecutionDataIDs[i] {
+		if !cid.Equals(other.ChunkExecutionDataIDs[i]) {
 			return false
 		}
 	}

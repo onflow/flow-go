@@ -121,13 +121,11 @@ func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Conte
 // This function passes through any errors returned by fn.
 func WithLocks(manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) error {
 	lctx := manager.NewContext()
+	defer lctx.Release()
 	for _, lockID := range lockIDs {
-		err := lctx.AcquireLock(lockID)
-		if err != nil {
-			lctx.Release()
+		if err := lctx.AcquireLock(lockID); err != nil {
 			return err
 		}
 	}
-	defer lctx.Release()
 	return fn(lctx)
 }
