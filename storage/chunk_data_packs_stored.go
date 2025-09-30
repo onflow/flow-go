@@ -8,12 +8,17 @@ import (
 
 // ChunkDataPacks represents persistent storage for chunk data packs.
 type StoredChunkDataPacks interface {
+	// StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
+	// It returns the IDs of the stored chunk data packs.
+	// No error are expected during normal operation.
 	StoreChunkDataPacks(cs []*StoredChunkDataPack) ([]flow.Identifier, error)
 
+	// ByID returns the StoredChunkDataPack for the given ID.
+	// It returns [storage.ErrNotFound] if no entry exists for the given ID.
 	ByID(id flow.Identifier) (*StoredChunkDataPack, error)
 
 	// Remove removes multiple ChunkDataPacks cs keyed by their StoredChunkDataPack IDs in a batch.
-	// No errors are expected during normal operation, but it may return generic error
+	// No errors are expected during normal operation.
 	Remove(cs []flow.Identifier) error
 }
 

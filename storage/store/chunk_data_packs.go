@@ -14,15 +14,28 @@ import (
 )
 
 type ChunkDataPacks struct {
-	db             storage.DB
-	collections    storage.Collections
-	stored         storage.StoredChunkDataPacks
-	byChunkIDCache *Cache[flow.Identifier, flow.Identifier] // cache chunkID -> storedChunkDataPackID
+	// the protocol DB is used for storing index mappings from chunk ID to stored chunk data pack ID
+	db storage.DB
+
+	// the actual chunk data pack is stored here, which is a separate storage from protocol DB
+	stored storage.StoredChunkDataPacks
+
+	// the collection is stored separately by the caller, it is only used here for retrieving collection
+	// when returning chunk data pack by chunk ID
+	collections storage.Collections
+
+	// cache chunkID -> storedChunkDataPackID
+	chunkIDToStoredChunkDataPackIDCache *Cache[flow.Identifier, flow.Identifier]
+
+	// it takes 3 look ups to return chunk data pack by chunk ID:
+	// 1. a cache lookup for chunkID -> storedChunkDataPackID
+	// 2. a lookup for storedChunkDataPackID -> StoredChunkDataPack (only has CollectionID, no collection data)
+	// 3. a lookup for CollectionID -> Collection, then restore the chunk data pack with the collection and the StoredChunkDataPack
 }
 
 var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
-func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored storage.StoredChunkDataPacks, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
+func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored storage.StoredChunkDataPacks, collections storage.Collections, chunkIDToStoredChunkDataPackIDCacheSize uint) *ChunkDataPacks {
 
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val flow.Identifier) error {
 		return operation.InsertChunkDataPackID(lctx, rw, key, val)
@@ -35,16 +48,16 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	}
 
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
-		withLimit[flow.Identifier, flow.Identifier](byChunkIDCacheSize),
+		withLimit[flow.Identifier, flow.Identifier](chunkIDToStoredChunkDataPackIDCacheSize),
 		withStoreWithLock(storeWithLock),
 		withRetrieve(retrieve),
 	)
 
 	ch := ChunkDataPacks{
-		db:             db,
-		byChunkIDCache: cache,
-		stored:         stored,
-		collections:    collections,
+		db:                                  db,
+		chunkIDToStoredChunkDataPackIDCache: cache,
+		stored:                              stored,
+		collections:                         collections,
 	}
 	return &ch
 }
@@ -62,25 +75,21 @@ func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
 }
 
 // Store stores multiple ChunkDataPacks in a two-phase process:
-// 1. First phase: Store the actual chunk data pack content in the stored storage layer
-// 2. Second phase: Create index mappings from chunkID to storedChunkDataPackID
-// Note, it does not store the collections, which must be stored separately before storing chunk data packs.
+// 1. First phase: Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+// 2. Second phase: Create index mappings from ChunkID to storedChunkDataPackID in protocol database
 //
-// This method returns a function that must be called within a database transaction
-// to complete the storage process. The returned function handles the indexing phase
-// and should be called with proper lock context and batch writer.
-//
-// Returns:
-//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function to complete the storage process, and this
-//     function might return [storage.ErrDataMismatch] when an existing chunk data pack ID is found for the same chunk ID,
-//     and is different from the one being stored.
-//   - error: Error if the first phase fails
-//
+// The reason it's a two-phase process is that, the chunk data pack and the other execution data are stored in different databases.
 // The two-phase approach ensures that:
-//   - Chunk data pack content is stored atomically in the stored storage layer
-//   - Index mappings are created within the same transaction as other operations
-//   - Cache is properly updated when the transaction commits
-//   - Partial failures don't leave the system in an inconsistent state
+//   - Chunk data pack content is stored atomically in the chunk data pack database
+//   - Index mappings are created within the same atomic batch update in protocol database
+//
+// The Store method returns:
+//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function to index the chunk id with
+//     chunk data pack hash within batch update to store along with other execution data into protocol database,
+//     this function might return [storage.ErrDataMismatch] when an existing chunk data pack ID is found for
+//     the same chunk ID, and is different from the one being stored.
+//     the caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
+//   - error: No error should be returned during normal operation. Any error indicates a failure in the first phase.
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error, error) {
 
@@ -94,14 +103,13 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 		return nil, fmt.Errorf("cannot store chunk data packs: %w", err)
 	}
 
-	// Validate that we received the expected number of IDs
+	// Sanity check: validate that we received the expected number of IDs
 	if len(cs) != len(storedChunkDataPackIDs) {
-		return nil, fmt.Errorf("stored chunk data pack IDs count mismatch: expected: %d, got: %d: %w",
-			len(cs), len(storedChunkDataPackIDs), storage.ErrDataMismatch)
+		return nil, fmt.Errorf("stored chunk data pack IDs count mismatch: expected: %d, got: %d",
+			len(cs), len(storedChunkDataPackIDs))
 	}
 
 	// Phase 2: Create the function that will index chunkID -> storedChunkDataPackID mappings
-	// This function must be called within a database transaction to complete the storage
 	storeChunkDataPacksFunc := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		// Create index mappings for each chunk data pack
 		for i, c := range cs {
@@ -126,7 +134,7 @@ func (ch *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.
 	// First, collect all stored chunk data pack IDs that need to be removed
 	var storedChunkDataPackIDs []flow.Identifier
 	for _, chunkID := range chunkIDs {
-		storedChunkDataPackID, err := ch.byChunkIDCache.Get(batch.GlobalReader(), chunkID) // remove from cache optimistically
+		storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(batch.GlobalReader(), chunkID) // remove from cache optimistically
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				// If we can't find the stored chunk data pack ID, continue with other removals
@@ -150,7 +158,7 @@ func (ch *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.
 	// Remove the chunk data pack ID mappings and update cache
 	for _, chunkID := range chunkIDs {
 		storage.OnCommitSucceed(batch, func() {
-			ch.byChunkIDCache.Remove(chunkID)
+			ch.chunkIDToStoredChunkDataPackIDCache.Remove(chunkID)
 		})
 		err := operation.RemoveChunkDataPackID(batch.Writer(), chunkID)
 		if err != nil {
@@ -160,9 +168,11 @@ func (ch *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.
 	return nil
 }
 
+// ByChunkID returns the chunk data for the given chunk ID.
+// It returns [storage.ErrNotFound] if no entry exists for the given chunk ID.
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	// First, retrieve the stored chunk data pack ID (using cache if available)
-	storedChunkDataPackID, err := ch.byChunkIDCache.Get(ch.db.Reader(), chunkID)
+	storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(ch.db.Reader(), chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack ID for chunk %x: %w", chunkID, err)
 	}
@@ -190,16 +200,4 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	}
 
 	return chdp, nil
-}
-
-// StoreByChunkID stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
-// This is a convenience method that wraps the Store method for backward compatibility.
-func (ch *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
-	storeFunc, err := ch.Store(cs)
-	if err != nil {
-		return err
-	}
-	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return storeFunc(lctx, rw)
-	})
 }

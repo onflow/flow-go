@@ -38,6 +38,8 @@ func NewStoredChunkDataPacks(collector module.CacheMetrics, db storage.DB, byIDC
 	return &ch
 }
 
+// ByID returns the StoredChunkDataPack for the given ID.
+// It returns [storage.ErrNotFound] if no entry exists for the given ID.
 func (ch *StoredChunkDataPacks) ByID(storedChunkDataPackID flow.Identifier) (*storage.StoredChunkDataPack, error) {
 	val, err := ch.byIDCache.Get(ch.db.Reader(), storedChunkDataPackID)
 	if err != nil {
@@ -68,8 +70,9 @@ func (ch *StoredChunkDataPacks) batchRemove(storedChunkDataPackID flow.Identifie
 	return operation.RemoveStoredChunkDataPack(rw.Writer(), storedChunkDataPackID)
 }
 
-// StoreByChunkID stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
-// No errors are expected during normal operation, but it may return generic error
+// StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
+// It returns the IDs of the stored chunk data packs.
+// No error are expected during normal operation.
 func (ch *StoredChunkDataPacks) StoreChunkDataPacks(cs []*storage.StoredChunkDataPack) ([]flow.Identifier, error) {
 	ids := make([]flow.Identifier, 0, len(cs))
 
