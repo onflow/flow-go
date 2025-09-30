@@ -203,7 +203,7 @@ func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
 	}
 
 	// Wrap decompressor in a greedy reader so cbor gets all data at once
-	greedy := bufio.NewReader(comp)
+	greedy := bufio.NewReaderSize(comp, DefaultMaxBlobSize)
 
 	dec := s.codec.NewDecoder(greedy)
 
