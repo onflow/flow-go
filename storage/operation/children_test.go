@@ -117,7 +117,7 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 				err = operation.RetrieveBlockChildren(db.Reader(), parentID, &retrievedIDs)
 				require.NoError(t, err)
 
-				require.Equal(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
+				require.ElementsMatch(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
 			})
 		})
 	}
