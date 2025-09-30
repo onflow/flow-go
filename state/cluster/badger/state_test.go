@@ -14,7 +14,7 @@ import (
 )
 
 // TestUnknownSnapshotReference verifies that AtBlockID returns a snapshot that
-// returns state.ErrUnknownSnapshotReference for all methods when given an unknown block ID.
+// returns [state.ErrUnknownSnapshotReference] for all methods when given an unknown block ID.
 func TestUnknownSnapshotReference(t *testing.T) {
 	// Setup
 	genesis, err := unittest.ClusterBlock.Genesis()
