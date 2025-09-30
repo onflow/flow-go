@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
@@ -13,6 +14,7 @@ import (
 
 func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// insert random events
@@ -34,10 +36,9 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 					Proof:        []byte{'p'},
 					CollectionID: collectionID,
 				}
-				err := operation.InsertChunkDataPack(rw.Writer(), cdp)
-				if err != nil {
-					return err
-				}
+				require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+					return operation.InsertChunkDataPack(lctx, rw, cdp)
+				}))
 			}
 
 			// insert 20 results
