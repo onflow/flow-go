@@ -209,7 +209,6 @@ func TestDirectChildren(t *testing.T) {
 // TestChildrenWrongLockIsRejected verifies that operations fail when called with the wrong lock type.
 // This ensures that IndexNewBlock requires LockInsertBlock and IndexNewClusterBlock requires LockInsertOrFinalizeClusterBlock.
 func TestChildrenWrongLockIsRejected(t *testing.T) {
-
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 
