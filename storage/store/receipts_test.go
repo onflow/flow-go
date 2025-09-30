@@ -26,7 +26,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 	t.Run("get empty", func(t *testing.T) {
 		withStore(t, func(store1 *store.ExecutionReceipts) {
 			block := unittest.BlockFixture()
-			receipts, err := store1.ByBlockID(block.ID())
+			receipts, err := store1.ByBlockID(block.Hash())
 			require.NoError(t, err)
 			require.Equal(t, 0, len(receipts))
 		})
@@ -40,12 +40,12 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			err := store1.Store(receipt1)
 			require.NoError(t, err)
 
-			actual, err := store1.ByID(receipt1.ID())
+			actual, err := store1.ByID(receipt1.Hash())
 			require.NoError(t, err)
 
 			require.Equal(t, receipt1, actual)
 
-			receipts, err := store1.ByBlockID(block.ID())
+			receipts, err := store1.ByBlockID(block.Hash())
 			require.NoError(t, err)
 
 			require.Equal(t, flow.ExecutionReceiptList{receipt1}, receipts)
@@ -68,7 +68,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			err = store1.Store(receipt2)
 			require.NoError(t, err)
 
-			receipts, err := store1.ByBlockID(block.ID())
+			receipts, err := store1.ByBlockID(block.Hash())
 			require.NoError(t, err)
 
 			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1, receipt2}, receipts)
@@ -92,10 +92,10 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			err = store1.Store(receipt2)
 			require.NoError(t, err)
 
-			receipts1, err := store1.ByBlockID(block1.ID())
+			receipts1, err := store1.ByBlockID(block1.Hash())
 			require.NoError(t, err)
 
-			receipts2, err := store1.ByBlockID(block2.ID())
+			receipts2, err := store1.ByBlockID(block2.Hash())
 			require.NoError(t, err)
 
 			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1}, receipts1)
@@ -116,7 +116,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			err = store1.Store(receipt1)
 			require.NoError(t, err)
 
-			receipts, err := store1.ByBlockID(block1.ID())
+			receipts, err := store1.ByBlockID(block1.Hash())
 			require.NoError(t, err)
 
 			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1}, receipts)
@@ -138,7 +138,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			err = store1.Store(receipt2)
 			require.NoError(t, err)
 
-			receipts, err := store1.ByBlockID(block1.ID())
+			receipts, err := store1.ByBlockID(block1.Hash())
 			require.NoError(t, err)
 
 			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1, receipt2}, receipts)

@@ -20,5 +20,5 @@ type IncorporatedResultSeal struct {
 // IncorporatedResultID returns the identifier of the IncorporatedResult
 // associated with the IncorporatedResultSeal.
 func (s *IncorporatedResultSeal) IncorporatedResultID() Identifier {
-	return s.IncorporatedResult.ID()
+	return s.IncorporatedResult.Hash()
 }

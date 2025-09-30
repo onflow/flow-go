@@ -45,7 +45,7 @@ func checkMyCommitWithSealedCommit(
 		// mismatch
 		return fmt.Errorf("execution result is different from the sealed result, height: %v, block_id: %v, sealed_commit: %v, my_commit: %v",
 			executedBlock.Height,
-			executedBlock.ID(),
+			executedBlock.Hash(),
 			sealedCommit,
 			myCommit,
 		)
@@ -53,7 +53,7 @@ func checkMyCommitWithSealedCommit(
 
 	logger.Info().
 		Uint64("height", executedBlock.Height).
-		Str("block_id", executedBlock.ID().String()).
+		Str("block_id", executedBlock.Hash().String()).
 		Msg("execution result matches the sealed result")
 
 	// match
@@ -68,7 +68,7 @@ func (c *Core) RunCheck() error {
 		return err
 	}
 
-	mycommitAtLastSealed, err := c.execState.StateCommitmentByBlockID(lastSealedBlock.ID())
+	mycommitAtLastSealed, err := c.execState.StateCommitmentByBlockID(lastSealedBlock.Hash())
 	if err == nil {
 		// if last sealed block has been executed, then check if they match
 		return checkMyCommitWithSealedCommit(c.log, lastSealedBlock, mycommitAtLastSealed, seal.FinalState)

@@ -143,7 +143,7 @@ func New(params Params) (*Backend, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
 	}
-	systemTxID := systemTx.ID()
+	systemTxID := systemTx.Hash()
 
 	accountsBackend, err := accounts.NewAccountsBackend(
 		params.Log,

@@ -365,7 +365,7 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 		// logging collection id of non-system chunks.
 		// A system chunk has both the collection and collection id set to nil.
 		lg = lg.With().
-			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
+			Hex("collection_id", logging.ID(chunkDataPack.Collection.Hash())).
 			Logger()
 	}
 	lg.Info().Msg("chunk data pack request successfully replied")

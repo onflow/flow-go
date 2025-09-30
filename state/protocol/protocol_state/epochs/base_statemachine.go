@@ -55,8 +55,8 @@ func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer,
 // dysfunctional state and should be discarded.
 func (u *baseStateMachine) Build() (updatedState *flow.EpochStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
-	stateID = updatedState.ID()
-	hasChanges = stateID != u.parentEpochState.ID()
+	stateID = updatedState.Hash()
+	hasChanges = stateID != u.parentEpochState.Hash()
 	return
 }
 

@@ -50,7 +50,7 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 		forest:              forest.NewLevelledForest(lastSealed.Height),
 		lock:                sync.RWMutex{},
 		createCollector:     createCollector,
-		lastSealedID:        lastSealed.ID(),
+		lastSealedID:        lastSealed.Hash(),
 		lastFinalizedHeight: lastSealed.Height,
 		lastSealedHeight:    lastSealed.Height,
 		headers:             headers,
@@ -90,13 +90,13 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 
 	// STEP 1: orphan forks in the AssignmentCollectorTree whose results are
 	// for blocks that are conflicting with the finalized blocks
-	t.lastSealedID = sealed.ID()
+	t.lastSealedID = sealed.Hash()
 	for height := finalized.Height; height > t.lastFinalizedHeight; height-- {
 		finalizedBlock, err := t.headers.ByHeight(height)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", height, err)
 		}
-		finalizedBlockID := finalizedBlock.ID()
+		finalizedBlockID := finalizedBlock.Hash()
 		iter := t.forest.GetVerticesAtLevel(height)
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
@@ -230,7 +230,7 @@ type LazyInitCollector struct {
 
 // GetOrCreateCollector performs lazy initialization of AssignmentCollector using double-checked locking.
 func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionResult) (*LazyInitCollector, error) {
-	resultID := result.ID()
+	resultID := result.Hash()
 	// first let's check if we have a collector already
 	cachedCollector := t.GetCollector(resultID)
 	if cachedCollector != nil {

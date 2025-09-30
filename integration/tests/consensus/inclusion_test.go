@@ -116,7 +116,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	signerIndices, err := signature.EncodeSignersToIndices(clusterCommittee, clusterCommittee)
 	require.NoError(t, err)
 	sentinel.SignerIndices = signerIndices
-	sentinel.ReferenceBlockID = is.net.Root().ID()
+	sentinel.ReferenceBlockID = is.net.Root().Hash()
 	sentinel.ClusterChainID = is.net.BootstrapData.ClusterRootBlocks[0].ChainID
 	colID := sentinel.CollectionID
 
@@ -129,7 +129,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	proposal := is.waitUntilCollectionIncludeInProposal(deadline, sentinel)
 
-	is.T().Logf("collection guarantee %x included in a proposal %x\n", colID, proposal.ToHeader().ID())
+	is.T().Logf("collection guarantee %x included in a proposal %x\n", colID, proposal.ToHeader().Hash())
 
 	is.waitUntilProposalConfirmed(deadline, sentinel, proposal)
 
@@ -209,7 +209,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		// check if the collection guarantee is included
 		for _, guarantee := range guarantees {
 			if guarantee.CollectionID == sentinel.CollectionID {
-				proposalID := block.ID()
+				proposalID := block.Hash()
 				is.T().Logf("%x: collection guarantee %x included!\n", proposalID, colID)
 				return &block
 			}
@@ -227,7 +227,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 	// we try to find a block with the guarantee included and three confirmations
 	confirmations := make(map[flow.Identifier]uint)
 	// add the proposal that includes the guarantee
-	confirmations[block.ID()] = 0
+	confirmations[block.Hash()] = 0
 
 	for time.Now().Before(deadline) {
 
@@ -246,7 +246,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		nextBlock := proposal.Block
 
 		// check if the proposal was already processed
-		proposalID := nextBlock.ID()
+		proposalID := nextBlock.Hash()
 		is.T().Logf("proposal %v received from %v", proposalID, originID)
 
 		_, processed := confirmations[proposalID]

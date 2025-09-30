@@ -85,7 +85,7 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 		return nil, err
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedBlockID := sealed.Hash()
 	account, err := a.provider.GetAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
@@ -124,7 +124,7 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 		return 0, err
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedBlockID := sealed.Hash()
 	balance, err := a.provider.GetAccountBalanceAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedBlockID)
@@ -167,7 +167,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 		return nil, err
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedBlockID := sealed.Hash()
 	key, err := a.provider.GetAccountKeyAtBlock(ctx, address, keyIndex, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", sealedBlockID)
@@ -210,7 +210,7 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 		return nil, err
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedBlockID := sealed.Hash()
 	keys, err := a.provider.GetAccountKeysAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)

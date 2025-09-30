@@ -7,7 +7,7 @@ import (
 )
 
 // ClusterPrefixedMessagesReceivedRecord cache record that keeps track of the amount of cluster prefixed control messages received from a peer.
-// This struct implements the flow.Entity interface and uses  node ID of the sender for deduplication.
+// This struct implements the flow.Hashable interface and uses  node ID of the sender for deduplication.
 type ClusterPrefixedMessagesReceivedRecord struct {
 	// NodeID the node ID of the sender.
 	NodeID flow.Identifier

@@ -98,7 +98,7 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf(
 		"Fetched block header: %s (height %d)",
-		header.ID(),
+		header.Hash(),
 		blockHeight,
 	)
 

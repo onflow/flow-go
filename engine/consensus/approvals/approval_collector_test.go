@@ -53,10 +53,10 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_SealResult() {
 	s.sealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
-			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
-			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+			require.Equal(s.T(), s.Block.Hash(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.Hash(), seal.Seal.ResultID)
 			require.Equal(s.T(), s.IncorporatedResult.Result.BlockID, seal.Seal.BlockID)
-			require.Equal(s.T(), seal.Seal.BlockID, seal.Header.ID())
+			require.Equal(s.T(), seal.Seal.BlockID, seal.Header.Hash())
 		},
 	).Return(true, nil).Once()
 

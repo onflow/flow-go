@@ -98,7 +98,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, err
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
+	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(latestHeader.Hash(), latestHeader.Height, script, arguments))
 	return res, err
 }
 
@@ -138,6 +138,6 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		return nil, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
 	}
 
-	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
+	res, _, err := b.executor.Execute(ctx, executor.NewScriptExecutionRequest(header.Hash(), blockHeight, script, arguments))
 	return res, err
 }

@@ -13,7 +13,7 @@ func HeadersFromMap(headerDB map[flow.Identifier]*flow.Header) *storage.Headers 
 	headers := &storage.Headers{}
 	headers.On("Store", mock.Anything).Return(
 		func(header *flow.Header) error {
-			headerDB[header.ID()] = header
+			headerDB[header.Hash()] = header
 			return nil
 		},
 	)

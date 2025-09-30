@@ -64,8 +64,8 @@ func NewCollectionGuarantee(untrusted UntrustedCollectionGuarantee) (*Collection
 	}, nil
 }
 
-// ID returns a collision-resistant hash of the CollectionGuarantee struct.
+// Hash returns a collision-resistant hash of the CollectionGuarantee struct.
 // This is distinct from the ID of the corresponding collection.
-func (cg *CollectionGuarantee) ID() Identifier {
+func (cg *CollectionGuarantee) Hash() Identifier {
 	return MakeID(cg)
 }

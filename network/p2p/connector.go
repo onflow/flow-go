@@ -77,7 +77,7 @@ type ConnectorHost interface {
 	// 	error if there is any error while closing the connection to the given peer.ID. All errors are benign.
 	ClosePeer(peerId peer.ID) error
 
-	// ID returns the peer.ID of the underlying host.
+	// Hash returns the peer.ID of the underlying host.
 	// Returns:
 	// 	peer.ID of the underlying host.
 	ID() peer.ID

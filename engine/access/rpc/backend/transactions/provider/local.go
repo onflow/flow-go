@@ -84,7 +84,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 	transactionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
 	if err != nil {
 		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
@@ -157,7 +157,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	index uint32,
 	eventEncoding entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 	txResult, err := t.txResultsIndex.ByBlockIDTransactionIndex(blockID, block.Height, index)
 	if err != nil {
 		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
@@ -230,7 +230,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 	block *flow.Block,
 ) ([]*flow.TransactionBody, error) {
 	var transactions []*flow.TransactionBody
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := t.collections.ByID(guarantee.CollectionID)
@@ -277,7 +277,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 	txResults, err := t.txResultsIndex.ByBlockID(blockID, block.Height)
 	if err != nil {
 		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
@@ -364,7 +364,7 @@ func (t *LocalTransactionProvider) SystemTransaction(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	blockID := block.ID()
+	blockID := block.Hash()
 
 	if txID == t.systemTxID || !t.scheduledCallbacksEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
@@ -372,7 +372,7 @@ func (t *LocalTransactionProvider) SystemTransaction(
 			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
 		}
 
-		if txID == systemTx.ID() {
+		if txID == systemTx.Hash() {
 			return systemTx, nil
 		}
 		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
@@ -389,7 +389,7 @@ func (t *LocalTransactionProvider) SystemTransaction(
 	}
 
 	for _, tx := range sysCollection.Transactions {
-		if tx.ID() == txID {
+		if tx.Hash() == txID {
 			return tx, nil
 		}
 	}

@@ -21,10 +21,10 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *accessmodel.Transacti
 	t.Expandable = &TransactionExpandable{}
 	if txr != nil {
 		var txResult TransactionResult
-		txResult.Build(txr, tx.ID(), link)
+		txResult.Build(txr, tx.Hash(), link)
 		t.Result = &txResult
 	} else {
-		resultLink, _ := link.TransactionResultLink(tx.ID())
+		resultLink, _ := link.TransactionResultLink(tx.Hash())
 		t.Expandable.Result = resultLink
 	}
 
@@ -37,7 +37,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *accessmodel.Transacti
 	var proposalKey ProposalKey
 	proposalKey.Build(tx.ProposalKey)
 
-	t.Id = tx.ID().String()
+	t.Id = tx.Hash().String()
 	t.Script = util.ToBase64(tx.Script)
 	t.Arguments = args
 	t.ReferenceBlockId = tx.ReferenceBlockID.String()
@@ -48,7 +48,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *accessmodel.Transacti
 	t.PayloadSignatures = payloadSigs
 	t.EnvelopeSignatures = envelopeSigs
 
-	self, _ := SelfLink(tx.ID(), link.TransactionLink)
+	self, _ := SelfLink(tx.Hash(), link.TransactionLink)
 	t.Links = self
 }
 

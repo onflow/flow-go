@@ -248,7 +248,7 @@ func (s *ExecutionDataPruningSuite) checkResults(
 		header, err := headers.ByHeight(i)
 		require.NoError(s.T(), err, "%s: could not get header", s.accessNodeName)
 
-		result, err := anResults.ByBlockID(header.ID())
+		result, err := anResults.ByBlockID(header.Hash())
 		require.NoError(s.T(), err, "%s: could not get sealed result", s.accessNodeName)
 
 		var blobNotFoundError *execution_data.BlobNotFoundError
@@ -258,7 +258,7 @@ func (s *ExecutionDataPruningSuite) checkResults(
 		require.Error(s.T(), err, "%s: could not prune execution data for height %v", s.accessNodeName, i)
 		require.ErrorAs(s.T(), err, &blobNotFoundError)
 
-		result, err = onResults.ByID(result.ID())
+		result, err = onResults.ByID(result.Hash())
 		require.NoError(s.T(), err, "%s: could not get sealed result from ON`s storage", s.observerNodeName)
 
 		// verify ON execution data

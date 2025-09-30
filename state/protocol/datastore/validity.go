@@ -32,20 +32,20 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 
 	highest := segment.Highest() // reference block of the snapshot
 	lowest := segment.Sealed()   // last sealed block
-	highestID := highest.ID()
-	lowestID := lowest.ID()
+	highestID := highest.Hash()
+	lowestID := lowest.Hash()
 
 	if result.BlockID != lowestID {
-		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest.ID())
+		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest.Hash())
 	}
 
 	if seal.BlockID != lowestID {
-		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, lowest.ID())
+		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, lowest.Hash())
 	}
 
 	if verifyResultID {
-		if seal.ResultID != result.ID() {
-			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+		if seal.ResultID != result.Hash() {
+			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.Hash())
 		}
 	}
 

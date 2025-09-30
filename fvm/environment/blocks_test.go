@@ -52,15 +52,15 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		header4 := unittest.BlockHeaderWithParentFixture(header3)
 		header5 := unittest.BlockHeaderWithParentFixture(header4)
 
-		headers.On("ByBlockID", header4.ID()).Return(header4, nil)
+		headers.On("ByBlockID", header4.Hash()).Return(header4, nil)
 		headers.On("ByHeight", uint64(4)).Return(nil, storage.ErrNotFound)
-		headers.On("ByBlockID", header3.ID()).Return(header3, nil)
+		headers.On("ByBlockID", header3.Hash()).Return(header3, nil)
 		headers.On("ByHeight", uint64(3)).Return(nil, storage.ErrNotFound)
-		headers.On("ByBlockID", header2.ID()).Return(header2, nil)
+		headers.On("ByBlockID", header2.Hash()).Return(header2, nil)
 		headers.On("ByHeight", uint64(2)).Return(nil, storage.ErrNotFound)
-		headers.On("ByBlockID", header1.ID()).Return(header1, nil)
+		headers.On("ByBlockID", header1.Hash()).Return(header1, nil)
 		headers.On("ByHeight", uint64(1)).Return(nil, storage.ErrNotFound)
-		headers.On("ByBlockID", header0.ID()).Return(header0, nil)
+		headers.On("ByBlockID", header0.Hash()).Return(header0, nil)
 		//headers.On("ByHeight", uint64(0)).Return(nil, storage.ErrNotFound)
 
 		heightFrom, err := blockFinder.ByHeightFrom(0, header5)
@@ -78,9 +78,9 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		header4 := unittest.BlockHeaderWithParentFixture(header3)
 		header5 := unittest.BlockHeaderWithParentFixture(header4)
 
-		headers.On("ByBlockID", header4.ID()).Return(header4, nil)
+		headers.On("ByBlockID", header4.Hash()).Return(header4, nil)
 		headers.On("ByHeight", uint64(4)).Return(nil, storage.ErrNotFound)
-		headers.On("ByBlockID", header3.ID()).Return(header3, nil)
+		headers.On("ByBlockID", header3.Hash()).Return(header3, nil)
 		headers.On("ByHeight", uint64(3)).Return(header3, nil)
 		headers.On("ByHeight", uint64(0)).Return(header0, nil)
 

@@ -73,7 +73,7 @@ func NewOneshotExecutionDataRequester(
 	blockHeader *flow.Header,
 	config OneshotExecutionDataConfig,
 ) (*OneshotExecutionDataRequester, error) {
-	if blockHeader.ID() != executionResult.BlockID {
+	if blockHeader.Hash() != executionResult.BlockID {
 		return nil, fmt.Errorf("block id and execution result mismatch")
 	}
 

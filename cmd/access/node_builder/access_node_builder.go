@@ -893,9 +893,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 					checkpointHeight := builder.SealedRootBlock.Height
 
-					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+					if builder.SealedRootBlock.Hash() != builder.RootSeal.BlockID {
 						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
-							builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+							builder.SealedRootBlock.Hash(), builder.RootSeal.BlockID)
 					}
 
 					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
@@ -2205,7 +2205,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				channels.RequestCollections,
 				filter.HasRole[flow.Identity](flow.RoleCollection),
-				func() flow.Entity { return new(flow.Collection) },
+				func() flow.Hashable { return new(flow.Collection) },
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)

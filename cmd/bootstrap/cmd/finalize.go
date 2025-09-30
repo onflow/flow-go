@@ -233,16 +233,16 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not load sealed result")
 	}
 
-	if savedSeal.ID() != seal.ID() {
-		log.Fatal().Msgf("inconsistent seralization of the root seal: %v != %v", savedSeal.ID(), seal.ID())
+	if savedSeal.Hash() != seal.Hash() {
+		log.Fatal().Msgf("inconsistent seralization of the root seal: %v != %v", savedSeal.Hash(), seal.Hash())
 	}
 
-	if savedResult.ID() != result.ID() {
-		log.Fatal().Msgf("inconsistent seralization of the root result: %v != %v", savedResult.ID(), result.ID())
+	if savedResult.Hash() != result.Hash() {
+		log.Fatal().Msgf("inconsistent seralization of the root result: %v != %v", savedResult.Hash(), result.Hash())
 	}
 
-	if savedSeal.ResultID != savedResult.ID() {
-		log.Fatal().Msgf("mismatch saved seal's resultID  %v and result %v", savedSeal.ResultID, savedResult.ID())
+	if savedSeal.ResultID != savedResult.Hash() {
+		log.Fatal().Msgf("mismatch saved seal's resultID  %v and result %v", savedSeal.ResultID, savedResult.Hash())
 	}
 
 	log.Info().Msg("saved result and seal are matching")
@@ -305,7 +305,7 @@ func readRootBlockVotes() []*hotstuff.Vote {
 		}
 
 		votes = append(votes, &vote)
-		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.ID(), vote.BlockID, vote.SignerID)
+		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.Hash(), vote.BlockID, vote.SignerID)
 	}
 	return votes
 }

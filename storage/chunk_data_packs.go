@@ -47,7 +47,7 @@ func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 
 	if c.Collection != nil {
 		// non system chunk
-		sc.CollectionID = c.Collection.ID()
+		sc.CollectionID = c.Collection.Hash()
 	} else {
 		sc.SystemChunk = true
 	}

@@ -288,7 +288,7 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	)
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
 	require.NoError(t, err)
-	epochProtocolStateID := minEpochStateEntry.ID()
+	epochProtocolStateID := minEpochStateEntry.Hash()
 	safetyParams, err := protocol.DefaultEpochSafetyParams(rootHeaderBody.ChainID)
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
@@ -296,7 +296,7 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	root, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
 			HeaderBody: rootHeaderBody,
-			Payload:    flow.Payload{ProtocolStateID: rootProtocolState.ID()},
+			Payload:    flow.Payload{ProtocolStateID: rootProtocolState.Hash()},
 		},
 	)
 	require.NoError(t, err)

@@ -39,7 +39,7 @@ func NewEpochCommits(collector module.CacheMetrics, db storage.DB) *EpochCommits
 }
 
 func (ec *EpochCommits) BatchStore(rw storage.ReaderBatchWriter, commit *flow.EpochCommit) error {
-	return ec.cache.PutTx(rw, commit.ID(), commit)
+	return ec.cache.PutTx(rw, commit.Hash(), commit)
 }
 
 func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) (*flow.EpochCommit, error) {

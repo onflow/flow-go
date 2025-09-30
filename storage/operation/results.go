@@ -13,7 +13,7 @@ import (
 //
 // No errors are expected during normal operation.
 func InsertExecutionResult(w storage.Writer, result *flow.ExecutionResult) error {
-	return UpsertByKey(w, MakePrefix(codeExecutionResult, result.ID()), result)
+	return UpsertByKey(w, MakePrefix(codeExecutionResult, result.Hash()), result)
 }
 
 // RetrieveExecutionResult retrieves an Execution Result by its ID.

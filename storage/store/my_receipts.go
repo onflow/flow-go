@@ -68,7 +68,7 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.Executio
 // Expected error returns during *normal* operations:
 //   - `storage.ErrDataMismatch` if a *different* receipt has already been indexed for the same block
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *flow.ExecutionReceipt, rw storage.ReaderBatchWriter) error {
-	receiptID := receipt.ID()
+	receiptID := receipt.Hash()
 	blockID := receipt.ExecutionResult.BlockID
 
 	if lctx == nil || !lctx.HoldsLock(storage.LockInsertOwnReceipt) {

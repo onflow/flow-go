@@ -254,7 +254,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		unittest.ClusterBlock.WithParent(parent),
 		unittest.ClusterBlock.WithProposerID(s.myID),
 	)
-	s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
+	s.payloads.On("ByBlockID", block.Hash()).Return(&block.Payload, nil)
 	s.payloads.On("ByBlockID", mock.Anything).Return(nil, storerr.ErrNotFound)
 
 	s.Run("should fail with wrong proposer", func() {
@@ -346,7 +346,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 			unittest.ClusterBlock.WithParent(s.head),
 			unittest.ClusterBlock.WithProposerID(s.myID),
 		)
-		s.payloads.On("ByBlockID", block.ID()).Return(&block.Payload, nil)
+		s.payloads.On("ByBlockID", block.Hash()).Return(&block.Payload, nil)
 		proposal := unittest.ProposalHeaderFromHeader(block.ToHeader())
 
 		// unset chain and height to make sure they are correctly reconstructed

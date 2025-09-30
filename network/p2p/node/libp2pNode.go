@@ -295,7 +295,7 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	return stream, nil
 }
 
-// ID returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
+// Hash returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
 // For other libp2p nodes, the current node is identified by this ID.
 func (n *Node) ID() peer.ID {
 	return n.host.ID()

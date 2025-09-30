@@ -70,7 +70,7 @@ func newPendingBlock(
 		// behaviour on a real network, where views are not consecutive
 		view:               prevBlock.View + uint64(rand.Intn(MaxViewIncrease)+1),
 		chainID:            chainID,
-		parentID:           prevBlock.ID(),
+		parentID:           prevBlock.Hash(),
 		timestamp:          timestamp,
 		transactions:       make(map[flowgo.Identifier]*flowgo.TransactionBody),
 		transactionIDs:     make([]flowgo.Identifier, 0),
@@ -92,7 +92,7 @@ func (b *pendingBlock) Block() *flowgo.Block {
 	guarantees := make([]*flowgo.CollectionGuarantee, len(collections))
 	for i, collection := range collections {
 		guarantees[i] = &flowgo.CollectionGuarantee{
-			CollectionID: collection.ID(),
+			CollectionID: collection.Hash(),
 		}
 	}
 
@@ -141,8 +141,8 @@ func (b *pendingBlock) Finalize() *snapshot.ExecutionSnapshot {
 
 // AddTransaction adds a transaction to the pending block.
 func (b *pendingBlock) AddTransaction(tx flowgo.TransactionBody) {
-	b.transactionIDs = append(b.transactionIDs, tx.ID())
-	b.transactions[tx.ID()] = &tx
+	b.transactionIDs = append(b.transactionIDs, tx.Hash())
+	b.transactions[tx.Hash()] = &tx
 }
 
 // ContainsTransaction checks if a transaction is included in the pending block.
@@ -200,7 +200,7 @@ func (b *pendingBlock) ExecuteNextTransaction(
 		return fvm.ProcedureOutput{}, err
 	}
 
-	b.transactionResults[txnBody.ID()] = IndexedTransactionResult{
+	b.transactionResults[txnBody.Hash()] = IndexedTransactionResult{
 		ProcedureOutput: output,
 		Index:           txnIndex,
 	}

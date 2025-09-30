@@ -125,7 +125,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(uint64(i + 1)), // avoiding edge case of height = 0 (genesis block)
 		)
-		id := block.ID()
+		id := block.Hash()
 		blockIDs[i] = id[:]
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
 		eventMessages := make([]*entities.Event, eventsPerBlock)
@@ -384,8 +384,8 @@ func (suite *Suite) TestGetTransactionResult() {
 	totalEvents := 10
 	block := unittest.BlockFixture()
 	tx := unittest.TransactionFixture()
-	bID := block.ID()
-	txID := tx.ID()
+	bID := block.Hash()
+	txID := tx.Hash()
 	txIndex := rand.Uint32()
 
 	// setup the events storage mock
@@ -712,10 +712,10 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	totalEvents := 10
 	block := unittest.BlockFixture()
 	tx := unittest.TransactionFixture()
-	bID := block.ID()
+	bID := block.Hash()
 	nonexistingBlockID := unittest.IdentifierFixture()
-	tx1ID := tx.ID()
-	tx2ID := tx.ID()
+	tx1ID := tx.Hash()
+	tx2ID := tx.Hash()
 	//txIndex := rand.Uint32()
 
 	// setup the events storage mock
@@ -920,8 +920,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 func (suite *Suite) TestGetTransactionErrorMessage() {
 	block := unittest.BlockFixture()
 	tx := unittest.TransactionFixture()
-	bID := block.ID()
-	txID := tx.ID()
+	bID := block.Hash()
+	txID := tx.Hash()
 	txIndex := rand.Uint32()
 
 	// create the handler
@@ -1208,11 +1208,11 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 func (suite *Suite) TestGetTransactionErrorMessagesByBlockID() {
 	block := unittest.BlockFixture()
 	tx := unittest.TransactionFixture()
-	bID := block.ID()
+	bID := block.Hash()
 	nonexistingBlockID := unittest.IdentifierFixture()
-	tx1ID := tx.ID()
-	tx2ID := tx.ID()
-	tx3ID := tx.ID()
+	tx1ID := tx.Hash()
+	tx2ID := tx.Hash()
+	tx3ID := tx.Hash()
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {

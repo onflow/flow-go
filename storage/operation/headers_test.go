@@ -28,13 +28,13 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 			},
 			PayloadHash: flow.Identifier{0x22},
 		}
-		blockID := expected.ID()
+		blockID := expected.Hash()
 
 		lockManager := storage.NewTestingLockManager()
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+				return operation.InsertHeader(lctx, rw, expected.Hash(), expected)
 			})
 		})
 		require.NoError(t, err)

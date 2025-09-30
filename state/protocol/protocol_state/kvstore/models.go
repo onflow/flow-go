@@ -63,8 +63,8 @@ type Modelv0 struct {
 var _ protocol_state.KVStoreAPI = (*Modelv0)(nil)
 var _ protocol_state.KVStoreMutator = (*Modelv0)(nil)
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
-func (model *Modelv0) ID() flow.Identifier {
+// Hash returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv0) Hash() flow.Identifier {
 	return makeVersionedModelID(model)
 }
 
@@ -190,8 +190,8 @@ type Modelv1 struct {
 var _ protocol_state.KVStoreAPI = (*Modelv1)(nil)
 var _ protocol_state.KVStoreMutator = (*Modelv1)(nil)
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
-func (model *Modelv1) ID() flow.Identifier {
+// Hash returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv1) Hash() flow.Identifier {
 	return makeVersionedModelID(model)
 }
 
@@ -249,8 +249,8 @@ type Modelv2 struct {
 	Modelv1
 }
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
-func (model *Modelv2) ID() flow.Identifier {
+// Hash returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv2) Hash() flow.Identifier {
 	return makeVersionedModelID(model)
 }
 
@@ -316,8 +316,8 @@ type Modelv3 struct {
 	CadenceComponentVersion     protocol.UpdatableField[protocol.MagnitudeVersion]
 }
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
-func (model *Modelv3) ID() flow.Identifier {
+// Hash returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv3) Hash() flow.Identifier {
 	return makeVersionedModelID(model)
 }
 

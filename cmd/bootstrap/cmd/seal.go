@@ -36,8 +36,8 @@ func constructRootResultAndSeal(
 		log.Fatal().Err(err).Msg("could not generate root seal")
 	}
 
-	if seal.ResultID != result.ID() {
-		log.Fatal().Msgf("root block seal (%v) mismatch with result id: (%v)", seal.ResultID, result.ID())
+	if seal.ResultID != result.Hash() {
+		log.Fatal().Msgf("root block seal (%v) mismatch with result id: (%v)", seal.ResultID, result.Hash())
 	}
 
 	return result, seal

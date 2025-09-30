@@ -161,7 +161,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	if height == b.sporkRootBlockHeight {
 		return &execution_data.BlockExecutionDataEntity{
 			BlockExecutionData: &execution_data.BlockExecutionData{
-				BlockID: b.state.Params().SporkRootBlock().ID(),
+				BlockID: b.state.Params().SporkRootBlock().Hash(),
 			},
 		}, nil
 	}

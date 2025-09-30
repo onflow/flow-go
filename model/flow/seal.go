@@ -21,7 +21,7 @@ import (
 // be processed in the context of the block, which contains it.
 //
 // (2) Even though seals are not strictly entities, they still implement the
-// Entity interface. This allows us to store and retrieve seals individually.
+// Hashable interface. This allows us to store and retrieve seals individually.
 // CAUTION: As seals are part of the block payload, their _exact_ content must
 // be preserved by the storage system. This includes the exact list of approval
 // signatures (incl. order). While it is possible to construct different valid
@@ -79,6 +79,7 @@ func NewSeal(untrusted UntrustedSeal) (*Seal, error) {
 	}, nil
 }
 
-func (s Seal) ID() Identifier {
+// Hash returns a unique identifier for the Seal.
+func (s Seal) Hash() Identifier {
 	return MakeID(s)
 }

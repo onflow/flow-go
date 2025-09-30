@@ -19,13 +19,13 @@ func TestTransactions(t *testing.T) {
 		// storing a tx
 		expected := unittest.TransactionBodyFixture()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertTransaction(rw.Writer(), expected.ID(), &expected)
+			return operation.UpsertTransaction(rw.Writer(), expected.Hash(), &expected)
 		})
 		require.NoError(t, err)
 
 		// verify can be retrieved
 		var actual flow.TransactionBody
-		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual)
+		err = operation.RetrieveTransaction(db.Reader(), expected.Hash(), &actual)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 
@@ -36,12 +36,12 @@ func TestTransactions(t *testing.T) {
 
 		// delete
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.RemoveTransaction(rw.Writer(), expected.ID())
+			return operation.RemoveTransaction(rw.Writer(), expected.Hash())
 		})
 		require.NoError(t, err)
 
 		// verify has been deleted
-		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual)
+		err = operation.RetrieveTransaction(db.Reader(), expected.Hash(), &actual)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 

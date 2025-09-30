@@ -34,7 +34,7 @@ func (f *sealFactory) WithResult(result *flow.ExecutionResult) func(*flow.Seal) 
 		if err != nil {
 			panic("missing first execution result's final state commitment")
 		}
-		seal.ResultID = result.ID()
+		seal.ResultID = result.Hash()
 		seal.BlockID = result.BlockID
 		seal.FinalState = finalState
 		seal.AggregatedApprovalSigs = Seal.AggregatedSignatureFixtures(len(result.Chunks))
@@ -49,7 +49,7 @@ func (f *sealFactory) WithBlockID(blockID flow.Identifier) func(*flow.Seal) {
 
 func (f *sealFactory) WithBlock(block *flow.Header) func(*flow.Seal) {
 	return func(seal *flow.Seal) {
-		seal.BlockID = block.ID()
+		seal.BlockID = block.Hash()
 	}
 }
 

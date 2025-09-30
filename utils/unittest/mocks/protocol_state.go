@@ -111,7 +111,7 @@ func (ps *ProtocolState) AtHeight(height uint64) protocol.Snapshot {
 		snapshot.On("Head").Return(block.ToHeader(), nil)
 		mocked := snapshot.On("Descendants")
 		mocked.RunFn = func(args mock.Arguments) {
-			pendings := pending(ps, block.ID())
+			pendings := pending(ps, block.Hash())
 			mocked.ReturnArguments = mock.Arguments{pendings, nil}
 		}
 
@@ -132,7 +132,7 @@ func (ps *ProtocolState) Final() protocol.Snapshot {
 
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Head").Return(final.ToHeader(), nil)
-	finalID := final.ID()
+	finalID := final.Hash()
 	mocked := snapshot.On("Descendants")
 	mocked.RunFn = func(args mock.Arguments) {
 		// not concurrent safe
@@ -177,11 +177,11 @@ func (m *ProtocolState) Bootstrap(root *flow.Block, result *flow.ExecutionResult
 	m.Lock()
 	defer m.Unlock()
 
-	if _, ok := m.blocks[root.ID()]; ok {
+	if _, ok := m.blocks[root.Hash()]; ok {
 		return storage.ErrAlreadyExists
 	}
 
-	m.blocks[root.ID()] = root
+	m.blocks[root.Hash()] = root
 	m.root = root
 	m.result = result
 	m.seal = seal
@@ -194,7 +194,7 @@ func (m *ProtocolState) Extend(block *flow.Block) error {
 	m.Lock()
 	defer m.Unlock()
 
-	id := block.ID()
+	id := block.Hash()
 	if _, ok := m.blocks[id]; ok {
 		return storage.ErrAlreadyExists
 	}

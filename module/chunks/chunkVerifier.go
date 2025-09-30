@@ -153,7 +153,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// TODO check the number of transactions and computation used
 
 	chIndex := chunk.Index
-	execResID := result.ID()
+	execResID := result.Hash()
 
 	if chunkDataPack == nil {
 		return nil, fmt.Errorf("missing chunk data pack")
@@ -298,11 +298,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if chunk.EventCollection != eventsHash {
 		collectionID := ""
 		if chunkDataPack.Collection != nil {
-			collectionID = chunkDataPack.Collection.ID().String()
+			collectionID = chunkDataPack.Collection.Hash().String()
 		}
 		for i, event := range events {
 			fcv.logger.Warn().Int("list_index", i).
-				Str("event_id", event.ID().String()).
+				Str("event_id", event.Hash().String()).
 				Hex("event_fingerprint", fingerprint.Fingerprint(event)).
 				Str("event_type", string(event.Type)).
 				Str("event_tx_id", event.TransactionID.String()).
@@ -311,7 +311,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				Bytes("event_payload", event.Payload).
 				Str("block_id", chunk.BlockID.String()).
 				Str("collection_id", collectionID).
-				Str("result_id", result.ID().String()).
+				Str("result_id", result.Hash().String()).
 				Uint64("chunk_index", chunk.Index).
 				Msg("not matching events debug")
 		}

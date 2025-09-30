@@ -57,7 +57,7 @@ func (s *BeaconKeyRecoverySuite) SetupTest() {
 	s.nextEpochCounter = uint64(1)
 	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 		entry.NextEpochCommit.Counter = s.nextEpochCounter
-		entry.NextEpoch.CommitID = entry.NextEpochCommit.ID()
+		entry.NextEpoch.CommitID = entry.NextEpochCommit.Hash()
 	})
 	s.nextEpochCommit = entry.NextEpochCommit
 

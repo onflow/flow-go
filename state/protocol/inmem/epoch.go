@@ -240,7 +240,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 	rootQC, err := flow.NewQuorumCertificate(flow.UntrustedQuorumCertificate{
 		View:          rootBlock.View,
-		BlockID:       rootBlock.ID(),
+		BlockID:       rootBlock.Hash(),
 		SignerIndices: signerIndices,
 		SigData:       rootQCVoteData.SigData,
 	})

@@ -90,12 +90,12 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 
 	dbUpdates := deferred.NewDeferredBlockPersist()
 	block3View := block2.View + 1
-	updatedStateId, err := mutableProtocolState.EvolveState(dbUpdates, block2.ID(), block3View, seals)
+	updatedStateId, err := mutableProtocolState.EvolveState(dbUpdates, block2.Hash(), block3View, seals)
 	require.NoError(t, err)
 	require.False(t, dbUpdates.IsEmpty())
 
 	block3 := BlockFixture(
-		Block.WithParent(block2.ID(), block2.View, block2.Height),
+		Block.WithParent(block2.Hash(), block2.View, block2.Height),
 		Block.WithPayload(
 			flow.Payload{
 				Seals:           seals,
@@ -112,6 +112,6 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 func InsertAndFinalize(t *testing.T, st protocol.ParticipantState, block *flow.Block) {
 	err := st.Extend(context.Background(), ProposalFromBlock(block))
 	require.NoError(t, err)
-	err = st.Finalize(context.Background(), block.ID())
+	err = st.Finalize(context.Background(), block.Hash())
 	require.NoError(t, err)
 }

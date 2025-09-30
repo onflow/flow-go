@@ -111,8 +111,8 @@ func (t *TimeoutCertificate) Equals(other *TimeoutCertificate) bool {
 		bytes.Equal(t.SigData, other.SigData)
 }
 
-// ID returns the TimeoutCertificate's identifier
-func (t *TimeoutCertificate) ID() Identifier {
+// Hash returns the TimeoutCertificate's identifier
+func (t *TimeoutCertificate) Hash() Identifier {
 	if t == nil {
 		return ZeroID
 	}

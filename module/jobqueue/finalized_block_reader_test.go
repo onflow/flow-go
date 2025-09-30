@@ -33,7 +33,7 @@ func TestBlockReader(t *testing.T) {
 
 			retrieved, err := jobqueue.JobToBlock(job)
 			require.NoError(t, err)
-			require.Equal(t, actual.ID(), retrieved.ID())
+			require.Equal(t, actual.Hash(), retrieved.Hash())
 		}
 	})
 }
@@ -66,7 +66,7 @@ func withReader(
 		require.NoError(t, err)
 		protocolState, err := s.State.Final().ProtocolState()
 		require.NoError(t, err)
-		protocolStateID := protocolState.ID()
+		protocolStateID := protocolState.Hash()
 
 		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(10)

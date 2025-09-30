@@ -56,7 +56,7 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
 		status, exists := backdata.Get(request.ChunkID)
-		chunkLocatorID := request.Locator.ID()
+		chunkLocatorID := request.Locator.Hash()
 
 		if !exists {
 			locators := make(chunks.LocatorMap)

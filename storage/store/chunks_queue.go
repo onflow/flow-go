@@ -34,7 +34,7 @@ func newChunkLocatorCache(collector module.CacheMetrics) *Cache[uint64, *chunks.
 			return fmt.Errorf("failed to insert chunk locator: %w", err)
 		}
 
-		err = operation.InsertJobAtIndex(rw.Writer(), JobQueueChunksQueue, index, locator.ID())
+		err = operation.InsertJobAtIndex(rw.Writer(), JobQueueChunksQueue, index, locator.Hash())
 		if err != nil {
 			return fmt.Errorf("failed to set job index for chunk locator queue at index %v: %w", index, err)
 		}
@@ -128,7 +128,7 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 	}
 
 	// make sure the chunk locator is unique
-	exists, err := operation.ExistChunkLocator(q.db.Reader(), locator.ID())
+	exists, err := operation.ExistChunkLocator(q.db.Reader(), locator.Hash())
 	if err != nil {
 		return false, fmt.Errorf("failed to check chunk locator existence: %w", err)
 	}

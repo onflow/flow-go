@@ -25,7 +25,7 @@ type BlockIDHeight struct {
 
 func HeaderToBlockIDHeight(header *flow.Header) BlockIDHeight {
 	return BlockIDHeight{
-		ID:     header.ID(),
+		ID:     header.Hash(),
 		Height: header.Height,
 	}
 }

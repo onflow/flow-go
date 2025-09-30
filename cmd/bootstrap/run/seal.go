@@ -17,7 +17,7 @@ func GenerateRootSeal(result *flow.ExecutionResult) (*flow.Seal, error) {
 	seal, err := flow.NewSeal(
 		flow.UntrustedSeal{
 			BlockID:                result.BlockID,
-			ResultID:               result.ID(),
+			ResultID:               result.Hash(),
 			FinalState:             finalState,
 			AggregatedApprovalSigs: nil,
 		},

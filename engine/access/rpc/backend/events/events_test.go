@@ -118,9 +118,9 @@ func (s *EventsSuite) SetupTest() {
 		}
 
 		s.blocks[i] = block
-		s.blockIDs[i] = block.ID()
+		s.blockIDs[i] = block.Hash()
 
-		s.T().Logf("block %d: %s", header.Height, block.ID())
+		s.T().Logf("block %d: %s", header.Height, block.Hash())
 	}
 
 	s.blockEvents = unittest.EventGenerator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
@@ -147,7 +147,7 @@ func (s *EventsSuite) SetupTest() {
 	s.headers.On("BlockIDByHeight", mock.Anything).Return(func(height uint64) (flow.Identifier, error) {
 		for _, block := range s.blocks {
 			if height == block.Height {
-				return block.ID(), nil
+				return block.Hash(), nil
 			}
 		}
 		return flow.ZeroID, storage.ErrNotFound
@@ -155,7 +155,7 @@ func (s *EventsSuite) SetupTest() {
 
 	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
 		for _, block := range s.blocks {
-			if blockID == block.ID() {
+			if blockID == block.Hash() {
 				return block.ToHeader(), nil
 			}
 		}
@@ -419,7 +419,7 @@ func (s *EventsSuite) assertResponse(response []flow.BlockEvents, encoding entit
 	s.Assert().Len(response, len(s.blocks))
 	for i, block := range s.blocks {
 		s.Assert().Equal(block.Height, response[i].BlockHeight)
-		s.Assert().Equal(block.ID(), response[i].BlockID)
+		s.Assert().Equal(block.Hash(), response[i].BlockID)
 		s.Assert().Len(response[i].Events, 1)
 
 		s.assertEncoding(&response[i].Events[0], encoding)
@@ -474,7 +474,7 @@ func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
 	// to ensure the mock library handles the response type correctly
 	var receipts flow.ExecutionReceiptList //nolint:gosimple
 	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+	s.receipts.On("ByBlockID", block.Hash()).Return(receipts, nil)
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
 		Return(s.execClient, &mocks.MockCloser{}, nil)
@@ -495,7 +495,7 @@ func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Bl
 	}
 
 	for i, block := range blocks {
-		id := block.ID()
+		id := block.Hash()
 		ids[i] = id[:]
 		results[i] = &execproto.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
@@ -520,7 +520,7 @@ func (s *EventsSuite) setupENSuccessResponse(eventType string, blocks []*flow.Bl
 func (s *EventsSuite) setupENFailingResponse(eventType string, headers []*flow.Header, err error) {
 	ids := make([][]byte, len(headers))
 	for i, header := range headers {
-		id := header.ID()
+		id := header.Hash()
 		ids[i] = id[:]
 	}
 	failingRequest := &execproto.GetEventsForBlockIDsRequest{

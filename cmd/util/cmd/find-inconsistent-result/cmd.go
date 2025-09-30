@@ -180,7 +180,7 @@ func findOwnResultIDByBlockID(results storage.ExecutionResults, blockID flow.Ide
 	if err != nil {
 		return flow.Identifier{}, err
 	}
-	return result.ID(), nil
+	return result.Hash(), nil
 }
 
 func findSealedResultIDByBlockHeight(seals storage.Seals, blockID flow.Identifier) (flow.Identifier, error) {

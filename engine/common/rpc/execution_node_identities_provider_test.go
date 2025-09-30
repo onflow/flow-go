@@ -73,7 +73,7 @@ func (suite *ENIdentitiesProviderSuite) TestExecutionNodesForBlockID() {
 
 	// setup receipts storage mock to return different list of receipts on each call
 	suite.receipts.
-		On("ByBlockID", block.ID()).Return(
+		On("ByBlockID", block.Hash()).Return(
 		func(id flow.Identifier) flow.ExecutionReceiptList {
 			switch currentAttempt {
 			case 0:
@@ -121,7 +121,7 @@ func (suite *ENIdentitiesProviderSuite) TestExecutionNodesForBlockID() {
 			fixedENIdentifiers,
 		)
 
-		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
+		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.Hash())
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := node_communicator.NewNodeSelectorFactory(false)
@@ -160,7 +160,7 @@ func (suite *ENIdentitiesProviderSuite) TestExecutionNodesForBlockID() {
 			flow.IdentifierList{},
 		)
 
-		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
+		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.Hash())
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := node_communicator.NewNodeSelectorFactory(false)

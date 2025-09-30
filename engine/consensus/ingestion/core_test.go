@@ -144,7 +144,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 
 	// we need to return the head as it's also used as reference block
-	headers.On("ByBlockID", head.ID()).Return(head, nil)
+	headers.On("ByBlockID", head.Hash()).Return(head, nil)
 
 	// only used for metrics, nobody cares
 	pool.On("Size").Return(uint(0))
@@ -164,15 +164,15 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromCollection() {
 	guarantee := suite.validGuarantee()
 
 	// the guarantee is not part of the memory pool yet
-	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.ID(), guarantee).Return(true)
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
+	suite.pool.On("Add", guarantee.Hash(), guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from collection node")
 
 	// check that the guarantee has been added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee.ID(), guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee.Hash(), guarantee)
 
 }
 
@@ -181,7 +181,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeOld() {
 	guarantee := suite.validGuarantee()
 
 	// the guarantee is part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(true)
+	suite.pool.On("Has", guarantee.Hash()).Return(true)
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
@@ -198,15 +198,15 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 	guarantee := suite.validGuarantee()
 
 	// the guarantee is not already part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.ID(), guarantee).Return(false)
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
+	suite.pool.On("Add", guarantee.Hash(), guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error when guarantee was already added")
 
 	// check that the guarantee has been added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee.ID(), guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee.Hash(), guarantee)
 
 }
 
@@ -218,7 +218,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantors() {
 	guarantee.SignerIndices = nil
 
 	// the guarantee is not part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a consensus node
@@ -235,15 +235,15 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 	// create an alternative block
 	header := unittest.BlockHeaderFixture()
 	header.Height = suite.head.Height - flow.DefaultTransactionExpiry - 1
-	suite.headers.On("ByBlockID", header.ID()).Return(header, nil)
+	suite.headers.On("ByBlockID", header.Hash()).Return(header, nil)
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := suite.validGuarantee()
-	guarantee.ReferenceBlockID = header.ID()
+	guarantee.ReferenceBlockID = header.Hash()
 
 	// the guarantee is not part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a consensus node
@@ -261,7 +261,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeReferenceBlockFromWrongEpoch() {
 	guarantee.ClusterChainID = cluster.CanonicalClusterID(suite.epochCounter+1, suite.clusterMembers.NodeIDs())
 
 	// the guarantee is not part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
@@ -278,7 +278,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 	guarantee.SignerIndices = []byte{4}
 
 	// the guarantee is not part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
@@ -308,8 +308,8 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 	guarantee := suite.validGuarantee()
 
 	// the guarantee is not part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.ID(), guarantee).Return(true).Once()
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
+	suite.pool.On("Add", guarantee.Hash(), guarantee).Return(true).Once()
 
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary
@@ -325,15 +325,15 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 	guarantee := suite.validGuarantee()
 
 	// the guarantee is not part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee.ID(), guarantee).Return(true)
+	suite.pool.On("Has", guarantee.Hash()).Return(false)
+	suite.pool.On("Add", guarantee.Hash(), guarantee).Return(true)
 
 	// submit the guarantee with an unknown origin
 	err := suite.core.OnGuarantee(unittest.IdentifierFixture(), guarantee)
 	suite.Assert().Error(err)
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
-	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee.ID(), guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee.Hash(), guarantee)
 
 }
 
@@ -347,6 +347,6 @@ func (suite *IngestionCoreSuite) validGuarantee() *flow.CollectionGuarantee {
 	require.NoError(suite.T(), err)
 
 	guarantee.SignerIndices = signerIndices
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee.ReferenceBlockID = suite.head.Hash()
 	return guarantee
 }

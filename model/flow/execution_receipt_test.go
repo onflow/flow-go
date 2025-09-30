@@ -12,7 +12,7 @@ import (
 )
 
 // TestExecutionReceiptID_Malleability confirms that ExecutionReceipt and ExecutionReceiptStub, which implement
-// the [flow.IDEntity] interface, are resistant to tampering.
+// the [flow.Hashable] interface, are resistant to tampering.
 func TestExecutionReceiptID_Malleability(t *testing.T) {
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))),
@@ -40,12 +40,12 @@ func TestExecutionReceiptGroupBy(t *testing.T) {
 	idA := unittest.IdentifierFixture()
 	idB := unittest.IdentifierFixture()
 	grouperFunc := func(er *flow.ExecutionReceipt) flow.Identifier {
-		switch er.ID() {
-		case er1.ID():
+		switch er.Hash() {
+		case er1.Hash():
 			return idA
-		case er2.ID():
+		case er2.Hash():
 			return idB
-		case er3.ID():
+		case er3.Hash():
 			return idA
 		default:
 			panic("unexpected ExecutionReceipt")
@@ -72,12 +72,12 @@ func TestExecutionReceiptStubGroupBy(t *testing.T) {
 	idA := unittest.IdentifierFixture()
 	idB := unittest.IdentifierFixture()
 	grouperFunc := func(er *flow.ExecutionReceiptStub) flow.Identifier {
-		switch er.ID() {
-		case er1.ID():
+		switch er.Hash() {
+		case er1.Hash():
 			return idA
-		case er2.ID():
+		case er2.Hash():
 			return idB
-		case er3.ID():
+		case er3.Hash():
 			return idA
 		default:
 			panic("unexpected ExecutionReceipt")

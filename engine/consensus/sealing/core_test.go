@@ -81,14 +81,14 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApprovals() {
 	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(s.VerID),
 		unittest.WithChunk(s.Chunks[0].Index),
-		unittest.WithBlockID(s.Block.ID()))
+		unittest.WithBlockID(s.Block.Hash()))
 	err := s.core.processApproval(approval)
 	require.NoError(s.T(), err)
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(s.Block))
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
-	err = s.core.ProcessFinalizedBlock(s.Block.ID())
+	err = s.core.ProcessFinalizedBlock(s.Block.Hash())
 	require.NoError(s.T(), err)
 
 	err = s.core.processApproval(approval)
@@ -102,7 +102,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExe
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(s.Block))
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
-	err := s.core.ProcessFinalizedBlock(s.Block.ID())
+	err := s.core.ProcessFinalizedBlock(s.Block.Hash())
 	require.NoError(s.T(), err)
 
 	err = s.core.processIncorporatedResult(s.IncorporatedResult)
@@ -137,15 +137,15 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	blockB1 := unittest.BlockHeaderWithParentFixture(s.Block)
 	blockB2 := unittest.BlockHeaderWithParentFixture(s.Block)
 
-	s.Blocks[blockB1.ID()] = blockB1
-	s.Blocks[blockB2.ID()] = blockB2
+	s.Blocks[blockB1.Hash()] = blockB1
+	s.Blocks[blockB2.Hash()] = blockB2
 
 	IR1 := unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB1.ID()),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB1.Hash()),
 		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
 
 	IR2 := unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.Hash()),
 		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
 
 	s.MarkFinalized(blockB1)
@@ -154,7 +154,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	// blockB1 becomes finalized
-	err := s.core.ProcessFinalizedBlock(blockB1.ID())
+	err := s.core.ProcessFinalizedBlock(blockB1.Hash())
 	require.NoError(s.T(), err)
 
 	err = s.core.processIncorporatedResult(IR1)
@@ -169,8 +169,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOldFinalize
 	blockB1 := unittest.BlockHeaderWithParentFixture(s.Block)
 	blockB2 := unittest.BlockHeaderWithParentFixture(blockB1)
 
-	s.Blocks[blockB1.ID()] = blockB1
-	s.Blocks[blockB2.ID()] = blockB2
+	s.Blocks[blockB1.Hash()] = blockB1
+	s.Blocks[blockB2.Hash()] = blockB2
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(s.Block))
 	// should only call it once
@@ -179,36 +179,36 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOldFinalize
 	s.MarkFinalized(blockB2)
 
 	// blockB1 becomes finalized
-	err := s.core.ProcessFinalizedBlock(blockB2.ID())
+	err := s.core.ProcessFinalizedBlock(blockB2.Hash())
 	require.NoError(s.T(), err)
 
-	err = s.core.ProcessFinalizedBlock(blockB1.ID())
+	err = s.core.ProcessFinalizedBlock(blockB1.Hash())
 	require.NoError(s.T(), err)
 }
 
 // TestProcessFinalizedBlock_CollectorsCleanup tests that stale collectorTree are cleaned up for
 // already sealed blocks.
 func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCleanup() {
-	blockID := s.Block.ID()
+	blockID := s.Block.Hash()
 	numResults := uint(10)
 	for i := uint(0); i < numResults; i++ {
 		// all results incorporated in different blocks
 		incorporatedBlock := unittest.BlockHeaderWithParentFixture(s.IncorporatedBlock)
-		s.Blocks[incorporatedBlock.ID()] = incorporatedBlock
+		s.Blocks[incorporatedBlock.Hash()] = incorporatedBlock
 		// create different incorporated results for same block ID
 		result := unittest.ExecutionResultFixture()
 		result.BlockID = blockID
-		result.PreviousResultID = s.IncorporatedResult.Result.ID()
+		result.PreviousResultID = s.IncorporatedResult.Result.Hash()
 		incorporatedResult := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(result),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()))
+			unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.Hash()))
 		err := s.core.processIncorporatedResult(incorporatedResult)
 		require.NoError(s.T(), err)
 	}
 	require.Equal(s.T(), uint64(numResults), s.core.collectorTree.GetSize())
 
 	candidate := unittest.BlockHeaderWithParentFixture(s.Block)
-	s.Blocks[candidate.ID()] = candidate
+	s.Blocks[candidate.Hash()] = candidate
 
 	// candidate becomes new sealed and finalized block, it means that
 	// we will need to cleanup our tree till new height, removing all outdated collectors
@@ -216,7 +216,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCl
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	s.MarkFinalized(candidate)
-	err := s.core.ProcessFinalizedBlock(candidate.ID())
+	err := s.core.ProcessFinalizedBlock(candidate.Hash())
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), uint64(0), s.core.collectorTree.GetSize())
 }
@@ -231,8 +231,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBefor
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
 				unittest.WithApproverID(verID),
-				unittest.WithBlockID(s.Block.ID()),
-				unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+				unittest.WithBlockID(s.Block.Hash()),
+				unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 			err := s.core.processApproval(approval)
 			require.NoError(s.T(), err)
 		}
@@ -261,8 +261,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfter
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
 				unittest.WithApproverID(verID),
-				unittest.WithBlockID(s.Block.ID()),
-				unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+				unittest.WithBlockID(s.Block.Hash()),
+				unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 			err := s.core.processApproval(approval)
 			require.NoError(s.T(), err)
 		}
@@ -280,8 +280,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInva
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
 		unittest.WithApproverID(s.VerID),
-		unittest.WithBlockID(s.Block.ID()),
-		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+		unittest.WithBlockID(s.Block.Hash()),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 
 	// this approval has to be cached since execution result is not known yet
 	err := s.core.processApproval(approval)
@@ -302,8 +302,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
 		unittest.WithApproverID(s.VerID),
-		unittest.WithBlockID(s.Block.ID()),
-		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+		unittest.WithBlockID(s.Block.Hash()),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 
 	// this approval has to be cached since execution result is not known yet
 	err := s.core.processApproval(approval)
@@ -336,8 +336,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
-			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
-			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+			require.Equal(s.T(), s.Block.Hash(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.Hash(), seal.Seal.ResultID)
 		},
 	).Return(true, nil).Once()
 
@@ -352,9 +352,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	s.MarkFinalized(lastFinalizedBlock)
 	for i := 0; i < approvals.DefaultEmergencySealingThresholdForFinalization; i++ {
 		finalizedBlock := unittest.BlockHeaderWithParentFixture(lastFinalizedBlock)
-		s.Blocks[finalizedBlock.ID()] = finalizedBlock
+		s.Blocks[finalizedBlock.Hash()] = finalizedBlock
 		s.MarkFinalized(finalizedBlock)
-		err := s.core.ProcessFinalizedBlock(finalizedBlock.ID())
+		err := s.core.ProcessFinalizedBlock(finalizedBlock.Hash())
 		require.NoError(s.T(), err)
 		lastFinalizedBlock = finalizedBlock
 	}
@@ -379,8 +379,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 
 		previousResult := s.IncorporatedResult.Result
 		for blockIndex, block := range fork {
-			s.Blocks[block.ID()] = block.ToHeader()
-			s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
+			s.Blocks[block.Hash()] = block.ToHeader()
+			s.IdentitiesCache[block.Hash()] = s.AuthorizedVerifiers
 
 			// create and incorporate result for every block in fork except first one
 			if blockIndex > 0 {
@@ -393,7 +393,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 
 				// incorporate in fork
 				IR := unittest.IncorporatedResult.Fixture(
-					unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+					unittest.IncorporatedResult.WithIncorporatedBlockID(block.Hash()),
 					unittest.IncorporatedResult.WithResult(result))
 
 				err := s.core.processIncorporatedResult(IR)
@@ -409,7 +409,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	// block B_1 becomes finalized
 	finalized := forks[0][0].ToHeader()
 	s.MarkFinalized(finalized)
-	err := s.core.ProcessFinalizedBlock(finalized.ID())
+	err := s.core.ProcessFinalizedBlock(finalized.Hash())
 	require.NoError(s.T(), err)
 
 	// verify will be called twice for every approval in first fork
@@ -419,7 +419,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	for _, results := range forkResults {
 		for _, result := range results {
 			executedBlockID := result.BlockID
-			resultID := result.ID()
+			resultID := result.Hash()
 
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(0),
 				unittest.WithApproverID(s.VerID),
@@ -446,8 +446,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 		forks[forkIndex] = unittest.ChainFixtureFrom(forkIndex+3, s.Block)
 		fork := forks[forkIndex]
 		for _, block := range fork {
-			s.Blocks[block.ID()] = block.ToHeader()
-			s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
+			s.Blocks[block.Hash()] = block.ToHeader()
+			s.IdentitiesCache[block.Hash()] = s.AuthorizedVerifiers
 		}
 	}
 
@@ -458,7 +458,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	// finalize block B
-	err := s.core.ProcessFinalizedBlock(finalized.ID())
+	err := s.core.ProcessFinalizedBlock(finalized.Hash())
 	require.NoError(s.T(), err)
 
 	// create incorporated result for each block in main fork
@@ -472,10 +472,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 
 			// incorporate in fork
 			IR := unittest.IncorporatedResult.Fixture(
-				unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+				unittest.IncorporatedResult.WithIncorporatedBlockID(block.Hash()),
 				unittest.IncorporatedResult.WithResult(result))
 			err := s.core.processIncorporatedResult(IR)
-			collector := s.core.collectorTree.GetCollector(result.ID())
+			collector := s.core.collectorTree.GetCollector(result.Hash())
 			if forkIndex > 0 {
 				require.NoError(s.T(), err)
 				require.Equal(s.T(), approvals.VerifyingApprovals, collector.ProcessingStatus())
@@ -497,20 +497,20 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	unsealedBlock := unittest.BlockHeaderWithParentFixture(s.Block)
-	s.Blocks[unsealedBlock.ID()] = unsealedBlock
-	s.IdentitiesCache[unsealedBlock.ID()] = s.AuthorizedVerifiers
+	s.Blocks[unsealedBlock.Hash()] = unsealedBlock
+	s.IdentitiesCache[unsealedBlock.Hash()] = s.AuthorizedVerifiers
 	result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*s.IncorporatedResult.Result))
-	result.BlockID = unsealedBlock.ID()
+	result.BlockID = unsealedBlock.Hash()
 
 	s.MarkFinalized(unsealedBlock)
-	err := s.core.ProcessFinalizedBlock(unsealedBlock.ID())
+	err := s.core.ProcessFinalizedBlock(unsealedBlock.Hash())
 	require.NoError(s.T(), err)
 
 	incorporatedBlock := unittest.BlockHeaderWithParentFixture(unsealedBlock)
-	s.Blocks[incorporatedBlock.ID()] = incorporatedBlock
-	s.IdentitiesCache[incorporatedBlock.ID()] = s.AuthorizedVerifiers
+	s.Blocks[incorporatedBlock.Hash()] = incorporatedBlock
+	s.IdentitiesCache[incorporatedBlock.Hash()] = s.AuthorizedVerifiers
 	IR := unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.Hash()),
 		unittest.IncorporatedResult.WithResult(result))
 	err = s.core.processIncorporatedResult(IR)
 	require.NoError(s.T(), err)
@@ -535,8 +535,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	parentBlock := s.ParentBlock
 	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock)
-		s.Blocks[block.ID()] = block.ToHeader()
-		s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
+		s.Blocks[block.Hash()] = block.ToHeader()
+		s.IdentitiesCache[block.Hash()] = s.AuthorizedVerifiers
 		unsealedFinalizedBlocks = append(unsealedFinalizedBlocks, *block)
 		parentBlock = block.ToHeader()
 	}
@@ -547,7 +547,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	// add an unfinalized block; it shouldn't require an approval request
 	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock)
-	s.Blocks[unfinalizedBlock.ID()] = unfinalizedBlock.ToHeader()
+	s.Blocks[unfinalizedBlock.Hash()] = unfinalizedBlock.ToHeader()
 
 	// we will assume that all chunks are assigned to the same two verifiers.
 	verifiers := make([]flow.Identifier, 0)
@@ -589,7 +589,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 				),
 			),
 			unittest.IncorporatedResult.WithIncorporatedBlockID(
-				unsealedFinalizedBlocks[i+1].ID(),
+				unsealedFinalizedBlocks[i+1].Hash(),
 			),
 		)
 
@@ -606,7 +606,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 		err := s.core.processIncorporatedResult(ir)
 		require.NoError(s.T(), err)
 
-		resultIDs = append(resultIDs, ir.Result.ID())
+		resultIDs = append(resultIDs, ir.Result.Hash())
 	}
 
 	// sealed block doesn't change
@@ -620,7 +620,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	for ; lastProcessedIndex < int(s.core.sealingConfigsGetter.ApprovalRequestsThresholdConst()); lastProcessedIndex++ {
 		finalized := unsealedFinalizedBlocks[lastProcessedIndex].ToHeader()
 		s.MarkFinalized(finalized)
-		err := s.core.ProcessFinalizedBlock(finalized.ID())
+		err := s.core.ProcessFinalizedBlock(finalized.Hash())
 		require.NoError(s.T(), err)
 	}
 
@@ -631,7 +631,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	for i := 0; i < 2; i++ {
 		finalized := unsealedFinalizedBlocks[lastProcessedIndex].ToHeader()
 		s.MarkFinalized(finalized)
-		err := s.core.ProcessFinalizedBlock(finalized.ID())
+		err := s.core.ProcessFinalizedBlock(finalized.Hash())
 		require.NoError(s.T(), err)
 		lastProcessedIndex += 1
 	}
@@ -648,7 +648,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// process next block
 	finalized := unsealedFinalizedBlocks[lastProcessedIndex].ToHeader()
 	s.MarkFinalized(finalized)
-	err = s.core.ProcessFinalizedBlock(finalized.ID())
+	err = s.core.ProcessFinalizedBlock(finalized.Hash())
 	require.NoError(s.T(), err)
 
 	// now 2 results should be pending
@@ -679,7 +679,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	blockChildren := make([]flow.Identifier, 0)
 
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.finalizedRootHeader, nil)
-	s.Snapshots[s.finalizedRootHeader.ID()] = rootSnapshot
+	s.Snapshots[s.finalizedRootHeader.Hash()] = rootSnapshot
 	block, err := flow.NewRootBlock(
 		flow.UntrustedBlock{
 			HeaderBody: s.finalizedRootHeader.HeaderBody,
@@ -697,7 +697,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 			},
 		}}, nil)
 
-	s.sealsDB.On("HighestInFork", s.IncorporatedBlock.ID()).Return(
+	s.sealsDB.On("HighestInFork", s.IncorporatedBlock.Hash()).Return(
 		unittest.Seal.Fixture(
 			unittest.Seal.WithBlock(s.ParentBlock)), nil)
 
@@ -706,12 +706,12 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		unittest.WithReceipts(
 			unittest.ExecutionReceiptFixture(
 				unittest.WithResult(s.IncorporatedResult.Result))))
-	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
+	payloads.On("ByBlockID", s.IncorporatedBlock.Hash()).Return(&incorporatedBlockPayload, nil)
 
 	emptyPayload := flow.NewEmptyPayload()
-	payloads.On("ByBlockID", s.Block.ID()).Return(emptyPayload, nil)
+	payloads.On("ByBlockID", s.Block.Hash()).Return(emptyPayload, nil)
 
-	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
+	s.IdentitiesCache[s.IncorporatedBlock.Hash()] = s.AuthorizedVerifiers
 
 	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
 
@@ -721,7 +721,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		prevResult := s.IncorporatedResult.Result
 		// create execution results for all blocks except last one, since it won't be valid by definition
 		for blockIndex, block := range fork {
-			blockID := block.ID()
+			blockID := block.Hash()
 
 			// create execution result for previous block in chain
 			// this result will be incorporated in current block.
@@ -839,8 +839,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 
 	// Create block S (root block) first
 	blockS := unittest.BlockFixture()
-	s.Blocks[blockS.ID()] = blockS.ToHeader()
-	s.IdentitiesCache[blockS.ID()] = s.AuthorizedVerifiers
+	s.Blocks[blockS.Hash()] = blockS.ToHeader()
+	s.IdentitiesCache[blockS.Hash()] = s.AuthorizedVerifiers
 	// Note: as Block S is already sealed, `payloads` should not be queried for it
 
 	// Create block B with results for both X and S
@@ -852,10 +852,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		blockS.ToHeader(),
 		unittest.PayloadFixture(unittest.WithReceipts(receiptX, receiptS)),
 	)
-	s.Blocks[blockB.ID()] = blockB.ToHeader()
-	s.IdentitiesCache[blockB.ID()] = s.AuthorizedVerifiers
-	payloads.On("ByBlockID", blockB.ID()).Return(&blockB.Payload, nil)
-	assigner.On("Assign", receiptS.ExecutionResult, blockB.ID()).Return(s.ChunksAssignment, nil).Maybe() // we allow an assignment for block S to be created, even though it is sealed.
+	s.Blocks[blockB.Hash()] = blockB.ToHeader()
+	s.IdentitiesCache[blockB.Hash()] = s.AuthorizedVerifiers
+	payloads.On("ByBlockID", blockB.Hash()).Return(&blockB.Payload, nil)
+	assigner.On("Assign", receiptS.ExecutionResult, blockB.Hash()).Return(s.ChunksAssignment, nil).Maybe() // we allow an assignment for block S to be created, even though it is sealed.
 	// Note: We expect the assigner to NOT be called for resultForX as it references a pre-root block
 
 	// Create block C with seal for X
@@ -864,9 +864,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		unittest.PayloadFixture(unittest.WithSeals(
 			unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptX.ExecutionResult)),
 		)))
-	s.Blocks[blockC.ID()] = blockC.ToHeader()
-	s.IdentitiesCache[blockC.ID()] = s.AuthorizedVerifiers
-	payloads.On("ByBlockID", blockC.ID()).Return(&blockC.Payload, nil)
+	s.Blocks[blockC.Hash()] = blockC.ToHeader()
+	s.IdentitiesCache[blockC.Hash()] = s.AuthorizedVerifiers
+	payloads.On("ByBlockID", blockC.Hash()).Return(&blockC.Payload, nil)
 
 	// Create block D with seal for S and receipt for B:
 	sealS := unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptS.ExecutionResult))
@@ -880,10 +880,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 			unittest.WithSeals(sealS),
 			unittest.WithReceipts(receiptB),
 		))
-	s.Blocks[blockD.ID()] = blockD.ToHeader()
-	s.IdentitiesCache[blockD.ID()] = s.AuthorizedVerifiers
-	payloads.On("ByBlockID", blockD.ID()).Return(&blockD.Payload, nil)
-	assigner.On("Assign", &receiptB.ExecutionResult, blockD.ID()).Return(s.ChunksAssignment, nil) // this is the only result that a verifier assignment should be created for
+	s.Blocks[blockD.Hash()] = blockD.ToHeader()
+	s.IdentitiesCache[blockD.Hash()] = s.AuthorizedVerifiers
+	payloads.On("ByBlockID", blockD.Hash()).Return(&blockD.Payload, nil)
+	assigner.On("Assign", &receiptB.ExecutionResult, blockD.Hash()).Return(s.ChunksAssignment, nil) // this is the only result that a verifier assignment should be created for
 
 	// Setup Protocol State:
 	// * latest sealed block is the root block S
@@ -894,7 +894,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	//   know any children of D, the Sealing Segment definition guarantees that only finalized blocks are included.
 	finalSnapshot := unittest.StateSnapshotForKnownBlock(blockD.ToHeader(), nil)
 	s.State.On("Final").Return(finalSnapshot) // call `s.State.AtBlockID(…)` looks up the snapshots in map `s.Snapshots`
-	s.Snapshots[blockD.ID()] = finalSnapshot
+	s.Snapshots[blockD.Hash()] = finalSnapshot
 	s.finalizedRootHeader = blockD.ToHeader() // call `s.State.Params().FinalizedRoot()` returns `s.finalizedRootHeader`
 	finalSnapshot.On("SealingSegment").Return(
 		&flow.SealingSegment{
@@ -920,7 +920,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	finalSnapshot.On("Descendants").Return([]flow.Identifier{}, nil) // block D has no descendants
 
 	// Mock highest sealed block lookup
-	s.sealsDB.On("HighestInFork", blockD.ID()).Return(sealS, nil)
+	s.sealsDB.On("HighestInFork", blockD.Hash()).Return(sealS, nil)
 
 	// Instantiate sealing.Core and repopulate the assignment collector tree
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{},

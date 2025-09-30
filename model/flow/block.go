@@ -6,15 +6,6 @@ import (
 	"time"
 )
 
-// HashablePayload is a temporary interface used to generalize the payload type of GenericBlock.
-// It defines the minimal interface required for a payload to participate in block hashing.
-//
-// TODO(malleability, #7164): remove this interface after renaming IDEntity's method `ID` to `Hash`,
-// and replace all usages of HashablePayload with IDEntity.
-type HashablePayload interface {
-	Hash() Identifier
-}
-
 // GenericBlock represents a generic Flow block structure parameterized by a payload type.
 // It includes both the block header metadata and the block payload.
 //
@@ -23,7 +14,7 @@ type HashablePayload interface {
 // using NewBlock to ensure validation of the block fields.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type GenericBlock[T HashablePayload] struct {
+type GenericBlock[T Hashable] struct {
 	// HeaderBody is a container encapsulating most of the header fields - *excluding* the payload hash
 	// and the proposer signature. Generally, the type [HeaderBody] should not be used on its own.
 	// CAUTION regarding security:
@@ -36,9 +27,9 @@ type GenericBlock[T HashablePayload] struct {
 	Payload T
 }
 
-// ID returns a collision-resistant hash of the Block struct.
-func (b *GenericBlock[T]) ID() Identifier {
-	return b.ToHeader().ID()
+// Hash returns a collision-resistant hash of the Block struct.
+func (b *GenericBlock[T]) Hash() Identifier {
+	return b.ToHeader().Hash()
 }
 
 // ToHeader converts the block into a compact [flow.Header] representation,
@@ -76,7 +67,7 @@ func (b *GenericBlock[T]) MarshalJSON() ([]byte, error) {
 		ID Identifier
 	}{
 		GenericBlock: *b,
-		ID:           b.ID(),
+		ID:           b.Hash(),
 	})
 }
 
@@ -267,8 +258,8 @@ func NewCertifiedBlock(proposal *Proposal, qc *QuorumCertificate) (CertifiedBloc
 	if proposal.Block.View != qc.View {
 		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.View, qc.View)
 	}
-	if proposal.Block.ID() != qc.BlockID {
-		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.ID(), qc.BlockID)
+	if proposal.Block.Hash() != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.Hash(), qc.BlockID)
 	}
 	return CertifiedBlock{Proposal: proposal, CertifyingQC: qc}, nil
 }

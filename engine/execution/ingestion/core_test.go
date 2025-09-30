@@ -88,7 +88,7 @@ func createCore(t *testing.T, blocks []*flow.Block) (
 	execState.On("GetHighestFinalizedExecuted").Return(blocks[0].Height, nil)
 
 	// root block is executed
-	consumer := newMockConsumer(blocks[0].ID())
+	consumer := newMockConsumer(blocks[0].Hash())
 
 	execState.On("StateCommitmentByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) (flow.StateCommitment, error) {
@@ -146,33 +146,33 @@ func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) 
 
 func receiveBlock(t *testing.T, throttle Throttle, state *unittestMocks.ProtocolState, headers *headerStore, blocksDB *storage.Blocks, consumer *mockConsumer, block *flow.Block, wg *sync.WaitGroup) {
 	require.NoError(t, state.Extend(block))
-	blocksDB.On("ByID", block.ID()).Return(block, nil)
-	require.NoError(t, throttle.OnBlock(block.ID(), block.Height))
-	consumer.WaitForExecuted(block.ID(), wg)
+	blocksDB.On("ByID", block.Hash()).Return(block, nil)
+	require.NoError(t, throttle.OnBlock(block.Hash(), block.Height))
+	consumer.WaitForExecuted(block.Hash(), wg)
 }
 
 func verifyBlockExecuted(t *testing.T, consumer *mockConsumer, wg *sync.WaitGroup, blocks ...*flow.Block) {
 	// Wait until blocks are executed
 	unittest.AssertReturnsBefore(t, func() { wg.Wait() }, time.Millisecond*20)
 	for _, block := range blocks {
-		require.True(t, consumer.MockIsBlockExecuted(block.ID()))
+		require.True(t, consumer.MockIsBlockExecuted(block.Hash()))
 	}
 }
 
 func verifyBlockNotExecuted(t *testing.T, consumer *mockConsumer, blocks ...*flow.Block) {
 	for _, block := range blocks {
-		require.False(t, consumer.MockIsBlockExecuted(block.ID()))
+		require.False(t, consumer.MockIsBlockExecuted(block.Hash()))
 	}
 }
 
 func storeCollection(t *testing.T, collectionDB *mocks.MockCollectionStore, collection *flow.Collection) {
-	log.Info().Msgf("collectionDB: store collection %v", collection.ID())
+	log.Info().Msgf("collectionDB: store collection %v", collection.Hash())
 	_, err := collectionDB.Store(collection)
 	require.NoError(t, err)
 }
 
 func receiveCollection(t *testing.T, fetcher *mockFetcher, core *Core, collection *flow.Collection) {
-	require.True(t, fetcher.IsFetched(collection.ID()))
+	require.True(t, fetcher.IsFetched(collection.Hash()))
 	core.OnCollection(collection)
 }
 

@@ -93,7 +93,7 @@ func (g *ChunkExecutionDataGenerator) Fixture(opts ...ChunkExecutionDataOption) 
 	if len(ced.TransactionResults) == 0 {
 		ced.TransactionResults = make([]flow.LightTransactionResult, len(ced.Collection.Transactions))
 		for i, tx := range ced.Collection.Transactions {
-			ced.TransactionResults[i] = g.lightTxResults.Fixture(LightTransactionResult.WithTransactionID(tx.ID()))
+			ced.TransactionResults[i] = g.lightTxResults.Fixture(LightTransactionResult.WithTransactionID(tx.Hash()))
 		}
 	}
 

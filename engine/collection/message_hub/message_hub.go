@@ -213,7 +213,7 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 			proposal := msg.(*flow.ProposalHeader)
 			err := h.sendOwnProposal(proposal)
 			if err != nil {
-				return fmt.Errorf("could not process queued proposal %v: %w", proposal.Header.ID(), err)
+				return fmt.Errorf("could not process queued proposal %v: %w", proposal.Header.Hash(), err)
 			}
 			continue
 		}
@@ -302,7 +302,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// retrieve the payload for the block
-	payload, err := h.payloads.ByBlockID(header.ID())
+	payload, err := h.payloads.ByBlockID(header.Hash())
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
@@ -311,7 +311,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.ID(header.ID())).
+		Hex("block_id", logging.ID(header.Hash())).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("ref_block", payload.ReferenceBlockID[:]).
 		Int("transaction_count", payload.Collection.Len()).
@@ -481,7 +481,7 @@ func (h *MessageHub) forwardToOwnVoteAggregator(vote *model.Vote) {
 		Uint64("block_view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
 		Hex("voter", vote.SignerID[:]).
-		Str("vote_id", vote.ID().String()).
+		Str("vote_id", vote.Hash().String()).
 		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
 	h.voteAggregator.AddVote(vote)
 }

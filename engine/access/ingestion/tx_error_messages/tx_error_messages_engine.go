@@ -125,7 +125,7 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	err = e.processErrorMessagesForBlock(ctx, header.ID())
+	err = e.processErrorMessagesForBlock(ctx, header.Hash())
 	if err == nil {
 		done()
 		return

@@ -449,7 +449,7 @@ func (s *StopControl) blockFinalized(
 
 	handleErr := func(err error) {
 		s.log.Err(err).
-			Stringer("block_id", h.ID()).
+			Stringer("block_id", h.Hash()).
 			Stringer("stop", s.stopBoundary).
 			Msg("Error in stop control BlockFinalized")
 
@@ -470,7 +470,7 @@ func (s *StopControl) blockFinalized(
 		// last finalized block
 		s.log.Warn().
 			Uint64("finalization_height", h.Height).
-			Stringer("block_id", h.ID()).
+			Stringer("block_id", h.Hash()).
 			Stringer("stop", s.stopBoundary).
 			Msg("Block finalization already beyond stop.")
 
@@ -487,7 +487,7 @@ func (s *StopControl) blockFinalized(
 	s.stopBoundary.stopAfterExecuting = parentID
 
 	s.log.Info().
-		Stringer("block_id", h.ID()).
+		Stringer("block_id", h.Hash()).
 		Stringer("stop", s.stopBoundary).
 		Stringer("stop_after_executing", s.stopBoundary.stopAfterExecuting).
 		Msgf("Found ID of the block that should be executed last")
@@ -518,7 +518,7 @@ func (s *StopControl) OnBlockExecuted(h *flow.Header) {
 		return
 	}
 
-	if s.stopBoundary.stopAfterExecuting != h.ID() {
+	if s.stopBoundary.stopAfterExecuting != h.Hash() {
 		return
 	}
 
@@ -530,7 +530,7 @@ func (s *StopControl) OnBlockExecuted(h *flow.Header) {
 				"Inconsistent stopping state. "+
 					"Scheduled to stop after executing block ID %s and height %d, "+
 					"but this block has a height %d. ",
-				h.ID().String(),
+				h.Hash().String(),
 				s.stopBoundary.StopBeforeHeight-1,
 				h.Height,
 			)

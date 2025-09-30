@@ -45,7 +45,7 @@ func runBenchmark(b *testing.B, compressorName string) {
 	exeResults := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
 	for i := 0; i < len(blockHeaders); i++ {
 		exeResults[i] = &execution.GetEventsForBlockIDsResponse_Result{
-			BlockId:     convert.IdentifierToMessage(blockHeaders[i].ID()),
+			BlockId:     convert.IdentifierToMessage(blockHeaders[i].Hash()),
 			BlockHeight: blockHeaders[i].Height,
 			Events:      convert.EventsToMessages(getEvents(10)),
 		}
@@ -56,7 +56,7 @@ func runBenchmark(b *testing.B, compressorName string) {
 
 	blockIDs := make([]flow.Identifier, len(blockHeaders))
 	for i, header := range blockHeaders {
-		blockIDs[i] = header.ID()
+		blockIDs[i] = header.Hash()
 	}
 	eventsReq := &execution.GetEventsForBlockIDsRequest{
 		BlockIds: convert.IdentifiersToMessages(blockIDs),

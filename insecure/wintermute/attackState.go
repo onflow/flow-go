@@ -20,7 +20,7 @@ func (a attackState) containsCorruptedChunkId(chunkId flow.Identifier) bool {
 // corruptedChunkIndexOf returns the chunk index of the corresponding corrupted chunk id.
 func (a attackState) corruptedChunkIndexOf(chunkId flow.Identifier) (uint64, error) {
 	for _, chunk := range a.corruptedResult.Chunks {
-		if chunk.ID() == chunkId {
+		if chunk.Hash() == chunkId {
 			return chunk.Index, nil
 		}
 	}

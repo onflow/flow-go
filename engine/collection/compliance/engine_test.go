@@ -211,7 +211,7 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
 	proposal := unittest.ClusterProposalFromBlock(finalizedBlock)
 	cs.head = proposal
-	cs.headerDB[finalizedBlock.ID()] = proposal.Block.ToHeader()
+	cs.headerDB[finalizedBlock.Hash()] = proposal.Block.ToHeader()
 
 	*cs.pending = module.PendingClusterBlockBuffer{}
 	// wait for both expected calls before ending the test

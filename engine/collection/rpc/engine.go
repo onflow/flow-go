@@ -170,7 +170,7 @@ func (h *handler) SendTransaction(_ context.Context, req *access.SendTransaction
 		return nil, err
 	}
 
-	txID := tx.ID()
+	txID := tx.Hash()
 
 	return &access.SendTransactionResponse{Id: txID[:]}, nil
 }

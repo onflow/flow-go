@@ -39,7 +39,7 @@ func (f quorumCertificateFactory) WithBlockID(blockID flow.Identifier) QuorumCer
 func (f quorumCertificateFactory) CertifiesBlock(header *flow.Header) QuorumCertificateOption {
 	return func(g *QuorumCertificateGenerator, qc *flow.QuorumCertificate) {
 		qc.View = header.View
-		qc.BlockID = header.ID()
+		qc.BlockID = header.Hash()
 	}
 }
 

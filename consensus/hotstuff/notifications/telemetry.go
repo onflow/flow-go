@@ -180,7 +180,7 @@ func (t *TelemetryConsumer) OnOwnVote(vote *model.Vote, recipientID flow.Identif
 func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	step := t.pathHandler.NextStep().
 		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", logging.ID(proposal.Header.ID())).
+		Hex("block_id", logging.ID(proposal.Header.Hash())).
 		Hex("block_proposer_id", logging.ID(proposal.Header.ProposerID)).
 		Time("block_time", time.UnixMilli(int64(proposal.Header.Timestamp)).UTC()).
 		Uint64("qc_view", proposal.Header.ParentView).

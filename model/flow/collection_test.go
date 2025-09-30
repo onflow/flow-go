@@ -10,7 +10,7 @@ import (
 )
 
 // TestLightCollectionID_Malleability confirms that the LightCollection struct, which implements
-// the [flow.IDEntity] interface, is resistant to tampering.
+// the [flow.Hashable] interface, is resistant to tampering.
 func TestLightCollectionID_Malleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, &flow.LightCollection{
 		Transactions: unittest.IdentifierListFixture(5),
@@ -18,7 +18,7 @@ func TestLightCollectionID_Malleability(t *testing.T) {
 }
 
 // TestCollectionID_Malleability confirms that the Collection struct, which implements
-// the [flow.IDEntity] interface, is resistant to tampering.
+// the [flow.Hashable] interface, is resistant to tampering.
 func TestCollectionID_Malleability(t *testing.T) {
 	collection := unittest.CollectionFixture(5)
 	unittest.RequireEntityNonMalleable(t, &collection, unittest.WithTypeGenerator[flow.TransactionBody](func() flow.TransactionBody {
@@ -42,7 +42,7 @@ func TestNewCollection(t *testing.T) {
 			light := col.Light()
 			assert.Equal(t, light.Len(), col.Len())
 			for i := range light.Len() {
-				assert.Equal(t, col.Transactions[i].ID(), light.Transactions[i])
+				assert.Equal(t, col.Transactions[i].Hash(), light.Transactions[i])
 			}
 		})
 	})

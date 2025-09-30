@@ -174,7 +174,7 @@ func TestEventEmitted(t *testing.T) {
 			context.Background(),
 			string(expectedType),
 			[]flowsdk.Identifier{
-				flowsdk.Identifier(block.ID()),
+				flowsdk.Identifier(block.Hash()),
 			},
 		)
 		require.NoError(t, err)

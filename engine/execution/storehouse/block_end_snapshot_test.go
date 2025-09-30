@@ -21,8 +21,8 @@ func TestBlockEndSnapshot(t *testing.T) {
 		// create mock for storage
 		store := executionMock.NewRegisterStore(t)
 		reg := unittest.MakeOwnerReg("key", "value")
-		store.On("GetRegister", header.Height, header.ID(), reg.Key).Return(reg.Value, nil).Once()
-		snapshot := storehouse.NewBlockEndStateSnapshot(store, header.ID(), header.Height)
+		store.On("GetRegister", header.Height, header.Hash(), reg.Key).Return(reg.Value, nil).Once()
+		snapshot := storehouse.NewBlockEndStateSnapshot(store, header.Hash(), header.Height)
 
 		// test get from storage
 		value, err := snapshot.Get(reg.Key)
@@ -36,7 +36,7 @@ func TestBlockEndSnapshot(t *testing.T) {
 
 		// test get non existing register
 		unknownReg := unittest.MakeOwnerReg("unknown", "unknown")
-		store.On("GetRegister", header.Height, header.ID(), unknownReg.Key).
+		store.On("GetRegister", header.Height, header.Hash(), unknownReg.Key).
 			Return(nil, fmt.Errorf("fail: %w", storage.ErrNotFound)).Once()
 
 		value, err = snapshot.Get(unknownReg.Key)
@@ -50,7 +50,7 @@ func TestBlockEndSnapshot(t *testing.T) {
 
 		// test getting storage.ErrHeightNotIndexed error
 		heightNotIndexed := unittest.MakeOwnerReg("height not index", "height not index")
-		store.On("GetRegister", header.Height, header.ID(), heightNotIndexed.Key).
+		store.On("GetRegister", header.Height, header.Hash(), heightNotIndexed.Key).
 			Return(nil, fmt.Errorf("fail: %w", storage.ErrHeightNotIndexed)).
 			Twice() // to verify the result is not cached
 
@@ -66,7 +66,7 @@ func TestBlockEndSnapshot(t *testing.T) {
 		heightNotExecuted := unittest.MakeOwnerReg("height not executed", "height not executed")
 		counter := atomic.NewInt32(0)
 		store.
-			On("GetRegister", header.Height, header.ID(), heightNotExecuted.Key).
+			On("GetRegister", header.Height, header.Hash(), heightNotExecuted.Key).
 			Return(func(uint64, flow.Identifier, flow.RegisterID) (flow.RegisterValue, error) {
 				counter.Inc()
 				// the first call should return error

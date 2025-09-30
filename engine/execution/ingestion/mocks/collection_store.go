@@ -30,7 +30,7 @@ func (m *MockCollectionStore) ByID(id flow.Identifier) (*flow.Collection, error)
 }
 
 func (m *MockCollectionStore) Store(c *flow.Collection) (*flow.LightCollection, error) {
-	m.byID[c.ID()] = c
+	m.byID[c.Hash()] = c
 	return c.Light(), nil
 }
 

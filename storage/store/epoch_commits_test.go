@@ -31,7 +31,7 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve the commit by ID
-		actual, err := s.ByID(expected.ID())
+		actual, err := s.ByID(expected.Hash())
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 

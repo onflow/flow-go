@@ -378,7 +378,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		sealB := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(sealA.IncorporatedResult.Result))
 		_, _ = wrapper.Add(sealB)
 
-		receiptsDB.On("ByBlockID", block.ID()).Return(nil, nil).Twice()
+		receiptsDB.On("ByBlockID", block.Hash()).Return(nil, nil).Twice()
 
 		// two seals, but they are not confirmed with receipts
 		seals := wrapper.All()
@@ -388,7 +388,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 			unittest.ExecutionReceiptFixture(unittest.WithResult(sealA.IncorporatedResult.Result)),
 			unittest.ExecutionReceiptFixture(unittest.WithResult(sealB.IncorporatedResult.Result)),
 		}
-		receiptsDB.On("ByBlockID", block.ID()).Return(receipts, nil).Twice()
+		receiptsDB.On("ByBlockID", block.Hash()).Return(receipts, nil).Twice()
 
 		// at this point we have two seals, confirmed by two receipts but no execution fork
 		seals = wrapper.All()
@@ -399,7 +399,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		_, _ = wrapper.Add(conflictingSeal)
 
 		// conflicting seal doesn't have any receipts yet
-		receiptsDB.On("ByBlockID", block.ID()).Return(receipts, nil).Times(3)
+		receiptsDB.On("ByBlockID", block.Hash()).Return(receipts, nil).Times(3)
 
 		seals = wrapper.All()
 		require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, seals)
@@ -410,7 +410,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 			unittest.ExecutionReceiptFixture(unittest.WithResult(conflictingSeal.IncorporatedResult.Result)),
 		)
 
-		receiptsDB.On("ByBlockID", block.ID()).Return(receipts, nil).Times(3)
+		receiptsDB.On("ByBlockID", block.Hash()).Return(receipts, nil).Times(3)
 
 		// querying should detect execution fork
 		seals = wrapper.All()

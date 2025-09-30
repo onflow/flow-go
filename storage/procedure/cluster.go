@@ -45,7 +45,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 
 	// Here the key `blockID` is derived from the `block` via a collision-resistant hash function.
 	// Hence, two different blocks having the same key is practically impossible.
-	blockID := proposal.Block.ID()
+	blockID := proposal.Block.Hash()
 	// 2. Store the block header; errors with [storage.ErrAlreadyExists] if some entry for `blockID` already exists
 	err := operation.InsertHeader(lctx, rw, blockID, proposal.Block.ToHeader())
 	if err != nil {
@@ -214,7 +214,7 @@ func InsertClusterPayload(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 
 	// persist constituent transactions:
 	for _, colTx := range payload.Collection.Transactions {
-		err = operation.UpsertTransaction(writer, colTx.ID(), colTx) // as transaction is keyed by content hash, hence no overwrite protection is needed
+		err = operation.UpsertTransaction(writer, colTx.Hash(), colTx) // as transaction is keyed by content hash, hence no overwrite protection is needed
 		if err != nil {
 			return fmt.Errorf("could not insert payload transaction: %w", err)
 		}

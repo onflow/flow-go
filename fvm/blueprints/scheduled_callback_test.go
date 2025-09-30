@@ -363,7 +363,7 @@ func TestSystemCollection(t *testing.T) {
 			}
 
 			// Verify collection properties
-			assert.NotEmpty(t, collection.ID())
+			assert.NotEmpty(t, collection.Hash())
 			assert.Equal(t, len(transactions), len(collection.Transactions))
 		})
 	}

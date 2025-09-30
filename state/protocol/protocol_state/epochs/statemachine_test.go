@@ -63,7 +63,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 		return nil
 	})
 	s.parentState.On("GetEpochStateID").Return(func() flow.Identifier {
-		return s.parentEpochState.ID()
+		return s.parentEpochState.Hash()
 	})
 
 	s.happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
@@ -90,15 +90,15 @@ func (s *EpochStateMachineSuite) SetupTest() {
 // epoch state ID in the KV store even when there were no events to process.
 func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochStateEntry, s.parentEpochState.ID(), false).Once()
+	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochStateEntry, s.parentEpochState.Hash(), false).Once()
 
 	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
 
 	rw := storagemock.NewReaderBatchWriter(s.T())
 
-	s.epochStateDB.On("BatchIndex", rw, s.candidate.ID(), s.parentEpochState.ID()).Return(nil).Once()
-	s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
+	s.epochStateDB.On("BatchIndex", rw, s.candidate.Hash(), s.parentEpochState.Hash()).Return(nil).Once()
+	s.mutator.On("SetEpochStateID", s.parentEpochState.Hash()).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
@@ -106,7 +106,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
 	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
 	// operations are deferred only because block ID is not known yet.
-	blockID := s.candidate.ID()
+	blockID := s.candidate.Hash()
 	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
@@ -117,7 +117,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 	updatedState := unittest.EpochStateFixture().EpochStateEntry
-	updatedStateID := updatedState.ID()
+	updatedStateID := updatedState.Hash()
 	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
 	epochSetup := unittest.EpochSetupFixture()
@@ -140,7 +140,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	require.NoError(s.T(), err)
 
 	// prepare a DB update for epoch state
-	s.epochStateDB.On("BatchIndex", rw, s.candidate.ID(), updatedStateID).Return(nil).Once()
+	s.epochStateDB.On("BatchIndex", rw, s.candidate.Hash(), updatedStateID).Return(nil).Once()
 	s.epochStateDB.On("BatchStore", w, updatedStateID, updatedState.MinEpochStateEntry).Return(nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
@@ -150,7 +150,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
 	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
 	// operations are deferred only because block ID is not known yet.
-	blockID := s.candidate.ID()
+	blockID := s.candidate.Hash()
 	err = dbUpdates.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }
@@ -532,7 +532,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
 	require.NoError(s.T(), err)
 
-	s.epochStateDB.On("BatchIndex", mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("BatchIndex", mocks.Anything, s.candidate.Hash(), mocks.Anything).Return(nil).Once()
 
 	expectedEpochState := &flow.MinEpochStateEntry{
 		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
@@ -541,8 +541,8 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 		EpochFallbackTriggered: true,
 	}
 
-	s.epochStateDB.On("BatchStore", mocks.Anything, expectedEpochState.ID(), expectedEpochState).Return(nil).Once()
-	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
+	s.epochStateDB.On("BatchStore", mocks.Anything, expectedEpochState.Hash(), expectedEpochState).Return(nil).Once()
+	s.mutator.On("SetEpochStateID", expectedEpochState.Hash()).Return().Once()
 
 	dbOps, err := stateMachine.Build()
 	require.NoError(s.T(), err)
@@ -554,7 +554,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
 	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
 	// operations are deferred only because block ID is not known yet
-	blockID := s.candidate.ID()
+	blockID := s.candidate.Hash()
 	err = dbOps.Execute(nil, blockID, rw)
 	require.NoError(s.T(), err)
 }

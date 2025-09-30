@@ -13,7 +13,7 @@ func BlockHeaderToMessage(
 	h *flow.Header,
 	signerIDs flow.IdentifierList,
 ) (*entities.BlockHeader, error) {
-	id := h.ID()
+	id := h.Hash()
 
 	var lastViewTC *entities.TimeoutCertificate
 	if h.LastViewTC != nil {

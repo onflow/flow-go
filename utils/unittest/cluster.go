@@ -31,12 +31,12 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterLi
 		if after != nil {
 			after(&tx)
 		}
-		routed, ok := clusters.ByTxID(tx.ID())
+		routed, ok := clusters.ByTxID(tx.Hash())
 		if !ok {
-			panic(fmt.Sprintf("unable to find cluster by txID: %x", tx.ID()))
+			panic(fmt.Sprintf("unable to find cluster by txID: %x", tx.Hash()))
 		}
 
-		if routed.ID() == target.ID() {
+		if routed.Hash() == target.Hash() {
 			return tx
 		}
 	}

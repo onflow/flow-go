@@ -88,7 +88,7 @@ func (c *Collections) Store(collection *flow.Collection) (*flow.LightCollection,
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.collections[collection.ID()] = collection
+	c.collections[collection.Hash()] = collection
 	light := collection.Light()
 	return light, nil
 }
@@ -109,9 +109,9 @@ func (c *Collections) StoreAndIndexByTransaction(_ lockctx.Proof, collection *fl
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.collections[collection.ID()] = collection
+	c.collections[collection.Hash()] = collection
 	light := collection.Light()
-	c.lightCollections[light.ID()] = light
+	c.lightCollections[light.Hash()] = light
 	for _, txID := range light.Transactions {
 		c.transactionIDToLightCollection[txID] = light
 	}
@@ -134,7 +134,7 @@ func (c *Collections) Remove(collID flow.Identifier) error {
 	delete(c.collections, collID)
 	delete(c.lightCollections, collID)
 	for txID, coll := range c.transactionIDToLightCollection {
-		if coll.ID() == collID {
+		if coll.Hash() == collID {
 			delete(c.transactionIDToLightCollection, txID)
 		}
 	}

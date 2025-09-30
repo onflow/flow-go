@@ -48,8 +48,8 @@ func NewIncorporatedResult(untrusted UntrustedIncorporatedResult) (*Incorporated
 	}, nil
 }
 
-// ID returns a collision-resistant hash for the [IncorporatedResult] structure.
-func (ir *IncorporatedResult) ID() Identifier {
+// Hash returns a collision-resistant hash for the [IncorporatedResult] structure.
+func (ir *IncorporatedResult) Hash() Identifier {
 	return MakeID(ir)
 }
 
@@ -90,7 +90,7 @@ func (l IncorporatedResultList) GroupByIncorporatedBlockID() IncorporatedResultG
 // GroupByResultID partitions the IncorporatedResultList by the Results' IDs.
 // Within each group, the order and multiplicity of the IncorporatedResults is preserved.
 func (l IncorporatedResultList) GroupByResultID() IncorporatedResultGroupedList {
-	grouper := func(ir *IncorporatedResult) Identifier { return ir.Result.ID() }
+	grouper := func(ir *IncorporatedResult) Identifier { return ir.Result.Hash() }
 	return l.GroupBy(grouper)
 }
 

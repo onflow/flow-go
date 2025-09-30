@@ -46,7 +46,7 @@ func (t *Transactions) Store(tx *flow.TransactionBody) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	txID := tx.ID()
+	txID := tx.Hash()
 	if _, ok := t.store[txID]; !ok {
 		t.store[txID] = tx
 	}

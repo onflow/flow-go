@@ -92,7 +92,7 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByID(blockID flow.Identifier) (
 }
 
 func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (*flow.Block, error) {
-	blockID := header.ID()
+	blockID := header.Hash()
 	block, err := r.blocks.ByID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by ID %v: %w", blockID, err)

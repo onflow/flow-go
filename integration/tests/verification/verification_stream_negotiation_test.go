@@ -40,11 +40,11 @@ func testVerificationNodeHappyPath(t *testing.T,
 	// wait for next height finalized (potentially first height), called blockA
 	currentFinalized := blocks.HighestFinalizedHeight()
 	blockA := blocks.WaitForHighestFinalizedProgress(t, currentFinalized)
-	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Height, blockA.ID())
+	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Height, blockA.Hash())
 
 	// waits for execution receipt for blockA from execution node, called receiptA
-	receiptA := receipts.WaitForReceiptFrom(t, blockA.ID(), exeID)
-	resultID := receiptA.ExecutionResult.ID()
+	receiptA := receipts.WaitForReceiptFrom(t, blockA.Hash(), exeID)
+	resultID := receiptA.ExecutionResult.Hash()
 	t.Logf("receipt for blockA generated: result ID: %x\n", resultID)
 
 	// wait for a result approval from verification node

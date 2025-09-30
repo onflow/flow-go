@@ -23,28 +23,28 @@ func TestEvents_HappyPath(t *testing.T) {
 		unittest.Event.WithEventType(flow.EventAccountCreated),
 		unittest.Event.WithTransactionIndex(0),
 		unittest.Event.WithEventIndex(0),
-		unittest.Event.WithTransactionID(transaction1.ID()),
+		unittest.Event.WithTransactionID(transaction1.Hash()),
 	)
 	event2 := unittest.EventFixture(
 		unittest.Event.WithEventType(flow.EventAccountUpdated),
 		unittest.Event.WithTransactionIndex(0),
 		unittest.Event.WithEventIndex(1),
-		unittest.Event.WithTransactionID(transaction1.ID()),
+		unittest.Event.WithTransactionID(transaction1.Hash()),
 	)
 	event3 := unittest.EventFixture(
 		unittest.Event.WithEventType(flow.EventAccountCreated),
 		unittest.Event.WithTransactionIndex(1),
 		unittest.Event.WithEventIndex(2),
-		unittest.Event.WithTransactionID(transaction2.ID()),
+		unittest.Event.WithTransactionID(transaction2.Hash()),
 	)
 
 	// Store events
 	expectedStoredEvents := flow.EventsList{event1, event2, event3}
-	err := eventsStore.Store(block.ID(), []flow.EventsList{expectedStoredEvents})
+	err := eventsStore.Store(block.Hash(), []flow.EventsList{expectedStoredEvents})
 	require.NoError(t, err)
 
 	// Retrieve events by block ID
-	storedEvents, err := eventsStore.ByBlockID(block.ID())
+	storedEvents, err := eventsStore.ByBlockID(block.Hash())
 	require.NoError(t, err)
 	assert.Len(t, storedEvents, len(expectedStoredEvents))
 	assert.Contains(t, storedEvents, event1)
@@ -52,20 +52,20 @@ func TestEvents_HappyPath(t *testing.T) {
 	assert.Contains(t, storedEvents, event3)
 
 	// Retrieve events by transaction ID
-	txEvents, err := eventsStore.ByBlockIDTransactionID(block.ID(), transaction1.ID())
+	txEvents, err := eventsStore.ByBlockIDTransactionID(block.Hash(), transaction1.Hash())
 	require.NoError(t, err)
 	assert.Len(t, txEvents, 2)
 	assert.Equal(t, event1, txEvents[0])
 	assert.Equal(t, event2, txEvents[1])
 
 	// Retrieve events by transaction index
-	indexEvents, err := eventsStore.ByBlockIDTransactionIndex(block.ID(), 1)
+	indexEvents, err := eventsStore.ByBlockIDTransactionIndex(block.Hash(), 1)
 	require.NoError(t, err)
 	assert.Len(t, indexEvents, 1)
 	assert.Equal(t, event3, indexEvents[0])
 
 	// Retrieve events by event type
-	typeEvents, err := eventsStore.ByBlockIDEventType(block.ID(), flow.EventAccountCreated)
+	typeEvents, err := eventsStore.ByBlockIDEventType(block.Hash(), flow.EventAccountCreated)
 	require.NoError(t, err)
 	assert.Len(t, typeEvents, 2)
 	assert.Contains(t, typeEvents, event1)

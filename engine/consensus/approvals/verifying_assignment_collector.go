@@ -120,13 +120,13 @@ func (ac *VerifyingAssignmentCollector) ProcessingStatus() ProcessingStatus {
 //     errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	ac.log.Debug().
-		Str("result_id", incorporatedResult.Result.ID().String()).
+		Str("result_id", incorporatedResult.Result.Hash().String()).
 		Str("incorporated_block_id", incorporatedResult.IncorporatedBlockID.String()).
 		Str("block_id", incorporatedResult.Result.BlockID.String()).
 		Msg("processing incorporated result")
 
 	// check that result is the one that this VerifyingAssignmentCollector manages
-	if irID := incorporatedResult.Result.ID(); irID != ac.ResultID() {
+	if irID := incorporatedResult.Result.Hash(); irID != ac.ResultID() {
 		return fmt.Errorf("this VerifyingAssignmentCollector manages result %x but got %x", ac.ResultID(), irID)
 	}
 
@@ -173,7 +173,7 @@ func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedRe
 		// those approvals are verified already and shouldn't yield any errors
 		err = collector.ProcessApproval(approval)
 		if err != nil {
-			return fmt.Errorf("processing already validated approval %x failed: %w", approval.ID(), err)
+			return fmt.Errorf("processing already validated approval %x failed: %w", approval.Hash(), err)
 		}
 	}
 
@@ -204,7 +204,7 @@ func (ac *VerifyingAssignmentCollector) allCollectors() []*ApprovalCollector {
 }
 
 func (ac *VerifyingAssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
-	id := approval.Attestation.ID()
+	id := approval.Attestation.Hash()
 	valid, err := nodeIdentity.StakingPubKey.Verify(approval.AttestationSignature, id[:], ac.sigHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify attestation signature: %w", err)
@@ -218,7 +218,7 @@ func (ac *VerifyingAssignmentCollector) verifyAttestationSignature(approval *flo
 }
 
 func (ac *VerifyingAssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
-	id := approval.Body.ID()
+	id := approval.Body.Hash()
 	valid, err := nodeIdentity.StakingPubKey.Verify(approval.VerifierSignature, id[:], ac.sigHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify approval signature: %w", err)

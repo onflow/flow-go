@@ -50,7 +50,7 @@ func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 // from _different_ ENs committing to the result.
 func (ir *IncorporatedResultSeals) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedResult) bool {
 	blockID := incorporatedResult.Result.BlockID // block that was computed
-	resultID := incorporatedResult.Result.ID()
+	resultID := incorporatedResult.Result.Hash()
 
 	// get all receipts that are known for the block
 	receipts, err := ir.receiptsDB.ByBlockID(blockID)

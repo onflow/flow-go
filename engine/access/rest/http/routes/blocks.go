@@ -125,7 +125,7 @@ func getBlock(option blockProviderOption, req *common.Request, backend access.AP
 	// lookup execution result
 	// (even if not specified as expandable, since we need the execution result ID to generate its expandable link)
 	var block commonmodels.Block
-	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.ID())
+	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.Hash())
 	if err != nil {
 		// handle case where execution result is not yet available
 		if se, ok := status.FromError(err); ok {

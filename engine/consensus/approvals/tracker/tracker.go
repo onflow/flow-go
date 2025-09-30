@@ -50,7 +50,7 @@ func (st *SealingTracker) nextUnsealedFinalizedBlock(sealedBlock *flow.Header) f
 	if err != nil {
 		return id.False
 	}
-	return id.Is(nextUnsealed.ID())
+	return id.Is(nextUnsealed.Hash())
 }
 
 // NewSealingObservation constructs a SealingObservation, which capture information
@@ -117,7 +117,7 @@ func (st *SealingObservation) ApprovalsRequested(ir *flow.IncorporatedResult, re
 // getOrCreateRecord returns the sealing record for the given incorporated result.
 // If no such record is found, a new record is created and stored in `records`.
 func (st *SealingObservation) getOrCreateRecord(ir *flow.IncorporatedResult) *SealingRecord {
-	irID := ir.ID()
+	irID := ir.Hash()
 	record, found := st.records[irID]
 	if !found {
 		record = &SealingRecord{
@@ -136,7 +136,7 @@ func (st *SealingObservation) Complete() {
 	observation := st.log.Info()
 
 	// basic information
-	observation.Str("finalized_block", st.finalizedBlock.ID().String()).
+	observation.Str("finalized_block", st.finalizedBlock.Hash().String()).
 		Uint64("finalized_block_height", st.finalizedBlock.Height).
 		Uint("seals_mempool_size", st.sealsPl.Size())
 

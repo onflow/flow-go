@@ -52,9 +52,9 @@ func (f executionResultFactory) WithExecutionDataID(executionDataID flow.Identif
 // WithBlock is an option that sets the `BlockID` of the execution result and all configured `Chunks`
 func (f executionResultFactory) WithBlock(block *flow.Block) ExecutionResultOption {
 	return func(g *ExecutionResultGenerator, result *flow.ExecutionResult) {
-		result.BlockID = block.ID()
+		result.BlockID = block.Hash()
 		for _, chunk := range result.Chunks {
-			chunk.BlockID = block.ID()
+			chunk.BlockID = block.Hash()
 		}
 	}
 }
@@ -63,7 +63,7 @@ func (f executionResultFactory) WithBlock(block *flow.Block) ExecutionResultOpti
 // adjusts the `StartState` of the first chunk to match the final state of the previous result.
 func (f executionResultFactory) WithPreviousResult(previousResult *flow.ExecutionResult) ExecutionResultOption {
 	return func(g *ExecutionResultGenerator, result *flow.ExecutionResult) {
-		result.PreviousResultID = previousResult.ID()
+		result.PreviousResultID = previousResult.Hash()
 		finalState, err := previousResult.FinalStateCommitment()
 		NoError(err)
 		result.Chunks[0].StartState = finalState

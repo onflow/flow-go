@@ -75,7 +75,7 @@ func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporat
 		currentState := collector.ProcessingStatus()
 		err := collector.ProcessIncorporatedResult(incorporatedResult)
 		if err != nil {
-			return fmt.Errorf("could not process incorporated result %v: %w", incorporatedResult.ID(), err)
+			return fmt.Errorf("could not process incorporated result %v: %w", incorporatedResult.Hash(), err)
 		}
 		if currentState != asm.ProcessingStatus() {
 			continue
@@ -96,7 +96,7 @@ func (asm *AssignmentCollectorStateMachine) ProcessApproval(approval *flow.Resul
 		currentState := collector.ProcessingStatus()
 		err := collector.ProcessApproval(approval)
 		if err != nil {
-			return fmt.Errorf("could not process approval %v: %w", approval.ID(), err)
+			return fmt.Errorf("could not process approval %v: %w", approval.Hash(), err)
 		}
 		if currentState != asm.ProcessingStatus() {
 			continue
@@ -268,9 +268,9 @@ func (asm *AssignmentCollectorStateMachine) reIngestIncorporatedResultTask(incRe
 		if err != nil {
 			asm.log.Fatal().Err(err).
 				Str("executed_block_id", incResult.Result.BlockID.String()).
-				Str("result_id", incResult.Result.ID().String()).
+				Str("result_id", incResult.Result.Hash().String()).
 				Str("incorporating_block_id", incResult.IncorporatedBlockID.String()).
-				Str("incorporated_result_id", incResult.ID().String()).
+				Str("incorporated_result_id", incResult.Hash().String()).
 				Msg("re-ingesting incorporated results failed")
 		}
 	}
@@ -287,7 +287,7 @@ func (asm *AssignmentCollectorStateMachine) reIngestApprovalTask(approval *flow.
 				Str("approver_id", approval.Body.ApproverID.String()).
 				Str("executed_block_id", approval.Body.BlockID.String()).
 				Str("result_id", approval.Body.ExecutionResultID.String()).
-				Str("approval_id", approval.ID().String()).
+				Str("approval_id", approval.Hash().String()).
 				Logger()
 			if engine.IsInvalidInputError(err) {
 				lg.Error().Msgf("received invalid approval")

@@ -32,14 +32,14 @@ func TestLoadingUnfinalizedBlocks(t *testing.T) {
 	require.NoError(t, ps.Extend(blockB))
 	require.NoError(t, ps.Extend(blockC))
 	require.NoError(t, ps.Extend(blockD))
-	require.NoError(t, ps.Finalize(blockC.ID()))
+	require.NoError(t, ps.Finalize(blockC.Hash()))
 
 	es := new(stateMock.FinalizedExecutionState)
 	es.On("GetHighestFinalizedExecuted").Return(genesis.Height, nil)
 	headers := new(storage.Headers)
-	headers.On("BlockIDByHeight", blockA.Height).Return(blockA.ID(), nil)
-	headers.On("BlockIDByHeight", blockB.Height).Return(blockB.ID(), nil)
-	headers.On("BlockIDByHeight", blockC.Height).Return(blockC.ID(), nil)
+	headers.On("BlockIDByHeight", blockA.Height).Return(blockA.Hash(), nil)
+	headers.On("BlockIDByHeight", blockB.Height).Return(blockB.Hash(), nil)
+	headers.On("BlockIDByHeight", blockC.Height).Return(blockC.Hash(), nil)
 
 	loader := loader.NewUnfinalizedLoader(unittest.Logger(), ps, headers, es)
 
@@ -47,9 +47,9 @@ func TestLoadingUnfinalizedBlocks(t *testing.T) {
 	require.NoError(t, err)
 
 	unittest.IDsEqual(t, []flow.Identifier{
-		blockA.ID(),
-		blockB.ID(),
-		blockC.ID(),
-		blockD.ID(),
+		blockA.Hash(),
+		blockB.Hash(),
+		blockC.Hash(),
+		blockD.Hash(),
 	}, unexecuted)
 }

@@ -241,8 +241,8 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	nextEpoch := m.state.NextEpoch
 	if nextEpoch != nil {
 		// accept iff the EpochRecover is the same as the one we have already recovered.
-		if nextEpoch.SetupID != epochRecover.EpochSetup.ID() ||
-			nextEpoch.CommitID != epochRecover.EpochCommit.ID() {
+		if nextEpoch.SetupID != epochRecover.EpochSetup.Hash() ||
+			nextEpoch.CommitID != epochRecover.EpochCommit.Hash() {
 			m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(),
 				protocol.NewInvalidServiceEventErrorf("multiple inconsistent EpochRecover events sealed in the same block"))
 			return false, nil
@@ -261,8 +261,8 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	}
 	nextEpochState, err := flow.NewEpochStateContainer(
 		flow.UntrustedEpochStateContainer{
-			SetupID:          epochRecover.EpochSetup.ID(),
-			CommitID:         epochRecover.EpochCommit.ID(),
+			SetupID:          epochRecover.EpochSetup.Hash(),
+			CommitID:         epochRecover.EpochCommit.Hash(),
 			ActiveIdentities: nextEpochParticipants,
 			EpochExtensions:  nil,
 		},

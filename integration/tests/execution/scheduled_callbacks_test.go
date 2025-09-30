@@ -29,7 +29,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	// wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.Hash())
 
 	// Execute script to call getStatus(id: 10) on the contract
 	result, ok := s.getCallbackStatus(10)
@@ -38,7 +38,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 
 	// Wait for a block to be executed to ensure everything is processed
 	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.HeaderBody.Height)
-	erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockB.ID()), s.exe1ID)
+	erBlock := s.ReceiptState.WaitForReceiptFrom(s.T(), flow.Identifier(blockB.Hash()), s.exe1ID)
 	s.T().Logf("got block result ID %v", erBlock.ExecutionResult.BlockID)
 }
 
@@ -48,7 +48,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.Hash())
 
 	// Deploy the test contract first
 	err := lib.DeployScheduledCallbackTestContract(
@@ -56,7 +56,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 		sdk.Address(sc.FlowCallbackScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
 		sdk.Address(sc.FungibleToken.Address),
-		sdk.Identifier(s.net.Root().ID()),
+		sdk.Identifier(s.net.Root().Hash()),
 	)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
@@ -118,7 +118,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	// Wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
+	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.Hash())
 
 	// Deploy the test contract first
 	err := lib.DeployScheduledCallbackTestContract(
@@ -126,7 +126,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 		sdk.Address(sc.FlowCallbackScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
 		sdk.Address(sc.FungibleToken.Address),
-		sdk.Identifier(s.net.Root().ID()),
+		sdk.Identifier(s.net.Root().Hash()),
 	)
 	require.NoError(s.T(), err, "could not deploy test contract")
 

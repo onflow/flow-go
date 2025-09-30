@@ -15,10 +15,10 @@ import (
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
 	db storage.DB
-	// cache is essentially an in-memory map from `CollectionGuarantee.ID()` -> `CollectionGuarantee`
+	// cache is essentially an in-memory map from `CollectionGuarantee.Hash()` -> `CollectionGuarantee`
 	cache *Cache[flow.Identifier, *flow.CollectionGuarantee]
 
-	// byCollectionIdCache is essentially an in-memory map from `CollectionGuarantee.CollectionID` -> `CollectionGuarantee.ID()`.
+	// byCollectionIdCache is essentially an in-memory map from `CollectionGuarantee.CollectionID` -> `CollectionGuarantee.Hash()`.
 	// The full flow.CollectionGuarantee can be retrieved from the `cache` above.
 	byCollectionIdCache *Cache[flow.Identifier, flow.Identifier]
 }
@@ -77,7 +77,7 @@ func NewGuarantees(
 }
 
 func (g *Guarantees) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, guarantee *flow.CollectionGuarantee) error {
-	guaranteeID := guarantee.ID()
+	guaranteeID := guarantee.Hash()
 	err := g.cache.PutTx(rw, guaranteeID, guarantee)
 	if err != nil {
 		return err

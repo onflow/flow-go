@@ -482,7 +482,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 
 	processEvent := flow.Event{
 		Type:             flow.EventType(processedEventName),
-		TransactionID:    processTxBody.ID(),
+		TransactionID:    processTxBody.Hash(),
 		TransactionIndex: 0,
 		EventIndex:       0,
 		Payload:          callbackEventPayload,
@@ -531,9 +531,9 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 
 	// Update transaction results to match the 3 transactions
 	meta.TxResults = []flow.LightTransactionResult{
-		{TransactionID: processTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
-		{TransactionID: executeCallbackTx.ID(), ComputationUsed: computationUsed, Failed: false},
-		{TransactionID: serviceTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: processTxBody.Hash(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: executeCallbackTx.Hash(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: serviceTxBody.Hash(), ComputationUsed: computationUsed, Failed: false},
 	}
 
 	// Update service events
@@ -572,8 +572,8 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledCallbacks() {
 
 	// Update transaction results for 2 transactions (process callback + system)
 	meta.TxResults = []flow.LightTransactionResult{
-		{TransactionID: processTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
-		{TransactionID: serviceTxBody.ID(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: processTxBody.Hash(), ComputationUsed: computationUsed, Failed: false},
+		{TransactionID: serviceTxBody.Hash(), ComputationUsed: computationUsed, Failed: false},
 	}
 
 	// Update service events
@@ -601,7 +601,7 @@ func newLedger(t *testing.T) *completeLedger.Ledger {
 }
 
 func blockFixture(collection *flow.Collection) *flow.Block {
-	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
+	guarantee := &flow.CollectionGuarantee{CollectionID: collection.Hash()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(
 			flow.Payload{Guarantees: []*flow.CollectionGuarantee{guarantee}},
@@ -695,7 +695,7 @@ func generateTransactionResults(t *testing.T, collection *flow.Collection) []flo
 	txResults := make([]flow.LightTransactionResult, len(collection.Transactions))
 	for i, tx := range collection.Transactions {
 		txResults[i] = flow.LightTransactionResult{
-			TransactionID:   tx.ID(),
+			TransactionID:   tx.Hash(),
 			ComputationUsed: computationUsed,
 			Failed:          false,
 		}
@@ -791,7 +791,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 		Update:        update,
 		Proof:         proof,
 
-		ExecDataBlockID: block.ID(),
+		ExecDataBlockID: block.Hash(),
 
 		ledger: s.ledger,
 	}
@@ -854,7 +854,7 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: 0,
 			StartState:      flow.StateCommitment(m.StartState),
-			BlockID:         m.Header.ID(),
+			BlockID:         m.Header.Hash(),
 			// in these test cases, all defined service events correspond to the current chunk
 			ServiceEventCount: uint16(len(m.ServiceEvents)),
 			EventCollection:   eventsMerkleRootHash,
@@ -863,7 +863,7 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 	}
 
 	chunkDataPack := &flow.ChunkDataPack{
-		ChunkID:           chunk.ID(),
+		ChunkID:           chunk.Hash(),
 		StartState:        flow.StateCommitment(m.StartState),
 		Proof:             m.Proof,
 		Collection:        m.Collection,
@@ -872,7 +872,7 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 
 	// ExecutionResult setup
 	result := &flow.ExecutionResult{
-		BlockID:         m.Header.ID(),
+		BlockID:         m.Header.Hash(),
 		Chunks:          flow.ChunkList{chunk},
 		ServiceEvents:   m.ServiceEvents,
 		ExecutionDataID: executionDataID,

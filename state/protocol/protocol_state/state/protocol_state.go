@@ -270,7 +270,7 @@ func (s *MutableProtocolState) initializeOrthogonalStateMachines(
 		}
 		stateMachines = append(stateMachines, stateMachine)
 	}
-	return parentState.ID(), stateMachines, evolvingState, nil
+	return parentState.Hash(), stateMachines, evolvingState, nil
 }
 
 // serviceEventsFromSeals arranges the sealed results in order of increasing height of the executed blocks
@@ -296,7 +296,7 @@ func (s *MutableProtocolState) serviceEventsFromSeals(candidateSeals []*flow.Sea
 		result, err := s.results.ByID(seal.ResultID)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, irrecoverable.NewExceptionf("could not get result %x sealed by valid seal %x: %w", seal.ResultID, seal.ID(), err)
+				return nil, irrecoverable.NewExceptionf("could not get result %x sealed by valid seal %x: %w", seal.ResultID, seal.Hash(), err)
 			}
 			return nil, fmt.Errorf("retrieving result %x resulted in unexpected exception: %w", seal.ResultID, err)
 		}
@@ -339,7 +339,7 @@ func (s *MutableProtocolState) build(
 		}
 		deferredDBOps.Chain(dbOps)
 	}
-	resultingStateID := evolvingState.ID()
+	resultingStateID := evolvingState.Hash()
 
 	// We _always_ index the protocol state by the candidate block's ID. But only if the
 	// state actually changed, we add a database operation to persist it.

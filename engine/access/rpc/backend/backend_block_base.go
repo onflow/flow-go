@@ -30,7 +30,7 @@ func (b *backendBlockBase) getBlockStatus(header *flow.Header) (flow.BlockStatus
 		return flow.BlockStatusUnknown, fmt.Errorf("failed to lookup block ID by height: %w", err)
 	}
 
-	if blockIDFinalizedAtHeight != header.ID() {
+	if blockIDFinalizedAtHeight != header.Hash() {
 		// The queried block has been orphaned. It will never be finalized or sealed.
 		return flow.BlockStatusUnknown, nil
 	}

@@ -91,7 +91,7 @@ func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID 
 func (c CompleteExecutionReceiptList) ChunkOf(t *testing.T, resultID flow.Identifier, chunkIndex uint64) *flow.Chunk {
 	for _, completeER := range c {
 		for _, result := range completeER.ContainerBlock.Payload.Results {
-			if result.ID() == resultID {
+			if result.Hash() == resultID {
 				return result.Chunks[chunkIndex]
 			}
 		}
@@ -128,7 +128,7 @@ func (c CompleteExecutionReceiptList) resultOf(t *testing.T, chunkID flow.Identi
 	for _, completeER := range c {
 		for _, result := range completeER.ContainerBlock.Payload.Results {
 			for _, chunk := range result.Chunks {
-				if chunk.ID() == chunkID {
+				if chunk.Hash() == chunkID {
 					return result, chunk.Index
 				}
 			}
@@ -530,9 +530,9 @@ func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.Exec
 	}
 
 	// to be a valid fixture, results A and B must share first chunk.
-	require.Equal(t, resultA.Chunks[0].ID(), resultB.Chunks[0].ID())
+	require.Equal(t, resultA.Chunks[0].Hash(), resultB.Chunks[0].Hash())
 	// and they must represent a fork
-	require.NotEqual(t, resultA.ID(), resultB.ID())
+	require.NotEqual(t, resultA.Hash(), resultB.Hash())
 
 	return resultA, resultB, collections[0], block
 }

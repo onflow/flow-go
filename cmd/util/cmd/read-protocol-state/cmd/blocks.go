@@ -61,7 +61,7 @@ func NewReader(state protocol.State, blocks storage.Blocks, commits storage.Comm
 }
 
 func (r *Reader) getBlockByHeader(header *flow.Header) (*flow.Block, error) {
-	blockID := header.ID()
+	blockID := header.Hash()
 	block, err := r.blocks.ByID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by ID %v: %w", blockID, err)
@@ -229,7 +229,7 @@ func runE(*cobra.Command, []string) error {
 					return fmt.Errorf("could not get block by height: %v: %w", h, err)
 				}
 
-				executed, err := reader.IsExecuted(block.ID())
+				executed, err := reader.IsExecuted(block.Hash())
 				if err != nil {
 					log.Fatal().Err(err).Msgf("could not check block executed or not: %v", h)
 				}

@@ -117,7 +117,7 @@ func (e *ExecutionResultQueryProvider) ExecutionResultQuery(blockID flow.Identif
 		// None of these are possible since there must be at least one AgreeingExecutorsCount. If the
 		// criteria is met, then there must be at least one acceptable executor. If this is not true,
 		// then the criteria check must fail.
-		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
+		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.Hash(), blockID, err)
 	}
 
 	return &optimistic_sync.Query{

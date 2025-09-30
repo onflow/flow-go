@@ -25,7 +25,7 @@ func TestReadClusterRange(t *testing.T) {
 		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			// add parent as boundary
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
+				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.Hash())
 			})
 			if err != nil {
 				return err
@@ -48,7 +48,7 @@ func TestReadClusterRange(t *testing.T) {
 				}
 
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+					return procedure.FinalizeClusterBlock(lctx, rw, block.Hash())
 				})
 			})
 			require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestReadClusterRange(t *testing.T) {
 		require.NoError(t, err)
 
 		for i, light := range lights {
-			require.Equal(t, light.ID, blocks[i].ID())
+			require.Equal(t, light.ID, blocks[i].Hash())
 		}
 
 		require.Equal(t, len(blocks), len(lights))

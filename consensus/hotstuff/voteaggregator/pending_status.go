@@ -35,11 +35,11 @@ func (pv *PendingVotes) AddVote(vote *model.Vote) bool {
 // returns false if it has been added before
 // returns true otherwise
 func (ps *PendingStatus) AddVote(vote *model.Vote) bool {
-	_, exists := ps.voteMap[vote.ID()]
+	_, exists := ps.voteMap[vote.Hash()]
 	if exists {
 		return false
 	}
-	ps.voteMap[vote.ID()] = struct{}{}
+	ps.voteMap[vote.Hash()] = struct{}{}
 	ps.orderedVotes = append(ps.orderedVotes, vote)
 	return true
 }

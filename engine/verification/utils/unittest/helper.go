@@ -195,19 +195,19 @@ func SetupMockConsensusNode(t *testing.T,
 			assert.True(t, ok)
 
 			lg.Debug().
-				Hex("result_approval_id", logging.ID(resultApproval.ID())).
+				Hex("result_approval_id", logging.ID(resultApproval.Hash())).
 				Msg("result approval received")
 
 			// asserts that result approval has not been seen from this
-			_, ok = resultApprovalSeen[originID][resultApproval.ID()]
+			_, ok = resultApprovalSeen[originID][resultApproval.Hash()]
 			assert.False(t, ok)
 
 			// marks result approval as seen
-			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
+			resultApprovalSeen[originID][resultApproval.Hash()] = struct{}{}
 
 			// result approval should belong to an assigned chunk to the verification node.
 			chunk := completeERs.ChunkOf(t, resultApproval.Body.ExecutionResultID, resultApproval.Body.ChunkIndex)
-			assert.Contains(t, assignedChunkIDs, chunk.ID())
+			assert.Contains(t, assignedChunkIDs, chunk.Hash())
 
 			// verifies SPoCK proof of result approval
 			// against the SPoCK secret of the execution result
@@ -227,7 +227,7 @@ func SetupMockConsensusNode(t *testing.T,
 			valid, err := crypto.SPOCKVerifyAgainstData(
 				pk,
 				resultApproval.Body.Spock,
-				completeERs.ReceiptDataOf(t, chunk.ID()).SpockSecrets[resultApproval.Body.ChunkIndex],
+				completeERs.ReceiptDataOf(t, chunk.Hash()).SpockSecrets[resultApproval.Body.ChunkIndex],
 				hasher,
 			)
 			assert.NoError(t, err)
@@ -303,7 +303,7 @@ func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 func WithAssignee(t *testing.T, assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.AssignmentBuilder) *flow.Chunk {
 	return func(blockID flow.Identifier, index uint64, assignmentBuilder *chunks.AssignmentBuilder) *flow.Chunk {
 		chunk := ChunkWithIndex(blockID, int(index))
-		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
+		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.Hash())
 		require.NoError(t, assignmentBuilder.Add(chunk.Index, flow.IdentifierList{assignee}))
 		return chunk
 	}
@@ -332,7 +332,7 @@ func MockChunkAssignmentFixture(t *testing.T,
 		for _, receipt := range completeER.Receipts {
 			a := chunks.NewAssignmentBuilder()
 
-			_, duplicate := visited[receipt.ExecutionResult.ID()]
+			_, duplicate := visited[receipt.ExecutionResult.Hash()]
 			if duplicate {
 				// skips mocking chunk assignment for duplicate results
 				continue
@@ -340,9 +340,9 @@ func MockChunkAssignmentFixture(t *testing.T,
 
 			for _, chunk := range receipt.ExecutionResult.Chunks {
 				if isAssigned(chunk.Index, len(receipt.ExecutionResult.Chunks)) {
-					locatorID := unittest.ChunkLocatorFixture(receipt.ExecutionResult.ID(), chunk.Index).ID()
+					locatorID := unittest.ChunkLocatorFixture(receipt.ExecutionResult.Hash(), chunk.Index).Hash()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
-					expectedChunkIds = append(expectedChunkIds, chunk.ID())
+					expectedChunkIds = append(expectedChunkIds, chunk.Hash())
 					require.NoError(t, a.Add(chunk.Index, verIds.NodeIDs()))
 				} else {
 					// the chunk has no verifiers assigned
@@ -352,8 +352,8 @@ func MockChunkAssignmentFixture(t *testing.T,
 			}
 			assignment := a.Build()
 
-			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(assignment, nil)
-			visited[receipt.ExecutionResult.ID()] = struct{}{}
+			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.Hash()).Return(assignment, nil)
+			visited[receipt.ExecutionResult.Hash()] = struct{}{}
 		}
 	}
 
@@ -386,7 +386,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 	for _, completeER := range completeExecutionReceipts {
 		// extends state with reference blocks of the receipts
 		for _, receipt := range completeER.ReceiptsData {
-			refBlockID := receipt.ReferenceBlock.ID()
+			refBlockID := receipt.ReferenceBlock.Hash()
 			_, dup := duplicate[refBlockID]
 			if dup {
 				// skips extending state with already duplicate reference block
@@ -394,7 +394,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 			}
 
 			err := state.Extend(context.Background(), unittest.ProposalFromBlock(receipt.ReferenceBlock))
-			require.NoError(t, err, fmt.Errorf("can not extend block %v: %w", receipt.ReferenceBlock.ID(), err))
+			require.NoError(t, err, fmt.Errorf("can not extend block %v: %w", receipt.ReferenceBlock.Hash(), err))
 			err = state.Finalize(context.Background(), refBlockID)
 			require.NoError(t, err)
 			blocks = append(blocks, receipt.ReferenceBlock)
@@ -402,7 +402,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 		}
 
 		// extends state with container block of receipt.
-		containerBlockID := completeER.ContainerBlock.ID()
+		containerBlockID := completeER.ContainerBlock.Hash()
 		_, dup := duplicate[containerBlockID]
 		if dup {
 			// skips extending state with already duplicate container block
@@ -493,7 +493,7 @@ func withConsumers(t *testing.T,
 	require.NoError(t, err)
 	protocolState, err := s.State.Final().ProtocolState()
 	require.NoError(t, err)
-	protocolStateID := protocolState.ID()
+	protocolStateID := protocolState.Hash()
 
 	chainID := root.ChainID
 	ops = append(ops, WithExecutorIDs(

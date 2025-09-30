@@ -13,7 +13,7 @@ func NewMockFetcher() *MockFetcher {
 }
 
 func (r *MockFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
-	r.byID[guarantee.ID()] = struct{}{}
+	r.byID[guarantee.Hash()] = struct{}{}
 	return nil
 }
 

@@ -18,9 +18,9 @@ type ClusterLightBlock struct {
 
 func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterLightBlock {
 	return &ClusterLightBlock{
-		ID:           clusterBlock.ID(),
+		ID:           clusterBlock.Hash(),
 		Height:       clusterBlock.Height,
-		CollectionID: clusterBlock.Payload.Collection.ID(),
+		CollectionID: clusterBlock.Payload.Collection.Hash(),
 		Transactions: clusterBlock.Payload.Collection.Light().Transactions,
 	}
 }
@@ -49,7 +49,7 @@ type LightBlock struct {
 
 func BlockToLight(block *flow.Block) *LightBlock {
 	return &LightBlock{
-		ID:          block.ID(),
+		ID:          block.Hash(),
 		Height:      block.Height,
 		Collections: flow.EntitiesToIDs(block.Payload.Guarantees),
 	}

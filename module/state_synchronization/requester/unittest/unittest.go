@@ -156,7 +156,7 @@ func WithBlockIDByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockO
 				if _, has := blocksByHeight[height]; !has {
 					return flow.ZeroID
 				}
-				return blocksByHeight[height].ID()
+				return blocksByHeight[height].Hash()
 			},
 			func(height uint64) error {
 				if _, has := blocksByHeight[height]; !has {

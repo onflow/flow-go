@@ -20,7 +20,7 @@ func TestCollection_HappyCase(t *testing.T) {
 	require.NoError(t, err)
 
 	// Retrieve collection
-	retrieved, err := collections.ByID(collection.ID())
+	retrieved, err := collections.ByID(collection.Hash())
 	require.NoError(t, err)
 	require.Equal(t, &collection, retrieved)
 
@@ -30,10 +30,10 @@ func TestCollection_HappyCase(t *testing.T) {
 	require.Equal(t, collection, extracted[0])
 
 	// Remove collection
-	err = collections.Remove(collection.ID())
+	err = collections.Remove(collection.Hash())
 	require.NoError(t, err)
 
-	retrieved, err = collections.ByID(collection.ID())
+	retrieved, err = collections.ByID(collection.Hash())
 	require.ErrorIs(t, err, storage.ErrNotFound)
 	require.Nil(t, retrieved)
 }
@@ -48,12 +48,12 @@ func TestLightByTransactionID_HappyCase(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fetch by transaction ID and validate
-	retrieved, err := collections.LightByTransactionID(collection.Transactions[0].ID())
+	retrieved, err := collections.LightByTransactionID(collection.Transactions[0].Hash())
 	require.NoError(t, err)
 	lightCollection := collection.Light()
 	require.Equal(t, *lightCollection, *retrieved)
 
-	retrieved, err = collections.LightByTransactionID(collection.Transactions[1].ID())
+	retrieved, err = collections.LightByTransactionID(collection.Transactions[1].Hash())
 	require.NoError(t, err)
 	require.Equal(t, *lightCollection, *retrieved)
 

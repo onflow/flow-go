@@ -57,7 +57,7 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 		suite.block.Height: suite.block,
 	}
 
-	suite.executionData = unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(suite.block.ID()))
+	suite.executionData = unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(suite.block.Hash()))
 
 	suite.highestAvailableHeight = func() uint64 { return suite.block.Height + 1 }
 
@@ -71,7 +71,7 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	)
 
 	seal := unittest.Seal.Fixture(
-		unittest.Seal.WithBlockID(suite.block.ID()),
+		unittest.Seal.WithBlockID(suite.block.Hash()),
 		unittest.Seal.WithResult(result),
 	)
 
@@ -81,12 +81,12 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	)
 	suite.results = synctest.MockResultsStorage(
 		synctest.WithResultByID(map[flow.Identifier]*flow.ExecutionResult{
-			result.ID(): result,
+			result.Hash(): result,
 		}),
 	)
 	suite.seals = synctest.MockSealsStorage(
 		synctest.WithSealsByBlockID(map[flow.Identifier]*flow.Seal{
-			suite.block.ID(): seal,
+			suite.block.Hash(): seal,
 		}),
 	)
 

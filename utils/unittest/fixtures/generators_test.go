@@ -56,16 +56,16 @@ func TestGeneratorsDeterminism(t *testing.T) {
 
 				// Test with parent details
 				parent := suite.Headers().Fixture()
-				child1 := suite.Headers().Fixture(Header.WithParent(parent.ID(), parent.View, parent.Height))
+				child1 := suite.Headers().Fixture(Header.WithParent(parent.Hash(), parent.View, parent.Height))
 				assert.Equal(t, parent.Height+1, child1.Height)
-				assert.Equal(t, parent.ID(), child1.ParentID)
+				assert.Equal(t, parent.Hash(), child1.ParentID)
 				assert.Equal(t, parent.ChainID, child1.ChainID)
 				assert.Less(t, parent.View, child1.View)
 
 				// Test with parent header
 				child2 := suite.Headers().Fixture(Header.WithParentHeader(parent))
 				assert.Equal(t, parent.Height+1, child2.Height)
-				assert.Equal(t, parent.ID(), child2.ParentID)
+				assert.Equal(t, parent.Hash(), child2.ParentID)
 				assert.Equal(t, parent.ChainID, child2.ChainID)
 				assert.Less(t, parent.View, child2.View)
 

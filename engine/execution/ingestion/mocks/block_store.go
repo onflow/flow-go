@@ -43,10 +43,10 @@ func NewMockBlockStore(t *testing.T) *MockBlockStore {
 	}
 
 	byBlock := make(map[flow.Identifier]*BlockResult)
-	byBlock[rootResult.Block.ID()] = blockResult
+	byBlock[rootResult.Block.Hash()] = blockResult
 
 	executed := make(map[flow.Identifier]struct{})
-	executed[rootResult.Block.ID()] = struct{}{}
+	executed[rootResult.Block.Hash()] = struct{}{}
 	return &MockBlockStore{
 		ResultByBlock: byBlock,
 		Executed:      executed,
@@ -57,7 +57,7 @@ func NewMockBlockStore(t *testing.T) *MockBlockStore {
 func (bs *MockBlockStore) MarkExecuted(computationResult *execution.ComputationResult) error {
 	bs.Lock()
 	defer bs.Unlock()
-	blockID := computationResult.ExecutableBlock.Block.ID()
+	blockID := computationResult.ExecutableBlock.Block.Hash()
 	_, executed := bs.Executed[blockID]
 	if executed {
 		return fmt.Errorf("block %s already executed", blockID)
@@ -86,7 +86,7 @@ func (bs *MockBlockStore) CreateBlockAndMockResult(t *testing.T, block *entity.E
 	parentResult, ok := bs.ResultByBlock[parent]
 	require.True(t, ok, "parent block %s not found", parent)
 
-	previousExecutionResultID := parentResult.Result.ExecutionReceipt.ExecutionResult.ID()
+	previousExecutionResultID := parentResult.Result.ExecutionReceipt.ExecutionResult.Hash()
 
 	previousCommit := parentResult.Result.CurrentEndState()
 

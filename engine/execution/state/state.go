@@ -360,7 +360,7 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return result.ID(), nil
+	return result.Hash(), nil
 }
 
 func (s *state) SaveExecutionResults(
@@ -461,7 +461,7 @@ func (s *state) saveExecutionResults(
 			return fmt.Errorf("could not persist execution result: %w", err)
 		}
 
-		err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+		err = s.results.BatchIndex(blockID, executionResult.Hash(), batch)
 		if err != nil {
 			return fmt.Errorf("cannot index execution result: %w", err)
 		}

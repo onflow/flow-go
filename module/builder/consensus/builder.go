@@ -149,7 +149,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.Hash(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
 	err = b.state.Extend(ctx, blockProposal)
@@ -171,7 +171,7 @@ func (b *Builder) repopulateExecutionTree() error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized block: %w", err)
 	}
-	finalizedID := finalized.ID()
+	finalizedID := finalized.Hash()
 
 	// Get the latest sealed block on this fork, i.e. the highest
 	// block for which there is a finalized seal.
@@ -209,14 +209,14 @@ func (b *Builder) repopulateExecutionTree() error {
 
 	// receiptCollector adds _all known_ receipts for the given block to the execution tree
 	receiptCollector := func(header *flow.Header) error {
-		receipts, err := b.receiptsDB.ByBlockID(header.ID())
+		receipts, err := b.receiptsDB.ByBlockID(header.Hash())
 		if err != nil {
-			return fmt.Errorf("could not retrieve execution reciepts for block %x: %w", header.ID(), err)
+			return fmt.Errorf("could not retrieve execution reciepts for block %x: %w", header.Hash(), err)
 		}
 		for _, receipt := range receipts {
 			_, err = b.recPool.AddReceipt(receipt, header)
 			if err != nil {
-				return fmt.Errorf("could not add receipt (%x) to execution tree: %w", receipt.ID(), err)
+				return fmt.Errorf("could not add receipt (%x) to execution tree: %w", receipt.Hash(), err)
 			}
 		}
 		return nil
@@ -292,7 +292,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 	// loop through the fork backwards, from parent to limit (inclusive),
 	// and keep track of blocks and collections visited on the way
 	forkScanner := func(header *flow.Header) error {
-		ancestorID := header.ID()
+		ancestorID := header.Hash()
 		blockLookup[ancestorID] = struct{}{}
 
 		index, err := b.index.ByBlockID(ancestorID)
@@ -322,7 +322,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		}
 
 		// skip collections that are already included in a block on the fork
-		_, duplicated := receiptLookup[guarantee.ID()]
+		_, duplicated := receiptLookup[guarantee.Hash()]
 		if duplicated {
 			continue
 		}
@@ -387,7 +387,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	//    Therefore, we only have to inspect the results incorporated in unsealed blocks.
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
-		blockID := header.ID()
+		blockID := header.Hash()
 		if blockID == parentID {
 			// Important protocol edge case: There must be at least one block in between the block incorporating
 			// a result and the block sealing the result. This is because we need the Source of Randomness for
@@ -424,7 +424,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we
 			// find a candidate seal satisfies condition (0)
-			irSeal, ok := b.sealPool.Get(incorporatedResult.ID())
+			irSeal, ok := b.sealPool.Get(incorporatedResult.Hash())
 			if !ok {
 				continue
 			}
@@ -530,7 +530,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	// loop through the fork backwards, from parent to last sealed (including),
 	// and keep track of blocks and receipts visited on the way.
 	forkScanner := func(ancestor *flow.Header) error {
-		ancestorID := ancestor.ID()
+		ancestorID := ancestor.Hash()
 		ancestors[ancestorID] = struct{}{}
 
 		index, err := b.index.ByBlockID(ancestorID)
@@ -692,7 +692,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 func isResultForBlock(blockIDs map[flow.Identifier]struct{}) mempool.BlockFilter {
 	blockIdFilter := id.InSet(blockIDs)
 	return func(h *flow.Header) bool {
-		return blockIdFilter(h.ID())
+		return blockIdFilter(h.Hash())
 	}
 }
 
@@ -701,7 +701,7 @@ func isResultForBlock(blockIDs map[flow.Identifier]struct{}) mempool.BlockFilter
 // * or are for the sealed block
 func isNoDupAndNotSealed(includedReceipts map[flow.Identifier]struct{}, sealedBlockID flow.Identifier) mempool.ReceiptFilter {
 	return func(receipt *flow.ExecutionReceipt) bool {
-		if _, duplicate := includedReceipts[receipt.ID()]; duplicate {
+		if _, duplicate := includedReceipts[receipt.Hash()]; duplicate {
 			return false
 		}
 		if receipt.ExecutionResult.BlockID == sealedBlockID {

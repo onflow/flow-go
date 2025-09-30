@@ -33,10 +33,10 @@ func (s *TransactionMetricsSuite) TestTransactionMetrics() {
 	// wait for next height finalized (potentially first height), called blockA
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got blockA height %v ID %v\n", blockA.Height, blockA.ID())
+	s.T().Logf("got blockA height %v ID %v\n", blockA.Height, blockA.Hash())
 
 	// send transaction
-	tx, err := accessClient.DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
+	tx, err := accessClient.DeployContract(context.Background(), sdk.Identifier(s.net.Root().Hash()), lib.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	txres, err := accessClient.WaitForExecuted(context.Background(), tx.ID())
@@ -68,7 +68,7 @@ func (s *TransactionMetricsSuite) TestTransactionMetrics() {
 	}
 
 	// send another transaction
-	tx, err = accessClient.UpdateContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
+	tx, err = accessClient.UpdateContract(context.Background(), sdk.Identifier(s.net.Root().Hash()), lib.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	txres, err = accessClient.WaitForExecuted(context.Background(), tx.ID())

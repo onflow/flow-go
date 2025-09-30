@@ -32,7 +32,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve the setup by ID
-		actual, err := s.ByID(expected.ID())
+		actual, err := s.ByID(expected.Hash())
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 

@@ -29,11 +29,11 @@ func (snap EncodableSnapshot) Head() *flow.Header {
 // No errors are expected during normal operation.
 func (snap EncodableSnapshot) LatestSeal() (*flow.Seal, error) {
 	head := snap.Head()
-	latestSealID := snap.SealingSegment.LatestSeals[head.ID()]
+	latestSealID := snap.SealingSegment.LatestSeals[head.Hash()]
 
 	// Genesis/Spork-Root Case: The spork root block is the latest sealed block.
 	// By protocol definition, FirstSeal seals the spork root block.
-	if snap.SealingSegment.FirstSeal != nil && snap.SealingSegment.FirstSeal.ID() == latestSealID {
+	if snap.SealingSegment.FirstSeal != nil && snap.SealingSegment.FirstSeal.Hash() == latestSealID {
 		return snap.SealingSegment.FirstSeal, nil
 	}
 
@@ -43,7 +43,7 @@ func (snap EncodableSnapshot) LatestSeal() (*flow.Seal, error) {
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
 		proposal := snap.SealingSegment.Blocks[i]
 		for _, seal := range proposal.Block.Payload.Seals {
-			if seal.ID() == latestSealID {
+			if seal.Hash() == latestSealID {
 				return seal, nil
 			}
 		}
@@ -72,13 +72,13 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
 		proposal := snap.SealingSegment.Blocks[i]
 		for _, result := range proposal.Block.Payload.Results {
-			if latestSeal.ResultID == result.ID() {
+			if latestSeal.ResultID == result.Hash() {
 				return result, nil
 			}
 		}
 	}
 	for _, result := range snap.SealingSegment.ExecutionResults {
-		if latestSeal.ResultID == result.ID() {
+		if latestSeal.ResultID == result.Hash() {
 			return result, nil
 		}
 	}

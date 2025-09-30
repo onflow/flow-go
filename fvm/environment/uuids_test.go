@@ -20,7 +20,7 @@ func TestUUIDPartition(t *testing.T) {
 	// With enough samples, all partitions should be used.  (The first 1500 blocks
 	// only uses 254 partitions)
 	for numBlocks := 0; numBlocks < 2500; numBlocks++ {
-		blockId := blockHeader.ID()
+		blockId := blockHeader.Hash()
 
 		partition0 := uuidPartition(blockId, 0)
 		usedPartitions[partition0] = struct{}{}
@@ -69,7 +69,7 @@ func TestUUIDGeneratorInitializePartition(t *testing.T) {
 	blockHeader := &flow.Header{}
 
 	for numBlocks := 0; numBlocks < 10; numBlocks++ {
-		blockId := blockHeader.ID()
+		blockId := blockHeader.Hash()
 
 		for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
 			uuids := NewUUIDGenerator(

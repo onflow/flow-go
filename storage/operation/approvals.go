@@ -38,7 +38,7 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 // Expected error returns:
 //   - `storage.ErrDataMismatch` if a *different* approval for the same key pair (ExecutionResultID, chunk index) is already indexed
 func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
-	approvalID := approval.ID()
+	approvalID := approval.Hash()
 	resultID := approval.Body.ExecutionResultID
 	chunkIndex := approval.Body.ChunkIndex
 

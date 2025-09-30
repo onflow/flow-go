@@ -156,7 +156,7 @@ func (b *Store) StoreBlock(_ context.Context, block *flowgo.Block) error {
 
 func (b *Store) storeBlock(block *flowgo.Block) error {
 	b.blocks[block.Height] = *block
-	b.blockIDToHeight[block.ID()] = block.Height
+	b.blockIDToHeight[block.Hash()] = block.Height
 
 	if block.Height > b.blockHeight {
 		b.blockHeight = block.Height
@@ -228,7 +228,7 @@ func (b *Store) CommitBlock(
 	}
 
 	for _, tx := range transactions {
-		err := b.InsertTransaction(tx.ID(), *tx)
+		err := b.InsertTransaction(tx.Hash(), *tx)
 		if err != nil {
 			return err
 		}
@@ -359,7 +359,7 @@ func (b *Store) EventsByHeight(
 }
 
 func (b *Store) InsertCollection(col *flowgo.LightCollection) error {
-	b.collections[col.ID()] = *col
+	b.collections[col.Hash()] = *col
 	return nil
 }
 

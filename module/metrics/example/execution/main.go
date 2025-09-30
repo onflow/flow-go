@@ -32,7 +32,7 @@ func main() {
 		}
 		diskTotal := rand.Int63n(1024 * 1024 * 1024)
 		for i := 0; i < 1000; i++ {
-			blockID := unittest.BlockFixture().ID()
+			blockID := unittest.BlockFixture().Hash()
 			collector.StartBlockReceivedToExecuted(blockID)
 
 			duration := time.Duration(rand.Int31n(2000)) * time.Millisecond

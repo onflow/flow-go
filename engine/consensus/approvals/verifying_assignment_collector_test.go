@@ -84,14 +84,14 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
-			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
-			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+			require.Equal(s.T(), s.Block.Hash(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.Hash(), seal.Seal.ResultID)
 		},
 	).Return(true, nil).Once()
 	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	blockID := s.Block.ID()
-	resultID := s.IncorporatedResult.Result.ID()
+	blockID := s.Block.Hash()
+	resultID := s.IncorporatedResult.Result.Hash()
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
@@ -115,8 +115,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 	s.SealsPL.On("Add", mock.Anything).Return(true, nil).Twice()
 	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	blockID := s.Block.ID()
-	resultID := s.IncorporatedResult.Result.ID()
+	blockID := s.Block.Hash()
+	resultID := s.IncorporatedResult.Result.Hash()
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
@@ -129,12 +129,12 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 	}
 
 	incorporatedBlock := unittest.BlockHeaderWithParentFixture(s.Block)
-	s.Blocks[incorporatedBlock.ID()] = incorporatedBlock
+	s.Blocks[incorporatedBlock.Hash()] = incorporatedBlock
 
 	// at this point we have proposed a seal, let's construct new incorporated result with same assignment
 	// but different incorporated block ID resulting in new seal.
 	incorporatedResult := unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.Hash()),
 		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
 	)
 
@@ -152,7 +152,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidSignature() {
 
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
 		unittest.WithApproverID(s.VerID),
-		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 
 	// attestation signature is valid
 	s.PublicKey.On("Verify", mock.Anything, approval.Body.AttestationSignature, mock.Anything).Return(true, nil).Once()
@@ -172,7 +172,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidBlockID() {
 
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
 		unittest.WithApproverID(s.VerID),
-		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 
 	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
@@ -187,7 +187,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidBlockChunkInde
 
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(uint64(s.Chunks.Len())),
 		unittest.WithApproverID(s.VerID),
-		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 
 	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
@@ -290,7 +290,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 func (s *AssignmentCollectorTestSuite) TestProcessApproval_BeforeIncorporatedResult() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
 		unittest.WithApproverID(s.VerID),
-		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.Hash()))
 	err := s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
@@ -323,7 +323,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 		incorporatedBlock.Height = lastHeight
 		lastHeight++
 
-		s.Blocks[incorporatedBlock.ID()] = incorporatedBlock
+		s.Blocks[incorporatedBlock.Hash()] = incorporatedBlock
 		incorporatedBlocks = append(incorporatedBlocks, incorporatedBlock)
 	}
 
@@ -331,7 +331,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	for _, block := range incorporatedBlocks {
 		incorporatedResult := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()))
+			unittest.IncorporatedResult.WithIncorporatedBlockID(block.Hash()))
 		incorporatedResults = append(incorporatedResults, incorporatedResult)
 
 		err := s.collector.ProcessIncorporatedResult(incorporatedResult)
@@ -396,8 +396,8 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
-			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
-			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+			require.Equal(s.T(), s.Block.Hash(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.Hash(), seal.Seal.ResultID)
 		},
 	).Return(true, nil).Once()
 

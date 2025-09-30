@@ -44,9 +44,9 @@ func (s *CacheSuite) TestPeek() {
 	_, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	for _, proposal := range blocks {
-		actual := s.cache.Peek(proposal.Block.ID())
+		actual := s.cache.Peek(proposal.Block.Hash())
 		require.NotNil(s.T(), actual)
-		require.Equal(s.T(), actual.Block.ID(), proposal.Block.ID())
+		require.Equal(s.T(), actual.Block.Hash(), proposal.Block.Hash())
 	}
 }
 
@@ -69,7 +69,7 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 		// update view to be the same as already submitted batch to trigger equivocation
 		block.View = blocks[i].Block.View
 		// update parentID and parentView so blocks are still connected
-		block.ParentID = equivocatedBlocks[i-1].ID()
+		block.ParentID = equivocatedBlocks[i-1].Hash()
 		block.ParentView = equivocatedBlocks[i-1].View
 		s.consumer.On("OnDoubleProposeDetected",
 			model.BlockFromFlow(blocks[i].Block.ToHeader()), model.BlockFromFlow(block.ToHeader())).Return().Once()
@@ -118,7 +118,7 @@ func (s *CacheSuite) TestChildCertifiesParent() {
 	certifiedBatch, err = s.cache.AddBlocks([]*flow.Proposal{unittest.ProposalFromBlock(child)})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
-	require.Equal(s.T(), block.ID(), certifiedBatch[0].CertifyingQC.BlockID)
+	require.Equal(s.T(), block.Hash(), certifiedBatch[0].CertifyingQC.BlockID)
 	require.Equal(s.T(), certifiedBatch[0].Proposal, proposal)
 }
 
@@ -132,7 +132,7 @@ func (s *CacheSuite) TestChildBeforeParent() {
 	certifiedBatch, err := s.cache.AddBlocks(blocks[0:1])
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
-	require.Equal(s.T(), blocks[0].Block.ID(), certifiedBatch[0].CertifyingQC.BlockID)
+	require.Equal(s.T(), blocks[0].Block.Hash(), certifiedBatch[0].CertifyingQC.BlockID)
 	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
 }
 
@@ -172,7 +172,7 @@ func (s *CacheSuite) TestAddBatch() {
 		certifiedBlock := certifiedBatch[i]
 		require.Equal(s.T(), blocks[i], certifiedBlock.Proposal)
 		require.Equal(s.T(), blocks[i+1].Block.ParentQC(), certifiedBlock.CertifyingQC)
-		require.Equal(s.T(), certifiedBlock.Proposal.Block.ID(), certifiedBlock.CertifyingQC.BlockID)
+		require.Equal(s.T(), certifiedBlock.Proposal.Block.Hash(), certifiedBlock.CertifyingQC.BlockID)
 		require.Equal(s.T(), certifiedBlock.Proposal.Block.View, certifiedBlock.CertifyingQC.View)
 	}
 }
@@ -295,7 +295,7 @@ func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBlocks, 1)
 	require.Equal(s.T(), Ap, certifiedBlocks[0].Proposal)
-	require.Equal(s.T(), A.ID(), certifiedBlocks[0].CertifyingQC.BlockID)
+	require.Equal(s.T(), A.Hash(), certifiedBlocks[0].CertifyingQC.BlockID)
 }
 
 // TestChildEjectedBeforeAddingParent tests a scenario where we have:
@@ -320,14 +320,14 @@ func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
 	_, err = s.cache.AddBlocks([]*flow.Proposal{Cp})
 	require.NoError(s.T(), err)
 	// eject B
-	s.cache.backend.Remove(B.ID())
+	s.cache.backend.Remove(B.Hash())
 	s.cache.handleEjectedBlock(Bp)
 
 	certifiedBlocks, err := s.cache.AddBlocks([]*flow.Proposal{Ap})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBlocks, 1)
 	require.Equal(s.T(), Ap, certifiedBlocks[0].Proposal)
-	require.Equal(s.T(), A.ID(), certifiedBlocks[0].CertifyingQC.BlockID)
+	require.Equal(s.T(), A.Hash(), certifiedBlocks[0].CertifyingQC.BlockID)
 }
 
 // TestAddOverCacheLimit tests a scenario where caller feeds blocks to the cache in concurrent way

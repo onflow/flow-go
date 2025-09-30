@@ -39,7 +39,7 @@ var epochCommitCmd = &cobra.Command{
 				return fmt.Errorf("could not get epoch commit with id: %v: %w", commitID, err)
 			}
 
-			log.Info().Msgf("epoch commit id: %v", epochCommit.ID())
+			log.Info().Msgf("epoch commit id: %v", epochCommit.Hash())
 			common.PrettyPrint(epochCommit)
 			return nil
 		})

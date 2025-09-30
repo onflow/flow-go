@@ -38,7 +38,7 @@ func TestSubmitTransaction(t *testing.T) {
 		backend.AssertCalled(t, "ProcessTransaction", &tx)
 
 		// should return the fingerprint of the submitted transaction
-		assert.Equal(t, tx.ID(), flow.HashToID(res.Id))
+		assert.Equal(t, tx.Hash(), flow.HashToID(res.Id))
 	})
 
 	t.Run("should pass through error", func(t *testing.T) {

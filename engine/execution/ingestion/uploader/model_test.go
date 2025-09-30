@@ -38,11 +38,11 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 
 	eventsInBlockData := make(map[flow.Identifier]flow.Event)
 	for _, e := range blockData.Events {
-		eventsInBlockData[e.ID()] = *e
+		eventsInBlockData[e.Hash()] = *e
 	}
 
 	for _, expectedEvent := range allEvents {
-		event, ok := eventsInBlockData[expectedEvent.ID()]
+		event, ok := eventsInBlockData[expectedEvent.Hash()]
 		require.True(t, ok)
 		require.Equal(t, expectedEvent, event)
 	}

@@ -231,7 +231,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		block := unittest.ClusterBlockFixture()
 		block.Height = height
 		ss.heights[height] = unittest.ClusterProposalFromBlock(block)
-		ss.blockIDs[block.ID()] = ss.heights[height]
+		ss.blockIDs[block.Hash()] = ss.heights[height]
 	}
 
 	// empty range should be a no-op
@@ -262,7 +262,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 				expected := ss.heights[ref-1]
 				actual, err := clustermodel.NewProposal(res.Blocks[0])
 				require.NoError(t, err)
-				assert.Equal(ss.T(), expected.Block.ID(), actual.Block.ID(), "response should contain right block")
+				assert.Equal(ss.T(), expected.Block.Hash(), actual.Block.Hash(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -386,9 +386,9 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	ss.T().Run("request for existing blocks", func(t *testing.T) {
 		block := unittest.ClusterBlockFixture()
 		block.Height = ss.head.Height - 1
-		req.BlockIDs = []flow.Identifier{block.ID()}
+		req.BlockIDs = []flow.Identifier{block.Hash()}
 		proposal := unittest.ClusterProposalFromBlock(block)
-		ss.blockIDs[block.ID()] = proposal
+		ss.blockIDs[block.Hash()] = proposal
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
@@ -413,8 +413,8 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		for i := 0; i < len(req.BlockIDs); i++ {
 			b := unittest.ClusterBlockFixture()
 			b.Height = ss.head.Height - uint64(i)
-			req.BlockIDs[i] = b.ID()
-			ss.blockIDs[b.ID()] = unittest.ClusterProposalFromBlock(b)
+			req.BlockIDs[i] = b.Hash()
+			ss.blockIDs[b.Hash()] = unittest.ClusterProposalFromBlock(b)
 		}
 
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(

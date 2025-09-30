@@ -53,9 +53,9 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochSetupIsNoop() {
 	require.False(s.T(), applied)
 	updatedState, stateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges)
-	require.Equal(s.T(), s.parentProtocolState.ID(), updatedState.ID())
-	require.Equal(s.T(), updatedState.ID(), stateID)
-	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
+	require.Equal(s.T(), s.parentProtocolState.Hash(), updatedState.Hash())
+	require.Equal(s.T(), updatedState.Hash(), stateID)
+	require.Equal(s.T(), s.parentProtocolState.Hash(), s.stateMachine.ParentState().Hash())
 }
 
 // ProcessEpochCommitIsNoop ensures that processing epoch commit event is noop.
@@ -69,9 +69,9 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 	require.False(s.T(), applied)
 	updatedState, stateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges)
-	require.Equal(s.T(), s.parentProtocolState.ID(), updatedState.ID())
-	require.Equal(s.T(), updatedState.ID(), stateID)
-	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
+	require.Equal(s.T(), s.parentProtocolState.Hash(), updatedState.Hash())
+	require.Equal(s.T(), updatedState.Hash(), stateID)
+	require.Equal(s.T(), s.parentProtocolState.Hash(), s.stateMachine.ParentState().Hash())
 }
 
 // TestProcessEpochRecover ensures that after processing EpochRecover event, the state machine initializes
@@ -92,14 +92,14 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 	require.True(s.T(), processed)
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
-	require.Equal(s.T(), updatedState.ID(), updatedStateID, "state ID should be equal to updated state ID")
+	require.Equal(s.T(), updatedState.Hash(), updatedStateID, "state ID should be equal to updated state ID")
 
 	expectedState := &flow.MinEpochStateEntry{
 		PreviousEpoch: s.parentProtocolState.PreviousEpoch.Copy(),
 		CurrentEpoch:  s.parentProtocolState.CurrentEpoch,
 		NextEpoch: &flow.EpochStateContainer{
-			SetupID:          epochRecover.EpochSetup.ID(),
-			CommitID:         epochRecover.EpochCommit.ID(),
+			SetupID:          epochRecover.EpochSetup.Hash(),
+			CommitID:         epochRecover.EpochCommit.Hash(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
 		},
 		EpochFallbackTriggered: false,
@@ -301,8 +301,8 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 		require.NoError(s.T(), err)
 		updatedState, stateID, hasChanges := s.stateMachine.Build()
 		require.True(s.T(), hasChanges)
-		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
-		require.Equal(s.T(), updatedState.ID(), stateID)
+		require.NotEqual(s.T(), parentProtocolState.Hash(), updatedState.Hash())
+		require.Equal(s.T(), updatedState.Hash(), stateID)
 		require.Equal(s.T(), expectedState, updatedState, "FallbackStateMachine produced unexpected Protocol State")
 	}
 }
@@ -359,13 +359,13 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		candidateView := thresholdView - 1
 		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidateView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
+		require.Equal(s.T(), parentProtocolState.Hash(), stateMachine.ParentState().Hash())
 		require.Equal(s.T(), candidateView, stateMachine.View())
 
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "EpochFallbackTriggered has to be updated")
-		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
+		require.Equal(s.T(), updatedState.Hash(), stateID)
+		require.NotEqual(s.T(), parentProtocolState.Hash(), stateID)
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
@@ -385,13 +385,13 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	s.Run("staking-phase", func() {
 		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
+		require.Equal(s.T(), parentProtocolState.Hash(), stateMachine.ParentState().Hash())
 		require.Equal(s.T(), thresholdView, stateMachine.View())
 
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "EpochFallbackTriggered has to be updated")
-		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
+		require.Equal(s.T(), updatedState.Hash(), stateID)
+		require.NotEqual(s.T(), parentProtocolState.Hash(), stateID)
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
@@ -423,14 +423,14 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, parentProtocolState)
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
+		require.Equal(s.T(), parentProtocolState.Hash(), stateMachine.ParentState().Hash())
 		require.Equal(s.T(), thresholdView, stateMachine.View())
 
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "EpochFallbackTriggered has to be updated")
 		require.Nil(s.T(), updatedState.NextEpoch, "outdated information for the next epoch should have been removed")
-		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
+		require.Equal(s.T(), updatedState.Hash(), stateID)
+		require.NotEqual(s.T(), parentProtocolState.Hash(), stateID)
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
@@ -463,13 +463,13 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, parentProtocolState)
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
+		require.Equal(s.T(), parentProtocolState.Hash(), stateMachine.ParentState().Hash())
 		require.Equal(s.T(), thresholdView, stateMachine.View())
 
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "EpochFallbackTriggered has to be updated")
-		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
+		require.Equal(s.T(), updatedState.Hash(), stateID)
+		require.NotEqual(s.T(), parentProtocolState.Hash(), stateID)
 
 		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,

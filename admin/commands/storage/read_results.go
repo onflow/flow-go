@@ -43,7 +43,7 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	case readResultsRequestByBlock:
 		if header, err := getBlockHeader(r.state, data.value.(*blocksRequest)); err != nil {
 			return nil, fmt.Errorf("failed to get block header: %w", err)
-		} else if result, err := r.results.ByBlockID(header.ID()); err != nil {
+		} else if result, err := r.results.ByBlockID(header.Hash()); err != nil {
 			return nil, fmt.Errorf("failed to get result by block ID: %w", err)
 		} else {
 			results = append(results, result)

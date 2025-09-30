@@ -184,7 +184,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	var prevResults []*flow.ExecutionResult
 	var sealsForPrev []*flow.Seal
 
-	aBlock, ok := builder.blocksByID[A.ID()]
+	aBlock, ok := builder.blocksByID[A.Hash()]
 	if ok {
 		// A is not the root block. B will contain a receipt for A, and a seal
 		// for the receipt contained in A.
@@ -336,7 +336,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	final, err := finalSnap.Head()
 	require.NoError(builder.t, err)
 
-	finalBlock, ok := builder.blocksByID[final.ID()]
+	finalBlock, ok := builder.blocksByID[final.Hash()]
 	require.True(builder.t, ok)
 
 	// A is the first block of the next epoch (see diagram in BuildEpoch)
@@ -372,7 +372,7 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	require.False(builder.t, dbUpdates.IsEmpty())
 
 	block.Payload.ProtocolStateID = updatedStateId
-	blockID := block.ID()
+	blockID := block.Hash()
 	for _, state := range builder.states {
 		err = state.ExtendCertified(context.Background(), NewCertifiedBlock(block))
 		require.NoError(builder.t, err)
@@ -381,7 +381,7 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 		require.NoError(builder.t, err)
 	}
 
-	builder.blocksByID[block.ID()] = block
+	builder.blocksByID[block.Hash()] = block
 	builder.blocks = append(builder.blocks, block)
 }
 

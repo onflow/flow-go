@@ -50,7 +50,7 @@ func (p *ChunkAssigner) Size() uint {
 //   - unexpected errors should be considered symptoms of internal bugs
 func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
 	// computes a fingerprint for blockID||resultID||alpha
-	hash, err := fingerPrint(blockID, result.ID(), p.alpha)
+	hash, err := fingerPrint(blockID, result.Hash(), p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}

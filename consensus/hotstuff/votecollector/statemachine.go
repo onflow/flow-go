@@ -96,7 +96,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			return nil
 		}
 		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
-			vote.ID(), vote.BlockID, err)
+			vote.Hash(), vote.BlockID, err)
 	}
 
 	err = m.processVote(vote)
@@ -118,7 +118,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			return nil
 		}
 		return fmt.Errorf("internal error processing vote %v for block %v: %w",
-			vote.ID(), vote.BlockID, err)
+			vote.Hash(), vote.BlockID, err)
 	}
 	return nil
 }

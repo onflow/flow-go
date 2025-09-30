@@ -17,7 +17,7 @@ func TestTransactions_HappyPath(t *testing.T) {
 	require.NoError(t, err, "storing transaction should not return an error")
 
 	// Retrieve the transaction by ID
-	retrievedTx, err := txStore.ByID(tx.ID())
+	retrievedTx, err := txStore.ByID(tx.Hash())
 	require.NoError(t, err, "retrieving stored transaction should not return an error")
 	require.NotNil(t, retrievedTx, "retrieved transaction should not be nil")
 

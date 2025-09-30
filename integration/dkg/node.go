@@ -82,7 +82,7 @@ func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup f
 	snapshot.On("EpochPhase").Return(flow.EpochPhaseStaking, nil)
 	snapshot.On("Head").Return(firstBlock, nil)
 	state := new(protocolmock.ParticipantState)
-	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
+	state.On("AtBlockID", firstBlock.Hash()).Return(snapshot)
 	state.On("Final").Return(snapshot)
 	n.GenericNode.State = state
 	n.reactorEngine.State = state

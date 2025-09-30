@@ -75,7 +75,7 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 	suite.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protocol.Snapshot {
 			for _, block := range blocks {
-				if block.ID() == blockID {
+				if block.Hash() == blockID {
 					return createSnapshot(block.ToHeader())
 				}
 			}
@@ -95,7 +95,7 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 	suite.blocks.On("ByID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Block {
 			for _, block := range blocks {
-				if block.ID() == blockID {
+				if block.Hash() == blockID {
 					return block
 				}
 			}
@@ -103,7 +103,7 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 		},
 		func(blockID flow.Identifier) error {
 			for _, block := range blocks {
-				if block.ID() == blockID {
+				if block.Hash() == blockID {
 					return nil
 				}
 			}
@@ -236,7 +236,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestHandleHeight() {
 func (suite *ReadProtocolStateBlocksSuite) TestHandleID() {
 	for _, block := range suite.allBlocks {
 		responseBlocks := suite.getBlocks(map[string]interface{}{
-			"block": block.ID().String(),
+			"block": block.Hash().String(),
 		})
 		require.Len(suite.T(), responseBlocks, 1)
 		require.EqualValues(suite.T(), responseBlocks[0], block)

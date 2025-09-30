@@ -63,7 +63,7 @@ func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
 // Add adds an IncorporatedResultSeal to the mempool
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
-	resultID := seal.IncorporatedResult.ID()
+	resultID := seal.IncorporatedResult.Hash()
 	err := ir.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
 		// skip elements below the pruned
 		if seal.Header.Height < ir.lowestHeight {

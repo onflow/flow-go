@@ -42,7 +42,7 @@ func NewExecutionResults(collector module.CacheMetrics, db storage.DB) *Executio
 }
 
 func (r *ExecutionResults) store(rw storage.ReaderBatchWriter, result *flow.ExecutionResult) error {
-	return r.cache.PutTx(rw, result.ID(), result)
+	return r.cache.PutTx(rw, result.Hash(), result)
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) (*flow.ExecutionResult, error) {

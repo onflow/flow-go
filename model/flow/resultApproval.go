@@ -47,8 +47,8 @@ func NewAttestation(untrusted UntrustedAttestation) (*Attestation, error) {
 	}, nil
 }
 
-// ID generates a unique identifier using attestation
-func (a Attestation) ID() Identifier {
+// Hash generates a unique identifier using attestation
+func (a Attestation) Hash() Identifier {
 	return MakeID(a)
 }
 
@@ -116,8 +116,8 @@ func (rab ResultApprovalBody) PartialID() Identifier {
 	return MakeID(data)
 }
 
-// ID generates a unique identifier using ResultApprovalBody
-func (rab ResultApprovalBody) ID() Identifier {
+// Hash generates a unique identifier using ResultApprovalBody
+func (rab ResultApprovalBody) Hash() Identifier {
 	return MakeID(rab)
 }
 
@@ -136,7 +136,7 @@ type ResultApproval struct {
 	VerifierSignature crypto.Signature
 }
 
-var _ Entity = (*ResultApproval)(nil)
+var _ Hashable = (*ResultApproval)(nil)
 
 // UntrustedResultApproval is an untrusted input-only representation of an ResultApproval,
 // used for construction.
@@ -169,8 +169,8 @@ func NewResultApproval(untrusted UntrustedResultApproval) (*ResultApproval, erro
 	}, nil
 }
 
-// ID generates a unique identifier using result approval full content
-func (ra ResultApproval) ID() Identifier {
+// Hash generates a unique identifier using result approval full content
+func (ra ResultApproval) Hash() Identifier {
 	return MakeID(ra)
 }
 

@@ -135,7 +135,7 @@ func (s *BackendScriptsSuite) setupExecutionNodes(block *flow.Block) {
 	// to ensure the mock library handles the response type correctly
 	var receipts flow.ExecutionReceiptList //nolint:gosimple
 	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
-	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+	s.receipts.On("ByBlockID", block.Hash()).Return(receipts, nil)
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
 		Return(s.execClient, &mocks.MockCloser{}, nil)
@@ -173,7 +173,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 	ctx := context.Background()
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
 
@@ -200,7 +200,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	errToReturn := status.Error(statusCode, "random error")
 
 	s.setupExecutionNodes(s.block)
-	s.setupENFailingResponse(s.block.ID(), errToReturn)
+	s.setupENFailingResponse(s.block.Hash(), errToReturn)
 
 	scripts := s.defaultBackend(execmock.NewScriptExecutor(s.T()), query_mode.IndexQueryModeExecutionNodesOnly)
 
@@ -308,7 +308,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	}
 
 	s.setupExecutionNodes(s.block)
-	s.setupENSuccessResponse(s.block.ID())
+	s.setupENSuccessResponse(s.block.Hash())
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeFailover)
@@ -385,7 +385,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 	// setup the execution client mocks
 	s.setupExecutionNodes(s.block)
-	s.setupENFailingResponse(s.block.ID(), errToReturn)
+	s.setupENFailingResponse(s.block.Hash(), errToReturn)
 
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -448,7 +448,7 @@ func (s *BackendScriptsSuite) TestExecuteScript_ExceedsMaxSize() {
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		actual, err := scripts.ExecuteScriptAtBlockID(ctx, s.block.ID(), script, s.arguments)
+		actual, err := scripts.ExecuteScriptAtBlockID(ctx, s.block.Hash(), script, s.arguments)
 		s.Require().Error(err)
 		s.Require().Equal(codes.InvalidArgument, status.Code(err), "error code mismatch: expected %d, got %d: %s", codes.InvalidArgument, status.Code(err), err)
 		s.Require().Nil(actual)
@@ -479,7 +479,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context
 }
 
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, scripts *Scripts, statusCode codes.Code) {
-	blockID := s.block.ID()
+	blockID := s.block.Hash()
 	s.headers.On("ByBlockID", blockID).Return(s.block.ToHeader(), nil).Once()
 
 	if statusCode == codes.OK {

@@ -291,7 +291,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 
 	// commit the next epoch, and emit a protocol event
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
+	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.Hash()).Return(suite.snapshot)
 	suite.CommitEpochs(suite.nextEpoch)
 	suite.lookup.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 

@@ -223,7 +223,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		s.state.sporkRootBlock,
 	)
 	scraper := func(header *flow.Header) error {
-		blockID := header.ID()
+		blockID := header.Hash()
 		block, err := s.state.blocks.ProposalByID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not get proposal: %w", err)
@@ -270,7 +270,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	if limitHeight < blockSealedAtHead.Height {
 		// we need to include extra blocks in sealing segment
 		extraBlocksScraper := func(header *flow.Header) error {
-			blockID := header.ID()
+			blockID := header.Hash()
 			block, err := s.state.blocks.ProposalByID(blockID)
 			if err != nil {
 				return fmt.Errorf("could not get block: %w", err)

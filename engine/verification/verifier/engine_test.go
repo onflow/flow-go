@@ -147,8 +147,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			err: chmodel.NewCFMissingRegisterTouch(
 				[]string{"test missing register touch"},
 				vChunk.Chunk.Index,
-				vChunk.Result.ID(),
-				unittest.TransactionFixture().ID()),
+				vChunk.Result.Hash(),
+				unittest.TransactionFixture().Hash()),
 		},
 	}
 
@@ -163,14 +163,14 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 					return func(lctx lockctx.Proof) error {
 						suite.Assert().True(lctx.HoldsLock(storage.LockIndexResultApproval))
 						suite.Assert().Equal(vChunk.Chunk.BlockID, ra.Body.BlockID)
-						suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
+						suite.Assert().Equal(vChunk.Result.Hash(), ra.Body.ExecutionResultID)
 						suite.Assert().Equal(vChunk.Chunk.Index, ra.Body.ChunkIndex)
 						suite.Assert().Equal(suite.me.NodeID(), ra.Body.ApproverID)
 
 						// verifies the signatures
-						atstID := ra.Body.Attestation.ID()
+						atstID := ra.Body.Attestation.Hash()
 						suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
-						bodyID := ra.Body.ID()
+						bodyID := ra.Body.Hash()
 						suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
 
 						// spock should be non-nil
@@ -223,7 +223,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 					"test",
 					errors.New("test invalid verifiable chunk"),
 					vc.Chunk.Index,
-					vc.Result.ID())
+					vc.Result.Hash())
 			},
 		},
 		{
@@ -232,7 +232,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 					unittest.StateCommitmentFixture(),
 					unittest.StateCommitmentFixture(),
 					vc.Chunk.Index,
-					vc.Result.ID())
+					vc.Result.Hash())
 			},
 		},
 		{
@@ -241,13 +241,13 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 					unittest.IdentifierFixture(),
 					unittest.IdentifierFixture(),
 					vc.Chunk.Index,
-					vc.Result.ID(),
+					vc.Result.Hash(),
 					flow.EventsList{})
 			},
 		},
 		{
 			errFn: func(vc *verification.VerifiableChunkData) error {
-				return chmodel.NewCFSystemChunkIncludedCollection(vc.Chunk.Index, vc.Result.ID())
+				return chmodel.NewCFSystemChunkIncludedCollection(vc.Chunk.Index, vc.Result.Hash())
 			},
 		},
 		{
@@ -256,7 +256,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 					unittest.IdentifierFixture(),
 					unittest.IdentifierFixture(),
 					vc.Chunk.Index,
-					vc.Result.ID())
+					vc.Result.Hash())
 			},
 		},
 		{
@@ -265,7 +265,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 					0,
 					0,
 					vc.Chunk.Index,
-					vc.Result.ID())
+					vc.Result.Hash())
 			},
 		},
 		{
@@ -274,7 +274,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 					cid.Cid{},
 					cid.Cid{},
 					vc.Chunk.Index,
-					vc.Result.ID())
+					vc.Result.Hash())
 			},
 		},
 		{
@@ -283,7 +283,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 					unittest.IdentifierFixture(),
 					unittest.IdentifierFixture(),
 					vc.Chunk.Index,
-					vc.Result.ID())
+					vc.Result.Hash())
 			},
 		},
 		{

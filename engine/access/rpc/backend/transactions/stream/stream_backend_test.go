@@ -242,7 +242,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.eventIndex,
 		s.txResultIndex,
 		errorMessageProvider,
-		s.systemTx.ID(),
+		s.systemTx.Hash(),
 		txStatusDeriver,
 		s.chainID,
 		true, // scheduledCallbacksEnabled
@@ -256,7 +256,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		nodeCommunicator,
 		execNodeProvider,
 		txStatusDeriver,
-		s.systemTx.ID(),
+		s.systemTx.Hash(),
 		s.chainID,
 		true, // scheduledCallbacksEnabled
 	)
@@ -308,7 +308,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Metrics:                     metrics.NewNoopCollector(),
 		State:                       s.state,
 		ChainID:                     s.chainID,
-		SystemTxID:                  s.systemTx.ID(),
+		SystemTxID:                  s.systemTx.Hash(),
 		StaticCollectionRPCClient:   client,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,
@@ -347,7 +347,7 @@ func blockByID(blockMap *concurrentmap.Map[uint64, *flow.Block]) func(flow.Ident
 	return func(blockID flow.Identifier) (*flow.Block, error) {
 		var block *flow.Block
 		_ = blockMap.ForEach(func(height uint64, b *flow.Block) error {
-			if b.ID() == blockID {
+			if b.Hash() == blockID {
 				block = b
 			}
 			return nil
@@ -434,7 +434,7 @@ func (s *TransactionStreamSuite) initializeHappyCaseMockInstructions() {
 
 // createSendTransaction generate sent transaction with ref block of the current finalized block
 func (s *TransactionStreamSuite) createSendTransaction() flow.TransactionBody {
-	transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(s.finalizedBlock.ID()))
+	transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(s.finalizedBlock.Hash()))
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction, nil).Maybe()
 	return transaction
 }
@@ -472,7 +472,7 @@ func (s *TransactionStreamSuite) mockTransactionResult(transactionID *flow.Ident
 
 func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.TransactionBody) {
 	col := unittest.CollectionFromTransactions(transaction)
-	colID := col.ID()
+	colID := col.Hash()
 	guarantee := flow.CollectionGuarantee{CollectionID: colID}
 	light := col.Light()
 	s.sealedBlock = s.finalizedBlock
@@ -486,7 +486,7 @@ func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Trans
 		)
 		require.NoError(s.T(), err)
 		s.collections.On("LightByID", colID).Return(light, nil).Maybe()
-		s.collections.On("LightByTransactionID", transaction.ID()).Return(light, nil)
+		s.collections.On("LightByTransactionID", transaction.Hash()).Return(light, nil)
 		s.blocks.On("ByCollectionID", colID).Return(block, nil)
 	})
 }
@@ -498,7 +498,7 @@ func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription.Su
 		v, ok := <-sub.Channel()
 		require.True(s.T(), ok,
 			"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
-			txId, s.finalizedBlock.ID(), sub.Err())
+			txId, s.finalizedBlock.Hash(), sub.Err())
 
 		txResults, ok := v.([]*accessmodel.TransactionResult)
 		require.True(s.T(), ok, "unexpected response type: %T", v)
@@ -510,7 +510,7 @@ func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription.Su
 			assert.Equal(s.T(), expectedTxStatus, result.Status)
 		}
 
-	}, 180*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+	}, 180*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.Hash()))
 }
 
 // checkGracefulShutdown ensures the provided subscription shuts down gracefully within a specified timeout duration.
@@ -532,7 +532,7 @@ func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := s.createSendTransaction()
-	txId := transaction.ID()
+	txId := transaction.Hash()
 
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
 
@@ -585,7 +585,7 @@ func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusExpired() 
 
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := s.createSendTransaction()
-	txId := transaction.ID()
+	txId := transaction.Hash()
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound)
 
 	// Subscribe to transaction status and receive the first message with pending status
@@ -620,7 +620,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentPendin
 	s.initializeHappyCaseMockInstructions()
 
 	transaction := s.createSendTransaction()
-	txId := transaction.ID()
+	txId := transaction.Hash()
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
 
 	hasTransactionResultInStorage := false
@@ -654,7 +654,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentFinali
 	s.initializeHappyCaseMockInstructions()
 
 	transaction := s.createSendTransaction()
-	txId := transaction.ID()
+	txId := transaction.Hash()
 
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
@@ -686,7 +686,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentExecut
 	s.initializeHappyCaseMockInstructions()
 
 	transaction := s.createSendTransaction()
-	txId := transaction.ID()
+	txId := transaction.Hash()
 
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
@@ -727,7 +727,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentSealed
 	s.initializeHappyCaseMockInstructions()
 
 	transaction := s.createSendTransaction()
-	txId := transaction.ID()
+	txId := transaction.Hash()
 
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
@@ -787,7 +787,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		}, nil).Once()
 		s.state.On("Sealed").Return(s.sealedSnapshot, nil).Once()
 		expectedError := storage.ErrNotFound
-		s.blockTracker.On("GetStartHeightFromBlockID", s.sealedBlock.ID()).Return(uint64(0), expectedError).Once()
+		s.blockTracker.On("GetStartHeightFromBlockID", s.sealedBlock.Hash()).Return(uint64(0), expectedError).Once()
 
 		sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 		s.Assert().ErrorContains(sub.Err(), expectedError.Error())

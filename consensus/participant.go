@@ -149,7 +149,7 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 
 	// if finalized view is genesis block, then use genesis block as the trustedRoot
 	if final.View == rootHeader.View {
-		if final.ID() != rootHeader.ID() {
+		if final.Hash() != rootHeader.Hash() {
 			return nil, fmt.Errorf("finalized Block conflicts with trusted root")
 		}
 		certifiedRoot, err := makeCertifiedRootBlock(rootHeader, rootQC)
@@ -160,10 +160,10 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 	}
 
 	// find a valid child of the finalized block in order to get its QC
-	children, err := headers.ByParentID(final.ID())
+	children, err := headers.ByParentID(final.Hash())
 	if err != nil {
 		// a finalized block must have a valid child, if err happens, we exit
-		return nil, fmt.Errorf("could not get children for finalized block (ID: %v, view: %v): %w", final.ID(), final.View, err)
+		return nil, fmt.Errorf("could not get children for finalized block (ID: %v, view: %v): %w", final.Hash(), final.View, err)
 	}
 	if len(children) == 0 {
 		return nil, fmt.Errorf("finalized block has no children")
@@ -187,7 +187,7 @@ func makeCertifiedRootBlock(header *flow.Header, qc *flow.QuorumCertificate) (mo
 	// and a later-finalized root block where we can retrieve the qc.
 	rootBlock := &model.Block{
 		View:       header.View,
-		BlockID:    header.ID(),
+		BlockID:    header.Hash(),
 		ProposerID: header.ProposerID,
 		QC:         nil, // QC is omitted
 		Timestamp:  header.Timestamp,

@@ -265,7 +265,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		Error:         result.Err,
 		BlockID:       sdk.EmptyID,
 		BlockHeight:   0,
-		TransactionID: emulator.FlowIdentifierToSDK(txBody.ID()),
+		TransactionID: emulator.FlowIdentifierToSDK(txBody.Hash()),
 		CollectionID:  sdk.EmptyID,
 	}
 

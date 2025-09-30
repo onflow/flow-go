@@ -276,14 +276,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chunkDataPack1 := chunkDataPacks[0]
 
-		assert.Equal(t, chunk1.ID(), chunkDataPack1.ChunkID)
+		assert.Equal(t, chunk1.Hash(), chunkDataPack1.ChunkID)
 		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
 		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
 		assert.NotNil(t, chunkDataPack1.Collection)
 
 		chunkDataPack2 := chunkDataPacks[1]
 
-		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
+		assert.Equal(t, chunk2.Hash(), chunkDataPack2.ChunkID)
 		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
 		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
 		assert.Nil(t, chunkDataPack2.Collection)
@@ -567,7 +567,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		for _, c := range block.CompleteCollections {
 			for _, t := range c.Collection.Transactions {
 				txResult := flow.TransactionResult{
-					TransactionID: t.ID(),
+					TransactionID: t.Hash(),
 					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
 						flow.EmptyAddress,
 						"no payer address provided").Error(),
@@ -643,8 +643,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			// events to emit for each iteration/transaction
 			events := map[common.Location][]cadence.Event{
-				common.TransactionLocation(transactions[0].ID()): nil,
-				common.TransactionLocation(transactions[1].ID()): {
+				common.TransactionLocation(transactions[0].Hash()): nil,
+				common.TransactionLocation(transactions[1].Hash()): {
 					serviceEventA,
 					{
 						EventType: &cadence.EventType{
@@ -653,7 +653,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						},
 					},
 				},
-				common.TransactionLocation(transactions[2].ID()): {
+				common.TransactionLocation(transactions[2].Hash()): {
 					{
 						EventType: &cadence.EventType{
 							Location:            stdlib.FlowLocation{},
@@ -661,7 +661,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						},
 					},
 				},
-				common.TransactionLocation(transactions[3].ID()): nil,
+				common.TransactionLocation(transactions[3].Hash()): nil,
 			}
 
 			systemTransactionEvents := []cadence.Event{
@@ -888,7 +888,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		normalTransactions := map[common.Location]struct{}{}
 		for _, col := range block.Collections() {
 			for _, txn := range col.Collection.Transactions {
-				loc := common.TransactionLocation(txn.ID())
+				loc := common.TransactionLocation(txn.Hash())
 				normalTransactions[loc] = struct{}{}
 			}
 		}
@@ -1832,7 +1832,7 @@ func generateCollection(
 
 	collection := flow.Collection{Transactions: transactions}
 
-	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
+	guarantee := &flow.CollectionGuarantee{CollectionID: collection.Hash()}
 
 	return &entity.CompleteCollection{
 		Guarantee:  guarantee,

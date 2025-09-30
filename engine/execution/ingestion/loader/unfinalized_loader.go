@@ -83,7 +83,7 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 
 	lg.Info().
 		// Uint64("sealed_root_height", rootBlock.Height).
-		// Hex("sealed_root_id", logging.Entity(rootBlock)).
+		// Hex("sealed_root_id", logging.Hashable(rootBlock)).
 		Int("total_finalized_unexecuted", len(unexecutedFinalized)).
 		Int("total_unexecuted", len(unexecuted)).
 		Msgf("finalized unexecuted blocks")

@@ -282,7 +282,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		return nil, fmt.Errorf("could not retrieve main chain finalized header: %w", err)
 	}
 	ctx.refChainFinalizedHeight = mainChainFinalizedHeader.Height
-	ctx.refChainFinalizedID = mainChainFinalizedHeader.ID()
+	ctx.refChainFinalizedID = mainChainFinalizedHeader.Hash()
 
 	// if the epoch has ended and the final block is cached, use the cached values
 	if b.epochFinalHeight != nil && b.epochFinalID != nil {
@@ -330,13 +330,13 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 // building on top of) and ends with the oldest unfinalized block in the ancestry.
 func (b *Builder) populateUnfinalizedAncestryLookup(ctx *blockBuildContext) error {
 	err := fork.TraverseBackward(b.clusterHeaders, ctx.parentID, func(ancestor *flow.Header) error {
-		payload, err := b.payloads.ByBlockID(ancestor.ID())
+		payload, err := b.payloads.ByBlockID(ancestor.Hash())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 		}
 
 		for _, tx := range payload.Collection.Transactions {
-			ctx.lookup.addUnfinalizedAncestor(tx.ID())
+			ctx.lookup.addUnfinalizedAncestor(tx.Hash())
 			ctx.limiter.addAncestor(ancestor.Height, tx)
 		}
 		return nil
@@ -394,7 +394,7 @@ func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *block
 			return fmt.Errorf("could not retrieve cluster payload (block_id=%x): %w", blockID, err)
 		}
 		for _, tx := range payload.Collection.Transactions {
-			lookup.addFinalizedAncestor(tx.ID())
+			lookup.addFinalizedAncestor(tx.Hash())
 			limiter.addAncestor(header.Height, tx)
 		}
 	}
@@ -433,7 +433,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		if uint(len(transactions)) >= config.MaxCollectionSize {
 			break
 		}
-		txID := tx.ID()
+		txID := tx.Hash()
 		if _, exists := txDedup[txID]; exists {
 			continue
 		}

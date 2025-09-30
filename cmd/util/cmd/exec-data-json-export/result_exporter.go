@@ -58,11 +58,11 @@ func ExportResults(blockID flow.Identifier, dbPath string, outputPath string) er
 
 			chunks := make([]string, 0)
 			for _, c := range res.Chunks {
-				cid := c.ID()
+				cid := c.Hash()
 				chunks = append(chunks, hex.EncodeToString(cid[:]))
 			}
 
-			resID := res.ID()
+			resID := res.Hash()
 			finalState, err := res.FinalStateCommitment()
 			if err != nil {
 				return fmt.Errorf("export result error: %w", err)

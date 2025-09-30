@@ -64,7 +64,7 @@ type PendingTree struct {
 func NewPendingTree(finalized *flow.Header) *PendingTree {
 	return &PendingTree{
 		forest:          forest.NewLevelledForest(finalized.View),
-		lastFinalizedID: finalized.ID(),
+		lastFinalizedID: finalized.Hash(),
 	}
 }
 
@@ -183,7 +183,7 @@ func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]flow.CertifiedBloc
 		}
 		return connectedBlocks, fmt.Errorf("could not prune tree up to view %d: %w", finalized.View, err)
 	}
-	t.lastFinalizedID = finalized.ID()
+	t.lastFinalizedID = finalized.Hash()
 
 	iter := t.forest.GetChildren(t.lastFinalizedID)
 	for iter.HasNext() {

@@ -82,7 +82,7 @@ func TraverseForward(
 		block := blocks[i]
 		err = visitor(block)
 		if err != nil {
-			return fmt.Errorf("visitor errored on block %x at height %d: %w", block.ID(), block.Height, err)
+			return fmt.Errorf("visitor errored on block %x at height %d: %w", block.Hash(), block.Height, err)
 		}
 	}
 
@@ -101,7 +101,7 @@ func unsafeTraverse(headers storage.Headers, block *flow.Header, visitor onVisit
 	for {
 		err := visitor(block)
 		if err != nil {
-			return nil, fmt.Errorf("visitor errored on block %x at height %d: %w", block.ID(), block.Height, err)
+			return nil, fmt.Errorf("visitor errored on block %x at height %d: %w", block.Hash(), block.Height, err)
 		}
 
 		if block.Height == lowestHeightToVisit {

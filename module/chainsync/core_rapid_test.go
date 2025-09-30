@@ -53,9 +53,9 @@ func (r *rapidSync) init(t *rapid.T) {
 // RequestByID is an action that requests a block by its ID.
 func (r *rapidSync) RequestByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_request")
-	r.core.RequestBlock(b.ID(), b.Height)
+	r.core.RequestBlock(b.Hash(), b.Height)
 	// Re-queueing by ID should always succeed
-	r.idRequests[b.ID()] = true
+	r.idRequests[b.Hash()] = true
 	// Re-qeueuing by ID "forgets" a past height request
 	r.heightRequests[b.Height] = false
 }
@@ -87,12 +87,12 @@ func (r *rapidSync) HandleHeight(t *rapid.T) {
 func (r *rapidSync) HandleByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_handling")
 	success := r.core.HandleBlock(b)
-	assert.True(t, success || r.idRequests[b.ID()] == false)
+	assert.True(t, success || r.idRequests[b.Hash()] == false)
 
 	// we decrease the pending requests iff we have already requested this block
 	// and we have not received it since
-	if r.idRequests[b.ID()] == true {
-		r.idRequests[b.ID()] = false
+	if r.idRequests[b.Hash()] == true {
+		r.idRequests[b.Hash()] = false
 	}
 	// we eagerly remove height requests for blocks we receive
 	r.heightRequests[b.Height] = false
@@ -110,7 +110,7 @@ func (r *rapidSync) Check(t *rapid.T) {
 		s, foundID := r.core.blockIDs[id]
 
 		block, foundBlock := findHeader(r.store, func(h *flow.Header) bool {
-			return h.ID() == id
+			return h.Hash() == id
 		})
 		require.True(t, foundBlock, "incorrect management of idRequests in the tests: all added IDs are supposed to be from the store")
 

@@ -473,7 +473,7 @@ func AssertEqualBlockSequences(t *testing.T, blocks []*flow.Block, proposals []*
 	assert.Equal(t, len(blocks), len(proposals), "block and proposal sequences have different lengths (%d vs %d)", len(blocks), len(proposals))
 	for i, block := range blocks {
 		proposal := proposals[i]
-		assert.Equal(t, block.ID(), proposal.Block.ID(), "block and proposal at index %d do not match", i)
+		assert.Equal(t, block.Hash(), proposal.Block.Hash(), "block and proposal at index %d do not match", i)
 	}
 }
 

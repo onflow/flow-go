@@ -152,7 +152,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(convert.ToSDKID(suite.net.Root().ID())).
+		SetReferenceBlockID(convert.ToSDKID(suite.net.Root().Hash())).
 		SetProposalKey(acct.addr, acct.key.Index, acct.key.SequenceNumber).
 		SetPayer(acct.addr).
 		AddAuthorizer(acct.addr)
@@ -186,7 +186,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 		require.NoError(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
-		if routed.ID() == target.ID() {
+		if routed.Hash() == target.Hash() {
 			break
 		}
 	}
@@ -261,8 +261,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *cluster.Proposal:
 			block := val.Block
 			collection := block.Payload.Collection
-			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, block.Height, collection.ID(), collection.Len())
-			if guarantees[collection.ID()] {
+			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, block.Height, collection.Hash(), collection.Len())
+			if guarantees[collection.Hash()] {
 				for _, txID := range collection.Light().Transactions {
 					delete(lookup, txID)
 				}
@@ -278,8 +278,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 				// caching the proposal, so that when we receive the guarantee, we can finalized all the transactions
 				// in it.
 				suite.T().Logf("no guarantee for the received collection proposal %v, caching the collection proposal",
-					collection.ID())
-				proposals[collection.ID()] = collection.Light().Transactions
+					collection.Hash())
+				proposals[collection.Hash()] = collection.Light().Transactions
 			}
 
 		case *flow.CollectionGuarantee:
@@ -302,7 +302,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			}
 
 		case *flow.TransactionBody:
-			suite.T().Logf("got tx from %v: %v", originID, val.ID())
+			suite.T().Logf("got tx from %v: %v", originID, val.Hash())
 		}
 	}
 
@@ -346,7 +346,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	rootQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(rootBlock.ID()))
+	rootQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(rootBlock.Hash()))
 	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC, setup.Counter)
 	suite.NoError(err)
 	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())

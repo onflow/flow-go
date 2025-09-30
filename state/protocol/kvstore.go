@@ -26,10 +26,10 @@ import (
 // database, which should exactly correspond to the versioned model types defined in
 // ./kvstore/models.go
 type KVStoreReader interface {
-	// ID returns an identifier for this key-value store snapshot by hashing internal fields.
+	// Hash returns an identifier for this key-value store snapshot by hashing internal fields.
 	// Two different model versions containing the same data must have different IDs.
-	// New models should use `makeVersionedModelID` to implement ID.
-	ID() flow.Identifier
+	// New models should use `makeVersionedModelID` to implement Hash.
+	Hash() flow.Identifier
 
 	// v0/v1
 

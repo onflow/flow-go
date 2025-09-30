@@ -40,7 +40,7 @@ func TestSealingSegmentSuite(t *testing.T) {
 
 // addResult adds the result to the suite mapping.
 func (suite *SealingSegmentSuite) addResult(result *flow.ExecutionResult) {
-	suite.results[result.ID()] = result
+	suite.results[result.Hash()] = result
 }
 
 // addSeal adds the seal as being the latest w.r.t. the block ID.
@@ -92,7 +92,7 @@ func (suite *SealingSegmentSuite) SetupTest() {
 
 	priorBlock := suite.BlockFixture()
 	priorReceipt, priorSeal := unittest.ReceiptAndSealForBlock(priorBlock)
-	suite.results[priorReceipt.ExecutionResult.ID()] = &priorReceipt.ExecutionResult
+	suite.results[priorReceipt.ExecutionResult.Hash()] = &priorReceipt.ExecutionResult
 	suite.priorBlock = priorBlock
 	suite.priorReceipt = priorReceipt
 	suite.priorSeal = priorSeal
@@ -131,7 +131,7 @@ func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
 			unittest.WithReceipts(suite.priorReceipt),
 		)),
 	)
-	suite.addSeal(block.ID(), suite.priorSeal)
+	suite.addSeal(block.Hash(), suite.priorSeal)
 	return block
 }
 
@@ -145,7 +145,7 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 		for _, seal := range block.Payload.Seals {
 			latestSeal = seal
 		}
-		suite.addSeal(block.ID(), latestSeal)
+		suite.addSeal(block.Hash(), latestSeal)
 		err := suite.builder.AddBlock(unittest.ProposalFromBlock(block))
 		require.NoError(suite.T(), err)
 	}
@@ -183,7 +183,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 
 	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
-	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
+	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.Hash(), segment.ExecutionResults[0].Hash())
 }
 
 // Tests the case where the first block contains no seal.
@@ -195,7 +195,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
 	// B1 contains an empty payload
 	block1 := suite.BlockFixture()
 	// latest seal as of B1 is priorSeal
-	suite.sealsByBlockID[block1.ID()] = suite.priorSeal
+	suite.sealsByBlockID[block1.Hash()] = suite.priorSeal
 
 	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 	block2 := unittest.BlockWithParentAndPayload(
@@ -219,7 +219,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
 	require.Equal(suite.T(), suite.priorSeal, segment.FirstSeal)
 	// should contain result referenced by first seal
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
-	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
+	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.Hash(), segment.ExecutionResults[0].Hash())
 }
 
 // Tests the case where a seal contained in a segment block payloads references
@@ -234,7 +234,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromPayloadSeal() {
 	pastResult := unittest.ExecutionResultFixture()
 	suite.addResult(pastResult)
 	pastSeal := unittest.Seal.Fixture()
-	pastSeal.ResultID = pastResult.ID()
+	pastSeal.ResultID = pastResult.Hash()
 
 	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 	block2 := unittest.BlockWithParentAndPayload(
@@ -255,7 +255,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromPayloadSeal() {
 
 	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
-	require.Equal(suite.T(), pastResult.ID(), segment.ExecutionResults[0].ID())
+	require.Equal(suite.T(), pastResult.Hash(), segment.ExecutionResults[0].Hash())
 }
 
 // Tests the case where the final block in the segment contains both a seal
@@ -301,7 +301,7 @@ func (suite *SealingSegmentSuite) TestBuild_MultipleFinalBlockSeals() {
 	pastResult := unittest.ExecutionResultFixture()
 	suite.addResult(pastResult)
 	pastSeal := unittest.Seal.Fixture()
-	pastSeal.ResultID = pastResult.ID()
+	pastSeal.ResultID = pastResult.Hash()
 
 	block2 := unittest.BlockWithParentAndPayload(
 		block1.ToHeader(),
@@ -320,14 +320,14 @@ func (suite *SealingSegmentSuite) TestBuild_MultipleFinalBlockSeals() {
 
 	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
-	require.Equal(suite.T(), pastResult.ID(), segment.ExecutionResults[0].ID())
+	require.Equal(suite.T(), pastResult.Hash(), segment.ExecutionResults[0].Hash())
 	require.NoError(suite.T(), segment.Validate())
 }
 
 // TestBuild_RootSegment tests we can build a valid root sealing segment.
 func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	suite.sealsByBlockID[root.ID()] = seal
+	suite.sealsByBlockID[root.Hash()] = seal
 	suite.addProtocolStateEntry(root.Payload.ProtocolStateID, suite.ProtocolStateEntryWrapperFixture())
 	suite.addResult(result)
 	err := suite.builder.AddBlock(unittest.ProposalFromBlock(root))
@@ -338,8 +338,8 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 	require.NoError(suite.T(), segment.Validate())
 
 	unittest.AssertEqualBlockSequences(suite.T(), []*flow.Block{root}, segment.Blocks)
-	require.Equal(suite.T(), segment.Highest().ID(), root.ID())
-	require.Equal(suite.T(), segment.Sealed().ID(), root.ID())
+	require.Equal(suite.T(), segment.Highest().Hash(), root.Hash())
+	require.Equal(suite.T(), segment.Sealed().Hash(), root.Hash())
 }
 
 // TestBuild_RootSegmentWrongView tests that we return ErrSegmentInvalidRootView for
@@ -350,7 +350,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 		func(block *flow.Block) {
 			block.View = 10 // invalid root block view
 		})
-	suite.sealsByBlockID[root.ID()] = seal
+	suite.sealsByBlockID[root.Hash()] = seal
 	suite.addProtocolStateEntry(root.Payload.ProtocolStateID, suite.ProtocolStateEntryWrapperFixture())
 	suite.addResult(result)
 	err := suite.builder.AddBlock(unittest.ProposalFromBlock(root))

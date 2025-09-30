@@ -32,21 +32,21 @@ func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 	}
 
 	// Store error messages
-	err := storage.Store(block.ID(), errorMessages)
+	err := storage.Store(block.Hash(), errorMessages)
 	require.NoError(t, err)
 
 	// Retrieve by BlockID and TransactionID
-	retrievedErrorMessage, err := storage.ByBlockIDTransactionID(block.ID(), errorMessages[0].TransactionID)
+	retrievedErrorMessage, err := storage.ByBlockIDTransactionID(block.Hash(), errorMessages[0].TransactionID)
 	require.NoError(t, err)
 	assert.Equal(t, &errorMessages[0], retrievedErrorMessage)
 
 	// Retrieve by BlockID and Index
-	retrievedErrorMessageByIndex, err := storage.ByBlockIDTransactionIndex(block.ID(), 0)
+	retrievedErrorMessageByIndex, err := storage.ByBlockIDTransactionIndex(block.Hash(), 0)
 	require.NoError(t, err)
 	assert.Equal(t, &errorMessages[0], retrievedErrorMessageByIndex)
 
 	// Retrieve by BlockID
-	retrievedErrorMessages, err := storage.ByBlockID(block.ID())
+	retrievedErrorMessages, err := storage.ByBlockID(block.Hash())
 	require.NoError(t, err)
 	assert.Len(t, retrievedErrorMessages, len(errorMessages))
 	assert.Equal(t, errorMessages, retrievedErrorMessages)

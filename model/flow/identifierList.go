@@ -46,9 +46,9 @@ func (il IdentifierList) Strings() []string {
 	return list
 }
 
-// ID returns a cryptographic commitment to the list of identifiers.
+// Hash returns a cryptographic commitment to the list of identifiers.
 // Since an IdentifierList has no mutable fields, it is equal to the checksum.
-func (il IdentifierList) ID() Identifier {
+func (il IdentifierList) Hash() Identifier {
 	return MakeID(il)
 }
 

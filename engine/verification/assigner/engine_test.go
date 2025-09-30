@@ -168,7 +168,7 @@ func newBlockHappyPath(t *testing.T) {
 	s.mockStateAtBlockID(result.BlockID)
 
 	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
-		IncorporatedBlockID: containerBlock.ID(),
+		IncorporatedBlockID: containerBlock.Hash(),
 		Result:              result,
 	})
 	require.NoError(t, err)
@@ -180,9 +180,9 @@ func newBlockHappyPath(t *testing.T) {
 	// invoked for it.
 	// Also, once all receipts of the block processed, engine should notify the block consumer once, that
 	// it is done with processing this chunk.
-	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, true, nil)
+	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.Hash(), assignment, true, nil)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.Hash()).Return().Once()
 	s.metrics.On("OnAssignedChunkProcessedAtAssigner").Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
@@ -223,7 +223,7 @@ func newBlockVerifierNotAuthorized(t *testing.T) {
 		s.mockStateAtBlockID(result.BlockID)
 
 		// once assigner engine is done processing the block, it should notify the processing notifier.
-		s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+		s.notifier.On("Notify", containerBlock.Hash()).Return().Once()
 
 		// sends block containing receipt to assigner engine
 		s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
@@ -278,7 +278,7 @@ func newBlockNoChunk(t *testing.T) {
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
-		IncorporatedBlockID: containerBlock.ID(),
+		IncorporatedBlockID: containerBlock.Hash(),
 		Result:              result,
 	})
 	require.NoError(t, err)
@@ -286,7 +286,7 @@ func newBlockNoChunk(t *testing.T) {
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.Hash()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
@@ -323,7 +323,7 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
-		IncorporatedBlockID: containerBlock.ID(),
+		IncorporatedBlockID: containerBlock.Hash(),
 		Result:              result,
 	})
 	require.NoError(t, err)
@@ -331,7 +331,7 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.Hash()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
@@ -368,7 +368,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
-		IncorporatedBlockID: containerBlock.ID(),
+		IncorporatedBlockID: containerBlock.Hash(),
 		Result:              result,
 	})
 	require.NoError(t, err)
@@ -378,12 +378,12 @@ func newBlockMultipleAssignment(t *testing.T) {
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
 	// invoked for it.
-	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, true, nil)
+	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.Hash(), assignment, true, nil)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.metrics.On("OnAssignedChunkProcessedAtAssigner").Return().Times(chunksNum)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.Hash()).Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()
@@ -412,7 +412,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
-		IncorporatedBlockID: containerBlock.ID(),
+		IncorporatedBlockID: containerBlock.Hash(),
 		Result:              result,
 	})
 	require.NoError(t, err)
@@ -421,10 +421,10 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
-	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, false, nil)
+	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.Hash(), assignment, false, nil)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.Hash()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Height).Return().Once()

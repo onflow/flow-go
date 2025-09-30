@@ -78,7 +78,7 @@ func (r *ResultApprovals) StoreMyApproval(approval *flow.ResultApproval) func(lc
 			storage.OnCommitSucceed(rw, func() {
 				// the success callback is called after the lock is released, so
 				// the id computation here would not increase the lock contention
-				r.cache.Insert(approval.ID(), approval)
+				r.cache.Insert(approval.Hash(), approval)
 			})
 			return storing(lctx, rw)
 		})
