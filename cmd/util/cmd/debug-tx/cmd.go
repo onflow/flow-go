@@ -87,7 +87,7 @@ func run(_ *cobra.Command, args []string) {
 
 	var remoteClient debug.RemoteClient
 	if flagUseExecutionDataAPI {
-		remoteClient, err = debug.NewExecutionDataRemoteClient(flagAccessAddress)
+		remoteClient, err = debug.NewExecutionDataRemoteClient(flagAccessAddress, chain)
 	} else if flagExecutionAddress != "" {
 		remoteClient, err = debug.NewExecutionNodeRemoteClient(flagExecutionAddress)
 	} else {
@@ -421,13 +421,17 @@ func RunTransaction(
 	computeLimit uint64,
 ) debug.Result {
 
+	log := log.With().
+		Str("tx", tx.ID().String()).
+		Logger()
+
 	var fvmOptions []fvm.Option
 
 	if spanExporter != nil {
 
 		const sync = true
 		tracer, err := trace.NewTracerWithExporter(
-			log.Logger,
+			log,
 			"debug-tx",
 			string(chain.ChainID()),
 			trace.SensitivityCaptureAll,
@@ -450,13 +454,13 @@ func RunTransaction(
 
 	debugger := debug.NewRemoteDebugger(
 		chain,
-		log.Logger,
+		log,
 		useVM,
 		useVM,
 		fvmOptions...,
 	)
 
-	log.Info().Msgf("Running transaction %s ...", tx.ID())
+	log.Info().Msgf("Running transaction ...")
 
 	result, err := debugger.RunSDKTransaction(
 		tx,

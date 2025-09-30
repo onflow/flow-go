@@ -77,6 +77,7 @@ func (snapshot *ExecutionNodeStorageSnapshot) Get(
 // to an access node to read the registers (via its execution data API).
 type ExecutionDataStorageSnapshot struct {
 	Client      executiondata.ExecutionDataAPIClient
+	Chain       flow.Chain
 	BlockHeight uint64
 }
 
@@ -84,6 +85,7 @@ var _ StorageSnapshot = &ExecutionDataStorageSnapshot{}
 
 func NewExecutionDataStorageSnapshot(
 	client executiondata.ExecutionDataAPIClient,
+	chain flow.Chain,
 	blockHeight uint64,
 ) (
 	*ExecutionDataStorageSnapshot,
@@ -91,6 +93,7 @@ func NewExecutionDataStorageSnapshot(
 ) {
 	return &ExecutionDataStorageSnapshot{
 		Client:      client,
+		Chain:       chain,
 		BlockHeight: blockHeight,
 	}, nil
 }
@@ -105,11 +108,13 @@ func (snapshot *ExecutionDataStorageSnapshot) Get(
 	value flow.RegisterValue,
 	err error,
 ) {
+	owner := []byte(id.Owner)
+
 	req := &executiondata.GetRegisterValuesRequest{
 		BlockHeight: snapshot.BlockHeight,
 		RegisterIds: []*entities.RegisterID{
 			{
-				Owner: []byte(id.Owner),
+				Owner: owner,
 				Key:   []byte(id.Key),
 			},
 		},
@@ -121,9 +126,18 @@ func (snapshot *ExecutionDataStorageSnapshot) Get(
 		req,
 	)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		switch status.Code(err) {
+		case codes.NotFound:
 			value = nil
-		} else {
+		case codes.InvalidArgument:
+			// If the owner address is invalid for the chain, the AN returns InvalidArgument.
+			// In this case, we return nil to indicate the register does not exist.
+			if !snapshot.Chain.IsValid(flow.BytesToAddress(owner)) {
+				value = nil
+			} else {
+				return nil, err
+			}
+		default:
 			return nil, err
 		}
 	} else {

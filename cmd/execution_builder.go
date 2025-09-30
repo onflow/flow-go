@@ -716,7 +716,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	node *NodeConfig,
 ) (err error) {
 	exeNode.executionDataDatastore, err = edstorage.CreateDatastoreManager(
-		node.Logger, exeNode.exeConf.executionDataDir, exeNode.exeConf.executionDataDBMode)
+		node.Logger, exeNode.exeConf.executionDataDir)
 	if err != nil {
 		return fmt.Errorf("could not create execution data datastore manager: %w", err)
 	}
