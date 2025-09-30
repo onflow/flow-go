@@ -97,7 +97,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 
 	rw := storagemock.NewReaderBatchWriter(s.T())
 
-	s.epochStateDB.On("BatchIndex", rw, s.candidate.ID(), s.parentEpochState.ID()).Return(nil).Once()
+	s.epochStateDB.On("BatchIndex", mocks.Anything, rw, s.candidate.ID(), s.parentEpochState.ID()).Return(nil).Once()
 	s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()
@@ -140,7 +140,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	require.NoError(s.T(), err)
 
 	// prepare a DB update for epoch state
-	s.epochStateDB.On("BatchIndex", rw, s.candidate.ID(), updatedStateID).Return(nil).Once()
+	s.epochStateDB.On("BatchIndex", mocks.Anything, rw, s.candidate.ID(), updatedStateID).Return(nil).Once()
 	s.epochStateDB.On("BatchStore", w, updatedStateID, updatedState.MinEpochStateEntry).Return(nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
@@ -532,7 +532,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
 	require.NoError(s.T(), err)
 
-	s.epochStateDB.On("BatchIndex", mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("BatchIndex", mocks.Anything, mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
 
 	expectedEpochState := &flow.MinEpochStateEntry{
 		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
