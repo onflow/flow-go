@@ -6,6 +6,7 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
@@ -595,7 +596,7 @@ func (proc *procedure) deployAt(
 	res.DeployedContractAddress = &call.To
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
-	proc.state.SetCode(addr, ret)
+	proc.state.SetCode(addr, ret, tracing.CodeChangeContractCreation)
 	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }
