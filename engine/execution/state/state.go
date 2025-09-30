@@ -363,6 +363,9 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
+// SaveExecutionResults saves all data related to the execution of a block.
+// It is concurrent-safe
+// It returns [storage.ErrDataMismatch] if there is data already stored for the same block ID but with different content.
 func (s *state) SaveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,

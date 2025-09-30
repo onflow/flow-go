@@ -20,6 +20,8 @@ type StoredChunkDataPacks interface {
 	// Remove removes multiple ChunkDataPacks cs keyed by their StoredChunkDataPack IDs in a batch.
 	// No errors are expected during normal operation.
 	Remove(cs []flow.Identifier) error
+
+	BatchRemove(cs []flow.Identifier, batch ReaderBatchWriter) error
 }
 
 // StoredChunkDataPack is an in-storage representation of chunk data pack.

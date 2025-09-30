@@ -40,7 +40,7 @@ func (p *ChunkDataPackPruner) PruneByBlockID(blockID flow.Identifier, batchWrite
 
 	// remove all chunk data packs in a single batch operation
 	if len(chunkIDs) > 0 {
-		err := p.chunkDataPacks.BatchRemove(chunkIDs, batchWriter)
+		err := p.chunkDataPacks.BatchRemoveStoredChunkDataPacksOnly(chunkIDs, batchWriter)
 		if err != nil {
 			return fmt.Errorf("could not remove chunk data packs for block id %v: %w", blockID, err)
 		}

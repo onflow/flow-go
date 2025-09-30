@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -62,18 +63,6 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	return &ch
 }
 
-// Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
-// No errors are expected during normal operation, even if no entries are matched.
-func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
-	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		storage.OnCommitSucceed(rw, func() {
-			// ch.stored.Remove(chunkIDs)
-		})
-
-		return ch.BatchRemove(chunkIDs, rw)
-	})
-}
-
 // Store stores multiple ChunkDataPacks in a two-phase process:
 // 1. First phase: Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
 // 2. Second phase: Create index mappings from ChunkID to storedChunkDataPackID in protocol database
@@ -111,6 +100,16 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 
 	// Phase 2: Create the function that will index chunkID -> storedChunkDataPackID mappings
 	storeChunkDataPacksFunc := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+		rw.AddCallback(func(err error) {
+			if err != nil {
+				// Rollback the stored chunk data packs if the batch operation fails
+				err := ch.stored.Remove(storedChunkDataPackIDs) // rollback stored chunk data packs on failure
+				if err != nil {
+					log.Error().Msgf("cannot rollback stored chunk data packs: %v", err) // log the error, but do not override the original error
+				}
+			}
+		})
+
 		// Create index mappings for each chunk data pack
 		for i, c := range cs {
 			storedChunkDataPackID := storedChunkDataPackIDs[i]
@@ -128,13 +127,22 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	return storeChunkDataPacksFunc, nil
 }
 
-// BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
+// BatchRemove remove multiple ChunkDataPacks with the given chunk IDs.
+// It performs a two-phase removal:
+// 1. First phase: Remove index mappings from ChunkID to storedChunkDataPackID in the protocol database
+// 2. Second phase: Remove chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+// Note: it does not remove the collection referred by the chunk data pack.
+// This method is useful for the rollback execution tool to batch remove chunk data packs associated with a set of blocks.
 // No errors are expected during normal operation, even if no entries are matched.
-func (ch *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.ReaderBatchWriter) error {
+func (ch *ChunkDataPacks) BatchRemove(
+	chunkIDs []flow.Identifier,
+	protocolDBBatch storage.ReaderBatchWriter,
+	chunkDataPackDBBatch storage.ReaderBatchWriter,
+) error {
 	// First, collect all stored chunk data pack IDs that need to be removed
 	var storedChunkDataPackIDs []flow.Identifier
 	for _, chunkID := range chunkIDs {
-		storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(batch.GlobalReader(), chunkID) // remove from cache optimistically
+		storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(protocolDBBatch.GlobalReader(), chunkID) // remove from cache optimistically
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				// If we can't find the stored chunk data pack ID, continue with other removals
@@ -149,7 +157,7 @@ func (ch *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.
 
 	// Remove the stored chunk data packs
 	if len(storedChunkDataPackIDs) > 0 {
-		err := ch.stored.Remove(storedChunkDataPackIDs)
+		err := ch.stored.BatchRemove(storedChunkDataPackIDs, chunkDataPackDBBatch)
 		if err != nil {
 			return fmt.Errorf("cannot remove stored chunk data packs: %w", err)
 		}
@@ -157,14 +165,55 @@ func (ch *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, batch storage.
 
 	// Remove the chunk data pack ID mappings and update cache
 	for _, chunkID := range chunkIDs {
-		storage.OnCommitSucceed(batch, func() {
+		storage.OnCommitSucceed(protocolDBBatch, func() {
 			ch.chunkIDToStoredChunkDataPackIDCache.Remove(chunkID)
 		})
-		err := operation.RemoveChunkDataPackID(batch.Writer(), chunkID)
+		err := operation.RemoveChunkDataPackID(protocolDBBatch.Writer(), chunkID)
 		if err != nil {
 			return fmt.Errorf("cannot remove chunk data pack %x: %w", chunkID, err)
 		}
 	}
+	return nil
+}
+
+// BatchRemoveStoredChunkDataPacksOnly removes multiple ChunkDataPacks with the given chunk IDs from chunk data pack database only.
+// It does not remove the index mappings from ChunkID to storedChunkDataPackID in the protocol database.
+// This method is useful for the runtime chunk data pack pruner to batch remove chunk data packs associated with a set of blocks.
+// No errors are expected during normal operation, even if no entries are matched.
+func (ch *ChunkDataPacks) BatchRemoveStoredChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch storage.ReaderBatchWriter) error {
+	// First, collect all stored chunk data pack IDs that need to be removed
+	var storedChunkDataPackIDs []flow.Identifier
+	for _, chunkID := range chunkIDs {
+		storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(chunkDataPackDBBatch.GlobalReader(), chunkID) // remove from cache optimistically
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				// If we can't find the stored chunk data pack ID, continue with other removals
+				// This handles the case where the chunk data pack was never properly stored
+				continue
+			}
+
+			return fmt.Errorf("cannot retrieve stored chunk data pack ID for chunk %x: %w", chunkID, err)
+		}
+		storedChunkDataPackIDs = append(storedChunkDataPackIDs, storedChunkDataPackID)
+	}
+
+	// Remove the stored chunk data packs
+	if len(storedChunkDataPackIDs) > 0 {
+		err := ch.stored.BatchRemove(storedChunkDataPackIDs, chunkDataPackDBBatch)
+		if err != nil {
+			return fmt.Errorf("cannot remove stored chunk data packs: %w", err)
+		}
+	}
+
+	// Remove from cache
+	for _, chunkID := range chunkIDs {
+		chunkDataPackDBBatch.AddCallback(func(err error) {
+			if err == nil {
+				ch.chunkIDToStoredChunkDataPackIDCache.Remove(chunkID)
+			}
+		})
+	}
+
 	return nil
 }
 

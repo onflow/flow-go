@@ -31,8 +31,18 @@ type ChunkDataPacks interface {
 	// It returns [storage.ErrNotFound] if no entry exists for the given chunk ID.
 	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
 
-	// BatchRemove remove multiple ChunkDataPacks with the given chunk IDs (in a batch).
+	// BatchRemove remove multiple ChunkDataPacks with the given chunk IDs.
+	// It performs a two-phase removal:
+	// 1. First phase: Remove index mappings from ChunkID to storedChunkDataPackID in the protocol database
+	// 2. Second phase: Remove chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
 	// Note: it does not remove the collection referred by the chunk data pack.
+	// This method is useful for the rollback execution tool to batch remove chunk data packs associated with a set of blocks.
 	// No errors are expected during normal operation, even if no entries are matched.
-	BatchRemove(chunkIDs []flow.Identifier, batch ReaderBatchWriter) error
+	BatchRemove(chunkIDs []flow.Identifier, protocolDBBatch ReaderBatchWriter, chunkDataPackDBBatch ReaderBatchWriter) error
+
+	// BatchRemoveStoredChunkDataPacksOnly removes multiple ChunkDataPacks with the given chunk IDs from chunk data pack database only.
+	// It does not remove the index mappings from ChunkID to storedChunkDataPackID in the protocol database.
+	// This method is useful for the runtime chunk data pack pruner to batch remove chunk data packs associated with a set of blocks.
+	// No errors are expected during normal operation, even if no entries are matched.
+	BatchRemoveStoredChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch ReaderBatchWriter) error
 }

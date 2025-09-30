@@ -246,7 +246,7 @@ func removeForBlockID(
 	}
 
 	if len(chunkIDs) > 0 {
-		err := chunks.BatchRemove(chunkIDs, chunkBatch)
+		err := chunks.BatchRemove(chunkIDs, writeBatch, chunkBatch)
 		if err != nil {
 			return fmt.Errorf("could not remove chunk data packs for block id %v: %w", blockID, err)
 		}
