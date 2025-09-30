@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/cluster/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 type State struct {
@@ -61,7 +60,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 		if err != nil {
 			return fmt.Errorf("could not build root cluster proposal: %w", err)
 		}
-		err = procedure.InsertClusterBlock(lctx, rw, proposal)
+		err = operation.InsertClusterBlock(lctx, rw, proposal)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}

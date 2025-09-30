@@ -1,4 +1,4 @@
-package procedure
+package operation
 
 import (
 	"testing"
