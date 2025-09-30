@@ -149,7 +149,7 @@ func TestIndexZeroParent(t *testing.T) {
 	}
 }
 
-// lookup block children will only return direct childrens
+// lookup block children will only return direct children, even if grandchildren exist
 func TestDirectChildren(t *testing.T) {
 	for _, opPair := range getTestOperationPairs() {
 		t.Run(opPair.name, func(t *testing.T) {
