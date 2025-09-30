@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 
 	cborlib "github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
@@ -239,6 +240,11 @@ func (s *serializer) DeserializeBuffered(r io.Reader) (interface{}, error) {
 
 	intermediateBuf, err := io.ReadAll(comp)
 	if err != nil {
+		err := os.WriteFile("/data/bitswap_data.txt", inputBuf, 0644)
+		if err != nil {
+			panic(err)
+		}
+
 		return nil, fmt.Errorf("failed to create intermediateReader reader: %w", err)
 	}
 	intermediateReader := bytes.NewBuffer(intermediateBuf)
