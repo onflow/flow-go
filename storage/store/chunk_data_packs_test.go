@@ -89,14 +89,16 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
 		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-			require.NoError(t, store1.StoreByChunkID(lctx, chunkDataPacks))
+			return store1.StoreByChunkID(lctx, chunkDataPacks)
+		}))
 
-			for _, c := range chunkDataPacks {
-				c2, err := store1.ByChunkID(c.ChunkID)
-				require.NoError(t, err)
-				require.Equal(t, c, c2)
-			}
+		for _, c := range chunkDataPacks {
+			c2, err := store1.ByChunkID(c.ChunkID)
+			require.NoError(t, err)
+			require.Equal(t, c, c2)
+		}
 
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			return store1.StoreByChunkID(lctx, chunkDataPacks)
 		}))
 	})
