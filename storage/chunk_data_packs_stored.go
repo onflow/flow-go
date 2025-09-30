@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -65,26 +66,28 @@ func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack {
 	return scs
 }
 
-func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) error {
+// Equals compares two StoredChunkDataPack for equality.
+// The second return value is a string describing the first found mismatch, or empty if they are equal.
+func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) (bool, string) {
 	if c.ChunkID != other.ChunkID {
-		return ErrDataMismatch
+		return false, fmt.Errorf("chunk ID mismatch: %s != %s", c.ChunkID, other.ChunkID).Error()
 	}
 	if c.StartState != other.StartState {
-		return ErrDataMismatch
+		return false, fmt.Errorf("start state mismatch: %s != %s", c.StartState, other.StartState).Error()
 	}
 	if !c.ExecutionDataRoot.Equals(other.ExecutionDataRoot) {
-		return ErrDataMismatch
+		return false, fmt.Sprintf("execution data root mismatch: %s != %s", c.ExecutionDataRoot, other.ExecutionDataRoot)
 	}
 	if c.SystemChunk != other.SystemChunk {
-		return ErrDataMismatch
+		return false, fmt.Sprintf("system chunk flag mismatch: %t != %t", c.SystemChunk, other.SystemChunk)
 	}
 	if !bytes.Equal(c.Proof, other.Proof) {
-		return ErrDataMismatch
+		return false, "storage proof mismatch"
 	}
 	if c.CollectionID != other.CollectionID {
-		return ErrDataMismatch
+		return false, fmt.Sprintf("collection ID mismatch: %s != %s", c.CollectionID, other.CollectionID)
 	}
-	return nil
+	return true, ""
 }
 
 func (c StoredChunkDataPack) ID() flow.Identifier {
