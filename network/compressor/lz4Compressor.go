@@ -3,7 +3,12 @@ package compressor
 import (
 	"io"
 
-	"github.com/pierrec/lz4/v3"
+	// TODO: there was a bug in the v2.6 version that caused decompression to fail for some inputs on
+	// intel CPUs. This is fixed on v4.1, however the newer version produces a different compressed
+	// output. Using split versions for now to fix the compression issue. more investigation is needed
+	// to understand why it's different. if we opt to upgrade the writer, it will need an HCU.
+	lz4v2 "github.com/pierrec/lz4"
+	lz4 "github.com/pierrec/lz4/v4"
 
 	"github.com/onflow/flow-go/network"
 )
@@ -21,11 +26,11 @@ func (lz4Comp Lz4Compressor) NewReader(r io.Reader) (io.ReadCloser, error) {
 }
 
 func (lz4Comp Lz4Compressor) NewWriter(w io.Writer) (network.WriteCloseFlusher, error) {
-	return &lz4WriteCloseFlusher{w: lz4.NewWriter(w)}, nil
+	return &lz4WriteCloseFlusher{w: lz4v2.NewWriter(w)}, nil
 }
 
 type lz4WriteCloseFlusher struct {
-	w *lz4.Writer
+	w *lz4v2.Writer
 }
 
 func (lz4W *lz4WriteCloseFlusher) Write(p []byte) (int, error) {
