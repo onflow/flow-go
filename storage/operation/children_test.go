@@ -199,7 +199,6 @@ func TestDirectChildren(t *testing.T) {
 
 				err = operation.RetrieveBlockChildren(db.Reader(), b4, &retrievedIDs)
 				// verify b4 has no children index (not indexed yet)
-				require.Error(t, err)
 				require.ErrorIs(t, err, storage.ErrNotFound)
 			})
 		})
