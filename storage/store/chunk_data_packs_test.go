@@ -20,14 +20,14 @@ import (
 // TestChunkDataPacks_Store evaluates correct storage and retrieval of chunk data packs in the storage.
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
-	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, db storage.DB, lockManager storage.LockManager) {
+	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, protocolDB storage.DB, chunkDataPackDB storage.DB, lockManager storage.LockManager) {
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 
 			storeFunc, err := chunkDataPackStore.Store(chunkDataPacks)
 			if err != nil {
 				return err
 			}
-			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err = protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return storeFunc(lctx, rw)
 			})
 			if err != nil {
@@ -38,7 +38,7 @@ func TestChunkDataPacks_Store(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return storeFunc(lctx, rw)
 			})
 		}))
@@ -89,33 +89,37 @@ func TestChunkDataPacks_Store(t *testing.T) {
 
 // TestChunkDataPacks_MissingItem evaluates querying a missing item returns a storage.ErrNotFound error.
 func TestChunkDataPacks_MissingItem(t *testing.T) {
-	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-		db := pebbleimpl.ToDB(pdb)
-		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
-		collections := store.NewCollections(db, transactions)
-		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
+	unittest.RunWithPebbleDB(t, func(protocolPdb *pebble.DB) {
+		unittest.RunWithPebbleDB(t, func(chunkDataPackPdb *pebble.DB) {
+			protocolDB := pebbleimpl.ToDB(protocolPdb)
+			chunkDataPackDB := pebbleimpl.ToDB(chunkDataPackPdb)
 
-		// attempt to get an invalid
-		_, err := store1.ByChunkID(unittest.IdentifierFixture())
-		assert.ErrorIs(t, err, storage.ErrNotFound)
+			transactions := store.NewTransactions(&metrics.NoopCollector{}, protocolDB)
+			collections := store.NewCollections(protocolDB, transactions)
+			stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, chunkDataPackDB, 10)
+			store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, protocolDB, stored, collections, 1)
+
+			// attempt to get an invalid
+			_, err := store1.ByChunkID(unittest.IdentifierFixture())
+			assert.ErrorIs(t, err, storage.ErrNotFound)
+		})
 	})
 }
 
 // TestChunkDataPacks_StoreTwice evaluates that storing the same chunk data pack twice
 // does not result in an error.
 func TestChunkDataPacks_StoreTwice(t *testing.T) {
-	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, db storage.DB, lockManager storage.LockManager) {
-		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
-		collections := store.NewCollections(db, transactions)
-		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
+	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, protocolDB storage.DB, chunkDataPackDB storage.DB, lockManager storage.LockManager) {
+		transactions := store.NewTransactions(&metrics.NoopCollector{}, protocolDB)
+		collections := store.NewCollections(protocolDB, transactions)
+		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, chunkDataPackDB, 10)
+		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, protocolDB, stored, collections, 1)
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			storeFunc, err := store1.Store(chunkDataPacks)
 			if err != nil {
 				return err
 			}
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return storeFunc(lctx, rw)
 			})
 		}))
@@ -132,7 +136,7 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return storeFunc(lctx, rw)
 			})
 		}))
@@ -141,32 +145,36 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 
 // WithChunkDataPacks is a test helper that generates specified number of chunk data packs, store1 them using the storeFunc, and
 // then evaluates whether they are successfully retrieved from storage.
-func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *store.ChunkDataPacks, storage.DB, storage.LockManager)) {
-	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-		lockManager := storage.NewTestingLockManager()
-		db := pebbleimpl.ToDB(pdb)
-		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
-		collections := store.NewCollections(db, transactions)
-		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
+func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *store.ChunkDataPacks, storage.DB, storage.DB, storage.LockManager)) {
+	unittest.RunWithPebbleDB(t, func(protocolPdb *pebble.DB) {
+		unittest.RunWithPebbleDB(t, func(chunkDataPackPdb *pebble.DB) {
+			lockManager := storage.NewTestingLockManager()
+			protocolDB := pebbleimpl.ToDB(protocolPdb)
+			chunkDataPackDB := pebbleimpl.ToDB(chunkDataPackPdb)
 
-		chunkDataPacks := unittest.ChunkDataPacksFixture(chunks)
-		for _, chunkDataPack := range chunkDataPacks {
-			// store collection in Collections storage (which ChunkDataPacks store uses internally)
-			_, err := collections.Store(chunkDataPack.Collection)
-			require.NoError(t, err)
-		}
+			transactions := store.NewTransactions(&metrics.NoopCollector{}, protocolDB)
+			collections := store.NewCollections(protocolDB, transactions)
+			// keep the cache size at 1 to make sure that entries are written and read from storage itself.
+			stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, chunkDataPackDB, 10)
+			store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, protocolDB, stored, collections, 1)
 
-		// store chunk data packs in the memory using provided store function.
-		storeFunc(t, chunkDataPacks, store1, db, lockManager)
+			chunkDataPacks := unittest.ChunkDataPacksFixture(chunks)
+			for _, chunkDataPack := range chunkDataPacks {
+				// store collection in Collections storage (which ChunkDataPacks store uses internally)
+				_, err := collections.Store(chunkDataPack.Collection)
+				require.NoError(t, err)
+			}
 
-		// store1d chunk data packs should be retrieved successfully.
-		for _, expected := range chunkDataPacks {
-			actual, err := store1.ByChunkID(expected.ChunkID)
-			require.NoError(t, err)
+			// store chunk data packs in the memory using provided store function.
+			storeFunc(t, chunkDataPacks, store1, protocolDB, chunkDataPackDB, lockManager)
 
-			assert.Equal(t, expected, actual)
-		}
+			// store1d chunk data packs should be retrieved successfully.
+			for _, expected := range chunkDataPacks {
+				actual, err := store1.ByChunkID(expected.ChunkID)
+				require.NoError(t, err)
+
+				assert.Equal(t, expected, actual)
+			}
+		})
 	})
 }
