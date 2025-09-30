@@ -224,31 +224,54 @@ func (s *serializer) DeserializeBuffered(r io.Reader) (interface{}, error) {
 		return nil, fmt.Errorf("failed to read prototype: %w", err)
 	}
 
-	comp, err := s.compressor.NewReader(r)
+	inputReader, err := NewFullyBufferedReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create inputReader reader: %w", err)
+	}
+
+	comp, err := s.compressor.NewReader(inputReader)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compressor reader: %w", err)
 	}
 	defer comp.Close()
 
-	buf := bytes.NewBuffer(make([]byte, 0, DefaultMaxBlobSize))
-	for {
-		data := make([]byte, 0, DefaultMaxBlobSize)
-		n, err := comp.Read(data)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, fmt.Errorf("failed to read data: %w", err)
-		}
-		buf.Write(data[:n])
+	intermediateReader, err := NewFullyBufferedReader(comp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create intermediateReader reader: %w", err)
 	}
 
-	dec := s.codec.NewDecoder(buf)
+	dec := s.codec.NewDecoder(intermediateReader)
 
 	if err := dec.Decode(v); err != nil {
 		return nil, fmt.Errorf("failed to decode data: %w", err)
 	}
 
 	return v, nil
+}
+
+type fullyBufferedReader struct {
+	io.Reader
+}
+
+func NewFullyBufferedReader(reader io.Reader) (*fullyBufferedReader, error) {
+	buf := bytes.NewBuffer(make([]byte, 0, DefaultMaxBlobSize))
+	data := make([]byte, 0, DefaultMaxBlobSize)
+	for {
+		data = data[:0]
+
+		n, err := reader.Read(data)
+
+		if n > 0 {
+			buf.Write(data[:n])
+		}
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("failed to read data: %w", err)
+		}
+	}
+	return &fullyBufferedReader{Reader: buf}, nil
 }
