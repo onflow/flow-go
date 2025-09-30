@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ipfs/go-cid"
 	"golang.org/x/sync/errgroup"
@@ -101,6 +102,7 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 	chunkExecutionDatas := make([]*ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
 	// Execution data cids
 	var edCids = []cid.Cid{flow.IdToCid(executionDataID)}
+	var mu sync.Mutex
 
 	for i, chunkDataID := range edRoot.ChunkExecutionDataIDs {
 		i := i
@@ -117,8 +119,10 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 				return fmt.Errorf("failed to get chunk execution data at index %d: %w", i, err)
 			}
 
+			mu.Lock()
 			chunkExecutionDatas[i] = ced
 			edCids = append(edCids, cids...)
+			mu.Unlock()
 
 			return nil
 		})
