@@ -1,6 +1,7 @@
 package execution_data
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"math"
@@ -201,7 +202,10 @@ func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create compressor reader: %w", err)
 	}
 
-	dec := s.codec.NewDecoder(comp)
+	// Wrap decompressor in a greedy reader so cbor gets all data at once
+	greedy := bufio.NewReader(comp)
+
+	dec := s.codec.NewDecoder(greedy)
 
 	if err := dec.Decode(v); err != nil {
 		return nil, fmt.Errorf("failed to decode data: %w", err)
