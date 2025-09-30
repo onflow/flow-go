@@ -156,6 +156,7 @@ func TestDirectChildren(t *testing.T) {
 			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 				lockManager := storage.NewTestingLockManager()
 
+				// We emulate a fork of blocks: b1 ← b2 ← b3 ← b4
 				b1 := unittest.IdentifierFixture()
 				b2 := unittest.IdentifierFixture()
 				b3 := unittest.IdentifierFixture()
