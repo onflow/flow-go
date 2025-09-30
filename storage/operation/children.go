@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// IndexNewBlock indexes a new block and updates the parent-child relationship in the block children index.
-// This function creates an empty children index for the new block and adds the new block to the parent's children list.
+// IndexNewBlock populates the parent-child index for block, by adding the given blockID to the set of children of its parent.
 //
 // CAUTION:
+//   - This function should only be used for KNOWN BLOCKs (neither existence of the block nor its parent is verified here)
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
 //
 // Expected error returns during normal operations:
@@ -26,10 +26,11 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 	return indexBlockByParent(rw, blockID, parentID)
 }
 
-// IndexNewClusterBlock indexes a new cluster block and updates the parent-child relationship in the block children index.
-// This function creates an empty children index for the new cluster block and adds the new block to the parent's children list.
+// IndexNewClusterBlock populates the parent-child index for cluster blocks, aka collections, by adding the given
+// blockID to the set of children of its parent.
 //
 // CAUTION:
+//   - This function should only be used for KNOWN BLOCKs (neither existence of the block nor its parent is verified here)
 //   - The caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database write has been committed.
 //
 // Expected error returns during normal operations:
@@ -57,18 +58,15 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 			storage.ErrAlreadyExists)
 	}
 
-	// Step 2: adding the second index for the parent block
-	// if the parent block is zero, for instance root block has no parent,
-	// then no need to add index for it
-	// useful to skip for cluster root block which has no parent
+	// By convention, the parentID being [flow.ZeroID] means that the block has no parent.
+	// This is the case for genesis blocks and cluster root blocks. In this case, there
+	// is no parent, whose child we can index.
 	if parentID == flow.ZeroID {
 		return nil
 	}
 
-	// if the parent block is not zero, depending on whether the parent block has
-	// children or not, we will either update the index or insert the index:
-	// when parent block doesn't exist, we will insert the block children.
-	// when parent block exists already, we will update the block children,
+	// If the parent block is not zero, depending on whether the parent block has
+	// children or not, we will either update the index or insert the index.
 	var childrenIDs flow.IdentifierList
 	err = RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
 	if err != nil {
@@ -98,7 +96,7 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 
 // RetrieveBlockChildren retrieves the list of child block IDs for the specified parent block.
 //
-// Expected errors during normal operations:
+// No error returns expected during normal operations.
 // It returns [storage.ErrNotFound] if the block has no children.
 // Note, this would mean either the block does not exist or the block exists but has no children.
 // The caller has to check if the block exists by other means if needed.

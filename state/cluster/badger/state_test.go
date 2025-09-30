@@ -43,7 +43,6 @@ func TestUnknownSnapshotReference(t *testing.T) {
 
 	// Verify that Collection() returns state.ErrUnknownSnapshotReference
 	_, err = snapshot.Collection()
-	assert.Error(t, err)
 	assert.ErrorIs(t, err, state.ErrUnknownSnapshotReference)
 
 	// Verify that Head() returns state.ErrUnknownSnapshotReference
@@ -58,7 +57,7 @@ func TestUnknownSnapshotReference(t *testing.T) {
 }
 
 // TestValidSnapshotReference verifies that AtBlockID returns a working snapshot
-// when given a valid block ID (the genesis block).
+// when given a valid block ID (which in this test is the genesis block ID).
 func TestValidSnapshotReference(t *testing.T) {
 	// Setup
 	genesis, err := unittest.ClusterBlock.Genesis()

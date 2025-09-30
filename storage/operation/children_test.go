@@ -13,14 +13,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestOperationPair represents a pair of operations to test
+// TestOperationPair is a pair of indexing operation and corresponding lock to be held during the operation. 
+// The name is an auxiliary identifier, for debugging only. 
 type TestOperationPair struct {
 	name      string
 	indexFunc func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, flow.Identifier) error
 	lockType  string
 }
 
-// getTestOperationPairs returns the operation pairs to test
+// getTestOperationPairs returns a `TestOperationPair` for indexing main consensus blocks
+// and one `TestOperationPair` for indexing collector blocks (aka collections).
 func getTestOperationPairs() []TestOperationPair {
 	return []TestOperationPair{
 		{
@@ -47,7 +49,6 @@ func TestIndexAndLookupChild(t *testing.T) {
 				// retrieving children of a non-existent block should return empty list
 				var retrievedIDs flow.IdentifierList
 				err := operation.RetrieveBlockChildren(db.Reader(), nonExist, &retrievedIDs)
-				require.Error(t, err)
 				require.ErrorIs(t, err, storage.ErrNotFound)
 
 				parentID := unittest.IdentifierFixture()
@@ -68,7 +69,6 @@ func TestIndexAndLookupChild(t *testing.T) {
 
 				err = operation.RetrieveBlockChildren(db.Reader(), childID, &retrievedIDs)
 				// verify new block has no children index (returning storage.ErrNotFound)
-				require.Error(t, err)
 				require.ErrorIs(t, err, storage.ErrNotFound)
 
 				// verify indexing again would hit storage.ErrAlreadyExists error
@@ -77,7 +77,6 @@ func TestIndexAndLookupChild(t *testing.T) {
 						return opPair.indexFunc(lctx, rw, childID, parentID)
 					})
 				})
-				require.Error(t, err)
 				require.ErrorIs(t, err, storage.ErrAlreadyExists)
 			})
 		})
