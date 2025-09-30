@@ -365,12 +365,10 @@ func stringsToCids(strs []string) ([]cid.Cid, error) {
 
 // Equals returns true if and only if receiver BlockExecutionDataRoot is equal to the `other`.
 func (b BlockExecutionDataRoot) Equals(other BlockExecutionDataRoot) bool {
-	// Compare BlockID fields
 	if b.BlockID != other.BlockID {
 		return false
 	}
 
-	// Compare ChunkExecutionDataIDs slices
 	if len(b.ChunkExecutionDataIDs) != len(other.ChunkExecutionDataIDs) {
 		return false
 	}
