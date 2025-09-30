@@ -327,7 +327,9 @@ type ObserverServiceBuilder struct {
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	stateStreamBackend *statestreambackend.StateStreamBackend
+	stateStreamBackend          *statestreambackend.StateStreamBackend
+	executionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	executionStateCache         optimistic_sync.ExecutionStateCache
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -1205,58 +1207,101 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			)
 
 			return nil
-		}).
-		Component("public execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			opts := []network.BlobServiceOption{
-				blob.WithBitswapOptions(
-					bitswap.WithTracer(
-						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
-					),
+		}).Module("execution state cache", func(node *cmd.NodeConfig) error {
+		config := builder.rpcConf
+		backendConfig := config.BackendConfig
+
+		preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		execNodeSelector := execution_result.NewExecutionNodeSelector(
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		builder.executionResultInfoProvider, err = execution_result.NewExecutionResultInfoProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Headers,
+			node.Storage.Receipts,
+			execNodeSelector,
+			optimistic_sync.DefaultCriteria,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create execution result provider: %w", err)
+		}
+
+		// TODO: use real objects instead of mocks once they're implemented
+		snapshot := osyncsnapshot.NewSnapshotMock(
+			builder.events,
+			nil,
+			nil,
+			builder.lightTransactionResults,
+			nil,
+			nil,
+			*executionDataStoreCache,
+		)
+		builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
+
+		return nil
+	}).Component("public execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		opts := []network.BlobServiceOption{
+			blob.WithBitswapOptions(
+				bitswap.WithTracer(
+					blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
 				),
-			}
+			),
+		}
 
-			var err error
-			bs, err = node.EngineRegistry.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+		var err error
+		bs, err = node.EngineRegistry.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("could not register blob service: %w", err)
+		}
+
+		// add blobservice into ReadyDoneAware dependency passed to peer manager
+		// this starts the blob service and configures peer manager to wait for the blobservice
+		// to be ready before starting
+		publicBsDependable.Init(bs)
+
+		var downloaderOpts []execution_data.DownloaderOption
+
+		if executionDataPrunerEnabled {
+			sealed, err := node.State.Sealed().Head()
 			if err != nil {
-				return nil, fmt.Errorf("could not register blob service: %w", err)
+				return nil, fmt.Errorf("cannot get the sealed block: %w", err)
 			}
 
-			// add blobservice into ReadyDoneAware dependency passed to peer manager
-			// this starts the blob service and configures peer manager to wait for the blobservice
-			// to be ready before starting
-			publicBsDependable.Init(bs)
-
-			var downloaderOpts []execution_data.DownloaderOption
-
-			if executionDataPrunerEnabled {
-				sealed, err := node.State.Sealed().Head()
-				if err != nil {
-					return nil, fmt.Errorf("cannot get the sealed block: %w", err)
-				}
-
-				trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-				builder.ExecutionDataTracker, err = tracker.OpenStorage(
-					trackerDir,
-					sealed.Height,
-					node.Logger,
-					tracker.WithPruneCallback(func(c cid.Cid) error {
-						// TODO: use a proper context here
-						return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
-					}),
-				)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create execution data tracker: %w", err)
-				}
-
-				downloaderOpts = []execution_data.DownloaderOption{
-					execution_data.WithExecutionDataTracker(builder.ExecutionDataTracker, node.Storage.Headers),
-				}
+			trackerDir := filepath.Join(builder.executionDataDir, "tracker")
+			builder.ExecutionDataTracker, err = tracker.OpenStorage(
+				trackerDir,
+				sealed.Height,
+				node.Logger,
+				tracker.WithPruneCallback(func(c cid.Cid) error {
+					// TODO: use a proper context here
+					return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
+				}),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data tracker: %w", err)
 			}
 
-			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs, downloaderOpts...)
+			downloaderOpts = []execution_data.DownloaderOption{
+				execution_data.WithExecutionDataTracker(builder.ExecutionDataTracker, node.Storage.Headers),
+			}
+		}
 
-			return builder.ExecutionDataDownloader, nil
-		}).
+		builder.ExecutionDataDownloader = execution_data.NewDownloader(bs, downloaderOpts...)
+
+		return builder.ExecutionDataDownloader, nil
+	}).
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
@@ -1593,6 +1638,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				builder.executionResultInfoProvider,
+				builder.executionStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1972,34 +2019,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
-		execNodeSelector := execution_result.NewExecutionNodeSelector(
-			preferredENIdentifiers,
-			fixedENIdentifiers,
-		)
-
-		execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
-			node.Logger,
-			node.State,
-			node.Storage.Headers,
-			node.Storage.Receipts,
-			execNodeSelector,
-			optimistic_sync.DefaultCriteria,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create execution result provider: %w", err)
-		}
-
-		// TODO: use real objects instead of mocks once they're implemented
-		snapshot := osyncsnapshot.NewSnapshotMock(
-			builder.events,
-			nil,
-			nil,
-			builder.lightTransactionResults,
-			nil,
-			nil,
-		)
-		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
-
 		backendParams := backend.Params{
 			State:                node.State,
 			Blocks:               node.Storage.Blocks,
@@ -2031,8 +2050,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			VersionControl:              builder.VersionControl,
 			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
 			MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
-			ExecutionResultInfoProvider: execResultInfoProvider,
-			ExecutionStateCache:         execStateCache,
+			ExecutionResultInfoProvider: builder.executionResultInfoProvider,
+			ExecutionStateCache:         builder.executionStateCache,
 			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		}
 

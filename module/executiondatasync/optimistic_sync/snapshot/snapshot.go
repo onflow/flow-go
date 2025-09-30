@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
 )
@@ -12,6 +13,7 @@ type Mock struct {
 	lightTransactionResults        storage.LightTransactionResultsReader
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader
 	registers                      storage.RegisterIndexReader
+	executionData                  execdatacache.ExecutionDataCache
 }
 
 var _ optimistic_sync.Snapshot = (*Mock)(nil)
@@ -23,6 +25,7 @@ func NewSnapshotMock(
 	lightTransactionResults storage.LightTransactionResultsReader,
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader,
 	registers storage.RegisterIndexReader,
+	executionData execdatacache.ExecutionDataCache,
 ) *Mock {
 	return &Mock{
 		events:                         events,
@@ -31,6 +34,7 @@ func NewSnapshotMock(
 		lightTransactionResults:        lightTransactionResults,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		registers:                      registers,
+		executionData:                  executionData,
 	}
 }
 
@@ -57,3 +61,5 @@ func (s *Mock) TransactionResultErrorMessages() storage.TransactionResultErrorMe
 func (s *Mock) Registers() storage.RegisterIndexReader {
 	return s.registers
 }
+
+func (s *Mock) ExecutionData() execdatacache.ExecutionDataCache { return s.executionData }

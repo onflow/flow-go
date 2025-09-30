@@ -375,8 +375,10 @@ type FlowAccessNodeBuilder struct {
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	stateStreamBackend *statestreambackend.StateStreamBackend
-	nodeBackend        *backend.Backend
+	stateStreamBackend          *statestreambackend.StateStreamBackend
+	nodeBackend                 *backend.Backend
+	executionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	executionStateCache         optimistic_sync.ExecutionStateCache
 
 	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
 	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
@@ -649,7 +651,51 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			)
 
 			return nil
-		}).
+		}).Module("execution state cache", func(node *cmd.NodeConfig) error {
+		config := builder.rpcConf
+		backendConfig := config.BackendConfig
+
+		preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		execNodeSelector := execution_result.NewExecutionNodeSelector(
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		builder.executionResultInfoProvider, err = execution_result.NewExecutionResultInfoProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Headers,
+			node.Storage.Receipts,
+			execNodeSelector,
+			optimistic_sync.DefaultCriteria,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create execution result provider: %w", err)
+		}
+
+		// TODO: use real objects instead of mocks once they're implemented
+		snapshot := osyncsnapshot.NewSnapshotMock(
+			builder.events,
+			builder.collections,
+			builder.transactions,
+			builder.lightTransactionResults,
+			builder.transactionResultErrorMessages,
+			nil,
+			*executionDataStoreCache,
+		)
+		builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
+
+		return nil
+	}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
@@ -1084,6 +1130,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				builder.executionResultInfoProvider,
+				builder.executionStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -2113,34 +2161,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.ExecNodeIdentitiesProvider),
 			)
 
-			execNodeSelector := execution_result.NewExecutionNodeSelector(
-				preferredENIdentifiers,
-				fixedENIdentifiers,
-			)
-
-			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
-				node.Logger,
-				node.State,
-				node.Storage.Headers,
-				node.Storage.Receipts,
-				execNodeSelector,
-				optimistic_sync.DefaultCriteria,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
-			}
-
-			// TODO: use real objects instead of mocks once they're implemented
-			snapshot := osyncsnapshot.NewSnapshotMock(
-				builder.events,
-				builder.collections,
-				builder.transactions,
-				builder.lightTransactionResults,
-				builder.transactionResultErrorMessages,
-				nil,
-			)
-			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
-
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
 				CollectionRPC:         builder.CollectionRPC, // might be nil
@@ -2181,8 +2201,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				VersionControl:              notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
-				ExecutionResultInfoProvider: execResultInfoProvider,
-				ExecutionStateCache:         execStateCache,
+				ExecutionResultInfoProvider: builder.executionResultInfoProvider,
+				ExecutionStateCache:         builder.executionStateCache,
 				OperatorCriteria:            optimistic_sync.DefaultCriteria,
 				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 				ScheduledCallbacksEnabled:   builder.scheduledCallbacksEnabled,

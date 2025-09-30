@@ -3,6 +3,7 @@
 package mock
 
 import (
+	cache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -48,6 +49,24 @@ func (_m *Snapshot) Events() storage.EventsReader {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(storage.EventsReader)
 		}
+	}
+
+	return r0
+}
+
+// ExecutionData provides a mock function with no fields
+func (_m *Snapshot) ExecutionData() cache.ExecutionDataCache {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExecutionData")
+	}
+
+	var r0 cache.ExecutionDataCache
+	if rf, ok := ret.Get(0).(func() cache.ExecutionDataCache); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(cache.ExecutionDataCache)
 	}
 
 	return r0
