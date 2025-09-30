@@ -33,7 +33,13 @@ func TestChunkDataPackPruner(t *testing.T) {
 		cdp1, result1 := unittest.ChunkDataPacksFixtureAndResult()
 		require.NoError(t, results.Store(result1))
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-			return chunks.StoreByChunkID(lctx, cdp1)
+			storeFunc, err := chunks.Store(cdp1)
+			if err != nil {
+				return err
+			}
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return storeFunc(lctx, rw)
+			})
 		}))
 
 		pruner := NewChunkDataPackPruner(chunks, results)
