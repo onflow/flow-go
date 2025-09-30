@@ -88,6 +88,7 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			require.NoError(t, store1.StoreByChunkID(lctx, chunkDataPacks))
 
+			// sanity-check first that chunk data packs are stored, before attempting to store them again.
 			for _, c := range chunkDataPacks {
 				c2, err := store1.ByChunkID(c.ChunkID)
 				require.NoError(t, err)
