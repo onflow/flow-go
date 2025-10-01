@@ -1,0 +1,240 @@
+package storage
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/state/protocol"
+)
+
+var _ commands.AdminCommand = (*BackfillTxErrorMessagesCommand)(nil)
+
+// backfillTxErrorMessagesRequest represents the input parameters for
+// backfilling transaction error messages.
+type backfillTxErrorMessagesRequest struct {
+	startHeight      uint64            // Start height from which to begin backfilling.
+	endHeight        uint64            // End height up to which backfilling is performed.
+	executionNodeIds flow.IdentityList // List of execution node IDs to be used for backfilling.
+}
+
+// BackfillTxErrorMessagesCommand executes a command to backfill
+// transaction error messages by fetching them from execution nodes.
+type BackfillTxErrorMessagesCommand struct {
+	log                 zerolog.Logger
+	state               protocol.State
+	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
+}
+
+// NewBackfillTxErrorMessagesCommand creates a new instance of BackfillTxErrorMessagesCommand
+func NewBackfillTxErrorMessagesCommand(
+	log zerolog.Logger,
+	state protocol.State,
+	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
+) commands.AdminCommand {
+	return &BackfillTxErrorMessagesCommand{
+		log:                 log.With().Str("command", "backfill-tx-error-messages").Logger(),
+		state:               state,
+		txErrorMessagesCore: txErrorMessagesCore,
+	}
+}
+
+// Validator validates the input for the backfill command. The input is validated
+// for field types, boundaries, and coherence of start and end heights.
+//
+// Expected errors during normal operation:
+//   - admin.InvalidAdminReqError - if start-height is greater than end-height or
+//     if the input format is invalid, if an invalid execution node ID is provided.
+func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest) error {
+	input, ok := request.Data.(map[string]interface{})
+	if !ok {
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
+	}
+
+	data := &backfillTxErrorMessagesRequest{}
+
+	root, err := b.state.Params().SealedRoot()
+	if err != nil {
+		return fmt.Errorf("could not get sealed root: %w", err)
+	}
+	data.startHeight = root.Height // Default value
+
+	sealed, err := b.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("failed to lookup sealed header: %w", err)
+	}
+
+	lastSealedHeight := sealed.Height
+	if startHeightIn, ok := input["start-height"]; ok {
+		startHeight, err := parseN(startHeightIn)
+		if err != nil {
+			return admin.NewInvalidAdminReqErrorf("invalid 'start-height' field: %w", err)
+		}
+
+		if startHeight > lastSealedHeight {
+			return admin.NewInvalidAdminReqErrorf(
+				"'start-height' %d must not be greater than latest sealed block %d",
+				startHeight,
+				lastSealedHeight,
+			)
+		}
+
+		if startHeight < root.Height {
+			return admin.NewInvalidAdminReqErrorf(
+				"'start-height' %d must not be less than root block %d",
+				startHeight,
+				root.Height,
+			)
+		}
+
+		data.startHeight = startHeight
+	}
+
+	data.endHeight = lastSealedHeight // Default value
+	if endHeightIn, ok := input["end-height"]; ok {
+		endHeight, err := parseN(endHeightIn)
+		if err != nil {
+			return admin.NewInvalidAdminReqErrorf("invalid 'end-height' field: %w", err)
+		}
+
+		if endHeight > lastSealedHeight {
+			return admin.NewInvalidAdminReqErrorf(
+				"'end-height' %d must not be greater than latest sealed block %d",
+				endHeight,
+				lastSealedHeight,
+			)
+		}
+
+		data.endHeight = endHeight
+	}
+
+	if data.endHeight < data.startHeight {
+		return admin.NewInvalidAdminReqErrorf(
+			"'start-height' %d must not be less than 'end-height' %d",
+			data.startHeight,
+			data.endHeight,
+		)
+	}
+
+	identities, err := b.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return fmt.Errorf("failed to retreive execution IDs: %w", err)
+	}
+
+	if executionNodeIdsIn, ok := input["execution-node-ids"]; ok {
+		executionNodeIds, err := b.parseExecutionNodeIds(executionNodeIdsIn, identities)
+		if err != nil {
+			return err
+		}
+		data.executionNodeIds = executionNodeIds
+	} else {
+		// in case no execution node ids provided, the command will use any valid execution node
+		data.executionNodeIds = identities
+	}
+
+	request.ValidatorData = data
+
+	return nil
+}
+
+// Handler performs the backfilling operation by fetching missing transaction
+// error messages for blocks within the specified height range. Uses execution nodes
+// from data.executionNodeIds if available, otherwise defaults to valid execution nodes.
+//
+// No errors are expected during normal operation.
+func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *admin.CommandRequest) (interface{}, error) {
+	if b.txErrorMessagesCore == nil {
+		return nil, fmt.Errorf("failed to backfill, could not get transaction error messages storage")
+	}
+
+	data := request.ValidatorData.(*backfillTxErrorMessagesRequest)
+
+	total := data.endHeight - data.startHeight + 1
+	progress := util.LogProgress(b.log,
+		util.DefaultLogProgressConfig("backfilling", int(total)),
+	)
+
+	b.log.Info().
+		Uint64("start_height", data.startHeight).
+		Uint64("end_height", data.endHeight).
+		Uint64("blocks", total).
+		Msgf("starting backfill")
+
+	for height := data.startHeight; height <= data.endHeight; height++ {
+		header, err := b.state.AtHeight(height).Head()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get block header: %w", err)
+		}
+
+		blockID := header.ID()
+		err = b.txErrorMessagesCore.HandleTransactionResultErrorMessagesByENs(ctx, blockID, data.executionNodeIds)
+		if err != nil {
+			return nil, fmt.Errorf("error encountered while processing transaction result error message for block: %d, %w", height, err)
+		}
+
+		progress(1)
+	}
+
+	return nil, nil
+}
+
+// convertToExecutionStringList converts a given input to a slice of strings containing execution node IDs.
+// Returns an error if the input is not a slice of strings or if the slice is empty.
+func convertToExecutionStringList(executionNodeIdsIn interface{}) ([]string, error) {
+	var executionNodeIds []string
+	switch executionNodeIdsConverted := executionNodeIdsIn.(type) {
+	case []interface{}:
+		for _, executionNodeIdIn := range executionNodeIdsConverted {
+			executionNodeId, ok := executionNodeIdIn.(string)
+			if !ok {
+				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
+			}
+			executionNodeIds = append(executionNodeIds, executionNodeId)
+		}
+	default:
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
+	}
+
+	if len(executionNodeIds) == 0 {
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
+	}
+
+	return executionNodeIds, nil
+}
+
+// parseExecutionNodeIds converts a list of node IDs from input to flow.IdentitySkeletonList.
+// Returns an error if the IDs are invalid or empty.
+//
+// Expected errors during normal operation:
+// - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
+func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentityList, error) {
+	executionNodeIds, err := convertToExecutionStringList(executionNodeIdsIn)
+	if err != nil {
+		return nil, err
+	}
+
+	requestedENIdentifiers, err := commonrpc.IdentifierList(executionNodeIds)
+	if err != nil {
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
+	}
+
+	var ids flow.IdentityList
+
+	for _, enId := range requestedENIdentifiers {
+		id, exists := allIdentities.ByNodeID(enId)
+		if !exists {
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}

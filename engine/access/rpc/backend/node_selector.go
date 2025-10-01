@@ -3,11 +3,9 @@ package backend
 import (
 	"fmt"
 
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-// maxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
-const maxNodesCnt = 3
 
 // NodeSelector is an interface that represents the ability to select node identities that the access node is trying to reach.
 // It encapsulates the internal logic of node selection and provides a way to change implementations for different types
@@ -32,7 +30,7 @@ func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) (NodeSelector
 	var err error
 	// If the circuit breaker is disabled, the legacy logic should be used, which selects only a specified number of nodes.
 	if !n.circuitBreakerEnabled {
-		nodes, err = nodes.Sample(maxNodesCnt)
+		nodes, err = nodes.Sample(commonrpc.MaxNodesCnt)
 		if err != nil {
 			return nil, fmt.Errorf("sampling failed: %w", err)
 		}

@@ -148,7 +148,7 @@ clean-data:
 	rm -rf ./bootstrap
 	rm -rf ./trie
 	rm -rf ./profiler
-	rm -f ./targets.nodes.json
+	rm -rf ./targets.nodes.json
 	rm -f ./docker-compose.nodes.yml
 
 # deletes the stopped environment-clean container(s) - running this command inside another target doesn't delete the containers so it's isolated to run in a separate target

@@ -763,6 +763,10 @@ type ExecutionStateIndexerMetrics interface {
 	// This should only be used during startup. After startup, use BlockIndexed to record newly
 	// indexed heights.
 	InitializeLatestHeight(height uint64)
+
+	// TransactionErrorsIndexedHeight records the highest consecutive finalized block height with
+	// all transaction errors indexed.
+	TransactionErrorsIndexedHeight(height uint64)
 }
 
 type RuntimeMetrics interface {

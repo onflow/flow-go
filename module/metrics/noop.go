@@ -357,6 +357,7 @@ var _ module.ExecutionStateIndexerMetrics = (*NoopCollector)(nil)
 func (nc *NoopCollector) BlockIndexed(uint64, time.Duration, int, int, int) {}
 func (nc *NoopCollector) BlockReindexed()                                   {}
 func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}
+func (nc *NoopCollector) TransactionErrorsIndexedHeight(height uint64)      {}
 
 var _ module.CollectionExecutedMetric = (*NoopCollector)(nil)
 
