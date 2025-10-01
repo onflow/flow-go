@@ -334,6 +334,7 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
+	var err error
 	db := node.ProtocolDB
 
 	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
@@ -342,7 +343,10 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
 	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
 	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
-	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+	exeNode.txResults, err = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+	if err != nil {
+		return err
+	}
 	exeNode.eventsReader = exeNode.events
 	exeNode.commitsReader = exeNode.commits
 	exeNode.resultsReader = exeNode.results
@@ -716,7 +720,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	node *NodeConfig,
 ) (err error) {
 	exeNode.executionDataDatastore, err = edstorage.CreateDatastoreManager(
-		node.Logger, exeNode.exeConf.executionDataDir, exeNode.exeConf.executionDataDBMode)
+		node.Logger, exeNode.exeConf.executionDataDir)
 	if err != nil {
 		return fmt.Errorf("could not create execution data datastore manager: %w", err)
 	}

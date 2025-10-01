@@ -161,7 +161,6 @@ type AccessNodeConfig struct {
 	rpcMetricsEnabled                    bool
 	executionDataSyncEnabled             bool
 	publicNetworkExecutionDataEnabled    bool
-	executionDataDBMode                  string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	executionDataPruningInterval         time.Duration
@@ -277,7 +276,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 		executionDataIndexingEnabled:         false,
-		executionDataDBMode:                  execution_data.ExecutionDataDBModePebble.String(),
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -591,7 +589,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			var err error
 			builder.ExecutionDatastoreManager, err = edstorage.CreateDatastoreManager(
-				node.Logger, builder.executionDataDir, builder.executionDataDBMode)
+				node.Logger, builder.executionDataDir)
 			if err != nil {
 				return fmt.Errorf("could not create execution data datastore manager: %w", err)
 			}
@@ -1362,10 +1360,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-		flags.StringVar(&builder.executionDataDBMode,
+
+		var builderexecutionDataDBMode string
+		flags.StringVar(&builderexecutionDataDBMode,
 			"execution-data-db",
-			defaultConfig.executionDataDBMode,
-			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+			"pebble",
+			"[deprecated] the DB type for execution datastore")
+
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
 			"execution-data-height-range-target",
 			defaultConfig.executionDataPrunerHeightRangeTarget,
@@ -2060,7 +2061,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// handles block-related operations.
 			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
-				builder.FinalizedRootBlock.Height,
+				builder.SealedRootBlock.Height,
 				node.Storage.Headers,
 				broadcaster,
 			)

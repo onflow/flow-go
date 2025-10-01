@@ -1178,6 +1178,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		ErrorCode:               types.ErrorCode(errorCode),
 		ErrorMessage:            string(errorMsg),
 		GasConsumed:             uint64(gasUsed),
+		MaxGasConsumed:          uint64(gasUsed),
 		ReturnedData:            convertedData,
 		DeployedContractAddress: convertedDeployedAddress,
 	}, nil
