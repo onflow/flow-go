@@ -17,13 +17,13 @@ import (
 //   - OVERWRITES existing data (potential for data corruption):
 //     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK
 //     is done elsewhere ATOMICALLY with this write operation. It is intended that this function is called only for new
-//     blocks, i.e. no signature was previously persisted for it. 
+//     blocks, i.e. no signature was previously persisted for it.
 //
 // No errors are expected during normal operation.
 func InsertProposalSignature(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sig *[]byte) error {
-	held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	held, errStr := storage.HeldOneLock(lctx, storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
 	if !held {
-		return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
+		return fmt.Errorf("%s", errStr)
 	}
 
 	return UpsertByKey(w, MakePrefix(codeBlockIDToProposalSignature, blockID), sig)
