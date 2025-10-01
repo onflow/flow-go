@@ -204,10 +204,10 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 		}
 
 		// Test that parent only returns direct children (child1)
-		children, err := headers.ByParentID(parentBlock.ID())
+		children, err := headers.ByParentID(parent.ID())
 		require.NoError(t, err)
 		require.Len(t, children, 1)
-		require.Equal(t, child1.ToHeader(), children[0])
+		require.Equal(t, child.ToHeader(), children[0])
 
 		// Test that child1 returns its direct children (grandchild1, grandchild2)
 		// Test that child returns its direct children (grandchild1, grandchild2)
