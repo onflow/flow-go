@@ -43,24 +43,11 @@ func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	return indexBlockByParent(rw, blockID, parentID)
 }
 
+// indexBlockByParent is the internal function that implements the indexing logic for both regular blocks and cluster blocks.
+// the caller must ensure the required locks are held to prevent concurrent writes to the [codeBlockChildren] key space.
 func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	// Step 1: make sure the new block has no children yet
-	var nonExist flow.IdentifierList
-	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
-	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not check for existing children of new block: %w", err)
-		}
-	}
-
-	if len(nonExist) > 0 {
-		return fmt.Errorf("a new block supposed to have no children, but found %v: %w", nonExist,
-			storage.ErrAlreadyExists)
-	}
-
-	// By convention, the parentID being [flow.ZeroID] means that the block has no parent.
-	// This is the case for genesis blocks and cluster root blocks. In this case, there
-	// is no parent, whose child we can index.
+	// By convention, the parentID being [flow.ZeroID] means that the block is a root block that has no parent.
+	// This is the case for genesis blocks and cluster root blocks. In this case, we don't need to index anything.
 	if parentID == flow.ZeroID {
 		return nil
 	}
@@ -68,7 +55,7 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 	// If the parent block is not zero, depending on whether the parent block has
 	// children or not, we will either update the index or insert the index.
 	var childrenIDs flow.IdentifierList
-	err = RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
+	err := RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not look up block children: %w", err)
