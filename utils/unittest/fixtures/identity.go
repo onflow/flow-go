@@ -1,6 +1,8 @@
 package fixtures
 
 import (
+	"fmt"
+
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -131,10 +133,11 @@ func (g *IdentityGenerator) Fixture(opts ...IdentityOption) *flow.Identity {
 		weight = g.random.Uint64InRange(1, 999)
 	}
 
+	nodeID := g.identifiers.Fixture()
 	identity := &flow.Identity{
 		IdentitySkeleton: flow.IdentitySkeleton{
-			NodeID:        g.identifiers.Fixture(),
-			Address:       g.addresses.Fixture().String(),
+			NodeID:        nodeID,
+			Address:       fmt.Sprintf("%x@flow.com:1234", nodeID),
 			Role:          RandomElement(g.random, flow.Roles()),
 			InitialWeight: weight,
 			StakingPubKey: g.cryptoGen.StakingPrivateKey().PublicKey(),

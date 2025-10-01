@@ -25,8 +25,8 @@ func (f payloadFactory) WithGuarantees(guarantees ...*flow.CollectionGuarantee) 
 	}
 }
 
-// WithReceipts is an option that sets the `Receipts` and `Results` of the payload by adding all
-// receipts and their `ExecutionResults` to the payload.
+// WithReceipts is an option that updates the `Receipts` and `Results` fields of the payload by
+// appending all receipts and their `ExecutionResults` to the payload.
 //
 // To add only receipts, use `WithReceiptStubs` instead.
 // e.g.
@@ -51,9 +51,27 @@ func (f payloadFactory) WithReceiptStubs(receipts ...*flow.ExecutionReceiptStub)
 }
 
 // WithResults is an option that sets the `Results` of the payload.
-func (f payloadFactory) WithResults(results flow.ExecutionResultList) PayloadOption {
+func (f payloadFactory) WithResults(results ...*flow.ExecutionResult) PayloadOption {
 	return func(g *PayloadGenerator, payload *flow.Payload) {
 		payload.Results = results
+	}
+}
+
+// Empty is an option that sets the `Guarantees`, `Receipts`, `Results`, and `Seals` of the payload to nil.
+// Equivalent to
+//
+//	 g.Payloads().Fixture(
+//		fixtures.Payload.WithGuarantees(),
+//		fixtures.Payload.WithReceiptStubs(),
+//		fixtures.Payload.WithResults(),
+//		fixtures.Payload.WithSeals(),
+//	 )
+func (f payloadFactory) Empty() PayloadOption {
+	return func(g *PayloadGenerator, payload *flow.Payload) {
+		payload.Guarantees = nil
+		payload.Receipts = nil
+		payload.Results = nil
+		payload.Seals = nil
 	}
 }
 
