@@ -28,11 +28,29 @@ type EventsResponse struct {
 type EventsProvider struct {
 	log              zerolog.Logger
 	headers          storage.Headers
-	getExecutionData GetExecutionDataFunc
+	execDataProvider ExecutionDataProvider
 
 	fetchFromLocalCache bool
 	execResultProvider  optimistic_sync.ExecutionResultInfoProvider
 	execStateCache      optimistic_sync.ExecutionStateCache
+}
+
+func NewEventsProvider(
+	log zerolog.Logger,
+	headers storage.Headers,
+	execDataProvider ExecutionDataProvider,
+	fetchFromLocalCache bool,
+	execResultProvider optimistic_sync.ExecutionResultInfoProvider,
+	execStateCache optimistic_sync.ExecutionStateCache,
+) *EventsProvider {
+	return &EventsProvider{
+		log:                 log,
+		headers:             headers,
+		execDataProvider:    execDataProvider,
+		fetchFromLocalCache: fetchFromLocalCache,
+		execResultProvider:  execResultProvider,
+		execStateCache:      execStateCache,
+	}
 }
 
 // GetAllEventsResponse returns a function that retrieves the event response for a given block height.
@@ -79,7 +97,7 @@ func (b *EventsProvider) getEventsFromExecutionData(
 	ctx context.Context,
 	height uint64,
 ) (*EventsResponse, error) {
-	executionData, err := b.getExecutionData(ctx, height)
+	executionData, err := b.execDataProvider.ExecutionData(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}

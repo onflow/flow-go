@@ -25,6 +25,20 @@ type EventsBackend struct {
 
 var _ state_stream.EventsAPI = (*EventsBackend)(nil)
 
+func NewEventsBackend(
+	log zerolog.Logger,
+	subscriptionFactory subscription.Factory,
+	executionDataTracker tracker.ExecutionDataTracker,
+	eventsProvider EventsProvider,
+) EventsBackend {
+	return EventsBackend{
+		log:                  log,
+		subscriptionFactory:  &subscriptionFactory,
+		executionDataTracker: executionDataTracker,
+		eventsProvider:       eventsProvider,
+	}
+}
+
 // SubscribeEvents is deprecated and will be removed in a future version.
 // Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 //

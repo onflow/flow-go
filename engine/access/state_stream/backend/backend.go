@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -115,18 +114,23 @@ func New(
 		registerRequestLimit: registerIDsRequestLimit,
 	}
 
+	executionDataProvider := NewExecutionDataProvider(
+		executionDataTracker,
+		execDataCache,
+	)
+
 	b.ExecutionDataBackend = ExecutionDataBackend{
 		log:                  logger,
 		headers:              headers,
 		subscriptionFactory:  subscriptionFactory,
-		getExecutionData:     b.getExecutionData,
+		execDataProvider:     executionDataProvider,
 		executionDataTracker: executionDataTracker,
 	}
 
 	eventsProvider := EventsProvider{
 		log:                 logger,
 		headers:             headers,
-		getExecutionData:    b.getExecutionData,
+		execDataProvider:    executionDataProvider,
 		fetchFromLocalCache: fetchFromLocalStorage,
 		execResultProvider:  executionResultProvider,
 		execStateCache:      executionStateCache,
@@ -147,31 +151,6 @@ func New(
 	}
 
 	return b, nil
-}
-
-// getExecutionData returns the execution data for the given block height.
-// Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
-func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
-	highestHeight := b.ExecutionDataTracker.GetHighestHeight()
-	// fail early if no notification has been received for the given block height.
-	// note: it's possible for the data to exist in the data store before the notification is
-	// received. this ensures a consistent view is available to all streams.
-	if height > highestHeight {
-		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
-	}
-
-	execData, err := b.execDataCache.ByHeight(ctx, height)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) ||
-			execution_data.IsBlobNotFoundError(err) {
-			err = errors.Join(err, subscription.ErrBlockNotReady)
-			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
-		}
-		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
-	}
-
-	return execData, nil
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.

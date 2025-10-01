@@ -28,7 +28,7 @@ type ExecutionDataBackend struct {
 	log     zerolog.Logger
 	headers storage.Headers
 
-	getExecutionData GetExecutionDataFunc
+	execDataProvider ExecutionDataProvider
 
 	subscriptionFactory  *subscription.Factory
 	executionDataTracker tracker.ExecutionDataTracker
@@ -40,7 +40,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 		return nil, fmt.Errorf("could not get block header for %s: %w", blockID, err)
 	}
 
-	executionData, err := b.getExecutionData(ctx, header.Height)
+	executionData, err := b.execDataProvider.ExecutionData(ctx, header.Height)
 
 	if err != nil {
 		// need custom not found handler due to blob not found error
@@ -133,7 +133,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Cont
 }
 
 func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {
-	executionData, err := b.getExecutionData(ctx, height)
+	executionData, err := b.execDataProvider.ExecutionData(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}

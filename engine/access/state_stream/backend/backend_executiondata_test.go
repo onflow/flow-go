@@ -196,7 +196,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	s.executionResultProvider = osmock.NewExecutionResultProvider(s.T())
 	s.executionResultProvider.
-		On("ExecutionResult", mock.Anything, mock.Anything).
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 			ids := unittest.IdentityListFixture(2)
 			return &optimistic_sync.ExecutionResultInfo{
