@@ -172,6 +172,51 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 				assert.Equal(t, clusterFinalizedHeights[i], actual)
 			}
 		})
+
+		t.Run("update to non-sequential finalized height returns error", func(t *testing.T) {
+			// Use a different cluster ID to avoid conflicts with other tests
+			testClusterID := flow.ChainID("test-cluster-non-sequential")
+
+			// First bootstrap a cluster with height 20
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.BootstrapClusterFinalizedHeight(lctx, rw, testClusterID, 20)
+				})
+			})
+			require.NoError(t, err)
+
+			// Try to update to a non-sequential height (should fail)
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.UpdateClusterFinalizedHeight(lctx, rw, testClusterID, 25) // Should be 21, not 25
+				})
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "finalization isn't sequential")
+		})
+
+		t.Run("bootstrap on non-empty key returns error", func(t *testing.T) {
+			// Use a different cluster ID to avoid conflicts with other tests
+			testClusterID := flow.ChainID("test-cluster-bootstrap-error")
+
+			// First bootstrap a cluster with height 30
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.BootstrapClusterFinalizedHeight(lctx, rw, testClusterID, 30)
+				})
+			})
+			require.NoError(t, err)
+
+			// Try to bootstrap again (should fail)
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.BootstrapClusterFinalizedHeight(lctx, rw, testClusterID, 35)
+				})
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "finalized height for cluster")
+			assert.Contains(t, err.Error(), "already initialized")
+		})
 	})
 }
 
