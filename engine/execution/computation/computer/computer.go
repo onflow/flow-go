@@ -654,6 +654,8 @@ func (e *blockComputer) executeProcessCallback(
 			Bool("critical_error", true).
 			Uint64("height", request.ctx.BlockHeader.Height).
 			Msg("system process transaction output error")
+
+		return nil, txnIndex, nil
 	}
 
 	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(e.vmCtx.Chain, txn.Output().Events)
