@@ -34,7 +34,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -571,8 +571,8 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.Equal(suite.T(), uint64(1), rateLimits.Load())
 }
 
-func (suite *NetworkTestSuite) createOverlay(provider *unittest.UpdatableIDProvider) *mocknetwork.Overlay {
-	overlay := &mocknetwork.Overlay{}
+func (suite *NetworkTestSuite) createOverlay(provider *unittest.UpdatableIDProvider) *mocknetwork.Underlay {
+	overlay := &mocknetwork.Underlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return provider.Identities(filter.Any)
 	})

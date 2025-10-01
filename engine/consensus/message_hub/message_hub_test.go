@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -48,7 +48,7 @@ type MessageHubSuite struct {
 	payloads          *storage.Payloads
 	me                *module.Local
 	state             *protocol.State
-	net               *mocknetwork.Network
+	net               *mocknetwork.EngineRegistry
 	con               *mocknetwork.Conduit
 	pushBlocksCon     *mocknetwork.Conduit
 	hotstuff          *module.HotStuff
@@ -76,7 +76,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.payloads = storage.NewPayloads(s.T())
 	s.me = module.NewLocal(s.T())
 	s.state = protocol.NewState(s.T())
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.pushBlocksCon = mocknetwork.NewConduit(s.T())
 	s.hotstuff = module.NewHotStuff(s.T())

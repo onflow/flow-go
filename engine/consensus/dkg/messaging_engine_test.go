@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,7 +25,7 @@ type MessagingEngineSuite struct {
 	suite.Suite
 
 	conduit *mocknetwork.Conduit
-	network *mocknetwork.Network
+	network *mocknetwork.EngineRegistry
 	me      *mockmodule.Local
 
 	engine *MessagingEngine
@@ -38,7 +38,7 @@ func TestMessagingEngine(t *testing.T) {
 func (ms *MessagingEngineSuite) SetupTest() {
 	// setup mock conduit
 	ms.conduit = mocknetwork.NewConduit(ms.T())
-	ms.network = mocknetwork.NewNetwork(ms.T())
+	ms.network = mocknetwork.NewEngineRegistry(ms.T())
 	ms.network.On("Register", mock.Anything, mock.Anything).
 		Return(ms.conduit, nil).
 		Once()

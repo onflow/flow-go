@@ -53,7 +53,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 	}
 
 	// insert the block payload; without further overwrite checks (see above for explanation)
-	err = operation.InsertProposalSignature(rw.Writer(), blockID, &proposal.ProposerSigData)
+	err = operation.InsertProposalSignature(lctx, rw.Writer(), blockID, &proposal.ProposerSigData)
 	if err != nil {
 		return fmt.Errorf("could not insert proposer signature: %w", err)
 	}

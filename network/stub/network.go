@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 )
 
@@ -25,7 +25,7 @@ import (
 // When an engine is attached on a Network instance, the mocked Network delivers
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
-	mocknetwork.Network
+	mocknetwork.EngineRegistry
 	ctx context.Context
 	sync.Mutex
 	myId           flow.Identifier                               // used to represent information of the attached node.

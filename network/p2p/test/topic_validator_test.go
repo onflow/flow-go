@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"

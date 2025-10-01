@@ -50,8 +50,8 @@ require (
 	github.com/onflow/cadence v1.7.0
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.4.15
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.8.1
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.8.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.0
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.0
 	github.com/onflow/flow-go-sdk v1.8.2
 	github.com/onflow/flow/protobuf/go/flow v0.4.15
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -95,6 +95,7 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dustin/go-humanize v1.0.1
+	github.com/fxamacker/golang-lru/v2 v2.0.0-20250716153046-22c8d17dc4ee
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/golang/snappy v0.0.5-0.20231225225746-43d5d4cd4e0e
 	github.com/gorilla/websocket v1.5.3

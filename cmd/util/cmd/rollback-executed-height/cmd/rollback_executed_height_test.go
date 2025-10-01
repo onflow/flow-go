@@ -41,7 +41,8 @@ func TestReExecuteBlock(t *testing.T) {
 		all := store.InitAll(metrics, db)
 		headers := all.Headers
 		blocks := all.Blocks
-		txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		txResults, err := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		require.NoError(t, err)
 		commits := store.NewCommits(metrics, db)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
 		results := all.Results
@@ -50,7 +51,7 @@ func TestReExecuteBlock(t *testing.T) {
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
@@ -86,12 +87,11 @@ func TestReExecuteBlock(t *testing.T) {
 		computationResult := testutil.ComputationResultFixture(t)
 		header := computationResult.Block.ToHeader()
 
-		lctx2 := lockManager.NewContext()
-		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(computationResult.Block))
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(computationResult.Block))
+			})
 		})
-		lctx2.Release()
 		require.NoError(t, err)
 
 		// save execution results
@@ -202,14 +202,16 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
-		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		txResults, err := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		require.NoError(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			})
 		})
+		require.NoError(t, err)
 
 		getLatestFinalized := func() (uint64, error) {
 			return genesis.Height, nil
@@ -242,11 +244,12 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			&unittest.GenesisStateCommitment)
 		blockID := executableBlock.Block.ID()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(executableBlock.Block))
 			})
 		})
+		require.NoError(t, err)
 
 		computationResult := testutil.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock

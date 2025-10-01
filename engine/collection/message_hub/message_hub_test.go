@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	clusterint "github.com/onflow/flow-go/state/cluster"
 	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -52,7 +52,7 @@ type MessageHubSuite struct {
 	me                *module.Local
 	state             *clusterstate.MutableState
 	protoState        *protocol.State
-	net               *mocknetwork.Network
+	net               *mocknetwork.EngineRegistry
 	con               *mocknetwork.Conduit
 	hotstuff          *module.HotStuff
 	voteAggregator    *hotstuff.VoteAggregator
@@ -79,7 +79,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.payloads = storage.NewClusterPayloads(s.T())
 	s.me = module.NewLocal(s.T())
 	s.protoState = protocol.NewState(s.T())
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.hotstuff = module.NewHotStuff(s.T())
 	s.voteAggregator = hotstuff.NewVoteAggregator(s.T())

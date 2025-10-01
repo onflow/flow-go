@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -49,7 +49,7 @@ type Suite struct {
 	}
 
 	me           *modulemock.Local
-	net          *mocknetwork.Network
+	net          *mocknetwork.EngineRegistry
 	request      *modulemock.Requester
 	obsIdentity  *flow.Identity
 	provider     *mocknetwork.Engine
@@ -92,7 +92,7 @@ func (s *Suite) TearDownTest() {
 }
 
 func (s *Suite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	db, dbDir := unittest.TempPebbleDB(s.T())
 	s.db = pebbleimpl.ToDB(db)
@@ -118,7 +118,7 @@ func (s *Suite) SetupTest() {
 
 	s.me = modulemock.NewLocal(s.T())
 	s.me.On("NodeID").Return(s.obsIdentity.NodeID).Maybe()
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	conduit := mocknetwork.NewConduit(s.T())
 	s.net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
@@ -415,12 +415,9 @@ func (s *Suite) TestOnCollection() {
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
 
 	// Create a lock context for indexing
-	lctx := s.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	require.NoError(s.T(), err)
-	defer lctx.Release()
-
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+	err := unittest.WithLock(s.T(), s.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		return indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+	})
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed
@@ -491,12 +488,9 @@ func (s *Suite) TestOnCollectionDuplicate() {
 	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, storage.ErrAlreadyExists).Once()
 
 	// Create a lock context for indexing
-	lctx := s.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	require.NoError(s.T(), err)
-	defer lctx.Release()
-
-	err = indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+	err := unittest.WithLock(s.T(), s.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		return indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+	})
 	require.ErrorIs(s.T(), err, storage.ErrAlreadyExists)
 
 	// check that the collection was stored and indexed

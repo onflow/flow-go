@@ -103,6 +103,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829 // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
+	github.com/fxamacker/golang-lru/v2 v2.0.0-20250716153046-22c8d17dc4ee // indirect
 	github.com/gabriel-vasile/mimetype v1.4.6 // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/gammazero/workerpool v1.1.3 // indirect
@@ -122,7 +123,6 @@ require (
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.2.5 // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v0.0.5-0.20231225225746-43d5d4cd4e0e // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
@@ -215,8 +215,8 @@ require (
 	github.com/onflow/atree v0.10.1 // indirect
 	github.com/onflow/cadence v1.7.0 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.8.1 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.8.1 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.0 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect

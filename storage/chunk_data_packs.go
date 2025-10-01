@@ -1,6 +1,10 @@
 package storage
 
 import (
+	"bytes"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -9,7 +13,7 @@ type ChunkDataPacks interface {
 
 	// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 	// No errors are expected during normal operation, but it may return generic error
-	Store(cs []*flow.ChunkDataPack) error
+	StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error
 
 	// Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 	// No errors are expected during normal operation, but it may return generic error
@@ -53,4 +57,26 @@ func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 	}
 
 	return sc
+}
+
+func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) error {
+	if c.ChunkID != other.ChunkID {
+		return ErrDataMismatch
+	}
+	if c.StartState != other.StartState {
+		return ErrDataMismatch
+	}
+	if !c.ExecutionDataRoot.Equals(other.ExecutionDataRoot) {
+		return ErrDataMismatch
+	}
+	if c.SystemChunk != other.SystemChunk {
+		return ErrDataMismatch
+	}
+	if !bytes.Equal(c.Proof, other.Proof) {
+		return ErrDataMismatch
+	}
+	if c.CollectionID != other.CollectionID {
+		return ErrDataMismatch
+	}
+	return nil
 }

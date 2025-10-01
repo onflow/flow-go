@@ -24,7 +24,7 @@ import (
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )

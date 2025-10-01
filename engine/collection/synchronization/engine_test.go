@@ -25,7 +25,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	clusterint "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -44,7 +44,7 @@ type SyncSuite struct {
 	head         *flow.Header
 	heights      map[uint64]*clustermodel.Proposal
 	blockIDs     map[flow.Identifier]*clustermodel.Proposal
-	net          *mocknetwork.Network
+	net          *mocknetwork.EngineRegistry
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *cluster.State
@@ -72,7 +72,7 @@ func (ss *SyncSuite) SetupTest() {
 	clusterID := header.ChainID
 
 	// set up the network module mock
-	ss.net = &mocknetwork.Network{}
+	ss.net = &mocknetwork.EngineRegistry{}
 	ss.net.On("Register", channels.SyncCluster(clusterID), mock.Anything).Return(
 		func(network channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con

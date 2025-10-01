@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 
 	"github.com/stretchr/testify/require"
 

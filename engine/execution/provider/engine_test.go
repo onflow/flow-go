@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,7 +28,7 @@ import (
 func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 	t.Run("non-existent chunk", func(t *testing.T) {
-		net := mocknetwork.NewNetwork(t)
+		net := mocknetwork.NewEngineRegistry(t)
 		chunkConduit := mocknetwork.NewConduit(t)
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
@@ -66,7 +66,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		net := mocknetwork.NewNetwork(t)
+		net := mocknetwork.NewEngineRegistry(t)
 		chunkConduit := &mocknetwork.Conduit{}
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
@@ -115,7 +115,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 func TestProviderEngine_BroadcastExecutionReceipt(t *testing.T) {
 	// prepare
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	chunkConduit := mocknetwork.NewConduit(t)
 	receiptConduit := mocknetwork.NewConduit(t)
 	net.On("Register", channels.PushReceipts, mock.Anything).Return(receiptConduit, nil)
@@ -155,7 +155,7 @@ func TestProviderEngine_BroadcastExecutionReceipt(t *testing.T) {
 }
 
 func TestProviderEngine_BroadcastExecutionUnauthorized(t *testing.T) {
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	chunkConduit := mocknetwork.NewConduit(t)
 	receiptConduit := mocknetwork.NewConduit(t)
 	net.On("Register", channels.PushReceipts, mock.Anything).Return(receiptConduit, nil)
@@ -177,7 +177,7 @@ func TestProviderEngine_BroadcastExecutionUnauthorized(t *testing.T) {
 	require.False(t, broadcasted)
 }
 
-func newTestEngine(t *testing.T, net *mocknetwork.Network, authorized bool) (
+func newTestEngine(t *testing.T, net *mocknetwork.EngineRegistry, authorized bool) (
 	*Engine,
 	*mockprotocol.State,
 	*state.ExecutionState,
