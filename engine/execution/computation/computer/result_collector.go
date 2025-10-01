@@ -240,7 +240,7 @@ func (collector *resultCollector) processTransactionResult(
 			Logger()
 		logger.Info().Msg("transaction execution failed")
 
-		if txn.isSystemTransaction {
+		if txn.transactionType == ComputerTransactionTypeSystem {
 			// This log is used as the data source for an alert on grafana.
 			// The critical_error field must not be changed without adding
 			// the corresponding changes in grafana.
@@ -311,8 +311,8 @@ func (collector *resultCollector) handleTransactionExecutionMetrics(
 		ComputationIntensities:     output.ComputationIntensities,
 		NumberOfTxnConflictRetries: numConflictRetries,
 		Failed:                     output.Err != nil,
-		ScheduledTransaction:       txn.isScheduledTransaction,
-		SystemTransaction:          txn.isSystemTransaction,
+		ScheduledTransaction:       txn.transactionType == ComputerTransactionTypeScheduled,
+		SystemTransaction:          txn.transactionType == ComputerTransactionTypeSystem,
 	}
 	for _, entry := range txnExecutionSnapshot.UpdatedRegisters() {
 		transactionExecutionStats.NumberOfBytesWrittenToRegisters += len(entry.Value)

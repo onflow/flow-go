@@ -40,6 +40,14 @@ type collectionInfo struct {
 	*entity.CompleteCollection
 }
 
+type ComputerTransactionType uint
+
+const (
+	ComputerTransactionTypeUser ComputerTransactionType = iota
+	ComputerTransactionTypeSystem
+	ComputerTransactionTypeScheduled
+)
+
 type TransactionRequest struct {
 	collectionInfo
 
@@ -48,8 +56,7 @@ type TransactionRequest struct {
 
 	txnIndex uint32
 
-	isScheduledTransaction      bool
-	isSystemTransaction         bool
+	transactionType             ComputerTransactionType
 	lastTransactionInCollection bool
 
 	ctx fvm.Context
@@ -62,8 +69,7 @@ func newTransactionRequest(
 	collectionLogger zerolog.Logger,
 	txnIndex uint32,
 	txnBody *flow.TransactionBody,
-	isScheduledTransaction bool,
-	isSystemTransaction bool,
+	transactionType ComputerTransactionType,
 	lastTransactionInCollection bool,
 ) TransactionRequest {
 	txnId := txnBody.ID()
@@ -85,8 +91,7 @@ func newTransactionRequest(
 			txnId,
 			txnIndex,
 			txnBody),
-		isScheduledTransaction:      isScheduledTransaction,
-		isSystemTransaction:         isSystemTransaction,
+		transactionType:             transactionType,
 		lastTransactionInCollection: lastTransactionInCollection,
 	}
 }
@@ -299,8 +304,7 @@ func (e *blockComputer) queueUserTransactions(
 				collectionLogger,
 				txnIndex,
 				txnBody,
-				false,
-				false,
+				ComputerTransactionTypeUser,
 				i == len(collection.Collection.Transactions)-1,
 			)
 			txnIndex += 1
@@ -340,8 +344,7 @@ func (e *blockComputer) queueSystemTransactions(
 			scheduledTxLogger,
 			txnIndex,
 			txBody,
-			true,
-			false,
+			ComputerTransactionTypeScheduled,
 			false,
 		)
 
@@ -354,8 +357,7 @@ func (e *blockComputer) queueSystemTransactions(
 		systemTxLogger,
 		txnIndex,
 		systemTxn,
-		false,
-		true,
+		ComputerTransactionTypeSystem,
 		true,
 	)
 
@@ -631,8 +633,7 @@ func (e *blockComputer) executeProcessCallback(
 		callbackLogger,
 		txnIndex,
 		e.processCallbackTxn,
-		false,
-		true,
+		ComputerTransactionTypeSystem,
 		false)
 
 	txnIndex++
@@ -733,7 +734,7 @@ func (e *blockComputer) executeTransaction(
 		attempt)
 	if err != nil {
 		prefix := ""
-		if request.isSystemTransaction {
+		if request.transactionType == ComputerTransactionTypeSystem {
 			prefix = "system "
 		}
 

@@ -122,8 +122,7 @@ func (db *testCoordinator) newTransaction(txnIndex uint32) (
 			zerolog.Nop(),
 			txnIndex,
 			&flow.TransactionBody{},
-			false,
-			false,
+			ComputerTransactionTypeUser,
 			false),
 		0)
 }
