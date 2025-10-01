@@ -3,6 +3,7 @@ package tx_error_messages
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -135,7 +136,7 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 	}
 
 	err = e.processErrorMessagesForBlock(ctx, header.ID())
-	if err == nil {
+	if err == nil || isPrunedError(err) {
 		done()
 		e.metrics.TransactionErrorsIndexedHeight(header.Height)
 		return
@@ -186,6 +187,16 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 		attempt++
 		err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
 
+		// the mainnet24 historic EN was dynamic bootstrapped mid-spork, so it's missing some data.
+		// just skip the data and ingest what's available. The Access API will return placeholder values
+		if isPrunedError(err) {
+			return err
+		}
+
 		return retry.RetryableError(err)
 	})
+}
+
+func isPrunedError(err error) bool {
+	return strings.Contains(err.Error(), "has not been executed by node or was pruned")
 }
