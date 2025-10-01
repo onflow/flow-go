@@ -53,19 +53,18 @@ func TestClusterHeights(t *testing.T) {
 
 			// First index a block ID for the cluster and height
 			firstBlockID := unittest.IdentifierFixture()
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.IndexClusterBlockHeight(lctx, rw, testClusterID, testHeight, firstBlockID)
 				})
 			})
+			require.NoError(t, err)
 
 			// Try to index a different block ID for the same cluster and height
 			differentBlockID := unittest.IdentifierFixture()
-			var err error
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					err = operation.IndexClusterBlockHeight(lctx, rw, testClusterID, testHeight, differentBlockID)
-					return nil // Don't return the error here, we want to check it outside
+					return operation.IndexClusterBlockHeight(lctx, rw, testClusterID, testHeight, differentBlockID)
 				})
 			})
 
@@ -132,8 +131,9 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 					return operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, 21)
 				})
 			})
+			require.NoError(t, err)
 
-			unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, 22)
 				})
