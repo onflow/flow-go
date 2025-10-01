@@ -152,7 +152,7 @@ func TestHeadersByParentID(t *testing.T) {
 		require.NoError(t, err)
 		require.ElementsMatch(t,
 			children,
-			[]*flow.Header{childProposals[0].Block.ToHeader(), childProposals[0].Block.ToHeader(), childProposals[0].Block.ToHeader()})
+			[]*flow.Header{childProposals[0].Block.ToHeader(), childProposals[1].Block.ToHeader(), childProposals[2].Block.ToHeader()})
 
 		// Test case 3: Non-existent parent should return ErrNotFound
 		nonExistentParent := unittest.IdentifierFixture()
