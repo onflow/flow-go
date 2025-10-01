@@ -177,21 +177,26 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
-		if attempt > 0 {
-			e.log.Debug().
-				Str("block_id", blockID.String()).
-				Uint64("attempt", uint64(attempt)).
-				Msgf("retrying process transaction result error messages")
-
-		}
-		attempt++
 		err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
+		if err == nil {
+			return nil
+		}
 
 		// the mainnet24 historic EN was dynamic bootstrapped mid-spork, so it's missing some data.
 		// just skip the data and ingest what's available. The Access API will return placeholder values
 		if isPrunedError(err) {
 			return err
 		}
+
+		if attempt > 0 {
+			e.log.Debug().
+				Err(err).
+				Str("block_id", blockID.String()).
+				Uint64("attempt", uint64(attempt)).
+				Msgf("retrying process transaction result error messages")
+
+		}
+		attempt++
 
 		return retry.RetryableError(err)
 	})
