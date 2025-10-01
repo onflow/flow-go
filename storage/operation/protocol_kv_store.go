@@ -20,17 +20,15 @@ func InsertProtocolKVStore(w storage.Writer, protocolKVStoreID flow.Identifier, 
 }
 
 // RetrieveProtocolKVStore retrieves a protocol KV store by ID.
-// Error returns:
-//   - storage.ErrNotFound if the key does not exist in the database
-//   - generic error in case of unexpected failure from the database layer
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no protocol KV with the given ID store exists
 func RetrieveProtocolKVStore(r storage.Reader, protocolKVStoreID flow.Identifier, kvStore *flow.PSKeyValueStoreData) error {
 	return RetrieveByKey(r, MakePrefix(codeProtocolKVStore, protocolKVStoreID), kvStore)
 }
 
 // IndexProtocolKVStore indexes a protocol KV store by block ID.
-// Error returns:
-// - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
-//   - generic error in case of unexpected failure from the database layer
+// Expected error returns during normal operations:
+//   - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
 func IndexProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, protocolKVStoreID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -58,9 +56,8 @@ func IndexProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 }
 
 // LookupProtocolKVStore finds protocol KV store ID by block ID.
-// Error returns:
-//   - storage.ErrNotFound if the key does not exist in the database
-//   - generic error in case of unexpected failure from the database layer
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if the given ID does not correspond to any known block
 func LookupProtocolKVStore(r storage.Reader, blockID flow.Identifier, protocolKVStoreID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeProtocolKVStoreByBlockID, blockID), protocolKVStoreID)
 }
