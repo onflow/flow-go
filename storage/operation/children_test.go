@@ -120,7 +120,7 @@ func TestIndexWithMultiChildrenRetrieve(t *testing.T) {
 	}
 }
 
-// Test indexing the same child with different parents should error
+// Test indexing the same child with different parents should not error
 func TestIndexAgainWithDifferentParentShouldError(t *testing.T) {
 	for _, opPair := range getTestOperationPairs() {
 		t.Run(opPair.name, func(t *testing.T) {
@@ -154,7 +154,8 @@ func TestIndexAgainWithDifferentParentShouldError(t *testing.T) {
 				require.ElementsMatch(t, flow.IdentifierList{child}, retrievedIDs)
 
 				err = operation.RetrieveBlockChildren(db.Reader(), parent2, &retrievedIDs)
-				require.ErrorIs(t, err, storage.ErrNotFound)
+				require.NoError(t, err)
+				require.ElementsMatch(t, flow.IdentifierList{child}, retrievedIDs)
 			})
 		})
 	}
