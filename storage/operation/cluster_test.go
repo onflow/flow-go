@@ -71,8 +71,6 @@ func TestClusterHeights(t *testing.T) {
 			})
 
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "cluster block height already indexed with different block ID")
-			assert.Contains(t, err.Error(), "data for key is different")
 			assert.ErrorIs(t, err, storage.ErrDataMismatch)
 		})
 

@@ -38,10 +38,8 @@ func IndexClusterBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, c
 		if existing != blockID {
 			return fmt.Errorf("cluster block height already indexed with different block ID: %s vs %s: %w", existing, blockID, storage.ErrDataMismatch)
 		}
-		// already indexed, nothing to do
-		return nil
-	}
-
+		return nil // for the specified height, the finalized block is already set to `blockID`
+	// We do NOT want to continue with the WRITE UNLESS `storage.ErrNotFound` was received when checking for existing data.
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to check existing cluster block height index: %w", err)
 	}
@@ -58,6 +56,16 @@ func LookupClusterBlockHeight(r storage.Reader, clusterID flow.ChainID, height u
 	return RetrieveByKey(r, MakePrefix(codeFinalizedCluster, clusterID, height), blockID)
 }
 
+// BootstrapClusterFinalizedHeight initializes the latest finalized cluster block height for the given cluster.
+//
+// CAUTION:
+//   - This function is intended to be called during bootstrapping only. It expects that the height of the latest
+//     known finalized cluster block has not yet been persisted.
+//   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
+//     Therefore, the caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database
+//     write has been committed.
+//
+// No error returns expected during normal operations.
 func BootstrapClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, number uint64) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
@@ -68,9 +76,10 @@ func BootstrapClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchW
 	var existing uint64
 	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
 	if err == nil {
-		return fmt.Errorf("finalized height already initialized: %d", existing)
+		return fmt.Errorf("finalized height for cluster %v already initialized to %d", clusterID, existing)
 	}
 
+	// We do NOT want to continue with the WRITE UNLESS `storage.ErrNotFound` was received when checking for existing data.
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to check existing finalized height: %w", err)
 	}
@@ -79,7 +88,17 @@ func BootstrapClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchW
 }
 
 // UpdateClusterFinalizedHeight updates (overwrites!) the latest finalized cluster block height for the given cluster.
-func UpdateClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, number uint64) error {
+//
+// CAUTION:
+//   - This function is intended for normal operations after bootstrapping. It expects that the height of the
+//     latest known finalized cluster block has already been persisted. This function guarantees that the height is updated
+//     sequentially, i.e. the new height is equal to the old height plus one. Otherwise, an exception is returned.
+//   - Reading the current height value, checking that it increases sequentially, and writing the new value must happen in one
+//     atomic operation to prevent data corruption. Hence, the caller must acquire [storage.LockInsertOrFinalizeClusterBlock]
+//     and hold it until the database write has been committed.
+//
+// No error returns expected during normal operations.
+func UpdateClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, clusterID flow.ChainID, latestFinalizedHeight uint64) error {
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
 		return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
 	}
