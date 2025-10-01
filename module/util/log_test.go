@@ -218,6 +218,98 @@ func TestLogProgress1000(t *testing.T) {
 	}
 }
 
+func TestLogProgressWhenTotalIs0(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			0,
+		),
+	)
+
+	for i := 0; i < 10; i++ {
+		logger(1)
+	}
+
+	expectedLogs := []string{
+		fmt.Sprintf(`test progress %d/%d (100.0%%)`, 0, 0),
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, 0)
+	}
+
+	lines := strings.Count(buf.String(), "\n")
+	// log only once
+	require.Equal(t, 1, lines)
+}
+
+func TestLogProgressMoreTicksThenTotal(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			5,
+		),
+	)
+
+	for i := 0; i < 5; i++ {
+		logger(1)
+	}
+
+	expectedLogs := []string{
+		fmt.Sprintf(`test progress %d/%d (100.0%%)`, 5, 5),
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, 0)
+	}
+
+	lines := strings.Count(buf.String(), "\n")
+	// log only once
+	require.Equal(t, 6, lines)
+}
+
+func TestLogProgressContinueLoggingAfter100(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			100,
+		),
+	)
+
+	for i := 0; i < 15; i++ {
+		logger(10)
+	}
+
+	expectedLogs := []string{
+		fmt.Sprintf(`test progress %d/%d (100.0%%)`, 100, 100),
+		fmt.Sprintf(`test progress %d/%d (110.0%%)`, 110, 100),
+		fmt.Sprintf(`test progress %d/%d (150.0%%)`, 150, 100),
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, 0)
+	}
+
+	lines := strings.Count(buf.String(), "\n")
+	// log only once
+	require.Equal(t, 16, lines)
+}
+
 func TestLogProgressNoDataForAWhile(t *testing.T) {
 	t.Parallel()
 
@@ -227,12 +319,12 @@ func TestLogProgressNoDataForAWhile(t *testing.T) {
 	lg := zerolog.New(buf)
 	logger := LogProgress(
 		lg,
-		LogProgressConfig[uint64]{
-			Message:           "test",
-			Total:             uint64(total),
-			Ticks:             11,
-			NoDataLogDuration: 1 * time.Millisecond,
-		},
+		NewLogProgressConfig[uint64](
+			"test",
+			uint64(total),
+			1*time.Millisecond,
+			10,
+		),
 	)
 
 	for i := 0; i < total; i++ {
