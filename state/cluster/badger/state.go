@@ -66,13 +66,12 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 		// insert block height -> ID mapping
-		err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), chainID, genesis.Height, genesis.ID())
+		err = operation.IndexClusterBlockHeight(lctx, rw, chainID, genesis.Height, genesis.ID())
 		if err != nil {
 			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
 		// insert boundary
-		err = operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), chainID, genesis.Height)
-		// insert started view for hotstuff
+		err = operation.BootstrapClusterFinalizedHeight(lctx, rw, chainID, genesis.Height)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
@@ -83,7 +82,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 		}
 
 		livenessData := &hotstuff.LivenessData{
-			CurrentView: genesis.View + 1,
+			CurrentView: genesis.View + 1, // starting view for hotstuff
 			NewestQC:    rootQC,
 		}
 		// insert safety data

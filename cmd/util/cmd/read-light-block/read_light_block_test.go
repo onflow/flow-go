@@ -25,14 +25,14 @@ func TestReadClusterRange(t *testing.T) {
 		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 			// add parent as boundary
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
+				return operation.IndexClusterBlockHeight(lctx, rw, parent.ChainID, parent.Height, parent.ID())
 			})
 			if err != nil {
 				return err
 			}
 
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.ChainID, parent.Height)
+				return operation.BootstrapClusterFinalizedHeight(lctx, rw, parent.ChainID, parent.Height)
 			})
 		})
 		require.NoError(t, err)
