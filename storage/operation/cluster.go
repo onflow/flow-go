@@ -39,6 +39,7 @@ func IndexClusterBlockHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, c
 			return fmt.Errorf("cluster block height already indexed with different block ID: %s vs %s: %w", existing, blockID, storage.ErrDataMismatch)
 		}
 		return nil // for the specified height, the finalized block is already set to `blockID`
+	}
 	// We do NOT want to continue with the WRITE UNLESS `storage.ErrNotFound` was received when checking for existing data.
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("failed to check existing cluster block height index: %w", err)
@@ -111,11 +112,11 @@ func UpdateClusterFinalizedHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrit
 		return fmt.Errorf("failed to check existing finalized height: %w", err)
 	}
 
-	if existing+1 != number {
-		return fmt.Errorf("finalization isn't sequential: existing %d, new %d", existing, number)
+	if existing+1 != latestFinalizedHeight {
+		return fmt.Errorf("finalization isn't sequential: existing %d, new %d", existing, latestFinalizedHeight)
 	}
 
-	return UpsertByKey(rw.Writer(), key, number)
+	return UpsertByKey(rw.Writer(), key, latestFinalizedHeight)
 }
 
 // RetrieveClusterFinalizedHeight retrieves the latest finalized cluster block height of the given cluster.
