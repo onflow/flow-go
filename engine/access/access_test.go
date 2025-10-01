@@ -715,13 +715,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		)
 		require.NoError(suite.T(), err)
 
-		progress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).Initialize(suite.rootBlock.Height)
+		progress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		processedHeight, err := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight).Initialize(suite.rootBlock.Height)
+		processedHeight, err := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight).Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 
 		collectionSyncer := ingestion.NewCollectionSyncer(
@@ -939,11 +939,11 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 
 		processedHeight, err := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight).
-			Initialize(suite.rootBlock.Height)
+			Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 
 		lastFullBlockHeightProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).
-			Initialize(suite.rootBlock.Height)
+			Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
@@ -1207,11 +1207,11 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 
 		processedHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
-		processedHeight, err := processedHeightInitializer.Initialize(suite.rootBlock.Height)
+		processedHeight, err := processedHeightInitializer.Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 
 		lastFullBlockHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight)
-		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.rootBlock.Height)
+		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
