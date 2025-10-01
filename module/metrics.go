@@ -823,6 +823,20 @@ type ExecutionStateIndexerMetrics interface {
 	InitializeLatestHeight(height uint64)
 }
 
+type TransactionErrorMessagesMetrics interface {
+	// TxErrorsInitialHeight records the initial height of the transaction error messages.
+	TxErrorsInitialHeight(height uint64)
+
+	// TxErrorsFetchStarted records that a transaction error messages download has started.
+	TxErrorsFetchStarted()
+
+	// TxErrorsFetchFinished records that a transaction error messages download has finished.
+	TxErrorsFetchFinished(duration time.Duration, success bool, height uint64)
+
+	// TxErrorsFetchRetried records that a transaction error messages download has been retried.
+	TxErrorsFetchRetried()
+}
+
 type RuntimeMetrics interface {
 	// RuntimeTransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
