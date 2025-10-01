@@ -49,6 +49,7 @@ type Engine struct {
 	*component.ComponentManager
 
 	log     zerolog.Logger
+	metrics module.ExecutionStateIndexerMetrics
 	state   protocol.State
 	headers storage.Headers
 
@@ -67,6 +68,7 @@ type Engine struct {
 // No errors are expected during normal operation.
 func New(
 	log zerolog.Logger,
+	metrics module.ExecutionStateIndexerMetrics,
 	state protocol.State,
 	headers storage.Headers,
 	txErrorMessagesProcessedHeight storage.ConsumerProgress,
@@ -74,6 +76,7 @@ func New(
 ) (*Engine, error) {
 	e := &Engine{
 		log:                     log.With().Str("engine", "tx_error_messages_engine").Logger(),
+		metrics:                 metrics,
 		state:                   state,
 		headers:                 headers,
 		txErrorMessagesCore:     txErrorMessagesCore,
@@ -112,6 +115,8 @@ func New(
 		return nil, fmt.Errorf("error creating transaction result error messages jobqueue: %w", err)
 	}
 
+	e.metrics.TransactionErrorsIndexedHeight(e.txErrorMessagesConsumer.LastProcessedIndex())
+
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.runTxResultErrorMessagesConsumer).
@@ -132,6 +137,7 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 	err = e.processErrorMessagesForBlock(ctx, header.ID())
 	if err == nil {
 		done()
+		e.metrics.TransactionErrorsIndexedHeight(header.Height)
 		return
 	}
 

@@ -35,6 +35,7 @@ type TxErrorMessagesCoreSuite struct {
 	}
 
 	receipts        *storage.ExecutionReceipts
+	results         *storage.LightTransactionResults
 	txErrorMessages *storage.TransactionResultErrorMessages
 
 	enNodeIDs   flow.IdentityList
@@ -72,6 +73,7 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
+	s.results = storage.NewLightTransactionResults(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 
 	s.rootBlock = unittest.BlockFixture()
@@ -117,6 +119,8 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 
 	// Create mock transaction results with a mix of failed and non-failed transactions.
 	resultsByBlockID := mockTransactionResultsByBlock(5)
+
+	s.results.On("ByBlockID", blockId).Return(resultsByBlockID, nil).Once()
 
 	// Prepare a request to fetch transaction error messages by block ID from execution nodes.
 	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
@@ -184,6 +188,11 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 		// Mock the txErrorMessages storage to confirm that error messages do not exist yet.
 		s.txErrorMessages.On("Exists", blockId).Return(false, nil).Once()
 
+		// Create mock transaction results with a mix of failed and non-failed transactions.
+		resultsByBlockID := mockTransactionResultsByBlock(5)
+
+		s.results.On("ByBlockID", blockId).Return(resultsByBlockID, nil).Once()
+
 		// Simulate an error when fetching transaction error messages from the execution node.
 		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 			BlockId: blockId[:],
@@ -210,6 +219,8 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 
 		// Create mock transaction results with a mix of failed and non-failed transactions.
 		resultsByBlockID := mockTransactionResultsByBlock(5)
+
+		s.results.On("ByBlockID", blockId).Return(resultsByBlockID, nil).Once()
 
 		// Prepare a request to fetch transaction error messages by block ID from execution nodes.
 		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
@@ -259,6 +270,7 @@ func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
 		s.proto.state,
 		backend,
 		s.receipts,
+		s.results,
 		s.txErrorMessages,
 		s.enNodeIDs.NodeIDs(),
 		nil,

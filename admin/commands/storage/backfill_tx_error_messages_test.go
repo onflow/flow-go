@@ -20,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -37,6 +39,7 @@ type BackfillTxErrorMessagesSuite struct {
 	command commands.AdminCommand
 
 	log      zerolog.Logger
+	metrics  module.ExecutionStateIndexerMetrics
 	state    *protocolmock.State
 	snapshot *protocolmock.Snapshot
 	params   *protocolmock.Params
@@ -44,6 +47,7 @@ type BackfillTxErrorMessagesSuite struct {
 	txErrorMessages    *storagemock.TransactionResultErrorMessages
 	transactionResults *storagemock.LightTransactionResults
 	receipts           *storagemock.ExecutionReceipts
+	results            *storagemock.LightTransactionResults
 	headers            *storagemock.Headers
 
 	execClient *accessmock.ExecutionAPIClient
@@ -68,10 +72,12 @@ func TestBackfillTxErrorMessages(t *testing.T) {
 
 func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
+	suite.metrics = metrics.NewNoopCollector()
 
 	suite.state = new(protocolmock.State)
 	suite.headers = new(storagemock.Headers)
 	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.results = storagemock.NewLightTransactionResults(suite.T())
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.txErrorMessages = new(storagemock.TransactionResultErrorMessages)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -146,6 +152,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		suite.state,
 		suite.backend,
 		suite.receipts,
+		suite.results,
 		suite.txErrorMessages,
 		nil,
 		nil,
@@ -351,6 +358,8 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 
 			results := suite.generateResultsForBlock()
 
+			suite.results.On("ByBlockID", blockId).Return(results, nil).Once()
+
 			// Mock the execution node API calls to fetch the error messages.
 			suite.mockTransactionErrorMessagesResponseByBlockID(blockId, results)
 
@@ -406,6 +415,8 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			suite.txErrorMessages.On("Exists", blockId).Return(false, nil).Once()
 
 			results := suite.generateResultsForBlock()
+
+			suite.results.On("ByBlockID", blockId).Return(results, nil).Once()
 
 			// Mock the execution node API calls to fetch the error messages.
 			suite.mockTransactionErrorMessagesResponseByBlockID(blockId, results)

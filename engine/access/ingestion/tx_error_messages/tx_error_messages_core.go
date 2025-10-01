@@ -25,6 +25,7 @@ type TxErrorMessagesCore struct {
 	backend *backend.Backend
 
 	executionReceipts              storage.ExecutionReceipts
+	results                        storage.LightTransactionResults
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -37,6 +38,7 @@ func NewTxErrorMessagesCore(
 	state protocol.State,
 	backend *backend.Backend,
 	executionReceipts storage.ExecutionReceipts,
+	results storage.LightTransactionResults,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	preferredExecutionNodeIDs flow.IdentifierList,
 	fixedExecutionNodeIDs flow.IdentifierList,
@@ -46,6 +48,7 @@ func NewTxErrorMessagesCore(
 		state:                          state,
 		backend:                        backend,
 		executionReceipts:              executionReceipts,
+		results:                        results,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		preferredExecutionNodeIDs:      preferredExecutionNodeIDs,
 		fixedExecutionNodeIDs:          fixedExecutionNodeIDs,
@@ -70,6 +73,23 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.C
 	}
 
 	if exists {
+		return nil
+	}
+
+	// only send request to EN if we know there are errors
+	results, err := c.results.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get transaction results: %w", err)
+	}
+
+	hasErrors := false
+	for _, result := range results {
+		if result.Failed {
+			hasErrors = true
+			break
+		}
+	}
+	if !hasErrors {
 		return nil
 	}
 
@@ -121,6 +141,23 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
 		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
 	}
 	if exists {
+		return nil
+	}
+
+	// only send request to EN if we know there are errors
+	results, err := c.results.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get transaction results: %w", err)
+	}
+
+	hasErrors := false
+	for _, result := range results {
+		if result.Failed {
+			hasErrors = true
+			break
+		}
+	}
+	if !hasErrors {
 		return nil
 	}
 

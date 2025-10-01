@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
@@ -12,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/rs/zerolog"
 )
 
 var _ commands.AdminCommand = (*BackfillTxErrorMessagesCommand)(nil)

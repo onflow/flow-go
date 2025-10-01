@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -34,14 +35,16 @@ import (
 type TxErrorMessagesEngineSuite struct {
 	suite.Suite
 
-	log   zerolog.Logger
-	proto struct {
+	log     zerolog.Logger
+	metrics module.ExecutionStateIndexerMetrics
+	proto   struct {
 		state    *protocol.FollowerState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
 	}
 	headers         *storage.Headers
 	receipts        *storage.ExecutionReceipts
+	results         *storage.LightTransactionResults
 	txErrorMessages *storage.TransactionResultErrorMessages
 
 	enNodeIDs   flow.IdentityList
@@ -73,6 +76,7 @@ func (s *TxErrorMessagesEngineSuite) TearDownTest() {
 
 func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.log = zerolog.New(os.Stderr)
+	s.metrics = metrics.NewNoopCollector()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 	// mock out protocol state
@@ -83,6 +87,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.headers = storage.NewHeaders(s.T())
 	s.receipts = storage.NewExecutionReceipts(s.T())
+	s.results = storage.NewLightTransactionResults(s.T())
 	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 
 	blockCount := 5
@@ -160,6 +165,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		s.proto.state,
 		backend,
 		s.receipts,
+		s.results,
 		s.txErrorMessages,
 		s.enNodeIDs.NodeIDs(),
 		nil,
@@ -167,6 +173,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 
 	eng, err := New(
 		s.log,
+		s.metrics,
 		s.proto.state,
 		s.headers,
 		processedTxErrorMessagesBlockHeight,
@@ -217,6 +224,8 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 
 		// Create mock transaction results with a mix of failed and non-failed transactions.
 		resultsByBlockID := mockTransactionResultsByBlock(5)
+
+		s.results.On("ByBlockID", blockID).Return(resultsByBlockID, nil).Once()
 
 		// Prepare a request to fetch transaction error messages by block ID from execution nodes.
 		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
