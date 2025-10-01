@@ -38,8 +38,6 @@ type collectionInfo struct {
 
 	collectionIndex int
 	*entity.CompleteCollection
-
-	isSystemTransaction bool
 }
 
 type TransactionRequest struct {
@@ -50,6 +48,8 @@ type TransactionRequest struct {
 
 	txnIndex uint32
 
+	isScheduledTransaction      bool
+	isSystemTransaction         bool
 	lastTransactionInCollection bool
 
 	ctx fvm.Context
@@ -62,6 +62,8 @@ func newTransactionRequest(
 	collectionLogger zerolog.Logger,
 	txnIndex uint32,
 	txnBody *flow.TransactionBody,
+	isScheduledTransaction bool,
+	isSystemTransaction bool,
 	lastTransactionInCollection bool,
 ) TransactionRequest {
 	txnId := txnBody.ID()
@@ -83,6 +85,8 @@ func newTransactionRequest(
 			txnId,
 			txnIndex,
 			txnBody),
+		isScheduledTransaction:      isScheduledTransaction,
+		isSystemTransaction:         isSystemTransaction,
 		lastTransactionInCollection: lastTransactionInCollection,
 	}
 }
@@ -281,12 +285,11 @@ func (e *blockComputer) queueUserTransactions(
 			Logger()
 
 		collectionInfo := collectionInfo{
-			blockId:             blockId,
-			blockIdStr:          blockIdStr,
-			blockHeight:         blockHeader.Height,
-			collectionIndex:     idx,
-			CompleteCollection:  collection,
-			isSystemTransaction: false,
+			blockId:            blockId,
+			blockIdStr:         blockIdStr,
+			blockHeight:        blockHeader.Height,
+			collectionIndex:    idx,
+			CompleteCollection: collection,
 		}
 
 		for i, txnBody := range collection.Collection.Transactions {
@@ -296,7 +299,10 @@ func (e *blockComputer) queueUserTransactions(
 				collectionLogger,
 				txnIndex,
 				txnBody,
-				i == len(collection.Collection.Transactions)-1)
+				false,
+				false,
+				i == len(collection.Collection.Transactions)-1,
+			)
 			txnIndex += 1
 		}
 	}
@@ -307,48 +313,51 @@ func (e *blockComputer) queueUserTransactions(
 func (e *blockComputer) queueSystemTransactions(
 	callbackCtx fvm.Context,
 	systemChunkCtx fvm.Context,
-	systemColection collectionInfo,
+	systemCollection collectionInfo,
 	systemTxn *flow.TransactionBody,
 	executeCallbackTxs []*flow.TransactionBody,
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) chan TransactionRequest {
-	var logger zerolog.Logger
 
-	systemChunkTxLogger := systemLogger.With().
-		Uint32("num_txs", uint32(len(systemColection.CompleteCollection.Collection.Transactions))).
+	systemTxLogger := systemLogger.With().
+		Uint32("num_txs", uint32(len(systemCollection.CompleteCollection.Collection.Transactions))).
+		Bool("system_transaction", true).
 		Logger()
 
-	scheduledTxLogger := systemChunkTxLogger.With().
+	scheduledTxLogger := systemLogger.With().
+		Uint32("num_txs", uint32(len(systemCollection.CompleteCollection.Collection.Transactions))).
 		Bool("scheduled_transaction", true).
-		Bool("critical_error", false).
 		Logger()
 
-	allTxs := append(executeCallbackTxs, systemTxn)
-	txQueue := make(chan TransactionRequest, len(allTxs))
+	txQueue := make(chan TransactionRequest, len(executeCallbackTxs)+1)
 	defer close(txQueue)
 
-	for i, txBody := range allTxs {
-		systemChunkTx := i == len(allTxs)-1 // last tx in collection is system chunk
-		ctx := callbackCtx
-		logger = scheduledTxLogger
-
-		if systemChunkTx {
-			ctx = systemChunkCtx
-			logger = systemChunkTxLogger
-		}
-
+	for _, txBody := range executeCallbackTxs {
 		txQueue <- newTransactionRequest(
-			systemColection,
-			ctx,
-			logger,
+			systemCollection,
+			callbackCtx,
+			scheduledTxLogger,
 			txnIndex,
 			txBody,
-			systemChunkTx,
+			true,
+			false,
+			false,
 		)
 
 		txnIndex++
 	}
+
+	txQueue <- newTransactionRequest(
+		systemCollection,
+		systemChunkCtx,
+		systemTxLogger,
+		txnIndex,
+		systemTxn,
+		false,
+		true,
+		true,
+	)
 
 	return txQueue
 }
@@ -495,20 +504,17 @@ func (e *blockComputer) executeSystemTransactions(
 	)
 
 	systemCollectionInfo := collectionInfo{
-		blockId:             block.BlockID(),
-		blockIdStr:          block.BlockID().String(),
-		blockHeight:         block.Block.Height,
-		collectionIndex:     userCollectionCount,
-		CompleteCollection:  nil, // We do not yet know all the scheduled callbacks, so postpone construction of the collection.
-		isSystemTransaction: true,
+		blockId:            block.BlockID(),
+		blockIdStr:         block.BlockID().String(),
+		blockHeight:        block.Block.Height,
+		collectionIndex:    userCollectionCount,
+		CompleteCollection: nil, // We do not yet know all the scheduled callbacks, so postpone construction of the collection.
 	}
 
-	systemLogger := callbackCtx.Logger.With().
+	systemChunkLogger := callbackCtx.Logger.With().
 		Str("block_id", block.BlockID().String()).
 		Uint64("height", block.Block.Height).
 		Bool("system_chunk", true).
-		Bool("system_transaction", true).
-		Bool("critical_error", true).
 		Int("num_collections", userCollectionCount).
 		Logger()
 
@@ -528,7 +534,7 @@ func (e *blockComputer) executeSystemTransactions(
 			database,
 			blockSpan,
 			txIndex,
-			systemLogger,
+			systemChunkLogger,
 		)
 		if err != nil {
 			return err
@@ -565,7 +571,7 @@ func (e *blockComputer) executeSystemTransactions(
 		e.systemTxn,
 		callbackTxs,
 		txIndex,
-		systemLogger,
+		systemChunkLogger,
 	)
 
 	e.executeQueue(blockSpan, database, txQueue)
@@ -616,7 +622,7 @@ func (e *blockComputer) executeProcessCallback(
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, uint32, error) {
 	callbackLogger := systemLogger.With().
-		Bool("scheduled_transaction", true).
+		Bool("system_transaction", true).
 		Logger()
 
 	request := newTransactionRequest(
@@ -625,6 +631,8 @@ func (e *blockComputer) executeProcessCallback(
 		callbackLogger,
 		txnIndex,
 		e.processCallbackTxn,
+		false,
+		true,
 		false)
 
 	txnIndex++

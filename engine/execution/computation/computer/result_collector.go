@@ -242,12 +242,9 @@ func (collector *resultCollector) processTransactionResult(
 
 		if txn.isSystemTransaction {
 			// This log is used as the data source for an alert on grafana.
-			// The system_chunk_error field must not be changed without adding
+			// The critical_error field must not be changed without adding
 			// the corresponding changes in grafana.
-			// https://github.com/dapperlabs/flow-internal/issues/1546
 			logger.Error().
-				Bool("system_chunk_error", true).
-				Bool("system_transaction_error", true).
 				Bool("critical_error", true).
 				Msg("error executing system chunk transaction")
 		}
@@ -314,6 +311,7 @@ func (collector *resultCollector) handleTransactionExecutionMetrics(
 		ComputationIntensities:     output.ComputationIntensities,
 		NumberOfTxnConflictRetries: numConflictRetries,
 		Failed:                     output.Err != nil,
+		ScheduledTransaction:       txn.isScheduledTransaction,
 		SystemTransaction:          txn.isSystemTransaction,
 	}
 	for _, entry := range txnExecutionSnapshot.UpdatedRegisters() {
