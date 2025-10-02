@@ -34,58 +34,26 @@ func TestChunkDataPacks_Store(t *testing.T) {
 				return err
 			}
 
+			// Verify chunk data packs are stored
+			for i, chunkDataPack := range chunkDataPacks {
+				stored, err := chunkDataPackStore.ByChunkID(chunkDataPack.ChunkID)
+				require.NoError(t, err)
+				require.Equal(t, chunkDataPack, stored, "mismatched chunk data pack at index %d", i)
+			}
+
+			// Store again is idemopotent
 			storeFunc, err = chunkDataPackStore.Store(chunkDataPacks)
 			if err != nil {
 				return err
 			}
-			return protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err = protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return storeFunc(lctx, rw)
 			})
+			require.NoError(t, err)
+			return nil
 		}))
 	})
 }
-
-// func TestChunkDataPack_Remove(t *testing.T) {
-// 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-// 		lockManager := storage.NewTestingLockManager()
-// 		db := pebbleimpl.ToDB(pdb)
-// 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
-// 		collections := store.NewCollections(db, transactions)
-// 		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, db, 10)
-// 		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-// 		chunkDataPackStore := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, stored, collections, 1)
-//
-// 		chunkDataPacks := unittest.ChunkDataPacksFixture(10)
-// 		for _, chunkDataPack := range chunkDataPacks {
-// 			// store collection in Collections storage (which ChunkDataPacks store uses internally)
-// 			_, err := collections.Store(chunkDataPack.Collection)
-// 			require.NoError(t, err)
-// 		}
-//
-// 		chunkIDs := make([]flow.Identifier, 0, len(chunkDataPacks))
-// 		for _, chunk := range chunkDataPacks {
-// 			chunkIDs = append(chunkIDs, chunk.ChunkID)
-// 		}
-//
-// 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-// 			storeFunc, err := chunkDataPackStore.Store(chunkDataPacks)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-// 				return storeFunc(lctx, rw)
-// 			})
-// 		}))
-// 		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
-//
-// 		// verify it has been removed
-// 		_, err := chunkDataPackStore.ByChunkID(chunkIDs[0])
-// 		assert.ErrorIs(t, err, storage.ErrNotFound)
-//
-// 		// Removing again should not error
-// 		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
-// 	})
-// }
 
 // TestChunkDataPacks_MissingItem evaluates querying a missing item returns a storage.ErrNotFound error.
 func TestChunkDataPacks_MissingItem(t *testing.T) {
@@ -103,43 +71,6 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 			_, err := store1.ByChunkID(unittest.IdentifierFixture())
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
-	})
-}
-
-// TestChunkDataPacks_StoreTwice evaluates that storing the same chunk data pack twice
-// does not result in an error.
-func TestChunkDataPacks_StoreTwice(t *testing.T) {
-	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, protocolDB storage.DB, chunkDataPackDB storage.DB, lockManager storage.LockManager) {
-		transactions := store.NewTransactions(&metrics.NoopCollector{}, protocolDB)
-		collections := store.NewCollections(protocolDB, transactions)
-		stored := store.NewStoredChunkDataPacks(&metrics.NoopCollector{}, chunkDataPackDB, 10)
-		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, protocolDB, stored, collections, 1)
-		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-			storeFunc, err := store1.Store(chunkDataPacks)
-			if err != nil {
-				return err
-			}
-			return protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return storeFunc(lctx, rw)
-			})
-		}))
-
-		// sanity-check first that chunk data packs are stored, before attempting to store them again.
-		for _, c := range chunkDataPacks {
-			c2, err := store1.ByChunkID(c.ChunkID)
-			require.NoError(t, err)
-			require.Equal(t, c, c2)
-		}
-
-		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-			storeFunc, err := store1.Store(chunkDataPacks)
-			if err != nil {
-				return err
-			}
-			return protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return storeFunc(lctx, rw)
-			})
-		}))
 	})
 }
 

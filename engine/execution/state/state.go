@@ -346,7 +346,7 @@ func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCom
 func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve chunk data pack: %w", err)
+		return nil, fmt.Errorf("could not retrieve chunk data pack for chunk ID %v: %w", chunkID, err)
 	}
 
 	return chunkDataPack, nil
@@ -420,7 +420,7 @@ func (s *state) saveExecutionResults(
 
 	return storage.WithLock(s.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 		// The batch update writes all execution result data in a single atomic operation.
-		// Since the chunk data pack itself was already stored in a separate database
+		// Since the chunk data pack itself was already stored in a separate database (s.chunkDataPacks)
 		// during the previous step, this step stores only the mapping between chunk ID
 		// and chunk data pack ID together with the execution result data in the same batch.
 		//
@@ -436,6 +436,8 @@ func (s *state) saveExecutionResults(
 		// chunk data pack with the same chunk ID, the conflict is detected, preventing
 		// overwriting of the previously stored mapping.
 		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+			// store the ChunkID -> StoredChunkDataPack.ID() mapping
+			// in s.db (protocol database along with other execution data in a single batch)
 			err := storeFunc(lctx, batch)
 			if err != nil {
 				return fmt.Errorf("cannot store chunk data packs: %w", err)
@@ -482,6 +484,7 @@ func (s *state) saveExecutionResults(
 			return nil
 		})
 	})
+
 }
 
 func (s *state) UpdateLastExecutedBlock(ctx context.Context, executedID flow.Identifier) error {

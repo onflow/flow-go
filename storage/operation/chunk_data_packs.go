@@ -44,7 +44,7 @@ func RemoveChunkDataPackID(w storage.Writer, chunkID flow.Identifier) error {
 //
 // No error returns during normal operations:
 func InsertStoredChunkDataPack(rw storage.ReaderBatchWriter, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
-	return UpsertByKey(rw.Writer(), MakePrefix(codeStoredChunkDataPack, c.ID()), c)
+	return UpsertByKey(rw.Writer(), MakePrefix(codeStoredChunkDataPack, storeChunkDataPackID), c)
 }
 
 // RetrieveStoredChunkDataPack retrieves a chunk data pack by stored chunk data pack ID.

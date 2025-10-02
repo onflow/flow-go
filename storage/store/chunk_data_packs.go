@@ -38,19 +38,15 @@ var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
 func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored storage.StoredChunkDataPacks, collections storage.Collections, chunkIDToStoredChunkDataPackIDCacheSize uint) *ChunkDataPacks {
 
-	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val flow.Identifier) error {
-		return operation.InsertChunkDataPackID(lctx, rw, key, val)
-	}
-
-	retrieve := func(r storage.Reader, key flow.Identifier) (flow.Identifier, error) {
+	retrieve := func(r storage.Reader, chunkID flow.Identifier) (flow.Identifier, error) {
 		var storedChunkDataPackID flow.Identifier
-		err := operation.RetrieveChunkDataPackID(r, key, &storedChunkDataPackID)
+		err := operation.RetrieveChunkDataPackID(r, chunkID, &storedChunkDataPackID)
 		return storedChunkDataPackID, err
 	}
 
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
 		withLimit[flow.Identifier, flow.Identifier](chunkIDToStoredChunkDataPackIDCacheSize),
-		withStoreWithLock(storeWithLock),
+		withStoreWithLock(operation.InsertChunkDataPackID),
 		withRetrieve(retrieve),
 	)
 
@@ -102,6 +98,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	storeChunkDataPacksFunc := func(lctx lockctx.Proof, protocolDBBatch storage.ReaderBatchWriter) error {
 		protocolDBBatch.AddCallback(func(err error) {
 			if err != nil {
+				log.Warn().Msgf("batch operation failed, rolling back stored chunk data packs for chunks: %v", cs)
 				// Rollback the stored chunk data packs if the batch operation fails
 				err := ch.stored.Remove(storedChunkDataPackIDs) // rollback stored chunk data packs on failure
 				if err != nil {
@@ -114,7 +111,8 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 		for i, c := range cs {
 			storedChunkDataPackID := storedChunkDataPackIDs[i]
 			// Index the stored chunk data pack ID by chunk ID for fast retrieval
-			err := operation.InsertChunkDataPackID(lctx, protocolDBBatch, c.ChunkID, storedChunkDataPackID)
+			err := ch.chunkIDToStoredChunkDataPackIDCache.PutWithLockTx(
+				lctx, protocolDBBatch, c.ChunkID, storedChunkDataPackID)
 			if err != nil {
 				return fmt.Errorf("cannot index stored chunk data pack ID by chunk ID: %w", err)
 			}
