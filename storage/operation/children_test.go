@@ -254,7 +254,18 @@ func TestChildrenWrongLockIsRejected(t *testing.T) {
 
 				parentID := unittest.IdentifierFixture()
 				childID := unittest.IdentifierFixture()
-				err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+
+				// Use the wrong lock type for each operation
+				var wrongLockType string
+				if opPair.lockType == storage.LockInsertBlock {
+					// For IndexNewBlock, use the cluster block lock (wrong)
+					wrongLockType = storage.LockInsertOrFinalizeClusterBlock
+				} else {
+					// For IndexNewClusterBlock, use the regular block lock (wrong)
+					wrongLockType = storage.LockInsertBlock
+				}
+
+				err := unittest.WithLock(t, lockManager, wrongLockType, func(lctx lockctx.Context) error {
 					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return opPair.indexFunc(lctx, rw, childID, parentID)
 					})
