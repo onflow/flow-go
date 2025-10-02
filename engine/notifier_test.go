@@ -105,6 +105,12 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 
 				// wait for the previous notification to be consumed to ensure that the producer
 				// won't drop any notifications.
+				// NOTE: this is necessary because golang channels do not provide atomic consistency.
+				// Specifically, it means that when we send a notification while workers are waiting
+				// it is not guaranteed that a worker will atomically receive that notification. In
+				// other words, the channel might behave as if there was no worker waiting and de-
+				// duplicating notifications. For details, see
+				// https://www.notion.so/flowfoundation/Golang-Channel-Consistency-19a1aee12324817699b1ff162921d8fc
 				synctest.Wait()
 			}
 
@@ -128,12 +134,11 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			notifier := NewNotifier()
 
-			producerCount := int32(10)
-			producerJobs := int32(10)
+			producerCount := int32(10) // number of producers
+			producerJobs := int32(10) // number of tasks that each producer will queue up
 			pendingWorkQueue := make(chan struct{}, producerCount*producerJobs)
 			consumedWork := atomic.NewInt32(0)
 
