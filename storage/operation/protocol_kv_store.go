@@ -49,7 +49,7 @@ func IndexProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 			return nil
 		}
 
-		return fmt.Errorf("kv-store snapshot with block id (%x) already exists and different (%v != %v): %w",
+		return fmt.Errorf("for block id %x, a kv-store snapshot (%v) is already persisted which is different than the given one (%v): %w",
 			blockID[:],
 			existing, protocolKVStoreID,
 			storage.ErrDataMismatch)
