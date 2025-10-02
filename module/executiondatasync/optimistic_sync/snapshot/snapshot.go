@@ -1,6 +1,10 @@
 package snapshot
 
 import (
+	"context"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
@@ -63,3 +67,13 @@ func (s *Mock) Registers() storage.RegisterIndexReader {
 }
 
 func (s *Mock) ExecutionData() execdatacache.ExecutionDataCache { return s.executionData }
+
+func (s *Mock) BlockExecutionData(ctx context.Context, blockID flow.Identifier) execution_data.BlockExecutionData {
+
+	blockExecutionData, err := s.executionData.ByBlockID(ctx, blockID)
+	if err != nil {
+		panic(err)
+	}
+
+	return *blockExecutionData.BlockExecutionData
+}

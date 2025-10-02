@@ -1,6 +1,10 @@
 package optimistic_sync
 
 import (
+	"context"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/storage"
 )
@@ -27,4 +31,7 @@ type Snapshot interface {
 
 	// ExecutionData returns a reader for querying execution data.
 	ExecutionData() execdatacache.ExecutionDataCache
+
+	//BlockExecutionData returns a reader for querying execution data.
+	BlockExecutionData(ctx context.Context, blockID flow.Identifier) execution_data.BlockExecutionData
 }
