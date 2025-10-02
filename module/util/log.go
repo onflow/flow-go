@@ -68,6 +68,11 @@ func NewLogProgressConfig[T int | uint | int32 | uint32 | uint64 | int64](
 		ticks = uint64(total + 1)
 	}
 
+	// sanitize noDataLogDuration
+	if noDataLogDuration < time.Millisecond {
+		noDataLogDuration = time.Millisecond
+	}
+
 	return LogProgressConfig[T]{
 		message:           message,
 		total:             total,
