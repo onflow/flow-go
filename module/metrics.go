@@ -946,6 +946,7 @@ type TransactionExecutionResultStats struct {
 	ExecutionResultStats
 	NumberOfTxnConflictRetries int
 	Failed                     bool
+	ScheduledTransaction       bool
 	SystemTransaction          bool
 	ComputationIntensities     meter.MeteredComputationIntensities
 }

@@ -586,6 +586,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.LessOrEqual(t, vm.CallCount(), (1+totalTransactionCount)/2*totalTransactionCount)
 	})
 
+	// TODO: this test is flaky with a low probability of failing
 	t.Run(
 		"service events are emitted", func(t *testing.T) {
 			execCtx := fvm.NewContext(
@@ -1510,7 +1511,7 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 	exemetrics.On("ExecutionTransactionExecuted",
 		mock.Anything,
 		mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
-			return !arg.Failed && arg.SystemTransaction
+			return !arg.Failed && (arg.SystemTransaction || arg.ScheduledTransaction)
 		}),
 		mock.Anything).
 		Return(nil).
