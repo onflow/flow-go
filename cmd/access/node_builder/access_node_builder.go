@@ -653,8 +653,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution state cache", func(node *cmd.NodeConfig) error {
-		config := builder.rpcConf
-		backendConfig := config.BackendConfig
+		backendConfig := builder.rpcConf.BackendConfig
 
 		preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
 		if err != nil {
