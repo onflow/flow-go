@@ -2118,17 +2118,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				fixedENIdentifiers,
 			)
 
-			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+			execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
 				node.Logger,
 				node.State,
-				node.Storage.Headers,
 				node.Storage.Receipts,
 				execNodeSelector,
 				optimistic_sync.DefaultCriteria,
 			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
-			}
 
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(

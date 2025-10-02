@@ -21,50 +21,29 @@ type Provider struct {
 
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
-
-	executionNodes *ExecutionNodeSelector
-
-	rootBlockID     flow.Identifier
-	rootBlockResult *flow.ExecutionResult
-
-	baseCriteria optimistic_sync.Criteria
+	rootBlockID       flow.Identifier
+	executionNodes    *ExecutionNodeSelector
+	baseCriteria      optimistic_sync.Criteria
 }
 
 var _ optimistic_sync.ExecutionResultInfoProvider = (*Provider)(nil)
 
-// NewExecutionResultInfoProvider creates and returns a new instance of
-// Provider.
-//
-// No errors are expected during normal operations
+// NewExecutionResultInfoProvider creates and returns a new instance of Provider.
 func NewExecutionResultInfoProvider(
 	log zerolog.Logger,
 	state protocol.State,
-	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
 	executionNodes *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
-) (*Provider, error) {
-	// Root block ID and result should not change and could be cached.
-	sporkRootBlockHeight := state.Params().SporkRootBlockHeight()
-	rootBlockID, err := headers.BlockIDByHeight(sporkRootBlockHeight)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve block ID by height: %w", err)
-	}
-
-	rootBlockResult, _, err := state.AtBlockID(rootBlockID).SealedResult()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
-	}
-
+) *Provider {
 	return &Provider{
-		log:               log.With().Str("module", "execution_result_query").Logger(),
+		log:               log.With().Str("module", "execution_result_info").Logger(),
 		executionReceipts: executionReceipts,
 		state:             state,
 		executionNodes:    executionNodes,
-		rootBlockID:       rootBlockID,
-		rootBlockResult:   rootBlockResult,
+		rootBlockID:       state.Params().SporkRootBlock().ID(),
 		baseCriteria:      optimistic_sync.DefaultCriteria.OverrideWith(operatorCriteria),
-	}, nil
+	}
 }
 
 // ExecutionResultInfo retrieves execution results and associated execution nodes for a given block ID
@@ -72,28 +51,34 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - storage.ErrNotFound - if the request is for the spork root block and the node was bootstrapped
+//     from a newer block.
 func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) (*optimistic_sync.ExecutionResultInfo, error) {
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
+		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
 	}
 
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
 	if e.rootBlockID == blockID {
-		subsetENs, err := e.executionNodes.SelectExecutionNodes(
-			executorIdentities,
-			criteria.RequiredExecutors,
-		)
+		subsetENs, err := e.executionNodes.SelectExecutionNodes(executorIdentities, criteria.RequiredExecutors)
 		if err != nil {
 			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
 		}
 
+		rootBlockResult, _, err := e.state.AtBlockID(e.rootBlockID).SealedResult()
+		if err != nil {
+			// if the node was bootstrapped from a block after the spork root block, then the root
+			// block's result will not be present.
+			return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
+		}
+
 		return &optimistic_sync.ExecutionResultInfo{
-			ExecutionResultID: e.rootBlockResult.ID(),
+			ExecutionResultID: rootBlockResult.ID(),
 			ExecutionNodes:    subsetENs,
 		}, nil
 	}

@@ -62,17 +62,13 @@ func (suite *ExecutionResultInfoProviderSuite) createProvider(
 	preferredExecutors flow.IdentifierList,
 	operatorCriteria optimistic_sync.Criteria,
 ) *Provider {
-	provider, err := NewExecutionResultInfoProvider(
+	return NewExecutionResultInfoProvider(
 		suite.log,
 		suite.state,
-		suite.headers,
 		suite.receipts,
 		NewExecutionNodeSelector(preferredExecutors, operatorCriteria.RequiredExecutors),
 		operatorCriteria,
 	)
-	suite.Require().NoError(err)
-
-	return provider
 }
 
 // setupIdentitiesMock sets up the mock for identity-related calls.
