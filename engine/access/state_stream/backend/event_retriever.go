@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -149,6 +150,16 @@ func (b *EventsProvider) getEventsFromStorage(
 	if err != nil {
 		return nil, fmt.Errorf("could not get events for block %d: %w", blockID, err)
 	}
+
+	// Normalize ordering for events coming from storage.
+	// The index may return events ordered by TransactionID (implementation detail),
+	// but consumers and tests expect events ordered by transaction index and event index.
+	sort.SliceStable(events, func(i, j int) bool {
+		if events[i].TransactionIndex == events[j].TransactionIndex {
+			return events[i].EventIndex < events[j].EventIndex
+		}
+		return events[i].TransactionIndex < events[j].TransactionIndex
+	})
 
 	metadata := access.ExecutorMetadata{
 		ExecutionResultID: result.ExecutionResultID,
