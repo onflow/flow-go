@@ -26,7 +26,7 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 		expectedAttempts := 10
 
 		withUpdaterScenario(t, chunks, expectedAttempts, incUpdater, func(t *testing.T, attempts uint64, lastTried time.Time, retryAfter time.Duration) {
-			require.Equal(t, expectedAttempts, int(attempts))           // each chunk request should be attempted 10 times.
+			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 			qualified, _ := qualifier(attempts, lastTried, retryAfter)
 			require.True(t, qualified) // request should be immediately qualified for retrial.
 		})
