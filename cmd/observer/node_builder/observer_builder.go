@@ -1251,7 +1251,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 
 		return nil
-	}).Component("public execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	}).
+	Component("public execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		opts := []network.BlobServiceOption{
 			blob.WithBitswapOptions(
 				bitswap.WithTracer(
