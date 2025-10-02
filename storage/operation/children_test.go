@@ -247,24 +247,31 @@ func TestDirectChildren(t *testing.T) {
 // TestChildrenWrongLockIsRejected verifies that operations fail when called with the wrong lock type.
 // This ensures that IndexNewBlock requires LockInsertBlock and IndexNewClusterBlock requires LockInsertOrFinalizeClusterBlock.
 func TestChildrenWrongLockIsRejected(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
+	for _, opPair := range getTestOperationPairs() {
+		t.Run(opPair.name, func(t *testing.T) {
+			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+				lockManager := storage.NewTestingLockManager()
 
-		parentID := unittest.IdentifierFixture()
-		childID := unittest.IdentifierFixture()
+				parentID := unittest.IdentifierFixture()
+				childID := unittest.IdentifierFixture()
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexNewClusterBlock(lctx, rw, childID, parentID)
+				// Use the wrong lock type for each operation
+				var wrongLockType string
+				if opPair.lockType == storage.LockInsertBlock {
+					// For IndexNewBlock, use the cluster block lock (wrong)
+					wrongLockType = storage.LockInsertOrFinalizeClusterBlock
+				} else {
+					// For IndexNewClusterBlock, use the regular block lock (wrong)
+					wrongLockType = storage.LockInsertBlock
+				}
+
+				err := unittest.WithLock(t, lockManager, wrongLockType, func(lctx lockctx.Context) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return opPair.indexFunc(lctx, rw, childID, parentID)
+					})
+				})
+				require.Error(t, err)
 			})
 		})
-		require.Error(t, err)
-
-		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexNewBlock(lctx, rw, childID, parentID)
-			})
-		})
-		require.Error(t, err)
-	})
+	}
 }

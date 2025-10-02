@@ -256,7 +256,7 @@ func bootstrapProtocolState(
 	for _, proposal := range segment.AllBlocks() {
 		blockID := proposal.Block.ID()
 		protocolStateEntryWrapper := segment.ProtocolStateEntries[proposal.Block.Payload.ProtocolStateID]
-		err := epochProtocolStateSnapshots.BatchIndex(rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
+		err := epochProtocolStateSnapshots.BatchIndex(lctx, rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
 		if err != nil {
 			return fmt.Errorf("could not index root protocol state: %w", err)
 		}
