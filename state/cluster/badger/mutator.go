@@ -441,7 +441,6 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
 		if len(dupeTxIDsForBlock) == 0 {
 			continue
 		}
-		dupeTxIDs = append(dupeTxIDs, dupeTxIDsForBlock...)
 
 		// otherwise, if any duplicates were found, confirm that the block is an ancestor of the candidate block
 		// We checked that the candidate block extends the finalized state as of the beginning of the Extend process.
@@ -454,9 +453,10 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
 			return nil, fmt.Errorf("could not retrieve header by block_id=%x: %w", blockID, err)
 		}
 		// Since we already checked for duplicate transactions in the unfinalized ancestry above, we
-		// know that if we found a duplicate here, it must be on a difference fork (otherwise we would
-		// have found it before).
+		// know that if we found a duplicate here ABOVE our view of the finalized height, it must be on a different fork
+		// (otherwise we would have found it before). So, we only consider blocks at or below our view of the finalized height.
 		if header.Height <= finalClusterHeight {
+			dupeTxIDs = append(dupeTxIDs, dupeTxIDsForBlock...)
 			// TODO: We could stop at this point since we know the candidate is invalid.
 			//       We likely SHOULD stop here when permissionless LNs are available, for performance reasons.
 			//       For now, we continue and obtain a complete list of duplicates for debugging purposes, since we don't expect this case to occur.
