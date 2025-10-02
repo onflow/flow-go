@@ -183,8 +183,6 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 
 			// wait for all producers and consumers to block. at this point, all jobs should be consumed.
 			synctest.Wait()
-
-			// verify all scheduled jobs were consumed.
 			assert.Equal(t, producerCount*producerJobs, consumedWork.Load())
 
 			// shutdown blocked consumers and wait for them to complete
