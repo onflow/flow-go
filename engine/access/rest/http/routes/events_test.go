@@ -525,6 +525,8 @@ func buildRequest(
 	t *testing.T,
 	args requestArgs,
 ) *http.Request {
+	t.Helper()
+
 	u, _ := url.Parse("/v1/events")
 	q := u.Query()
 
