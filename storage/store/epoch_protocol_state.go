@@ -84,6 +84,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 	}
 
 	storeByBlockID := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
+		// CAUTION: requires [storage.LockInsertBlock] and for the caller to ensure that they are not overwriting existing data.
 		err := operation.IndexEpochProtocolState(lctx, rw.Writer(), blockID, epochProtocolStateEntryID)
 		if err != nil {
 			return fmt.Errorf("could not index EpochProtocolState for block (%x): %w", blockID[:], err)
@@ -114,14 +115,15 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 }
 
 // BatchStore persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
-// the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
-// otherwise an exception is returned.
+// the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present), otherwise an
+// exception is returned.
+//
+// CAUTION: The caller must ensure `epochProtocolStateID` is a collision-resistant hash of the provided
+// `epochProtocolStateEntry`! This method silently overrides existing data, which is safe only if for the same
+// key, we always write the same value.
+//
 // No errors are expected during normal operation.
-func (s *EpochProtocolStateEntries) BatchStore(
-	w storage.Writer,
-	epochProtocolStateEntryID flow.Identifier,
-	epochStateEntry *flow.MinEpochStateEntry,
-) error {
+func (s *EpochProtocolStateEntries) BatchStore(w storage.Writer, epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.MinEpochStateEntry) error {
 	// sanity checks:
 	if !epochStateEntry.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
 		return fmt.Errorf("sanity check failed: identities are not sorted")

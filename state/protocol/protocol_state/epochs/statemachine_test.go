@@ -543,36 +543,32 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	require.NoError(s.T(), err)
 
 	// Create a proper lock context proof for the BatchIndex operation
-	var lockCtx lockctx.Proof
 	err = unittest.WithLock(s.T(), s.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-		lockCtx = lctx
-		return nil
+		s.epochStateDB.On("BatchIndex", lctx, mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
+
+		expectedEpochState := &flow.MinEpochStateEntry{
+			PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
+			CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
+			NextEpoch:              nil,
+			EpochFallbackTriggered: true,
+		}
+
+		s.epochStateDB.On("BatchStore", mocks.Anything, expectedEpochState.ID(), expectedEpochState).Return(nil).Once()
+		s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
+
+		dbOps, err := stateMachine.Build()
+		require.NoError(s.T(), err)
+
+		w := storagemock.NewWriter(s.T())
+		rw := storagemock.NewReaderBatchWriter(s.T())
+		rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
+
+		// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
+		// which is asserted by the testify framework. The lock context proof is passed to verify that the BatchIndex
+		// operation receives the proper lock context as required by the storage layer.
+		blockID := s.candidate.ID()
+		return dbOps.Execute(lctx, blockID, rw)
 	})
 	require.NoError(s.T(), err)
 
-	s.epochStateDB.On("BatchIndex", lockCtx, mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
-
-	expectedEpochState := &flow.MinEpochStateEntry{
-		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
-		CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
-		NextEpoch:              nil,
-		EpochFallbackTriggered: true,
-	}
-
-	s.epochStateDB.On("BatchStore", mocks.Anything, expectedEpochState.ID(), expectedEpochState).Return(nil).Once()
-	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
-
-	dbOps, err := stateMachine.Build()
-	require.NoError(s.T(), err)
-
-	w := storagemock.NewWriter(s.T())
-	rw := storagemock.NewReaderBatchWriter(s.T())
-	rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
-
-	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
-	// which is asserted by the testify framework. The lock context proof is passed to verify that the BatchIndex
-	// operation receives the proper lock context as required by the storage layer.
-	blockID := s.candidate.ID()
-	err = dbOps.Execute(lockCtx, blockID, rw)
-	require.NoError(s.T(), err)
 }
