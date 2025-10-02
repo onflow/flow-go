@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -63,7 +62,7 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForBlockIDs() {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return(expectedEvents, access.ExecutorMetadata{}, nil).
+			Return(expectedEvents, nil, nil).
 			Once()
 
 		request := buildRequest(
@@ -92,7 +91,7 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForBlockIDs() {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return(nil, access.ExecutorMetadata{},
+			Return(nil, nil,
 				status.Error(codes.InvalidArgument, "block IDs must not be empty")).
 			Once()
 
@@ -118,7 +117,7 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForBlockIDs() {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return(nil, access.ExecutorMetadata{}, assert.AnError).
+			Return(nil, nil, assert.AnError).
 			Once()
 
 		request := buildRequest(
@@ -146,7 +145,7 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForHeightRange() {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return(s.events, access.ExecutorMetadata{}, nil).
+			Return(s.events, nil, nil).
 			Once()
 
 		request := buildRequest(
@@ -177,7 +176,7 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForHeightRange() {
 				entities.EventEncodingVersion_JSON_CDC_V0,
 				mocks.Anything,
 			).
-			Return(s.events, access.ExecutorMetadata{}, nil).
+			Return(s.events, nil, nil).
 			Once()
 
 		request := buildRequest(
@@ -374,7 +373,7 @@ func (s *GetEventsSuite) TestGetEvents_ParseExecutionState() {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
-		Return(s.events, access.ExecutorMetadata{}, nil)
+		Return(s.events, nil, nil)
 
 	s.T().Run("empty execution state query", func(t *testing.T) {
 		request := buildRequest(
@@ -489,7 +488,7 @@ func (s *GetEventsSuite) TestGetEvents_GetAtSealedBlock() {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			optimistic_sync.DefaultCriteria,
 		).
-		Return(s.events, access.ExecutorMetadata{}, nil).
+		Return(s.events, nil, nil).
 		Once()
 
 	request := buildRequest(
@@ -560,7 +559,7 @@ func buildRequest(
 }
 
 func buildExpectedResponse(t *testing.T, events []flow.BlockEvents, includeMetadata bool) string {
-	list := models.NewBlockEventsList(events, access.ExecutorMetadata{}, includeMetadata)
+	list := models.NewBlockEventsList(events, nil, includeMetadata)
 	data, err := json.Marshal(list)
 	require.NoError(t, err)
 

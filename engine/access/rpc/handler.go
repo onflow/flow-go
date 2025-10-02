@@ -926,13 +926,13 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 
-	if query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
-	}
-
 	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.EventsResponse{
@@ -974,13 +974,13 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	if query.GetIncludeExecutorMetadata() {
-		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(&executorMetadata)
-	}
-
 	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.EventsResponse{

@@ -39,7 +39,7 @@ func (f *FailoverEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	result *optimistic_sync.ExecutionResultInfo,
-) (Response, access.ExecutorMetadata, error) {
+) (Response, *access.ExecutorMetadata, error) {
 	localEvents, localMetadata, localErr := f.localProvider.Events(
 		ctx,
 		blocks,

@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,12 +25,11 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 
 		// store payload
 		manager := storage.NewTestingLockManager()
-		lctx := manager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
+		err := unittest.WithLock(t, manager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.InsertClusterPayload(lctx, rw, blockID, expected)
+			})
 		})
-		lctx.Release()
 		require.NoError(t, err)
 
 		// fetch payload

@@ -147,14 +147,12 @@ func (suite *SnapshotSuite) Proposal() model.Proposal {
 }
 
 func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	suite.Assert().Nil(err)
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, &proposal)
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return procedure.InsertClusterBlock(lctx, rw, &proposal)
+		})
 	})
-	suite.Assert().Nil(err)
+	suite.Require().NoError(err)
 }
 
 // InsertSubtree recursively inserts chain state as a subtree of the parent
@@ -239,13 +237,12 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.NoError(t, err)
 
 	// finalize the block
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.ID())
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return procedure.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.ID())
+		})
 	})
-	assert.NoError(t, err)
+	suite.Require().NoError(err)
 
 	// get the final snapshot, should map to finalizedProposal1
 	snapshot := suite.state.Final()

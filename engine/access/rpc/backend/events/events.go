@@ -38,7 +38,6 @@ type Events struct {
 	provider           provider.EventProvider
 	queryMode          query_mode.IndexQueryMode
 	execResultProvider optimistic_sync.ExecutionResultInfoProvider
-	operatorCriteria   optimistic_sync.Criteria
 }
 
 var _ access.EventsAPI = (*Events)(nil)
@@ -55,7 +54,6 @@ func NewEventsBackend(
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
-	operatorCriteria optimistic_sync.Criteria,
 ) (*Events, error) {
 	var eventProvider provider.EventProvider
 
@@ -92,7 +90,6 @@ func NewEventsBackend(
 		headers:            headers,
 		provider:           eventProvider,
 		queryMode:          queryMode,
-		operatorCriteria:   operatorCriteria,
 		execResultProvider: executionResultProvider,
 	}, nil
 }
@@ -105,22 +102,19 @@ func (e *Events) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, accessmodel.ExecutorMetadata{},
-			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
+		return nil, nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	if endHeight < startHeight {
-		return nil, accessmodel.ExecutorMetadata{},
-			status.Error(codes.InvalidArgument, "start height must not be larger than end height")
+		return nil, nil, status.Error(codes.InvalidArgument, "start height must not be larger than end height")
 	}
 
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(e.maxHeightRange) {
-		return nil, accessmodel.ExecutorMetadata{},
-			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)",
-				rangeSize, e.maxHeightRange)
+		return nil, nil, status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)",
+			rangeSize, e.maxHeightRange)
 	}
 
 	// get the latest sealed block header
@@ -129,12 +123,12 @@ func (e *Events) GetEventsForHeightRange(
 		// sealed block must be in the store, so throw an exception for any error
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, accessmodel.ExecutorMetadata{}, err
+		return nil, nil, err
 	}
 
 	// a start height should not be beyond the last sealed height
 	if startHeight > sealed.Height {
-		return nil, accessmodel.ExecutorMetadata{},
+		return nil, nil,
 			status.Errorf(codes.OutOfRange, "start height %d is greater than the last sealed block height %d", startHeight, sealed.Height)
 	}
 
@@ -160,13 +154,11 @@ func (e *Events) GetEventsForHeightRange(
 		// and avoids calculating header.ID() for each block.
 		blockID, err := e.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, accessmodel.ExecutorMetadata{},
-				rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
+			return nil, nil, rpc.ConvertStorageError(common.ResolveHeightError(e.state.Params(), i, err))
 		}
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, accessmodel.ExecutorMetadata{},
-				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
+			return nil, nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
@@ -182,7 +174,7 @@ func (e *Events) GetEventsForHeightRange(
 	lastBlockID := blockHeaders[len(blockHeaders)-1].ID
 	execResultInfo, err := e.execResultProvider.ExecutionResultInfo(lastBlockID, criteria)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{},
+		return nil, nil,
 			fmt.Errorf("failed to get execution result for last block: %w", err)
 	}
 
@@ -207,21 +199,19 @@ func (e *Events) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
-) ([]flow.BlockEvents, accessmodel.ExecutorMetadata, error) {
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	if len(blockIDs) == 0 {
-		return nil, accessmodel.ExecutorMetadata{},
-			status.Error(codes.InvalidArgument, "block IDs must not be empty")
+		return nil, nil, status.Error(codes.InvalidArgument, "block IDs must not be empty")
 	}
 
 	if uint(len(blockIDs)) > e.maxHeightRange {
-		return nil, accessmodel.ExecutorMetadata{},
+		return nil, nil,
 			status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)",
 				len(blockIDs), e.maxHeightRange)
 	}
 
 	if _, err := events.ValidateEvent(flow.EventType(eventType), e.chain); err != nil {
-		return nil, accessmodel.ExecutorMetadata{},
-			status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
+		return nil, nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
 	var newestView uint64
@@ -232,8 +222,7 @@ func (e *Events) GetEventsForBlockIDs(
 	for _, blockID := range blockIDs {
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, accessmodel.ExecutorMetadata{},
-				rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
+			return nil, nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
 		if header.View >= newestView {
@@ -256,8 +245,7 @@ func (e *Events) GetEventsForBlockIDs(
 		criteria,
 	)
 	if err != nil {
-		return nil, accessmodel.ExecutorMetadata{},
-			fmt.Errorf("failed to get execution result for block %v: %w", newestBlockID, err)
+		return nil, nil, fmt.Errorf("failed to get execution result for block %v: %w", newestBlockID, err)
 	}
 
 	resp, metadata, err := e.provider.Events(

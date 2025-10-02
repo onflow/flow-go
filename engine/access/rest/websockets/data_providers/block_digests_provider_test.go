@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -68,7 +68,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlockDigestsFromStartBlockID",
 					mock.Anything,
@@ -84,7 +84,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlockDigestsFromStartHeight",
 					mock.Anything,
@@ -99,7 +99,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlockDigestsFromLatest",
 					mock.Anything,

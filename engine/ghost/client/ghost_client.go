@@ -108,8 +108,12 @@ func (fmsr *FlowMessageStreamReader) Next() (flow.Identifier, interface{}, error
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("failed to decode event: %w", err)
 	}
+	internal, err := event.ToInternal()
+	if err != nil {
+		return flow.ZeroID, nil, fmt.Errorf("failed to convert event to internal: %w", err)
+	}
 
 	originID := flow.HashToID(msg.GetSenderID())
 
-	return originID, event, nil
+	return originID, internal, nil
 }

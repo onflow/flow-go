@@ -99,12 +99,12 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Params").Return(params, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
-	suite.blocks = new(storagemock.Blocks)
-	suite.headers = new(storagemock.Headers)
-	suite.transactions = new(storagemock.Transactions)
-	suite.collections = new(storagemock.Collections)
-	suite.receipts = new(storagemock.ExecutionReceipts)
-	suite.events = new(storagemock.Events)
+	suite.blocks = storagemock.NewBlocks(suite.T())
+	suite.headers = storagemock.NewHeaders(suite.T())
+	suite.transactions = storagemock.NewTransactions(suite.T())
+	suite.collections = storagemock.NewCollections(suite.T())
+	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
+	suite.events = storagemock.NewEvents(suite.T())
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -171,24 +171,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.snapshot.On("Head").Return(block, nil)
 
 	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
-	suite.executionResultInfoProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResultID: unittest.IdentifierFixture(),
-			ExecutionNodes:    unittest.IdentityListFixture(2).ToSkeleton(),
-		}, nil).
-		Maybe()
-
 	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
-	suite.executionDataSnapshot.On("Events").
-		Return(suite.events, nil).
-		Maybe()
-
 	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
-	suite.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(suite.executionDataSnapshot, nil).
-		Maybe()
 
 	bnd, err := backend.New(backend.Params{
 		State:                       suite.state,
@@ -264,6 +248,8 @@ func (suite *RateLimitTestSuite) TearDownTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
 }
 
+// TestRateLimit runs the RateLimitTestSuite to verify that Access API rate
+// limiting is enforced correctly for both steady-state requests and bursts.
 func TestRateLimit(t *testing.T) {
 	suite.Run(t, new(RateLimitTestSuite))
 }

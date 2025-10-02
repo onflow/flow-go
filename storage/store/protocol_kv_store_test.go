@@ -3,6 +3,7 @@ package store
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,15 +29,14 @@ func TestKeyValueStoreStorage(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := store.BatchStore(lctx, rw, stateID, expected)
-			require.NoError(t, err)
-			return store.BatchIndex(lctx, rw, blockID, stateID)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := store.BatchStore(lctx, rw, stateID, expected)
+				require.NoError(t, err)
+				return store.BatchIndex(lctx, rw, blockID, stateID)
+			})
 		})
 		require.NoError(t, err)
-		defer lctx.Release() // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
 
 		// fetch protocol state by its own ID
 		actual, err := store.ByID(stateID)
@@ -66,18 +66,20 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 			Data:    unittest.RandomBytes(32),
 		}
 
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(lctx, rw, stateID, expected)
+		// Store initial data
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, rw, stateID, expected)
+			})
 		})
 		require.NoError(t, err)
-		defer lctx.Release() // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(lctx, rw, stateID, expected)
+		// Store same data again - should not error
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, rw, stateID, expected)
+			})
 		})
-		// No error when storing same data again
 		require.NoError(t, err)
 
 		// Attempt to store different data with the same stateID
@@ -86,8 +88,10 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 			Data:    unittest.RandomBytes(32),
 		}
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(lctx, rw, stateID, dataDifferent)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, rw, stateID, dataDifferent)
+			})
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 
@@ -97,8 +101,10 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 			Data:    expected.Data,
 		}
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(lctx, rw, stateID, versionDifferent)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, rw, stateID, versionDifferent)
+			})
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
@@ -117,22 +123,28 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 		stateID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
 
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(lctx, rw, blockID, stateID)
-		})
-		require.NoError(t, err)
-		defer lctx.Release() // While still holding the lock, retrieve values; this verifies that reads are not blocked by acquired locks
-
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(lctx, rw, blockID, stateID)
+		// Index initial data
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchIndex(lctx, rw, blockID, stateID)
+			})
 		})
 		require.NoError(t, err)
 
+		// Index same data again - should not error
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchIndex(lctx, rw, blockID, stateID)
+			})
+		})
+		require.NoError(t, err)
+
+		// Attempt to index different stateID with same blockID
 		differentStateID := unittest.IdentifierFixture()
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchIndex(lctx, rw, blockID, differentStateID)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchIndex(lctx, rw, blockID, differentStateID)
+			})
 		})
 		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})

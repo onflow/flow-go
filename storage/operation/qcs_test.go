@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,10 +19,10 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		expected := unittest.QuorumCertificateFixture()
 		lockManager := storage.NewTestingLockManager()
 
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertQuorumCertificate(lctx, rw, expected)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertQuorumCertificate(lctx, rw, expected)
+			})
 		})
 		require.NoError(t, err)
 
@@ -30,21 +31,19 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		err = operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)
 		require.NoError(t, err)
 		assert.Equal(t, expected, &actual)
-		lctx.Release()
 
 		// create a different QC for the same block
 		different := unittest.QuorumCertificateFixture()
 		different.BlockID = expected.BlockID
 
 		// verify that overwriting the prior QC fails with `storage.ErrAlreadyExists`
-		lctx2 := lockManager.NewContext()
-		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertQuorumCertificate(lctx2, rw, different)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertQuorumCertificate(lctx, rw, different)
+			})
 		})
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
-		lctx2.Release()
 
 		// verify that the original QC is still there
 		err = operation.RetrieveQuorumCertificate(db.Reader(), expected.BlockID, &actual)

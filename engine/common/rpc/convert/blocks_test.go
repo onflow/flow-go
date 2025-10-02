@@ -60,3 +60,19 @@ func TestConvertBlockLight(t *testing.T) {
 	assert.Len(t, msg.ExecutionReceiptMetaList, 0)
 	assert.Len(t, msg.ExecutionResultList, 0)
 }
+
+// TestConvertRootBlock tests that converting a root block to and from a protobuf message results in
+// the same block
+func TestConvertRootBlock(t *testing.T) {
+	t.Parallel()
+
+	block := unittest.Block.Genesis(flow.Emulator)
+
+	msg, err := convert.BlockToMessage(block, flow.IdentifierList{})
+	require.NoError(t, err)
+
+	converted, err := convert.MessageToBlock(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, block.ID(), converted.ID())
+}

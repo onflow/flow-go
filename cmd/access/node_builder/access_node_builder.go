@@ -2061,7 +2061,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// handles block-related operations.
 			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
-				builder.FinalizedRootBlock.Height,
+				builder.SealedRootBlock.Height,
 				node.Storage.Headers,
 				broadcaster,
 			)

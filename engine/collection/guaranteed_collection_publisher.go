@@ -1,7 +1,7 @@
 package collection
 
 import (
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 )
 
 // GuaranteedCollectionPublisher defines the interface to send collection guarantees
@@ -11,5 +11,5 @@ import (
 type GuaranteedCollectionPublisher interface {
 	// SubmitCollectionGuarantee adds a guarantee to an internal queue
 	// to be published to consensus nodes.
-	SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee)
+	SubmitCollectionGuarantee(guarantee *messages.CollectionGuarantee)
 }

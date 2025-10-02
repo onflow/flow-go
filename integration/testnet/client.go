@@ -197,7 +197,7 @@ func (c *Client) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, 
 		return nil, nil, err
 	}
 	authNChallenge := hasher.ComputeHash(transactionMessage)
-	authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
+	authNChallengeBase64Url := base64.RawURLEncoding.EncodeToString(authNChallenge)
 	validUserFlag := byte(0x01)
 	validClientDataOrigin := "https://testing.com"
 	rpIDHash := unittest.RandomBytes(32)

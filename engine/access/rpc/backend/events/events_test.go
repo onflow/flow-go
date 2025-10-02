@@ -209,7 +209,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 
 	s.executionDataSnapshot.
 		On("Events").
-		Return(s.events, nil)
+		Return(s.events)
 
 	startHeight := s.blocks[0].Height
 	endHeight := s.sealedHead.Height
@@ -236,7 +236,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	})
 
 	for _, tt := range s.testCases {
-		s.Run(fmt.Sprintf("with local query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+		s.Run(fmt.Sprintf("with local query mode. encoding: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
 			if tt.queryMode != query_mode.IndexQueryModeLocalOnly {
 				return
 			}
@@ -257,7 +257,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			s.assertResponse(response, tt.encoding)
 		})
 
-		s.Run(fmt.Sprintf("with execution node query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+		s.Run(fmt.Sprintf("with execution node query mode. encoding: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
 			if tt.queryMode != query_mode.IndexQueryModeExecutionNodesOnly {
 				return
 			}
@@ -280,7 +280,7 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 			s.assertResponse(response, tt.encoding)
 		})
 
-		s.Run(fmt.Sprintf("with failover query mode. encdoing: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
+		s.Run(fmt.Sprintf("with failover query mode. encoding: %s, query mode: %s", tt.encoding.String(), tt.queryMode), func() {
 			if tt.queryMode != query_mode.IndexQueryModeFailover {
 				return
 			}
@@ -523,7 +523,6 @@ func (s *EventsSuite) defaultBackend(mode query_mode.IndexQueryMode) *Events {
 		),
 		s.executionResultProvider,
 		s.executionStateCache,
-		optimistic_sync.DefaultCriteria,
 	)
 	require.NoError(s.T(), err)
 

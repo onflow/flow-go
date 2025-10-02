@@ -23,6 +23,9 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
+// ENEventProvider retrieves events by querying remote Execution Nodes (ENs).
+// It selects from available executors for a given execution result and
+// aggregates responses, converting them into the Access API format.
 type ENEventProvider struct {
 	log              zerolog.Logger
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
@@ -52,9 +55,9 @@ func (e *ENEventProvider) Events(
 	eventType flow.EventType,
 	encodingVersion entities.EventEncodingVersion,
 	execResultInfo *optimistic_sync.ExecutionResultInfo,
-) (Response, access.ExecutorMetadata, error) {
+) (Response, *access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, access.ExecutorMetadata{}, nil
+		return Response{}, nil, nil
 	}
 
 	blockIDs := make([]flow.Identifier, len(blocks))
@@ -69,13 +72,8 @@ func (e *ENEventProvider) Events(
 
 	resp, node, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return Response{}, access.ExecutorMetadata{},
+		return Response{}, nil,
 			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
-	}
-
-	metadata := access.ExecutorMetadata{
-		ExecutionResultID: execResultInfo.ExecutionResultID,
-		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	// convert execution node api result to access node api result
@@ -86,8 +84,13 @@ func (e *ENEventProvider) Events(
 		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, access.ExecutorMetadata{},
+		return Response{}, nil,
 			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+	}
+
+	metadata := &access.ExecutorMetadata{
+		ExecutionResultID: execResultInfo.ExecutionResultID,
+		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	return Response{
@@ -199,7 +202,7 @@ func verifyAndConvertToAccessEvents(
 }
 
 // orderedExecutors creates an ordered list of executors for the same execution result
-// - respondingExecutor is the executor who returned execution result.
+// - respondingExecutor is the executor who returned an execution result.
 // - executorList is the full list of executors who produced the same execution result.
 func orderedExecutors(respondingExecutor flow.Identifier, executorList flow.IdentifierList) flow.IdentifierList {
 	ordered := make(flow.IdentifierList, 0, len(executorList))
