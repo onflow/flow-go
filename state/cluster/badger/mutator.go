@@ -344,12 +344,12 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 	// follow the same fork as the one we are extending here. Hence, we might apply the transaction de-duplication logic
 	// against blocks that do not belong to our fork. If we erroneously find a duplicated transaction, based on a block
 	// that is not part of our fork, we would be raising an invalid slashing challenge, which would get this node slashed.
-	conflicts, err := m.checkDupeTransactionsInFinalizedAncestry(lctx, txLookup, minRefHeight, maxRefHeight, ctx.finalizedClusterBlock.Height)
+	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(lctx, txLookup, minRefHeight, maxRefHeight, ctx.finalizedClusterBlock.Height)
 	if err != nil {
 		return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
 	}
-	if len(conflicts) > 0 {
-		return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in finalized ancestry (duplicates: %v)", conflicts)
+	if len(duplicateTxIDs) > 0 {
+		return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in finalized ancestry (duplicates: %s)", duplicateTxIDs)
 	}
 
 	return nil
