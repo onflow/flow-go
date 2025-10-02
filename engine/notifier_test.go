@@ -19,7 +19,7 @@ func TestNotifier_PassByValue(t *testing.T) {
 	var sent sync.WaitGroup
 	sent.Add(1)
 	go func(n Notifier) {
-		notifier.Notify()
+		n.Notify()
 		sent.Done()
 	}(notifier)
 	sent.Wait()
@@ -78,9 +78,8 @@ func TestNotifier_ManyNotifications(t *testing.T) {
 	}
 }
 
-// TestNotifier_ManyConsumers spans many worker routines and
-// sends just as many notifications with small delays. We require that
-// all workers eventually get a notification.
+// TestNotifier_ManyConsumers spans many worker routines and sends just as many notifications.
+// We require that all workers eventually get a notification.
 func TestNotifier_ManyConsumers(t *testing.T) {
 	singleTestRun := func(t *testing.T) {
 		t.Parallel()
@@ -138,7 +137,7 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			notifier := NewNotifier()
 
 			producerCount := int32(10) // number of producers
-			producerJobs := int32(10) // number of tasks that each producer will queue up
+			producerJobs := int32(10)  // number of tasks that each producer will queue up
 			pendingWorkQueue := make(chan struct{}, producerCount*producerJobs)
 			consumedWork := atomic.NewInt32(0)
 
