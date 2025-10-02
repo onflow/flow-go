@@ -84,6 +84,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 	}
 
 	storeByBlockID := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
+		// CAUTION: requires [storage.LockInsertBlock] and for the caller to ensure that they are not overwriting existing data.
 		err := operation.IndexEpochProtocolState(lctx, rw.Writer(), blockID, epochProtocolStateEntryID)
 		if err != nil {
 			return fmt.Errorf("could not index EpochProtocolState for block (%x): %w", blockID[:], err)
