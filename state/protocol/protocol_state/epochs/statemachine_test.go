@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -40,6 +42,7 @@ type EpochStateMachineSuite struct {
 	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
 	fallbackPathStateMachineFactory *mock.StateMachineFactoryMethod
 	candidate                       *flow.Header
+	lockManager                     lockctx.Manager
 
 	stateMachine *epochs.EpochStateMachine
 }
@@ -56,6 +59,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.happyPathStateMachine = mock.NewStateMachine(s.T())
 	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
+	s.lockManager = storage.NewTestingLockManager()
 
 	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichEpochStateEntry {
 		return s.parentEpochState
@@ -97,17 +101,20 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 
 	rw := storagemock.NewReaderBatchWriter(s.T())
 
-	s.epochStateDB.On("BatchIndex", mocks.Anything, rw, s.candidate.ID(), s.parentEpochState.ID()).Return(nil).Once()
-	s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
+	// Create a proper lock context proof for the BatchIndex operation
+	err = unittest.WithLock(s.T(), s.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		s.epochStateDB.On("BatchIndex", lctx, rw, s.candidate.ID(), s.parentEpochState.ID()).Return(nil).Once()
+		s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
 
-	dbUpdates, err := s.stateMachine.Build()
-	require.NoError(s.T(), err)
+		dbUpdates, err := s.stateMachine.Build()
+		require.NoError(s.T(), err)
 
-	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
-	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
-	// operations are deferred only because block ID is not known yet.
-	blockID := s.candidate.ID()
-	err = dbUpdates.Execute(nil, blockID, rw)
+		// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
+		// which is asserted by the testify framework. The lock context proof is passed to verify that the BatchIndex
+		// operation receives the proper lock context as required by the storage layer.
+		blockID := s.candidate.ID()
+		return dbUpdates.Execute(lctx, blockID, rw)
+	})
 	require.NoError(s.T(), err)
 }
 
@@ -139,19 +146,22 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	err := s.stateMachine.EvolveState([]flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()})
 	require.NoError(s.T(), err)
 
-	// prepare a DB update for epoch state
-	s.epochStateDB.On("BatchIndex", mocks.Anything, rw, s.candidate.ID(), updatedStateID).Return(nil).Once()
-	s.epochStateDB.On("BatchStore", w, updatedStateID, updatedState.MinEpochStateEntry).Return(nil).Once()
-	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
+	// Create a proper lock context proof for the BatchIndex operation
+	err = unittest.WithLock(s.T(), s.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		// prepare a DB update for epoch state
+		s.epochStateDB.On("BatchIndex", lctx, rw, s.candidate.ID(), updatedStateID).Return(nil).Once()
+		s.epochStateDB.On("BatchStore", w, updatedStateID, updatedState.MinEpochStateEntry).Return(nil).Once()
+		s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
-	dbUpdates, err := s.stateMachine.Build()
-	require.NoError(s.T(), err)
+		dbUpdates, err := s.stateMachine.Build()
+		require.NoError(s.T(), err)
 
-	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
-	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
-	// operations are deferred only because block ID is not known yet.
-	blockID := s.candidate.ID()
-	err = dbUpdates.Execute(nil, blockID, rw)
+		// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
+		// which is asserted by the testify framework. The lock context proof is passed to verify that the BatchIndex
+		// operation receives the proper lock context as required by the storage layer.
+		blockID := s.candidate.ID()
+		return dbUpdates.Execute(lctx, blockID, rw)
+	})
 	require.NoError(s.T(), err)
 }
 
@@ -532,7 +542,15 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
 	require.NoError(s.T(), err)
 
-	s.epochStateDB.On("BatchIndex", mocks.Anything, mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
+	// Create a proper lock context proof for the BatchIndex operation
+	var lockCtx lockctx.Proof
+	err = unittest.WithLock(s.T(), s.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		lockCtx = lctx
+		return nil
+	})
+	require.NoError(s.T(), err)
+
+	s.epochStateDB.On("BatchIndex", lockCtx, mocks.Anything, s.candidate.ID(), mocks.Anything).Return(nil).Once()
 
 	expectedEpochState := &flow.MinEpochStateEntry{
 		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
@@ -552,9 +570,9 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
 
 	// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
-	// which is asserted by the testify framework. Passing nil lockctx proof because no operations require lock;
-	// operations are deferred only because block ID is not known yet
+	// which is asserted by the testify framework. The lock context proof is passed to verify that the BatchIndex
+	// operation receives the proper lock context as required by the storage layer.
 	blockID := s.candidate.ID()
-	err = dbOps.Execute(nil, blockID, rw)
+	err = dbOps.Execute(lockCtx, blockID, rw)
 	require.NoError(s.T(), err)
 }
