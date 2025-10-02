@@ -27,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -261,6 +263,8 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 			subscription.DefaultSendBufferSize,
 		),
 		s.executionDataTracker,
+		osyncmock.NewExecutionResultInfoProvider(s.T()),
+		osyncmock.NewExecutionStateCache(s.T()),
 	)
 	require.NoError(s.T(), err)
 
@@ -340,7 +344,8 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
-		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		res, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), optimistic_sync.Criteria{})
+		assert.NotNil(s.T(), metadata)
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
@@ -350,8 +355,9 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
-		execDataRes, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), optimistic_sync.Criteria{})
 		assert.Nil(s.T(), execDataRes)
+		assert.NotNil(s.T(), metadata)
 		assert.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 }
