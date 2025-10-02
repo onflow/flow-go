@@ -1207,7 +1207,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			)
 
 			return nil
-		}).Module("execution state cache", func(node *cmd.NodeConfig) error {
+		}).
+		Module("execution state cache", func(node *cmd.NodeConfig) error {
 		config := builder.rpcConf
 		backendConfig := config.BackendConfig
 
