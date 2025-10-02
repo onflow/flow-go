@@ -89,7 +89,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // write has been committed.
 //
 // Expected error returns during normal operations:
-// - [storage.ErrAlreadyExist] if a _different_ KV store for the given stateID has already been persisted
+// - [storage.ErrAlreadyExist] if a KV store with the given ID has already been stored
 func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return s.cache.PutWithLockTx(lctx, rw, stateID, data)
@@ -99,9 +99,6 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 // BatchIndex appends the following operation to the provided write batch:
 // we extend the map from `blockID` to `stateID`, where `blockID` references the
 // block that _proposes_ updated key-value store.
-// BatchIndex is idempotent, i.e. it accepts repeated calls with the same pairs of (blockID , stateID).
-// Per protocol convention, the block references the `stateID`. As the `blockID` is a collision-resistant hash,
-// for the same `blockID`, BatchIndex will reject changing the data.
 // Protocol convention:
 //   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
 //     the KV store changes if we seal some execution results emitting specific service events.
@@ -114,7 +111,7 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 // database write has been committed.
 //
 // Expected error returns during normal operations:
-// - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
+// - [storage.ErrAlready] if a KV store for the given blockID has already been indexed.
 func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
 	return s.byBlockIdCache.PutWithLockTx(lctx, rw, blockID, stateID)
 }

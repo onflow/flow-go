@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -11,10 +10,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertProtocolKVStore inserts a protocol KV store by ID.
+// InsertProtocolKVStore inserts a protocol KV store by protocol kv store ID.
 // Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
-//   - generic error in case of unexpected failure from the database layer or encoding failure.
+//   - [storage.ErrAlreadyExists] if the key already exists in the database.
 func InsertProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, protocolKVStoreID flow.Identifier, kvStore *flow.PSKeyValueStoreData) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -39,36 +37,26 @@ func RetrieveProtocolKVStore(r storage.Reader, protocolKVStoreID flow.Identifier
 	return RetrieveByKey(r, MakePrefix(codeProtocolKVStore, protocolKVStoreID), kvStore)
 }
 
-// IndexProtocolKVStore indexes a protocol KV store by block ID. The function is idempotent, i.e. it accepts
-// repeated calls with the same pairs of (blockID, protocolKVStoreID).
+// IndexProtocolKVStore indexes a protocol KV store by block ID.
 //
 // CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent
 // database write. Hence, we require the caller to acquire [storage.LockInsertBlock] and hold it until the
 // database write has been committed.
 //
 // Expected error returns during normal operations:
-//   - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
+//   - [storage.ErrAlreadyExists] if a KV store for the given blockID has already been indexed
 func IndexProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, protocolKVStoreID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
 	key := MakePrefix(codeProtocolKVStoreByBlockID, blockID)
-	var existing flow.Identifier
-	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
-	if err == nil {
-		// no-op if the *same* stateID is already indexed for the blockID
-		if existing == protocolKVStoreID {
-			return nil
-		}
-
-		return fmt.Errorf("for block id %x, a kv-store snapshot (%v) is already persisted which is different than the given one (%v): %w",
-			blockID[:],
-			existing, protocolKVStoreID,
-			storage.ErrDataMismatch)
-	}
-	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
+	exists, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
 		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], irrecoverable.NewException(err))
+	}
+	if exists {
+		return fmt.Errorf("a kv-store snapshot for block id (%x) already exists: %w", blockID[:], storage.ErrAlreadyExists)
 	}
 
 	return UpsertByKey(rw.Writer(), key, protocolKVStoreID)

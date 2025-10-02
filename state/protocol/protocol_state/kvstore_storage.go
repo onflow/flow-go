@@ -19,16 +19,13 @@ type ProtocolKVStore interface {
 	// BatchStore adds the KV-store snapshot in the database using the given ID as key. Per convention, all
 	// implementations of [protocol.KVStoreReader] should be able to successfully encode their state into a
 	// data blob. If the encoding fails, an error is returned.
-	// BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
-	// Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
-	// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
 	//
 	// CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent database
 	// write. Hence, we require the caller to acquire the [storage.LockInsertBlock] lock and hold it until the database
 	// write has been committed.
 	//
 	// Expected error returns during normal operations:
-	// - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
+	// - [storage.ErrAlreadyExists] if a KV store with the given ID has already been stored
 	BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
 
 	// BatchIndex writes the blockID->stateID index to the input write batch.
@@ -46,7 +43,7 @@ type ProtocolKVStore interface {
 	// database write has been committed.
 	//
 	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
+	//   - [storage.ErrAlreadyExists] if a KV store for the given blockID has already been indexed.
 	BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
