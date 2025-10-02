@@ -58,10 +58,10 @@ func constructRootEpochEvents(
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.ThresholdKeySet,
 	dkgIndexMap flow.DKGIndexMap,
-	csprg random.Rand,
+	rng random.Rand,
 ) (*flow.EpochSetup, *flow.EpochCommit, error) {
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	csprg.Read(randomSource)
+	rng.Read(randomSource)
 	epochSetup, err := flow.NewEpochSetup(
 		flow.UntrustedEpochSetup{
 			Counter:            flagEpochCounter,
