@@ -18,8 +18,8 @@ func TestNotifier_PassByValue(t *testing.T) {
 
 	var sent sync.WaitGroup
 	sent.Add(1)
-	go func(n Notifier) {
-		n.Notify()
+	go func(passedByValue Notifier) {
+		passedByValue.Notify()
 		sent.Done()
 	}(notifier)
 	sent.Wait()
