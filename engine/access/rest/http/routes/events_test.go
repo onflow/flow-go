@@ -50,12 +50,8 @@ func (s *GetEventsSuite) SetupTest() {
 	}
 }
 
-func (s *GetEventsSuite) SetupSubTest() {
-	s.backend = mock.NewAPI(s.T())
-}
-
 func (s *GetEventsSuite) TestGetEvents_GetEventsForBlockIDs() {
-	s.Run("for n blocks", func() {
+	s.Run("for 3 blocks", func() {
 		expectedEvents := s.events[0:2]
 
 		s.backend.
@@ -72,13 +68,10 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForBlockIDs() {
 
 		request := buildRequest(
 			s.T(),
-			s.eventType,
-			"",
-			"",
-			[]string{s.events[0].BlockID.String(), s.events[1].BlockID.String()},
-			"",
-			[]string{},
-			"",
+			requestArgs{
+				eventType: s.eventType,
+				blockIDs:  []string{s.events[0].BlockID.String(), s.events[1].BlockID.String()},
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -105,13 +98,10 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForBlockIDs() {
 
 		request := buildRequest(
 			s.T(),
-			s.eventType,
-			"",
-			"",
-			[]string{s.events[0].BlockID.String()}, // pass any block
-			"",
-			[]string{},
-			"",
+			requestArgs{
+				eventType: s.eventType,
+				blockIDs:  []string{s.events[0].BlockID.String()}, // pass any block
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -133,13 +123,10 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForBlockIDs() {
 
 		request := buildRequest(
 			s.T(),
-			s.eventType,
-			"",
-			"",
-			[]string{s.events[0].BlockID.String()},
-			"",
-			[]string{},
-			"",
+			requestArgs{
+				eventType: s.eventType,
+				blockIDs:  []string{s.events[0].BlockID.String()},
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -164,13 +151,11 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForHeightRange() {
 
 		request := buildRequest(
 			s.T(),
-			s.eventType,
-			fmt.Sprint(s.events[0].BlockHeight),
-			fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
-			[]string{},
-			"",
-			[]string{},
-			"",
+			requestArgs{
+				eventType: s.eventType,
+				start:     fmt.Sprint(s.events[0].BlockHeight),
+				end:       fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -197,13 +182,11 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForHeightRange() {
 
 		request := buildRequest(
 			s.T(),
-			s.eventType,
-			fmt.Sprint(s.events[0].BlockHeight),
-			fmt.Sprint(s.events[len(s.events)-1].BlockHeight+5),
-			[]string{},
-			"",
-			[]string{},
-			"",
+			requestArgs{
+				eventType: s.eventType,
+				start:     fmt.Sprint(s.events[0].BlockHeight),
+				end:       fmt.Sprint(s.events[len(s.events)-1].BlockHeight + 5),
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -216,136 +199,132 @@ func (s *GetEventsSuite) TestGetEvents_GetEventsForHeightRange() {
 }
 
 func (s *GetEventsSuite) TestGetEvents_InvalidRequest() {
-	s.T().Run("all fields missing", func(t *testing.T) {
+	s.Run("all fields missing", func() {
 		request := buildRequest(
-			t,
-			"",
-			"",
-			"",
-			nil,
-			"2",
-			[]string{},
-			"true",
+			s.T(),
+			requestArgs{
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, nil)
-		require.Equal(t, http.StatusBadRequest, responseRecorder.Code)
+		require.Equal(s.T(), http.StatusBadRequest, responseRecorder.Code)
 
 		expectedResponse := `{"code":400,"message":"must provide either block IDs or start and end height range"}`
 		actualResponse := responseRecorder.Body.String()
-		require.JSONEq(t, expectedResponse, actualResponse)
+		require.JSONEq(s.T(), expectedResponse, actualResponse)
 	})
 
-	s.T().Run("query event type missing", func(t *testing.T) {
+	s.Run("query event type missing", func() {
 		request := buildRequest(
-			t,
-			"",
-			"",
-			"",
-			[]string{unittest.IdentifierFixture().String()},
-			"2",
-			[]string{},
-			"true",
+			s.T(),
+			requestArgs{
+				blockIDs:                []string{unittest.IdentifierFixture().String()},
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, nil)
-		require.Equal(t, http.StatusBadRequest, responseRecorder.Code)
+		require.Equal(s.T(), http.StatusBadRequest, responseRecorder.Code)
 
 		expectedResponse := `{"code":400,"message":"event type must be provided"}`
 		actualResponse := responseRecorder.Body.String()
-		require.JSONEq(t, expectedResponse, actualResponse)
+		require.JSONEq(s.T(), expectedResponse, actualResponse)
 	})
 
-	s.T().Run("end height missing", func(t *testing.T) {
+	s.Run("end height missing", func() {
 		request := buildRequest(
-			t,
-			s.eventType,
-			"100",
-			"",
-			nil,
-			"2",
-			[]string{},
-			"true",
+			s.T(),
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   "100",
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, nil)
-		require.Equal(t, http.StatusBadRequest, responseRecorder.Code)
+		require.Equal(s.T(), http.StatusBadRequest, responseRecorder.Code)
 
 		expectedResponse := `{"code":400,"message":"must provide either block IDs or start and end height range"}`
 		actualResponse := responseRecorder.Body.String()
-		require.JSONEq(t, expectedResponse, actualResponse)
+		require.JSONEq(s.T(), expectedResponse, actualResponse)
 	})
 
-	s.T().Run("start height greater than end height", func(t *testing.T) {
+	s.Run("start height greater than end height", func() {
 		request := buildRequest(
-			t,
-			s.eventType,
-			"100",
-			"50",
-			nil,
-			"2",
-			[]string{},
-			"true",
+			s.T(),
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   "100",
+				end:                     "50",
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, nil)
-		require.Equal(t, http.StatusBadRequest, responseRecorder.Code)
+		require.Equal(s.T(), http.StatusBadRequest, responseRecorder.Code)
 
 		expectedResponse := `{"code":400,"message":"start height must be less than or equal to end height"}`
 		actualResponse := responseRecorder.Body.String()
-		require.JSONEq(t, expectedResponse, actualResponse)
+		require.JSONEq(s.T(), expectedResponse, actualResponse)
 	})
 
-	s.T().Run("too big interval", func(t *testing.T) {
+	s.Run("too big interval", func() {
+		s.T()
 		request := buildRequest(
-			t,
-			s.eventType,
-			"0",
-			"5000",
-			nil,
-			"2",
-			[]string{},
-			"true",
+			s.T(),
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   "0",
+				end:                     "5000",
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, nil)
-		require.Equal(t, http.StatusBadRequest, responseRecorder.Code)
+		require.Equal(s.T(), http.StatusBadRequest, responseRecorder.Code)
 
 		expectedResponse := `{"code":400,"message":"height range 5000 exceeds maximum allowed of 250"}`
 		actualResponse := responseRecorder.Body.String()
-		require.JSONEq(t, expectedResponse, actualResponse)
+		require.JSONEq(s.T(), expectedResponse, actualResponse)
 	})
 
-	s.T().Run("all fields provided", func(t *testing.T) {
+	s.Run("all fields provided", func() {
 		request := buildRequest(
-			t,
-			s.eventType,
-			"100",
-			"120",
-			[]string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"},
-			"2",
-			[]string{},
-			"true",
+			s.T(),
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   "100",
+				end:                     "120",
+				blockIDs:                []string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"},
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, nil)
-		require.Equal(t, http.StatusBadRequest, responseRecorder.Code)
+		require.Equal(s.T(), http.StatusBadRequest, responseRecorder.Code)
 
 		expectedResponse := `{"code":400,"message":"can only provide either block IDs or start and end height range"}`
 		actualResponse := responseRecorder.Body.String()
-		require.JSONEq(t, expectedResponse, actualResponse)
+		require.JSONEq(s.T(), expectedResponse, actualResponse)
 	})
 
 	s.T().Run("invalid height format", func(t *testing.T) {
 		request := buildRequest(
 			t,
-			s.eventType,
-			"foo",
-			"120",
-			nil,
-			"2",
-			[]string{},
-			"true",
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   "foo",
+				end:                     "120",
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, nil)
@@ -366,13 +345,13 @@ func (s *GetEventsSuite) TestGetEvents_InvalidRequest() {
 
 		request := buildRequest(
 			t,
-			s.eventType,
-			fmt.Sprint(latestBlock.Height+1),
-			"sealed",
-			nil,
-			"2",
-			[]string{},
-			"true",
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   fmt.Sprint(latestBlock.Height + 1),
+				end:                     "sealed",
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, backend)
@@ -400,13 +379,11 @@ func (s *GetEventsSuite) TestGetEvents_ParseExecutionState() {
 	s.T().Run("empty execution state query", func(t *testing.T) {
 		request := buildRequest(
 			t,
-			s.eventType,
-			fmt.Sprint(s.events[0].BlockHeight),
-			fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
-			[]string{},
-			"",
-			[]string{},
-			"",
+			requestArgs{
+				eventType: s.eventType,
+				start:     fmt.Sprint(s.events[0].BlockHeight),
+				end:       fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -420,13 +397,13 @@ func (s *GetEventsSuite) TestGetEvents_ParseExecutionState() {
 	s.T().Run("empty agreeing executors count", func(t *testing.T) {
 		request := buildRequest(
 			t,
-			s.eventType,
-			fmt.Sprint(s.events[0].BlockHeight),
-			fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
-			[]string{},
-			"",
-			unittest.IdentifierListFixture(2).Strings(),
-			"true",
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   fmt.Sprint(s.events[0].BlockHeight),
+				end:                     fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
+				requiredExecutors:       unittest.IdentifierListFixture(2).Strings(),
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -440,13 +417,13 @@ func (s *GetEventsSuite) TestGetEvents_ParseExecutionState() {
 	s.T().Run("empty required executors", func(t *testing.T) {
 		request := buildRequest(
 			t,
-			s.eventType,
-			fmt.Sprint(s.events[0].BlockHeight),
-			fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
-			[]string{},
-			"2",
-			[]string{},
-			"true",
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   fmt.Sprint(s.events[0].BlockHeight),
+				end:                     fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
+				agreeingExecutorsCount:  "2",
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -460,13 +437,13 @@ func (s *GetEventsSuite) TestGetEvents_ParseExecutionState() {
 	s.T().Run("empty include executor metadata", func(t *testing.T) {
 		request := buildRequest(
 			t,
-			s.eventType,
-			fmt.Sprint(s.events[0].BlockHeight),
-			fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
-			[]string{},
-			"2",
-			unittest.IdentifierListFixture(2).Strings(),
-			"",
+			requestArgs{
+				eventType:              s.eventType,
+				start:                  fmt.Sprint(s.events[0].BlockHeight),
+				end:                    fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
+				agreeingExecutorsCount: "2",
+				requiredExecutors:      unittest.IdentifierListFixture(2).Strings(),
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -480,13 +457,14 @@ func (s *GetEventsSuite) TestGetEvents_ParseExecutionState() {
 	s.T().Run("agreeing executors count equals 0", func(t *testing.T) {
 		request := buildRequest(
 			t,
-			s.eventType,
-			fmt.Sprint(s.events[0].BlockHeight),
-			fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
-			[]string{},
-			"0",
-			unittest.IdentifierListFixture(2).Strings(),
-			"true",
+			requestArgs{
+				eventType:               s.eventType,
+				start:                   fmt.Sprint(s.events[0].BlockHeight),
+				end:                     fmt.Sprint(s.events[len(s.events)-1].BlockHeight),
+				agreeingExecutorsCount:  "0",
+				requiredExecutors:       unittest.IdentifierListFixture(2).Strings(),
+				includeExecutorMetadata: "true",
+			},
 		)
 
 		responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -516,13 +494,13 @@ func (s *GetEventsSuite) TestGetEvents_GetAtSealedBlock() {
 
 	request := buildRequest(
 		s.T(),
-		s.eventType,
-		fmt.Sprint(s.events[0].BlockHeight),
-		"sealed",
-		[]string{},
-		"2",
-		[]string{},
-		"true",
+		requestArgs{
+			eventType:               s.eventType,
+			start:                   fmt.Sprint(s.events[0].BlockHeight),
+			end:                     "sealed",
+			agreeingExecutorsCount:  "2",
+			includeExecutorMetadata: "true",
+		},
 	)
 
 	responseRecorder := router.ExecuteRequest(request, s.backend)
@@ -533,39 +511,43 @@ func (s *GetEventsSuite) TestGetEvents_GetAtSealedBlock() {
 	require.JSONEq(s.T(), expectedResponse, actualResponse)
 }
 
+type requestArgs struct {
+	eventType               string
+	start                   string
+	end                     string
+	blockIDs                []string
+	agreeingExecutorsCount  string
+	requiredExecutors       []string
+	includeExecutorMetadata string
+}
+
 func buildRequest(
 	t *testing.T,
-	eventType string,
-	start string,
-	end string,
-	blockIDs []string,
-	agreeingExecutorsCount string,
-	requiredExecutors []string,
-	includeExecutorMetadata string,
+	args requestArgs,
 ) *http.Request {
 	u, _ := url.Parse("/v1/events")
 	q := u.Query()
 
-	if len(blockIDs) > 0 {
-		q.Add(routes.BlockQueryParam, strings.Join(blockIDs, ","))
+	if len(args.blockIDs) > 0 {
+		q.Add(routes.BlockQueryParam, strings.Join(args.blockIDs, ","))
 	}
 
-	if start != "" && end != "" {
-		q.Add(router.StartHeightQueryParam, start)
-		q.Add(router.EndHeightQueryParam, end)
+	if args.start != "" && args.end != "" {
+		q.Add(router.StartHeightQueryParam, args.start)
+		q.Add(router.EndHeightQueryParam, args.end)
 	}
 
-	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+	q.Add(router.AgreeingExecutorsCountQueryParam, args.agreeingExecutorsCount)
 
-	if len(requiredExecutors) > 0 {
-		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	if len(args.requiredExecutors) > 0 {
+		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(args.requiredExecutors, ","))
 	}
 
-	if len(includeExecutorMetadata) > 0 {
-		q.Add(router.IncludeExecutorMetadataQueryParam, includeExecutorMetadata)
+	if len(args.includeExecutorMetadata) > 0 {
+		q.Add(router.IncludeExecutorMetadataQueryParam, args.includeExecutorMetadata)
 	}
 
-	q.Add(routes.EventTypeQuery, eventType)
+	q.Add(routes.EventTypeQuery, args.eventType)
 
 	u.RawQuery = q.Encode()
 
