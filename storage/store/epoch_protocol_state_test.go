@@ -3,6 +3,7 @@ package store
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +17,7 @@ import (
 
 // TestProtocolStateStorage tests if the protocol state is sd, retrieved and indexed correctly
 func TestProtocolStateStorage(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 
@@ -28,26 +30,27 @@ func TestProtocolStateStorage(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// store epoch events to be able to retrieve them later
-			err := setups.BatchStore(rw, expected.PreviousEpochSetup)
-			require.NoError(t, err)
-			err = setups.BatchStore(rw, expected.CurrentEpochSetup)
-			require.NoError(t, err)
-			err = setups.BatchStore(rw, expected.NextEpochSetup)
-			require.NoError(t, err)
-			err = commits.BatchStore(rw, expected.PreviousEpochCommit)
-			require.NoError(t, err)
-			err = commits.BatchStore(rw, expected.CurrentEpochCommit)
-			require.NoError(t, err)
-			err = commits.BatchStore(rw, expected.NextEpochCommit)
-			require.NoError(t, err)
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// store epoch events to be able to retrieve them later
+				err := setups.BatchStore(rw, expected.PreviousEpochSetup)
+				require.NoError(t, err)
+				err = setups.BatchStore(rw, expected.CurrentEpochSetup)
+				require.NoError(t, err)
+				err = setups.BatchStore(rw, expected.NextEpochSetup)
+				require.NoError(t, err)
+				err = commits.BatchStore(rw, expected.PreviousEpochCommit)
+				require.NoError(t, err)
+				err = commits.BatchStore(rw, expected.CurrentEpochCommit)
+				require.NoError(t, err)
+				err = commits.BatchStore(rw, expected.NextEpochCommit)
+				require.NoError(t, err)
 
-			err = s.BatchStore(rw.Writer(), protocolStateID, expected.MinEpochStateEntry)
-			require.NoError(t, err)
-			return s.BatchIndex(rw, blockID, protocolStateID)
-		})
-		require.NoError(t, err)
+				err = s.BatchStore(rw.Writer(), protocolStateID, expected.MinEpochStateEntry)
+				require.NoError(t, err)
+				return s.BatchIndex(lctx, rw, blockID, protocolStateID)
+			})
+		}))
 
 		// fetch protocol state
 		actual, err := s.ByID(protocolStateID)
@@ -146,6 +149,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 // TestProtocolStateRootSnapshot tests that storing and retrieving root protocol state (in case of bootstrap) works as expected.
 // Specifically, this means that no prior epoch exists (situation after a spork) from the perspective of the freshly-sporked network.
 func TestProtocolStateRootSnapshot(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 
@@ -158,18 +162,19 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// store protocol state and auxiliary info
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// store epoch events to be able to retrieve them later
-			err := setups.BatchStore(rw, expected.CurrentEpochSetup)
-			require.NoError(t, err)
-			err = commits.BatchStore(rw, expected.CurrentEpochCommit)
-			require.NoError(t, err)
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// store epoch events to be able to retrieve them later
+				err := setups.BatchStore(rw, expected.CurrentEpochSetup)
+				require.NoError(t, err)
+				err = commits.BatchStore(rw, expected.CurrentEpochCommit)
+				require.NoError(t, err)
 
-			err = s.BatchStore(rw.Writer(), protocolStateID, expected.MinEpochStateEntry)
-			require.NoError(t, err)
-			return s.BatchIndex(rw, blockID, protocolStateID)
-		})
-		require.NoError(t, err)
+				err = s.BatchStore(rw.Writer(), protocolStateID, expected.MinEpochStateEntry)
+				require.NoError(t, err)
+				return s.BatchIndex(lctx, rw, blockID, protocolStateID)
+			})
+		}))
 
 		// fetch protocol state
 		actual, err := s.ByID(protocolStateID)

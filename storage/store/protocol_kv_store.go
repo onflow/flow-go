@@ -96,22 +96,29 @@ func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchW
 	})
 }
 
-// BatchIndex appends the following operation to the provided write batch:
-// we extend the map from `blockID` to `stateID`, where `blockID` references the
-// block that _proposes_ updated key-value store.
+// BatchIndex persists the specific map entry in the node's database.
+// In a nutshell, we want to maintain a map from `blockID` to `epochStateEntry`, where `blockID` references the
+// block that _proposes_ the referenced epoch protocol state entry.
 // Protocol convention:
-//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
-//     the KV store changes if we seal some execution results emitting specific service events.
-//   - For the key `blockID`, we use the identity of block B which _proposes_ this updated KV store.
-//   - IMPORTANT: The updated state requires confirmation by a QC and will only become active at the child block,
+//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
+//     the protocol state changes if we seal some execution results emitting service events.
+//   - For the key `blockID`, we use the identity of block B which _proposes_ this Protocol State. As value,
+//     the hash of the resulting protocol state at the end of processing B is to be used.
+//   - IMPORTANT: The protocol state requires confirmation by a QC and will only become active at the child block,
 //     _after_ validating the QC.
 //
-// CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent
-// database write. Hence, we require the caller to acquire [storage.LockInsertBlock] and hold it until the
-// database write has been committed.
+// CAUTION:
+//   - The caller must acquire the lock [storage.LockInsertBlock] and hold it until the database write has been committed.
+//   - OVERWRITES existing data (potential for data corruption):
+//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
+//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
+//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
+//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
+//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY with this write operation.
 //
-// Expected error returns during normal operations:
-// - [storage.ErrAlready] if a KV store for the given blockID has already been indexed.
+// Expected errors during normal operations:
+// - [storage.ErrAlreadyExist] if a KV store for the given blockID has already been indexed.
 func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
 	return s.byBlockIdCache.PutWithLockTx(lctx, rw, blockID, stateID)
 }
