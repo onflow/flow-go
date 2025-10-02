@@ -26,7 +26,13 @@ func RetrieveProtocolKVStore(r storage.Reader, protocolKVStoreID flow.Identifier
 	return RetrieveByKey(r, MakePrefix(codeProtocolKVStore, protocolKVStoreID), kvStore)
 }
 
-// IndexProtocolKVStore indexes a protocol KV store by block ID.
+// IndexProtocolKVStore indexes a protocol KV store by block ID. The function is idempotent, i.e. it accepts
+// repeated calls with the same pairs of (blockID, protocolKVStoreID).
+//
+// CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent
+// database write. Hence, we require the caller to acquire [storage.LockInsertBlock] and hold it until the
+// database write has been committed.
+//
 // Expected error returns during normal operations:
 //   - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
 func IndexProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, protocolKVStoreID flow.Identifier) error {
