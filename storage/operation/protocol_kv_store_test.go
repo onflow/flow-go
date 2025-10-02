@@ -180,6 +180,45 @@ func TestIndexProtocolKVStore_MissingLock(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), storage.LockInsertBlock)
+	})
+}
 
+// TestInsertProtocolKVStore_WrongLock tests that InsertProtocolKVStore fails when holding wrong locks.
+func TestInsertProtocolKVStore_WrongLock(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		expected := &flow.PSKeyValueStoreData{
+			Version: 2,
+			Data:    unittest.RandomBytes(32),
+		}
+
+		kvStoreStateID := unittest.IdentifierFixture()
+
+		// Test with LockFinalizeBlock (wrong lock)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, expected)
+			})
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), storage.LockInsertBlock)
+	})
+}
+
+// TestIndexProtocolKVStore_WrongLock tests that IndexProtocolKVStore fails when holding wrong locks.
+func TestIndexProtocolKVStore_WrongLock(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		kvStoreStateID := unittest.IdentifierFixture()
+		blockID := unittest.IdentifierFixture()
+
+		// Test with LockFinalizeBlock (wrong lock)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexProtocolKVStore(lctx, rw, blockID, kvStoreStateID)
+			})
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), storage.LockInsertBlock)
 	})
 }
