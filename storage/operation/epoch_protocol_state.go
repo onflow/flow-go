@@ -19,7 +19,6 @@ func InsertEpochProtocolState(w storage.Writer, entryID flow.Identifier, entry *
 // RetrieveEpochProtocolState retrieves an epoch protocol state entry by ID.
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
-//   - generic error in case of unexpected failure from the database layer
 func RetrieveEpochProtocolState(r storage.Reader, entryID flow.Identifier, entry *flow.MinEpochStateEntry) error {
 	return RetrieveByKey(r, MakePrefix(codeEpochProtocolState, entryID), entry)
 }
@@ -36,8 +35,7 @@ func RetrieveEpochProtocolState(r storage.Reader, entryID flow.Identifier, entry
 //     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
 //     ATOMICALLY with this write operation.
 //
-// Error returns:
-//   - generic error in case of unexpected failure from the database layer or encoding failure.
+// No error returns are expected during normal operation.
 func IndexEpochProtocolState(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
@@ -49,7 +47,6 @@ func IndexEpochProtocolState(lctx lockctx.Proof, w storage.Writer, blockID flow.
 // LookupEpochProtocolState finds an epoch protocol state entry ID by block ID.
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
-//   - generic error in case of unexpected failure from the database layer
 func LookupEpochProtocolState(r storage.Reader, blockID flow.Identifier, epochProtocolStateEntryID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeEpochProtocolStateByBlockID, blockID), epochProtocolStateEntryID)
 }
