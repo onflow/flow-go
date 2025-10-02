@@ -46,14 +46,22 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 ) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error) {
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for block %v: %w", blockID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, status.Errorf(codes.NotFound, "could not find execution result info: %v", err)
+		}
+
+		return nil, nil, rpc.ConvertError(err, "could not get execution result", codes.Internal)
 	}
 
 	executionResultID := execResultInfo.ExecutionResultID
 	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, nil,
-			fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, status.Errorf(codes.NotFound, "could not find snapshot for execution result %s: %v", executionResultID, err)
+		}
+
+		return nil, nil, rpc.ConvertError(err, "failed to get snapshot for execution result", codes.Internal)
+
 	}
 
 	execDataCache := snapshot.ExecutionData()
