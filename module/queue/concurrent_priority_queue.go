@@ -13,7 +13,7 @@ import (
 type ConcurrentPriorityQueue[T any] struct {
 	queue              PriorityQueue[T]
 	smallerValuesFirst bool
-	notifier           engine.Notifier
+	trapdoor           *engine.Trapdoor
 	mu                 sync.RWMutex
 }
 
@@ -23,7 +23,7 @@ func NewConcurrentPriorityQueue[T any](smallerValuesFirst bool) *ConcurrentPrior
 	return &ConcurrentPriorityQueue[T]{
 		queue:              PriorityQueue[T]{},
 		smallerValuesFirst: smallerValuesFirst,
-		notifier:           engine.NewNotifier(),
+		trapdoor:           engine.NewTrapdoor(),
 	}
 }
 
@@ -49,7 +49,7 @@ func (mq *ConcurrentPriorityQueue[T]) Push(item T, priority uint64) {
 
 	heap.Push(&mq.queue, NewPriorityQueueItem(item, priority))
 
-	mq.notifier.Notify()
+	mq.trapdoor.Activate()
 }
 
 // Pop removes and immediately returns the highest priority item from the queue.
@@ -71,5 +71,5 @@ func (mq *ConcurrentPriorityQueue[T]) Pop() (T, bool) {
 // Channel returns a signal channel that receives a signal when an item is inserted.
 // This allows consumers to be notified of new items without polling.
 func (mq *ConcurrentPriorityQueue[T]) Channel() <-chan struct{} {
-	return mq.notifier.Channel()
+	return mq.trapdoor.Channel()
 }
