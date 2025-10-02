@@ -109,9 +109,10 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 		dbUpdates, err := s.stateMachine.Build()
 		require.NoError(s.T(), err)
 
-		// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
-		// which is asserted by the testify framework. The lock context proof is passed to verify that the BatchIndex
-		// operation receives the proper lock context as required by the storage layer.
+		// Storage operations are deferred, because block ID is not known when the block is newly constructed. Only at the
+		// end after the block is fully constructed, its ID can be computed. We emulate this step here to verify that the
+		// deferred `dbOps` have been correctly constructed. Thereby, the expected mock methods should be called,
+		// which is asserted by the testify framework.
 		blockID := s.candidate.ID()
 		return dbUpdates.Execute(lctx, blockID, rw)
 	})
@@ -563,9 +564,10 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 		rw := storagemock.NewReaderBatchWriter(s.T())
 		rw.On("Writer").Return(w).Once() // called by epochStateDB.BatchStore
 
-		// Provide the blockID and execute the resulting `dbUpdates`. Thereby, the expected mock methods should be called,
-		// which is asserted by the testify framework. The lock context proof is passed to verify that the BatchIndex
-		// operation receives the proper lock context as required by the storage layer.
+		// Storage operations are deferred, because block ID is not known when the block is newly constructed. Only at the
+		// end after the block is fully constructed, its ID can be computed. We emulate this step here to verify that the
+		// deferred `dbOps` have been correctly constructed. Thereby, the expected mock methods should be called,
+		// which is asserted by the testify framework.
 		blockID := s.candidate.ID()
 		return dbOps.Execute(lctx, blockID, rw)
 	})
