@@ -24,8 +24,10 @@ func TestInsertProtocolKVStore(t *testing.T) {
 		}
 
 		kvStoreStateID := unittest.IdentifierFixture()
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertProtocolKVStore(rw.Writer(), kvStoreStateID, expected)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, expected)
+			})
 		})
 		require.NoError(t, err)
 

@@ -15,8 +15,21 @@ import (
 // Error returns:
 //   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
-func InsertProtocolKVStore(w storage.Writer, protocolKVStoreID flow.Identifier, kvStore *flow.PSKeyValueStoreData) error {
-	return UpsertByKey(w, MakePrefix(codeProtocolKVStore, protocolKVStoreID), kvStore)
+func InsertProtocolKVStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, protocolKVStoreID flow.Identifier, kvStore *flow.PSKeyValueStoreData) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
+
+	key := MakePrefix(codeProtocolKVStore, protocolKVStoreID)
+	exists, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return fmt.Errorf("could not check if kv-store snapshot %x exists: %w", protocolKVStoreID[:], irrecoverable.NewException(err))
+	}
+	if exists {
+		return fmt.Errorf("a kv-store snapshot with id %x already exists: %w", protocolKVStoreID[:], storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, kvStore)
 }
 
 // RetrieveProtocolKVStore retrieves a protocol KV store by ID.
