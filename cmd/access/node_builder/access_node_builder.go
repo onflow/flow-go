@@ -651,7 +651,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			)
 
 			return nil
-		}).Module("execution state cache", func(node *cmd.NodeConfig) error {
+		}).
+		Module("execution state cache", func(node *cmd.NodeConfig) error {
 		config := builder.rpcConf
 		backendConfig := config.BackendConfig
 
