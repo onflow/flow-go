@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
@@ -110,6 +111,6 @@ func (l *LightTransactionResults) Data() []flow.LightTransactionResult {
 
 // BatchStore inserts a batch of transaction result into a batch.
 // This method is not implemented and will always return an error.
-func (l *LightTransactionResults) BatchStore(flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error {
+func (l *LightTransactionResults) BatchStore(lockctx.Proof, flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
 }

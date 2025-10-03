@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -103,7 +104,7 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 
 // Store will store events for the given block ID.
 // No errors are expected during normal operation.
-func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
+func (e *Events) Store(_ lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList) error {
 	var events []flow.Event
 	for _, eventList := range blockEvents {
 		events = append(events, eventList...)
@@ -131,7 +132,7 @@ func (e *Events) Data() flow.EventsList {
 // BatchStore will store events for the given block ID in a given batch.
 //
 // This method is NOT implemented and will always return an error.
-func (e *Events) BatchStore(flow.Identifier, []flow.EventsList, storage.ReaderBatchWriter) error {
+func (e *Events) BatchStore(lockctx.Proof, flow.Identifier, []flow.EventsList, storage.ReaderBatchWriter) error {
 	return fmt.Errorf("not implemented")
 }
 
