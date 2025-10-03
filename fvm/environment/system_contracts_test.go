@@ -61,7 +61,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 				0,
 				runtime.Config{},
 				func(_ runtime.Config) runtime.Runtime {
-					return &testutil.TestInterpreterRuntime{
+					return &testutil.TestRuntime{
 						InvokeContractFunc: tc.contractFunction,
 					}
 				},
