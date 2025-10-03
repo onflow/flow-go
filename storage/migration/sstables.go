@@ -164,5 +164,5 @@ func ForceCompactPebbleDB(pebbleDir string) error {
 		return err
 	}
 
-	return pebbleDB.Compact([]byte{0x00}, []byte{0xff}, true)
+	return pebbleDB.Compact(context.TODO(), []byte{0x00}, []byte{0xff}, true)
 }
