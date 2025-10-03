@@ -182,10 +182,6 @@ type BaseConfig struct {
 	// DhtSystemEnabled configures whether the DHT system is enabled on Access and Execution nodes.
 	DhtSystemEnabled bool
 
-	// BitswapReprovideEnabled configures whether the Bitswap reprovide mechanism is enabled.
-	// This is only meaningful to Access and Execution nodes.
-	BitswapReprovideEnabled bool
-
 	TransactionFeesDisabled bool
 }
 
@@ -297,12 +293,11 @@ func DefaultBaseConfig() *BaseConfig {
 			Duration: 10 * time.Second,
 		},
 
-		HeroCacheMetricsEnable:  false,
-		SyncCoreConfig:          chainsync.DefaultConfig(),
-		CodecFactory:            codecFactory,
-		ComplianceConfig:        compliance.DefaultConfig(),
-		DhtSystemEnabled:        true,
-		BitswapReprovideEnabled: true,
+		HeroCacheMetricsEnable: false,
+		SyncCoreConfig:         chainsync.DefaultConfig(),
+		CodecFactory:           codecFactory,
+		ComplianceConfig:       compliance.DefaultConfig(),
+		DhtSystemEnabled:       true,
 	}
 }
 

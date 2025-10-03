@@ -9,10 +9,9 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/boxo/bitswap"
 	bsmsg "github.com/ipfs/boxo/bitswap/message"
-	bsnet "github.com/ipfs/boxo/bitswap/network"
+	"github.com/ipfs/boxo/bitswap/network/bsnet"
 	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipfs/boxo/blockstore"
-	"github.com/ipfs/boxo/provider"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -35,17 +34,11 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const (
-	// DefaultReprovideInterval is the default interval at which DHT provider entries are refreshed
-	DefaultReprovideInterval = 12 * time.Hour
-)
-
 type blobService struct {
 	prefix string
 	component.Component
 	blockService blockservice.BlockService
 	blockStore   blockstore.Blockstore
-	reprovider   provider.System
 	config       *BlobServiceConfig
 }
 
@@ -53,15 +46,7 @@ var _ network.BlobService = (*blobService)(nil)
 var _ component.Component = (*blobService)(nil)
 
 type BlobServiceConfig struct {
-	ReprovideInterval time.Duration    // the interval at which the DHT provider entries are refreshed
-	BitswapOptions    []bitswap.Option // options to pass to the Bitswap service
-}
-
-// WithReprovideInterval sets the interval at which DHT provider entries are refreshed
-func WithReprovideInterval(d time.Duration) network.BlobServiceOption {
-	return func(bs network.BlobService) {
-		bs.(*blobService).config.ReprovideInterval = d
-	}
+	BitswapOptions []bitswap.Option // options to pass to the Bitswap service
 }
 
 // WithBitswapOptions sets additional options for Bitswap exchange
@@ -78,12 +63,14 @@ func WithParentBlobService(parent network.BlobService) network.BlobServiceOption
 	}
 }
 
-// WithHashOnRead sets whether the blobstore will rehash the blob data on read
+// WithHashOnRead configures the blobstore to rehash the blob data on read
 // When set, calls to GetBlob will fail with an error if the hash of the data in storage does not
 // match its CID
-func WithHashOnRead(enabled bool) network.BlobServiceOption {
+func WithHashOnRead() network.BlobServiceOption {
 	return func(bs network.BlobService) {
-		bs.(*blobService).blockStore.HashOnRead(enabled)
+		bs.(*blobService).blockStore = &blockstore.ValidatingBlockstore{
+			Blockstore: bs.(*blobService).blockStore,
+		}
 	}
 }
 
@@ -108,7 +95,7 @@ func NewBlobService(
 	logger zerolog.Logger,
 	opts ...network.BlobServiceOption,
 ) (*blobService, error) {
-	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
+	bsNetwork := bsnet.NewFromIpfsHost(host, bsnet.Prefix(protocol.ID(prefix)))
 	blockStore, err := blockstore.CachedBlockstore(
 		context.Background(),
 		blockstore.NewBlockstore(ds),
@@ -118,10 +105,8 @@ func NewBlobService(
 		return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
 	}
 	bs := &blobService{
-		prefix: prefix,
-		config: &BlobServiceConfig{
-			ReprovideInterval: DefaultReprovideInterval,
-		},
+		prefix:     prefix,
+		config:     &BlobServiceConfig{},
 		blockStore: blockStore,
 	}
 
@@ -131,7 +116,7 @@ func NewBlobService(
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			btswp := bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...)
+			btswp := bitswap.New(ctx, bsNetwork, r, bs.blockStore, bs.config.BitswapOptions...)
 			bs.blockService = blockservice.New(bs.blockStore, btswp)
 
 			ready()
@@ -161,20 +146,6 @@ func NewBlobService(
 			}
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// New creates and starts the reprovider (non-blocking)
-			reprovider, err := provider.New(ds,
-				provider.Online(r),
-				provider.KeyProvider(provider.NewBlockstoreProvider(bs.blockStore)),
-				provider.ReproviderInterval(bs.config.ReprovideInterval),
-			)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("failed to start reprovider: %w", err))
-			}
-
-			bs.reprovider = reprovider
-			ready()
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 
 			<-bs.Ready() // wait for variables to be initialized
@@ -182,7 +153,6 @@ func NewBlobService(
 
 			var err *multierror.Error
 
-			err = multierror.Append(err, bs.reprovider.Close())
 			err = multierror.Append(err, bs.blockService.Close())
 
 			if err.ErrorOrNil() != nil {
@@ -194,10 +164,6 @@ func NewBlobService(
 	bs.Component = cm
 
 	return bs, nil
-}
-
-func (bs *blobService) TriggerReprovide(ctx context.Context) error {
-	return bs.reprovider.Reprovide(ctx)
 }
 
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {

@@ -17,6 +17,8 @@ type MockStream struct {
 	pr *io.PipeReader
 }
 
+var _ network.Stream = (*MockStream)(nil)
+
 func NewMockStream(pw *io.PipeWriter, pr *io.PipeReader) *MockStream {
 	return &MockStream{
 		pw: pw,
@@ -46,6 +48,10 @@ func (m *MockStream) CloseWrite() error {
 }
 
 func (m *MockStream) Reset() error {
+	return nil
+}
+
+func (m *MockStream) ResetWithError(errCode network.StreamErrorCode) error {
 	return nil
 }
 

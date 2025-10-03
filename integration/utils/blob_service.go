@@ -24,12 +24,14 @@ type testBlobService struct {
 var _ network.BlobService = (*testBlobService)(nil)
 var _ component.Component = (*testBlobService)(nil)
 
-// WithHashOnRead sets whether or not the blobstore will rehash the blob data on read
+// WithHashOnRead configures the blobstore toi rehash the blob data on read
 // When set, calls to GetBlob will fail with an error if the hash of the data in storage does not
 // match its CID
-func WithHashOnRead(enabled bool) network.BlobServiceOption {
+func WithHashOnRead() network.BlobServiceOption {
 	return func(bs network.BlobService) {
-		bs.(*testBlobService).blockStore.HashOnRead(enabled)
+		bs.(*testBlobService).blockStore = &blockstore.ValidatingBlockstore{
+			Blockstore: bs.(*testBlobService).blockStore,
+		}
 	}
 }
 
