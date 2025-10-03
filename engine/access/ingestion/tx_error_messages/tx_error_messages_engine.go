@@ -135,7 +135,9 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 
 	err = e.processErrorMessagesForBlock(ctx, header.ID())
 
-	e.metrics.TxErrorsFetchFinished(time.Since(start), err == nil, header.Height)
+	// use the last processed index to ensure the metrics reflect the highest _consecutive_ height.
+	// this makes it easier to see when downloading gets stuck at a height.
+	e.metrics.TxErrorsFetchFinished(time.Since(start), err == nil, e.txErrorMessagesConsumer.LastProcessedIndex())
 
 	if err == nil {
 		done()

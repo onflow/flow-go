@@ -76,6 +76,8 @@ func (c *TransactionErrorMessagesCollector) TxErrorsFetchStarted() {
 }
 
 // TxErrorsFetchFinished records that a transaction error messages download has finished.
+// Pass the highest consecutive height to ensure the metrics reflect the height up to which the
+// requester has completed downloads. This allows us to easily see when downloading gets stuck.
 func (c *TransactionErrorMessagesCollector) TxErrorsFetchFinished(duration time.Duration, success bool, height uint64) {
 	c.downloadsInProgress.Dec()
 	c.fetchDuration.Observe(float64(duration.Milliseconds()))
