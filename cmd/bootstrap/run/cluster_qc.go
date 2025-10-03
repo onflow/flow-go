@@ -29,6 +29,15 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	if err != nil {
 		return nil, err
 	}
+	return GenerateClusterRootQCFromVotes(signers, allCommitteeMembers, clusterBlock, votes)
+}
+
+// GenerateClusterRootQCFromVotes generates a QC from the provided votes based on participant data
+func GenerateClusterRootQCFromVotes(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentitySkeletonList, clusterBlock *cluster.Block, votes []*model.Vote) (*flow.QuorumCertificate, error) {
+	if !allCommitteeMembers.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
+		return nil, fmt.Errorf("can't create root cluster QC: committee members are not sorted in canonical order")
+	}
+	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.ToHeader())
 
 	// STEP 1.5: patch committee to include dynamic identities. This is a temporary measure until bootstrapping is refactored.
 	// We need a Committee for creating the cluster's root QC and the Committee requires dynamic identities to be instantiated.
