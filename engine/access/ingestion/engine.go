@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -78,6 +79,8 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
+	db                storage.DB
+	lockManager       storage.LockManager
 	blocks            storage.Blocks
 	executionReceipts storage.ExecutionReceipts
 	maxReceiptHeight  uint64
@@ -101,6 +104,8 @@ func New(
 	net network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
+	lockManager storage.LockManager,
+	db storage.DB,
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
@@ -133,6 +138,8 @@ func New(
 		log:                      log.With().Str("engine", "ingestion").Logger(),
 		state:                    state,
 		me:                       me,
+		lockManager:              lockManager,
+		db:                       db,
 		blocks:                   blocks,
 		executionResults:         executionResults,
 		executionReceipts:        executionReceipts,
@@ -371,19 +378,26 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 
 	// TODO: substitute an indexer module as layer between engine and storage
 
+	// TODO (leothis): to include in the batch update
 	// index the block storage with each of the collection guarantee
 	err := e.blocks.IndexBlockContainingCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
-	}
+	// TODO (leothis): to use a different lock ID
+	storage.WithLock(e.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// loop through seals and index ID -> result ID
+			for _, seal := range block.Payload.Seals {
+				err := e.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
+				if err != nil {
+					return fmt.Errorf("could not index block for execution result: %w", err)
+				}
+			}
+			return nil
+		})
+	})
 
 	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	e.collectionExecutedMetric.BlockFinalized(block)

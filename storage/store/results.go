@@ -32,10 +32,6 @@ func NewExecutionResults(collector module.CacheMetrics, db storage.DB) *Executio
 		return &result, err
 	}
 
-	indexByBlockID := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
-		return operation.IndexOwnExecutionResult(lctx, rw, blockID, resultID)
-	}
-
 	retrieveByBlockID := func(r storage.Reader, blockID flow.Identifier) (flow.Identifier, error) {
 		var resultID flow.Identifier
 		err := operation.LookupExecutionResult(r, blockID, &resultID)
@@ -53,7 +49,7 @@ func NewExecutionResults(collector module.CacheMetrics, db storage.DB) *Executio
 			// this API is only used to fetch result for last executed block, so in happy case, it only need to be 1,
 			// we use 100 here to be more resilient to forks
 			withLimit[flow.Identifier, flow.Identifier](100),
-			withStoreWithLock(indexByBlockID),
+			withStoreWithLock(operation.IndexOwnExecutionResult),
 			withRetrieve(retrieveByBlockID),
 		),
 	}

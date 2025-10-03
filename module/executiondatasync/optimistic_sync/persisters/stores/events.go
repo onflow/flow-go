@@ -40,7 +40,7 @@ func (e *EventsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWrite
 	}
 
 	if len(eventsList) > 0 {
-		if err := e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{eventsList}, batch); err != nil {
+		if err := e.persistedEvents.BatchStore(lctx, e.blockID, []flow.EventsList{eventsList}, batch); err != nil {
 			return fmt.Errorf("could not add events to batch: %w", err)
 		}
 	}

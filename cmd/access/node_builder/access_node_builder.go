@@ -2238,6 +2238,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.EngineRegistry,
 				node.State,
 				node.Me,
+				node.StorageLockMgr,
+				node.ProtocolDB,
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
