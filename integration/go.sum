@@ -527,8 +527,6 @@ github.com/ipfs/go-datastore v0.8.2 h1:Jy3wjqQR6sg/LhyY0NIePZC3Vux19nLtg7dx0TVqr
 github.com/ipfs/go-datastore v0.8.2/go.mod h1:W+pI1NsUsz3tcsAACMtfC+IZdnQTnC/7VfPoJBQuts0=
 github.com/ipfs/go-detect-race v0.0.1 h1:qX/xay2W3E4Q1U7d9lNs1sU9nvguX0a7319XbyQ6cOk=
 github.com/ipfs/go-detect-race v0.0.1/go.mod h1:8BNT7shDZPo99Q74BpGMK+4D8Mn4j46UU0LZ723meps=
-github.com/ipfs/go-ds-pebble v0.5.0 h1:lXffYCAKVD7nLLPqwJ9D8IxgO7Kz8woiX021tezdsIM=
-github.com/ipfs/go-ds-pebble v0.5.0/go.mod h1:aiCRVcj3K60sxc6k5C+HO9C6rouqiSkjR/WKnbTcMfQ=
 github.com/ipfs/go-ipfs-blocksutil v0.0.1 h1:Eh/H4pc1hsvhzsQoMEP3Bke/aW5P5rVM1IWFJMcGIPQ=
 github.com/ipfs/go-ipfs-blocksutil v0.0.1/go.mod h1:Yq4M86uIOmxmGPUHv/uI7uKqZNtLb449gwKqXjIsnRk=
 github.com/ipfs/go-ipfs-delay v0.0.1 h1:r/UXYyRcddO6thwOnhiznIAiSvxMECGgtv35Xs1IeRQ=
@@ -785,6 +783,8 @@ github.com/onflow/flow-nft/lib/go/templates v1.3.0 h1:uGIBy4GEY6Z9hKP7sm5nA5kwvb
 github.com/onflow/flow-nft/lib/go/templates v1.3.0/go.mod h1:gVbb5fElaOwKhV5UEUjM+JQTjlsguHg2jwRupfM/nng=
 github.com/onflow/flow/protobuf/go/flow v0.4.16 h1:UADQeq/mpuqFk+EkwqDNoF70743raWQKmB/Dm/eKt2Q=
 github.com/onflow/flow/protobuf/go/flow v0.4.16/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
+github.com/onflow/go-ds-pebble v0.0.0-20251003225212-131edca3a897 h1:ZtFYJ3OSR00aiKMMxgm3fRYWqYzjvDXeoBGQm6yC8DE=
+github.com/onflow/go-ds-pebble v0.0.0-20251003225212-131edca3a897/go.mod h1:aiCRVcj3K60sxc6k5C+HO9C6rouqiSkjR/WKnbTcMfQ=
 github.com/onflow/go-ethereum v1.16.2 h1:yhC3DA5PTNmUmu7ziq8GmWyQ23KNjle4jCabxpKYyNk=
 github.com/onflow/go-ethereum v1.16.2/go.mod h1:1vsrG/9APHPqt+mVFni60hIXkqkVdU9WQayNjYi/Ah4=
 github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 h1:sxyWLqGm/p4EKT6DUlQESDG1ZNMN9GjPCm1gTq7NGfc=
