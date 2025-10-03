@@ -46,7 +46,7 @@ func NewPebbleDatastoreManager(logger zerolog.Logger, path string, options *pebb
 
 	ds, err := pebbleds.NewDatastore(path,
 		pebbleds.WithPebbleDB(db),
-		pebbleds.WithWriteOptions(pebble.Sync),
+		pebbleds.WithPebbleWriteOptions(pebble.Sync),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker ds: %w", err)
