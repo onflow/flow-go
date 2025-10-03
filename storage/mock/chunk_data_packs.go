@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -80,17 +82,17 @@ func (_m *ChunkDataPacks) Remove(cs []flow.Identifier) error {
 	return r0
 }
 
-// Store provides a mock function with given fields: cs
-func (_m *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
-	ret := _m.Called(cs)
+// StoreByChunkID provides a mock function with given fields: lctx, cs
+func (_m *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
+	ret := _m.Called(lctx, cs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Store")
+		panic("no return value specified for StoreByChunkID")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]*flow.ChunkDataPack) error); ok {
-		r0 = rf(cs)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, []*flow.ChunkDataPack) error); ok {
+		r0 = rf(lctx, cs)
 	} else {
 		r0 = ret.Error(0)
 	}

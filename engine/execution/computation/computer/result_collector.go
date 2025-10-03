@@ -240,14 +240,11 @@ func (collector *resultCollector) processTransactionResult(
 			Logger()
 		logger.Info().Msg("transaction execution failed")
 
-		if txn.isSystemTransaction {
+		if txn.transactionType == ComputerTransactionTypeSystem {
 			// This log is used as the data source for an alert on grafana.
-			// The system_chunk_error field must not be changed without adding
+			// The critical_error field must not be changed without adding
 			// the corresponding changes in grafana.
-			// https://github.com/dapperlabs/flow-internal/issues/1546
 			logger.Error().
-				Bool("system_chunk_error", true).
-				Bool("system_transaction_error", true).
 				Bool("critical_error", true).
 				Msg("error executing system chunk transaction")
 		}
@@ -314,7 +311,8 @@ func (collector *resultCollector) handleTransactionExecutionMetrics(
 		ComputationIntensities:     output.ComputationIntensities,
 		NumberOfTxnConflictRetries: numConflictRetries,
 		Failed:                     output.Err != nil,
-		SystemTransaction:          txn.isSystemTransaction,
+		ScheduledTransaction:       txn.transactionType == ComputerTransactionTypeScheduled,
+		SystemTransaction:          txn.transactionType == ComputerTransactionTypeSystem,
 	}
 	for _, entry := range txnExecutionSnapshot.UpdatedRegisters() {
 		transactionExecutionStats.NumberOfBytesWrittenToRegisters += len(entry.Value)

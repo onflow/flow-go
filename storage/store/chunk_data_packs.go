@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -20,8 +22,8 @@ var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
 func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
-	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *storage.StoredChunkDataPack) error {
-		return operation.InsertChunkDataPack(rw.Writer(), val)
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, key flow.Identifier, val *storage.StoredChunkDataPack) error {
+		return operation.InsertChunkDataPack(lctx, rw, val)
 	}
 
 	retrieve := func(r storage.Reader, key flow.Identifier) (*storage.StoredChunkDataPack, error) {
@@ -32,7 +34,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, collections
 
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
 		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byChunkIDCacheSize),
-		withStore(store),
+		withStoreWithLock(storeWithLock),
 		withRetrieve(retrieve),
 	)
 
@@ -59,25 +61,15 @@ func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
 	})
 }
 
-// BatchStore stores ChunkDataPack c keyed by its ChunkID in provided batch.
+// StoreByChunkID stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 // No errors are expected during normal operation, but it may return generic error
-// if entity is not serializable or Badger unexpectedly fails to process request
-func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, rw storage.ReaderBatchWriter) error {
-	sc := storage.ToStoredChunkDataPack(c)
-	storage.OnCommitSucceed(rw, func() {
-		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
-	})
-	return operation.InsertChunkDataPack(rw.Writer(), sc)
-}
-
-// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
-// No errors are expected during normal operation, but it may return generic error
-func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
+func (ch *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error {
 	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, c := range cs {
-			err := ch.BatchStore(c, rw)
+			sc := storage.ToStoredChunkDataPack(c)
+			err := ch.byChunkIDCache.PutWithLockTx(lctx, rw, sc.ChunkID, sc)
 			if err != nil {
-				return fmt.Errorf("cannot store chunk data pack: %w", err)
+				return err
 			}
 		}
 
