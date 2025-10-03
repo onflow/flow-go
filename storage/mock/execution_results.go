@@ -160,24 +160,6 @@ func (_m *ExecutionResults) IDByBlockID(blockID flow.Identifier) (flow.Identifie
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: result
-func (_m *ExecutionResults) Store(result *flow.ExecutionResult) error {
-	ret := _m.Called(result)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult) error); ok {
-		r0 = rf(result)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewExecutionResults creates a new instance of ExecutionResults. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewExecutionResults(t interface {
