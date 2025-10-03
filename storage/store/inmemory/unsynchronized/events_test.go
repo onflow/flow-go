@@ -40,7 +40,7 @@ func TestEvents_HappyPath(t *testing.T) {
 
 	// Store events
 	expectedStoredEvents := flow.EventsList{event1, event2, event3}
-	err := eventsStore.Store(block.ID(), []flow.EventsList{expectedStoredEvents})
+	err := eventsStore.Store(nil, block.ID(), []flow.EventsList{expectedStoredEvents})
 	require.NoError(t, err)
 
 	// Retrieve events by block ID

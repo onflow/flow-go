@@ -74,6 +74,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 
 func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		const blockCount = 10
 		const txCountPerBlock = 10
 
@@ -98,14 +99,16 @@ func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
 		}
 
 		// Store transaction results of multiple blocks
-		err = db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
-			for _, blockID := range blockIDs {
-				err := st.BatchStore(blockID, txResults[blockID], rbw)
-				if err != nil {
-					return err
+		err = storage.WithLock(lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
+				for _, blockID := range blockIDs {
+					err := st.BatchStore(lctx, blockID, txResults[blockID], rbw)
+					if err != nil {
+						return err
+					}
 				}
-			}
-			return nil
+				return nil
+			})
 		})
 		require.NoError(t, err)
 
