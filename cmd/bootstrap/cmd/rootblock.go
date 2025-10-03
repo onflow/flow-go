@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/onflow/cadence"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
@@ -43,11 +46,15 @@ var (
 	flagNumViewsInEpoch             uint64
 	flagNumViewsInStakingAuction    uint64
 	flagNumViewsInDKGPhase          uint64
+	flagEpochRandomSeed             []byte
 	// Epoch target end time config
 	flagUseDefaultEpochTargetEndTime bool
 	flagEpochTimingRefCounter        uint64
 	flagEpochTimingRefTimestamp      uint64
 	flagEpochTimingDuration          uint64
+
+	flagIntermediaryClusteringDataPath string
+	flagRootClusterBlockVotesDir       string
 )
 
 // rootBlockCmd represents the rootBlock command
@@ -106,11 +113,13 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "kvstore-epoch-extension-view-count", 0, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
 	rootBlockCmd.Flags().StringVar(&flagKVStoreVersion, "kvstore-version", "default",
 		"protocol state KVStore version to initialize ('default' or an integer equal to a supported protocol version: '0', '1', '2', ...)")
+	rootBlockCmd.Flags().BytesHexVar(&flagEpochRandomSeed, "random-seed", nil, "random seed")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-view")
+	cmd.MarkFlagRequired(rootBlockCmd, "random-seed")
 
 	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
 	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
@@ -224,16 +233,6 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to merge node infos")
 	}
-	publicInfo, err := model.ToPublicNodeInfoList(stakingNodes)
-	if err != nil {
-		log.Fatal().Msg("failed to read public node info")
-	}
-	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, publicInfo)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write json")
-	}
-	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfosPub)
-	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
 	randomBeaconData, dkgIndexMap := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
@@ -242,30 +241,22 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	// create flow.IdentityList representation of the participant set
 	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
-	// use system randomness to create cluster assignment
-	// TODO(7848): use randomness provided from the command line
-	var randomSeed [32]byte
-	_, err = rand.Read(randomSeed[:])
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to generate random seed")
+	// read the previously created cluster assignment (see cmd/bootstrap/cmd/clustering.go)
+	clusteringData := readIntermediaryClusteringData()
+	if flagEpochCounter != clusteringData.EpochCounter {
+		log.Fatal().Msgf("Epoch counter does not match the one used to generate collector clusters")
 	}
-	clusteringPrg, err := prg.New(randomSeed[:], prg.BootstrapClusterAssignment, nil)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to initialize pseudorandom generator")
-	}
-	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partnerNodes), model.ToIdentityList(internalNodes), int(flagCollectionClusters), clusteringPrg)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
-	}
+	clusters := clusteringData.Clusters
+	log.Info().Msg("reading votes for collection node cluster root blocks")
+	votes := readClusterBlockVotes(clusteringData.Assignments)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root blocks for collection node clusters")
-	clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
+	clusterBlocks := run.GenerateRootClusterBlocks(clusteringData.EpochCounter, clusters)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
-	clusterQCs := run.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
+	clusterQCs := run.ConstructClusterRootQCsFromVotes(log, clusters, internalNodes, clusterBlocks, votes)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root header")
@@ -275,13 +266,13 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 	log.Info().Msg("")
 
-	// use the same randomness for the RandomSource of the new epoch
-	randomSourcePrg, err := prg.New(randomSeed[:], prg.BootstrapEpochRandomSource, nil)
+	// use provided randomness for the RandomSource of the new epoch
+	randomSourcePrg, err := prg.New(flagEpochRandomSeed, prg.BootstrapEpochRandomSource, nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize pseudorandom generator")
 	}
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit, err := constructRootEpochEvents(headerBody.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap, randomSourcePrg)
+	epochSetup, epochCommit, err := constructRootEpochEvents(headerBody.View, participants, clusteringData.Assignments, clusterQCs, randomBeaconData, dkgIndexMap, randomSourcePrg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to construct root epoch events")
 	}
@@ -386,6 +377,53 @@ func validateEpochConfig() error {
 			epochCommitDeadline, dkgFinalView, defaultEpochSafetyParams.FinalizationSafetyThreshold)
 	}
 	return nil
+}
+
+// readIntermediaryBootstrappingData reads intermediary clustering data file from disk.
+// This file needs to be prepared with the clustering bootstrap command
+func readIntermediaryClusteringData() *IntermediaryClusteringData {
+	intermediaryData, err := utils.ReadData[IntermediaryClusteringData](flagIntermediaryClusteringDataPath)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read clustering data, was the clustering command run?")
+	}
+	return intermediaryData
+}
+
+// readClusterBlockVotes reads votes for root cluster blocks.
+// It sorts the votes into the appropriate clusters according to the given assignment list.
+func readClusterBlockVotes(al flow.AssignmentList) [][]*hotstuff.Vote {
+	votes := make([][]*hotstuff.Vote, len(al))
+	files, err := common.FilesInDir(flagRootClusterBlockVotesDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read cluster block votes")
+	}
+	for _, f := range files {
+		// skip files that do not include node-infos
+		if !strings.Contains(f, model.FilenameClusterBlockVotePrefix) {
+			continue
+		}
+
+		// read file and append to partners
+		var vote hotstuff.Vote
+		err = common.ReadJSON(f, &vote)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to read json")
+		}
+		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.ID(), vote.BlockID, vote.SignerID)
+
+		// put the vote in the correct bucket for its cluster
+		found := false
+		for i, cluster := range al {
+			if cluster.Contains(vote.SignerID) {
+				votes[i] = append(votes[i], &vote)
+				found = true
+			}
+		}
+		if !found {
+			log.Warn().Msgf("ignoring vote for block %v from signerID %v not part of the assignment", vote.BlockID, vote.SignerID)
+		}
+	}
+	return votes
 }
 
 // generateExecutionStateEpochConfig generates epoch-related configuration used
