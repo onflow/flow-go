@@ -46,7 +46,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 				// insert 20 results
 				for i := 0; i < 20; i++ {
 					result := unittest.ExecutionResultFixture()
-					err := operation.InsertExecutionResult(rw.Writer(), result)
+					err := operation.InsertExecutionResult(rw.Writer(), result.ID(), result)
 					if err != nil {
 						return err
 					}
