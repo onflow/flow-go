@@ -156,6 +156,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(
+		suite.log,
 		suite.state,
 		suite.txResultErrorMessagesCore,
 	)
@@ -230,7 +231,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1),         // raw json parses to float64
 				"end-height":         float64(endHeight), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.Error(err)
@@ -283,7 +284,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(4), // raw json parses to float64
-				"execution-node-ids": []string{invalidENID.String()},
+				"execution-node-ids": []any{invalidENID.String()},
 			},
 		})
 		suite.Error(err)
@@ -314,7 +315,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(3), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.NoError(err)
@@ -382,7 +383,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64
 				"end-height":         float64(endHeight),   // raw json parses to float64
-				"execution-node-ids": []string{executorID.String()},
+				"execution-node-ids": []any{executorID.String()},
 			},
 		}
 		suite.Require().NoError(suite.command.Validator(req))
@@ -425,6 +426,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 	suite.Run("error when txErrorMessagesCore is nil", func() {
 		req := &admin.CommandRequest{Data: map[string]interface{}{}}
 		command := NewBackfillTxErrorMessagesCommand(
+			suite.log,
 			suite.state,
 			nil,
 		)

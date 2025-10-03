@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -25,16 +28,19 @@ type backfillTxErrorMessagesRequest struct {
 // BackfillTxErrorMessagesCommand executes a command to backfill
 // transaction error messages by fetching them from execution nodes.
 type BackfillTxErrorMessagesCommand struct {
+	log                 zerolog.Logger
 	state               protocol.State
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
 
 // NewBackfillTxErrorMessagesCommand creates a new instance of BackfillTxErrorMessagesCommand
 func NewBackfillTxErrorMessagesCommand(
+	log zerolog.Logger,
 	state protocol.State,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 ) commands.AdminCommand {
 	return &BackfillTxErrorMessagesCommand{
+		log:                 log.With().Str("command", "backfill-tx-error-messages").Logger(),
 		state:               state,
 		txErrorMessagesCore: txErrorMessagesCore,
 	}
@@ -147,6 +153,17 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 
 	data := request.ValidatorData.(*backfillTxErrorMessagesRequest)
 
+	total := data.endHeight - data.startHeight + 1
+	progress := util.LogProgress(b.log,
+		util.DefaultLogProgressConfig("backfilling", int(total)),
+	)
+
+	b.log.Info().
+		Uint64("start_height", data.startHeight).
+		Uint64("end_height", data.endHeight).
+		Uint64("blocks", total).
+		Msgf("starting backfill")
+
 	for height := data.startHeight; height <= data.endHeight; height++ {
 		header, err := b.state.AtHeight(height).Head()
 		if err != nil {
@@ -158,6 +175,8 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 		if err != nil {
 			return nil, fmt.Errorf("error encountered while processing transaction result error message for block: %d, %w", height, err)
 		}
+
+		progress(1)
 	}
 
 	return nil, nil
@@ -170,13 +189,18 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
 func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
 	var ids flow.IdentityList
-
 	switch executionNodeIds := executionNodeIdsIn.(type) {
-	case []string:
+	case []any:
 		if len(executionNodeIds) == 0 {
 			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
 		}
-		requestedENIdentifiers, err := flow.IdentifierListFromHex(executionNodeIds)
+
+		idStrings := make([]string, len(executionNodeIds))
+		for i, id := range executionNodeIds {
+			idStrings[i] = id.(string)
+		}
+
+		requestedENIdentifiers, err := flow.IdentifierListFromHex(idStrings)
 		if err != nil {
 			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
 		}

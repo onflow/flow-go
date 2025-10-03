@@ -65,7 +65,10 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	storeTxAccess := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlagf("--store-tx-result-error-messages=true"),
+		testnet.WithAdditionalFlag("--store-tx-result-error-messages=true"),
+		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
+		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
+		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithMetricsServer(),
 	)
 
@@ -107,14 +110,18 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 // are stored correctly in the database by sending a transaction, generating an error,
 // and checking if the error message is properly stored and retrieved from the database.
 func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
+	ctx, cancel := context.WithTimeout(s.ctx, 60*time.Second)
+	defer cancel()
+
 	// Create and send a transaction that will result in an error.
 	txResult := s.createAndSendTxWithTxError()
 
-	// Wait until execution receipts are handled, transaction error messages are stored.
-	s.Eventually(func() bool {
-		value, err := s.getMaxReceiptHeight(s.accessContainerName)
-		return err == nil && value > txResult.BlockHeight
-	}, 60*time.Second, 1*time.Second)
+	client, err := s.net.ContainerByName(s.accessContainerName).TestnetClient()
+	s.Require().NoError(err)
+
+	// wait until the node has indexed a few blocks past the transaction block height
+	err = client.WaitUntilIndexed(ctx, txResult.BlockHeight+10)
+	s.Require().NoError(err)
 
 	// Stop the network containers before checking the results.
 	s.net.StopContainers()

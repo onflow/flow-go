@@ -374,6 +374,13 @@ func (nc *NoopCollector) BlockIndexed(uint64, time.Duration, int, int, int) {}
 func (nc *NoopCollector) BlockReindexed()                                   {}
 func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}
 
+var _ module.TransactionErrorMessagesMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) TxErrorsInitialHeight(uint64)                      {}
+func (nc *NoopCollector) TxErrorsFetchStarted()                             {}
+func (nc *NoopCollector) TxErrorsFetchFinished(time.Duration, bool, uint64) {}
+func (nc *NoopCollector) TxErrorsFetchRetried()                             {}
+
 var _ module.GossipSubScoringRegistryMetrics = (*NoopCollector)(nil)
 
 func (nc *NoopCollector) DuplicateMessagePenalties(penalty float64) {}

@@ -1566,6 +1566,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			return errors.New("rest-max-request-size must be greater than 0")
 		}
 
+		// indexing tx error messages is only supported when tx results are also indexed
+		if builder.storeTxResultErrorMessages && !builder.executionDataIndexingEnabled {
+			return errors.New("execution-data-indexing-enabled must be set if store-tx-result-error-messages is enabled")
+		}
+
 		return nil
 	})
 }
@@ -1901,14 +1906,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
-		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-			if builder.storeTxResultErrorMessages {
-				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
-			}
-
-			return nil
-		}).
 		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if !builder.versionControlEnabled {
 				noop := &module.NoopReadyDoneAware{}
@@ -2189,34 +2186,42 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.Logger,
 				builder.State,
 				builder.TxResultErrorMessagesCore,
 			)
 		})
 
 	if builder.storeTxResultErrorMessages {
-		builder.Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedTxErrorMessagesBlockHeight = store.NewConsumerProgress(
-				builder.ProtocolDB,
-				module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
-			)
-			return nil
-		})
-		builder.Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			engine, err := tx_error_messages.New(
-				node.Logger,
-				node.State,
-				node.Storage.Headers,
-				processedTxErrorMessagesBlockHeight,
-				builder.TxResultErrorMessagesCore,
-			)
-			if err != nil {
-				return nil, err
-			}
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
+		builder.
+			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
+				return nil
+			}).
+			Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
+				processedTxErrorMessagesBlockHeight = store.NewConsumerProgress(
+					builder.ProtocolDB,
+					module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
+				)
+				return nil
+			}).
+			Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				engine, err := tx_error_messages.New(
+					node.Logger,
+					metrics.NewTransactionErrorMessagesCollector(),
+					node.State,
+					node.Storage.Headers,
+					processedTxErrorMessagesBlockHeight,
+					builder.TxResultErrorMessagesCore,
+				)
+				if err != nil {
+					return nil, err
+				}
+				builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
-			return engine, nil
-		})
+				return engine, nil
+			})
 	}
 
 	if builder.supportsObserver {
