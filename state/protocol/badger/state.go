@@ -300,7 +300,7 @@ func bootstrapSealingSegment(
 	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		w := rw.Writer()
 		for _, result := range segment.ExecutionResults {
-			err := operation.InsertExecutionResult(w, result)
+			err := operation.InsertExecutionResult(w, result.ID(), result)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
