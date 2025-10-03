@@ -97,7 +97,7 @@ const (
 	codeGuaranteeByCollectionID    = 81 // index of collection guarantee by collection ID
 
 	// legacy codes (should be cleaned up)
-	codeChunkDataPack                      = 100
+	_                                      = 100 // codeChunkDataPack (100) is deprecated
 	codeCommit                             = 101
 	codeEvent                              = 102
 	codeExecutionStateInteractions         = 103
@@ -109,10 +109,16 @@ const (
 	codeLightTransactionResultIndex        = 109
 	codeTransactionResultErrorMessage      = 110
 	codeTransactionResultErrorMessageIndex = 111
-	codeIndexCollection                    = 200
-	codeIndexExecutionResultByBlock        = 202
-	codeIndexCollectionByTransaction       = 203
-	codeIndexResultApprovalByChunk         = 204
+	// different from codeChunkDataPack, which stores chunkID -> storedChunkDataPack relationship,
+	// codeChunkDataPackID stores the chunkID->storedChunkDataPackID relationship, and
+	// codeStoredChunkDataPack stores storedChunkDataPackID -> storedChunkDataPack relationship.
+	// this breakup allows us to store chunk data packs in a different database in a concurrent safe way
+	codeChunkDataPackID              = 112
+	codeStoredChunkDataPack          = 113
+	codeIndexCollection              = 200
+	codeIndexExecutionResultByBlock  = 202
+	codeIndexCollectionByTransaction = 203
+	codeIndexResultApprovalByChunk   = 204
 
 	// TEMPORARY codes
 	disallowedNodeIDs = 205 // manual override for adding node IDs to list of ejected nodes, applies to networking layer only

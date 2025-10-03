@@ -44,7 +44,8 @@ func TestReExecuteBlock(t *testing.T) {
 		txResults, err := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 		require.NoError(t, err)
 		commits := store.NewCommits(metrics, db)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.DefaultCacheSize)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
 		results := all.Results
 		receipts := all.Receipts
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
@@ -201,7 +202,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		serviceEvents := store.NewServiceEvents(metrics, db)
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), bstorage.DefaultCacheSize)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, collections, bstorage.DefaultCacheSize)
 		txResults, err := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 		require.NoError(t, err)
 

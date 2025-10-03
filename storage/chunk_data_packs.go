@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"bytes"
-
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -11,72 +9,40 @@ import (
 // ChunkDataPacks represents persistent storage for chunk data packs.
 type ChunkDataPacks interface {
 
-	// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
-	// No errors are expected during normal operation, but it may return generic error
-	StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDataPack) error
+	// Store stores multiple ChunkDataPacks in a two-phase process:
+	// 1. First phase: Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+	// 2. Second phase: Create index mappings from ChunkID to storedChunkDataPackID in protocol database
+	//
+	// The reason it's a two-phase process is that, the chunk data pack and the other execution data are stored in different databases.
+	// The two-phase approach ensures that:
+	//   - Chunk data pack content is stored atomically in the chunk data pack database
+	//   - Index mappings are created within the same atomic batch update in protocol database
+	//
+	// The Store method returns:
+	//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function to index the chunk id with
+	// 		 chunk data pack hash within batch update to store along with other execution data into protocol database,
+	//     this function might return [storage.ErrDataMismatch] when an existing chunk data pack ID is found for
+	//     the same chunk ID, and is different from the one being stored.
+	//     the caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
+	//   - error: No error should be returned during normal operation. Any error indicates a failure in the first phase.
+	Store(cs []*flow.ChunkDataPack) (func(lctx lockctx.Proof, rw ReaderBatchWriter) error, error)
 
-	// Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
-	// No errors are expected during normal operation, but it may return generic error
-	Remove(cs []flow.Identifier) error
-
-	// ByChunkID returns the chunk data for the given a chunk ID.
+	// ByChunkID returns the chunk data for the given chunk ID.
+	// It returns [storage.ErrNotFound] if no entry exists for the given chunk ID.
 	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
 
-	// BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
+	// BatchRemove remove multiple ChunkDataPacks with the given chunk IDs.
+	// It performs a two-phase removal:
+	// 1. First phase: Remove index mappings from ChunkID to storedChunkDataPackID in the protocol database
+	// 2. Second phase: Remove chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+	// Note: it does not remove the collection referred by the chunk data pack.
+	// This method is useful for the rollback execution tool to batch remove chunk data packs associated with a set of blocks.
 	// No errors are expected during normal operation, even if no entries are matched.
-	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemove(chunkID flow.Identifier, batch ReaderBatchWriter) error
-}
+	BatchRemove(chunkIDs []flow.Identifier, protocolDBBatch ReaderBatchWriter, chunkDataPackDBBatch ReaderBatchWriter) error
 
-// StoredChunkDataPack is an in-storage representation of chunk data pack.
-// Its prime difference is instead of an actual collection, it keeps a collection ID hence relying on maintaining
-// the collection on a secondary storage.
-type StoredChunkDataPack struct {
-	ChunkID           flow.Identifier
-	StartState        flow.StateCommitment
-	Proof             flow.StorageProof
-	CollectionID      flow.Identifier
-	SystemChunk       bool
-	ExecutionDataRoot flow.BlockExecutionDataRoot
-}
-
-func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
-	sc := &StoredChunkDataPack{
-		ChunkID:           c.ChunkID,
-		StartState:        c.StartState,
-		Proof:             c.Proof,
-		SystemChunk:       false,
-		ExecutionDataRoot: c.ExecutionDataRoot,
-	}
-
-	if c.Collection != nil {
-		// non system chunk
-		sc.CollectionID = c.Collection.ID()
-	} else {
-		sc.SystemChunk = true
-	}
-
-	return sc
-}
-
-func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) error {
-	if c.ChunkID != other.ChunkID {
-		return ErrDataMismatch
-	}
-	if c.StartState != other.StartState {
-		return ErrDataMismatch
-	}
-	if !c.ExecutionDataRoot.Equals(other.ExecutionDataRoot) {
-		return ErrDataMismatch
-	}
-	if c.SystemChunk != other.SystemChunk {
-		return ErrDataMismatch
-	}
-	if !bytes.Equal(c.Proof, other.Proof) {
-		return ErrDataMismatch
-	}
-	if c.CollectionID != other.CollectionID {
-		return ErrDataMismatch
-	}
-	return nil
+	// BatchRemoveStoredChunkDataPacksOnly removes multiple ChunkDataPacks with the given chunk IDs from chunk data pack database only.
+	// It does not remove the index mappings from ChunkID to storedChunkDataPackID in the protocol database.
+	// This method is useful for the runtime chunk data pack pruner to batch remove chunk data packs associated with a set of blocks.
+	// No errors are expected during normal operation, even if no entries are matched.
+	BatchRemoveStoredChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch ReaderBatchWriter) error
 }
