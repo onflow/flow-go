@@ -98,7 +98,7 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 	p.Require().NoError(err)
 
 	eventsList := unittest.EventsFixture(5)
-	err = p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{eventsList})
+	err = p.inMemoryEvents.Store(nil, p.executionResult.BlockID, []flow.EventsList{eventsList})
 	p.Require().NoError(err)
 
 	for i := 0; i < 2; i++ {
@@ -133,7 +133,7 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	t := p.T()
 
-	err := p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{})
+	err := p.inMemoryEvents.Store(nil, p.executionResult.BlockID, []flow.EventsList{})
 	p.Require().NoError(err)
 
 	err = p.inMemoryResults.Store(p.executionResult.BlockID, []flow.LightTransactionResult{})

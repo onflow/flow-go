@@ -225,6 +225,8 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	blockProcessor, err := NewFinalizedBlockProcessor(
 		s.log,
 		s.proto.state,
+		s.lockManager,
+		s.db,
 		s.blocks,
 		s.results,
 		processedHeightInitializer,

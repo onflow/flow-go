@@ -3,6 +3,7 @@ package ingestion2
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -45,7 +46,10 @@ type FinalizedBlockProcessor struct {
 
 	consumer         *jobqueue.ComponentConsumer
 	consumerNotifier engine.Notifier
-	blocks           storage.Blocks
+	lockManager      storage.LockManager
+	db               storage.DB
+
+	blocks storage.Blocks
 
 	executionResults storage.ExecutionResults
 
@@ -60,6 +64,8 @@ type FinalizedBlockProcessor struct {
 func NewFinalizedBlockProcessor(
 	log zerolog.Logger,
 	state protocol.State,
+	lockManager storage.LockManager,
+	db storage.DB,
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer,
@@ -75,6 +81,8 @@ func NewFinalizedBlockProcessor(
 	consumerNotifier := engine.NewNotifier()
 	processor := &FinalizedBlockProcessor{
 		log:                      log,
+		db:                       db,
+		lockManager:              lockManager,
 		blocks:                   blocks,
 		executionResults:         executionResults,
 		consumerNotifier:         consumerNotifier,
@@ -150,13 +158,18 @@ func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := p.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
-	}
+	err = storage.WithLock(p.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// loop through seals and index ID -> result ID
+			for _, seal := range block.Payload.Seals {
+				err := p.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
+				if err != nil {
+					return fmt.Errorf("could not index block for execution result: %w", err)
+				}
+			}
+			return nil
+		})
+	})
 
 	p.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	p.collectionExecutedMetric.BlockFinalized(block)
