@@ -38,11 +38,12 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			}
 			txResults = append(txResults, expected)
 		}
-		unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return st.BatchStore(lctx, blockID, txResults, rw)
 			})
 		})
+		require.NoError(t, err)
 
 		for _, txResult := range txResults {
 			actual, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)

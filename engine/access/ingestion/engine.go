@@ -386,7 +386,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	}
 
 	// TODO (leothis): to use a different lock ID
-	storage.WithLock(e.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+	err = storage.WithLock(e.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// loop through seals and index ID -> result ID
 			for _, seal := range block.Payload.Seals {
@@ -398,6 +398,9 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 			return nil
 		})
 	})
+	if err != nil {
+		return fmt.Errorf("could not index execution results: %w", err)
+	}
 
 	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	e.collectionExecutedMetric.BlockFinalized(block)

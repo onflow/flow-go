@@ -26,18 +26,20 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 		txResults := getLightTransactionResultsFixture(10)
 
 		t.Run("batch store1 results", func(t *testing.T) {
-			unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return store1.BatchStore(lctx, blockID, txResults, rw)
 				})
 			})
+			require.NoError(t, err)
 
 			// add a results to a new block to validate they are not included in lookups
-			unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+			err = unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return store1.BatchStore(lctx, unittest.IdentifierFixture(), getLightTransactionResultsFixture(2), rw)
 				})
 			})
+			require.NoError(t, err)
 
 		})
 

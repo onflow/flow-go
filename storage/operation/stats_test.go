@@ -16,7 +16,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
-		unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// insert random events
 				b := unittest.IdentifierFixture()
@@ -55,6 +55,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 				return nil
 			})
 		})
+		require.NoError(t, err)
 
 		// summarize keys by first byte
 		stats, err := operation.SummarizeKeysByFirstByteConcurrent(unittest.Logger(), db.Reader(), 10)

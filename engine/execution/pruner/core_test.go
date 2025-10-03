@@ -79,6 +79,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 					return results.BatchIndex(lctx, rw, chunk.Result.BlockID, chunk.Result.ID())
 				})
 			})
+			require.NoError(t, err)
 			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 				return chunkDataPacks.StoreByChunkID(lctx, []*flow.ChunkDataPack{chunk.ChunkDataPack})
 			}))

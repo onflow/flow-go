@@ -170,6 +170,9 @@ func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
 			return nil
 		})
 	})
+	if err != nil {
+		return fmt.Errorf("could not index execution results: %w", err)
+	}
 
 	p.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	p.collectionExecutedMetric.BlockFinalized(block)
