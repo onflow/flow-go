@@ -382,7 +382,9 @@ func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.Sig
 
 	execData, err := e.execDataCache.ByBlockID(ctx, blockID)
 
-	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
+	// use the last processed index to ensure the metrics reflect the highest _consecutive_ height.
+	// this makes it easier to see when downloading gets stuck at a height.
+	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, e.blockConsumer.LastProcessedIndex())
 
 	if isInvalidBlobError(err) {
 		// This means an execution result was sealed with an invalid execution data id (invalid data).
