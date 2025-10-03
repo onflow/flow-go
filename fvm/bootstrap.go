@@ -306,6 +306,8 @@ type bootstrapExecutor struct {
 	txnState storage.TransactionPreparer
 
 	accountCreator environment.BootstrapAccountCreator
+
+	output ProcedureOutput
 }
 
 func newBootstrapExecutor(
@@ -319,6 +321,7 @@ func newBootstrapExecutor(
 			ctx,
 			WithContractDeploymentRestricted(false)),
 		txnState: txnState,
+		output:   ProcedureOutput{},
 	}
 }
 
@@ -327,7 +330,7 @@ func (b *bootstrapExecutor) Cleanup() {
 }
 
 func (b *bootstrapExecutor) Output() ProcedureOutput {
-	return ProcedureOutput{}
+	return b.output
 }
 
 func (b *bootstrapExecutor) Preprocess() error {
@@ -1069,13 +1072,11 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		WithEVMEnabled(true),
 	)
 
-	run := func(tx *flow.TransactionBody, failMSG string) {
-		txError, err := b.invokeMetaTransaction(ctx, Transaction(tx, 0))
-		panicOnMetaInvokeErrf(failMSG, txError, err)
-	}
+	txIndex := uint32(0)
+	events := flow.EventsList{}
 
 	runAndReturn := func(tx *flow.TransactionBody, failMSG string) ProcedureOutput {
-		txOutput, err := b.runMetaTransaction(ctx, Transaction(tx, 0))
+		txOutput, err := b.runMetaTransaction(ctx, Transaction(tx, txIndex))
 
 		if err != nil {
 			panic(fmt.Sprintf(failMSG, err.Error()))
@@ -1083,6 +1084,8 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		if txOutput.Err != nil {
 			panic(fmt.Sprintf(failMSG, txOutput.Err.Error()))
 		}
+		txIndex += 1
+		events = append(events, txOutput.Events...)
 
 		return txOutput
 	}
@@ -1092,7 +1095,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	if err != nil {
 		panic(fmt.Sprintf("failed to build COA contract transaction: %s", err))
 	}
-	run(txBody, "failed to create COA in Service Account: %s")
+	runAndReturn(txBody, "failed to create COA in Service Account: %s")
 
 	// Arbitrary high gas limit that can be used for all the
 	// EVM transactions to ensure none of them run out of gas
@@ -1171,27 +1174,13 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 			if err != nil {
 				panic(fmt.Sprintf("failed to build FlowEVMBridgeUtils transaction: %s", err))
 			}
-
-			txError, err := b.invokeMetaTransaction(
-				ctx,
-				Transaction(
-					txBody,
-					0),
-			)
-			panicOnMetaInvokeErrf("failed to deploy FlowEVMBridgeUtils contract: %s", txError, err)
+			runAndReturn(txBody, "failed to deploy FlowEVMBridgeUtils contract: %s")
 		} else {
 			txBody, err := blueprints.DeployContractTransaction(serviceAddress, contract, name).Build()
 			if err != nil {
 				panic(fmt.Sprintf("failed to build "+name+" contract transaction: %s", err))
 			}
-
-			txError, err := b.invokeMetaTransaction(
-				ctx,
-				Transaction(
-					txBody,
-					0),
-			)
-			panicOnMetaInvokeErrf("failed to deploy "+name+" contract: %s", txError, err)
+			runAndReturn(txBody, "failed to deploy "+name+" contract: %s")
 		}
 	}
 
@@ -1200,49 +1189,49 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	if err != nil {
 		panic(fmt.Sprintf("failed to build pause the bridge contracts transaction: %s", err))
 	}
-	run(txBody, "failed to pause the bridge contracts: %s")
+	runAndReturn(txBody, "failed to pause the bridge contracts: %s")
 
 	// Set the factory as registrar in the registry
 	txBody, err = blueprints.SetRegistrarTransaction(*env, bridgeEnv, serviceAddress, registryAddress)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build set the factory as register transaction: %s", err))
 	}
-	run(txBody, "failed to set the factory as registrar: %s")
+	runAndReturn(txBody, "failed to set the factory as registrar: %s")
 
 	// Add the registry to the factory
 	txBody, err = blueprints.SetDeploymentRegistryTransaction(*env, bridgeEnv, serviceAddress, registryAddress)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build add the registry to the factory transaction: %s", err))
 	}
-	run(txBody, "failed to add the registry to the factory: %s")
+	runAndReturn(txBody, "failed to add the registry to the factory: %s")
 
 	// Set the factory as delegated deployer in the ERC20 deployer
 	txBody, err = blueprints.SetDelegatedDeployerTransaction(*env, bridgeEnv, serviceAddress, erc20DeployerAddress)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build set the erc20 deployer as delegated deployer transaction: %s", err))
 	}
-	run(txBody, "failed to set the erc20 deployer as delegated deployer: %s")
+	runAndReturn(txBody, "failed to set the erc20 deployer as delegated deployer: %s")
 
 	// Set the factory as delegated deployer in the ERC721 deployer
 	txBody, err = blueprints.SetDelegatedDeployerTransaction(*env, bridgeEnv, serviceAddress, erc721DeployerAddress)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build set the erc721 deployer as delegated deployer transaction: %s", err))
 	}
-	run(txBody, "failed to set the erc721 deployer as delegated deployer: %s")
+	runAndReturn(txBody, "failed to set the erc721 deployer as delegated deployer: %s")
 
 	// Add the ERC20 Deployer as a deployer in the factory
 	txBody, err = blueprints.AddDeployerTransaction(*env, bridgeEnv, serviceAddress, "ERC20", erc20DeployerAddress)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build add the erc20 deployer in the factory transaction: %s", err))
 	}
-	run(txBody, "failed to add the erc20 deployer in the factory: %s")
+	runAndReturn(txBody, "failed to add the erc20 deployer in the factory: %s")
 
 	// Add the ERC721 Deployer as a deployer in the factory
 	txBody, err = blueprints.AddDeployerTransaction(*env, bridgeEnv, serviceAddress, "ERC721", erc721DeployerAddress)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build add the erc721 in the factory transaction: %s", err))
 	}
-	run(txBody, "failed to add the erc721 deployer in the factory: %s")
+	runAndReturn(txBody, "failed to add the erc721 deployer in the factory: %s")
 
 	// 	/* --- EVM Contract Integration --- */
 
@@ -1251,28 +1240,28 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	if err != nil {
 		panic(fmt.Sprintf("failed to build deploy FlowEVMBridgeAccessor transaction: %s", err))
 	}
-	run(txBody, "failed to deploy FlowEVMBridgeAccessor contract: %s")
+	runAndReturn(txBody, "failed to deploy FlowEVMBridgeAccessor contract: %s")
 
 	// Integrate the EVM contract with the BridgeAccessor
 	txBody, err = blueprints.IntegrateEVMWithBridgeAccessorTransaction(*env, bridgeEnv, serviceAddress)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build integrate the EVM contract with the BridgeAccessor transaction: %s", err))
 	}
-	run(txBody, "failed to integrate the EVM contract with the BridgeAccessor: %s")
+	runAndReturn(txBody, "failed to integrate the EVM contract with the BridgeAccessor: %s")
 
 	// Set the bridge onboarding fees
 	txBody, err = blueprints.UpdateOnboardFeeTransaction(*env, bridgeEnv, serviceAddress, 1.0)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build update the bridge onboarding fees transaction: %s", err))
 	}
-	run(txBody, "failed to update the bridge onboarding fees: %s")
+	runAndReturn(txBody, "failed to update the bridge onboarding fees: %s")
 
 	// Set the bridge base fee
 	txBody, err = blueprints.UpdateBaseFeeTransaction(*env, bridgeEnv, serviceAddress, 0.001)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build update the bridge base fees transaction: %s", err))
 	}
-	run(txBody, "failed to update the bridge base fees: %s")
+	runAndReturn(txBody, "failed to update the bridge base fees: %s")
 
 	tokenChunks := bridge.GetCadenceTokenChunkedJSONArguments(false)
 	nftChunks := bridge.GetCadenceTokenChunkedJSONArguments(true)
@@ -1282,14 +1271,14 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	if err != nil {
 		panic(fmt.Sprintf("failed to build add the FT template code chunks transaction: %s", err))
 	}
-	run(txBody, "failed to add the FT template code chunks: %s")
+	runAndReturn(txBody, "failed to add the FT template code chunks: %s")
 
 	// Add the NFT Template Cadence Code Chunks
 	txBody, err = blueprints.UpsertContractCodeChunksTransaction(*env, bridgeEnv, serviceAddress, "bridgedNFT", nftChunks)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build add the NFT template code chunks transaction: %s", err))
 	}
-	run(txBody, "failed to add the NFT template code chunks: %s")
+	runAndReturn(txBody, "failed to add the NFT template code chunks: %s")
 
 	// Retrieve the WFLOW bytecode from the JSON args
 	wflowBytecode, err := bridge.GetSolidityContractCode("WFLOW")
@@ -1314,7 +1303,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	if err != nil {
 		panic(fmt.Sprintf("failed to build create the WFLOW token handler transaction: %s", err))
 	}
-	run(txBody, "failed to create the WFLOW token handler: %s")
+	runAndReturn(txBody, "failed to create the WFLOW token handler: %s")
 
 	// Enable WFLOW Token Handler, supplying the Cadence FlowToken.Vault type
 	flowVaultType := "A." + env.FlowTokenAddress + ".FlowToken.Vault"
@@ -1323,15 +1312,16 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	if err != nil {
 		panic(fmt.Sprintf("failed to build enable the WFLOW token handler transaction: %s", err))
 	}
-	run(txBody, "failed to enable the WFLOW token handler: %s")
+	runAndReturn(txBody, "failed to enable the WFLOW token handler: %s")
 
 	// Unpause the bridge
 	txBody, err = blueprints.PauseBridgeTransaction(*env, bridgeEnv, serviceAddress, false)
 	if err != nil {
 		panic(fmt.Sprintf("failed to build un-pause the bridge contracts transaction: %s", err))
 	}
-	run(txBody,
-		"failed to un-pause the bridge contracts: %s")
+	runAndReturn(txBody, "failed to un-pause the bridge contracts: %s")
+
+	b.output.Events = events
 }
 
 // getContractAddressFromEVMEvent gets the deployment address from an evm deployment transaction
