@@ -24,10 +24,8 @@ func TestInsertProtocolKVStore(t *testing.T) {
 		}
 
 		kvStoreStateID := unittest.IdentifierFixture()
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, expected)
-			})
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertProtocolKVStore(rw, kvStoreStateID, expected)
 		})
 		require.NoError(t, err)
 
@@ -53,47 +51,6 @@ func TestInsertProtocolKVStore(t *testing.T) {
 	})
 }
 
-// TestInsertProtocolKVStore_ErrAlreadyExists tests that InsertProtocolKVStore returns ErrAlreadyExists
-// when attempting to insert a protocol KV store that already exists.
-func TestInsertProtocolKVStore_ErrAlreadyExists(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
-		expected := &flow.PSKeyValueStoreData{
-			Version: 2,
-			Data:    unittest.RandomBytes(32),
-		}
-
-		kvStoreStateID := unittest.IdentifierFixture()
-
-		// First insertion should succeed
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, expected)
-			})
-		})
-		require.NoError(t, err)
-
-		// Second insertion with same ID should fail with ErrAlreadyExists
-		differentData := &flow.PSKeyValueStoreData{
-			Version: 3,
-			Data:    unittest.RandomBytes(32),
-		}
-		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, differentData)
-			})
-		})
-		require.Error(t, err)
-		require.ErrorIs(t, err, storage.ErrAlreadyExists)
-
-		// Verify original data is still there and unchanged
-		var actual flow.PSKeyValueStoreData
-		err = operation.RetrieveProtocolKVStore(db.Reader(), kvStoreStateID, &actual)
-		require.NoError(t, err)
-		assert.Equal(t, expected, &actual)
-	})
-}
-
 // TestIndexProtocolKVStore_ErrAlreadyExists tests that IndexProtocolKVStore returns ErrAlreadyExists
 // when attempting to index a protocol KV store for a block ID that already has an index.
 func TestIndexProtocolKVStore_ErrAlreadyExists(t *testing.T) {
@@ -108,10 +65,8 @@ func TestIndexProtocolKVStore_ErrAlreadyExists(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		// Insert the protocol KV store first
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, expected)
-			})
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertProtocolKVStore(rw, kvStoreStateID, expected)
 		})
 		require.NoError(t, err)
 
@@ -141,29 +96,6 @@ func TestIndexProtocolKVStore_ErrAlreadyExists(t *testing.T) {
 	})
 }
 
-// TestInsertProtocolKVStore_MissingLock tests that InsertProtocolKVStore requires LockInsertBlock.
-func TestInsertProtocolKVStore_MissingLock(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
-		expected := &flow.PSKeyValueStoreData{
-			Version: 2,
-			Data:    unittest.RandomBytes(32),
-		}
-
-		kvStoreStateID := unittest.IdentifierFixture()
-
-		// Attempt to insert without holding the required lock
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, expected)
-		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), storage.LockInsertBlock)
-	})
-}
-
 // TestIndexProtocolKVStore_MissingLock tests that IndexProtocolKVStore requires LockInsertBlock.
 func TestIndexProtocolKVStore_MissingLock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -177,28 +109,6 @@ func TestIndexProtocolKVStore_MissingLock(t *testing.T) {
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.IndexProtocolKVStore(lctx, rw, blockID, kvStoreStateID)
-		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), storage.LockInsertBlock)
-	})
-}
-
-// TestInsertProtocolKVStore_WrongLock tests that InsertProtocolKVStore fails when holding wrong locks.
-func TestInsertProtocolKVStore_WrongLock(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
-		expected := &flow.PSKeyValueStoreData{
-			Version: 2,
-			Data:    unittest.RandomBytes(32),
-		}
-
-		kvStoreStateID := unittest.IdentifierFixture()
-
-		// Test with LockFinalizeBlock (wrong lock)
-		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertProtocolKVStore(lctx, rw, kvStoreStateID, expected)
-			})
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), storage.LockInsertBlock)

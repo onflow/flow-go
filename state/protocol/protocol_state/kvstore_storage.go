@@ -20,13 +20,8 @@ type ProtocolKVStore interface {
 	// implementations of [protocol.KVStoreReader] should be able to successfully encode their state into a
 	// data blob. If the encoding fails, an error is returned.
 	//
-	// CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent database
-	// write. Hence, we require the caller to acquire the [storage.LockInsertBlock] lock and hold it until the database
-	// write has been committed.
-	//
-	// Expected error returns during normal operations:
-	// - [storage.ErrAlreadyExists] if a KV store with the given ID has already been stored
-	BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
+	// No error is expected during normal operations
+	BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
 
 	// BatchIndex writes the blockID->stateID index to the input write batch.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the

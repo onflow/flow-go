@@ -3,8 +3,6 @@ package kvstore
 import (
 	"fmt"
 
-	"github.com/jordanschalm/lockctx"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -37,20 +35,15 @@ func NewProtocolKVStore(protocolStateSnapshots storage.ProtocolKVStore) *Protoco
 // data blob. If the encoding fails, an error is returned.
 // BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
 // Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
-// ProtocolStateVersion). Hence, for the same ID (key), BatchStore will reject changing the data (value).
+// ProtocolStateVersion).
 //
-// CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent
-// database write. Hence, we require the caller to acquire [storage.LockInsertBlock] and hold it until the
-// database write has been committed.
-//
-// Expected error returns during normal operations:
-// - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
-func (p *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
+// No error is exepcted during normal operations
+func (p *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
 	version, data, err := kvStore.VersionedEncode()
 	if err != nil {
 		return fmt.Errorf("failed to VersionedEncode protocol state: %w", err)
 	}
-	return p.ProtocolKVStore.BatchStore(lctx, rw, stateID, &flow.PSKeyValueStoreData{
+	return p.ProtocolKVStore.BatchStore(rw, stateID, &flow.PSKeyValueStoreData{
 		Version: version,
 		Data:    data,
 	})

@@ -70,7 +70,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 		db: db,
 		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
-			withStoreWithLock(operation.InsertProtocolKVStore),
+			withStore(operation.InsertProtocolKVStore),
 			withRetrieve(retrieveByStateID)),
 		byBlockIdCache: newCache(collector, metrics.ResourceProtocolKVStoreByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](kvStoreByBlockIDCacheSize),
@@ -84,15 +84,10 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
 // ProtocolStateVersion). Hence, for the same ID, BatchStore will reject changing the data.
 //
-// CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent database
-// write. Hence, we require the caller to acquire the [storage.LockInsertBlock] lock and hold it until the database
-// write has been committed.
-//
-// Expected error returns during normal operations:
-// - [storage.ErrAlreadyExist] if a KV store with the given ID has already been stored
-func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+// No error is expected during normal operations.
+func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return s.cache.PutWithLockTx(lctx, rw, stateID, data)
+		return s.cache.PutTx(rw, stateID, data)
 	})
 }
 
