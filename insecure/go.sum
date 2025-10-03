@@ -636,8 +636,6 @@ github.com/ipfs/go-datastore v0.9.0 h1:WocriPOayqalEsueHv6SdD4nPVl4rYMfYGLD4bqCZ
 github.com/ipfs/go-datastore v0.9.0/go.mod h1:uT77w/XEGrvJWwHgdrMr8bqCN6ZTW9gzmi+3uK+ouHg=
 github.com/ipfs/go-detect-race v0.0.1 h1:qX/xay2W3E4Q1U7d9lNs1sU9nvguX0a7319XbyQ6cOk=
 github.com/ipfs/go-detect-race v0.0.1/go.mod h1:8BNT7shDZPo99Q74BpGMK+4D8Mn4j46UU0LZ723meps=
-github.com/ipfs/go-ds-pebble v0.5.0 h1:lXffYCAKVD7nLLPqwJ9D8IxgO7Kz8woiX021tezdsIM=
-github.com/ipfs/go-ds-pebble v0.5.0/go.mod h1:aiCRVcj3K60sxc6k5C+HO9C6rouqiSkjR/WKnbTcMfQ=
 github.com/ipfs/go-ipfs-blocksutil v0.0.1 h1:Eh/H4pc1hsvhzsQoMEP3Bke/aW5P5rVM1IWFJMcGIPQ=
 github.com/ipfs/go-ipfs-blocksutil v0.0.1/go.mod h1:Yq4M86uIOmxmGPUHv/uI7uKqZNtLb449gwKqXjIsnRk=
 github.com/ipfs/go-ipfs-delay v0.0.1 h1:r/UXYyRcddO6thwOnhiznIAiSvxMECGgtv35Xs1IeRQ=
@@ -963,6 +961,8 @@ github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/9
 github.com/pelletier/go-toml/v2 v2.2.1 h1:9TA9+T8+8CUCO2+WYnDLCgrYi9+omqKXyjDtosvtEhg=
 github.com/pelletier/go-toml/v2 v2.2.1/go.mod h1:1t835xjRzz80PqgE6HHgN2JOsmgYu/h4qDAS4n929Rs=
 github.com/performancecopilot/speed v3.0.0+incompatible/go.mod h1:/CLtqpZ5gBg1M9iaPbIdPPGyKcA8hKdoy6hAWba7Yac=
+github.com/peterargue/go-ds-pebble v0.0.0-20251003183744-37392546ca21 h1:7OFQHuOryh8BUxxYvL5U/2P3GzJQwi5MQtaqr3fJT8o=
+github.com/peterargue/go-ds-pebble v0.0.0-20251003183744-37392546ca21/go.mod h1:pn2bxYkAE7JRkbAF7D8xuEEFD3oOQ7QqQZPWkAVBs58=
 github.com/pierrec/lz4 v1.0.2-0.20190131084431-473cd7ce01a1/go.mod h1:3/3N9NVKO0jef7pBehbT1qWhCMrIgbYNnFAZCqQ5LRc=
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
 github.com/pierrec/lz4 v2.6.1+incompatible h1:9UY3+iC23yxF0UfGaYrGplQ+79Rg+h/q9FV9ix19jjM=
