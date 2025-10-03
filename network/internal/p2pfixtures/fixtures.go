@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -58,7 +57,7 @@ func SilentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
 	require.NoError(t, err)
 
 	addrs := []multiaddr.Multiaddr{addr}
-	addrs, err = addrutil.ResolveUnspecifiedAddresses(addrs, nil)
+	addrs, err = manet.ResolveUnspecifiedAddresses(addrs, nil)
 	require.NoError(t, err)
 
 	go acceptAndHang(t, lst)

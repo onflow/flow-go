@@ -35,9 +35,7 @@ require (
 	github.com/ipfs/go-datastore v0.9.0
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/ipfs/go-ipld-format v0.6.3
-	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-log/v2 v2.8.1
-	github.com/libp2p/go-addr-util v0.1.0
 	github.com/libp2p/go-libp2p v0.43.0
 	github.com/libp2p/go-libp2p-kad-dht v0.34.0
 	github.com/libp2p/go-libp2p-kbucket v0.7.0
@@ -281,7 +279,6 @@ require (
 	github.com/onflow/flow-nft/lib/go/contracts v1.3.0 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.3.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
-	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
