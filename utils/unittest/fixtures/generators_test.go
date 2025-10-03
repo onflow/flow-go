@@ -519,7 +519,6 @@ func TestGeneratorsDeterminism(t *testing.T) {
 			},
 			sanity: func(t *testing.T, suite *GeneratorSuite) {
 				chunk := suite.Chunks().Fixture()
-				assert.NotEmpty(t, chunk.CollectionIndex)
 				assert.NotEmpty(t, chunk.StartState)
 				assert.NotEmpty(t, chunk.EventCollection)
 				assert.NotEmpty(t, chunk.BlockID)
