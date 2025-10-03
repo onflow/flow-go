@@ -1,6 +1,7 @@
 package operation_test
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -253,7 +254,7 @@ func TestRemoveDiskUsage(t *testing.T) {
 
 		// 2. Flush and compact to get a stable state.
 		require.NoError(t, db.Flush())
-		require.NoError(t, db.Compact(prefix, endPrefix, true))
+		require.NoError(t, db.Compact(context.Background(), prefix, endPrefix, true))
 
 		// 3. Get sizeBefore.
 		sizeBefore := getFolderSize(t, dir)
@@ -271,7 +272,7 @@ func TestRemoveDiskUsage(t *testing.T) {
 
 		// 5. Flush and compact again.
 		require.NoError(t, db.Flush())
-		require.NoError(t, db.Compact(prefix, endPrefix, true))
+		require.NoError(t, db.Compact(context.Background(), prefix, endPrefix, true))
 
 		// 6. Verify the disk usage is reduced.
 		require.Eventually(t, func() bool {

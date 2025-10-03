@@ -22,16 +22,15 @@ func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *
 
 		// When the maximum number of bytes for a level is exceeded, compaction is requested.
 		LBaseMaxBytes: 64 << 20, // 64 MB
-		Levels:        make([]pebble.LevelOptions, 7),
 		MaxOpenFiles:  16384,
 
 		// Writes are stopped when the sum of the queued memtable sizes exceeds MemTableStopWritesThreshold*MemTableSize.
 		MemTableSize:                64 << 20,
 		MemTableStopWritesThreshold: 4,
 
-		// The default is 1.
-		MaxConcurrentCompactions: func() int { return 4 },
-		Logger:                   util.NewLogger(logger),
+		// The default is 1, 1.
+		CompactionConcurrencyRange: func() (upper int, lower int) { return 1, 4 },
+		Logger:                     util.NewLogger(logger),
 	}
 
 	for i := 0; i < len(opts.Levels); i++ {
@@ -46,11 +45,7 @@ func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *
 		l.FilterPolicy = bloom.FilterPolicy(MinLookupKeyLen)
 		l.FilterType = pebble.TableFilter
 
-		if i > 0 {
-			// L0 starts at 2MiB, each level is 2x the previous.
-			l.TargetFileSize = opts.Levels[i-1].TargetFileSize * 2
-		}
-		l.EnsureDefaults()
+		l.EnsureL0Defaults()
 	}
 
 	// TODO(rbtz): benchmark with and without bloom filters on L6
@@ -58,7 +53,7 @@ func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *
 
 	// Splitting sstables during flush allows increased compaction flexibility and concurrency when those
 	// tables are compacted to lower levels.
-	opts.FlushSplitBytes = opts.Levels[0].TargetFileSize
+	opts.FlushSplitBytes = opts.TargetFileSizes[0]
 	opts.EnsureDefaults()
 
 	return opts
