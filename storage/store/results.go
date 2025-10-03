@@ -82,12 +82,6 @@ func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatch
 	return r.indexCache.PutWithLockTx(lctx, rw, blockID, resultID)
 }
 
-func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
-	return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return r.store(rw, result)
-	})
-}
-
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.ReaderBatchWriter) error {
 	return r.store(batch, result)
 }

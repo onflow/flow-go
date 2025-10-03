@@ -20,9 +20,6 @@ type ExecutionResultsReader interface {
 type ExecutionResults interface {
 	ExecutionResultsReader
 
-	// Store stores an execution result.
-	Store(result *flow.ExecutionResult) error
-
 	// BatchStore stores an execution result in a given batch
 	BatchStore(result *flow.ExecutionResult, batch ReaderBatchWriter) error
 

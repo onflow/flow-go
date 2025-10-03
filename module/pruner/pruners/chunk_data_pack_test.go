@@ -30,7 +30,13 @@ func TestChunkDataPackPruner(t *testing.T) {
 
 		// store the chunks
 		cdp1, result1 := unittest.ChunkDataPacksFixtureAndResult()
-		require.NoError(t, results.Store(result1))
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := results.BatchStore(result1, rw)
+				require.NoError(t, err)
+				return nil
+			})
+		}))
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			return chunks.StoreByChunkID(lctx, cdp1)
 		}))
