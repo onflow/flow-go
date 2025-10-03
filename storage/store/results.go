@@ -23,8 +23,8 @@ var _ storage.ExecutionResults = (*ExecutionResults)(nil)
 
 func NewExecutionResults(collector module.CacheMetrics, db storage.DB) *ExecutionResults {
 
-	store := func(rw storage.ReaderBatchWriter, _ flow.Identifier, result *flow.ExecutionResult) error {
-		return operation.InsertExecutionResult(rw.Writer(), result)
+	store := func(rw storage.ReaderBatchWriter, resultID flow.Identifier, result *flow.ExecutionResult) error {
+		return operation.InsertExecutionResult(rw.Writer(), resultID, result)
 	}
 
 	retrieve := func(r storage.Reader, resultID flow.Identifier) (*flow.ExecutionResult, error) {

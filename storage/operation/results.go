@@ -16,8 +16,8 @@ import (
 // of data corruption, because for the same key, we expect the same value.
 //
 // No errors are expected during normal operation.
-func InsertExecutionResult(w storage.Writer, result *flow.ExecutionResult) error {
-	return UpsertByKey(w, MakePrefix(codeExecutionResult, result.ID()), result)
+func InsertExecutionResult(w storage.Writer, resultID flow.Identifier, result *flow.ExecutionResult) error {
+	return UpsertByKey(w, MakePrefix(codeExecutionResult, resultID), result)
 }
 
 // RetrieveExecutionResult retrieves an Execution Result by its ID.
