@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -80,7 +79,7 @@ type RestAPITestSuite struct {
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.sealedSnaphost = new(protocol.Snapshot)

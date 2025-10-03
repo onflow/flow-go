@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -9,34 +10,99 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// UpsertBlockChildren updates the children of the specified parent block ID.
+// IndexNewBlock populates the parent-child index for block, by adding the given blockID to the set of children of its parent.
 //
 // CAUTION:
-//   - The caller must acquire either the lock [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock] (but not both)
-//     and hold it until the database write has been committed.
-//   - OVERWRITES existing data (potential for data corruption):
-//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
-//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
-//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
-//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
-//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
-//     ATOMICALLY with this write operation.
+//   - This function should only be used for KNOWN BLOCKs (neither existence of the block nor its parent is verified here)
+//   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
 //
-// No errors are expected during normal operation.
-func UpsertBlockChildren(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, childrenIDs flow.IdentifierList) error {
-	held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
-	if !held {
-		return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if the blockID is already indexed as a child of the parent
+func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
-	return UpsertByKey(w, MakePrefix(codeBlockChildren, blockID), childrenIDs)
+	return indexBlockByParent(rw, blockID, parentID)
+}
+
+// IndexNewClusterBlock populates the parent-child index for cluster blocks, aka collections, by adding the given
+// blockID to the set of children of its parent.
+//
+// CAUTION:
+//   - This function should only be used for KNOWN BLOCKs (neither existence of the block nor its parent is verified here)
+//   - The caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if the blockID is already indexed as a child of the parent
+func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
+	}
+
+	return indexBlockByParent(rw, blockID, parentID)
+}
+
+// indexBlockByParent is the internal function that implements the indexing logic for both regular blocks and cluster blocks.
+// the caller must ensure the required locks are held to prevent concurrent writes to the [codeBlockChildren] key space.
+func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
+	// By convention, the parentID being [flow.ZeroID] means that the block is a root block that has no parent.
+	// This is the case for genesis blocks and cluster root blocks. In this case, we don't need to index anything.
+	if parentID == flow.ZeroID {
+		return nil
+	}
+
+	// If the parent block is not zero, depending on whether the parent block has
+	// children or not, we will either update the index or insert the index.
+	var childrenIDs flow.IdentifierList
+	err := RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not look up block children: %w", err)
+		}
+	}
+
+	// check we don't add a duplicate
+	for _, dupID := range childrenIDs {
+		if blockID == dupID {
+			return storage.ErrAlreadyExists
+		}
+	}
+
+	// adding the new block to be another child of the parent
+	childrenIDs = append(childrenIDs, blockID)
+
+	// saving the index
+	err = UpsertByKey(rw.Writer(), MakePrefix(codeBlockChildren, parentID), childrenIDs)
+	if err != nil {
+		return fmt.Errorf("could not update children index: %w", err)
+	}
+
+	return nil
 }
 
 // RetrieveBlockChildren retrieves the list of child block IDs for the specified parent block.
-// For every known block (at or above the root block height), this index should be populated.
 //
-// Expected errors during normal operations:
-//   - [storage.ErrNotFound] if `blockID` does not refer to a known block
+// No error returns expected during normal operations.
+// It returns [storage.ErrNotFound] if the block has no children.
+// Note, this would mean either the block does not exist or the block exists but has no children.
+// The caller has to check if the block exists by other means if needed.
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
-	return RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
+	err := RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
+	if err != nil {
+		// when indexing new block, we don't create an index for the block if it has no children
+		// so we can't distinguish between a block that doesn't exist and a block that exists but has no children
+		// If the block doesn't have a children index yet, it means it has no children
+		if errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("the block has no children, but it might also be the case the block does not exist: %w", err)
+		}
+
+		return fmt.Errorf("could not retrieve block children: %w", err)
+	}
+
+	if len(*childrenIDs) == 0 {
+		return fmt.Errorf("the block has no children: %w", storage.ErrNotFound)
+	}
+
+	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -19,14 +20,17 @@ import (
 // TestChunkDataPacks_Store evaluates correct storage and retrieval of chunk data packs in the storage.
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
-	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, _ *pebble.DB) {
-		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
-		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, _ *pebble.DB, lockManager storage.LockManager) {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			require.NoError(t, chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks))
+			return chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks)
+		}))
 	})
 }
 
 func TestChunkDataPack_Remove(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
@@ -45,7 +49,9 @@ func TestChunkDataPack_Remove(t *testing.T) {
 			chunkIDs = append(chunkIDs, chunk.ChunkID)
 		}
 
-		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			return chunkDataPackStore.StoreByChunkID(lctx, chunkDataPacks)
+		}))
 		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
 
 		// verify it has been removed
@@ -74,27 +80,31 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 // TestChunkDataPacks_StoreTwice evaluates that storing the same chunk data pack twice
 // does not result in an error.
 func TestChunkDataPacks_StoreTwice(t *testing.T) {
-	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, pdb *pebble.DB) {
+	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, pdb *pebble.DB, lockManager storage.LockManager) {
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
 		store1 := store.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
-		require.NoError(t, store1.Store(chunkDataPacks))
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+			require.NoError(t, store1.StoreByChunkID(lctx, chunkDataPacks))
 
-		for _, c := range chunkDataPacks {
-			c2, err := store1.ByChunkID(c.ChunkID)
-			require.NoError(t, err)
-			require.Equal(t, c, c2)
-		}
+			// sanity-check first that chunk data packs are stored, before attempting to store them again.
+			for _, c := range chunkDataPacks {
+				c2, err := store1.ByChunkID(c.ChunkID)
+				require.NoError(t, err)
+				require.Equal(t, c, c2)
+			}
 
-		require.NoError(t, store1.Store(chunkDataPacks))
+			return store1.StoreByChunkID(lctx, chunkDataPacks)
+		}))
 	})
 }
 
 // WithChunkDataPacks is a test helper that generates specified number of chunk data packs, store1 them using the storeFunc, and
 // then evaluates whether they are successfully retrieved from storage.
-func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *store.ChunkDataPacks, *pebble.DB)) {
+func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *store.ChunkDataPacks, *pebble.DB, storage.LockManager)) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := store.NewCollections(db, transactions)
@@ -109,7 +119,7 @@ func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*
 		}
 
 		// store chunk data packs in the memory using provided store function.
-		storeFunc(t, chunkDataPacks, store1, pdb)
+		storeFunc(t, chunkDataPacks, store1, pdb, lockManager)
 
 		// store1d chunk data packs should be retrieved successfully.
 		for _, expected := range chunkDataPacks {

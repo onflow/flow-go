@@ -53,7 +53,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 	}
 
 	// insert the block payload; without further overwrite checks (see above for explanation)
-	err = operation.InsertProposalSignature(rw.Writer(), blockID, &proposal.ProposerSigData)
+	err = operation.InsertProposalSignature(lctx, rw.Writer(), blockID, &proposal.ProposerSigData)
 	if err != nil {
 		return fmt.Errorf("could not insert proposer signature: %w", err)
 	}
@@ -65,7 +65,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 	}
 
 	// index the child block for recovery; without further overwrite checks (see above for explanation)
-	err = IndexNewClusterBlock(lctx, rw, blockID, proposal.Block.ParentID)
+	err = operation.IndexNewClusterBlock(lctx, rw, blockID, proposal.Block.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not index new cluster block block: %w", err)
 	}
@@ -131,7 +131,6 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	r := rw.GlobalReader()
-	writer := rw.Writer()
 	// retrieve the header to check the parent
 	var header flow.Header
 	err := operation.RetrieveHeader(r, blockID, &header)
@@ -162,13 +161,13 @@ func FinalizeClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	}
 
 	// index the block by its height
-	err = operation.IndexClusterBlockHeight(lctx, writer, clusterID, header.Height, blockID)
+	err = operation.IndexClusterBlockHeight(lctx, rw, clusterID, header.Height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not index cluster block height: %w", err)
 	}
 
 	// update the finalized boundary
-	err = operation.UpsertClusterFinalizedHeight(lctx, writer, clusterID, header.Height)
+	err = operation.UpdateClusterFinalizedHeight(lctx, rw, clusterID, header.Height)
 	if err != nil {
 		return fmt.Errorf("could not update finalized boundary: %w", err)
 	}

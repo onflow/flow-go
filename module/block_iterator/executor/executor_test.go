@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -23,6 +24,7 @@ import (
 // verify the executor is able to iterate through all blocks from the iterator.
 func TestExecute(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		blockCount := 10
 
 		// prepare data
@@ -39,8 +41,10 @@ func TestExecute(t *testing.T) {
 		// store the chunk data packs to be pruned later
 		for _, cdp := range cdps {
 			sc := storage.ToStoredChunkDataPack(cdp)
-			require.NoError(t, pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertChunkDataPack(rw.Writer(), sc)
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertChunkDataPack(lctx, rw, sc)
+				})
 			}))
 		}
 
@@ -72,6 +76,7 @@ func TestExecute(t *testing.T) {
 // verify the pruning can be interrupted and resumed
 func TestExecuteCanBeResumed(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		blockCount := 10
 
 		cdps := make([]*flow.ChunkDataPack, 0, blockCount)
@@ -87,8 +92,10 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		// store the chunk data packs to be pruned later
 		for _, cdp := range cdps {
 			sc := storage.ToStoredChunkDataPack(cdp)
-			require.NoError(t, pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertChunkDataPack(rw.Writer(), sc)
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertChunkDataPack(lctx, rw, sc)
+				})
 			}))
 		}
 
