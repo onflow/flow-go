@@ -153,7 +153,11 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 //
 // No errors are expected during normal operations.
 func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
-	err := p.blocks.IndexBlockContainingCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := storage.WithLock(p.lockManager, storage.LockIndexFinalizedBlock, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return p.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
+		})
+	})
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}

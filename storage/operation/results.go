@@ -37,7 +37,8 @@ func IndexOwnExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, b
 		// during bootstrapping, we index the sealed root block or the spork root block, which is not
 		// produced by the node itself, but we still need to index its execution result to be able to
 		// execute next block
-		lctx.HoldsLock(storage.LockBootstrapping)
+		lctx.HoldsLock(storage.LockBootstrapping) ||
+		lctx.HoldsLock(storage.LockIndexFinalizedBlock)
 	if !held {
 		return fmt.Errorf("missing require locks: %s or %s", storage.LockInsertOwnReceipt, storage.LockBootstrapping)
 	}

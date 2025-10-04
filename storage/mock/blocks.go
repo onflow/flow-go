@@ -154,6 +154,24 @@ func (_m *Blocks) ByView(view uint64) (*flow.Block, error) {
 	return r0, r1
 }
 
+// BatchIndexBlockContainingCollectionGuarantees provides a mock function with given fields: lctx, rw, blockID, collIDs
+func (_m *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {
+	ret := _m.Called(lctx, rw, blockID, collIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchIndexBlockContainingCollectionGuarantees")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, []flow.Identifier) error); ok {
+		r0 = rf(lctx, rw, blockID, collIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // IndexBlockContainingCollectionGuarantees provides a mock function with given fields: blockID, collIDs
 func (_m *Blocks) IndexBlockContainingCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	ret := _m.Called(blockID, collIDs)

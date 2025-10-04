@@ -29,31 +29,36 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 				}
 
 				// insert 100 chunk data packs
-				for i := 0; i < 100; i++ {
-					collectionID := unittest.IdentifierFixture()
-					cdp := &storage.StoredChunkDataPack{
-						ChunkID:      unittest.IdentifierFixture(),
-						StartState:   unittest.StateCommitmentFixture(),
-						Proof:        []byte{'p'},
-						CollectionID: collectionID,
+				return unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx2 lockctx.Context) error {
+					for i := 0; i < 100; i++ {
+						collectionID := unittest.IdentifierFixture()
+						cdp := &storage.StoredChunkDataPack{
+							ChunkID:      unittest.IdentifierFixture(),
+							StartState:   unittest.StateCommitmentFixture(),
+							Proof:        []byte{'p'},
+							CollectionID: collectionID,
+						}
+						err := operation.InsertChunkDataPack(lctx2, rw, cdp)
+						if err != nil {
+							return err
+						}
 					}
-					err := operation.InsertChunkDataPack(lctx, rw, cdp)
-					if err != nil {
-						return err
-					}
-				}
-
-				// insert 20 results
-				for i := 0; i < 20; i++ {
-					result := unittest.ExecutionResultFixture()
-					err := operation.InsertExecutionResult(rw.Writer(), result.ID(), result)
-					if err != nil {
-						return err
-					}
-				}
-
-				return nil
+					return nil
+				})
 			})
+		})
+		require.NoError(t, err)
+
+		// insert 20 results
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			for i := 0; i < 20; i++ {
+				result := unittest.ExecutionResultFixture()
+				err := operation.InsertExecutionResult(rw.Writer(), result.ID(), result)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
 		})
 		require.NoError(t, err)
 

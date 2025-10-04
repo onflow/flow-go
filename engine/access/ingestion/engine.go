@@ -378,9 +378,12 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 
 	// TODO: substitute an indexer module as layer between engine and storage
 
-	// TODO (leothis): to include in the batch update
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexBlockContainingCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := storage.WithLock(e.lockManager, storage.LockIndexFinalizedBlock, func(lctx lockctx.Context) error {
+		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return e.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
+		})
+	})
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
