@@ -381,16 +381,11 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// index the block storage with each of the collection guarantee
 	err := storage.WithLock(e.lockManager, storage.LockIndexFinalizedBlock, func(lctx lockctx.Context) error {
 		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return e.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
-		})
-	})
-	if err != nil {
-		return fmt.Errorf("could not index block for collections: %w", err)
-	}
+			err := e.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
+			if err != nil {
+				return fmt.Errorf("could not index block for collections: %w", err)
+			}
 
-	// TODO (leothis): to use a different lock ID
-	err = storage.WithLock(e.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// loop through seals and index ID -> result ID
 			for _, seal := range block.Payload.Seals {
 				err := e.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
@@ -402,7 +397,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		})
 	})
 	if err != nil {
-		return fmt.Errorf("could not index execution results: %w", err)
+		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
 	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)

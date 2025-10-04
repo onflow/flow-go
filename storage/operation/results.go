@@ -29,7 +29,7 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 
 // IndexOwnExecutionResult indexes the result of the given block.
 // It is used by EN to index the result of a block to continue executing subsequent blocks.
-// The caller must acquire either [storage.LockInsertOwnReceipt] or [storage.LockBootstrapping]
+// The caller must acquire either [storage.LockInsertOwnReceipt] or [storage.LockBootstrapping] or [storage.LockIndexFinalizedBlock]
 //
 // No errors are expected during normal operation.
 func IndexOwnExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {

@@ -554,8 +554,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithExecutionResultBlockID(blockID),
 			unittest.WithServiceEvents(3))
 
-		// TODO (leothis): use a different lock
-		require.NoError(suite.T(), storage.WithLock(lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		require.NoError(suite.T(), storage.WithLock(lockManager, storage.LockIndexFinalizedBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := all.Results.BatchStore(er, rw)
 				if err != nil {
