@@ -554,6 +554,42 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
+// TestExtend_RaceCondition_FinalizedForkWithDupeTx tests the case where an extending
+// block conflicts with a block on another fork, and that fork is finalized.
+// Usually the extending block would be rejected because it is orphaned, however
+// concurrent finalization and extension can allow this scenario to occur.
+//
+//	  ↙ B(tx1)  [tentatively withheld by byzantine proposer to force a fork]
+//	A
+//	  ↖ C(tx1) ← D ← E [E finalizes C]
+func (suite *MutatorSuite) TestExtend_RaceCondition_FinalizedForkWithDupeTx() {
+	tx1 := suite.Tx()
+
+	// create a block extending genesis containing tx1
+	B := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+	// create a conflicting block C, which will be finalized concurrently with inserting B
+	C := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+
+	// should be able to extend block C
+	err := suite.state.Extend(&C)
+	suite.Assert().NoError(err)
+
+	// We want to replicate a race condition where block C is finalized concurrently with
+	// block B being inserted. To accomplish this, we skip actually inserting D/E (although
+	// they would be need in practice). Instead, we manually insert the reference block to
+	// transaction lookup for C which would be inserted during finalization.
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), suite.genesis.Height, C.Block.ID())
+		})
+	})
+	require.NoError(suite.T(), err)
+
+	// we should be able to extend B, because C is on a fork.
+	err = suite.state.Extend(&B)
+	suite.Assert().NoError(err)
+}
+
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 	tx1 := suite.Tx()
 
