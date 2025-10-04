@@ -37,6 +37,8 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -83,6 +85,9 @@ type Suite struct {
 	sporkID              flow.Identifier
 	protocolStateVersion uint64
 	lockManager          lockctx.Manager
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -153,6 +158,9 @@ func (suite *Suite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 	suite.finalizedHeaderCache = mocks.NewFinalizedHeaderCache(suite.T(), suite.state)
+
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
 }
 
 func (suite *Suite) RunTest(
@@ -164,24 +172,27 @@ func (suite *Suite) RunTest(
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                    suite.state,
-			CollectionRPC:            suite.collClient,
-			Blocks:                   all.Blocks,
-			Headers:                  all.Headers,
-			Collections:              all.Collections,
-			Transactions:             all.Transactions,
-			ExecutionResults:         all.Results,
-			ExecutionReceipts:        all.Receipts,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            suite.metrics,
-			MaxHeightRange:           events.DefaultMaxHeightRange,
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:      query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			MaxScriptAndArgumentSize: commonrpc.DefaultAccessMaxRequestSize,
+			State:                       suite.state,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 all.Collections,
+			Transactions:                all.Transactions,
+			ExecutionResults:            all.Results,
+			ExecutionReceipts:           all.Receipts,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
+			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -337,20 +348,24 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		connFactory.On("GetCollectionAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
 		connFactory.On("GetCollectionAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:              collections,
-			Transactions:             transactions,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            metrics,
-			ConnFactory:              connFactory,
-			MaxHeightRange:           events.DefaultMaxHeightRange,
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:      query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			MaxScriptAndArgumentSize: commonrpc.DefaultAccessMaxRequestSize,
+		bnd, err := backend.New(backend.Params{
+			State:                       suite.state,
+			Collections:                 collections,
+			Transactions:                transactions,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
+			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -679,26 +694,29 @@ func (suite *Suite) TestGetSealedTransaction() {
 		)
 
 		bnd, err := backend.New(backend.Params{
-			State:                      suite.state,
-			CollectionRPC:              suite.collClient,
-			Blocks:                     all.Blocks,
-			Headers:                    all.Headers,
-			Collections:                collections,
-			Transactions:               transactions,
-			ExecutionReceipts:          all.Receipts,
-			ExecutionResults:           all.Results,
-			ChainID:                    suite.chainID,
-			AccessMetrics:              suite.metrics,
-			ConnFactory:                connFactory,
-			MaxHeightRange:             events.DefaultMaxHeightRange,
-			Log:                        suite.log,
-			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               node_communicator.NewNodeCommunicator(false),
-			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
+			State:                       suite.state,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 collections,
+			Transactions:                transactions,
+			ExecutionReceipts:           all.Receipts,
+			ExecutionResults:            all.Results,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
+			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -897,26 +915,29 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 
 		bnd, err := backend.New(backend.Params{
-			State:                      suite.state,
-			CollectionRPC:              suite.collClient,
-			Blocks:                     all.Blocks,
-			Headers:                    all.Headers,
-			Collections:                collections,
-			Transactions:               transactions,
-			ExecutionReceipts:          all.Receipts,
-			ExecutionResults:           all.Results,
-			ChainID:                    suite.chainID,
-			AccessMetrics:              suite.metrics,
-			ConnFactory:                connFactory,
-			MaxHeightRange:             events.DefaultMaxHeightRange,
-			Log:                        suite.log,
-			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               node_communicator.NewNodeCommunicator(false),
-			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
+			State:                       suite.state,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 collections,
+			Transactions:                transactions,
+			ExecutionReceipts:           all.Receipts,
+			ExecutionResults:            all.Results,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
+			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1152,26 +1173,29 @@ func (suite *Suite) TestExecuteScript() {
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                      suite.state,
-			CollectionRPC:              suite.collClient,
-			Blocks:                     all.Blocks,
-			Headers:                    all.Headers,
-			Collections:                all.Collections,
-			Transactions:               all.Transactions,
-			ExecutionReceipts:          all.Receipts,
-			ExecutionResults:           all.Results,
-			ChainID:                    suite.chainID,
-			AccessMetrics:              suite.metrics,
-			ConnFactory:                connFactory,
-			MaxHeightRange:             events.DefaultMaxHeightRange,
-			Log:                        suite.log,
-			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-			Communicator:               node_communicator.NewNodeCommunicator(false),
-			EventQueryMode:             query_mode.IndexQueryModeExecutionNodesOnly,
-			ScriptExecutionMode:        query_mode.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:          query_mode.IndexQueryModeExecutionNodesOnly,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			MaxScriptAndArgumentSize:   commonrpc.DefaultAccessMaxRequestSize,
+			State:                       suite.state,
+			CollectionRPC:               suite.collClient,
+			Blocks:                      all.Blocks,
+			Headers:                     all.Headers,
+			Collections:                 all.Collections,
+			Transactions:                all.Transactions,
+			ExecutionReceipts:           all.Receipts,
+			ExecutionResults:            all.Results,
+			ChainID:                     suite.chainID,
+			AccessMetrics:               suite.metrics,
+			ConnFactory:                 connFactory,
+			MaxHeightRange:              events.DefaultMaxHeightRange,
+			Log:                         suite.log,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(false),
+			EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+			ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+			ExecutionStateCache:         suite.executionStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
+			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
 

@@ -36,6 +36,8 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -93,6 +95,9 @@ type SameGRPCPortTestSuite struct {
 	execDataHeroCache *herocache.BlockExecutionData
 
 	blockMap map[uint64]*flow.Block
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
 }
 
 func (suite *SameGRPCPortTestSuite) SetupTest() {
@@ -189,22 +194,28 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+
 	bnd, err := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         node_communicator.NewNodeCommunicator(false),
-		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+		State:                       suite.state,
+		CollectionRPC:               suite.collClient,
+		Blocks:                      suite.blocks,
+		Headers:                     suite.headers,
+		Collections:                 suite.collections,
+		Transactions:                suite.transactions,
+		ChainID:                     suite.chainID,
+		AccessMetrics:               suite.metrics,
+		MaxHeightRange:              0,
+		Log:                         suite.log,
+		SnapshotHistoryLimit:        0,
+		Communicator:                node_communicator.NewNodeCommunicator(false),
+		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+		ExecutionStateCache:         suite.executionStateCache,
+		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	})
 	require.NoError(suite.T(), err)
 

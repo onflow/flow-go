@@ -1,4 +1,4 @@
-package execution_result_query_provider
+package execution_result
 
 import (
 	"github.com/onflow/flow-go/model/flow"
@@ -10,10 +10,10 @@ const (
 	defaultMaxNodesCnt = 3
 )
 
-// ExecutionNodesSelector handles the selection of execution nodes based on preferences and requirements.
+// ExecutionNodeSelector handles the selection of execution nodes based on preferences and requirements.
 // It encapsulates the logic for choosing execution nodes based on operator preferences, operator requirements,
 // and user requirements.
-type ExecutionNodesSelector struct {
+type ExecutionNodeSelector struct {
 	// preferredENIdentifiers are the execution nodes that the operator prefers to use
 	preferredENIdentifiers flow.IdentifierList
 	// requiredENIdentifiers are the execution nodes that the operator requires to use
@@ -22,12 +22,12 @@ type ExecutionNodesSelector struct {
 	maxNodesCnt int
 }
 
-// NewExecutionNodes creates a new ExecutionNodesSelector with the provided configuration.
-func NewExecutionNodes(
+// NewExecutionNodeSelector creates a new ExecutionNodeSelector with the provided configuration.
+func NewExecutionNodeSelector(
 	preferredENIdentifiers flow.IdentifierList,
 	requiredENIdentifiers flow.IdentifierList,
-) *ExecutionNodesSelector {
-	return &ExecutionNodesSelector{
+) *ExecutionNodeSelector {
+	return &ExecutionNodeSelector{
 		preferredENIdentifiers: preferredENIdentifiers,
 		requiredENIdentifiers:  requiredENIdentifiers,
 		maxNodesCnt:            defaultMaxNodesCnt,
@@ -51,7 +51,7 @@ func NewExecutionNodes(
 //     executor IDs are returned.
 //
 // No errors are expected during normal operations
-func (en *ExecutionNodesSelector) SelectExecutionNodes(
+func (en *ExecutionNodeSelector) SelectExecutionNodes(
 	executors flow.IdentityList,
 	userRequiredExecutors flow.IdentifierList,
 ) (flow.IdentitySkeletonList, error) {
@@ -91,7 +91,7 @@ func (en *ExecutionNodesSelector) SelectExecutionNodes(
 // if `e.preferredENIdentifiers` is not empty, then any preferred ENs that have executed the result
 // will be added to the subset.
 // otherwise, any executor in the `e.requiredENIdentifiers` list will be returned.
-func (en *ExecutionNodesSelector) selectFromRequiredENIDs(
+func (en *ExecutionNodeSelector) selectFromRequiredENIDs(
 	executors flow.IdentityList,
 ) flow.IdentityList {
 	var chosenIDs flow.IdentityList
@@ -113,7 +113,7 @@ func (en *ExecutionNodesSelector) selectFromRequiredENIDs(
 }
 
 // mergeExecutionNodes adds nodes to chosenIDs if they are not already included
-func (en *ExecutionNodesSelector) mergeExecutionNodes(chosenIDs, candidates flow.IdentityList) flow.IdentityList {
+func (en *ExecutionNodeSelector) mergeExecutionNodes(chosenIDs, candidates flow.IdentityList) flow.IdentityList {
 	for _, candidateNode := range candidates {
 		if _, exists := chosenIDs.ByNodeID(candidateNode.NodeID); !exists {
 			chosenIDs = append(chosenIDs, candidateNode)
