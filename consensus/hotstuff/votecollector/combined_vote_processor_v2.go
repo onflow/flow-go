@@ -100,6 +100,7 @@ type CombinedVoteProcessorV2 struct {
 	rbRector          hotstuff.RandomBeaconReconstructor
 	onQCCreated       hotstuff.OnQCCreated
 	packer            hotstuff.Packer
+	votesCache        *VotesCache
 	minRequiredWeight uint64
 	done              atomic.Bool
 }
@@ -121,6 +122,7 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 		rbRector:          rbRector,
 		onQCCreated:       onQCCreated,
 		packer:            packer,
+		votesCache:        NewVotesCache(block.View),
 		minRequiredWeight: minRequiredWeight,
 		done:              *atomic.NewBool(false),
 	}
@@ -141,17 +143,28 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 // Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
-// * VoteForIncompatibleBlockError - submitted vote for incompatible block
-// * VoteForIncompatibleViewError - submitted vote for incompatible view
-// * model.InvalidVoteError - submitted vote with invalid signature
-// * model.DuplicatedSignerError if the signer has been already added
+//   - [VoteForIncompatibleBlockError] - submitted vote for incompatible block
+//   - [VoteForIncompatibleViewError] - submitted vote for incompatible view
+//   - [model.InvalidVoteError] - submitted vote with invalid signature
+//   - [model.DuplicatedSignerError] if the signer has been already added
+//   - [model.DoubleVoteError] - indicates that the voter has equivocated and submitted different votes for the same view.
+//
 // All other errors should be treated as exceptions.
 //
 // Impossibility of vote double-counting: Our signature scheme requires _every_ vote to supply a
 // staking signature. Therefore, the `stakingSigAggtor` has the set of _all_ signerIDs that have
 // provided a valid vote. Hence, the `stakingSigAggtor` guarantees that only a single vote can
 // be successfully added for each `signerID`, i.e. double-counting votes is impossible.
+// Additionally, all votes before being counted by the aggregator are first deduplicated using a dedicated [VotesCache]
+// which detects double voting and stops further processing of the vote.
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
+	if err := p.votesCache.AddVote(vote); err != nil {
+		if errors.Is(err, RepeatedVoteErr) {
+			return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
+		}
+		return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
+	}
+
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
 		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
