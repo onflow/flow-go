@@ -29,10 +29,6 @@ type Blobstore interface {
 	// the CIDs in the Blobstore can be read. It should respect
 	// the given context, closing the channel if it becomes Done.
 	AllKeysChan(ctx context.Context) (<-chan cid.Cid, error)
-
-	// HashOnRead specifies if every read blob should be
-	// rehashed to make sure it matches its CID.
-	HashOnRead(enabled bool)
 }
 
 var ErrNotFound = errors.New("blobstore: blob not found")
@@ -41,8 +37,29 @@ type blobstoreImpl struct {
 	bs blockstore.Blockstore
 }
 
-func NewBlobstore(ds datastore.Batching) *blobstoreImpl {
-	return &blobstoreImpl{bs: blockstore.NewBlockstore(ds)}
+var _ Blobstore = (*blobstoreImpl)(nil)
+
+type BlobstoreOption func(*blobstoreImpl)
+
+// WithHashOnRead configures the blobstore to rehash the blob data on read
+// When set, calls to Get will fail with an error if the hash of the data in storage does not
+// match its CID
+func WithHashOnRead() BlobstoreOption {
+	return func(bs *blobstoreImpl) {
+		bs.bs = &blockstore.ValidatingBlockstore{
+			Blockstore: bs.bs,
+		}
+	}
+}
+
+func NewBlobstore(ds datastore.Batching, opts ...BlobstoreOption) *blobstoreImpl {
+	bs := &blobstoreImpl{bs: blockstore.NewBlockstore(ds)}
+
+	for _, opt := range opts {
+		opt(bs)
+	}
+
+	return bs
 }
 
 func (bs *blobstoreImpl) DeleteBlob(ctx context.Context, c cid.Cid) error {
@@ -76,10 +93,6 @@ func (bs *blobstoreImpl) PutMany(ctx context.Context, blobs []Blob) error {
 
 func (bs *blobstoreImpl) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error) {
 	return bs.bs.AllKeysChan(ctx)
-}
-
-func (bs *blobstoreImpl) HashOnRead(enabled bool) {
-	bs.bs.HashOnRead(enabled)
 }
 
 // NoopBlobstore is a Blobstore that does nothing, which is useful for calculating
@@ -117,5 +130,3 @@ func (n *NoopBlobstore) PutMany(context.Context, []Blob) error {
 func (n *NoopBlobstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error) {
 	return nil, nil
 }
-
-func (n *NoopBlobstore) HashOnRead(enabled bool) {}

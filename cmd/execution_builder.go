@@ -409,10 +409,6 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		),
 	}
 
-	if !node.BitswapReprovideEnabled {
-		opts = append(opts, blob.WithReprovideInterval(-1))
-	}
-
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
 	}

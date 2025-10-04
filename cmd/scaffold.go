@@ -209,10 +209,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"dht-enabled",
 		defaultConfig.DhtSystemEnabled,
 		"[experimental] whether to enable dht system. This is an experimental feature. Use with caution.")
-	fnb.flags.BoolVar(&fnb.BaseConfig.BitswapReprovideEnabled,
-		"bitswap-reprovide-enabled",
-		defaultConfig.BitswapReprovideEnabled,
-		"[experimental] whether to enable bitswap reproviding. This is an experimental feature. Use with caution.")
 
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey,
