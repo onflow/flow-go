@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -14,16 +15,24 @@ import (
 )
 
 func TestResultStoreAndRetrieve(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewExecutionResults(metrics, db)
 
 		result := unittest.ExecutionResultFixture()
 		blockID := unittest.IdentifierFixture()
-		err := store1.Store(result)
-		require.NoError(t, err)
 
-		err = store1.Index(blockID, result.ID())
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := store1.BatchStore(result, rw)
+				require.NoError(t, err)
+
+				err = store1.BatchIndex(lctx, rw, blockID, result.ID())
+				require.NoError(t, err)
+				return nil
+			})
+		})
 		require.NoError(t, err)
 
 		actual, err := store1.ByBlockID(blockID)
@@ -34,27 +43,42 @@ func TestResultStoreAndRetrieve(t *testing.T) {
 }
 
 func TestResultStoreTwice(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewExecutionResults(metrics, db)
 
 		result := unittest.ExecutionResultFixture()
 		blockID := unittest.IdentifierFixture()
-		err := store1.Store(result)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := store1.BatchStore(result, rw)
+				require.NoError(t, err)
+
+				err = store1.BatchIndex(lctx, rw, blockID, result.ID())
+				require.NoError(t, err)
+				return nil
+			})
+		})
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result.ID())
-		require.NoError(t, err)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := store1.BatchStore(result, rw)
+				require.NoError(t, err)
 
-		err = store1.Store(result)
-		require.NoError(t, err)
-
-		err = store1.Index(blockID, result.ID())
+				err = store1.BatchIndex(lctx, rw, blockID, result.ID())
+				require.NoError(t, err)
+				return nil
+			})
+		})
 		require.NoError(t, err)
 	})
 }
 
 func TestResultBatchStoreTwice(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewExecutionResults(metrics, db)
@@ -62,28 +86,35 @@ func TestResultBatchStoreTwice(t *testing.T) {
 		result := unittest.ExecutionResultFixture()
 		blockID := unittest.IdentifierFixture()
 
-		require.NoError(t, db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-			err := store1.BatchStore(result, batch)
-			require.NoError(t, err)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+				err := store1.BatchStore(result, batch)
+				require.NoError(t, err)
 
-			err = store1.BatchIndex(blockID, result.ID(), batch)
-			require.NoError(t, err)
-			return nil
-		}))
+				err = store1.BatchIndex(lctx, batch, blockID, result.ID())
+				require.NoError(t, err)
+				return nil
+			})
+		})
+		require.NoError(t, err)
 
-		require.NoError(t, db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-			err := store1.BatchStore(result, batch)
-			require.NoError(t, err)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+				err := store1.BatchStore(result, batch)
+				require.NoError(t, err)
 
-			err = store1.BatchIndex(blockID, result.ID(), batch)
-			require.NoError(t, err)
+				err = store1.BatchIndex(lctx, batch, blockID, result.ID())
+				require.NoError(t, err)
 
-			return nil
-		}))
+				return nil
+			})
+		})
+		require.NoError(t, err)
 	})
 }
 
 func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewExecutionResults(metrics, db)
@@ -91,48 +122,40 @@ func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
 		result1 := unittest.ExecutionResultFixture()
 		result2 := unittest.ExecutionResultFixture()
 		blockID := unittest.IdentifierFixture()
-		err := store1.Store(result1)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := store1.BatchStore(result1, rw)
+				require.NoError(t, err)
+
+				err = store1.BatchIndex(lctx, rw, blockID, result1.ID())
+				require.NoError(t, err)
+				return nil
+			})
+		})
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result1.ID())
-		require.NoError(t, err)
-
-		// we can store1 a different result, but we can't index
+		// we can store a different result, but we can't index
 		// a different result for that block, because it will mean
 		// one block has two different results.
-		err = store1.Store(result2)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := store1.BatchStore(result2, rw)
+				require.NoError(t, err)
+				return nil
+			})
+		})
 		require.NoError(t, err)
 
-		err = store1.Index(blockID, result2.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrDataMismatch))
-	})
-}
-
-func TestResultStoreForceIndexOverridesMapping(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		metrics := metrics.NewNoopCollector()
-		store1 := store.NewExecutionResults(metrics, db)
-
-		result1 := unittest.ExecutionResultFixture()
-		result2 := unittest.ExecutionResultFixture()
-		blockID := unittest.IdentifierFixture()
-		err := store1.Store(result1)
+		var indexErr error
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				indexErr = store1.BatchIndex(lctx, rw, blockID, result2.ID())
+				return nil
+			})
+		})
 		require.NoError(t, err)
-		err = store1.Index(blockID, result1.ID())
-		require.NoError(t, err)
-
-		err = store1.Store(result2)
-		require.NoError(t, err)
-
-		// force index
-		err = store1.ForceIndex(blockID, result2.ID())
-		require.NoError(t, err)
-
-		// retrieve index to make sure it points to second ER now
-		byBlockID, err := store1.ByBlockID(blockID)
-
-		require.Equal(t, result2, byBlockID)
-		require.NoError(t, err)
+		require.Error(t, indexErr)
+		require.True(t, errors.Is(indexErr, storage.ErrDataMismatch))
 	})
 }

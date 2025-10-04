@@ -40,7 +40,7 @@ func (r *ResultsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWrit
 	}
 
 	if len(results) > 0 {
-		if err := r.persistedResults.BatchStore(r.blockID, results, batch); err != nil {
+		if err := r.persistedResults.BatchStore(lctx, r.blockID, results, batch); err != nil {
 			return fmt.Errorf("could not add transaction results to batch: %w", err)
 		}
 	}

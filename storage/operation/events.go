@@ -1,6 +1,10 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -9,11 +13,17 @@ func eventPrefix(prefix byte, blockID flow.Identifier, event flow.Event) []byte 
 	return MakePrefix(prefix, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
 }
 
-func InsertEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) error {
+func InsertEvent(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, event flow.Event) error {
+	if !lctx.HoldsLock(storage.LockInsertEvent) {
+		return fmt.Errorf("InsertEvent requires LockInsertEvent to be held")
+	}
 	return UpsertByKey(w, eventPrefix(codeEvent, blockID, event), event)
 }
 
-func InsertServiceEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) error {
+func InsertServiceEvent(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, event flow.Event) error {
+	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
+		return fmt.Errorf("InsertServiceEvent requires LockInsertOwnReceipt to be held")
+	}
 	return UpsertByKey(w, eventPrefix(codeServiceEvent, blockID, event), event)
 }
 

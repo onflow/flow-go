@@ -141,6 +141,46 @@ func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Ident
 	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
+// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
+// The caller must acquire a storage.LockIndexFinalizedBlock lock.
+//
+// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
+// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
+// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
+// Hence, this function should be treated as a temporary solution, which requires generalization
+// (one-to-many mapping) for soft finality and the mature protocol.
+//
+// Expected errors during normal operations:
+//   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
+func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockIndexFinalizedBlock) {
+		return fmt.Errorf("BatchIndexBlockContainingCollectionGuarantees requires %v", storage.LockIndexFinalizedBlock)
+	}
+
+	// Check if any keys already exist
+	for _, collID := range collIDs {
+		key := MakePrefix(codeCollectionBlock, collID)
+		exists, err := KeyExists(rw.GlobalReader(), key)
+		if err != nil {
+			return fmt.Errorf("could not check if collection guarantee is already indexed: %w", err)
+		}
+		if exists {
+			return fmt.Errorf("collection guarantee (%x) is already indexed: %w", collID, storage.ErrAlreadyExists)
+		}
+	}
+
+	// Index all collection guarantees
+	for _, collID := range collIDs {
+		key := MakePrefix(codeCollectionBlock, collID)
+		err := UpsertByKey(rw.Writer(), key, blockID)
+		if err != nil {
+			return fmt.Errorf("could not index collection guarantee (%x): %w", collID, err)
+		}
+	}
+
+	return nil
+}
+
 // LookupBlockContainingCollectionGuarantee retrieves the block containing the [flow.CollectionGuarantee] with the given ID.
 //
 // CAUTION: A collection can be included in multiple *unfinalized* blocks. However, the implementation

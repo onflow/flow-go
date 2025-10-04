@@ -285,6 +285,8 @@ func bootstrapProtocolState(
 //     segment, as it may or may not be included in SealingSegment.Blocks depending on how much
 //     history is covered. The spork root block is persisted as a root proposal without proposer
 //     signature (by convention).
+//
+// It requires [storage.LockInsertOwnReceipt] lock
 func bootstrapSealingSegment(
 	lctx lockctx.Proof,
 	db storage.DB,
@@ -298,11 +300,11 @@ func bootstrapSealingSegment(
 	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		w := rw.Writer()
 		for _, result := range segment.ExecutionResults {
-			err := operation.InsertExecutionResult(w, result)
+			err := operation.InsertExecutionResult(w, result.ID(), result)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = operation.IndexExecutionResult(w, result.BlockID, result.ID())
+			err = operation.IndexOwnExecutionResult(lctx, rw, result.BlockID, result.ID())
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
@@ -461,7 +463,7 @@ func bootstrapSealingSegment(
 		// If the sealed root block is different from the finalized root block, then it means the node dynamically
 		// bootstrapped. In that case, we index the result of the latest sealed result, so that the EN is able
 		// to confirm that it is loading the correct state to execute the next block.
-		err = operation.IndexExecutionResult(rw.Writer(), rootSeal.BlockID, rootSeal.ResultID)
+		err = operation.IndexOwnExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
 		}

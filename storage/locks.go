@@ -20,6 +20,11 @@ const (
 	// The reason they are combined is because insertion process reads some data updated by finalization process,
 	// in order to prevent dirty reads, we need to acquire the lock for both operations.
 	LockInsertOrFinalizeClusterBlock = "lock_insert_or_finalize_cluster_block"
+	// LockInsertEvent protects the insertion of events.
+	// This lock is reused by both EN storing its own receipt and AN indexing execution data
+	LockInsertEvent = "lock_insert_event"
+	// LockInsertLightTransactionResult protects the insertion of light transaction results.
+	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
 	LockInsertOwnReceipt = "lock_insert_own_receipt"
@@ -29,6 +34,8 @@ const (
 	LockBootstrapping = "lock_bootstrapping"
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
 	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	// LockIndexFinalizedBlock protects AN indexing finalized blocks by block ID.
+	LockIndexFinalizedBlock = "lock_index_finalized_block"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -38,10 +45,13 @@ func Locks() []string {
 		LockFinalizeBlock,
 		LockIndexResultApproval,
 		LockInsertOrFinalizeClusterBlock,
+		LockInsertEvent,
 		LockInsertOwnReceipt,
 		LockInsertCollection,
+		LockInsertLightTransactionResult,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
+		LockIndexFinalizedBlock,
 	}
 }
 
@@ -65,7 +75,7 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
-		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
+		Add(LockInsertOwnReceipt, LockInsertEvent).
 		Build()
 }
 

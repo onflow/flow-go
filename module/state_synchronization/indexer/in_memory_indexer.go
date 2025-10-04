@@ -98,6 +98,12 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	}
 	defer lctx.Release()
 
+	err = lctx.AcquireLock(storage.LockInsertEvent)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for event insert: %w", err)
+	}
+	defer lctx.Release()
+
 	// Process all chunk data in a single pass
 	for idx, chunk := range data.ChunkExecutionDatas {
 		// Collect events
@@ -129,7 +135,7 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 		}
 	}
 
-	if err := i.events.Store(data.BlockID, []flow.EventsList{events}); err != nil {
+	if err := i.events.Store(lctx, data.BlockID, []flow.EventsList{events}); err != nil {
 		return fmt.Errorf("could not index events: %w", err)
 	}
 

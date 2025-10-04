@@ -356,11 +356,11 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
 	defer span.End()
 
-	result, err := s.results.ByBlockID(blockID)
+	resultID, err := s.results.IDByBlockID(blockID)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return result.ID(), nil
+	return resultID, nil
 }
 
 func (s *state) SaveExecutionResults(
@@ -411,7 +411,7 @@ func (s *state) saveExecutionResults(
 	}
 
 	// Acquire both locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
-	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertChunkDataPack}, func(lctx lockctx.Context) error {
+	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertEvent}, func(lctx lockctx.Context) error {
 		err := s.chunkDataPacks.StoreByChunkID(lctx, chunks)
 		if err != nil {
 			return fmt.Errorf("can not store multiple chunk data pack: %w", err)
@@ -436,17 +436,18 @@ func (s *state) saveExecutionResults(
 				}
 			})
 
-			err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+			err = s.events.BatchStore(lctx, blockID, []flow.EventsList{result.AllEvents()}, batch)
 			if err != nil {
 				return fmt.Errorf("cannot store events: %w", err)
 			}
 
-			err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
+			err = s.serviceEvents.BatchStore(lctx, blockID, result.AllServiceEvents(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store service events: %w", err)
 			}
 
 			err = s.transactionResults.BatchStore(
+				lctx,
 				blockID,
 				result.AllTransactionResults(),
 				batch)
@@ -461,7 +462,7 @@ func (s *state) saveExecutionResults(
 				return fmt.Errorf("could not persist execution result: %w", err)
 			}
 
-			err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+			err = s.results.BatchIndex(lctx, batch, blockID, executionResult.ID())
 			if err != nil {
 				return fmt.Errorf("cannot index execution result: %w", err)
 			}
