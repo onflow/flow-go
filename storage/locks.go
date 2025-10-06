@@ -26,6 +26,8 @@ const (
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
+	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
+	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -38,6 +40,7 @@ func Locks() []string {
 		LockInsertOwnReceipt,
 		LockInsertCollection,
 		LockBootstrapping,
+		LockInsertChunkDataPack,
 	}
 }
 
@@ -61,6 +64,7 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
 		Build()
 }
 
@@ -109,4 +113,25 @@ func MakeSingletonLockManager() lockctx.Manager {
 // Unlike MakeSingletonLockManager, this function may be called multiple times.
 func NewTestingLockManager() lockctx.Manager {
 	return lockctx.NewManager(Locks(), makeLockPolicy())
+}
+
+// WithLock is a helper function that creates a new lock context, acquires the specified lock,
+// and executes the provided function within that context.
+// This function passes through any errors returned by fn.
+func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) error {
+	return WithLocks(manager, []string{lockID}, fn)
+}
+
+// WithLocks is a helper function that creates a new lock context, acquires the specified locks,
+// and executes the provided function within that context.
+// This function passes through any errors returned by fn.
+func WithLocks(manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) error {
+	lctx := manager.NewContext()
+	defer lctx.Release()
+	for _, lockID := range lockIDs {
+		if err := lctx.AcquireLock(lockID); err != nil {
+			return err
+		}
+	}
+	return fn(lctx)
 }

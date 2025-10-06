@@ -321,6 +321,8 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
         if: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) }}
+        # this docker auth is exclusively for higher rate limits. continue unauthenticated if it fails
+        continue-on-error: true
 
 
       - name: Docker build
