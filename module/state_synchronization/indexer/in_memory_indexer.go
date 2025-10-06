@@ -92,17 +92,17 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	indexedCollections := 0
 
 	lctx := i.lockManager.NewContext()
+	defer lctx.Release()
+
 	err := lctx.AcquireLock(storage.LockInsertCollection)
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for collection insert: %w", err)
 	}
-	defer lctx.Release()
 
 	err = lctx.AcquireLock(storage.LockInsertEvent)
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for event insert: %w", err)
 	}
-	defer lctx.Release()
 
 	// Process all chunk data in a single pass
 	for idx, chunk := range data.ChunkExecutionDatas {

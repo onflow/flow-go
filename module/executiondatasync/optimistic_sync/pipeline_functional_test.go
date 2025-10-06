@@ -185,6 +185,16 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+		// Check for errors in a separate goroutine
+		go func() {
+			select {
+			case err := <-errChan:
+				if err != nil {
+					p.T().Errorf("Pipeline error: %v", err)
+				}
+			}
+		}()
+
 		pipeline.OnParentStateUpdated(StateComplete)
 
 		waitForStateUpdates(p.T(), updateChan, StateProcessing, StateWaitingPersist)
@@ -277,7 +287,7 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages,
 	// it is hard to make a meaningful error explicitly.
 	mockEvents := storagemock.NewEvents(p.T())
-	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Once()
+	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Once()
 	p.persistentEvents = mockEvents
 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
