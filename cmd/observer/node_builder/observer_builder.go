@@ -72,6 +72,10 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_state"
+	osyncsnapshot "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/snapshot"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -1968,6 +1972,30 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
+		execNodeSelector := execution_result.NewExecutionNodeSelector(
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Receipts,
+			execNodeSelector,
+			optimistic_sync.DefaultCriteria,
+		)
+
+		// TODO: use real objects instead of mocks once they're implemented
+		snapshot := osyncsnapshot.NewSnapshotMock(
+			builder.events,
+			nil,
+			nil,
+			builder.lightTransactionResults,
+			nil,
+			nil,
+		)
+		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
+
 		backendParams := backend.Params{
 			State:                node.State,
 			Blocks:               node.Storage.Blocks,
@@ -1995,10 +2023,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
-			IndexReporter:              indexReporter,
-			VersionControl:             builder.VersionControl,
-			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
-			MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			IndexReporter:               indexReporter,
+			VersionControl:              builder.VersionControl,
+			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			ExecutionResultInfoProvider: execResultInfoProvider,
+			ExecutionStateCache:         execStateCache,
+			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		}
 
 		if builder.localServiceAPIEnabled {

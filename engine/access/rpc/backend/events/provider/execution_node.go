@@ -18,9 +18,14 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
+// ENEventProvider retrieves events by querying remote Execution Nodes (ENs).
+// It selects from available executors for a given execution result and
+// aggregates responses, converting them into the Access API format.
 type ENEventProvider struct {
 	log              zerolog.Logger
 	nodeProvider     *rpc.ExecutionNodeIdentitiesProvider
@@ -48,13 +53,13 @@ func (e *ENEventProvider) Events(
 	ctx context.Context,
 	blocks []BlockMetadata,
 	eventType flow.EventType,
-	encoding entities.EventEncodingVersion,
-) (Response, error) {
+	encodingVersion entities.EventEncodingVersion,
+	execResultInfo *optimistic_sync.ExecutionResultInfo,
+) (Response, *access.ExecutorMetadata, error) {
 	if len(blocks) == 0 {
-		return Response{}, nil
+		return Response{}, nil, nil
 	}
 
-	// create an execution API request for events at block ID
 	blockIDs := make([]flow.Identifier, len(blocks))
 	for i := range blocks {
 		blockIDs[i] = blocks[i].ID
@@ -65,42 +70,32 @@ func (e *ENEventProvider) Events(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
-	// choose the last block ID to find the list of execution nodes
-	lastBlockID := blockIDs[len(blockIDs)-1]
-
-	execNodes, err := e.nodeProvider.ExecutionNodesForBlockID(
-		ctx,
-		lastBlockID,
-	)
+	resp, node, err := e.getEventsFromAnyExeNode(ctx, execResultInfo.ExecutionNodes, req)
 	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
+		return Response{}, nil,
+			rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
 	}
-
-	var resp *execproto.GetEventsForBlockIDsResponse
-	var successfulNode *flow.IdentitySkeleton
-	resp, successfulNode, err = e.getEventsFromAnyExeNode(ctx, execNodes, req)
-	if err != nil {
-		return Response{}, rpc.ConvertError(err, "failed to get execution nodes for events query", codes.Internal)
-	}
-	e.log.Trace().
-		Str("execution_id", successfulNode.String()).
-		Str("last_block_id", lastBlockID.String()).
-		Msg("successfully got events")
 
 	// convert execution node api result to access node api result
 	results, err := verifyAndConvertToAccessEvents(
 		resp.GetResults(),
 		blocks,
 		resp.GetEventEncodingVersion(),
-		encoding,
+		encodingVersion,
 	)
 	if err != nil {
-		return Response{}, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+		return Response{}, nil,
+			status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
+	}
+
+	metadata := &access.ExecutorMetadata{
+		ExecutionResultID: execResultInfo.ExecutionResultID,
+		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	return Response{
 		Events: results,
-	}, nil
+	}, metadata, nil
 }
 
 // getEventsFromAnyExeNode retrieves the given events from any EN in `execNodes`.
@@ -204,4 +199,20 @@ func verifyAndConvertToAccessEvents(
 	}
 
 	return results, nil
+}
+
+// orderedExecutors creates an ordered list of executors for the same execution result
+// - respondingExecutor is the executor who returned an execution result.
+// - executorList is the full list of executors who produced the same execution result.
+func orderedExecutors(respondingExecutor flow.Identifier, executorList flow.IdentifierList) flow.IdentifierList {
+	ordered := make(flow.IdentifierList, 0, len(executorList))
+	ordered = append(ordered, respondingExecutor)
+
+	for _, nodeID := range executorList {
+		if nodeID != respondingExecutor {
+			ordered = append(ordered, nodeID)
+		}
+	}
+
+	return ordered
 }

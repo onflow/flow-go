@@ -12,6 +12,8 @@ import (
 
 	modelaccess "github.com/onflow/flow-go/model/access"
 
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+
 	subscription "github.com/onflow/flow-go/engine/access/subscription"
 )
 
@@ -554,64 +556,82 @@ func (_m *API) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow
 	return r0, r1
 }
 
-// GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion
-func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+// GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria
+func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *modelaccess.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventsForBlockIDs")
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) ([]flow.BlockEvents, error)); ok {
-		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	var r1 *modelaccess.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *modelaccess.ExecutorMetadata, error)); ok {
+		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) []flow.BlockEvents); ok {
-		r0 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
+		r0 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.BlockEvents)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *modelaccess.ExecutorMetadata); ok {
+		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*modelaccess.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetEventsForHeightRange provides a mock function with given fields: ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion
-func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-	ret := _m.Called(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+// GetEventsForHeightRange provides a mock function with given fields: ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria
+func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *modelaccess.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventsForHeightRange")
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) ([]flow.BlockEvents, error)); ok {
-		return rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	var r1 *modelaccess.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *modelaccess.ExecutorMetadata, error)); ok {
+		return rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) []flow.BlockEvents); ok {
-		r0 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
+		r0 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.BlockEvents)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) *modelaccess.ExecutorMetadata); ok {
+		r1 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*modelaccess.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetExecutionResultByID provides a mock function with given fields: ctx, id

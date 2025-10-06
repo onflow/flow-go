@@ -28,6 +28,8 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -62,6 +64,7 @@ type RateLimitTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+	events       *storagemock.Events
 
 	// test rate limit
 	rateLimit  int
@@ -73,6 +76,10 @@ type RateLimitTestSuite struct {
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
+	executionDataSnapshot       *osyncmock.Snapshot
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
@@ -92,11 +99,12 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Params").Return(params, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
-	suite.blocks = new(storagemock.Blocks)
-	suite.headers = new(storagemock.Headers)
-	suite.transactions = new(storagemock.Transactions)
-	suite.collections = new(storagemock.Collections)
-	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.blocks = storagemock.NewBlocks(suite.T())
+	suite.headers = storagemock.NewHeaders(suite.T())
+	suite.transactions = storagemock.NewTransactions(suite.T())
+	suite.collections = storagemock.NewCollections(suite.T())
+	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
+	suite.events = storagemock.NewEvents(suite.T())
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -162,22 +170,29 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+
 	bnd, err := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         node_communicator.NewNodeCommunicator(false),
-		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+		State:                       suite.state,
+		CollectionRPC:               suite.collClient,
+		Blocks:                      suite.blocks,
+		Headers:                     suite.headers,
+		Collections:                 suite.collections,
+		Transactions:                suite.transactions,
+		ChainID:                     suite.chainID,
+		AccessMetrics:               suite.metrics,
+		MaxHeightRange:              0,
+		Log:                         suite.log,
+		SnapshotHistoryLimit:        0,
+		Communicator:                node_communicator.NewNodeCommunicator(false),
+		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+		ExecutionStateCache:         suite.executionStateCache,
+		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	})
 	suite.Require().NoError(err)
 
@@ -233,6 +248,8 @@ func (suite *RateLimitTestSuite) TearDownTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
 }
 
+// TestRateLimit runs the RateLimitTestSuite to verify that Access API rate
+// limiting is enforced correctly for both steady-state requests and bursts.
 func TestRateLimit(t *testing.T) {
 	suite.Run(t, new(RateLimitTestSuite))
 }
