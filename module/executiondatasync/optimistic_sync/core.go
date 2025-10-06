@@ -80,7 +80,6 @@ type workingData struct {
 	persistentRegisters         storage.RegisterIndex
 	persistentEvents            storage.Events
 	persistentCollections       storage.Collections
-	persistentTransactions      storage.Transactions
 	persistentResults           storage.LightTransactionResults
 	persistentTxResultErrMsgs   storage.TransactionResultErrorMessages
 	latestPersistedSealedResult storage.LatestPersistedSealedResult

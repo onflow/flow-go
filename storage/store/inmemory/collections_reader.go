@@ -9,8 +9,6 @@ type CollectionsReader struct {
 	collections                    map[flow.Identifier]flow.Collection
 	lightCollections               map[flow.Identifier]*flow.LightCollection
 	transactionIDToLightCollection map[flow.Identifier]*flow.LightCollection
-
-	transactions *TransactionsReader // Reference to Transactions to store txs when storing collections
 }
 
 var _ storage.CollectionsReader = (*CollectionsReader)(nil)
