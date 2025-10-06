@@ -131,6 +131,7 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storagemock.ExecutionReceipts)
 	s.transactions = new(storagemock.Transactions)
 	s.results = new(storagemock.ExecutionResults)
+	s.results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	collectionsToMarkFinalized := stdmap.NewTimes(100)
 	collectionsToMarkExecuted := stdmap.NewTimes(100)
 	blocksToMarkExecuted := stdmap.NewTimes(100)
@@ -340,7 +341,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
-	s.results.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
+	s.results.AssertNumberOfCalls(s.T(), "BatchIndex", len(block.Payload.Seals))
 }
 
 // TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
@@ -416,7 +417,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	s.headers.AssertExpectations(s.T())
 	s.blocks.AssertNumberOfCalls(s.T(), "BatchIndexBlockContainingCollectionGuarantees", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
-	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
+	s.results.AssertNumberOfCalls(s.T(), "BatchIndex", expectedIndexCalls)
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
