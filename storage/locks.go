@@ -73,11 +73,16 @@ type LockManager = lockctx.Manager
 // This function will panic if a policy is created which does not prevent deadlocks.
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
+		// for protocol to Bootstrap, during bootstrapping,
+		// we need to insert and finalize
+		Add(LockBootstrapping, LockFinalizeBlock).
 		Add(LockInsertBlock, LockFinalizeBlock).
-		Add(LockFinalizeBlock, LockBootstrapping).
+
+		// EN to save execution result
 		Add(LockInsertOwnReceipt, LockInsertEvent).
 		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
-		Add(LockInsertEvent, LockInsertChunkDataPack).
+
+		// AN state sync to IndexBlockData
 		Add(LockInsertCollection, LockInsertEvent).
 		Add(LockInsertCollection, LockInsertLightTransactionResult).
 		Add(LockInsertEvent, LockInsertLightTransactionResult).

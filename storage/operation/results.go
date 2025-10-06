@@ -28,7 +28,10 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 }
 
 // IndexOwnOrSealedExecutionResult indexes the result of the given block.
-// It is used by EN to index the result of a block to continue executing subsequent blocks.
+// It is used by the following scenarios:
+// 1. Execution Node indexes its own executed block's result when finish executing a block
+// 2. Execution Node indexes the sealed root block's result during bootstrapping
+// 3. Access Node indexes the sealed result during syncing from EN.
 // The caller must acquire either [storage.LockInsertOwnReceipt] or [storage.LockBootstrapping] or [storage.LockIndexFinalizedBlock]
 //
 // No errors are expected during normal operation.

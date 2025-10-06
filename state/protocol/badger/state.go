@@ -112,7 +112,11 @@ func Bootstrap(
 	// trusted root snapshot are presumed to be finalized)
 	lctx := lockManager.NewContext()
 	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertBlock)
+	err := lctx.AcquireLock(storage.LockBootstrapping)
+	if err != nil {
+		return nil, err
+	}
+	err = lctx.AcquireLock(storage.LockInsertBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -120,11 +124,6 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
-	err = lctx.AcquireLock(storage.LockBootstrapping)
-	if err != nil {
-		return nil, err
-	}
-
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
 		opt(config)
