@@ -232,7 +232,7 @@ func bootstrapProtocolState(
 	// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
 	for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
 		// Store the protocol KV Store entry
-		err := protocolKVStoreSnapshots.BatchStore(lctx, rw, protocolStateID, &stateEntry.KVStore)
+		err := protocolKVStoreSnapshots.BatchStore(rw, protocolStateID, &stateEntry.KVStore)
 		if err != nil {
 			return fmt.Errorf("could not store protocol state kvstore: %w", err)
 		}
@@ -256,7 +256,7 @@ func bootstrapProtocolState(
 	for _, proposal := range segment.AllBlocks() {
 		blockID := proposal.Block.ID()
 		protocolStateEntryWrapper := segment.ProtocolStateEntries[proposal.Block.Payload.ProtocolStateID]
-		err := epochProtocolStateSnapshots.BatchIndex(rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
+		err := epochProtocolStateSnapshots.BatchIndex(lctx, rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
 		if err != nil {
 			return fmt.Errorf("could not index root protocol state: %w", err)
 		}

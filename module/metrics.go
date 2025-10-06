@@ -801,6 +801,8 @@ type ExecutionDataRequesterMetrics interface {
 	ExecutionDataFetchStarted()
 
 	// ExecutionDataFetchFinished records a completed download
+	// Pass the highest consecutive height to ensure the metrics reflect the height up to which the
+	// requester has completed downloads. This allows us to easily see when downloading gets stuck.
 	ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64)
 
 	// NotificationSent reports that ExecutionData received notifications were sent for a block height
@@ -946,6 +948,7 @@ type TransactionExecutionResultStats struct {
 	ExecutionResultStats
 	NumberOfTxnConflictRetries int
 	Failed                     bool
+	ScheduledTransaction       bool
 	SystemTransaction          bool
 	ComputationIntensities     meter.MeteredComputationIntensities
 }
