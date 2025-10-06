@@ -14,7 +14,9 @@ import (
 )
 
 // BlockPersister stores execution data for a single execution result into the database.
-// It uses the set of [stores.PersisterStore] to persist the data with a singl atomic batch operation.
+// It uses the set of [stores.PersisterStore] to persist the data with a single atomic batch operation.
+// To ensure the database only contains data certified by the protocol, the block persister must
+// only be called for sealed execution results.
 type BlockPersister struct {
 	log zerolog.Logger
 

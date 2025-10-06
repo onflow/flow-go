@@ -7,7 +7,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// RegistersPersister stores [flow.RegisterEntry] values into the registers db
+// RegistersPersister stores register data for a single execution result into the registers db in a
+// single atomic batch operation.
+// To ensure the database only contains data certified by the protocol, the registers persister must
+// only be called for sealed execution results.
 type RegistersPersister struct {
 	data      []flow.RegisterEntry
 	registers storage.RegisterIndex
