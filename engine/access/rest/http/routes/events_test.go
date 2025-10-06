@@ -351,16 +351,13 @@ func TestGetEvents_ParseExecutionState(t *testing.T) {
 	})
 
 	t.Run("empty agreeing executors count", func(t *testing.T) {
-		request := buildRequestFromRawArgs(
-			t,
-			rawRequestArgs{
-				eventType:               eventType,
-				start:                   fmt.Sprint(events[0].BlockHeight),
-				end:                     fmt.Sprint(events[len(events)-1].BlockHeight),
-				requiredExecutors:       unittest.IdentifierListFixture(2).Strings(),
-				includeExecutorMetadata: "true",
-			},
-		)
+		request := buildRequest(t, requestArgs{
+			eventType:               args.eventType,
+			start:                   args.start,
+			end:                     args.end,
+			requiredExecutors:       unittest.IdentifierListFixture(2),
+			includeExecutorMetadata: true,
+		})
 
 		responseRecorder := router.ExecuteRequest(request, backend)
 		require.Equal(t, http.StatusOK, responseRecorder.Code)
@@ -371,16 +368,13 @@ func TestGetEvents_ParseExecutionState(t *testing.T) {
 	})
 
 	t.Run("empty required executors", func(t *testing.T) {
-		request := buildRequestFromRawArgs(
-			t,
-			rawRequestArgs{
-				eventType:               eventType,
-				start:                   fmt.Sprint(events[0].BlockHeight),
-				end:                     fmt.Sprint(events[len(events)-1].BlockHeight),
-				agreeingExecutorsCount:  "2",
-				includeExecutorMetadata: "true",
-			},
-		)
+		request := buildRequest(t, requestArgs{
+			eventType:               args.eventType,
+			start:                   args.start,
+			end:                     args.end,
+			agreeingExecutorsCount:  2,
+			includeExecutorMetadata: true,
+		})
 
 		responseRecorder := router.ExecuteRequest(request, backend)
 		require.Equal(t, http.StatusOK, responseRecorder.Code)
@@ -391,16 +385,13 @@ func TestGetEvents_ParseExecutionState(t *testing.T) {
 	})
 
 	t.Run("empty include executor metadata", func(t *testing.T) {
-		request := buildRequestFromRawArgs(
-			t,
-			rawRequestArgs{
-				eventType:              eventType,
-				start:                  fmt.Sprint(events[0].BlockHeight),
-				end:                    fmt.Sprint(events[len(events)-1].BlockHeight),
-				agreeingExecutorsCount: "2",
-				requiredExecutors:      unittest.IdentifierListFixture(2).Strings(),
-			},
-		)
+		request := buildRequest(t, requestArgs{
+			eventType:              args.eventType,
+			start:                  args.start,
+			end:                    args.end,
+			agreeingExecutorsCount: 2,
+			requiredExecutors:      unittest.IdentifierListFixture(2),
+		})
 
 		responseRecorder := router.ExecuteRequest(request, backend)
 		require.Equal(t, http.StatusOK, responseRecorder.Code)
@@ -446,7 +437,7 @@ func TestGetEvents_GetAtSealedBlock(t *testing.T) {
 	responseRecorder := router.ExecuteRequest(request, backend)
 	require.Equal(t, http.StatusOK, responseRecorder.Code)
 
-	expectedResponse := buildExpectedResponse(t, events, false)
+	expectedResponse := buildExpectedResponse(t, events, true)
 	actualResponse := responseRecorder.Body.String()
 	require.JSONEq(t, expectedResponse, actualResponse)
 }
