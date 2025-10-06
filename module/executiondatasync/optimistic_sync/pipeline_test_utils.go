@@ -77,23 +77,6 @@ func waitForStateUpdates(t *testing.T, updateChan <-chan State, errChan <-chan e
 	close(done) // make sure function exists after timeout
 }
 
-// waitNeverStateUpdate verifies that no state updates occur within 500ms.
-// The test fails if any unexpected state transition is observed.
-func waitNeverStateUpdate(t *testing.T, updateChan <-chan State, errChan <-chan error) {
-	done := make(chan struct{})
-	unittest.RequireNeverReturnBefore(t, func() {
-		select {
-		case <-done:
-			return
-		case err := <-errChan:
-			require.NoError(t, err, "pipeline returned error")
-		case newState := <-updateChan:
-			t.Fatalf("Pipeline transitioned to state %s, but should not have", newState)
-		}
-	}, 500*time.Millisecond, "expected pipeline to not transition to any state")
-	close(done) // make sure function exists after timeout
-}
-
 // waitForErrorWithCustomCheckers waits for an error from the errChan within 500ms
 // and applies custom checker functions to validate the error.
 // If no checkers are provided, it asserts that no error occurred.
