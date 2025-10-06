@@ -20,7 +20,6 @@ type LightCollectionsStore struct {
 func NewCollectionsStore(
 	data []*flow.Collection,
 	persistedCollections storage.Collections,
-	lockManager storage.LockManager,
 ) *LightCollectionsStore {
 	return &LightCollectionsStore{
 		data:                 data,

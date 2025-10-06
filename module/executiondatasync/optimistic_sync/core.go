@@ -334,7 +334,7 @@ func (c *CoreImpl) Persist() error {
 	persisterStores := []stores.PersisterStore{
 		stores.NewEventsStore(indexerData.Events, c.workingData.persistentEvents, c.executionResult.BlockID),
 		stores.NewResultsStore(indexerData.Results, c.workingData.persistentResults, c.executionResult.BlockID),
-		stores.NewCollectionsStore(indexerData.Collections, c.workingData.persistentCollections, c.workingData.lockManager),
+		stores.NewCollectionsStore(indexerData.Collections, c.workingData.persistentCollections),
 		stores.NewTxResultErrMsgStore(c.workingData.txResultErrMsgsData, c.workingData.persistentTxResultErrMsgs, c.executionResult.BlockID),
 		stores.NewLatestSealedResultStore(c.workingData.latestPersistedSealedResult, c.executionResult.ID(), c.block.Height),
 	}

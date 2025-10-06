@@ -34,11 +34,8 @@ func NewTxResultErrMsgStore(
 //
 // No error returns are expected during normal operations
 func (t *TxResultErrMsgStore) Persist(_ lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	if len(t.data) > 0 {
-		if err := t.persistedTxResultErrMsg.BatchStore(t.blockID, t.data, batch); err != nil {
-			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
-		}
+	if err := t.persistedTxResultErrMsg.BatchStore(t.blockID, t.data, batch); err != nil {
+		return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 	}
-
 	return nil
 }

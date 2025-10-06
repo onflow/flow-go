@@ -67,7 +67,11 @@ func (p *PersisterSuite) TestPersister_HappyPath() {
 }
 
 func (p *PersisterSuite) TestPersister_EmptyData() {
-	p.indexerData = &indexer.IndexerData{}
+	p.indexerData = &indexer.IndexerData{
+		// this is needed because the events storage caches an empty slice when no events are passed.
+		// without it, assert.Equals will fail because nil != empty slice
+		Events: []flow.Event{},
+	}
 	p.txErrMsgs = nil
 	p.testWithDatabase()
 }
@@ -106,7 +110,7 @@ func (p *PersisterSuite) testWithDatabase() {
 			[]stores.PersisterStore{
 				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
 				stores.NewResultsStore(p.indexerData.Results, results, p.executionResult.BlockID),
-				stores.NewCollectionsStore(p.indexerData.Collections, collections, lockManager),
+				stores.NewCollectionsStore(p.indexerData.Collections, collections),
 				stores.NewTxResultErrMsgStore(p.txErrMsgs, txResultErrMsg, p.executionResult.BlockID),
 				stores.NewLatestSealedResultStore(latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
 			},
@@ -186,7 +190,7 @@ func (p *PersisterSuite) TestPersister_ErrorHandling() {
 			lockManager,
 			p.executionResult,
 			[]stores.PersisterStore{
-				stores.NewCollectionsStore(p.indexerData.Collections, collections, lockManager),
+				stores.NewCollectionsStore(p.indexerData.Collections, collections),
 				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
 			},
 		)
@@ -208,7 +212,7 @@ func (p *PersisterSuite) TestPersister_ErrorHandling() {
 			lockManager,
 			p.executionResult,
 			[]stores.PersisterStore{
-				stores.NewCollectionsStore(p.indexerData.Collections, collections, lockManager),
+				stores.NewCollectionsStore(p.indexerData.Collections, collections),
 				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
 			},
 		)

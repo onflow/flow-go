@@ -34,11 +34,8 @@ func NewResultsStore(
 //
 // No error returns are expected during normal operations
 func (r *ResultsStore) Persist(_ lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	if len(r.data) > 0 {
-		if err := r.persistedResults.BatchStore(r.blockID, r.data, batch); err != nil {
-			return fmt.Errorf("could not add transaction results to batch: %w", err)
-		}
+	if err := r.persistedResults.BatchStore(r.blockID, r.data, batch); err != nil {
+		return fmt.Errorf("could not add transaction results to batch: %w", err)
 	}
-
 	return nil
 }
