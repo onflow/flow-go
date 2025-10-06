@@ -57,6 +57,8 @@ type IndexerData struct {
 
 // NewInMemoryIndexer returns a new indexer that indexes block execution data and error messages for
 // a single ExecutionResult.
+//
+// No error returns are expected during normal operations.
 func NewInMemoryIndexer(
 	log zerolog.Logger,
 	block *flow.Block,
