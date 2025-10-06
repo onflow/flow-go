@@ -458,7 +458,7 @@ func (a *api) GetEventsForHeightRange(
 func (a *api) GetEventsForBlockIDs(
 	_ context.Context,
 	_ string,
-	_ []flow.Identifier,
+	_ flow.IdentifierList,
 	_ entities.EventEncodingVersion,
 	_ optimistic_sync.Criteria,
 ) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
