@@ -1014,7 +1014,8 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedChunkIndex == nil {
-		node.ProcessedChunkIndex = store.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationChunkIndex)
+		node.ProcessedChunkIndex, err = store.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationChunkIndex).Initialize(chunkconsumer.DefaultJobIndex)
+		require.NoError(t, err)
 	}
 
 	if node.ChunksQueue == nil {
@@ -1026,7 +1027,11 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedBlockHeight == nil {
-		node.ProcessedBlockHeight = store.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationBlockHeight)
+		sealedHead, err := node.State.Sealed().Head()
+		require.NoError(t, err)
+
+		node.ProcessedBlockHeight, err = store.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationBlockHeight).Initialize(sealedHead.Height)
+		require.NoError(t, err)
 	}
 	if node.VerifierEngine == nil {
 		vm := fvm.NewVirtualMachine()
@@ -1118,7 +1123,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.BlockConsumer == nil {
-		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
+		node.BlockConsumer, err = blockconsumer.NewBlockConsumer(node.Log,
 			collector,
 			node.ProcessedBlockHeight,
 			node.Blocks,
