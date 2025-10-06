@@ -22,7 +22,7 @@ type EventsAPI struct {
 }
 
 // GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria
-func (_m *EventsAPI) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error) {
+func (_m *EventsAPI) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs flow.IdentifierList, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error) {
 	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
@@ -32,10 +32,10 @@ func (_m *EventsAPI) GetEventsForBlockIDs(ctx context.Context, eventType string,
 	var r0 []flow.BlockEvents
 	var r1 *access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, flow.IdentifierList, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error)); ok {
 		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, flow.IdentifierList, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
 		r0 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
@@ -43,7 +43,7 @@ func (_m *EventsAPI) GetEventsForBlockIDs(ctx context.Context, eventType string,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, flow.IdentifierList, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
 		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(1) != nil {
@@ -51,7 +51,7 @@ func (_m *EventsAPI) GetEventsForBlockIDs(ctx context.Context, eventType string,
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, string, flow.IdentifierList, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
 		r2 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
 		r2 = ret.Error(2)

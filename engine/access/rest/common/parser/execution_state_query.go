@@ -17,9 +17,13 @@ func NewExecutionStateQuery(
 	var err error
 	if len(agreeingExecutorCount) > 0 {
 		executorCount, err = strconv.ParseUint(agreeingExecutorCount, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse agreeingExecutorCount: %w", err)
+		}
+
 		// executorCount can't be set to 0 explicitly
-		if err != nil || executorCount == 0 {
-			return nil, fmt.Errorf("invalid agreeingExecutorCount: %w", err)
+		if executorCount == 0 {
+			return nil, fmt.Errorf("agreeingExecutorCount cannot be equal 0")
 		}
 	}
 

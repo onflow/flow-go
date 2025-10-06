@@ -38,7 +38,7 @@ type EventsAPI interface {
 	GetEventsForBlockIDs(
 		ctx context.Context,
 		eventType string,
-		blockIDs []flow.Identifier,
+		blockIDs flow.IdentifierList,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
 		criteria optimistic_sync.Criteria,
 	) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error)
