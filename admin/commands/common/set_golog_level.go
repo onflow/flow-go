@@ -29,7 +29,7 @@ func (s *SetGologLevelCommand) Validator(req *admin.CommandRequest) error {
 	if !ok {
 		return errors.New("the input must be a string")
 	}
-	logLevel, err := golog.LevelFromString(level)
+	logLevel, err := golog.Parse(level)
 	if err != nil {
 		return fmt.Errorf("failed to parse level: %w", err)
 	}

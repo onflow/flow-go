@@ -274,8 +274,8 @@ func TestCalculateExecutionDataLifecycle(t *testing.T) {
 			require.NoError(t, err)
 			defer dsManager.Close()
 
-			bs := blobs.NewBlobstore(dsManager.Datastore())
-			bs.HashOnRead(true) // ensure data read from db matches expected hash
+			// ensure data read from db matches expected hash
+			bs := blobs.NewBlobstore(dsManager.Datastore(), blobs.WithHashOnRead())
 			executionDataStore := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
 
 			executionData, err := executionDataStore.Get(ctx, canonicalExecutionDataID)
