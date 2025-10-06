@@ -187,11 +187,9 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 		// Check for errors in a separate goroutine
 		go func() {
-			select {
-			case err := <-errChan:
-				if err != nil {
-					p.T().Errorf("Pipeline error: %v", err)
-				}
+			err := <-errChan
+			if err != nil {
+				p.T().Errorf("Pipeline error: %v", err)
 			}
 		}()
 
