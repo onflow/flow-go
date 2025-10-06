@@ -93,6 +93,7 @@ type Params struct {
 	ExecutionReceipts        storage.ExecutionReceipts
 	ExecutionResults         storage.ExecutionResults
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
+	ScheduledTransactions    storage.ScheduledTransactionsReader
 	ChainID                  flow.ChainID
 	AccessMetrics            module.AccessMetrics
 	ConnFactory              connection.ConnectionFactory
@@ -257,6 +258,7 @@ func New(params Params) (*Backend, error) {
 		Collections:                 params.Collections,
 		Transactions:                params.Transactions,
 		TxErrorMessageProvider:      params.TxErrorMessageProvider,
+		ScheduledTransactions:       params.ScheduledTransactions,
 		TxResultCache:               txResCache,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,

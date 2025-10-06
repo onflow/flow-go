@@ -299,6 +299,7 @@ type ObserverServiceBuilder struct {
 	// storage
 	events                  storage.Events
 	lightTransactionResults storage.LightTransactionResults
+	scheduledTransactions   storage.ScheduledTransactions
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -1349,6 +1350,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
 			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			return nil
+		}).Module("scheduled transactions storage", func(node *cmd.NodeConfig) error {
+			builder.scheduledTransactions = store.NewScheduledTransactions(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+			return nil
 		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Note: using a DependableComponent here to ensure that the indexer does not block
 			// other components from starting while bootstrapping the register db since it may
@@ -1445,7 +1449,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
 				builder.lightTransactionResults,
-				builder.RootChainID.Chain(),
+				builder.scheduledTransactions,
+				builder.RootChainID,
 				indexerDerivedChainData,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
@@ -1962,25 +1967,26 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 
 		backendParams := backend.Params{
-			State:                node.State,
-			Blocks:               node.Storage.Blocks,
-			Headers:              node.Storage.Headers,
-			Collections:          node.Storage.Collections,
-			Transactions:         node.Storage.Transactions,
-			ExecutionReceipts:    node.Storage.Receipts,
-			ExecutionResults:     node.Storage.Results,
-			ChainID:              node.RootChainID,
-			AccessMetrics:        accessMetrics,
-			ConnFactory:          connFactory,
-			RetryEnabled:         false,
-			MaxHeightRange:       backendConfig.MaxHeightRange,
-			Log:                  node.Logger,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			BlockTracker:         blockTracker,
-			ScriptExecutionMode:  scriptExecMode,
-			EventQueryMode:       eventQueryMode,
-			TxResultQueryMode:    txResultQueryMode,
+			State:                 node.State,
+			Blocks:                node.Storage.Blocks,
+			Headers:               node.Storage.Headers,
+			Collections:           node.Storage.Collections,
+			Transactions:          node.Storage.Transactions,
+			ExecutionReceipts:     node.Storage.Receipts,
+			ExecutionResults:      node.Storage.Results,
+			ScheduledTransactions: builder.scheduledTransactions,
+			ChainID:               node.RootChainID,
+			AccessMetrics:         accessMetrics,
+			ConnFactory:           connFactory,
+			RetryEnabled:          false,
+			MaxHeightRange:        backendConfig.MaxHeightRange,
+			Log:                   node.Logger,
+			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+			Communicator:          node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			BlockTracker:          blockTracker,
+			ScriptExecutionMode:   scriptExecMode,
+			EventQueryMode:        eventQueryMode,
+			TxResultQueryMode:     txResultQueryMode,
 			SubscriptionHandler: subscription.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,

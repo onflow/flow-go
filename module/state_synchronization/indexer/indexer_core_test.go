@@ -29,23 +29,24 @@ import (
 )
 
 type indexCoreTest struct {
-	t                *testing.T
-	indexer          *IndexerCore
-	registers        *storagemock.RegisterIndex
-	events           *storagemock.Events
-	collection       *flow.Collection
-	collections      *storagemock.Collections
-	transactions     *storagemock.Transactions
-	results          *storagemock.LightTransactionResults
-	headers          *storagemock.Headers
-	ctx              context.Context
-	blocks           []*flow.Block
-	data             *execution_data.BlockExecutionDataEntity
-	lastHeightStore  func(t *testing.T) uint64
-	firstHeightStore func(t *testing.T) uint64
-	registersStore   func(t *testing.T, entries flow.RegisterEntries, height uint64) error
-	eventsStore      func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
-	registersGet     func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
+	t                     *testing.T
+	indexer               *IndexerCore
+	registers             *storagemock.RegisterIndex
+	events                *storagemock.Events
+	collection            *flow.Collection
+	collections           *storagemock.Collections
+	transactions          *storagemock.Transactions
+	results               *storagemock.LightTransactionResults
+	headers               *storagemock.Headers
+	scheduledTransactions *storagemock.ScheduledTransactions
+	ctx                   context.Context
+	blocks                []*flow.Block
+	data                  *execution_data.BlockExecutionDataEntity
+	lastHeightStore       func(t *testing.T) uint64
+	firstHeightStore      func(t *testing.T) uint64
+	registersStore        func(t *testing.T, entries flow.RegisterEntries, height uint64) error
+	eventsStore           func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
+	registersGet          func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 func newIndexCoreTest(
@@ -53,21 +54,20 @@ func newIndexCoreTest(
 	blocks []*flow.Block,
 	exeData *execution_data.BlockExecutionDataEntity,
 ) *indexCoreTest {
-
 	collection := unittest.CollectionFixture(0)
-
 	return &indexCoreTest{
-		t:            t,
-		registers:    storagemock.NewRegisterIndex(t),
-		events:       storagemock.NewEvents(t),
-		collection:   &collection,
-		results:      storagemock.NewLightTransactionResults(t),
-		collections:  storagemock.NewCollections(t),
-		transactions: storagemock.NewTransactions(t),
-		blocks:       blocks,
-		ctx:          context.Background(),
-		data:         exeData,
-		headers:      newBlockHeadersStorage(blocks).(*storagemock.Headers), // convert it back to mock type for tests,
+		t:                     t,
+		registers:             storagemock.NewRegisterIndex(t),
+		events:                storagemock.NewEvents(t),
+		collection:            &collection,
+		results:               storagemock.NewLightTransactionResults(t),
+		collections:           storagemock.NewCollections(t),
+		transactions:          storagemock.NewTransactions(t),
+		scheduledTransactions: storagemock.NewScheduledTransactions(t),
+		blocks:                blocks,
+		ctx:                   context.Background(),
+		data:                  exeData,
+		headers:               newBlockHeadersStorage(blocks).(*storagemock.Headers), // convert it back to mock type for tests,
 	}
 }
 
@@ -224,7 +224,8 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		i.collections,
 		i.transactions,
 		i.results,
-		flow.Testnet.Chain(),
+		i.scheduledTransactions,
+		flow.Testnet,
 		derivedChainData,
 		collectionExecutedMetric,
 		lockManager,
@@ -652,7 +653,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
 				nil,
 				lockManager,
@@ -687,7 +689,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
 				nil,
 				lockManager,
@@ -715,7 +718,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
 				nil,
 				lockManager,
@@ -760,7 +764,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
 				nil,
 				lockManager,

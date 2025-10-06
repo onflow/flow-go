@@ -351,6 +351,7 @@ type FlowAccessNodeBuilder struct {
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	transactions                   storage.Transactions
 	collections                    storage.Collections
+	scheduledTransactions          storage.ScheduledTransactions
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -852,6 +853,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 				return nil
 			}).
+			Module("scheduled transactions storage", func(node *cmd.NodeConfig) error {
+				builder.scheduledTransactions = store.NewScheduledTransactions(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				return nil
+			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
@@ -947,7 +952,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.collections),
 					notNil(builder.transactions),
 					notNil(builder.lightTransactionResults),
-					builder.RootChainID.Chain(),
+					notNil(builder.scheduledTransactions),
+					builder.RootChainID,
 					indexerDerivedChainData,
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
@@ -2125,6 +2131,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
+				ScheduledTransactions: builder.scheduledTransactions,          // might be nil
 				ChainID:               node.RootChainID,
 				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,

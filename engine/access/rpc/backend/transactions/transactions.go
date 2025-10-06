@@ -53,12 +53,12 @@ type Transactions struct {
 	retrier                     retrier.Retrier
 
 	// Storages
-	blocks       storage.Blocks
-	collections  storage.Collections
-	transactions storage.Transactions
-	events       storage.Events
-
-	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
+	blocks                storage.Blocks
+	collections           storage.Collections
+	transactions          storage.Transactions
+	events                storage.Events
+	scheduledTransactions storage.ScheduledTransactionsReader
+	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
 	txValidator     *validator.TransactionValidator
 	txProvider      provider.TransactionProvider
@@ -85,6 +85,7 @@ type Params struct {
 	Collections                 storage.Collections
 	Transactions                storage.Transactions
 	Events                      storage.Events
+	ScheduledTransactions       storage.ScheduledTransactionsReader
 	TxErrorMessageProvider      error_messages.Provider
 	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	TxProvider                  provider.TransactionProvider
@@ -110,6 +111,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		collections:                 params.Collections,
 		transactions:                params.Transactions,
 		events:                      params.Events,
+		scheduledTransactions:       params.ScheduledTransactions,
 		txResultCache:               params.TxResultCache,
 		txValidator:                 params.TxValidator,
 		txProvider:                  params.TxProvider,
@@ -528,6 +530,56 @@ func (t *Transactions) GetSystemTransactionResult(
 	}
 
 	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
+}
+
+// GetScheduledTransaction returns the transaction body of the scheduled transaction by ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the scheduled transaction is not found
+func (t *Transactions) GetScheduledTransaction(ctx context.Context, scheduledTxID uint64) (*flow.TransactionBody, error) {
+	if t.scheduledTransactions == nil {
+		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
+	}
+
+	txID, err := t.scheduledTransactions.TransactionIDByID(scheduledTxID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	blockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
+	if err != nil {
+		// blockID and txID are indexed atomically. any error here indicates a bug or inconsistency in the database.
+		err := fmt.Errorf("failed to find scheduled transaction's blockID index (id: %d, txID: %s): %w", scheduledTxID, txID, err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	return t.GetSystemTransaction(ctx, txID, blockID)
+}
+
+// GetScheduledTransactionResult returns the transaction result of the scheduled transaction by ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the scheduled transaction is not found
+func (t *Transactions) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+	if t.scheduledTransactions == nil {
+		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
+	}
+
+	txID, err := t.scheduledTransactions.TransactionIDByID(scheduledTxID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	blockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
+	if err != nil {
+		// blockID and txID are indexed atomically. any error here indicates a bug or inconsistency in the database.
+		err := fmt.Errorf("failed to find scheduled transaction's blockID index (id: %d, txID: %s): %w", scheduledTxID, txID, err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	return t.GetSystemTransactionResult(ctx, txID, blockID, requiredEventEncodingVersion)
 }
 
 // Error returns:

@@ -88,7 +88,7 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 
 	events := make([]flow.Event, 0)
 	results := make([]flow.LightTransactionResult, 0)
-	registers := make(map[ledger.Path]*ledger.Payload)
+	regEntries := make(flow.RegisterEntries, 0)
 	indexedCollections := 0
 
 	lctx := i.lockManager.NewContext()
@@ -98,7 +98,6 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	}
 	defer lctx.Release()
 
-	// Process all chunk data in a single pass
 	for idx, chunk := range data.ChunkExecutionDatas {
 		// Collect events
 		events = append(events, chunk.Events...)
@@ -123,8 +122,18 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 			}
 
 			// Collect registers (last one for a path wins)
+			mapping := make(map[ledger.Path]*ledger.Payload)
 			for i, path := range chunk.TrieUpdate.Paths {
-				registers[path] = chunk.TrieUpdate.Payloads[i]
+				mapping[path] = chunk.TrieUpdate.Payloads[i]
+			}
+
+			// Convert final payloads to register entries
+			for _, payload := range mapping {
+				entry, err := i.toRegisterEntry(payload)
+				if err != nil {
+					return fmt.Errorf("could not convert payload to register entry: %w", err)
+				}
+				regEntries = append(regEntries, *entry)
 			}
 		}
 	}
@@ -137,14 +146,14 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 		return fmt.Errorf("could not index transaction results: %w", err)
 	}
 
-	if err := i.indexRegisters(registers, i.header.Height); err != nil {
+	if err := i.registers.Store(regEntries, i.header.Height); err != nil {
 		return fmt.Errorf("could not index registers: %w", err)
 	}
 
 	log.Debug().
 		Dur("duration_ms", time.Since(start)).
 		Int("event_count", len(events)).
-		Int("register_count", len(registers)).
+		Int("register_count", len(regEntries)).
 		Int("result_count", len(results)).
 		Int("collection_count", indexedCollections).
 		Msg("indexed block data")
@@ -152,39 +161,30 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	return nil
 }
 
-// indexRegisters processes register payloads and stores them in the register database.
-// No errors are expected during normal operation.
-func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
-	regEntries := make(flow.RegisterEntries, 0, len(registers))
-
-	for _, register := range registers {
-		k, err := register.Key()
-		if err != nil {
-			return fmt.Errorf("failed to get ledger key: %w", err)
-		}
-
-		id, err := convert.LedgerKeyToRegisterID(k)
-		if err != nil {
-			return fmt.Errorf("failed to convert ledger key to register id: %w", err)
-		}
-
-		regEntries = append(regEntries, flow.RegisterEntry{
-			Key:   id,
-			Value: register.Value(),
-		})
+// toRegisterEntry converts a ledger payload to a register entry.
+//
+// No error returns are expected during normal operation.
+func (i *InMemoryIndexer) toRegisterEntry(payload *ledger.Payload) (*flow.RegisterEntry, error) {
+	k, err := payload.Key()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ledger key: %w", err)
 	}
 
-	return i.registers.Store(regEntries, height)
+	id, err := convert.LedgerKeyToRegisterID(k)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ledger key to register id: %w", err)
+	}
+
+	return &flow.RegisterEntry{
+		Key:   id,
+		Value: payload.Value(),
+	}, nil
 }
 
-// indexCollection processes a collection and its associated transactions.
-// No errors are expected during normal operation.
+// indexCollection stores a collection and its associated transactions.
+//
+// No error returns are expected during normal operation.
 func (i *InMemoryIndexer) indexCollection(lctx lockctx.Proof, collection *flow.Collection) error {
-	// Store the light collection and index by transaction
 	_, err := i.collections.StoreAndIndexByTransaction(lctx, collection)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

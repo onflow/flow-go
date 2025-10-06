@@ -9,7 +9,10 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,18 +24,20 @@ import (
 
 // IndexerCore indexes the execution state.
 type IndexerCore struct {
-	log     zerolog.Logger
-	metrics module.ExecutionStateIndexerMetrics
-
-	registers    storage.RegisterIndex
-	headers      storage.Headers
-	events       storage.Events
-	collections  storage.Collections
-	transactions storage.Transactions
-	results      storage.LightTransactionResults
-	protocolDB   storage.DB
-
+	log                      zerolog.Logger
+	chainID                  flow.ChainID
+	fvmEnv                   templates.Environment
+	metrics                  module.ExecutionStateIndexerMetrics
 	collectionExecutedMetric module.CollectionExecutedMetric
+
+	registers             storage.RegisterIndex
+	headers               storage.Headers
+	events                storage.Events
+	collections           storage.Collections
+	transactions          storage.Transactions
+	results               storage.LightTransactionResults
+	scheduledTransactions storage.ScheduledTransactions
+	protocolDB            storage.DB
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
@@ -52,7 +57,8 @@ func New(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	results storage.LightTransactionResults,
-	chain flow.Chain,
+	scheduledTransactions storage.ScheduledTransactions,
+	chainID flow.ChainID,
 	derivedChainData *derived.DerivedChainData,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
@@ -65,18 +71,23 @@ func New(
 		Uint64("latest_height", registers.LatestHeight()).
 		Msg("indexer initialized")
 
+	fvmEnv := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
+
 	return &IndexerCore{
-		log:              log,
-		metrics:          metrics,
-		protocolDB:       protocolDB,
-		registers:        registers,
-		headers:          headers,
-		collections:      collections,
-		transactions:     transactions,
-		events:           events,
-		results:          results,
-		serviceAddress:   chain.ServiceAddress(),
-		derivedChainData: derivedChainData,
+		log:                   log,
+		metrics:               metrics,
+		chainID:               chainID,
+		fvmEnv:                fvmEnv,
+		protocolDB:            protocolDB,
+		registers:             registers,
+		headers:               headers,
+		collections:           collections,
+		transactions:          transactions,
+		events:                events,
+		results:               results,
+		scheduledTransactions: scheduledTransactions,
+		serviceAddress:        chainID.Chain().ServiceAddress(),
+		derivedChainData:      derivedChainData,
 
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
@@ -148,7 +159,16 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			results = append(results, chunk.TransactionResults...)
 		}
 
-		err := c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		systemChunkIndex := len(data.ChunkExecutionDatas) - 1
+		systemChunkEvents := data.ChunkExecutionDatas[systemChunkIndex].Events
+		systemChunkResults := data.ChunkExecutionDatas[systemChunkIndex].TransactionResults
+
+		scheduledTransactionData, err := c.collectScheduledTransactionMapping(systemChunkResults, systemChunkEvents)
+		if err != nil {
+			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
+		}
+
+		err = c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
 			if err != nil {
 				return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
@@ -158,6 +178,14 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			if err != nil {
 				return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
 			}
+
+			for txID, scheduledTxID := range scheduledTransactionData {
+				err = c.scheduledTransactions.BatchIndex(data.BlockID, txID, scheduledTxID, rw)
+				if err != nil {
+					return fmt.Errorf("could not index scheduled transaction (%d) %s at height %d: %w", scheduledTxID, txID, header.Height, err)
+				}
+			}
+
 			return nil
 		})
 
@@ -171,8 +199,9 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		lg.Debug().
 			Int("event_count", eventCount).
 			Int("result_count", resultCount).
+			Int("scheduled_tx_count", len(scheduledTransactionData)).
 			Dur("duration_ms", time.Since(start)).
-			Msg("indexed badger data")
+			Msg("indexed protocol data")
 
 		return nil
 	})
@@ -264,6 +293,90 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		Msg("indexed block data")
 
 	return nil
+}
+
+// collectScheduledTransactionMapping processes the system chunk's events and transaction results,
+// and returns a mapping from transaction ID to scheduled transaction ID for all scheduled transactions
+// executed within the system chunk.
+// The method also verifies that the transactions and events are consistent with the expected
+// system collection, and returns an error if there are any inconsistencies.
+//
+// No error returns are expected during normal operation.
+func (c *IndexerCore) collectScheduledTransactionMapping(systemChunkResults []flow.LightTransactionResult, systemChunkEvents []flow.Event) (map[flow.Identifier]uint64, error) {
+	if len(systemChunkResults) == 0 {
+		return nil, fmt.Errorf("system chunk contained 0 transaction results")
+	}
+
+	scheduledTransactionData := make(map[flow.Identifier]uint64, 0)
+	processCallbackEvents := make([]flow.Event, 0)
+
+	// extract the pending execution events and create a mapping from transaction ID to scheduled transaction ID
+	for i, event := range systemChunkEvents {
+		if blueprints.IsPendingExecutionEvent(c.fvmEnv, event) {
+			id, _, err := blueprints.CallbackDetailsFromEvent(event)
+			if err != nil {
+				return nil, fmt.Errorf("could not get callback details from event %d: %w", i, err)
+			}
+			scheduledTransactionData[event.TransactionID] = uint64(id)
+			processCallbackEvents = append(processCallbackEvents, event)
+		}
+	}
+
+	// sanity check: there should not be any duplicate txIDs in the process callback events
+	if len(scheduledTransactionData) != len(processCallbackEvents) {
+		return nil, fmt.Errorf("system chunk contained %d process callback events, but found %d unique scheduled transaction IDs", len(systemChunkResults), len(processCallbackEvents))
+	}
+
+	// there are 3 possible valid cases:
+	// 1. N (1 or more) scheduled transaction were executed, there should be N + 2 results
+	//    (N scheduled transactions, process callback tx, and the standard system tx)
+	// 2. 0 scheduled transactions were executed, and scheduled transactions are enabled. there should be 2 results
+	//    (process callback tx, and the standard system tx)
+	// 3. 0 scheduled transactions were executed, and scheduled transactions are disabled. there should be 1 result
+	//    (the standard system tx)
+	// there is currently no way to determine if scheduled transactions are enabled or disabled, so
+	// we simply check that there are either 1 or 2 results when there are 0 scheduled transactions.
+	// eventually, we should check using the execution version from the dynamic protocol state.
+
+	if len(scheduledTransactionData) == 0 {
+		if len(systemChunkResults) > 2 {
+			return nil, fmt.Errorf("system chunk contained %d results, and 0 scheduled transactions", len(systemChunkResults))
+		}
+		// this block either did not contain any scheduled transactions, or scheduled transactions were disabled
+		return scheduledTransactionData, nil
+	}
+
+	// if there were scheduled transactions, there should be exactly 2 more results than there were
+	// scheduled transactions.
+	if len(scheduledTransactionData) != len(systemChunkResults)-2 {
+		return nil, fmt.Errorf("system chunk contained %d results, but only found %d scheduled callbacks", len(systemChunkResults), len(scheduledTransactionData)+2)
+	}
+
+	// reconstruct the system collection, and verify that the results match the expected transaction
+	systemCollection, err := blueprints.SystemCollection(c.chainID.Chain(), processCallbackEvents)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct system collection: %w", err)
+	}
+
+	if len(systemChunkResults) != len(systemCollection.Transactions) {
+		return nil, fmt.Errorf("system chunk contained %d results, but expected %d", len(systemChunkResults), len(systemCollection.Transactions))
+	}
+
+	for i, tx := range systemCollection.Transactions {
+		txID := tx.ID()
+		if txID != systemChunkResults[i].TransactionID {
+			return nil, fmt.Errorf("system chunk result at index %d does not match expected. got: %v, expected: %v", i, systemChunkResults[i].TransactionID, txID)
+		}
+
+		// make sure that the txID included in the event matches the scheduled transaction result
+		if i > 0 && i < len(systemChunkResults)-1 {
+			if _, ok := scheduledTransactionData[txID]; !ok {
+				return nil, fmt.Errorf("scheduled transaction ID not found for transaction %s", txID)
+			}
+		}
+	}
+
+	return scheduledTransactionData, nil
 }
 
 func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Event, collections []*flow.Collection) error {
