@@ -29,7 +29,6 @@ type CoreSuite struct {
 	persistentRegisters           *storagemock.RegisterIndex
 	persistentEvents              *storagemock.Events
 	persistentCollections         *storagemock.Collections
-	persistentTransactions        *storagemock.Transactions
 	persistentResults             *storagemock.LightTransactionResults
 	persistentTxResultErrMsg      *storagemock.TransactionResultErrorMessages
 	latestPersistedSealedResult   *storagemock.LatestPersistedSealedResult
@@ -415,7 +414,6 @@ func (c *CoreSuite) TestCore_Persist() {
 		c.persistentRegisters = storagemock.NewRegisterIndex(t)
 		c.persistentEvents = storagemock.NewEvents(t)
 		c.persistentCollections = storagemock.NewCollections(t)
-		c.persistentTransactions = storagemock.NewTransactions(t)
 		c.persistentResults = storagemock.NewLightTransactionResults(t)
 		c.persistentTxResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
 		c.latestPersistedSealedResult = storagemock.NewLatestPersistedSealedResult(t)
