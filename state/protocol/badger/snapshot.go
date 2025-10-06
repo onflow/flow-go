@@ -16,12 +16,16 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-// Snapshot implements the protocol.Snapshot interface.
-// It represents a read-only immutable snapshot of the protocol state at the
-// block it is constructed with. It allows efficient access to data associated directly
-// with blocks at a given state (finalized, sealed), such as the related header, commit,
+// Snapshot pertains to a specific fork of the main consensus. Specifically, it references
+// one block denoted as the `Head`. It allows efficient access to the protocol state directly
+// that was active at a specific block (finalized, sealed), such as the related header, commit,
 // seed or descending blocks. A block snapshot can lazily convert to an epoch snapshot in
 // order to make data associated directly with epochs accessible through its API.
+//
+// This Snapshot implements the [protocol.Snapshot] interface for KNOWN BLOCKS.
+// Existence of the reference block is currently ensured, because Snapshot instances are
+// only created by AtBlockID and AtHeight method of State, which both check the existence
+// of the block first.
 type Snapshot struct {
 	state   *State
 	blockID flow.Identifier // reference block for this snapshot
@@ -39,6 +43,7 @@ var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
 
 // newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
 // CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
+// For unknown blocks, please use `invalid.NewSnapshot` or `invalid.NewSnapshotf`.
 func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
@@ -297,9 +302,15 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	return segment, nil
 }
 
-// Note, the caller must have checked that the block of the snapshot does exist in the database.
-// This is currently true, because the Snapshot instance is only created by AtBlockID and AtHeight
-// method of State, which both check the existence of the block first.
+// Descendants returns the IDs of all descendants of the Head block.
+// The IDs are ordered such that parents are included before their children.
+// Since all blocks are fully validated before being inserted to the state,
+// all returned blocks are validated.
+//
+// CAUTION: the list of descendants is constructed for each call via database reads,
+// and may be expensive to compute, especially if the reference block is older.
+//
+// No errors returns expected under normal operation.
 func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 	descendants, err := s.descendants(s.blockID)
 	if err != nil {
@@ -308,23 +319,27 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 	return descendants, nil
 }
 
-func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var children flow.IdentifierList
-	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &children)
-	if err != nil {
-		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
-	}
-	return children, nil
-}
-
+// descendants returns a slice the IDs of all known children of the given blockID.
+// CAUTION: this function behaves only correctly for known blocks (see constructor).
+// No error returns are expected during normal operation.
 func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, error) {
-	descendantIDs, err := s.lookupChildren(blockID)
+	var descendantIDs flow.IdentifierList
+	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &descendantIDs)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
+		}
+
+		// The low-level storage returns `storage.ErrNotFound` in two cases:
+		// 1. the block/collection is unknown
+		// 2. the block/collection is known but no children have been indexed yet
+		// By contract of the constructor, the blockID must correspond to a known collection in the database.
+		// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
+		// possible here, and we just return an empty list.
 	}
 
-	for _, descendantID := range descendantIDs {
-		additionalIDs, err := s.descendants(descendantID)
+	for _, child := range descendantIDs {
+		additionalIDs, err := s.descendants(child)
 		if err != nil {
 			return nil, err
 		}

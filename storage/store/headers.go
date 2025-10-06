@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -82,7 +83,7 @@ func (h *Headers) storeTx(
 		return err
 	}
 
-	return h.sigs.storeTx(rw, blockID, proposalSig)
+	return h.sigs.storeTx(lctx, rw, blockID, proposalSig)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
@@ -185,10 +186,27 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 // might be unfinalized; if there is more than one, at least one of them has to
 // be unfinalized.
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no block with the given parentID is known
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	var blockIDs flow.IdentifierList
 	err := operation.RetrieveBlockChildren(h.db.Reader(), parentID, &blockIDs)
 	if err != nil {
+		// if not found error is returned, there are two possible reasons:
+		// 1. the parent block does not exist, in which case we should return not found error
+		// 2. the parent block exists but has no children, in which case we should return empty list
+		if errors.Is(err, storage.ErrNotFound) {
+			exists, err := h.Exists(parentID)
+			if err != nil {
+				return nil, fmt.Errorf("could not check existence of parent %x: %w", parentID, err)
+			}
+			if !exists {
+				return nil, fmt.Errorf("cannot retrieve children of unknown block %x: %w", parentID, storage.ErrNotFound)
+			}
+			// parent exists but has no children
+			return []*flow.Header{}, nil
+		}
 		return nil, fmt.Errorf("could not look up children: %w", err)
 	}
 	headers := make([]*flow.Header, 0, len(blockIDs))

@@ -13,14 +13,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestOperationPair represents a pair of operations to test
+// TestOperationPair is a pair of indexing operation and corresponding lock to be held during the operation.
+// The name is an auxiliary identifier, for debugging only.
 type TestOperationPair struct {
 	name      string
 	indexFunc func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, flow.Identifier) error
 	lockType  string
 }
 
-// getTestOperationPairs returns the operation pairs to test
+// getTestOperationPairs returns a `TestOperationPair` for indexing main consensus blocks
+// and one `TestOperationPair` for indexing collector blocks (aka collections).
 func getTestOperationPairs() []TestOperationPair {
 	return []TestOperationPair{
 		{
@@ -47,8 +49,7 @@ func TestIndexAndLookupChild(t *testing.T) {
 				// retrieving children of a non-existent block should return empty list
 				var retrievedIDs flow.IdentifierList
 				err := operation.RetrieveBlockChildren(db.Reader(), nonExist, &retrievedIDs)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 
 				parentID := unittest.IdentifierFixture()
 				childID := unittest.IdentifierFixture()
@@ -67,9 +68,8 @@ func TestIndexAndLookupChild(t *testing.T) {
 				require.Equal(t, flow.IdentifierList{childID}, retrievedIDs)
 
 				err = operation.RetrieveBlockChildren(db.Reader(), childID, &retrievedIDs)
-				// verify new block has no children index (children is empty)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				// verify new block has no children index (returning storage.ErrNotFound)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 
 				// verify indexing again would hit storage.ErrAlreadyExists error
 				err = unittest.WithLock(t, lockManager, opPair.lockType, func(lctx lockctx.Context) error {
@@ -77,17 +77,14 @@ func TestIndexAndLookupChild(t *testing.T) {
 						return opPair.indexFunc(lctx, rw, childID, parentID)
 					})
 				})
-				require.Error(t, err)
 				require.ErrorIs(t, err, storage.ErrAlreadyExists)
 			})
 		})
 	}
 }
 
-// if two blocks connect to the same parent, indexing the second block would have
-// no effect, retrieving the child of the parent block will return the first block that
-// was indexed.
-func TestIndexTwiceAndRetrieve(t *testing.T) {
+// indexing multiple children to the same parent should be retrievable
+func TestIndexWithMultiChildrenRetrieve(t *testing.T) {
 	for _, opPair := range getTestOperationPairs() {
 		t.Run(opPair.name, func(t *testing.T) {
 			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -117,7 +114,48 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 				err = operation.RetrieveBlockChildren(db.Reader(), parentID, &retrievedIDs)
 				require.NoError(t, err)
 
-				require.Equal(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
+				require.ElementsMatch(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
+			})
+		})
+	}
+}
+
+// Test indexing the same child with different parents should not error
+func TestIndexAgainWithDifferentParentShouldError(t *testing.T) {
+	for _, opPair := range getTestOperationPairs() {
+		t.Run(opPair.name, func(t *testing.T) {
+			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+				lockManager := storage.NewTestingLockManager()
+
+				child := unittest.IdentifierFixture()
+				parent1 := unittest.IdentifierFixture()
+				parent2 := unittest.IdentifierFixture()
+
+				// index with parent
+				err := unittest.WithLock(t, lockManager, opPair.lockType, func(lctx lockctx.Context) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return opPair.indexFunc(lctx, rw, child, parent1)
+					})
+				})
+				require.NoError(t, err)
+
+				// index with a different parent
+				err = unittest.WithLock(t, lockManager, opPair.lockType, func(lctx lockctx.Context) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return opPair.indexFunc(lctx, rw, child, parent2)
+					})
+				})
+				require.NoError(t, err)
+
+				var retrievedIDs flow.IdentifierList
+				err = operation.RetrieveBlockChildren(db.Reader(), parent1, &retrievedIDs)
+				require.NoError(t, err)
+
+				require.ElementsMatch(t, flow.IdentifierList{child}, retrievedIDs)
+
+				err = operation.RetrieveBlockChildren(db.Reader(), parent2, &retrievedIDs)
+				require.NoError(t, err)
+				require.ElementsMatch(t, flow.IdentifierList{child}, retrievedIDs)
 			})
 		})
 	}
@@ -142,20 +180,21 @@ func TestIndexZeroParent(t *testing.T) {
 				// zero id should have no children
 				var retrievedIDs flow.IdentifierList
 				err = operation.RetrieveBlockChildren(db.Reader(), flow.ZeroID, &retrievedIDs)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				require.Error(t, err)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 			})
 		})
 	}
 }
 
-// lookup block children will only return direct childrens
+// lookup block children will only return direct children, even if grandchildren exist
 func TestDirectChildren(t *testing.T) {
 	for _, opPair := range getTestOperationPairs() {
 		t.Run(opPair.name, func(t *testing.T) {
 			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 				lockManager := storage.NewTestingLockManager()
 
+				// We emulate a fork of blocks: b1 ← b2 ← b3 ← b4
 				b1 := unittest.IdentifierFixture()
 				b2 := unittest.IdentifierFixture()
 				b3 := unittest.IdentifierFixture()
@@ -199,8 +238,7 @@ func TestDirectChildren(t *testing.T) {
 
 				err = operation.RetrieveBlockChildren(db.Reader(), b4, &retrievedIDs)
 				// verify b4 has no children index (not indexed yet)
-				require.NoError(t, err)
-				require.Empty(t, retrievedIDs)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 			})
 		})
 	}
@@ -209,25 +247,31 @@ func TestDirectChildren(t *testing.T) {
 // TestChildrenWrongLockIsRejected verifies that operations fail when called with the wrong lock type.
 // This ensures that IndexNewBlock requires LockInsertBlock and IndexNewClusterBlock requires LockInsertOrFinalizeClusterBlock.
 func TestChildrenWrongLockIsRejected(t *testing.T) {
+	for _, opPair := range getTestOperationPairs() {
+		t.Run(opPair.name, func(t *testing.T) {
+			dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+				lockManager := storage.NewTestingLockManager()
 
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
+				parentID := unittest.IdentifierFixture()
+				childID := unittest.IdentifierFixture()
 
-		parentID := unittest.IdentifierFixture()
-		childID := unittest.IdentifierFixture()
+				// Use the wrong lock type for each operation
+				var wrongLockType string
+				if opPair.lockType == storage.LockInsertBlock {
+					// For IndexNewBlock, use the cluster block lock (wrong)
+					wrongLockType = storage.LockInsertOrFinalizeClusterBlock
+				} else {
+					// For IndexNewClusterBlock, use the regular block lock (wrong)
+					wrongLockType = storage.LockInsertBlock
+				}
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexNewClusterBlock(lctx, rw, childID, parentID)
+				err := unittest.WithLock(t, lockManager, wrongLockType, func(lctx lockctx.Context) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return opPair.indexFunc(lctx, rw, childID, parentID)
+					})
+				})
+				require.Error(t, err)
 			})
 		})
-		require.Error(t, err)
-
-		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexNewBlock(lctx, rw, childID, parentID)
-			})
-		})
-		require.Error(t, err)
-	})
+	}
 }

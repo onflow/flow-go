@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// IndexNewBlock indexes a new block and updates the parent-child relationship in the block children index.
-// This function creates an empty children index for the new block and adds the new block to the parent's children list.
+// IndexNewBlock populates the parent-child index for block, by adding the given blockID to the set of children of its parent.
 //
 // CAUTION:
+//   - This function should only be used for KNOWN BLOCKs (neither existence of the block nor its parent is verified here)
 //   - The caller must acquire the [storage.LockInsertBlock] and hold it until the database write has been committed.
 //
 // Expected error returns during normal operations:
@@ -26,10 +26,11 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 	return indexBlockByParent(rw, blockID, parentID)
 }
 
-// IndexNewClusterBlock indexes a new cluster block and updates the parent-child relationship in the block children index.
-// This function creates an empty children index for the new cluster block and adds the new block to the parent's children list.
+// IndexNewClusterBlock populates the parent-child index for cluster blocks, aka collections, by adding the given
+// blockID to the set of children of its parent.
 //
 // CAUTION:
+//   - This function should only be used for KNOWN BLOCKs (neither existence of the block nor its parent is verified here)
 //   - The caller must acquire the [storage.LockInsertOrFinalizeClusterBlock] and hold it until the database write has been committed.
 //
 // Expected error returns during normal operations:
@@ -42,36 +43,23 @@ func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 	return indexBlockByParent(rw, blockID, parentID)
 }
 
+// indexBlockByParent is the internal function that implements the indexing logic for both regular blocks and cluster blocks.
+// the caller must ensure the required locks are held to prevent concurrent writes to the [codeBlockChildren] key space.
 func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	// Step 1: make sure the new block has no children yet
-	var nonExist flow.IdentifierList
-	err := RetrieveBlockChildren(rw.GlobalReader(), blockID, &nonExist)
-	if err != nil {
-		// verify err should be ErrNotFound, since new block has no children
-		return fmt.Errorf("could not check for existing children of new block: %w", err)
-	}
-
-	if len(nonExist) > 0 {
-		return fmt.Errorf("a new block supposed to have no children, but found %v: %w", nonExist,
-			storage.ErrAlreadyExists)
-	}
-
-	// Step 2: adding the second index for the parent block
-	// if the parent block is zero, for instance root block has no parent,
-	// then no need to add index for it
-	// useful to skip for cluster root block which has no parent
+	// By convention, the parentID being [flow.ZeroID] means that the block is a root block that has no parent.
+	// This is the case for genesis blocks and cluster root blocks. In this case, we don't need to index anything.
 	if parentID == flow.ZeroID {
 		return nil
 	}
 
-	// if the parent block is not zero, depending on whether the parent block has
-	// children or not, we will either update the index or insert the index:
-	// when parent block doesn't exist, we will insert the block children.
-	// when parent block exists already, we will update the block children,
+	// If the parent block is not zero, depending on whether the parent block has
+	// children or not, we will either update the index or insert the index.
 	var childrenIDs flow.IdentifierList
-	err = RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
+	err := RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
 	if err != nil {
-		return fmt.Errorf("could not look up block children: %w", err)
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not look up block children: %w", err)
+		}
 	}
 
 	// check we don't add a duplicate
@@ -94,10 +82,11 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 }
 
 // RetrieveBlockChildren retrieves the list of child block IDs for the specified parent block.
-// If the parent block has no children, the childrenIDs will be an empty list.
-// If the parent block does not exist in the index, the childrenIDs will be empty as well
 //
-// Expected errors during normal operations:
+// No error returns expected during normal operations.
+// It returns [storage.ErrNotFound] if the block has no children.
+// Note, this would mean either the block does not exist or the block exists but has no children.
+// The caller has to check if the block exists by other means if needed.
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
 	err := RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
 	if err != nil {
@@ -105,10 +94,15 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 		// so we can't distinguish between a block that doesn't exist and a block that exists but has no children
 		// If the block doesn't have a children index yet, it means it has no children
 		if errors.Is(err, storage.ErrNotFound) {
-			*childrenIDs = flow.IdentifierList{} // empty (non-nil) list
-			return nil
+			return fmt.Errorf("the block has no children, but it might also be the case the block does not exist: %w", err)
 		}
-		return err
+
+		return fmt.Errorf("could not retrieve block children: %w", err)
 	}
+
+	if len(*childrenIDs) == 0 {
+		return fmt.Errorf("the block has no children: %w", storage.ErrNotFound)
+	}
+
 	return nil
 }
