@@ -5,34 +5,35 @@ import (
 
 	"github.com/jordanschalm/lockctx"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 )
 
 var _ PersisterStore = (*LightCollectionsStore)(nil)
 
 // LightCollectionsStore handles persisting light collections
 type LightCollectionsStore struct {
-	inMemoryCollections  *unsynchronized.Collections
+	data                 []*flow.Collection
 	persistedCollections storage.Collections
 }
 
 func NewCollectionsStore(
-	inMemoryCollections *unsynchronized.Collections,
+	data []*flow.Collection,
 	persistedCollections storage.Collections,
 	lockManager storage.LockManager,
 ) *LightCollectionsStore {
 	return &LightCollectionsStore{
-		inMemoryCollections:  inMemoryCollections,
+		data:                 data,
 		persistedCollections: persistedCollections,
 	}
 }
 
 // Persist adds light collections to the batch.
-// No errors are expected during normal operations
+//
+// No error returns are expected during normal operations
 func (c *LightCollectionsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	for _, collection := range c.inMemoryCollections.Data() {
-		if _, err := c.persistedCollections.BatchStoreAndIndexByTransaction(lctx, &collection, batch); err != nil {
+	for _, collection := range c.data {
+		if _, err := c.persistedCollections.BatchStoreAndIndexByTransaction(lctx, collection, batch); err != nil {
 			return fmt.Errorf("could not add light collections to batch: %w", err)
 		}
 	}

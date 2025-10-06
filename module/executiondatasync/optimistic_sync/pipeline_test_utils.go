@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	osmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -59,13 +60,15 @@ func (m *mockStateConsumer) OnStateUpdated(state State) {
 
 // waitForStateUpdates waits for a sequence of state updates to occur or timeout after 500ms.
 // updates must be received in the correct order or the test will fail.
-func waitForStateUpdates(t *testing.T, updateChan <-chan State, expectedStates ...State) {
+func waitForStateUpdates(t *testing.T, updateChan <-chan State, errChan <-chan error, expectedStates ...State) {
 	done := make(chan struct{})
 	unittest.RequireReturnsBefore(t, func() {
 		for _, expected := range expectedStates {
 			select {
 			case <-done:
 				return
+			case err := <-errChan:
+				require.NoError(t, err, "pipeline returned error")
 			case update := <-updateChan:
 				assert.Equalf(t, expected, update, "expected pipeline to transition to %s, but got %s", expected, update)
 			}
@@ -76,12 +79,14 @@ func waitForStateUpdates(t *testing.T, updateChan <-chan State, expectedStates .
 
 // waitNeverStateUpdate verifies that no state updates occur within 500ms.
 // The test fails if any unexpected state transition is observed.
-func waitNeverStateUpdate(t *testing.T, updateChan <-chan State) {
+func waitNeverStateUpdate(t *testing.T, updateChan <-chan State, errChan <-chan error) {
 	done := make(chan struct{})
 	unittest.RequireNeverReturnBefore(t, func() {
 		select {
 		case <-done:
 			return
+		case err := <-errChan:
+			require.NoError(t, err, "pipeline returned error")
 		case newState := <-updateChan:
 			t.Fatalf("Pipeline transitioned to state %s, but should not have", newState)
 		}

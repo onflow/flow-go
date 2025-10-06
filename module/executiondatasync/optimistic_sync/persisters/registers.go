@@ -3,38 +3,34 @@ package persisters
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 )
 
-// RegistersPersister handles registers
+// RegistersPersister stores [flow.RegisterEntry] values into the registers db
 type RegistersPersister struct {
-	inMemoryRegisters  *unsynchronized.Registers
-	permanentRegisters storage.RegisterIndex
-	height             uint64
+	data      []flow.RegisterEntry
+	registers storage.RegisterIndex
+	height    uint64
 }
 
 func NewRegistersPersister(
-	inMemoryRegisters *unsynchronized.Registers,
-	permanentRegisters storage.RegisterIndex,
+	data []flow.RegisterEntry,
+	registers storage.RegisterIndex,
 	height uint64,
 ) *RegistersPersister {
 	return &RegistersPersister{
-		inMemoryRegisters:  inMemoryRegisters,
-		permanentRegisters: permanentRegisters,
-		height:             height,
+		data:      data,
+		registers: registers,
+		height:    height,
 	}
 }
 
-// Persist persists registers
-// No errors are expected during normal operations
+// Persist stores the register entries into the registers db
+//
+// No error returns are expected during normal operations
 func (r *RegistersPersister) Persist() error {
-	registerData, err := r.inMemoryRegisters.Data(r.height)
-	if err != nil {
-		return fmt.Errorf("could not get data from registers: %w", err)
-	}
-
-	if err := r.permanentRegisters.Store(registerData, r.height); err != nil {
+	if err := r.registers.Store(r.data, r.height); err != nil {
 		return fmt.Errorf("could not persist registers: %w", err)
 	}
 
