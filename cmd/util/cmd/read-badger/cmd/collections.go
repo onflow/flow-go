@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var flagCollectionID string
@@ -23,60 +26,56 @@ func init() {
 var collectionsCmd = &cobra.Command{
 	Use:   "collections",
 	Short: "get collection by collection or transaction ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		storages, db := InitStorages()
-		defer db.Close()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			storages := common.InitStorages(db)
 
-		if flagCollectionID != "" {
-			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
-			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
-			if err != nil {
-				log.Error().Err(err).Msg("malformed collection id")
-				return
-			}
-
-			log.Info().Msgf("getting collection by id: %v", collectionID)
-
-			// get only the light collection if specified
-			if flagLightCollection {
-				light, err := storages.Collections.LightByID(collectionID)
+			if flagCollectionID != "" {
+				log.Info().Msgf("got flag collection id: %s", flagCollectionID)
+				collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
 				if err != nil {
-					log.Error().Err(err).Msgf("could not get collection with id: %v", collectionID)
-					return
+					return fmt.Errorf("malformed collection id: %w", err)
 				}
+
+				log.Info().Msgf("getting collection by id: %v", collectionID)
+
+				// get only the light collection if specified
+				if flagLightCollection {
+					light, err := storages.Collections.LightByID(collectionID)
+					if err != nil {
+						return fmt.Errorf("could not get collection with id %v: %w", collectionID, err)
+					}
+					common.PrettyPrintEntity(light)
+					return nil
+				}
+
+				// otherwise get the full collection
+				fullCollection, err := storages.Collections.ByID(collectionID)
+				if err != nil {
+					return fmt.Errorf("could not get collection: %w", err)
+				}
+				common.PrettyPrintEntity(fullCollection)
+				return nil
+			}
+
+			if flagTransactionID != "" {
+				log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
+				transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
+				if err != nil {
+					return fmt.Errorf("malformed transaction id, %w", err)
+				}
+
+				log.Info().Msgf("getting collections by transaction id: %v", transactionID)
+				light, err := storages.Collections.LightByTransactionID(transactionID)
+				if err != nil {
+					return fmt.Errorf("could not get collections for transaction id %v: %w", transactionID, err)
+				}
+
 				common.PrettyPrintEntity(light)
-				return
+				return nil
 			}
 
-			// otherwise get the full collection
-			fullCollection, err := storages.Collections.ByID(collectionID)
-			if err != nil {
-				log.Error().Err(err).Msgf("could not get collection ")
-				return
-			}
-			common.PrettyPrintEntity(fullCollection)
-			return
-		}
-
-		if flagTransactionID != "" {
-			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
-			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
-			if err != nil {
-				log.Error().Err(err).Msg("malformed transaction id")
-				return
-			}
-
-			log.Info().Msgf("getting collections by transaction id: %v", transactionID)
-			light, err := storages.Collections.LightByTransactionID(transactionID)
-			if err != nil {
-				log.Error().Err(err).Msgf("could not get collections for transaction id: %v", transactionID)
-				return
-			}
-
-			common.PrettyPrintEntity(light)
-			return
-		}
-
-		log.Error().Msg("must specify exactly one of --collection-id or --transaction-id")
+			return fmt.Errorf("must specify exactly one of --collection-id or --transaction-id")
+		})
 	},
 }

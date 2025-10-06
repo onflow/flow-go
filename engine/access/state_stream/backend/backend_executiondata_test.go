@@ -200,6 +200,11 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Maybe()
 
+	s.state.On("Params").Return(s.params).Maybe()
+	s.params.On("SporkRootBlockHeight").Return(s.rootBlock.Height, nil).Maybe()
+	s.params.On("SporkRootBlock").Return(s.rootBlock, nil).Maybe()
+	s.headers.On("BlockIDByHeight", s.rootBlock.Height).Return(s.rootBlock.ID(), nil).Maybe()
+
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
 		mocks.StorageMapGetter(s.sealMap),
 	).Maybe()
@@ -377,18 +382,6 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			startBlockID:    s.blocks[0].ID(),
 			startHeight:     0,
 		},
-		{
-			name:            "happy path - start from root block by height",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    flow.ZeroID,
-			startHeight:     s.rootBlock.Height, // start from root block
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),  // start from root block
-			startHeight:     0,
-		},
 	}
 
 	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
@@ -403,7 +396,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockID()
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startBlockID:    s.rootBlock.ID(),
+			startBlockID:    s.blocks[0].ID(),
 		},
 		{
 			name:            "happy path - partial backfill",
@@ -414,11 +407,6 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockID()
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    s.blocks[0].ID(),
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),  // start from root block
 		},
 	}
 
@@ -441,7 +429,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockHeig
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startHeight:     s.rootBlock.Height,
+			startHeight:     s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - partial backfill",
@@ -452,11 +440,6 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockHeig
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startHeight:     s.blocks[0].Height,
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,  // backfill all blocks
-			startHeight:     s.rootBlock.Height, // start from root block
 		},
 	}
 
@@ -567,6 +550,137 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 		})
 	}
+}
+
+// TestSubscribeEventsFromSporkRootBlock tests that events subscriptions starting from the spork
+// root block return an empty result for the root block.
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// setup the backend to have 1 available block
+	s.highestBlockHeader = s.blocks[0].ToHeader()
+
+	rootEventResponse := &ExecutionDataResponse{
+		Height: s.rootBlock.Height,
+		ExecutionData: &execution_data.BlockExecutionData{
+			BlockID: s.rootBlock.ID(),
+		},
+	}
+
+	firstEventResponse := &ExecutionDataResponse{
+		Height:        s.blocks[0].Height,
+		ExecutionData: s.execDataMap[s.blocks[0].ID()].BlockExecutionData,
+	}
+
+	assertExecutionDataResponse := func(v interface{}, expected *ExecutionDataResponse) {
+		resp, ok := v.(*ExecutionDataResponse)
+		require.True(s.T(), ok, "unexpected response type: %T", v)
+
+		assert.Equal(s.T(), expected, resp)
+	}
+
+	assertSubscriptionResponses := func(sub subscription.Subscription, cancel context.CancelFunc) {
+		// the first response should have details from the root block and no events
+		resp := <-sub.Channel()
+		assertExecutionDataResponse(resp, rootEventResponse)
+
+		// the second response should have details from the first block and its events
+		resp = <-sub.Channel()
+		assertExecutionDataResponse(resp, firstEventResponse)
+
+		cancel()
+		resp, ok := <-sub.Channel()
+		assert.False(s.T(), ok)
+		assert.Nil(s.T(), resp)
+		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
+	}
+
+	s.Run("by height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromHeight", s.rootBlock.Height).
+			Return(func(startHeight uint64) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+			})
+
+		sub := s.backend.SubscribeExecutionDataFromStartBlockHeight(subCtx, s.rootBlock.Height)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by height - legacy", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromHeight", s.rootBlock.Height).
+			Return(func(startHeight uint64) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+			})
+
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.rootBlock.Height)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by ID", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.ID()).
+			Return(func(startBlockID flow.Identifier) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+			})
+
+		sub := s.backend.SubscribeExecutionDataFromStartBlockID(subCtx, s.rootBlock.ID())
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by ID - legacy", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.ID()).
+			Return(func(startBlockID flow.Identifier) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+			})
+
+		sub := s.backend.SubscribeExecutionData(subCtx, s.rootBlock.ID(), 0)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by latest", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		// simulate the case where the latest block is also the root block
+		s.snapshot.On("Head").Unset()
+		s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
+
+		s.executionDataTracker.On("GetStartHeightFromLatest", mock.Anything).
+			Return(func(ctx context.Context) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+			})
+
+		sub := s.backend.SubscribeExecutionDataFromLatest(subCtx)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by latest - legacy", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		// simulate the case where the latest block is also the root block
+		s.snapshot.On("Head").Unset()
+		s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
+
+		s.executionDataTracker.On("GetStartHeightFromLatest", mock.Anything).
+			Return(func(ctx context.Context) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+			})
+
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, 0)
+		assertSubscriptionResponses(sub, subCancel)
+	})
 }
 
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {

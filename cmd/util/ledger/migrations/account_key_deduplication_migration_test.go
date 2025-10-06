@@ -232,7 +232,7 @@ func TestMigration(t *testing.T) {
 		require.Equal(t, byte(0x40), encodedAccountStatusV4[0])
 		require.Equal(t, encodedAccountStatusV3[1:], encodedAccountStatusV4[1:])
 
-		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		err = ValidateAccountPublicKeyV4(common.Address(owner), accountRegisters)
 		require.NoError(t, err)
 	})
 
@@ -276,7 +276,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
-		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		err = ValidateAccountPublicKeyV4(common.Address(owner), accountRegisters)
 		require.NoError(t, err)
 	})
 
@@ -321,7 +321,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
-		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		err = ValidateAccountPublicKeyV4(common.Address(owner), accountRegisters)
 		require.NoError(t, err)
 	})
 
@@ -399,7 +399,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.ElementsMatch(t, [][]byte{{}, encodedSpk2}, encodedPks)
 
-		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		err = ValidateAccountPublicKeyV4(common.Address(owner), accountRegisters)
 		require.NoError(t, err)
 	})
 
@@ -488,7 +488,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), seqNum)
 
-		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		err = ValidateAccountPublicKeyV4(common.Address(owner), accountRegisters)
 		require.NoError(t, err)
 	})
 
@@ -548,7 +548,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, encodedPk1, encodedAccountPublicKey0)
 
-		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		err = ValidateAccountPublicKeyV4(common.Address(owner), accountRegisters)
 		require.NoError(t, err)
 	})
 
@@ -618,7 +618,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), seqNum)
 
-		err = validateAccountPublicKeyV4(common.Address(owner), accountRegisters)
+		err = ValidateAccountPublicKeyV4(common.Address(owner), accountRegisters)
 		require.NoError(t, err)
 	})
 }

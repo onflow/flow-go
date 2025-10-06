@@ -34,7 +34,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -232,8 +232,10 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 	senderID := suite.ids[0].NodeID
 	senderMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
 	receiverMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
+	internal, err := message.ToInternal()
+	require.NoError(suite.T(), err)
 	receiverMessageProcessor.
-		On("Process", channels.TestNetworkChannel, senderID, message).
+		On("Process", channels.TestNetworkChannel, senderID, internal).
 		Return(nil).
 		Maybe() // we may not actually process this message depending on how fast runs
 
@@ -569,8 +571,8 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.Equal(suite.T(), uint64(1), rateLimits.Load())
 }
 
-func (suite *NetworkTestSuite) createOverlay(provider *unittest.UpdatableIDProvider) *mocknetwork.Overlay {
-	overlay := &mocknetwork.Overlay{}
+func (suite *NetworkTestSuite) createOverlay(provider *unittest.UpdatableIDProvider) *mocknetwork.Underlay {
+	overlay := &mocknetwork.Underlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return provider.Identities(filter.Any)
 	})
@@ -614,7 +616,7 @@ func (suite *NetworkTestSuite) TestPing() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), expectedPayload, msgPayload.Text) // payload
 		}).Return(nil).Once()
@@ -681,7 +683,7 @@ func (suite *NetworkTestSuite) MultiPing(count int) {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			// payload
 			require.True(suite.T(), regex.MatchString(msgPayload.Text))
@@ -753,7 +755,7 @@ func (suite *NetworkTestSuite) TestEcho() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[first].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), expectedSendMsg, msgPayload.Text) // payload
 
@@ -777,7 +779,7 @@ func (suite *NetworkTestSuite) TestEcho() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[last].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), expectedReplyMsg, msgPayload.Text) // payload
 		}).Return(nil)
@@ -841,9 +843,13 @@ func (suite *NetworkTestSuite) TestLargeMessageSize_SendDirect() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[sourceIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*messages.ChunkDataResponse)
+			msgPayload, ok := args[2].(*flow.ChunkDataResponse)
 			require.True(suite.T(), ok)
-			require.Equal(suite.T(), event, msgPayload) // payload
+
+			internal, err := event.ToInternal()
+			require.NoError(suite.T(), err)
+
+			require.Equal(suite.T(), internal, msgPayload) // payload
 		}).Return(nil).Once()
 
 	// sends a direct message from source node to the target node
@@ -904,7 +910,7 @@ func (suite *NetworkTestSuite) TestUnsubscribe() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), suite.ids[senderIndex].NodeID, msgOriginID) // sender id
 
-			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			msgPayload, ok := args[2].(*flow.TestMessage)
 			require.True(suite.T(), ok)
 			require.True(suite.T(), msgPayload.Text == "hello1") // payload, we only expect hello 1 that was sent before unsubscribe.
 			msgRcvd <- struct{}{}
@@ -950,7 +956,7 @@ func TestChunkDataPackMaxMessageSize(t *testing.T) {
 		flow.IdentifierList{unittest.IdentifierFixture()},
 		channels.TopicFromChannel(channels.ProvideChunks, unittest.IdentifierFixture()),
 		&messages.ChunkDataResponse{
-			ChunkDataPack: *unittest.ChunkDataPackFixture(unittest.IdentifierFixture()),
+			ChunkDataPack: flow.UntrustedChunkDataPack(*unittest.ChunkDataPackFixture(unittest.IdentifierFixture())),
 			Nonce:         rand.Uint64(),
 		},
 		unittest.NetworkCodec().Encode,

@@ -18,6 +18,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// LocalEventProvider retrieves events from a local execution state cache.
+// It serves requests using the provided optimistic execution state, without
+// contacting external execution nodes. This is useful when events are already
+// available locally (e.g., after optimistic syncing).
 type LocalEventProvider struct {
 	execStateCache optimistic_sync.ExecutionStateCache
 }

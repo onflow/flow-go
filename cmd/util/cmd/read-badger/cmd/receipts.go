@@ -25,8 +25,8 @@ func init() {
 var receiptsCmd = &cobra.Command{
 	Use:   "receipts",
 	Short: "get receipt by block or receipt ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := WithStorage(func(db storage.DB) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			results := store.NewExecutionResults(metrics.NewNoopCollector(), db)
 			receipts := store.NewExecutionReceipts(metrics.NewNoopCollector(), db, results, 1)
 
@@ -71,9 +71,5 @@ var receiptsCmd = &cobra.Command{
 
 			return fmt.Errorf("missing flags: --block-id or --receipt-id")
 		})
-
-		if err != nil {
-			log.Error().Err(err).Msg("could not get receipts")
-		}
 	},
 }

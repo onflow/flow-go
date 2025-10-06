@@ -898,11 +898,10 @@ func (suite *Suite) TestGetTransaction() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	transaction := unittest.TransactionFixture()
-	expected := transaction.TransactionBody
 
 	suite.transactions.
 		On("ByID", transaction.ID()).
-		Return(&expected, nil).
+		Return(&transaction, nil).
 		Once()
 
 	params := suite.defaultBackendParams()
@@ -916,7 +915,7 @@ func (suite *Suite) TestGetTransaction() {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(actual)
 
-	suite.Require().Equal(expected, *actual)
+	suite.Require().Equal(transaction, *actual)
 
 	suite.assertAllExpectations()
 }

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -27,13 +28,11 @@ func TestCollections(t *testing.T) {
 		expected := unittest.CollectionFixture(3)
 
 		// Create a lock manager and context for testing
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertCollection)
-		require.NoError(t, err)
-		defer lctx.Release()
-
-		// store the collection and the transaction index
-		_, err = collections.StoreAndIndexByTransaction(lctx, &expected)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+			// store the collection and the transaction index
+			_, err := collections.StoreAndIndexByTransaction(lctx, &expected)
+			return err
+		})
 		require.NoError(t, err)
 
 		// retrieve the light collection by collection id
@@ -93,19 +92,15 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		col2.Transactions = append(col2.Transactions, dupTx)
 
 		// Create a lock manager and context for testing
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertCollection)
-		require.NoError(t, err)
-		defer lctx.Release()
+		err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+			// insert col1
+			_, err := collections.StoreAndIndexByTransaction(lctx, &col1)
+			require.NoError(t, err)
 
-		// insert col1
-		_, err = collections.StoreAndIndexByTransaction(lctx, &col1)
-		require.NoError(t, err)
-
-		// insert col2
-		_, err = collections.StoreAndIndexByTransaction(lctx, &col2)
-		require.NoError(t, err)
-
+			// insert col2
+			_, err = collections.StoreAndIndexByTransaction(lctx, &col2)
+			return err
+		})
 		require.NoError(t, err)
 
 		// should be able to retrieve col2 by ID
@@ -127,7 +122,7 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 	})
 }
 
-// verify that when StoreLightAndIndexByTransaction is concurrently called with same tx and
+// verify that when StoreAndIndexByTransaction is concurrently called with same tx and
 // different collection both will succeed, and one of the collection will be indexed by the tx
 func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -145,12 +140,6 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		sharedTx := col1.Transactions[0] // The shared transaction
 		col2.Transactions[0] = sharedTx
 
-		// Create a lock manager and context for testing
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertCollection)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		var wg sync.WaitGroup
 		errChan := make(chan error, 2*numCollections)
 
@@ -161,7 +150,10 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				_, err := collections.StoreAndIndexByTransaction(lctx, &col)
+				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+					_, err := collections.StoreAndIndexByTransaction(lctx, &col)
+					return err
+				})
 				errChan <- err
 			}
 		}()
@@ -173,7 +165,10 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
-				_, err := collections.StoreAndIndexByTransaction(lctx, &col)
+				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+					_, err := collections.StoreAndIndexByTransaction(lctx, &col)
+					return err
+				})
 				errChan <- err
 			}
 		}()

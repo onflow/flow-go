@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,7 +23,7 @@ func TestHandleIncomingEvent_AttackerRegistered(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.ConduitAdapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			codec := unittest.NetworkCodec()
@@ -74,7 +74,7 @@ func TestHandleIncomingEvent_NoAttacker(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.ConduitAdapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			originId := unittest.IdentifierFixture()

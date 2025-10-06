@@ -9,8 +9,9 @@ import (
 )
 
 // MockSignalerContext is a SignalerContext that can be used in tests to assert that an error is thrown.
-// It embeds a mock.Mock, so it can be used it to assert that Throw is called with a specific error.
-// Use NewMockSignalerContextExpectError to create a new MockSignalerContext that expects a specific error, otherwise NewMockSignalerContext.
+// It embeds a [mock.Mock], so it can be used to assert that Throw is called with a specific error.
+// Use NewMockSignalerContextExpectError to create a new MockSignalerContext that expects a specific error,
+// otherwise NewMockSignalerContext.
 type MockSignalerContext struct {
 	context.Context
 	*mock.Mock

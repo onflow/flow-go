@@ -101,10 +101,10 @@ func TestPrivateSend_Valid(t *testing.T) {
 
 	// expected DKGMessageOut
 	expectedMsg := msg.PrivDKGMessageOut{
-		DKGMessage: msg.NewDKGMessage(
-			msgb,
-			dkgInstanceID,
-		),
+		DKGMessage: msg.DKGMessage{
+			Data:          msgb,
+			DKGInstanceID: dkgInstanceID,
+		},
 		DestID: committee[dest].NodeID,
 	}
 
@@ -176,7 +176,7 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	dkgMessage := msg.NewDKGMessage(msgb, dkgInstanceID)
+	dkgMessage := msg.DKGMessage{Data: msgb, DKGInstanceID: dkgInstanceID}
 	expectedMsg := msg.PrivDKGMessageIn{
 		OriginID:             committee[0].NodeID,
 		DKGMessage:           dkgMessage,
@@ -384,10 +384,10 @@ func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 		}
 	}()
 
-	dkgMsg := msg.NewDKGMessage(
-		msgb,
-		dkgInstanceID,
-	)
+	dkgMsg := msg.DKGMessage{
+		Data:          msgb,
+		DKGInstanceID: dkgInstanceID,
+	}
 	// simulate receiving an incoming message with an OriginID of a non-committee member
 	receiver.tunnel.SendIn(
 		msg.PrivDKGMessageIn{

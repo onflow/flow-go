@@ -670,10 +670,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				fixedENIdentifiers,
 			)
 
-			builder.executionResultInfoProvider, err = execution_result.NewExecutionResultInfoProvider(
+			builder.executionResultInfoProvider = execution_result.NewExecutionResultInfoProvider(
 				node.Logger,
 				node.State,
-				node.Storage.Headers,
 				node.Storage.Receipts,
 				execNodeSelector,
 				optimistic_sync.DefaultCriteria,
@@ -2109,7 +2108,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// handles block-related operations.
 			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
-				builder.FinalizedRootBlock.Height,
+				builder.SealedRootBlock.Height,
 				node.Storage.Headers,
 				broadcaster,
 			)

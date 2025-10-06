@@ -202,35 +202,30 @@ func (suite *BuilderSuite) TearDownTest() {
 }
 
 func (suite *BuilderSuite) InsertBlock(block *model.Block) {
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	suite.Assert().NoError(err)
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+		})
 	})
-	suite.Assert().NoError(err)
+	suite.Require().NoError(err)
 }
 
 func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	suite.Assert().NoError(err)
-
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		var refBlock flow.Header
-		err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
-		if err != nil {
-			return err
-		}
-		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
-		if err != nil {
-			return err
-		}
-		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			var refBlock flow.Header
+			err := operation.RetrieveHeader(rw.GlobalReader(), block.Payload.ReferenceBlockID, &refBlock)
+			if err != nil {
+				return err
+			}
+			err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			if err != nil {
+				return err
+			}
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+		})
 	})
-	suite.Assert().NoError(err)
+	suite.Require().NoError(err)
 }
 
 // Payload returns a payload containing the given transactions, with a valid
@@ -1539,21 +1534,19 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(final),
 		)
-		lctx := suite.lockManager.NewContext()
-		require.NoError(b, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		err := suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+		err := unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+			})
 		})
 		require.NoError(b, err)
-		lctx.Release()
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
-			lctx := suite.lockManager.NewContext()
-			defer lctx.Release()
-			require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			err = unittest.WithLock(b, suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+				})
 			})
 			require.NoError(b, err)
 			final = block

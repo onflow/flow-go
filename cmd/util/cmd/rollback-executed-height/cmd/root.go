@@ -6,13 +6,15 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 )
 
 var (
 	flagDatadir string
 )
 
-// run with `./rollback-executed-height --datadir /var/flow/data/protocol --height 100`
+// run with `./rollback-executed-height --height 100`
 var rootCmd = &cobra.Command{
 	Use:   "rollback-executed-height",
 	Short: "rollback executed height",
@@ -27,7 +29,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
+	common.InitDataDirFlag(rootCmd, &flagDatadir)
 	_ = rootCmd.MarkPersistentFlagRequired("datadir")
 
 	cobra.OnInitialize(initConfig)
