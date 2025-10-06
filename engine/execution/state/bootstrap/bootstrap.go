@@ -113,7 +113,7 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
 		}
 
-		err = operation.IndexOwnExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
+		err = operation.IndexOwnOrSealedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not index result for root result: %w", err)
 		}

@@ -27,12 +27,12 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 	return RetrieveByKey(r, MakePrefix(codeExecutionResult, resultID), result)
 }
 
-// IndexOwnExecutionResult indexes the result of the given block.
+// IndexOwnOrSealedExecutionResult indexes the result of the given block.
 // It is used by EN to index the result of a block to continue executing subsequent blocks.
 // The caller must acquire either [storage.LockInsertOwnReceipt] or [storage.LockBootstrapping] or [storage.LockIndexFinalizedBlock]
 //
 // No errors are expected during normal operation.
-func IndexOwnExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
+func IndexOwnOrSealedExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
 	held := lctx.HoldsLock(storage.LockInsertOwnReceipt) ||
 		// during bootstrapping, we index the sealed root block or the spork root block, which is not
 		// produced by the node itself, but we still need to index its execution result to be able to
