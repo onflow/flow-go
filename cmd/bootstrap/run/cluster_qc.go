@@ -25,7 +25,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.ToHeader())
 
 	// STEP 1: create votes for cluster root block
-	votes, err := createRootBlockVotes(signers, clusterRootBlock)
+	votes, err := CreateClusterRootBlockVotes(signers, clusterRootBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +94,8 @@ func createClusterValidator(committee hotstuff.DynamicCommittee) (hotstuff.Valid
 	return hotstuffValidator, nil
 }
 
-// createRootBlockVotes generates a vote for the rootBlock from each participant
-func createRootBlockVotes(participants []bootstrap.NodeInfo, rootBlock *model.Block) ([]*model.Vote, error) {
+// CreateClusterRootBlockVotes generates a vote for the rootBlock from each participant
+func CreateClusterRootBlockVotes(participants []bootstrap.NodeInfo, rootBlock *model.Block) ([]*model.Vote, error) {
 	votes := make([]*model.Vote, 0, len(participants))
 	for _, participant := range participants {
 		// create the participant's local identity

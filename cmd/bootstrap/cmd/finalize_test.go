@@ -68,12 +68,19 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
+		flagIntermediaryClusteringDataPath = filepath.Join(bootDir, model.PathClusteringData)
+		flagRootClusterBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
+		flagEpochCounter = epochCounter
+
+		// clusterAssignment will generate the collector clusters
+		// In addition, it also generates votes from internal collector nodes
+		clusterAssignment(clusterAssignmentCmd, nil)
+
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
 		flagRootView = 1_000
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagEpochCounter = epochCounter
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
