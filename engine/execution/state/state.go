@@ -410,8 +410,8 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
 	}
 
-	// Acquire both locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
-	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertEvent}, func(lctx lockctx.Context) error {
+	// Acquire locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
+	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertEvent, storage.LockInsertChunkDataPack}, func(lctx lockctx.Context) error {
 		err := s.chunkDataPacks.StoreByChunkID(lctx, chunks)
 		if err != nil {
 			return fmt.Errorf("can not store multiple chunk data pack: %w", err)
