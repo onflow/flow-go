@@ -77,6 +77,12 @@ func run(*cobra.Command, []string) {
 		Bool("stop_on_mismatch", flagStopOnMismatch).
 		Logger()
 
+	// Log configuration before starting verification so users can cancel and restart with different values if needed
+	if !flagStopOnMismatch {
+		lg.Info().Msgf("note flag --stop_on_mismatch is false, so mismatches (if any) are logged but do not stop the verification")
+		lg.Info().Msgf("look for 'could not verify' in the log for any mismatch, or try again with --stop_on_mismatch true to stop on first mismatch")
+	}
+
 	if flagFromTo != "" {
 		from, to, err := parseFromTo(flagFromTo)
 		if err != nil {
@@ -97,11 +103,6 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("finished verified last %d sealed blocks", flagLastK)
-	}
-
-	if !flagStopOnMismatch {
-		lg.Info().Msgf("note flag --stop_on_mismatch is false, so mismatches (if any) are logged but do not stop the verification")
-		lg.Info().Msgf("look for 'could not verify' in the log for any mismatch, or try again with --stop_on_mismatch true to stop on first mismatch")
 	}
 }
 
