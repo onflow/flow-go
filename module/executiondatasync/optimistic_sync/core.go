@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/store/inmemory"
+	"github.com/onflow/flow-go/storage/inmemory"
 )
 
 // DefaultTxResultErrMsgsRequestTimeout is the default timeout for requesting transaction result error messages.
