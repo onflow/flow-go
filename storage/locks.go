@@ -76,6 +76,8 @@ func makeLockPolicy() lockctx.Policy {
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
 		Add(LockInsertOwnReceipt, LockInsertEvent).
+		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
+		Add(LockInsertEvent, LockInsertChunkDataPack).
 		Add(LockInsertCollection, LockInsertEvent).
 		Add(LockInsertCollection, LockInsertLightTransactionResult).
 		Add(LockInsertEvent, LockInsertLightTransactionResult).
