@@ -17,13 +17,18 @@ import (
 // designed to be used as part of the optimistic syncing processing pipeline, to index data for
 // unsealed execution results which is eventually persisted when the execution result is sealed.
 //
+// The data contained within the BlockExecutionData is verified by verifications nodes as part of the
+// approval process. Once the execution result is sealed, the Access node can accept it as valid
+// without further verification. However, with optimistic syncing, the Access node may index data
+// for execution results that are not sealed. Since this data is not certified by the protocol, it
+// must not be persisted to disk. It may be used by the Access node to serve Access API requests,
+// with the understanding that it may be later determined to be invalid.
+//
 // The provided BlockExecutionData is received over the network and its hash is compared to the value
 // included in an ExecutionResult within a certified block. This guarantees it is the same data that
-// was produced by an execution node who's stake is at risk if the data is incorrect. When the
-// execution result is eventually sealed, verification nodes have verified and approved the data.
-// Given other nodes on the newtwork are responsible for verifying the contents, the Access node
-// accepts the data as is. The indexer may perform opportunistic checks to ensure the data is
-// generally consistent, but this is not required.
+// was produced by an execution node whose stake is at risk if the data is incorrect. It is not
+// practical for an Access node to verify all data, but the indexer may perform opportunistic checks
+// to ensure the data is generally consistent.
 //
 // Transaction error messages are received directly from execution nodes with no protocol guarantees.
 // The node must validate that there is a one-to-one mapping between failed transactions and
@@ -76,7 +81,9 @@ func NewInMemoryIndexer(
 //
 // The method is idempotent and does not modify the state of the indexer.
 //
-// No error returns are expected during normal operation.
+// All error returns are benign and side-effect free for the node. They indicate that the BlockExecutionData
+// is inconsistent with the execution result and its block, which points to invalid data produced by
+// an external node.
 func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData) (*IndexerData, error) {
 	if data.BlockID != i.executionResult.BlockID {
 		return nil, fmt.Errorf("unexpected block execution data: expected block_id=%s, actual block_id=%s", i.executionResult.BlockID, data.BlockID)
@@ -163,7 +170,9 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 // ValidateTxErrors validates that the transaction results and error messages are consistent, and
 // returns an error if they are not.
 //
-// No error returns are expected during normal operation.
+// All error returns are benign and side-effect free for the node. They indicate that the transaction
+// results and error messages are inconsistent, which points to invalid data produced by an external
+// node.
 func ValidateTxErrors(results []flow.LightTransactionResult, txResultErrMsgs []flow.TransactionResultErrorMessage) error {
 	txWithErrors := make(map[flow.Identifier]bool)
 	for _, txResult := range txResultErrMsgs {
