@@ -201,23 +201,6 @@ func (s *AccessStoreTxErrorMessagesSuite) createAndSendTxWithTxError() *sdk.Tran
 	return accountCreationTxRes
 }
 
-// getMaxReceiptHeight retrieves the maximum receipt height for a given container by
-// querying the metrics endpoint. This is used to confirm that the transaction receipts
-// have been processed.
-func (s *AccessStoreTxErrorMessagesSuite) getMaxReceiptHeight(containerName string) (uint64, error) {
-	node := s.net.ContainerByName(containerName)
-	metricsURL := fmt.Sprintf("http://0.0.0.0:%s/metrics", node.Port(testnet.MetricsPort))
-	values := s.net.GetMetricFromContainer(s.T(), containerName, metricsURL, maxReceiptHeightMetric)
-
-	// If no values are found in the metrics, return an error.
-	if len(values) == 0 {
-		return 0, fmt.Errorf("no values found")
-	}
-
-	// Return the first value found as the max receipt height.
-	return uint64(values[0].GetGauge().GetValue()), nil
-}
-
 // fetchTxErrorMessage retrieves the stored transaction error message for a given transaction result.
 func (s *AccessStoreTxErrorMessagesSuite) fetchTxErrorMessages(txResults []*sdk.TransactionResult, containerName string) []*flow.TransactionResultErrorMessage {
 	accessNode := s.net.ContainerByName(containerName)
