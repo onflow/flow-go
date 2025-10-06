@@ -41,10 +41,13 @@ type Config struct {
 
 	BackendConfig             backend.Config // configurable options for creating Backend
 	RestConfig                rest.Config    // the REST server configuration
-	MaxMsgSize                uint           // GRPC max message size
 	CompressorName            string         // GRPC compressor name
 	WebSocketConfig           websockets.Config
 	EnableWebSocketsStreamAPI bool
+
+	// holds value of deprecated MaxMsgSize flag for use during bootstrapping.
+	// will be removed in a future release.
+	DeprecatedMaxMsgSize uint // in bytes
 }
 
 // Engine exposes the server with a simplified version of the Access API.

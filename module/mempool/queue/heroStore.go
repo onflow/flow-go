@@ -59,6 +59,10 @@ func (c *HeroStore) Get() (*engine.Message, bool) {
 	return c.q.Pop()
 }
 
+func (c *HeroStore) Size() uint {
+	return c.q.Size()
+}
+
 // IdentifierOfMessage generates the unique identifier for a message.
 func IdentifierOfMessage(msg *engine.Message) flow.Identifier {
 	return flow.MakeID(msg)

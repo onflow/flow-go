@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sort"
 
+	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -117,4 +118,8 @@ func (wpc *WrappedPrecompiledContract) Run(input []byte) ([]byte, error) {
 	output, err := wpc.pc.Run(input)
 	wpc.ct.CaptureRun(wpc.pc.Address(), input, output, err)
 	return output, err
+}
+
+func (wpc *WrappedPrecompiledContract) Name() string {
+	return precompiles.CADENCE_ARCH_PRECOMPILE_NAME
 }

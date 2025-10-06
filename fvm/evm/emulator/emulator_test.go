@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/testutils/contracts"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -1252,4 +1253,8 @@ func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {
 		panic("Run not set for the mocked precompiled contract")
 	}
 	return mp.RunFunc(input)
+}
+
+func (mp *MockedPrecompiled) Name() string {
+	return precompiles.CADENCE_ARCH_PRECOMPILE_NAME
 }

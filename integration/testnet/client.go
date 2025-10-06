@@ -2,24 +2,27 @@ package testnet
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
-	"github.com/onflow/flow-go-sdk/templates"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/onflow/cadence"
-
+	"github.com/onflow/crypto/hash"
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
-	"github.com/onflow/flow-go-sdk/crypto"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -61,7 +64,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 
 	accountKey := acc.Keys[0]
 
-	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := sdkcrypto.NewInMemorySigner(key, accountKey.HashAlgo)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a signer: %w", err)
 	}
@@ -170,6 +173,60 @@ func (c *Client) SignTransaction(tx *sdk.Transaction) (*sdk.Transaction, error) 
 	}
 
 	return tx, err
+}
+
+func (c *Client) SignTransactionWebAuthN(tx *sdk.Transaction) (*sdk.Transaction, error) {
+	transactionMessage := tx.EnvelopeMessage()
+
+	extensionData, messageToSign, err := c.validWebAuthnExtensionData(transactionMessage)
+	if err != nil {
+		return nil, err
+	}
+	sig, err := c.signer.Sign(messageToSign)
+	if err != nil {
+		return nil, err
+	}
+	tx.AddEnvelopeSignature(tx.Payer, tx.ProposalKey.KeyIndex, sig)
+	tx.EnvelopeSignatures[0].ExtensionData = slices.Concat([]byte{byte(flow.WebAuthnScheme)}, extensionData)
+	return tx, nil
+}
+
+func (c *Client) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, []byte, error) {
+	hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
+	if err != nil {
+		return nil, nil, err
+	}
+	authNChallenge := hasher.ComputeHash(transactionMessage)
+	authNChallengeBase64Url := base64.RawURLEncoding.EncodeToString(authNChallenge)
+	validUserFlag := byte(0x01)
+	validClientDataOrigin := "https://testing.com"
+	rpIDHash := unittest.RandomBytes(32)
+	sigCounter := unittest.RandomBytes(4)
+
+	// For use in cases where you're testing the other value
+	validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
+	validClientDataJSON := map[string]string{
+		"type":      flow.WebAuthnTypeGet,
+		"challenge": authNChallengeBase64Url,
+		"origin":    validClientDataOrigin,
+	}
+
+	clientDataJsonBytes, err := json.Marshal(validClientDataJSON)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	extensionData := flow.WebAuthnExtensionData{
+		AuthenticatorData: validAuthenticatorData,
+		ClientDataJson:    clientDataJsonBytes,
+	}
+	extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
+
+	var clientDataHash [hash.HashLenSHA2_256]byte
+	hash.ComputeSHA2_256(&clientDataHash, clientDataJsonBytes)
+	messageToSign := slices.Concat(validAuthenticatorData, clientDataHash[:])
+
+	return extensionDataRLPBytes, messageToSign, nil
 }
 
 // SendTransaction submits the transaction to the Access API. The caller must
@@ -458,8 +515,21 @@ func (c *Client) GetEventsForBlockIDs(
 	return events, nil
 }
 
+func (c *Client) GetEventsForHeightRange(
+	ctx context.Context,
+	eventType string,
+	startHeight uint64,
+	endHeight uint64,
+) ([]sdk.BlockEvents, error) {
+	events, err := c.client.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight)
+	if err != nil {
+		return nil, fmt.Errorf("could not get events for height range: %w", err)
+	}
+	return events, nil
+}
+
 func getAccount(ctx context.Context, client *client.Client, address sdk.Address) (*sdk.Account, error) {
-	header, err := client.GetLatestBlockHeader(ctx, false) // todo change back to true when sealing is done
+	header, err := client.GetLatestBlockHeader(ctx, true)
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest block header: %w", err)
 	}

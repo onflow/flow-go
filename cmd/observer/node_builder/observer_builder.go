@@ -16,7 +16,6 @@ import (
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -41,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
-	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -110,7 +108,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -145,7 +142,6 @@ type ObserverServiceConfig struct {
 	rpcMetricsEnabled                    bool
 	registersDBPath                      string
 	checkpointFile                       string
-	apiTimeout                           time.Duration
 	stateStreamConf                      statestreambackend.Config
 	stateStreamFilterConf                map[string]int
 	upstreamNodeAddresses                []string
@@ -158,7 +154,6 @@ type ObserverServiceConfig struct {
 	logTxTimeToSealed                    bool
 	executionDataSyncEnabled             bool
 	executionDataIndexingEnabled         bool
-	executionDataDBMode                  string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	executionDataPruningInterval         time.Duration
@@ -187,8 +182,9 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			CollectionAddr:         "",
 			HistoricalAccessAddrs:  "",
 			BackendConfig: backend.Config{
-				CollectionClientTimeout:   3 * time.Second,
-				ExecutionClientTimeout:    3 * time.Second,
+				AccessConfig:              rpcConnection.DefaultAccessConfig(),
+				CollectionConfig:          rpcConnection.DefaultCollectionConfig(), // unused on observers
+				ExecutionConfig:           rpcConnection.DefaultExecutionConfig(),  // unused on observers
 				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
 				MaxHeightRange:            events.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
@@ -198,19 +194,20 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				TxResultQueryMode:         query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
-				ListenAddress:  "",
-				WriteTimeout:   rest.DefaultWriteTimeout,
-				ReadTimeout:    rest.DefaultReadTimeout,
-				IdleTimeout:    rest.DefaultIdleTimeout,
-				MaxRequestSize: commonrest.DefaultMaxRequestSize,
+				ListenAddress:   "",
+				WriteTimeout:    rest.DefaultWriteTimeout,
+				ReadTimeout:     rest.DefaultReadTimeout,
+				IdleTimeout:     rest.DefaultIdleTimeout,
+				MaxRequestSize:  commonrpc.DefaultAccessMaxRequestSize,
+				MaxResponseSize: commonrpc.DefaultAccessMaxResponseSize,
 			},
-			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			DeprecatedMaxMsgSize:      0,
 			CompressorName:            grpcutils.NoCompressor,
 			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
 			EnableWebSocketsStreamAPI: true,
 		},
 		stateStreamConf: statestreambackend.Config{
-			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
+			MaxExecutionDataMsgSize: commonrpc.DefaultAccessMaxResponseSize,
 			ExecutionDataCacheSize:  subscription.DefaultCacheSize,
 			ClientSendTimeout:       subscription.DefaultSendTimeout,
 			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
@@ -225,7 +222,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		apiRatelimits:                        nil,
 		apiBurstlimits:                       nil,
 		observerNetworkingKeyPath:            cmd.NotSet,
-		apiTimeout:                           3 * time.Second,
 		upstreamNodeAddresses:                []string{},
 		upstreamNodePublicKeys:               []string{},
 		registersDBPath:                      filepath.Join(homedir, ".flow", "execution_state"),
@@ -237,7 +233,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		logTxTimeToSealed:                    false,
 		executionDataSyncEnabled:             false,
 		executionDataIndexingEnabled:         false,
-		executionDataDBMode:                  execution_data.ExecutionDataDBModeBadger.String(),
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -465,7 +460,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
-		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
+		final := finalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
@@ -640,10 +635,22 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"rest-max-request-size",
 			defaultConfig.rpcConf.RestConfig.MaxRequestSize,
 			"the maximum request size in bytes for payload sent over REST server")
-		flags.UintVar(&builder.rpcConf.MaxMsgSize,
+		flags.Int64Var(&builder.rpcConf.RestConfig.MaxResponseSize,
+			"rest-max-response-size",
+			defaultConfig.rpcConf.RestConfig.MaxResponseSize,
+			"the maximum response size in bytes for payload sent from REST server")
+		flags.UintVar(&builder.rpcConf.DeprecatedMaxMsgSize,
 			"rpc-max-message-size",
-			defaultConfig.rpcConf.MaxMsgSize,
-			"the maximum message size in bytes for messages sent or received over grpc")
+			defaultConfig.rpcConf.DeprecatedMaxMsgSize,
+			"[deprecated] the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			"rpc-max-request-message-size",
+			defaultConfig.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			"the maximum request message size in bytes for request messages received over grpc by the server")
+		flags.UintVar(&builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
+			"rpc-max-response-message-size",
+			defaultConfig.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
+			"the maximum message size in bytes for response messages sent over grpc by the server")
 		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize,
 			"connection-pool-size",
 			defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize,
@@ -664,7 +671,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"observer-networking-key-path",
 			defaultConfig.observerNetworkingKeyPath,
 			"path to the networking key for observer")
-		flags.DurationVar(&builder.apiTimeout, "upstream-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC sockets to upstrem nodes")
+		flags.DurationVar(&builder.rpcConf.BackendConfig.AccessConfig.Timeout,
+			"upstream-api-timeout",
+			defaultConfig.rpcConf.BackendConfig.AccessConfig.Timeout,
+			"tcp timeout for Flow API gRPC sockets to upstrem nodes")
 		flags.StringSliceVar(&builder.upstreamNodeAddresses,
 			"upstream-node-addresses",
 			defaultConfig.upstreamNodeAddresses,
@@ -700,10 +710,9 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
-		flags.StringVar(&builder.executionDataDBMode,
-			"execution-data-db",
-			defaultConfig.executionDataDBMode,
-			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+
+		var builderExecutionDataDBMode string
+		flags.StringVar(&builderExecutionDataDBMode, "execution-data-db", "pebble", "[deprecated] the DB type for execution datastore.")
 
 		// Execution data pruner
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
@@ -1098,7 +1107,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
-	var executionDataDBMode execution_data.ExecutionDataDBMode
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -1117,23 +1125,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return err
 			}
 
-			executionDataDBMode, err = execution_data.ParseExecutionDataDBMode(builder.executionDataDBMode)
+			builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+				node.Logger.With().Str("pebbledb", "endata").Logger(),
+				datastoreDir, nil)
 			if err != nil {
-				return fmt.Errorf("could not parse execution data DB mode: %w", err)
-			}
-
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
-					node.Logger.With().Str("pebbledb", "endata").Logger(),
-					datastoreDir, nil)
-				if err != nil {
-					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
-				}
-			} else {
-				builder.ExecutionDatastoreManager, err = edstorage.NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
-				if err != nil {
-					return fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
-				}
+				return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 			}
 			ds = builder.ExecutionDatastoreManager.Datastore()
 
@@ -1348,7 +1344,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-			indexedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressExecutionDataIndexerBlockHeight)
+			indexedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
 			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
@@ -1452,6 +1448,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.RootChainID.Chain(),
 				indexerDerivedChainData,
 				collectionExecutedMetric,
+				node.StorageLockMgr,
 			)
 			if err != nil {
 				return nil, err
@@ -1756,9 +1753,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("creating grpc servers", func(node *cmd.NodeConfig) error {
+		if builder.rpcConf.DeprecatedMaxMsgSize != 0 {
+			node.Logger.Warn().Msg("A deprecated flag was specified (--rpc-max-message-size). Use --rpc-max-request-message-size and --rpc-max-response-message-size instead. This flag will be removed in a future release.")
+			builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize = builder.rpcConf.DeprecatedMaxMsgSize
+			builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize = builder.rpcConf.DeprecatedMaxMsgSize
+		}
+
 		builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
 			builder.rpcConf.SecureGRPCListenAddr,
-			builder.rpcConf.MaxMsgSize,
+			builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
@@ -1767,6 +1771,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.stateStreamGrpcServer = grpcserver.NewGrpcServerBuilder(
 			node.Logger,
 			builder.stateStreamConf.ListenAddr,
+			builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
 			builder.stateStreamConf.MaxExecutionDataMsgSize,
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
@@ -1776,7 +1781,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
 			builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
 				builder.rpcConf.UnsecureGRPCListenAddr,
-				builder.rpcConf.MaxMsgSize,
+				builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+				builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits).Build()
@@ -1883,17 +1889,15 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
-			CollectionGRPCPort:        0,
-			ExecutionGRPCPort:         0,
-			CollectionNodeGRPCTimeout: builder.apiTimeout,
-			ExecutionNodeGRPCTimeout:  builder.apiTimeout,
-			AccessMetrics:             accessMetrics,
-			Log:                       node.Logger,
+			AccessConfig:     backendConfig.AccessConfig,
+			CollectionConfig: backendConfig.CollectionConfig,
+			ExecutionConfig:  backendConfig.ExecutionConfig,
+			AccessMetrics:    accessMetrics,
+			Log:              node.Logger,
 			Manager: rpcConnection.NewManager(
 				node.Logger,
 				accessMetrics,
 				connBackendCache,
-				config.MaxMsgSize,
 				backendConfig.CircuitBreakerConfig,
 				config.CompressorName,
 			),
@@ -1904,7 +1908,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// handles block-related operations.
 		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
-			builder.FinalizedRootBlock.Height,
+			builder.SealedRootBlock.Height,
 			node.Storage.Headers,
 			broadcaster,
 		)
@@ -1987,6 +1991,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			IndexReporter:              indexReporter,
 			VersionControl:             builder.VersionControl,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+			MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 		}
 
 		if builder.localServiceAPIEnabled {

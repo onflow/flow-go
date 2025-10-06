@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -57,4 +58,8 @@ func (pc *TestPrecompiledContract) Address() types.Address {
 		panic("AddressFunc is not set for the test precompiled contract")
 	}
 	return pc.AddressFunc()
+}
+
+func (pc *TestPrecompiledContract) Name() string {
+	return precompiles.CADENCE_ARCH_PRECOMPILE_NAME
 }

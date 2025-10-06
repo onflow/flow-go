@@ -9,6 +9,7 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -67,7 +68,7 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 		accessAddress,
 		client.WithGRPCDialOptions(
 			dialOpts,
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultAccessMaxResponseSize)),
 		),
 	)
 	if err != nil {
@@ -84,7 +85,7 @@ func insecureFlowClient(accessAddress string) (*client.Client, error) {
 		accessAddress,
 		client.WithGRPCDialOptions(
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultAccessMaxResponseSize)),
 		),
 	)
 	if err != nil {

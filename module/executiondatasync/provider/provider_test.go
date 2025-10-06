@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,16 +14,30 @@ import (
 	"github.com/stretchr/testify/require"
 	goassert "gotest.tools/assert"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
+)
+
+const (
+	// canonicalGeneratorSeed is the static randomness seed used to generate the canonical execution data.
+	// this ensures the data is deterministic and can be used for hash testing.
+	canonicalGeneratorSeed = 1103801176737782919
+)
+
+var (
+	// canonicalExecutionDataID is the execution data ID of the canonical execution data.
+	canonicalExecutionDataID = flow.MustHexStringToIdentifier("637cf35656b86a647eca490d9370632a276137712ecfec65846ba8ec90bec627")
 )
 
 func getDatastore() datastore.Batching {
@@ -52,13 +67,14 @@ func getProvider(blobService network.BlobService) provider.Provider {
 	)
 }
 
-func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk uint64) *execution_data.BlockExecutionData {
-	chunkData := make([]*execution_data.ChunkExecutionData, 0, numChunks)
-	for i := 0; i < numChunks; i++ {
-		chunkData = append(chunkData, unittest.ChunkExecutionDataFixture(t, int(minSerializedSizePerChunk)))
-	}
+func generateBlockExecutionData(numChunks int, minSerializedSizePerChunk int) *execution_data.BlockExecutionData {
+	suite := fixtures.NewGeneratorSuite()
 
-	return unittest.BlockExecutionDataFixture(unittest.WithChunkExecutionDatas(chunkData...))
+	cedGen := suite.ChunkExecutionDatas()
+	chunkExecutionData := cedGen.List(numChunks, cedGen.WithMinSize(minSerializedSizePerChunk))
+
+	bedGen := suite.BlockExecutionDatas()
+	return bedGen.Fixture(bedGen.WithChunkExecutionDatas(chunkExecutionData...))
 }
 
 func deepEqual(t *testing.T, expected, actual *execution_data.BlockExecutionData) {
@@ -81,8 +97,8 @@ func TestHappyPath(t *testing.T) {
 	provider := getProvider(getBlobservice(t, ds))
 	store := getExecutionDataStore(ds)
 
-	test := func(numChunks int, minSerializedSizePerChunk uint64) {
-		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
+	test := func(numChunks int, minSerializedSizePerChunk int) {
+		expected := generateBlockExecutionData(numChunks, minSerializedSizePerChunk)
 		executionDataID, executionDataRoot, err := provider.Provide(context.Background(), 0, expected)
 		require.NoError(t, err)
 
@@ -101,7 +117,7 @@ func TestHappyPath(t *testing.T) {
 func TestProvideContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
+	bed := generateBlockExecutionData(5, 5*execution_data.DefaultMaxBlobSize)
 
 	provider := getProvider(getBlobservice(t, getDatastore()))
 	_, _, err := provider.Provide(context.Background(), 0, bed)
@@ -120,11 +136,38 @@ func TestProvideContextCanceled(t *testing.T) {
 	assert.ErrorIs(t, err, ctx.Err())
 }
 
-// TestCalculateExecutionDataRootID tests that CalculateExecutionDataRootID calculates the correct ID given a static BlockExecutionDataRoot
+// TestGenerateExecutionDataRoot tests that GenerateExecutionDataRoot produces the same execution data ID and root
+// as the Provide method.
+// This ensures we can use the GenerateExecutionDataRoot method during testing to generate the correct data.
+func TestGenerateExecutionDataRoot(t *testing.T) {
+	t.Parallel()
+
+	bed := generateBlockExecutionData(5, 5*execution_data.DefaultMaxBlobSize)
+
+	testProvider := getProvider(getBlobservice(t, getDatastore()))
+	expectedExecutionDataID, expectedExecutionDataRoot, err := testProvider.Provide(context.Background(), 0, bed)
+	require.NoError(t, err)
+
+	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
+	actualExecutionDataID, actualExecutionDataRoot, err := cidProvider.GenerateExecutionDataRoot(bed)
+	require.NoError(t, err)
+
+	assert.Equal(t, expectedExecutionDataID, actualExecutionDataID)
+	assert.Equal(t, expectedExecutionDataRoot, actualExecutionDataRoot)
+}
+
+// TestCalculateExecutionDataRootID tests that CalculateExecutionDataRootID calculates the correct
+// ID given a static BlockExecutionDataRoot. This is used to ensure library updates or modification
+// to the provider do not change the ID calculation logic.
+//
+// CAUTION: Unintentional changes may cause execution forks!
+// Only modify this test if the hash calculation is expected to change.
 func TestCalculateExecutionDataRootID(t *testing.T) {
 	t.Parallel()
 
+	// ONLY modify this hash if it was expected to change. Unintentional changes may cause execution forks!
 	expected := flow.MustHexStringToIdentifier("ae80bb200545de7ff009d2f3e20970643198be635a9b90fffb9da1198a988deb")
+
 	edRoot := flow.BlockExecutionDataRoot{
 		BlockID: flow.MustHexStringToIdentifier("2b31c5e26b999a41d18dc62584ac68476742b071fc9412d68be9e516e1dfc79e"),
 		ChunkExecutionDataIDs: []cid.Cid{
@@ -143,15 +186,20 @@ func TestCalculateExecutionDataRootID(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-// TestCalculateChunkExecutionDataID tests that CalculateChunkExecutionDataID calculates the correct ID given a static ChunkExecutionData
-// This is used to ensure library updates or modification to the provider do not change the ID calculation logic
+// TestCalculateChunkExecutionDataID tests that CalculateChunkExecutionDataID calculates the correct
+// ID given a static ChunkExecutionData. This is used to ensure library updates or modification to
+// the provider do not change the ID calculation logic.
+//
+// CAUTION: Unintentional changes may cause execution forks!
+// Only modify this test if the hash calculation is expected to change.
 func TestCalculateChunkExecutionDataID(t *testing.T) {
 	t.Parallel()
 
 	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
 	require.NoError(t, err)
 
-	expected := cid.MustParse("QmWJsC7DTufdGijftpphuxZ6EbNsDar1knP2BnvgBaMf9n")
+	// ONLY modify this hash if it was expected to change. Unintentional changes may cause execution forks!
+	expected := cid.MustParse("QmSZ4sMzj8Be7kkZekjHKppmx2os87oAHV87WFUgZTMrWf")
 
 	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
@@ -185,13 +233,88 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	actual, err := cidProvider.CalculateChunkExecutionDataID(ced)
 	require.NoError(t, err)
 
-	// This can be used for updating the expected ID when the format is *intentionally* updated
-	t.Log(actual)
-
 	assert.Equal(t,
 		expected, actual,
 		"expected and actual CID do not match: expected %s, actual %s",
 		expected,
 		actual,
 	)
+}
+
+// TestCalculateExecutionDataLifecycle tests that the execution data is reproduced correctly
+// at different stages of the lifecycle. This ensures that the data remains consistent, and
+// the hashing logic is correct.
+//
+// CAUTION: Unintentional changes may cause execution forks!
+func TestCalculateExecutionDataLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	bed, bedRoot := canonicalBlockExecutionData(t)
+
+	unittest.RunWithTempDir(t, func(dbDir string) {
+		pebbleDir := filepath.Join(dbDir, "pebble")
+
+		t.Run("pebble provider generates correct ID", func(t *testing.T) {
+			dsManager, err := edstorage.NewPebbleDatastoreManager(unittest.Logger(), pebbleDir, nil)
+			require.NoError(t, err)
+			defer dsManager.Close()
+
+			provider := getProvider(getBlobservice(t, dsManager.Datastore()))
+			executionDataID, executionDataRoot, err := provider.Provide(ctx, 0, bed)
+			require.NoError(t, err)
+
+			assert.Equal(t, canonicalExecutionDataID, executionDataID)
+			assert.Equal(t, bedRoot, executionDataRoot)
+		})
+
+		t.Run("pebble provider retrieves correct execution data", func(t *testing.T) {
+			dsManager, err := edstorage.NewPebbleDatastoreManager(unittest.Logger(), pebbleDir, nil)
+			require.NoError(t, err)
+			defer dsManager.Close()
+
+			bs := blobs.NewBlobstore(dsManager.Datastore())
+			bs.HashOnRead(true) // ensure data read from db matches expected hash
+			executionDataStore := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
+
+			executionData, err := executionDataStore.Get(ctx, canonicalExecutionDataID)
+			require.NoError(t, err)
+
+			deepEqual(t, bed, executionData)
+		})
+	})
+
+	// test that the data is unchanged after protobuf conversions
+	t.Run("grpc proto messages", func(t *testing.T) {
+		protoMsg, err := convert.BlockExecutionDataToMessage(bed)
+		require.NoError(t, err)
+
+		executionData, err := convert.MessageToBlockExecutionData(protoMsg, flow.Emulator.Chain())
+		require.NoError(t, err)
+
+		deepEqual(t, bed, executionData)
+	})
+}
+
+// canonicalBlockExecutionData returns a block execution data fixture generated using a static random seed.
+// this ensures it produces the same data on every run, allowing for deterministic testing of output hashes.
+func canonicalBlockExecutionData(t *testing.T) (*execution_data.BlockExecutionData, *flow.BlockExecutionDataRoot) {
+	suite := fixtures.NewGeneratorSuite(fixtures.WithSeed(canonicalGeneratorSeed))
+
+	bedGen := suite.BlockExecutionDatas()
+	cedGen := suite.ChunkExecutionDatas()
+	executionData := bedGen.Fixture(bedGen.WithChunkExecutionDatas(cedGen.List(4)...))
+
+	// use in-memory provider to generate the ExecutionDataRoot and ExecutionDataID
+	prov := getProvider(getBlobservice(t, getDatastore()))
+	executionDataID, executionDataRoot, err := prov.Provide(context.Background(), 0, executionData)
+	require.NoError(t, err)
+
+	// ensure the generated execution data matches the expected canonical value
+	// if this fails, then something has change in either the execution data generation or the
+	// generator suite.
+	require.Equal(t, canonicalExecutionDataID, executionDataID)
+
+	return executionData, executionDataRoot
 }

@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/ipfs/go-cid"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,17 +27,18 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, commits *storage.Commits, finalized *testutil.MockFinalizedReader)) func(*testing.T) {
+func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storagemock.Headers, commits *storagemock.Commits, finalized *testutil.MockFinalizedReader)) func(*testing.T) {
 	return func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
+		lockManager := storage.NewTestingLockManager()
+		unittest.RunWithPebbleDB(t, func(pebbleDB *pebble.DB) {
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
 			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
@@ -48,22 +50,22 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				<-compactor.Done()
 			}()
 
-			stateCommitments := storage.NewCommits(t)
-			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			headers := storage.NewHeaders(t)
-			blocks := storage.NewBlocks(t)
-			events := storage.NewEvents(t)
+			stateCommitments := storagemock.NewCommits(t)
+			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			headers := storagemock.NewHeaders(t)
+			blocks := storagemock.NewBlocks(t)
+			events := storagemock.NewEvents(t)
 			events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			serviceEvents := storage.NewServiceEvents(t)
+			serviceEvents := storagemock.NewServiceEvents(t)
 			serviceEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			txResults := storage.NewTransactionResults(t)
+			txResults := storagemock.NewTransactionResults(t)
 			txResults.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			chunkDataPacks := storage.NewChunkDataPacks(t)
-			chunkDataPacks.On("Store", mock.Anything).Return(nil)
-			results := storage.NewExecutionResults(t)
+			chunkDataPacks := storagemock.NewChunkDataPacks(t)
+			chunkDataPacks.On("StoreByChunkID", mock.Anything, mock.Anything).Return(nil)
+			results := storagemock.NewExecutionResults(t)
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			myReceipts := storage.NewMyExecutionReceipts(t)
-			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything).Return(nil)
+			myReceipts := storagemock.NewMyExecutionReceipts(t)
+			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 			withRegisterStore(t, func(t *testing.T,
 				rs *storehouse.RegisterStore,
@@ -76,24 +78,30 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 
 				rootID, err := finalized.FinalizedBlockIDAtHeight(10)
 				require.NoError(t, err)
-				require.NoError(t,
-					badgerDB.Update(operation.InsertExecutedBlock(rootID)),
-				)
 
-				metrics := metrics.NewNoopCollector()
-				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
-				require.NoError(t, headersDB.Store(unittest.ProposalHeaderFromHeader(finalizedHeaders[10])))
+				db := pebbleimpl.ToDB(pebbleDB)
+				require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
+				}))
+
+				err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+					return pebbleimpl.ToDB(pebbleDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
+					})
+				})
+				require.NoError(t, err)
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil
 				}
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerimpl.ToDB(badgerDB),
+					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, pebbleimpl.ToDB(pebbleDB),
 					getLatestFinalized,
 					trace.NewNoopTracer(),
 					rs,
 					true,
+					lockManager,
 				)
 
 				f(t, es, ls, headers, stateCommitments, finalized)
@@ -113,7 +121,7 @@ func withRegisterStore(t *testing.T, fn func(
 	headers map[uint64]*flow.Header,
 )) {
 	// block 10 is executed block
-	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
+	pebblestorage.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebblestorage.Registers) {
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
 		finalized, headerByHeight, highest := testutil.NewMockFinalizedReader(10, 100)
@@ -125,7 +133,7 @@ func withRegisterStore(t *testing.T, fn func(
 
 func TestExecutionStateWithStorehouse(t *testing.T) {
 	t.Run("commit write and read new state", prepareStorehouseTest(func(
-		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, stateCommitments *storage.Commits, finalized *testutil.MockFinalizedReader) {
+		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storagemock.Headers, stateCommitments *storagemock.Commits, finalized *testutil.MockFinalizedReader) {
 
 		// block 11 is the block to be executed
 		block11 := finalized.BlockAtHeight(11)

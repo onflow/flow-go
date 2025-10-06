@@ -8,19 +8,23 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/verification/verifier"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var (
-	flagLastK                   uint64
-	flagDatadir                 string
-	flagChunkDataPackDir        string
-	flagChain                   string
-	flagFromTo                  string
-	flagWorkerCount             uint // number of workers to verify the blocks concurrently
-	flagStopOnMismatch          bool
-	flagtransactionFeesDisabled bool
+	flagLastK                     uint64
+	flagDatadir                   string
+	flagChunkDataPackDir          string
+	flagChain                     string
+	flagFromTo                    string
+	flagWorkerCount               uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch            bool
+	flagtransactionFeesDisabled   bool
+	flagScheduledCallbacksEnabled bool
 )
 
 // # verify the last 100 sealed blocks
@@ -37,9 +41,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
 	_ = Cmd.MarkFlagRequired("chain")
 
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "/var/flow/data/protocol",
-		"directory that stores the protocol state")
-	_ = Cmd.MarkFlagRequired("datadir")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 
 	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_pack",
 		"directory that stores the protocol state")
@@ -57,9 +59,12 @@ func init() {
 	Cmd.Flags().BoolVar(&flagStopOnMismatch, "stop_on_mismatch", false, "stop verification on first mismatch")
 
 	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
+
+	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledCallbacksEnabled, "enable scheduled callbacks")
 }
 
 func run(*cobra.Command, []string) {
+	lockManager := storage.MakeSingletonLockManager()
 	chainID := flow.ChainID(flagChain)
 	_ = chainID.Chain()
 
@@ -90,14 +95,14 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
+		err = verifier.VerifyRange(lockManager, from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledCallbacksEnabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
 		lg.Info().Msgf("finished verified range from %d to %d", from, to)
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
+		err := verifier.VerifyLastKHeight(lockManager, flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledCallbacksEnabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}

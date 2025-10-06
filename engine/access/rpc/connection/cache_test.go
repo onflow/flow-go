@@ -133,6 +133,8 @@ func TestConcurrentConnectionsAndDisconnects(t *testing.T) {
 	connectionCount := 100_000
 	conn := setupGRPCServer(t)
 
+	cfg := DefaultCollectionConfig()
+
 	t.Run("test concurrent connections", func(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(connectionCount)
@@ -140,7 +142,7 @@ func TestConcurrentConnectionsAndDisconnects(t *testing.T) {
 		for i := 0; i < connectionCount; i++ {
 			go func() {
 				defer wg.Done()
-				cachedConn, err := cache.GetConnected("foo", DefaultClientTimeout, nil, func(string, time.Duration, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error) {
+				cachedConn, err := cache.GetConnected("foo", cfg, nil, func(string, Config, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error) {
 					callCount.Inc()
 					return conn, nil
 				})
@@ -164,7 +166,7 @@ func TestConcurrentConnectionsAndDisconnects(t *testing.T) {
 		for i := 0; i < connectionCount; i++ {
 			go func() {
 				defer wg.Done()
-				cachedConn, err := cache.GetConnected("foo", DefaultClientTimeout, nil, func(string, time.Duration, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error) {
+				cachedConn, err := cache.GetConnected("foo", cfg, nil, func(string, Config, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error) {
 					callCount.Inc()
 					return conn, nil
 				})

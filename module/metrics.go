@@ -801,6 +801,8 @@ type ExecutionDataRequesterMetrics interface {
 	ExecutionDataFetchStarted()
 
 	// ExecutionDataFetchFinished records a completed download
+	// Pass the highest consecutive height to ensure the metrics reflect the height up to which the
+	// requester has completed downloads. This allows us to easily see when downloading gets stuck.
 	ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64)
 
 	// NotificationSent reports that ExecutionData received notifications were sent for a block height
@@ -946,6 +948,7 @@ type TransactionExecutionResultStats struct {
 	ExecutionResultStats
 	NumberOfTxnConflictRetries int
 	Failed                     bool
+	ScheduledTransaction       bool
 	SystemTransaction          bool
 	ComputationIntensities     meter.MeteredComputationIntensities
 }
@@ -1026,6 +1029,9 @@ type ExecutionMetrics interface {
 
 	// ExecutionScriptExecuted reports the time and memory spent on executing an script
 	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
+
+	// ExecutionCallbacksExecuted reports the number of callbacks executed, computation used by process transaction, and total computation limits for execute transactions
+	ExecutionCallbacksExecuted(callbackCount int, processComputationUsed, executeComputationLimits uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
@@ -1184,8 +1190,8 @@ type DHTMetrics interface {
 }
 
 type CollectionExecutedMetric interface {
-	CollectionFinalized(light flow.LightCollection)
-	CollectionExecuted(light flow.LightCollection)
+	CollectionFinalized(light *flow.LightCollection)
+	CollectionExecuted(light *flow.LightCollection)
 	BlockFinalized(block *flow.Block)
 	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
 	UpdateLastFullBlockHeight(height uint64)

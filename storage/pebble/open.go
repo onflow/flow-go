@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
@@ -38,7 +39,7 @@ func NewBootstrappedRegistersWithPath(logger zerolog.Logger, dir string) (*Regis
 }
 
 // OpenRegisterPebbleDB opens the database
-// The difference between OpenDefaultPebbleDB is that it uses
+// The difference between openDefaultPebbleDB is that it uses
 // a customized comparer (NewMVCCComparer) which is needed to
 // implement finding register values at any given height using
 // pebble's SeekPrefixGE function
@@ -55,11 +56,9 @@ func OpenRegisterPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error)
 	return db, nil
 }
 
-// OpenDefaultPebbleDB opens a pebble database using default options,
+// openDefaultPebbleDB opens a pebble database using default options,
 // such as cache size and comparer
-// If the pebbleDB is not bootstrapped at this folder, it will auto-bootstrap it,
-// use ShouldOpenDefaultPebbleDB if you want to return error instead
-func OpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
+func openDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
 	opts := DefaultPebbleOptions(logger, cache, pebble.DefaultComparer)
@@ -74,40 +73,73 @@ func OpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) 
 // ShouldOpenDefaultPebbleDB returns error if the pebbleDB is not bootstrapped at this folder
 // if bootstrapped, then open the pebbleDB
 func ShouldOpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
-	err := IsPebbleInitialized(dir)
-	if err != nil {
+	ok, err := IsPebbleFolder(dir)
+	if err != nil || !ok {
 		return nil, fmt.Errorf("pebble db is not initialized: %w", err)
 	}
 
-	return OpenDefaultPebbleDB(logger, dir)
+	return SafeOpen(logger, dir)
 }
 
-// IsPebbleInitialized checks if the given folder contains a valid Pebble DB.
+// SafeOpen open a pebble database at the given directory.
+// It opens the database only if the directory:
+// 1. does not exist, then it will create this directory
+// 2. is empty
+// 3. was opened before, in which case have all pebble required files
+// It returns an error if the directory is not empty and missing required pebble files.
+// more specifically, if the folder is a badger folder, it will return an error because it would
+// miss some pebble file.
+func SafeOpen(logger zerolog.Logger, dataDir string) (*pebble.DB, error) {
+	ok, err := util.IsEmptyOrNotExists(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("error checking if folder is empty or does not exist: %w", err)
+	}
+
+	// if the folder is empty or does not exist, then it can be used as a Pebble folder
+	if ok {
+		return openDefaultPebbleDB(logger, dataDir)
+	}
+
+	// note, a badger folder does not have MANIFEST-* file, so this will return error
+	// and prevent opening a badger folder as a pebble folder
+	ok, err = folderHaveAllPebbleFiles(dataDir)
+	if err != nil || !ok {
+		return nil, fmt.Errorf("folder %s is not a valid pebble folder: %w", dataDir, err)
+	}
+
+	return openDefaultPebbleDB(logger, dataDir)
+}
+
+// IsPebbleFolder checks if the given folder contains a valid Pebble DB.
 // return error if the folder does not exist, is not a directory, or is missing required files
 // return nil if the folder contains a valid Pebble DB
-func IsPebbleInitialized(folderPath string) error {
+func IsPebbleFolder(folderPath string) (bool, error) {
 	// Check if the folder exists
 	info, err := os.Stat(folderPath)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("directory does not exist: %s", folderPath)
+		return false, fmt.Errorf("directory does not exist: %s", folderPath)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("not a directory: %s", folderPath)
+		return false, fmt.Errorf("not a directory: %s", folderPath)
 	}
 
+	return folderHaveAllPebbleFiles(folderPath)
+}
+
+func folderHaveAllPebbleFiles(folderPath string) (bool, error) {
 	// Look for Pebble-specific files
 	requiredFiles := []string{"MANIFEST-*"}
 	for _, pattern := range requiredFiles {
 		matches, err := filepath.Glob(filepath.Join(folderPath, pattern))
 		if err != nil {
-			return fmt.Errorf("error checking for files: %v", err)
+			return false, fmt.Errorf("error checking for files: %v", err)
 		}
 		if len(matches) == 0 {
-			return fmt.Errorf("missing required file: %s", pattern)
+			return false, fmt.Errorf("missing required file: %s", pattern)
 		}
 	}
 
-	return nil
+	return true, nil
 }
 
 // ReadHeightsFromBootstrappedDB reads the first and latest height from a bootstrapped register db

@@ -61,7 +61,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	s.Run("Get Block", func() {
 		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
 			getBlock(at: %d)!
-			return getCurrentBlock().height 
+			return getCurrentBlock().height
 		}`, s.height))
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
@@ -153,6 +153,7 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 }
 
 func (s *scriptTestSuite) SetupTest() {
+	lockManager := storage.NewTestingLockManager()
 	logger := unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	entropyProvider := testutil.ProtocolStateWithSourceFixture(nil)
 	blockchain := unittest.BlockchainFixture(10)
@@ -190,6 +191,7 @@ func (s *scriptTestSuite) SetupTest() {
 		flow.Testnet.Chain(),
 		derivedChainData,
 		nil,
+		lockManager,
 	)
 	s.Require().NoError(err)
 

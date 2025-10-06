@@ -167,7 +167,8 @@ func verifyBlockNotExecuted(t *testing.T, consumer *mockConsumer, blocks ...*flo
 
 func storeCollection(t *testing.T, collectionDB *mocks.MockCollectionStore, collection *flow.Collection) {
 	log.Info().Msgf("collectionDB: store collection %v", collection.ID())
-	require.NoError(t, collectionDB.Store(collection))
+	_, err := collectionDB.Store(collection)
+	require.NoError(t, err)
 }
 
 func receiveCollection(t *testing.T, fetcher *mockFetcher, core *Core, collection *flow.Collection) {

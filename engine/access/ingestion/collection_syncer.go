@@ -55,6 +55,7 @@ type CollectionSyncer struct {
 	transactions storage.Transactions
 
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lockManager         storage.LockManager
 }
 
 // NewCollectionSyncer creates a new CollectionSyncer responsible for requesting,
@@ -68,6 +69,7 @@ func NewCollectionSyncer(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
+	lockManager storage.LockManager,
 ) *CollectionSyncer {
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
@@ -80,6 +82,7 @@ func NewCollectionSyncer(
 		transactions:             transactions,
 		lastFullBlockHeight:      lastFullBlockHeight,
 		collectionExecutedMetric: collectionExecutedMetric,
+		lockManager:              lockManager,
 	}
 }
 
@@ -155,7 +158,7 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 			Int("missing_collection_count", len(collections)).
 			Msg("re-requesting missing collections")
 
-		s.requestCollections(collections, false)
+		s.requestCollections(collections)
 	}
 
 	return nil
@@ -175,7 +178,7 @@ func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context
 		return nil
 	}
 
-	s.requestCollections(missingCollections, true)
+	s.requestCollections(missingCollections)
 
 	collectionsToBeDownloaded := make(map[flow.Identifier]struct{})
 	for _, collection := range missingCollections {
@@ -301,12 +304,12 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 		return
 	}
 
-	s.requestCollections(missingCollections, false)
+	s.requestCollections(missingCollections)
 }
 
-// requestCollections registers collection download requests in the requester engine,
-// optionally forcing immediate dispatch.
-func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee, immediately bool) {
+// requestCollections registers collection download requests in the requester engine and
+// causes the requester to immediately dispatch requests.
+func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee) {
 	for _, guarantee := range collections {
 		guarantors, err := protocol.FindGuarantors(s.state, guarantee)
 		if err != nil {
@@ -316,7 +319,7 @@ func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuar
 		s.requester.EntityByID(guarantee.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 
-	if immediately {
+	if len(collections) > 0 {
 		s.requester.Force()
 	}
 }
@@ -390,7 +393,17 @@ func (s *CollectionSyncer) OnCollectionDownloaded(_ flow.Identifier, entity flow
 		return
 	}
 
-	err := indexer.IndexCollection(collection, s.collections, s.transactions, s.logger, s.collectionExecutedMetric)
+	// Create a lock context for indexing
+	lctx := s.lockManager.NewContext()
+	defer lctx.Release()
+	err := lctx.AcquireLock(storage.LockInsertCollection)
+	if err != nil {
+		// TODO(leo): should be using irrecoverable.Context
+		s.logger.Fatal().Err(err).Msg("could not acquire lock for collection indexing")
+		return
+	}
+
+	err = indexer.IndexCollection(lctx, collection, s.collections, s.logger, s.collectionExecutedMetric)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("could not index collection after it has been downloaded")
 		return

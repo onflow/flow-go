@@ -80,6 +80,8 @@ type Meter interface {
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
+
+	RunWithMeteringDisabled(f func())
 }
 
 type meterImpl struct {
@@ -126,6 +128,10 @@ func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
 
 func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
 	return meter.txnState.TotalEmittedEventBytes()
+}
+
+func (meter *meterImpl) RunWithMeteringDisabled(f func()) {
+	meter.txnState.RunWithMeteringDisabled(f)
 }
 
 type cancellableMeter struct {

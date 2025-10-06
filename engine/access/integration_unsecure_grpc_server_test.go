@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -95,7 +95,7 @@ type SameGRPCPortTestSuite struct {
 }
 
 func (suite *SameGRPCPortTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -170,7 +170,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil,
@@ -178,7 +179,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil).Build()
@@ -312,6 +314,14 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 	// wait for the state stream engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Ready(), 2*time.Second)
+}
+
+func (suite *SameGRPCPortTestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Done(), 2*time.Second)
 }
 
 // TestEnginesOnTheSameGrpcPort verifies if both AccessAPI and ExecutionDataAPI client successfully connect and continue

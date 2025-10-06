@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,11 +28,11 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storerr "github.com/onflow/flow-go/storage"
-	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -49,17 +49,17 @@ type Suite struct {
 	}
 
 	me           *modulemock.Local
-	net          *mocknetwork.Network
+	net          *mocknetwork.EngineRegistry
 	request      *modulemock.Requester
 	obsIdentity  *flow.Identity
 	provider     *mocknetwork.Engine
-	blocks       *storage.Blocks
-	headers      *storage.Headers
-	collections  *storage.Collections
-	transactions *storage.Transactions
-	receipts     *storage.ExecutionReceipts
-	results      *storage.ExecutionResults
-	seals        *storage.Seals
+	blocks       *storagemock.Blocks
+	headers      *storagemock.Headers
+	collections  *storagemock.Collections
+	transactions *storagemock.Transactions
+	receipts     *storagemock.ExecutionReceipts
+	results      *storagemock.ExecutionResults
+	seals        *storagemock.Seals
 
 	conduit        *mocknetwork.Conduit
 	downloader     *downloadermock.Downloader
@@ -74,9 +74,10 @@ type Suite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	db                  *badger.DB
+	db                  storage.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lockManager         lockctx.Manager
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -93,11 +94,14 @@ func (s *Suite) TearDownTest() {
 func (s *Suite) SetupTest() {
 	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
+	pdb, dbDir := unittest.TempPebbleDB(s.T())
+	s.db = pebbleimpl.ToDB(pdb)
+	s.dbDir = dbDir
+	s.lockManager = storage.NewTestingLockManager()
 
 	s.obsIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
-	s.blocks = storage.NewBlocks(s.T())
+	s.blocks = storagemock.NewBlocks(s.T())
 	// mock out protocol state
 	s.proto.state = new(protocol.FollowerState)
 	s.proto.snapshot = new(protocol.Snapshot)
@@ -114,19 +118,19 @@ func (s *Suite) SetupTest() {
 
 	s.me = modulemock.NewLocal(s.T())
 	s.me.On("NodeID").Return(s.obsIdentity.NodeID).Maybe()
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	conduit := mocknetwork.NewConduit(s.T())
 	s.net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	s.request = modulemock.NewRequester(s.T())
 	s.provider = mocknetwork.NewEngine(s.T())
-	s.blocks = storage.NewBlocks(s.T())
-	s.headers = storage.NewHeaders(s.T())
-	s.collections = new(storage.Collections)
-	s.receipts = new(storage.ExecutionReceipts)
-	s.transactions = new(storage.Transactions)
-	s.results = new(storage.ExecutionResults)
+	s.blocks = storagemock.NewBlocks(s.T())
+	s.headers = storagemock.NewHeaders(s.T())
+	s.collections = new(storagemock.Collections)
+	s.receipts = new(storagemock.ExecutionReceipts)
+	s.transactions = new(storagemock.Transactions)
+	s.results = new(storagemock.ExecutionResults)
 	collectionsToMarkFinalized := stdmap.NewTimes(100)
 	collectionsToMarkExecuted := stdmap.NewTimes(100)
 	blocksToMarkExecuted := stdmap.NewTimes(100)
@@ -197,9 +201,9 @@ func (s *Suite) TestComponentShutdown() {
 // initEngineAndSyncer create new instance of ingestion engine and collection collectionSyncer.
 // It waits until the ingestion engine starts.
 func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine, *CollectionSyncer) {
-	processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressIngestionEngineBlockHeight)
+	processedHeightInitializer := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
 
-	lastFullBlockHeight, err := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
+	lastFullBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
 	require.NoError(s.T(), err)
 
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeight)
@@ -208,12 +212,13 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	syncer, err := NewCollectionSyncer(
 		s.log,
 		s.collectionExecutedMetric,
-		s.request,
+		module.Requester(s.request),
 		s.proto.state,
 		s.blocks,
 		s.collections,
 		s.transactions,
 		s.lastFullBlockHeight,
+		s.lockManager,
 	)
 	require.NoError(s.T(), err)
 
@@ -309,7 +314,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 	for _, seal := range block.Payload.Seals {
 		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
@@ -382,7 +387,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
-		s.blocks.On("IndexBlockForCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+		s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 		for _, cg := range block.Payload.Guarantees {
 			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -407,7 +412,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	}
 
 	s.headers.AssertExpectations(s.T())
-	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollectionGuarantees", newBlocksCount)
+	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockContainingCollectionGuarantees", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
 	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
@@ -420,28 +425,17 @@ func (s *Suite) TestOnCollection() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
+	// we should store the collection and index its transactions
+	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(light, nil).Once()
 
-	// for each transaction in the collection, we should store it
-	needed := make(map[flow.Identifier]struct{})
-	for _, txID := range light.Transactions {
-		needed[txID] = struct{}{}
-	}
-	s.transactions.On("Store", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			tx := args.Get(0).(*flow.TransactionBody)
-			_, pending := needed[tx.ID()]
-			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-		},
-	)
-
-	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	// Create a lock context for indexing
+	err := unittest.WithLock(s.T(), s.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		return indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+	})
 	require.NoError(s.T(), err)
 
-	// check that the collection was stored and indexed, and we stored all transactions
+	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
-	s.transactions.AssertNumberOfCalls(s.T(), "Store", len(collection.Transactions))
 }
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
@@ -452,8 +446,8 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(nil).Once()
+	// we should store the collection and index its transactions
+	s.collections.On("StoreAndIndexByTransaction", &collection).Return(light, nil).Once()
 	block := unittest.BlockFixture(
 		unittest.Block.WithHeight(0),
 		unittest.Block.WithPayload(
@@ -478,10 +472,10 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	er2 := unittest.ExecutionReceiptFixture()
 
 	s.receipts.On("Store", mock.Anything).Return(nil)
-	s.blocks.On("ByID", er1.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
+	s.blocks.On("ByID", er1.ExecutionResult.BlockID).Return(nil, storage.ErrNotFound)
 
 	s.receipts.On("Store", mock.Anything).Return(nil)
-	s.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
+	s.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storage.ErrNotFound)
 
 	err := eng.persistExecutionReceipt(er1)
 	require.NoError(s.T(), err)
@@ -499,32 +493,20 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 func (s *Suite) TestOnCollectionDuplicate() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	s.initEngineAndSyncer(irrecoverableCtx)
-
 	collection := unittest.CollectionFixture(5)
-	light := collection.Light()
 
-	// we should store the light collection and index its transactions
-	s.collections.On("StoreLightAndIndexByTransaction", light).Return(storerr.ErrAlreadyExists).Once()
+	// we should store the collection and index its transactions
+	s.collections.On("StoreAndIndexByTransaction", mock.Anything, &collection).Return(nil, storage.ErrAlreadyExists).Once()
 
-	// for each transaction in the collection, we should store it
-	needed := make(map[flow.Identifier]struct{})
-	for _, txID := range light.Transactions {
-		needed[txID] = struct{}{}
-	}
-	s.transactions.On("Store", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			tx := args.Get(0).(*flow.TransactionBody)
-			_, pending := needed[tx.ID()]
-			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-		},
-	)
+	// Create a lock context for indexing
+	err := unittest.WithLock(s.T(), s.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		return indexer.IndexCollection(lctx, &collection, s.collections, s.log, s.collectionExecutedMetric)
+	})
+	require.Error(s.T(), err)
+	require.ErrorIs(s.T(), err, storage.ErrAlreadyExists)
 
-	err := indexer.IndexCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
-	require.NoError(s.T(), err)
-
-	// check that the collection was stored and indexed, and we stored all transactions
+	// check that the collection was stored and indexed
 	s.collections.AssertExpectations(s.T())
-	s.transactions.AssertNotCalled(s.T(), "Store", "should not store any transactions")
 }
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
@@ -589,7 +571,7 @@ func (s *Suite) TestRequestMissingCollections() {
 			if rand.Float32() >= p {
 				rcvdColl[cID] = struct{}{}
 			}
-			return storerr.ErrNotFound
+			return storage.ErrNotFound
 		}).
 		// simulate some db i/o contention
 		After(time.Millisecond * time.Duration(rand.Intn(5)))
@@ -722,7 +704,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 				},
 				func(cID flow.Identifier) error {
 					if blkMissingColl[j] {
-						return storerr.ErrNotFound
+						return storage.ErrNotFound
 					}
 					return nil
 				})

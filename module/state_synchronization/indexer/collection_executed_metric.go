@@ -29,6 +29,8 @@ type CollectionExecutedMetricImpl struct {
 	blockTransactions *stdmap.IdentifierMap // Map to track transactions for each block for sealed metrics
 }
 
+var _ module.CollectionExecutedMetric = (*CollectionExecutedMetricImpl)(nil)
+
 func NewCollectionExecutedMetricImpl(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,
@@ -52,7 +54,7 @@ func NewCollectionExecutedMetricImpl(
 }
 
 // CollectionFinalized tracks collections to mark finalized
-func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightCollection) {
+func (c *CollectionExecutedMetricImpl) CollectionFinalized(light *flow.LightCollection) {
 	lightID := light.ID()
 	if ti, found := c.collectionsToMarkFinalized.Get(lightID); found {
 
@@ -73,7 +75,7 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightColle
 }
 
 // CollectionExecuted tracks collections to mark executed
-func (c *CollectionExecutedMetricImpl) CollectionExecuted(light flow.LightCollection) {
+func (c *CollectionExecutedMetricImpl) CollectionExecuted(light *flow.LightCollection) {
 	if ti, found := c.collectionsToMarkExecuted.Get(light.ID()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionExecuted(t, ti)

@@ -44,7 +44,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
-	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -66,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -116,6 +116,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	statedatastore "github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
@@ -143,8 +144,6 @@ import (
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
 	supportsObserver                     bool // True if this is an Access node that supports observers and consensus follower engines
-	collectionGRPCPort                   uint
-	executionGRPCPort                    uint
 	pingEnabled                          bool
 	nodeInfoFile                         string
 	apiRatelimits                        map[string]int
@@ -162,7 +161,6 @@ type AccessNodeConfig struct {
 	rpcMetricsEnabled                    bool
 	executionDataSyncEnabled             bool
 	publicNetworkExecutionDataEnabled    bool
-	executionDataDBMode                  string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	executionDataPruningInterval         time.Duration
@@ -185,6 +183,7 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
+	scheduledCallbacksEnabled            bool
 }
 
 type PublicNetworkConfig struct {
@@ -198,9 +197,7 @@ type PublicNetworkConfig struct {
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	homedir, _ := os.UserHomeDir()
 	return &AccessNodeConfig{
-		supportsObserver:   false,
-		collectionGRPCPort: 9000,
-		executionGRPCPort:  9000,
+		supportsObserver: false,
 		rpcConf: rpc.Config{
 			UnsecureGRPCListenAddr: "0.0.0.0:9000",
 			SecureGRPCListenAddr:   "0.0.0.0:9001",
@@ -208,8 +205,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			CollectionAddr:         "",
 			HistoricalAccessAddrs:  "",
 			BackendConfig: backend.Config{
-				CollectionClientTimeout:   3 * time.Second,
-				ExecutionClientTimeout:    3 * time.Second,
+				AccessConfig:              rpcConnection.DefaultAccessConfig(),
+				CollectionConfig:          rpcConnection.DefaultCollectionConfig(),
+				ExecutionConfig:           rpcConnection.DefaultExecutionConfig(),
 				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
 				MaxHeightRange:            events.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
@@ -225,19 +223,20 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				TxResultQueryMode:   query_mode.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
-				ListenAddress:  "",
-				WriteTimeout:   rest.DefaultWriteTimeout,
-				ReadTimeout:    rest.DefaultReadTimeout,
-				IdleTimeout:    rest.DefaultIdleTimeout,
-				MaxRequestSize: commonrest.DefaultMaxRequestSize,
+				ListenAddress:   "",
+				WriteTimeout:    rest.DefaultWriteTimeout,
+				ReadTimeout:     rest.DefaultReadTimeout,
+				IdleTimeout:     rest.DefaultIdleTimeout,
+				MaxRequestSize:  commonrpc.DefaultAccessMaxRequestSize,
+				MaxResponseSize: commonrpc.DefaultAccessMaxResponseSize,
 			},
-			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			DeprecatedMaxMsgSize:      0,
 			CompressorName:            grpcutils.NoCompressor,
 			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
 			EnableWebSocketsStreamAPI: true,
 		},
 		stateStreamConf: statestreambackend.Config{
-			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
+			MaxExecutionDataMsgSize: commonrpc.DefaultAccessMaxResponseSize,
 			ExecutionDataCacheSize:  subscription.DefaultCacheSize,
 			ClientSendTimeout:       subscription.DefaultSendTimeout,
 			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
@@ -277,7 +276,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 		executionDataIndexingEnabled:         false,
-		executionDataDBMode:                  execution_data.ExecutionDataDBModeBadger.String(),
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -294,6 +292,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
+		scheduledCallbacksEnabled:            fvm.DefaultScheduledCallbacksEnabled,
 	}
 }
 
@@ -445,7 +444,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
-		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
+		final := finalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		packer := signature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
@@ -580,11 +579,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
 		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
-
-			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
-
-			transactions := store.NewTransactions(node.Metrics.Cache, dbStore)
-			collections := store.NewCollections(dbStore, transactions)
+			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
+			collections := store.NewCollections(node.ProtocolDB, transactions)
 			builder.transactions = transactions
 			builder.collections = collections
 
@@ -593,7 +589,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			var err error
 			builder.ExecutionDatastoreManager, err = edstorage.CreateDatastoreManager(
-				node.Logger, builder.executionDataDir, builder.executionDataDBMode)
+				node.Logger, builder.executionDataDir)
 			if err != nil {
 				return fmt.Errorf("could not create execution data datastore manager: %w", err)
 			}
@@ -853,8 +849,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
-				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
+				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -955,6 +950,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
 					notNil(builder.collectionExecutedMetric),
+					node.StorageLockMgr,
 				)
 				if err != nil {
 					return nil, err
@@ -1162,8 +1158,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultAccessNodeConfig()
 
-		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
-		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
+		flags.UintVar(&builder.rpcConf.BackendConfig.CollectionConfig.GRPCPort,
+			"collection-ingress-port",
+			defaultConfig.rpcConf.BackendConfig.CollectionConfig.GRPCPort,
+			"the grpc ingress port for all collection nodes")
+		flags.UintVar(&builder.rpcConf.BackendConfig.ExecutionConfig.GRPCPort,
+			"execution-ingress-port",
+			defaultConfig.rpcConf.BackendConfig.ExecutionConfig.GRPCPort,
+			"the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr,
 			"rpc-addr",
 			"r",
@@ -1195,6 +1197,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"rest-max-request-size",
 			defaultConfig.rpcConf.RestConfig.MaxRequestSize,
 			"the maximum request size in bytes for payload sent over REST server")
+		flags.Int64Var(&builder.rpcConf.RestConfig.MaxResponseSize,
+			"rest-max-response-size",
+			defaultConfig.rpcConf.RestConfig.MaxResponseSize,
+			"the maximum response size in bytes for payload sent from REST server")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr,
 			"static-collection-ingress-addr",
 			"",
@@ -1210,22 +1216,46 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"",
 			defaultConfig.rpcConf.HistoricalAccessAddrs,
 			"comma separated rpc addresses for historical access nodes")
-		flags.DurationVar(&builder.rpcConf.BackendConfig.CollectionClientTimeout,
+		flags.DurationVar(&builder.rpcConf.BackendConfig.CollectionConfig.Timeout,
 			"collection-client-timeout",
-			defaultConfig.rpcConf.BackendConfig.CollectionClientTimeout,
+			defaultConfig.rpcConf.BackendConfig.CollectionConfig.Timeout,
 			"grpc client timeout for a collection node")
-		flags.DurationVar(&builder.rpcConf.BackendConfig.ExecutionClientTimeout,
+		flags.DurationVar(&builder.rpcConf.BackendConfig.ExecutionConfig.Timeout,
 			"execution-client-timeout",
-			defaultConfig.rpcConf.BackendConfig.ExecutionClientTimeout,
+			defaultConfig.rpcConf.BackendConfig.ExecutionConfig.Timeout,
 			"grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize,
 			"connection-pool-size",
 			defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize,
 			"maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
-		flags.UintVar(&builder.rpcConf.MaxMsgSize,
+		flags.UintVar(&builder.rpcConf.DeprecatedMaxMsgSize,
 			"rpc-max-message-size",
-			grpcutils.DefaultMaxMsgSize,
-			"the maximum message size in bytes for messages sent or received over grpc")
+			defaultConfig.rpcConf.DeprecatedMaxMsgSize,
+			"[deprecated] the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			"rpc-max-request-message-size",
+			defaultConfig.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+			"the maximum request message size in bytes for request messages received over grpc by the server")
+		flags.UintVar(&builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
+			"rpc-max-response-message-size",
+			defaultConfig.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
+			"the maximum message size in bytes for response messages sent over grpc by the server")
+		flags.UintVar(&builder.rpcConf.BackendConfig.CollectionConfig.MaxRequestMsgSize,
+			"rpc-max-collection-request-message-size",
+			defaultConfig.rpcConf.BackendConfig.CollectionConfig.MaxRequestMsgSize,
+			"the maximum request message size in bytes for request messages sent over grpc to collection nodes")
+		flags.UintVar(&builder.rpcConf.BackendConfig.CollectionConfig.MaxResponseMsgSize,
+			"rpc-max-collection-response-message-size",
+			defaultConfig.rpcConf.BackendConfig.CollectionConfig.MaxResponseMsgSize,
+			"the maximum message size in bytes for response messages received over grpc from collection nodes")
+		flags.UintVar(&builder.rpcConf.BackendConfig.ExecutionConfig.MaxRequestMsgSize,
+			"rpc-max-execution-request-message-size",
+			defaultConfig.rpcConf.BackendConfig.ExecutionConfig.MaxRequestMsgSize,
+			"the maximum request message size in bytes for request messages sent over grpc to execution nodes")
+		flags.UintVar(&builder.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize,
+			"rpc-max-execution-response-message-size",
+			defaultConfig.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize,
+			"the maximum message size in bytes for response messages received over grpc from execution nodes")
 		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange,
 			"rpc-max-height-range",
 			defaultConfig.rpcConf.BackendConfig.MaxHeightRange,
@@ -1292,6 +1322,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
+		flags.BoolVar(&builder.scheduledCallbacksEnabled,
+			"scheduled-callbacks-enabled",
+			defaultConfig.scheduledCallbacksEnabled,
+			"whether to include scheduled callback transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1326,10 +1360,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-		flags.StringVar(&builder.executionDataDBMode,
+
+		var builderexecutionDataDBMode string
+		flags.StringVar(&builderexecutionDataDBMode,
 			"execution-data-db",
-			defaultConfig.executionDataDBMode,
-			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+			"pebble",
+			"[deprecated] the DB type for execution datastore")
+
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
 			"execution-data-height-range-target",
 			defaultConfig.executionDataPrunerHeightRangeTarget,
@@ -1542,6 +1579,27 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
 			return errors.New("rest-max-request-size must be greater than 0")
 		}
+		if builder.rpcConf.RestConfig.MaxResponseSize <= 0 {
+			return errors.New("rest-max-response-size must be greater than 0")
+		}
+		if builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize <= 0 {
+			return errors.New("rpc-max-request-message-size must be greater than 0")
+		}
+		if builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize <= 0 {
+			return errors.New("rpc-max-response-message-size must be greater than 0")
+		}
+		if builder.rpcConf.BackendConfig.CollectionConfig.MaxRequestMsgSize <= 0 {
+			return errors.New("rpc-max-collection-request-message-size must be greater than 0")
+		}
+		if builder.rpcConf.BackendConfig.CollectionConfig.MaxResponseMsgSize <= 0 {
+			return errors.New("rpc-max-collection-response-message-size must be greater than 0")
+		}
+		if builder.rpcConf.BackendConfig.ExecutionConfig.MaxRequestMsgSize <= 0 {
+			return errors.New("rpc-max-execution-request-message-size must be greater than 0")
+		}
+		if builder.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize <= 0 {
+			return errors.New("rpc-max-execution-response-message-size must be greater than 0")
+		}
 
 		return nil
 	})
@@ -1633,7 +1691,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 
 	builder.EnqueueTracer()
 	builder.PreInit(cmd.DynamicStartPreInit)
-	builder.ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange)
+	builder.ValidateRootSnapshot(statedatastore.ValidRootSnapshotContainsEntityExpiryRange)
 
 	return nil
 }
@@ -1671,6 +1729,23 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	builder.
 		BuildConsensusFollower().
+		Module("normalize rpc message limits", func(node *cmd.NodeConfig) error {
+			// This needs to be the first module run so other modules can use the normalized values
+			// TODO: remove this module once the deprecated flag is removed
+			if builder.rpcConf.DeprecatedMaxMsgSize != 0 {
+				node.Logger.Warn().Msg("A deprecated flag was specified (--rpc-max-message-size). Use --rpc-max-request-message-size and --rpc-max-response-message-size instead. This flag will be removed in a future release.")
+				builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize = builder.rpcConf.DeprecatedMaxMsgSize
+				builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize = builder.rpcConf.DeprecatedMaxMsgSize
+
+				builder.rpcConf.BackendConfig.CollectionConfig.MaxRequestMsgSize = commonrpc.DefaultMaxMsgSize // previous version used this default
+				builder.rpcConf.BackendConfig.CollectionConfig.MaxResponseMsgSize = builder.rpcConf.DeprecatedMaxMsgSize
+
+				builder.rpcConf.BackendConfig.ExecutionConfig.MaxRequestMsgSize = commonrpc.DefaultMaxMsgSize // previous version used this default
+				builder.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize = builder.rpcConf.DeprecatedMaxMsgSize
+			}
+
+			return nil
+		}).
 		Module("collection node client", func(node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(builder.rpcConf.CollectionAddr) == "" {
@@ -1684,9 +1759,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			collectionRPCConn, err := grpc.Dial(
 				builder.rpcConf.CollectionAddr,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallSendMsgSize(int(builder.rpcConf.BackendConfig.CollectionConfig.MaxRequestMsgSize)),
+					grpc.MaxCallRecvMsgSize(int(builder.rpcConf.BackendConfig.CollectionConfig.MaxResponseMsgSize)),
+				),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				rpcConnection.WithClientTimeoutOption(builder.rpcConf.BackendConfig.CollectionClientTimeout))
+				rpcConnection.WithClientTimeoutOption(builder.rpcConf.BackendConfig.CollectionConfig.Timeout))
 			if err != nil {
 				return err
 			}
@@ -1701,9 +1779,24 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				}
 				node.Logger.Info().Str("access_nodes", addr).Msg("historical access node addresses")
 
+				// maintain backwards compatibility with the deprecated flag
+				// TODO: remove this once the deprecated flag is removed
+				var callOpts []grpc.CallOption
+				if builder.rpcConf.DeprecatedMaxMsgSize == 0 {
+					callOpts = append(callOpts,
+						grpc.MaxCallSendMsgSize(int(builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize)),
+						grpc.MaxCallRecvMsgSize(int(builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize)),
+					)
+				} else {
+					// only receive limit was enforced in previous versions. send used default (4mb)
+					callOpts = append(callOpts,
+						grpc.MaxCallRecvMsgSize(int(builder.rpcConf.DeprecatedMaxMsgSize)),
+					)
+				}
+
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
-					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+					grpc.WithDefaultCallOptions(callOpts...),
 					grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
 					return err
@@ -1789,7 +1882,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(
 				node.Logger,
 				builder.rpcConf.SecureGRPCListenAddr,
-				builder.rpcConf.MaxMsgSize,
+				builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+				builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
@@ -1798,6 +1892,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.stateStreamGrpcServer = grpcserver.NewGrpcServerBuilder(
 				node.Logger,
 				builder.stateStreamConf.ListenAddr,
+				builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
 				builder.stateStreamConf.MaxExecutionDataMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
@@ -1807,7 +1902,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
 				builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
 					builder.rpcConf.UnsecureGRPCListenAddr,
-					builder.rpcConf.MaxMsgSize,
+					builder.rpcConf.BackendConfig.AccessConfig.MaxRequestMsgSize,
+					builder.rpcConf.BackendConfig.AccessConfig.MaxResponseMsgSize,
 					builder.rpcMetricsEnabled,
 					builder.apiRatelimits,
 					builder.apiBurstlimits).Build()
@@ -1826,8 +1922,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
-			builder.events = store.NewEvents(node.Metrics.Cache, dbStore)
+			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1863,8 +1958,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				dbStore := cmd.GetStorageMultiDBStoreIfNeeded(node)
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, dbStore, bstorage.DefaultCacheSize)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			}
 
 			return nil
@@ -1935,17 +2029,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 
 			connFactory := &rpcConnection.ConnectionFactoryImpl{
-				CollectionGRPCPort:        builder.collectionGRPCPort,
-				ExecutionGRPCPort:         builder.executionGRPCPort,
-				CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
-				ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
-				AccessMetrics:             accessMetrics,
-				Log:                       node.Logger,
+				AccessConfig:     backendConfig.AccessConfig,
+				CollectionConfig: backendConfig.CollectionConfig,
+				ExecutionConfig:  backendConfig.ExecutionConfig,
+				AccessMetrics:    accessMetrics,
+				Log:              node.Logger,
 				Manager: rpcConnection.NewManager(
 					node.Logger,
 					accessMetrics,
 					connBackendCache,
-					config.MaxMsgSize,
 					backendConfig.CircuitBreakerConfig,
 					config.CompressorName,
 				),
@@ -1969,7 +2061,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// handles block-related operations.
 			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
-				builder.FinalizedRootBlock.Height,
+				builder.SealedRootBlock.Height,
 				node.Storage.Headers,
 				broadcaster,
 			)
@@ -2064,6 +2156,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				VersionControl:             notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
+				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
+				ScheduledCallbacksEnabled:  builder.scheduledCallbacksEnabled,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2135,6 +2229,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.collections),
 				notNil(builder.transactions),
 				lastFullBlockHeight,
+				node.StorageLockMgr,
 			)
 			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
 

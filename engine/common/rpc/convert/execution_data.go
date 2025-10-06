@@ -306,7 +306,7 @@ func messageToTrustedTransaction(
 		if err != nil {
 			return t, fmt.Errorf("could not convert payload signature address: %w", err)
 		}
-		tb.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddPayloadSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
@@ -314,7 +314,7 @@ func messageToTrustedTransaction(
 		if err != nil {
 			return t, fmt.Errorf("could not convert envelope signature address: %w", err)
 		}
-		tb.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
+		tb.AddEnvelopeSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}
 
 	transactionBody, err := tb.SetScript(m.GetScript()).

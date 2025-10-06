@@ -242,3 +242,13 @@ func (h *headerStore) Store(proposal *flow.ProposalHeader) error {
 func (h *headerStore) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
 	return nil, nil
 }
+
+func (h *headerStore) ByView(view uint64) (*flow.Header, error) {
+	// Find header with matching view
+	for _, header := range h.byID {
+		if header.View == view {
+			return header, nil
+		}
+	}
+	return nil, fmt.Errorf("no header found for view %d", view)
+}

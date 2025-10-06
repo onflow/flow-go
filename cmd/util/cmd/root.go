@@ -21,6 +21,7 @@ import (
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
+	"github.com/onflow/flow-go/cmd/util/cmd/diffkeys"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
@@ -43,7 +44,6 @@ import (
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
-	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	verify_evm_offchain_replay "github.com/onflow/flow-go/cmd/util/cmd/verify-evm-offchain-replay"
 	verify_execution_result "github.com/onflow/flow-go/cmd/util/cmd/verify_execution_result"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
@@ -105,7 +105,6 @@ func addCommands() {
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
 	rootCmd.AddCommand(checkpoint_trie_stats.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
-	rootCmd.AddCommand(truncate_database.Cmd)
 	rootCmd.AddCommand(read_badger.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
@@ -136,6 +135,7 @@ func addCommands() {
 	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
 	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 	rootCmd.AddCommand(db_migration.Cmd)
+	rootCmd.AddCommand(diffkeys.Cmd)
 }
 
 func initConfig() {

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,16 +27,19 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	protocolutil "github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/procedure"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type MutatorSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+	db          storage.DB
+	dbdir       string
+	lockManager lockctx.Manager
 
 	genesis      *model.Block
 	chainID      flow.ChainID
@@ -59,13 +62,15 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.chainID = suite.genesis.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.db = pebbleimpl.ToDB(pdb)
+	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := storage.InitAll(metrics, suite.db)
-	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db)
+	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
@@ -97,12 +102,13 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -110,7 +116,9 @@ func (suite *MutatorSuite) SetupTest() {
 		rootSnapshot,
 	)
 	require.NoError(suite.T(), err)
-	suite.protoState, err = pbadger.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(
+		log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer(),
+	)
 	require.NoError(suite.T(), err)
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
@@ -120,15 +128,15 @@ func (suite *MutatorSuite) SetupTest() {
 		state.Params(),
 		all.Headers,
 		all.Results,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 	)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
-	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
 }
 
@@ -190,18 +198,18 @@ func (suite *MutatorSuite) Proposal() model.Proposal {
 }
 
 func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
-	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlock flow.Header
-		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
-		if err != nil {
-			return err
-		}
-		err = procedure.FinalizeClusterBlock(block.ID())(tx)
-		if err != nil {
-			return err
-		}
-		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
-		return err
+	var refBlock flow.Header
+	err := operation.RetrieveHeader(suite.db.Reader(), block.Payload.ReferenceBlockID, &refBlock)
+	suite.Require().Nil(err)
+
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			if err != nil {
+				return err
+			}
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+		})
 	})
 	suite.Assert().NoError(err)
 }
@@ -241,41 +249,48 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	suite.Assert().Error(err)
 }
 
+// TestBootstrap_Successful verifies that basic information is successfully persisted during bootstrapping.
+//  1. The collector's root block was inserted and indexed. Specifically:
+//     - The collection contained in the root block can be retrieved by its ID.
+//     - The transactions contained in the root block's collection can be looked up by the root block's ID.
+//     - The root block's header can be retrieved by its ID.
+//     (The payload, i.e. the collection, we already retrieved above.)
+//     - The root block can be looked up by its height.
+//     - The latest finalized cluster block height should be the height of the root block.
 func (suite *MutatorSuite) TestBootstrap_Successful() {
-	err := suite.db.View(func(tx *badger.Txn) error {
-
-		// should insert collection
+	err := (func(r storage.Reader) error {
+		// Bootstrapping should have inserted the collection contained in the root block
 		collection := new(flow.LightCollection)
-		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), collection)(tx)
+		err := operation.RetrieveCollection(r, suite.genesis.Payload.Collection.ID(), collection)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
-		// should index collection
-		collection = new(flow.LightCollection) // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
+		// Bootstrapping should have indexed the transactions contained in the collector's root block.
+		var txIDs []flow.Identifier // reset the collection
+		err = operation.LookupCollectionPayload(r, suite.genesis.ID(), &txIDs)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
-		// should insert header
+		// Bootstrapping should have inserted the collector's root block header
 		var header flow.Header
-		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
+		err = operation.RetrieveHeader(r, suite.genesis.ID(), &header)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ToHeader().ID(), header.ID())
 
-		// should insert block height -> ID lookup
+		// Bootstrapping should have indexed the root block's by the root block's height.
 		var blockID flow.Identifier
-		err = operation.LookupClusterBlockHeight(suite.genesis.ChainID, suite.genesis.Height, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(r, suite.genesis.ChainID, suite.genesis.Height, &blockID)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
-		// should insert boundary
-		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.ChainID, &boundary)(tx)
+		// As the latest finalized cluster block height, bootstrapping should have indexed the root block.
+		var latestFinalizedClusterBlockHeight uint64
+		err = operation.RetrieveClusterFinalizedHeight(r, suite.genesis.ChainID, &latestFinalizedClusterBlockHeight)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Height, boundary)
+		suite.Assert().Equal(suite.genesis.Height, latestFinalizedClusterBlockHeight)
 
 		return nil
-	})
+	})(suite.db.Reader())
 	suite.Assert().Nil(err)
 }
 
@@ -366,14 +381,15 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	suite.Assert().Nil(err)
 
 	// should be able to retrieve the block
+	r := suite.db.Reader()
 	var extended model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(proposal.Block.ID(), &extended))
+	err = procedure.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
 	suite.Assert().Nil(err)
 	suite.Assert().Equal(proposal.Block.Payload, extended.Payload)
 
 	// the block should be indexed by its parent
 	var childIDs flow.IdentifierList
-	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
+	err = operation.RetrieveBlockChildren(r, suite.genesis.ID(), &childIDs)
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)
 	suite.Assert().Equal(proposal.Block.ID(), childIDs[0])
@@ -592,7 +608,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := *head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
+			err = procedure.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)

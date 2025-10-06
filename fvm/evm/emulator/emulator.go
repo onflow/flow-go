@@ -542,7 +542,6 @@ func (proc *procedure) deployAt(
 	// run code through interpreter
 	// this would check for errors and computes the final bytes to be stored under account
 	var err error
-	inter := gethVM.NewEVMInterpreter(proc.evm)
 	contract := gethVM.NewContract(
 		callerCommon,
 		addr,
@@ -555,7 +554,7 @@ func (proc *procedure) deployAt(
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
-	ret, err := inter.Run(contract, nil, false)
+	ret, err := proc.evm.Run(contract, nil, false)
 	gasCost := uint64(len(ret)) * gethParams.CreateDataGas
 	res.GasConsumed = gasCost
 
@@ -676,7 +675,7 @@ func (proc *procedure) run(
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
-		res.GasRefund = proc.state.GetRefund()
+		res.MaxGasConsumed = execResult.MaxUsedGas
 		res.Index = uint16(txIndex)
 		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
 		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()

@@ -3,43 +3,62 @@ package read
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/procedure"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestReadClusterRange(t *testing.T) {
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		chain := unittest.ClusterBlockFixtures(5)
 		parent, blocks := chain[0], chain[1:]
 
-		// add parent as boundary
-		err := db.Update(operation.IndexClusterBlockHeight(parent.ChainID, parent.Height, parent.ID()))
-		require.NoError(t, err)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			// add parent as boundary
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexClusterBlockHeight(lctx, rw, parent.ChainID, parent.Height, parent.ID())
+			})
+			if err != nil {
+				return err
+			}
 
-		err = db.Update(operation.InsertClusterFinalizedHeight(parent.ChainID, parent.Height))
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.BootstrapClusterFinalizedHeight(lctx, rw, parent.ChainID, parent.Height)
+			})
+		})
 		require.NoError(t, err)
 
 		// add blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(block)))
-			require.NoError(t, err)
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+				})
+				if err != nil {
+					return err
+				}
 
-			err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+				})
+			})
 			require.NoError(t, err)
 		}
 
-		clusterBlocks := badgerstorage.NewClusterBlocks(
+		clusterBlocks := store.NewClusterBlocks(
 			db,
 			blocks[0].ChainID,
-			badgerstorage.NewHeaders(metrics.NewNoopCollector(), db),
-			badgerstorage.NewClusterPayloads(metrics.NewNoopCollector(), db),
+			store.NewHeaders(metrics.NewNoopCollector(), db),
+			store.NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 
 		startHeight := blocks[0].Height

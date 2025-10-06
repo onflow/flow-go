@@ -117,6 +117,7 @@ func (s *BackendScriptsSuite) defaultBackend(executor execution.ScriptExecutor, 
 			flow.IdentifierList{},
 		),
 		loggedScripts,
+		commonrpc.DefaultAccessMaxRequestSize,
 	)
 	require.NoError(s.T(), err)
 
@@ -424,6 +425,39 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 
 		actual, err := scripts.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
 		s.Require().Error(err)
+		s.Require().Nil(actual)
+	})
+}
+
+// TestExecuteScript_ExceedsMaxSize tests that when a script exceeds the max size, it returns an error
+func (s *BackendScriptsSuite) TestExecuteScript_ExceedsMaxSize() {
+	ctx := context.Background()
+
+	script := unittest.RandomBytes(commonrpc.DefaultAccessMaxRequestSize + 1)
+
+	// configure local script executor which will never be called
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	scripts := s.defaultBackend(scriptExecutor, query_mode.IndexQueryModeLocalOnly)
+
+	s.Run("ExecuteScriptAtLatestBlock", func() {
+		actual, err := scripts.ExecuteScriptAtLatestBlock(ctx, script, s.arguments)
+		s.Require().Error(err)
+		s.Require().Equal(codes.InvalidArgument, status.Code(err), "error code mismatch: expected %d, got %d: %s", codes.InvalidArgument, status.Code(err), err)
+		s.Require().Nil(actual)
+	})
+
+	s.Run("ExecuteScriptAtBlockID", func() {
+		actual, err := scripts.ExecuteScriptAtBlockID(ctx, s.block.ID(), script, s.arguments)
+		s.Require().Error(err)
+		s.Require().Equal(codes.InvalidArgument, status.Code(err), "error code mismatch: expected %d, got %d: %s", codes.InvalidArgument, status.Code(err), err)
+		s.Require().Nil(actual)
+	})
+
+	s.Run("ExecuteScriptAtBlockHeight", func() {
+		actual, err := scripts.ExecuteScriptAtBlockHeight(ctx, s.block.Height, script, s.arguments)
+		s.Require().Error(err)
+		s.Require().Equal(codes.InvalidArgument, status.Code(err), "error code mismatch: expected %d, got %d: %s", codes.InvalidArgument, status.Code(err), err)
 		s.Require().Nil(actual)
 	})
 }

@@ -2,6 +2,7 @@ package validator_test
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -206,5 +208,102 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeight
 
 	err = validator.Validate(context.Background(), &txBody)
 	assert.NoError(s.T(), err)
+}
 
+func (s *TransactionValidatorSuite) TestTransactionValidator_SignatureValidation() {
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	// setting indexed height to be behind of sealed by bigger number than allowed(DefaultSealedIndexedHeightThreshold)
+	indexedHeight := s.header.Height - 40
+
+	s.blocks.
+		On("IndexedHeight").
+		Return(indexedHeight, nil)
+
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), validator)
+
+	// valid format signature
+	ecdsaSignatureFixtureStr := "0f9c37c155fbb656d2049a8349a0fcd2dedfe27d1588c2f635f60df2052141c17f2e195790c55ce42c4f73b5cc7e194060fee641818e8d640e69f92d4777518d"
+	ecdsaSignatureFixture, err := hex.DecodeString(ecdsaSignatureFixtureStr)
+	require.NoError(s.T(), err)
+
+	address := unittest.AddressFixture()
+	transactionBody := flow.TransactionBody{
+		Script: []byte("some script"),
+		Arguments: [][]byte{
+			[]byte("arg1"),
+		},
+		ReferenceBlockID: flow.HashToID([]byte("some block id")),
+		GasLimit:         1000,
+		Payer:            address,
+		ProposalKey: flow.ProposalKey{
+			Address:        address,
+			KeyIndex:       0,
+			SequenceNumber: 0,
+		},
+		Authorizers: []flow.Address{
+			address,
+		},
+		PayloadSignatures: []flow.TransactionSignature{
+			{
+				Address:       address,
+				KeyIndex:      0,
+				Signature:     ecdsaSignatureFixture,
+				SignerIndex:   0,
+				ExtensionData: unittest.RandomBytes(3),
+			},
+		},
+		EnvelopeSignatures: []flow.TransactionSignature{
+			{
+				Address:       address,
+				KeyIndex:      1,
+				Signature:     ecdsaSignatureFixture,
+				SignerIndex:   0,
+				ExtensionData: unittest.RandomBytes(3),
+			},
+		},
+	}
+
+	// detailed cases of signature validation are tested in model/flow/transaction_test.go
+	cases := []struct {
+		payloadSigExtensionData  []byte
+		EnvelopeSigExtensionData []byte
+		shouldError              bool
+	}{
+		{
+			// happy path
+			payloadSigExtensionData:  nil,
+			EnvelopeSigExtensionData: nil,
+			shouldError:              false,
+		},
+		{
+			// invalid payload transaction
+			payloadSigExtensionData:  []byte{10},
+			EnvelopeSigExtensionData: nil,
+			shouldError:              true,
+		}, {
+			// invalid envelope transaction
+			payloadSigExtensionData:  nil,
+			EnvelopeSigExtensionData: []byte{10},
+			shouldError:              true,
+		}, {
+			// invalid envelope and payload transactions
+			payloadSigExtensionData:  []byte{10},
+			EnvelopeSigExtensionData: []byte{10},
+			shouldError:              true,
+		},
+	}
+	// test all cases
+	for _, c := range cases {
+		transactionBody.PayloadSignatures[0].ExtensionData = c.payloadSigExtensionData
+		transactionBody.EnvelopeSignatures[0].ExtensionData = c.EnvelopeSigExtensionData
+		err = validator.Validate(context.Background(), &transactionBody)
+		if c.shouldError {
+			assert.Error(s.T(), err)
+		} else {
+			assert.NoError(s.T(), err)
+		}
+	}
 }

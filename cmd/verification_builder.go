@@ -38,7 +38,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -55,8 +54,8 @@ type VerificationConfig struct {
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
-	stopAtHeight             uint64 // height to stop the node on
-	scheduleCallbacksEnabled bool   // enable execution of scheduled callbacks
+	stopAtHeight              uint64 // height to stop the node on
+	scheduledCallbacksEnabled bool   // enable execution of scheduled callbacks
 }
 
 type VerificationNodeBuilder struct {
@@ -84,7 +83,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
-			flags.BoolVar(&v.verConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", false, "enable execution of scheduled callbacks")
+			flags.BoolVar(&v.verConf.scheduledCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledCallbacksEnabled, "enable execution of scheduled callbacks")
 		})
 }
 
@@ -170,20 +169,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var ok bool
 			var err error
 
-			if dbops.IsBadgerTransaction(v.DBOps) {
-				return fmt.Errorf("badger transaction is not supported for chunks queue")
-			} else if dbops.IsBatchUpdate(node.DBOps) {
-				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
-				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
-				if err != nil {
-					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
-				}
-
-				chunkQueue = queue
-				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
-			} else {
-				return fmt.Errorf(dbops.UsageErrMsg, v.DBOps)
+			queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
+			ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
+			if err != nil {
+				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 			}
+
+			chunkQueue = queue
+			node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
 
 			node.Logger.Info().
 				Str("component", "node-builder").
@@ -218,21 +211,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				computation.DefaultFVMOptions(
 					node.RootChainID,
 					false,
-					v.verConf.scheduleCallbacksEnabled,
+					v.verConf.scheduledCallbacksEnabled,
 				)...,
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 
-			var approvalStorage storage.ResultApprovals
-			if dbops.IsBadgerTransaction(v.DBOps) {
-				return nil, fmt.Errorf("badger transaction is not supported for approval storage")
-			} else if dbops.IsBatchUpdate(v.DBOps) {
-				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
-			} else {
-				return nil, fmt.Errorf("invalid db opts type: %v", v.DBOps)
-			}
+			approvalStorage := store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB, node.StorageLockMgr)
 
 			verifierEng, err = verifier.New(
 				node.Logger,
@@ -366,7 +352,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			final := finalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, followerState, node.Tracer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

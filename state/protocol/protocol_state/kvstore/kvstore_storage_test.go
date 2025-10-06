@@ -5,13 +5,13 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -37,16 +37,14 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 		kvState.On("VersionedEncode").Return(expectedVersion, encData, nil).Once()
 
-		deferredUpdate := storagemock.NewDeferredDBUpdate(t)
-		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		llStorage.On("StoreTx", kvStateID, versionedSnapshot).Return(deferredUpdate.Execute).Once()
+		rw := storagemock.NewReaderBatchWriter(t)
+		llStorage.On("BatchStore", rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
-		// Calling `StoreTx` should return the output of the wrapped low-level storage, which is a deferred database
+		// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
 		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
 		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
 		// and verify that the deferred database operation returned by the lower-level is actually reached.
-		dbUpdate := store.StoreTx(kvStateID, kvState)
-		err := dbUpdate(&transaction.Tx{})
+		err := store.BatchStore(rw, kvStateID, kvState)
 		require.NoError(t, err)
 	})
 
@@ -54,10 +52,11 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 	// a deferred database update that always returns the encoding error.
 	t.Run("encoding fails", func(t *testing.T) {
 		encodingError := errors.New("encoding error")
+
 		kvState.On("VersionedEncode").Return(uint64(0), nil, encodingError).Once()
 
-		dbUpdate := store.StoreTx(kvStateID, kvState)
-		err := dbUpdate(&transaction.Tx{})
+		rw := storagemock.NewReaderBatchWriter(t)
+		err := store.BatchStore(rw, kvStateID, kvState)
 		require.ErrorIs(t, err, encodingError)
 	})
 }
@@ -73,30 +72,35 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 
 	// should be called to persist the version-encoded snapshot.
 	t.Run("happy path", func(t *testing.T) {
-		deferredUpdate := storagemock.NewDeferredDBUpdate(t)
-		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		llStorage.On("IndexTx", blockID, stateID).Return(deferredUpdate.Execute).Once()
+		lockManager := storage.NewTestingLockManager()
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			rw := storagemock.NewReaderBatchWriter(t)
+			llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(nil).Once()
 
-		// Calling `IndexTx` should return the output of the wrapped low-level storage, which is a deferred database
-		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
-		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
-		// and verify that the deferred database operation returned by the lower-level is actually reached.
-		dbUpdate := store.IndexTx(blockID, stateID)
-		err := dbUpdate(&transaction.Tx{})
+			// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
+			// Calling `BatchIndex` should return the output of the wrapped low-level storage, which is a deferred database
+			// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
+			// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
+			// and verify that the deferred database operation returned by the lower-level is actually reached.
+			return store.BatchIndex(lctx, rw, blockID, stateID)
+		})
 		require.NoError(t, err)
 	})
 
 	// On the unhappy path, the deferred database update from the lower level just errors upon execution.
 	// This error should be escalated.
 	t.Run("unhappy path", func(t *testing.T) {
-		indexingError := errors.New("indexing error")
-		deferredUpdate := storagemock.NewDeferredDBUpdate(t)
-		deferredUpdate.On("Execute", mock.Anything).Return(indexingError).Once()
-		llStorage.On("IndexTx", blockID, stateID).Return(deferredUpdate.Execute).Once()
+		lockManager := storage.NewTestingLockManager()
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			indexingError := errors.New("indexing error")
+			rw := storagemock.NewReaderBatchWriter(t)
+			llStorage.On("BatchIndex", lctx, rw, blockID, stateID).Return(indexingError).Once()
 
-		dbUpdate := store.IndexTx(blockID, stateID)
-		err := dbUpdate(&transaction.Tx{})
-		require.ErrorIs(t, err, indexingError)
+			err := store.BatchIndex(lctx, rw, blockID, stateID)
+			require.ErrorIs(t, err, indexingError)
+			return nil
+		})
+		require.NoError(t, err)
 	})
 }
 

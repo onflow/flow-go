@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.25"
   BIGQUERY_DATASET: dev_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
   BIGQUERY_TABLE2: test_results

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +20,6 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
@@ -30,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -80,7 +79,7 @@ type RestAPITestSuite struct {
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.sealedSnaphost = new(protocol.Snapshot)
@@ -137,7 +136,9 @@ func (suite *RestAPITestSuite) SetupTest() {
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
 		RestConfig: rest.Config{
-			ListenAddress: unittest.DefaultAddress,
+			ListenAddress:   unittest.DefaultAddress,
+			MaxRequestSize:  commonrpc.DefaultAccessMaxRequestSize,
+			MaxResponseSize: commonrpc.DefaultAccessMaxResponseSize,
 		},
 		WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 	}
@@ -152,7 +153,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 
 	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil,
@@ -160,7 +162,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil).Build()
@@ -434,7 +437,7 @@ func (suite *RestAPITestSuite) TestRequestSizeRestriction() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// make a request of size larger than the max permitted size
-	requestBytes := make([]byte, common.DefaultMaxRequestSize+1)
+	requestBytes := make([]byte, commonrpc.DefaultAccessMaxRequestSize+1)
 	script := restclient.ScriptsBody{
 		Script: string(requestBytes),
 	}

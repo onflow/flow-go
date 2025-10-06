@@ -16,10 +16,11 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/follower/database"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 
 	"github.com/dapperlabs/testingdock"
-	badgerv2 "github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -52,11 +53,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/locks"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -77,8 +76,6 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
-	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
-	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -670,14 +667,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	return flowNetwork
 }
 
-func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
+func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, _ []ContainerConfig) {
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
-	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
 
-	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
+	pebbleDB, _, err := database.InitPebbleDB(net.log, dataDir)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
@@ -690,25 +686,16 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
-	dbOpts := badgerv2.
-		DefaultOptions(dataDir).
-		WithKeepL0InMemory(true).
-		WithValueLogFileSize(128 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-	badgerDB, err := badgerstorage.InitPublic(dbOpts)
-	require.NoError(t, err)
+	lockManager := storage.NewTestingLockManager()
 
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
+	protocolDB := pebbleimpl.ToDB(pebbleDB)
 	opts := append(
 		followerConf.Opts,
-		consensus_follower.WithDB(badgerDB),
-		// this is required, otherwise consensus follower will create a pebble db at the default
-		// path /data/protocol-pebble, which is outside of the tmpdir, and will run into permission
-		// denied error.
-		consensus_follower.WithPebbleDB(pebbleDB),
+		consensus_follower.WithProtocolDB(protocolDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 		// each consenesus follower will have a different lock manager singleton
-		consensus_follower.WithLockManager(locks.NewTestingLockManager()),
+		consensus_follower.WithLockManager(lockManager),
 	)
 
 	stakedANContainer := net.ContainerByID(followerConf.StakedNodeID)
@@ -1321,7 +1308,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
 
-	err = badger.IsValidRootSnapshotQCs(snapshot)
+	err = datastore.IsValidRootSnapshotQCs(snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("invalid root snapshot qcs: %w", err)
 	}

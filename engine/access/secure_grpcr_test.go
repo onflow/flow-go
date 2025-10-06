@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -70,7 +70,7 @@ type SecureGRPCTestSuite struct {
 }
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -127,7 +127,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 
 	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil,
@@ -135,7 +136,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil).Build()

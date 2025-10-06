@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,11 +20,12 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	realproto "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storerr "github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
-	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -66,19 +67,19 @@ type BuilderSuite struct {
 
 	// real dependencies
 	dir      string
-	db       *badger.DB
+	db       storage.DB
 	sentinel uint64
 	setter   func(*flow.HeaderBodyBuilder) error
 	sign     func(*flow.Header) ([]byte, error)
 
 	// mocked dependencies
 	state        *protocol.ParticipantState
-	headerDB     *storage.Headers
-	sealDB       *storage.Seals
-	indexDB      *storage.Index
-	blockDB      *storage.Blocks
-	resultDB     *storage.ExecutionResults
-	receiptsDB   *storage.ExecutionReceipts
+	headerDB     *storagemock.Headers
+	sealDB       *storagemock.Seals
+	indexDB      *storagemock.Index
+	blockDB      *storagemock.Blocks
+	resultDB     *storagemock.ExecutionResults
+	receiptsDB   *storagemock.ExecutionReceipts
 	stateMutator *protocol.MutableProtocolState
 
 	guarPool *mempool.Mempool[flow.Identifier, *flow.CollectionGuarantee]
@@ -178,7 +179,6 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 // For the verifiers to start checking a result R, they need a source of randomness for the block _incorporating_
 // result R. The result for block [A3] is incorporated in [parent], which does _not_ have a child yet.
 func (bs *BuilderSuite) SetupTest() {
-
 	// set up no-op dependencies
 	noopMetrics := metrics.NewNoopCollector()
 	noopTracer := trace.NewNoopTracer()
@@ -248,20 +248,32 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.parentID = parent.ID()
 
 	// set up temporary database for tests
-	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
+	pdb, dir := unittest.TempPebbleDB(bs.T())
+	bs.db = pebbleimpl.ToDB(pdb)
+	bs.dir = dir
 
-	err := bs.db.Update(operation.InsertFinalizedHeight(final.Height))
-	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(final.Height, bs.finalID))
-	bs.Require().NoError(err)
+	lockManager := storage.NewTestingLockManager()
 
-	err = bs.db.Update(operation.InsertRootHeight(13))
-	bs.Require().NoError(err)
-
-	err = bs.db.Update(operation.InsertSealedHeight(first.Height))
-	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(first.Height, first.ID()))
-	bs.Require().NoError(err)
+	// insert finalized height and root height
+	db := bs.db
+	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockFinalizeBlock, storage.LockBootstrapping}, func(lctx lockctx.Context) error {
+		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			enc, err := datastore.NewVersionedInstanceParams(
+				datastore.DefaultInstanceParamsVersion,
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+			)
+			require.NoError(bs.T(), err)
+			require.NoError(bs.T(), operation.InsertInstanceParams(lctx, rw, *enc))
+			require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
+			require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
+			return nil
+		})
+	})
+	require.NoError(bs.T(), err)
 
 	bs.sentinel = 1337
 	bs.setter = func(h *flow.HeaderBodyBuilder) error {
@@ -299,10 +311,10 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.state.On("Params").Return(params)
 
 	// set up storage mocks for tests
-	bs.sealDB = &storage.Seals{}
+	bs.sealDB = &storagemock.Seals{}
 	bs.sealDB.On("HighestInFork", mock.Anything).Return(bs.lastSeal, nil)
 
-	bs.headerDB = &storage.Headers{}
+	bs.headerDB = &storagemock.Headers{}
 	bs.headerDB.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Header {
 			return bs.headers[blockID]
@@ -310,13 +322,13 @@ func (bs *BuilderSuite) SetupTest() {
 		func(blockID flow.Identifier) error {
 			_, exists := bs.headers[blockID]
 			if !exists {
-				return storerr.ErrNotFound
+				return storage.ErrNotFound
 			}
 			return nil
 		},
 	)
 
-	bs.indexDB = &storage.Index{}
+	bs.indexDB = &storagemock.Index{}
 	bs.indexDB.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Index {
 			return bs.index[blockID]
@@ -324,13 +336,13 @@ func (bs *BuilderSuite) SetupTest() {
 		func(blockID flow.Identifier) error {
 			_, exists := bs.index[blockID]
 			if !exists {
-				return storerr.ErrNotFound
+				return storage.ErrNotFound
 			}
 			return nil
 		},
 	)
 
-	bs.blockDB = &storage.Blocks{}
+	bs.blockDB = &storagemock.Blocks{}
 	bs.blockDB.On("ByID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Block {
 			return bs.blocks[blockID]
@@ -338,13 +350,13 @@ func (bs *BuilderSuite) SetupTest() {
 		func(blockID flow.Identifier) error {
 			_, exists := bs.blocks[blockID]
 			if !exists {
-				return storerr.ErrNotFound
+				return storage.ErrNotFound
 			}
 			return nil
 		},
 	)
 
-	bs.resultDB = &storage.ExecutionResults{}
+	bs.resultDB = &storagemock.ExecutionResults{}
 	bs.resultDB.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
 			return bs.resultByID[resultID]
@@ -352,13 +364,13 @@ func (bs *BuilderSuite) SetupTest() {
 		func(resultID flow.Identifier) error {
 			_, exists := bs.resultByID[resultID]
 			if !exists {
-				return storerr.ErrNotFound
+				return storage.ErrNotFound
 			}
 			return nil
 		},
 	)
 
-	bs.receiptsDB = &storage.ExecutionReceipts{}
+	bs.receiptsDB = &storagemock.ExecutionReceipts{}
 	bs.receiptsDB.On("ByID", mock.Anything).Return(
 		func(receiptID flow.Identifier) *flow.ExecutionReceipt {
 			return bs.receiptsByID[receiptID]
@@ -366,7 +378,7 @@ func (bs *BuilderSuite) SetupTest() {
 		func(receiptID flow.Identifier) error {
 			_, exists := bs.receiptsByID[receiptID]
 			if !exists {
-				return storerr.ErrNotFound
+				return storage.ErrNotFound
 			}
 			return nil
 		},
@@ -378,7 +390,7 @@ func (bs *BuilderSuite) SetupTest() {
 		func(blockID flow.Identifier) error {
 			_, exists := bs.receiptsByBlockID[blockID]
 			if !exists {
-				return storerr.ErrNotFound
+				return storage.ErrNotFound
 			}
 			return nil
 		},
@@ -432,7 +444,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// setup mock state mutator, we don't need a real once since we are using mocked participant state.
 	bs.stateMutator = protocol.NewMutableProtocolState(bs.T())
-	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), transaction.NewDeferredBlockPersist(), nil).Maybe()
+	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), nil).Maybe()
 
 	// initialize the builder
 	bs.build, err = NewBuilder(
@@ -706,7 +718,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	b1seal := storeSealForIncorporatedResult(resultB1, b4.ID(), bs.pendingSeals)
 
 	// mock for seals storage layer:
-	bs.sealDB = &storage.Seals{}
+	bs.sealDB = &storagemock.Seals{}
 	bs.build.seals = bs.sealDB
 
 	bs.T().Run("Build on top of B4 and check that no seals are included", func(t *testing.T) {
@@ -745,7 +757,7 @@ func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
 	//	Pretend that the first n blocks are already sealed
 	n := 4
 	lastSeal := bs.chain[n-1]
-	mockSealDB := &storage.Seals{}
+	mockSealDB := &storagemock.Seals{}
 	mockSealDB.On("HighestInFork", mock.Anything).Return(lastSeal, nil)
 	bs.build.seals = mockSealDB
 
@@ -878,7 +890,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	for _, b := range blocks {
 		bs.storeBlock(b)
 	}
-	bs.sealDB = &storage.Seals{}
+	bs.sealDB = &storagemock.Seals{}
 	bs.build.seals = bs.sealDB
 	bs.sealDB.On("HighestInFork", mock.Anything).Return(sealF, nil)
 	bs.resultByID[sealedResult.ID()] = &sealedResult
@@ -927,7 +939,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 	f2 := bs.blocks[bs.finalizedBlockIDs[2]]
 	f2eal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[f2.ID()]))
 	f4Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[bs.finalID]))
-	bs.sealDB = &storage.Seals{}
+	bs.sealDB = &storagemock.Seals{}
 	bs.build.seals = bs.sealDB
 
 	// reset receipts mempool to verify calls made by Builder
@@ -991,7 +1003,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 
 	// set last sealed blocks:
 	b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[b1.ID()]))
-	bs.sealDB = &storage.Seals{}
+	bs.sealDB = &storagemock.Seals{}
 	bs.sealDB.On("HighestInFork", b5.ID()).Return(b1Seal, nil)
 	bs.build.seals = bs.sealDB
 

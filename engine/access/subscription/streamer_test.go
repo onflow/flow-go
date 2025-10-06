@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/engine"
-	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,7 +29,7 @@ func TestStream(t *testing.T) {
 	ctx := context.Background()
 	timeout := subscription.DefaultSendTimeout
 
-	sub := streammock.NewStreamable(t)
+	sub := submock.NewStreamable(t)
 	sub.On("ID").Return(uuid.NewString())
 
 	tests := []testData{}
@@ -69,7 +69,7 @@ func TestStreamRatelimited(t *testing.T) {
 
 	for _, limit := range []float64{0.2, 3, 20, 500} {
 		t.Run(fmt.Sprintf("responses are limited - %.1f rps", limit), func(t *testing.T) {
-			sub := streammock.NewStreamable(t)
+			sub := submock.NewStreamable(t)
 			sub.On("ID").Return(uuid.NewString())
 
 			broadcaster := engine.NewBroadcaster()
@@ -120,7 +120,7 @@ func TestLongStreamRatelimited(t *testing.T) {
 	limit := 5.0
 	duration := 30 * time.Second
 
-	sub := streammock.NewStreamable(t)
+	sub := submock.NewStreamable(t)
 	sub.On("ID").Return(uuid.NewString())
 
 	broadcaster := engine.NewBroadcaster()

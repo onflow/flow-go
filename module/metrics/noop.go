@@ -181,6 +181,7 @@ func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ module.
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                              {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64)      {}
+func (nc *NoopCollector) ExecutionCallbacksExecuted(int, uint64, uint64)                        {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                                   {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                     {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                      {}
@@ -384,8 +385,8 @@ func (nc *NoopCollector) DuplicateMessagesCounts(count float64) {}
 
 var _ module.CollectionExecutedMetric = (*NoopCollector)(nil)
 
-func (nc *NoopCollector) CollectionFinalized(light flow.LightCollection) {}
-func (nc *NoopCollector) CollectionExecuted(light flow.LightCollection)  {}
+func (nc *NoopCollector) CollectionFinalized(light *flow.LightCollection) {}
+func (nc *NoopCollector) CollectionExecuted(light *flow.LightCollection)  {}
 func (nc *NoopCollector) ExecutionReceiptReceived(r *flow.ExecutionReceipt) {
 }
 

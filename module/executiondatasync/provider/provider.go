@@ -208,12 +208,50 @@ type ExecutionDataCIDProvider struct {
 	maxBlobSize int
 }
 
+// GenerateExecutionDataRoot generates the execution data root and its ID from the provided
+// block execution data.
+// This is a helper function useful for testing.
+//
+// No errors are expected during normal operation.
+func (p *ExecutionDataCIDProvider) GenerateExecutionDataRoot(
+	executionData *execution_data.BlockExecutionData,
+) (flow.Identifier, *flow.BlockExecutionDataRoot, error) {
+	chunkDataIDs := make([]cid.Cid, len(executionData.ChunkExecutionDatas))
+	for i, chunkExecutionData := range executionData.ChunkExecutionDatas {
+		cedID, err := p.addChunkExecutionData(chunkExecutionData, nil)
+		if err != nil {
+			return flow.ZeroID, nil, fmt.Errorf("failed to add chunk execution data at index %d: %w", i, err)
+		}
+		chunkDataIDs[i] = cedID
+	}
+
+	root := &flow.BlockExecutionDataRoot{
+		BlockID:               executionData.BlockID,
+		ChunkExecutionDataIDs: chunkDataIDs,
+	}
+
+	rootID, err := p.addExecutionDataRoot(root, nil)
+	if err != nil {
+		return flow.ZeroID, nil, fmt.Errorf("failed to add execution data root: %w", err)
+	}
+
+	return rootID, root, nil
+}
+
+// CalculateExecutionDataRootID calculates the execution data root ID from the provided
+// execution data root.
+//
+// No errors are expected during normal operation.
 func (p *ExecutionDataCIDProvider) CalculateExecutionDataRootID(
 	edRoot flow.BlockExecutionDataRoot,
 ) (flow.Identifier, error) {
 	return p.addExecutionDataRoot(&edRoot, nil)
 }
 
+// CalculateChunkExecutionDataID calculates the chunk execution data ID from the provided
+// chunk execution data.
+//
+// No errors are expected during normal operation.
 func (p *ExecutionDataCIDProvider) CalculateChunkExecutionDataID(
 	ced execution_data.ChunkExecutionData,
 ) (cid.Cid, error) {

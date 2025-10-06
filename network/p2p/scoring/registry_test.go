@@ -592,8 +592,12 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 
 	// initial score will be 0 subsequent calls to get app specific score
 	// should reward the peer with the scoring.MaxAppSpecificPenalty for not having any spam record, staking, or subscription penalties
-	score = reg.AppSpecificScoreFunc()(peerID)
-	require.Equal(t, 0.0, score)
+	require.Eventually(t, func() bool {
+		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
+		score := reg.AppSpecificScoreFunc()(peerID)
+		// since the peer id does no other penalties the score is eventually expected to be the max app specific reward
+		return score == cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward
+	}, 1*time.Second, 10*time.Millisecond)
 
 	// app specific score should not be effected by duplicate messages count
 	require.Never(t, func() bool {

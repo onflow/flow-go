@@ -14,10 +14,9 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	mocks "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -49,8 +48,8 @@ func (s *NodeDisallowListWrapperTestSuite) SetupTest() {
 }
 
 func TestNodeDisallowListWrapperWithBadgerTestSuite(t *testing.T) {
-	bdb, _ := unittest.TempBadgerDB(t)
-	suite.Run(t, newNodeDisallowListWrapperTestSuite(badgerimpl.ToDB(bdb)))
+	pdb, _ := unittest.TempPebbleDB(t)
+	suite.Run(t, newNodeDisallowListWrapperTestSuite(pebbleimpl.ToDB(pdb)))
 }
 
 func TestNodeDisallowListWrapperWithPebbleTestSuite(t *testing.T) {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -9,20 +10,19 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/engine/common/provider"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
+	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/utils/grpcutils"
-
-	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
-	"github.com/onflow/flow-go/engine/execution/rpc"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 // ExecutionConfig contains the configs for starting up execution nodes
@@ -59,7 +59,6 @@ type ExecutionConfig struct {
 	importCheckpointWorkerCount           int
 	transactionExecutionMetricsEnabled    bool
 	transactionExecutionMetricsBufferSize uint
-	executionDataDBMode                   string
 	scheduleCallbacksEnabled              bool
 
 	computationConfig        computation.ComputationConfig
@@ -85,7 +84,12 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	datadir := "/data"
 
 	flags.StringVarP(&exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
-	flags.UintVar(&exeConf.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
+	flags.UintVar(&exeConf.rpcConf.DeprecatedMaxMsgSize, "rpc-max-message-size", 0,
+		"[deprecated] the maximum message size in bytes for messages sent or received over grpc")
+	flags.UintVar(&exeConf.rpcConf.MaxRequestMsgSize, "rpc-max-request-message-size", commonrpc.DefaultExecutionMaxRequestSize,
+		"the maximum request message size in bytes for request messages received over grpc by the server")
+	flags.UintVar(&exeConf.rpcConf.MaxResponseMsgSize, "rpc-max-response-message-size", commonrpc.DefaultExecutionMaxResponseSize,
+		"the maximum message size in bytes for response messages sent over grpc by the server")
 	flags.BoolVar(&exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 	flags.StringVar(&exeConf.triedir, "triedir", filepath.Join(datadir, "trie"), "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(datadir, "execution_data"), "directory to use for storing Execution Data")
@@ -99,7 +103,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.computationConfig.MaxConcurrency, "computer-max-concurrency", 1, "set to greater than 1 to enable concurrent transaction execution")
 	flags.StringVar(&exeConf.chunkDataPackDir, "chunk-data-pack-dir", filepath.Join(datadir, "chunk_data_packs"), "directory to use for storing chunk data packs")
 	flags.StringVar(&exeConf.chunkDataPackCheckpointsDir, "chunk-data-pack-checkpoints-dir", filepath.Join(datadir, "chunk_data_packs_checkpoints_dir"), "directory to use storing chunk data packs pebble database checkpoints for querying while the node is running")
-	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
+	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", store.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", provider.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
@@ -131,15 +135,17 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.importCheckpointWorkerCount, "import-checkpoint-worker-count", 10, "number of workers to import checkpoint file during bootstrap")
 	flags.BoolVar(&exeConf.transactionExecutionMetricsEnabled, "tx-execution-metrics", true, "enable collection of transaction execution metrics")
 	flags.UintVar(&exeConf.transactionExecutionMetricsBufferSize, "tx-execution-metrics-buffer-size", 200, "buffer size for transaction execution metrics. The buffer size is the number of blocks that are kept in memory by the metrics provider engine")
-	flags.StringVar(&exeConf.executionDataDBMode,
+
+	var exeConfExecutionDataDBMode string
+	flags.StringVar(&exeConfExecutionDataDBMode,
 		"execution-data-db",
-		execution_data.ExecutionDataDBModeBadger.String(),
-		"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+		execution_data.ExecutionDataDBModePebble.String(),
+		"[deprecated] the DB type for execution datastore. it's been deprecated")
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
-	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", false, "enable execution of scheduled callbacks")
+	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledCallbacksEnabled, "enable execution of scheduled callbacks")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
 	var deprecatedEnableNewIngestionEngine bool
 	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
@@ -164,6 +170,12 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 				return fmt.Errorf("invalid node ID in execution-data-allowed-requesters %s: %w", id, err)
 			}
 		}
+	}
+	if exeConf.rpcConf.MaxRequestMsgSize == 0 {
+		return errors.New("rpc-max-request-message-size must be greater than 0")
+	}
+	if exeConf.rpcConf.MaxResponseMsgSize == 0 {
+		return errors.New("rpc-max-response-message-size must be greater than 0")
 	}
 	return nil
 }

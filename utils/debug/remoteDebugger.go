@@ -21,15 +21,23 @@ type RemoteDebugger struct {
 func NewRemoteDebugger(
 	chain flow.Chain,
 	logger zerolog.Logger,
+	options ...fvm.Option,
 ) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine()
 
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
+
 	ctx := fvm.NewContext(
-		fvm.WithLogger(logger),
-		fvm.WithChain(chain),
-		fvm.WithAuthorizationChecksEnabled(false),
+		append(
+			[]fvm.Option{
+				fvm.WithLogger(logger),
+				fvm.WithChain(chain),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithEVMEnabled(true),
+			},
+			options...,
+		)...,
 	)
 
 	return &RemoteDebugger{

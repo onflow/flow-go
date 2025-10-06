@@ -23,6 +23,7 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -120,10 +121,11 @@ func InvalidFormatSignature() flow.TransactionSignature {
 func TransactionSignatureFixture() flow.TransactionSignature {
 	sigLen := crypto.SignatureLenECDSAP256
 	s := flow.TransactionSignature{
-		Address:     AddressFixture(),
-		SignerIndex: 0,
-		Signature:   SeedFixture(sigLen),
-		KeyIndex:    1,
+		Address:       AddressFixture(),
+		SignerIndex:   0,
+		Signature:     SeedFixture(sigLen),
+		KeyIndex:      1,
+		ExtensionData: []byte{},
 	}
 	// make sure the ECDSA signature passes the format check
 	s.Signature[sigLen/2] = 0
@@ -244,8 +246,30 @@ func ProposalFixture() *flow.Proposal {
 	return ProposalFromBlock(BlockFixture())
 }
 
+func BlockResponseFixture(count int) *flow.BlockResponse {
+	blocks := make([]flow.Proposal, count)
+	for i := 0; i < count; i++ {
+		blocks[i] = *ProposalFixture()
+	}
+	return &flow.BlockResponse{
+		Nonce:  rand.Uint64(),
+		Blocks: blocks,
+	}
+}
+
 func ClusterProposalFixture() *cluster.Proposal {
 	return ClusterProposalFromBlock(ClusterBlockFixture())
+}
+
+func ClusterBlockResponseFixture(count int) *cluster.BlockResponse {
+	blocks := make([]cluster.Proposal, count)
+	for i := 0; i < count; i++ {
+		blocks[i] = *ClusterProposalFixture()
+	}
+	return &cluster.BlockResponse{
+		Nonce:  rand.Uint64(),
+		Blocks: blocks,
+	}
 }
 
 func ProposalHeaderFromHeader(header *flow.Header) *flow.ProposalHeader {
@@ -384,11 +408,107 @@ func BlockWithParentAndPayload(parent *flow.Header, payload flow.Payload) *flow.
 	}
 }
 
+// BlockWithParentAndUniqueView creates a child block of the given parent.
+// We provide a set of views that are _not_ allowed to be used for the new block. A typical usage
+// scenario is to create blocks of different forks, without accidentally creating two blocks with
+// the same view.
+// CAUTION:
+//   - modifies the set `forbiddenViews` by adding the view of the newly created block.
+//   - To generate the child's view, we randomly select a small increment and add it to the
+//     parent's view. If the set of views covers all possible increments, this function will panic
+func BlockWithParentAndUniqueView(parent *flow.Header, forbiddenViews map[uint64]struct{}) *flow.Block {
+	var block *flow.Block
+	counter := 0
+	for {
+		block = BlockWithParentFixture(parent)
+		if _, hasForbiddenView := forbiddenViews[block.View]; !hasForbiddenView {
+			break
+		}
+		counter += 1
+		if counter > 20 {
+			panic(fmt.Sprintf("BlockWithParentAndUniqueView failed to generate child despite %d attempts", counter))
+		}
+	}
+	// block has a view that is not forbidden:
+	forbiddenViews[block.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
+	return block
+}
+
+// BlockWithParentAndPayloadAndUniqueView creates a child block of the given parent, where the block
+// to be constructed will contain the iven payload.
+// We provide a set of views that are _not_ allowed to be used for the new block. A typical usage
+// scenario is to create blocks of different forks, without accidentally creating two blocks with
+// the same view.
+// CAUTION:
+//   - modifies the set `forbiddenViews` by adding the view of the newly created block.
+//   - To generate the child's view, we randomly select a small increment and add it to the
+//     parent's view. If the set of views covers all possible increments, this function will panic
+func BlockWithParentAndPayloadAndUniqueView(parent *flow.Header, payload flow.Payload, forbiddenViews map[uint64]struct{}) *flow.Block {
+	var block *flow.Block
+	counter := 0
+	for {
+		block = BlockWithParentAndPayload(parent, payload)
+		if _, hasForbiddenView := forbiddenViews[block.View]; !hasForbiddenView {
+			break
+		}
+		counter += 1
+		if counter > 20 {
+			panic(fmt.Sprintf("BlockWithParentAndUniqueView failed to generate child despite %d attempts", counter))
+		}
+	}
+	// block has a view that is not forbidden:
+	forbiddenViews[block.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
+	return block
+}
+
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	return &flow.Block{
 		HeaderBody: HeaderBodyWithParentFixture(parent.ToHeader()),
 		Payload:    PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID)),
 	}
+}
+
+// BlockWithParentProtocolStateAndUniqueView creates a child block of the given parent, such that
+// the child's protocol state is the same as the parent's.
+// We provide a set of views that are _not_ allowed to be used for the new block. A typical usage
+// scenario is to create blocks of different forks, without accidentally creating two blocks with
+// the same view.
+// CAUTION:
+//   - modifies the set `forbiddenViews` by adding the view of the newly created block.
+//   - To generate the child's view, we randomly select a small increment and add it to the
+//     parent's view. If the set of views covers all possible increments, this function will panic
+func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, forbiddenViews map[uint64]struct{}) *flow.Block {
+	var block *flow.Block
+	counter := 0
+	for {
+		block = BlockWithParentProtocolState(parent)
+		if _, hasForbiddenView := forbiddenViews[block.View]; !hasForbiddenView {
+			break
+		}
+		counter += 1
+		if counter > 20 {
+			panic(fmt.Sprintf("BlockWithParentProtocolStateAndUniqueView failed to generate child despite %d attempts", counter))
+		}
+	}
+	// block has a view that is not forbidden:
+	forbiddenViews[block.View] = struct{}{} // add the block's view to `forbiddenViews` to prevent future re-usage
+	return block
+}
+
+func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
+	return &flow.Block{
+		HeaderBody: HeaderBodyFixture(),
+		Payload:    PayloadFixture(WithGuarantees(guarantees...)),
+	}
+
+}
+
+func WithoutGuarantee(payload *flow.Payload) {
+	payload.Guarantees = nil
+}
+
+func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
+	return &snapshot.ExecutionSnapshot{}
 }
 
 func BlockWithParentAndProposerFixture(
@@ -426,7 +546,7 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 	return BlockWithParentAndPayload(parent, payload)
 }
 
-func WithHeaderHeight(height uint64) func(header *flow.Header) {
+func WithHeaderHeight(height uint64) func(*flow.Header) {
 	return func(header *flow.Header) {
 		header.Height = height
 	}
@@ -652,10 +772,9 @@ func CollectionListFixture(n int, options ...func(*flow.Collection)) []*flow.Col
 
 func CollectionFixture(n int, options ...func(*flow.Collection)) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
-
 	for i := 0; i < n; i++ {
 		tx := TransactionFixture()
-		transactions = append(transactions, &tx.TransactionBody)
+		transactions = append(transactions, &tx)
 	}
 
 	col := flow.Collection{Transactions: transactions}
@@ -982,7 +1101,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 			Attestation:          attestation,
 			ApproverID:           IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
-			Spock:                nil,
+			Spock:                SignatureFixture(),
 		},
 		VerifierSignature: SignatureFixture(),
 	}
@@ -1471,14 +1590,11 @@ func RandomSourcesFixture(n int) [][]byte {
 	return sigs
 }
 
-func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
-	if len(n) > 0 {
-		n[0](&tx)
-	}
-	return tx
+func TransactionFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
+	return TransactionBodyFixture(opts...)
 }
 
+// DEPRECATED: please use TransactionFixture instead
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
 		Script:             []byte("access(all) fun main() {}"),
@@ -1523,7 +1639,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 		Imports: dsl.Imports{
 			dsl.Import{
 				Address: sdk.Address(chain.ServiceAddress()),
-				Names:   []string{"FlowCallbackScheduler"},
+				Names:   []string{"FlowTransactionScheduler"},
 			},
 		},
 		Content: dsl.Prepare{
@@ -1619,7 +1735,7 @@ func ChunkDataResponseMsgFixture(
 	opts ...func(*messages.ChunkDataResponse),
 ) *messages.ChunkDataResponse {
 	cdp := &messages.ChunkDataResponse{
-		ChunkDataPack: *ChunkDataPackFixture(chunkID),
+		ChunkDataPack: flow.UntrustedChunkDataPack(*ChunkDataPackFixture(chunkID)),
 		Nonce:         rand.Uint64(),
 	}
 
@@ -1636,8 +1752,7 @@ func WithApproximateSize(bytes uint64) func(*messages.ChunkDataResponse) {
 		// 1 tx fixture is approximately 350 bytes
 		txCount := bytes / 350
 		collection := CollectionFixture(int(txCount) + 1)
-		pack := ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection))
-		request.ChunkDataPack = *pack
+		request.ChunkDataPack = flow.UntrustedChunkDataPack(*ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection)))
 	}
 }
 

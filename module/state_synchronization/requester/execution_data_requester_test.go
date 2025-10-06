@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +32,7 @@ import (
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -42,7 +42,7 @@ type ExecutionDataRequesterSuite struct {
 
 	blobstore   blobs.Blobstore
 	datastore   datastore.Batching
-	db          *badger.DB
+	db          *pebble.DB
 	downloader  *exedatamock.Downloader
 	distributor *ExecutionDataDistributor
 
@@ -173,7 +173,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 
 	for _, run := range tests {
 		suite.Run(run.name, func() {
-			unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+			unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 				suite.db = db
 
 				suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
@@ -202,7 +202,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterResumesAfterRestart() {
 	test := func(stopHeight, resumeHeight uint64) {
 		testData.fetchedExecutionData = nil
 
-		unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 			suite.db = db
 
 			// Process half of the blocks
@@ -240,7 +240,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterResumesAfterRestart() {
 // TestRequesterCatchesUp tests that the requester processes all heights when it starts with a
 // backlog of sealed blocks.
 func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 		suite.db = db
 
 		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
@@ -262,7 +262,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
 // TestRequesterPausesAndResumes tests that the requester pauses when it downloads maxSearchAhead
 // blocks beyond the last processed block, and resumes when it catches up.
 func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 		suite.db = db
 
 		pauseHeight := uint64(10)
@@ -293,7 +293,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 // TestRequesterHalts tests that the requester handles halting correctly when it encounters an
 // invalid block
 func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 		suite.db = db
 
 		suite.run.blockCount = 10
@@ -412,8 +412,8 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	edCache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
-	processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
+	processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotification := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
 
 	edr, err := New(
 		logger,

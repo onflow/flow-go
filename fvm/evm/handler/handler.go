@@ -241,8 +241,14 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 		return nil, err
 	}
 
+	var res []*types.Result
 	// step 5 - batch run transactions
-	res, err := blk.BatchRunTransactions(txs)
+	h.backend.RunWithMeteringDisabled(
+		func() {
+			res, err = blk.BatchRunTransactions(txs)
+		},
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +390,11 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 5 - run transaction
-	res, err := blk.RunTransaction(tx)
+	var res *types.Result
+	h.backend.RunWithMeteringDisabled(
+		func() {
+			res, err = blk.RunTransaction(tx)
+		})
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +594,11 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// step 4 - run direct call
-	res, err := blk.DirectCall(call)
+	var res *types.Result
+	h.backend.RunWithMeteringDisabled(
+		func() {
+			res, err = blk.DirectCall(call)
+		})
 	// check backend errors first
 	if err != nil {
 		return nil, err

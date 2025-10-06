@@ -3,9 +3,12 @@ package verifier_test
 import (
 	"crypto/rand"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ipfs/go-cid"
+	"github.com/jordanschalm/lockctx"
+	"github.com/stretchr/testify/mock"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -18,21 +21,22 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	chmodel "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	realModule "github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage/locks"
+	"github.com/onflow/flow-go/storage"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net           *mocknetwork.Network
+	net           *mocknetwork.EngineRegistry
 	tracer        realModule.Tracer
 	state         *protocol.State
 	ss            *protocol.Snapshot
@@ -45,6 +49,7 @@ type VerifierEngineTestSuite struct {
 	metrics       *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 	approvals     *mockstorage.ResultApprovals
 	chunkVerifier *mockmodule.ChunkVerifier
+	lockManager   lockctx.Manager
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -52,8 +57,9 @@ func TestVerifierEngine(t *testing.T) {
 }
 
 func (suite *VerifierEngineTestSuite) SetupTest() {
+	suite.lockManager = storage.NewTestingLockManager()
 	suite.state = new(protocol.State)
-	suite.net = mocknetwork.NewNetwork(suite.T())
+	suite.net = mocknetwork.NewEngineRegistry(suite.T())
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = new(protocol.Snapshot)
 	suite.pushCon = mocknetwork.NewConduit(suite.T())
@@ -105,7 +111,7 @@ func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 		suite.me,
 		suite.chunkVerifier,
 		suite.approvals,
-		locks.NewTestingLockManager(),
+		suite.lockManager,
 	)
 	require.NoError(suite.T(), err)
 
@@ -148,30 +154,31 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	for _, test := range tests {
 		suite.Run(test.name, func() {
-			var expectedApproval *flow.ResultApproval
+
+			var expectedApproval atomic.Pointer[messages.ResultApproval]
 
 			suite.approvals.
-				On("StoreMyApproval", testifymock.Anything, testifymock.Anything).
-				Return(nil).
-				Run(func(args testifymock.Arguments) {
-					ra, ok := args[1].(*flow.ResultApproval)
-					suite.Require().True(ok)
+				On("StoreMyApproval", mock.Anything).
+				Return(func(ra *flow.ResultApproval) func(lockctx.Proof) error {
+					return func(lctx lockctx.Proof) error {
+						suite.Assert().True(lctx.HoldsLock(storage.LockIndexResultApproval))
+						suite.Assert().Equal(vChunk.Chunk.BlockID, ra.Body.BlockID)
+						suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
+						suite.Assert().Equal(vChunk.Chunk.Index, ra.Body.ChunkIndex)
+						suite.Assert().Equal(suite.me.NodeID(), ra.Body.ApproverID)
 
-					suite.Assert().Equal(vChunk.Chunk.BlockID, ra.Body.BlockID)
-					suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
-					suite.Assert().Equal(vChunk.Chunk.Index, ra.Body.ChunkIndex)
-					suite.Assert().Equal(suite.me.NodeID(), ra.Body.ApproverID)
+						// verifies the signatures
+						atstID := ra.Body.Attestation.ID()
+						suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
+						bodyID := ra.Body.ID()
+						suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
 
-					// verifies the signatures
-					atstID := ra.Body.Attestation.ID()
-					suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
-					bodyID := ra.Body.ID()
-					suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
+						// spock should be non-nil
+						suite.Assert().NotNil(ra.Body.Spock)
 
-					// spock should be non-nil
-					suite.Assert().NotNil(ra.Body.Spock)
-
-					expectedApproval = ra
+						expectedApproval.Store((*messages.ResultApproval)(ra))
+						return nil
+					}
 				}).
 				Once()
 
@@ -180,9 +187,9 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 				Return(nil).
 				Run(func(args testifymock.Arguments) {
 					// check that the approval matches the input execution result
-					ra, ok := args[0].(*flow.ResultApproval)
+					ra, ok := args[0].(*messages.ResultApproval)
 					suite.Require().True(ok)
-					suite.Assert().Equal(expectedApproval, ra)
+					suite.Assert().Equal(expectedApproval.Load(), ra)
 
 					// note: mock includes each variadic argument as a separate element in slice
 					node, ok := args[1].(flow.Identifier)

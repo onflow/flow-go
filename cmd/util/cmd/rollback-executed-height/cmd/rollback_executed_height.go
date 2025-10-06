@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -21,14 +20,13 @@ import (
 
 var (
 	flagHeight           uint64
-	flagDataDir          string
 	flagChunkDataPackDir string
 )
 
 var Cmd = &cobra.Command{
 	Use:   "rollback-executed-height",
 	Short: "Rollback the executed height",
-	Run:   run,
+	RunE:  runE,
 }
 
 func init() {
@@ -38,18 +36,18 @@ func init() {
 		"the height of the block to update the highest executed height")
 	_ = Cmd.MarkFlagRequired("height")
 
-	Cmd.Flags().StringVar(&flagDataDir, "datadir", "",
-		"directory that stores the protocol state")
-	_ = Cmd.MarkFlagRequired("datadir")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 
 	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_pack",
 		"directory that stores the protocol state")
 	_ = Cmd.MarkFlagRequired("chunk_data_pack_dir")
 }
 
-func run(*cobra.Command, []string) {
+func runE(*cobra.Command, []string) error {
+	lockManager := storage.MakeSingletonLockManager()
+
 	log.Info().
-		Str("datadir", flagDataDir).
+		Str("datadir", flagDatadir).
 		Str("chunk_data_pack_dir", flagChunkDataPackDir).
 		Uint64("height", flagHeight).
 		Msg("flags")
@@ -57,83 +55,87 @@ func run(*cobra.Command, []string) {
 	if flagHeight == 0 {
 		// this would be a mistake that the height flag is used but no height value
 		// was specified, so the default value 0 is used.
-		log.Fatal().Msg("height must be above 0")
+		return fmt.Errorf("height must be above 0: %v", flagHeight)
 	}
 
-	bdb := common.InitStorage(flagDataDir)
-	storages := common.InitStorages(bdb)
-	state, err := common.InitProtocolState(bdb, storages)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not init protocol states")
-	}
+	return common.WithStorage(flagDatadir, func(db storage.DB) error {
+		storages := common.InitStorages(db)
+		state, err := common.OpenProtocolState(lockManager, db, storages)
+		if err != nil {
+			return fmt.Errorf("could not open protocol states: %w", err)
+		}
 
-	db := badgerimpl.ToDB(bdb)
-	metrics := &metrics.NoopCollector{}
+		metrics := &metrics.NoopCollector{}
 
-	transactionResults := store.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
-	commits := store.NewCommits(metrics, db)
-	results := store.NewExecutionResults(metrics, db)
-	receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
-	myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
-	headers := badger.NewHeaders(metrics, bdb)
-	events := store.NewEvents(metrics, db)
-	serviceEvents := store.NewServiceEvents(metrics, db)
-	transactions := badger.NewTransactions(metrics, bdb)
-	collections := badger.NewCollections(bdb, transactions)
-	// require the chunk data pack data must exist before returning the storage module
-	chunkDataPacksPebbleDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
-		log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not open chunk data pack DB at %v", flagChunkDataPackDir)
-	}
-	chunkDataPacksDB := pebbleimpl.ToDB(chunkDataPacksPebbleDB)
-	chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, collections, 1000)
-	chunkBatch := chunkDataPacksDB.NewBatch()
-	defer chunkBatch.Close()
+		transactionResults, err := store.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
+		if err != nil {
+			return err
+		}
+		commits := store.NewCommits(metrics, db)
+		results := store.NewExecutionResults(metrics, db)
+		receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
+		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
+		headers := store.NewHeaders(metrics, db)
+		events := store.NewEvents(metrics, db)
+		serviceEvents := store.NewServiceEvents(metrics, db)
+		transactions := store.NewTransactions(metrics, db)
+		collections := store.NewCollections(db, transactions)
+		// require the chunk data pack data must exist before returning the storage module
+		chunkDataPacksPebbleDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
+			log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)
+		if err != nil {
+			return fmt.Errorf("could not open chunk data pack DB at %v: %w", flagChunkDataPackDir, err)
+		}
+		chunkDataPacksDB := pebbleimpl.ToDB(chunkDataPacksPebbleDB)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, collections, 1000)
+		chunkBatch := chunkDataPacksDB.NewBatch()
+		defer chunkBatch.Close()
 
-	writeBatch := db.NewBatch()
-	defer writeBatch.Close()
+		writeBatch := db.NewBatch()
+		defer writeBatch.Close()
 
-	err = removeExecutionResultsFromHeight(
-		writeBatch,
-		chunkBatch,
-		state,
-		transactionResults,
-		commits,
-		chunkDataPacks,
-		results,
-		myReceipts,
-		events,
-		serviceEvents,
-		flagHeight+1)
+		err = removeExecutionResultsFromHeight(
+			writeBatch,
+			chunkBatch,
+			state,
+			transactionResults,
+			commits,
+			chunkDataPacks,
+			results,
+			myReceipts,
+			events,
+			serviceEvents,
+			flagHeight+1)
 
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not remove result from height %v", flagHeight)
-	}
+		if err != nil {
+			return fmt.Errorf("could not remove result from height %v: %w", flagHeight, err)
+		}
 
-	// remove chunk data packs first, because otherwise the index to find chunk data pack will be removed.
-	err = chunkBatch.Commit()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not commit chunk batch at %v", flagHeight)
-	}
+		// remove chunk data packs first, because otherwise the index to find chunk data pack will be removed.
+		err = chunkBatch.Commit()
+		if err != nil {
+			return fmt.Errorf("could not commit chunk batch at %v: %w", flagHeight, err)
+		}
 
-	err = writeBatch.Commit()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not flush write batch at %v", flagHeight)
-	}
+		err = writeBatch.Commit()
+		if err != nil {
+			return fmt.Errorf("could not flush write batch at %v: %w", flagHeight, err)
+		}
 
-	header, err := state.AtHeight(flagHeight).Head()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get block header at height %v", flagHeight)
-	}
+		header, err := state.AtHeight(flagHeight).Head()
+		if err != nil {
+			return fmt.Errorf("could not get block header at height %v: %w", flagHeight, err)
+		}
 
-	err = headers.RollbackExecutedBlock(header)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not roll back executed block at height %v", flagHeight)
-	}
+		err = headers.RollbackExecutedBlock(header)
+		if err != nil {
+			return fmt.Errorf("could not roll back executed block at height %v: %w", flagHeight, err)
+		}
 
-	log.Info().Msgf("executed height rolled back to %v", flagHeight)
+		log.Info().Msgf("executed height rolled back to %v", flagHeight)
 
+		return nil
+	})
 }
 
 // use badger instances directly instead of stroage interfaces so that the interface don't

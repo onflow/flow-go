@@ -26,7 +26,7 @@ func InitPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, io.Closer, err
 		return nil, nil, fmt.Errorf("could not create pebble db (path: %s): %w", dir, err)
 	}
 
-	db, err := pebblestorage.OpenDefaultPebbleDB(logger, dir)
+	db, err := pebblestorage.SafeOpen(logger, dir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not open newly created pebble db (path: %s): %w", dir, err)
 	}

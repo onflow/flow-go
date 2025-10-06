@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -75,7 +75,7 @@ type RateLimitTestSuite struct {
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -143,7 +143,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 
 	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		apiRateLimt,
 		apiBurstLimt,
@@ -151,7 +152,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		apiRateLimt,
 		apiBurstLimt).Build()
@@ -294,7 +296,7 @@ func (suite *RateLimitTestSuite) assertRateLimitError(err error) {
 func accessAPIClient(address string) (accessproto.AccessAPIClient, io.Closer, error) {
 	conn, err := grpc.Dial(
 		address,
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultAccessMaxResponseSize)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to address %s: %w", address, err)

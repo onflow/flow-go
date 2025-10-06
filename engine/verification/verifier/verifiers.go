@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -31,6 +32,7 @@ import (
 // pruned.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyLastKHeight(
+	lockManager lockctx.Manager,
 	k uint64,
 	chainID flow.ChainID,
 	protocolDataDir string,
@@ -38,8 +40,9 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -86,14 +89,16 @@ func VerifyLastKHeight(
 // VerifyRange verifies all chunks in the results of the blocks in the given range.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyRange(
+	lockManager lockctx.Manager,
 	from, to uint64,
 	chainID flow.ChainID,
 	protocolDataDir string, chunkDataPackDir string,
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -136,14 +141,14 @@ func verifyConcurrently(
 	defer cancel() // Ensure cancel is called to release resources
 
 	var lowestErr error
-	var lowestErrHeight uint64 = ^uint64(0) // Initialize to max value of uint64
-	var mu sync.Mutex                       // To protect access to lowestErr and lowestErrHeight
+	var lowestErrHeight = ^uint64(0) // Initialize to max value of uint64
+	var mu sync.Mutex                // To protect access to lowestErr and lowestErrHeight
 
 	lg := util.LogProgress(
 		log.Logger,
 		util.DefaultLogProgressConfig(
 			fmt.Sprintf("verifying heights progress for [%v:%v]", from, to),
-			int(to+1-from),
+			to+1-from,
 		),
 	)
 
@@ -217,24 +222,29 @@ func verifyConcurrently(
 }
 
 func initStorages(
+	lockManager lockctx.Manager,
 	chainID flow.ChainID,
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) (
 	func() error,
-	*storage.All,
+	*store.All,
 	storage.ChunkDataPacks,
 	protocol.State,
 	module.ChunkVerifier,
 	error,
 ) {
-	db := common.InitStorage(dataDir)
+	db, err := common.InitStorage(dataDir)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not init storage database: %w", err)
+	}
 
 	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
 	// require the chunk data pack data must exist before returning the storage module
@@ -246,7 +256,7 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled)
+	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledCallbacksEnabled)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -319,6 +329,7 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
+	scheduledCallbacksEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -338,7 +349,7 @@ func makeVerifier(
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			true,
+			scheduledCallbacksEnabled,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)

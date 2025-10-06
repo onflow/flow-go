@@ -16,11 +16,6 @@ import (
 // NoCompressor use when no specific compressor name provided, which effectively means no compression.
 const NoCompressor = ""
 
-// DefaultMaxMsgSize use 1 GiB as the default message size limit.
-// This enforces a sane max message size, while still allowing for reasonably large messages.
-// grpc library default is 4 MiB.
-const DefaultMaxMsgSize = 1 << (10 * 3) // 1 GiB
-
 // CertificateConfig is used to configure an Certificate
 type CertificateConfig struct {
 	opts []libp2ptls.IdentityOption

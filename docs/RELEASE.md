@@ -1,6 +1,6 @@
 # Development
 
-Please carefully read our [Coding Conventions](./CodingConventions.md).
+Please carefully read our [Coding Conventions](../CodingConventions.md).
 
 ## Branching Policy
 

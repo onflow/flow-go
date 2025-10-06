@@ -29,6 +29,9 @@ type InstanceParams interface {
 	// Seal returns the root block seal of the current protocol state. This is the seal for the
 	// `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.
 	Seal() *flow.Seal
+
+	// SporkRootBlock returns the root block for the present spork.
+	SporkRootBlock() *flow.Block
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.

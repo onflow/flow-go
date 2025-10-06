@@ -15,6 +15,7 @@ import (
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -28,14 +29,16 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
 // LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
 type LocalTransactionProvider struct {
-	state           protocol.State
-	collections     storage.Collections
-	blocks          storage.Blocks
-	eventsIndex     *index.EventsIndex
-	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages error_messages.Provider
-	systemTxID      flow.Identifier
-	txStatusDeriver *txstatus.TxStatusDeriver
+	state                     protocol.State
+	collections               storage.Collections
+	blocks                    storage.Blocks
+	eventsIndex               *index.EventsIndex
+	txResultsIndex            *index.TransactionResultsIndex
+	txErrorMessages           error_messages.Provider
+	systemTxID                flow.Identifier
+	txStatusDeriver           *txstatus.TxStatusDeriver
+	scheduledCallbacksEnabled bool
+	chainID                   flow.ChainID
 }
 
 var _ TransactionProvider = (*LocalTransactionProvider)(nil)
@@ -49,16 +52,20 @@ func NewLocalTransactionProvider(
 	txErrorMessages error_messages.Provider,
 	systemTxID flow.Identifier,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	chainID flow.ChainID,
+	scheduledCallbacksEnabled bool,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
-		state:           state,
-		collections:     collections,
-		blocks:          blocks,
-		eventsIndex:     eventsIndex,
-		txResultsIndex:  txResultsIndex,
-		txErrorMessages: txErrorMessages,
-		systemTxID:      systemTxID,
-		txStatusDeriver: txStatusDeriver,
+		state:                     state,
+		collections:               collections,
+		blocks:                    blocks,
+		eventsIndex:               eventsIndex,
+		txResultsIndex:            txResultsIndex,
+		txErrorMessages:           txErrorMessages,
+		systemTxID:                systemTxID,
+		txStatusDeriver:           txStatusDeriver,
+		scheduledCallbacksEnabled: scheduledCallbacksEnabled,
+		chainID:                   chainID,
 	}
 }
 
@@ -148,7 +155,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	eventEncoding entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	txResult, err := t.txResultsIndex.ByBlockIDTransactionIndex(blockID, block.Height, index)
@@ -185,7 +192,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
-	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+	if eventEncoding == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
@@ -207,6 +214,53 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		BlockHeight:   block.Height,
 		CollectionID:  collectionID,
 	}, nil
+}
+
+// TransactionsByBlockID retrieves transactions by block ID from storage
+// Expected errors during normal operation:
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
+//   - codes.Internal when event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+// getter or when deriving transaction status.
+func (t *LocalTransactionProvider) TransactionsByBlockID(
+	ctx context.Context,
+	block *flow.Block,
+) ([]*flow.TransactionBody, error) {
+	var transactions []*flow.TransactionBody
+	blockID := block.ID()
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := t.collections.ByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, rpc.ConvertStorageError(err)
+		}
+
+		transactions = append(transactions, collection.Transactions...)
+	}
+
+	if !t.scheduledCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+		}
+
+		return append(transactions, systemTx), nil
+	}
+
+	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
+	if err != nil {
+		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
+	}
+
+	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+	}
+
+	return append(transactions, sysCollection.Transactions...), nil
 }
 
 // TransactionResultsByBlockID retrieves transaction results by block ID from storage
@@ -248,6 +302,14 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to map tx to collection ID: %v", err)
 	}
 
+	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	for _, txResult := range txResults {
 		txID := txResult.TransactionID
 
@@ -259,14 +321,6 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 				return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txID, blockID)
 			}
 			txStatusCode = 1
-		}
-
-		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
 		}
 
 		events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Height, txResult.TransactionID)
@@ -284,7 +338,9 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 		collectionID, ok := txToCollectionID[txID]
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "transaction %s not found in block %s", txID, blockID)
+			// for all the transactions that are not in the block's user collections we assign the
+			// ZeroID indicating system collection.
+			collectionID = flow.ZeroID
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
@@ -300,6 +356,60 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	}
 
 	return results, nil
+}
+
+// SystemTransaction rebuilds the system transaction from storage
+func (t *LocalTransactionProvider) SystemTransaction(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	blockID := block.ID()
+
+	if txID == t.systemTxID || !t.scheduledCallbacksEnabled {
+		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
+		}
+
+		if txID == systemTx.ID() {
+			return systemTx, nil
+		}
+		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	}
+
+	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
+	if err != nil {
+		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
+	}
+
+	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+	}
+
+	for _, tx := range sysCollection.Transactions {
+		if tx.ID() == txID {
+			return tx, nil
+		}
+	}
+
+	return nil, status.Errorf(codes.NotFound, "system transaction not found")
+}
+
+func (t *LocalTransactionProvider) SystemTransactionResult(
+	ctx context.Context,
+	block *flow.Block,
+	txID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, error) {
+	// make sure the request is for a system transaction
+	if txID != t.systemTxID {
+		if _, err := t.SystemTransaction(ctx, block, txID); err != nil {
+			return nil, status.Errorf(codes.NotFound, "system transaction not found")
+		}
+	}
+	return t.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)
 }
 
 // lookupCollectionIDInBlock returns the collection ID based on the transaction ID.
@@ -337,7 +447,6 @@ func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Bl
 			txToCollectionID[txID] = guarantee.CollectionID
 		}
 	}
-	txToCollectionID[t.systemTxID] = flow.ZeroID
 
 	return txToCollectionID, nil
 }

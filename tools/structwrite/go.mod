@@ -1,8 +1,6 @@
 module github.com/onflow/flow-go/tools/structwrite
 
-go 1.23.0
-
-toolchain go1.24.2
+go 1.25.0
 
 require (
 	github.com/golangci/plugin-module-register v0.1.1

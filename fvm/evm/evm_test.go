@@ -205,6 +205,8 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
+				require.Equal(t, uint64(23_520), res.GasConsumed)
+				require.Equal(t, uint64(23_520), res.MaxGasConsumed)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
@@ -3116,134 +3118,185 @@ func TestCadenceArch(t *testing.T) {
 	})
 }
 
-func TestEVMDeployFileSystemContract(t *testing.T) {
+func TestEVMFileSystemContract(t *testing.T) {
 	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	RunContractWithNewEnvironment(
-		t,
-		chain,
-		GetFileSystemContract(t),
-		func(
-			ctx fvm.Context,
-			vm fvm.VM,
-			snapshot snapshot.SnapshotTree,
-			testContract *TestContract,
-			testAccount *EOATestAccount,
-		) {
-			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-
-			code := []byte(fmt.Sprintf(
-				`
+	runFileSystemContract := func(
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+		testAccount *EOATestAccount,
+		computeLimit uint64,
+	) (
+		*snapshot.ExecutionSnapshot,
+		fvm.ProcedureOutput,
+	) {
+		code := []byte(fmt.Sprintf(
+			`
 					import EVM from %s
 
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
 						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
-
-							assert(res.status == EVM.Status.successful, message: "unexpected status")
-							assert(res.errorCode == 0, message: "unexpected error code")
-							assert(res.deployedContract == nil, message: "unexpected deployed contract")
 						}
 					}
 					`,
-				sc.EVMContract.Address.HexWithPrefix(),
-			))
+			sc.EVMContract.Address.HexWithPrefix(),
+		))
 
-			coinbaseAddr := types.Address{1, 2, 3}
-			coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
-			require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+		coinbaseAddr := types.Address{1, 2, 3}
+		coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+		require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
 
-			var buffer bytes.Buffer
-			address := common.HexToAddress("0xea02F564664A477286B93712829180be4764fAe2")
-			chunkHash := "0x2521660d04da85198d1cc71c20a69b7e875ebbf1682f6a5c6a3fec69068ccc13"
-			index := int64(0)
-			chunk := "T1ARYBYsPOJPVYoU7wVp+PYuXmdS6bgkLf2egcxa+1hP64wAxfkLXtnllU6DmEuj+Id4oWl1ZV4ftQ+ofQ3DQhOoxNlPZGOYbhoMLuzE"
-			for i := 0; i <= 500; i++ {
-				buffer.WriteString(chunk)
-			}
-			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-				testContract.DeployedAt.ToCommon(),
-				testContract.MakeCallData(
-					t,
-					"publishChunk",
-					address,
-					chunkHash,
-					big.NewInt(index),
-					buffer.String(),
-				),
-				big.NewInt(0),
-				uint64(2_500_000),
-				big.NewInt(1),
-			)
+		var buffer bytes.Buffer
+		address := common.HexToAddress("0xea02F564664A477286B93712829180be4764fAe2")
+		chunkHash := "0x2521660d04da85198d1cc71c20a69b7e875ebbf1682f6a5c6a3fec69068ccc13"
+		index := int64(0)
+		chunk := "T1ARYBYsPOJPVYoU7wVp+PYuXmdS6bgkLf2egcxa+1hP64wAxfkLXtnllU6DmEuj+Id4oWl1ZV4ftQ+ofQ3DQhOoxNlPZGOYbhoMLuzE"
+		for i := 0; i <= 500; i++ {
+			buffer.WriteString(chunk)
+		}
+		innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+			testContract.DeployedAt.ToCommon(),
+			testContract.MakeCallData(
+				t,
+				"publishChunk",
+				address,
+				chunkHash,
+				big.NewInt(index),
+				buffer.String(),
+			),
+			big.NewInt(0),
+			uint64(2_132_171),
+			big.NewInt(1),
+		)
 
-			innerTx := cadence.NewArray(
-				unittest.BytesToCdcUInt8(innerTxBytes),
-			).WithType(stdlib.EVMTransactionBytesCadenceType)
+		innerTx := cadence.NewArray(
+			unittest.BytesToCdcUInt8(innerTxBytes),
+		).WithType(stdlib.EVMTransactionBytesCadenceType)
 
-			coinbase := cadence.NewArray(
-				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
-			).WithType(stdlib.EVMAddressBytesCadenceType)
+		coinbase := cadence.NewArray(
+			unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+		).WithType(stdlib.EVMAddressBytesCadenceType)
 
-			txBody, err := flow.NewTransactionBodyBuilder().
-				SetScript(code).
-				AddAuthorizer(sc.FlowServiceAccount.Address).
-				AddArgument(json.MustEncode(innerTx)).
-				AddArgument(json.MustEncode(coinbase)).
-				Build()
-			require.NoError(t, err)
+		txBody, err := flow.NewTransactionBodyBuilder().
+			SetScript(code).
+			SetComputeLimit(computeLimit).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			AddArgument(json.MustEncode(innerTx)).
+			AddArgument(json.MustEncode(coinbase)).
+			Build()
+		require.NoError(t, err)
 
-			tx := fvm.Transaction(
-				txBody,
-				0,
-			)
+		tx := fvm.Transaction(
+			txBody,
+			0,
+		)
 
-			state, output, err := vm.Run(ctx, tx, snapshot)
-			require.NoError(t, err)
-			require.NoError(t, output.Err)
-			require.NotEmpty(t, state.WriteSet)
-			snapshot = snapshot.Append(state)
+		state, output, err := vm.Run(ctx, tx, snapshot)
+		require.NoError(t, err)
+		return state, output
+	}
 
-			// assert event fields are correct
-			require.Len(t, output.Events, 2)
-			txEvent := output.Events[0]
-			txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-			require.NoError(t, err)
+	t.Run("happy case", func(t *testing.T) {
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFileSystemContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 10001)
 
-			// fee transfer event
-			feeTransferEvent := output.Events[1]
-			feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
-			require.NoError(t, err)
-			require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
-			require.Equal(t, uint16(1), feeTranferEventPayload.Index)
-			require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				snapshot = snapshot.Append(state)
 
-			// commit block
-			blockEventPayload, _ := callEVMHeartBeat(t,
-				ctx,
-				vm,
-				snapshot,
-			)
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 
-			require.NotEmpty(t, blockEventPayload.Hash)
-			require.Equal(t, uint64(2132170), blockEventPayload.TotalGasUsed)
-			require.NotEmpty(t, blockEventPayload.Hash)
+				// fee transfer event
+				feeTransferEvent := output.Events[1]
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				//
+				//// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+				//
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(2_132_170), blockEventPayload.TotalGasUsed)
 
-			txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
-			require.Equal(t,
-				txHashes.RootHash(),
-				blockEventPayload.TransactionHashRoot,
-			)
-			require.NotEmpty(t, blockEventPayload.ReceiptRoot)
+				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
+				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
-			require.Equal(t, innerTxBytes, txEventPayload.Payload)
-			require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
-			require.Equal(t, uint16(0), txEventPayload.Index)
-			require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
-			require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
-			require.Empty(t, txEventPayload.ContractAddress)
-		},
-	)
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
+				require.Empty(t, txEventPayload.ContractAddress)
+
+				require.Greater(t, int(output.ComputationUsed), 400)
+			},
+			fvm.WithExecutionEffortWeights(
+				environment.MainnetExecutionEffortWeights,
+			),
+		)
+	})
+
+	t.Run("insufficient FVM computation to execute EVM transaction", func(t *testing.T) {
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFileSystemContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 400)
+				snapshot = snapshot.Append(state)
+
+				require.Len(t, output.Events, 0)
+
+				//// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+				//
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(0), blockEventPayload.TotalGasUsed)
+
+				// only a small amount of computation was used due to the EVM transaction never being executed
+				require.Less(t, int(output.ComputationUsed), 20)
+			},
+			fvm.WithExecutionEffortWeights(
+				environment.MainnetExecutionEffortWeights,
+			),
+		)
+	})
 }
 
 func createAndFundFlowAccount(
@@ -3536,7 +3589,13 @@ func getEVMAccountNonce(
 func RunWithNewEnvironment(
 	t *testing.T,
 	chain flow.Chain,
-	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
+	f func(
+		fvm.Context,
+		fvm.VM,
+		snapshot.SnapshotTree,
+		*TestContract,
+		*EOATestAccount,
+	),
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 	RunWithTestBackend(t, func(backend *TestBackend) {
@@ -3599,6 +3658,7 @@ func RunContractWithNewEnvironment(
 		*TestContract,
 		*EOATestAccount,
 	),
+	bootstrapOpts ...fvm.BootstrapProcedureOption,
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 
@@ -3632,6 +3692,7 @@ func RunContractWithNewEnvironment(
 				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 				}
+				baseBootstrapOpts = append(baseBootstrapOpts, bootstrapOpts...)
 
 				executionSnapshot, _, err := vm.Run(
 					ctx,

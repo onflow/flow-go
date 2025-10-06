@@ -3,15 +3,13 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/cockroachdb/pebble/v2"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -25,10 +23,13 @@ func init() {
 var transactionResultsCmd = &cobra.Command{
 	Use:   "transaction-results",
 	Short: "get transaction-result by block ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := WithBadgerAndPebble(func(bdb *badger.DB, pdb *pebble.DB) error {
-			transactionResults := store.NewTransactionResults(metrics.NewNoopCollector(), pebbleimpl.ToDB(pdb), 1)
-			storages := common.InitStorages(bdb)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			transactionResults, err := store.NewTransactionResults(metrics.NewNoopCollector(), db, 1)
+			if err != nil {
+				return err
+			}
+			storages := common.InitStorages(db)
 			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
@@ -65,9 +66,5 @@ var transactionResultsCmd = &cobra.Command{
 
 			return nil
 		})
-
-		if err != nil {
-			log.Error().Err(err).Msg("could not get transaction results")
-		}
 	},
 }

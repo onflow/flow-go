@@ -321,6 +321,20 @@ func (b *BlockExecutionDataRoot) UnmarshalMsgpack(data []byte) error {
 	return nil
 }
 
+// ChunkDataRequest represents a request for the chunk data pack
+// which is specified by a chunk ID.
+type ChunkDataRequest struct {
+	ChunkID Identifier
+	Nonce   uint64
+}
+
+// ChunkDataResponse is the structurally validated response to a chunk data pack request.
+// It contains the chunk data pack of the interest.
+type ChunkDataResponse struct {
+	ChunkDataPack ChunkDataPack
+	Nonce         uint64
+}
+
 // Helper function to convert a slice of cid.Cid to a slice of strings
 func cidsToStrings(cids []cid.Cid) []string {
 	if cids == nil {
@@ -347,4 +361,24 @@ func stringsToCids(strs []string) ([]cid.Cid, error) {
 		cids[i] = c
 	}
 	return cids, nil
+}
+
+// Equals returns true if and only if receiver BlockExecutionDataRoot is equal to the `other`.
+func (b BlockExecutionDataRoot) Equals(other BlockExecutionDataRoot) bool {
+	// Compare BlockID fields
+	if b.BlockID != other.BlockID {
+		return false
+	}
+
+	// Compare ChunkExecutionDataIDs slices
+	if len(b.ChunkExecutionDataIDs) != len(other.ChunkExecutionDataIDs) {
+		return false
+	}
+	for i, cid := range b.ChunkExecutionDataIDs {
+		if !cid.Equals(other.ChunkExecutionDataIDs[i]) {
+			return false
+		}
+	}
+
+	return true
 }

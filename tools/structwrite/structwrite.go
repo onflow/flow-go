@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
@@ -65,6 +66,8 @@ type PluginStructWrite struct {
 	mutationProtected map[string]struct{}
 	// Regex of constructor function names, where mutation is allowed.
 	constructorRegex *regexp.Regexp
+
+	mu sync.RWMutex
 }
 
 // New creates a new instance of the PluginStructWrite plugin.
@@ -143,7 +146,7 @@ func (p *PluginStructWrite) gatherMutationProtectedTypes(pass *analysis.Pass) {
 							typeObj := pass.TypesInfo.Defs[typeSpec.Name]
 							if named, ok := typeObj.Type().(*types.Named); ok {
 								fullyQualified := named.String()
-								p.mutationProtected[fullyQualified] = struct{}{}
+								p.setMutationProtected(fullyQualified)
 							}
 							break
 						}
@@ -242,8 +245,17 @@ func (p *PluginStructWrite) handleCompositeLit(lit *ast.CompositeLit, pass *anal
 
 // isMutationProtected checks whether a fully qualified type is configured to be mutation-protected.
 func (p *PluginStructWrite) isMutationProtected(fullyQualifiedTypeName string) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	_, ok := p.mutationProtected[fullyQualifiedTypeName]
 	return ok
+}
+
+// setMutationProtected sets a fully qualified type as mutation-protected.
+func (p *PluginStructWrite) setMutationProtected(fullyQualifiedTypeName string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.mutationProtected[fullyQualifiedTypeName] = struct{}{}
 }
 
 // containsTrackedStruct checks whether the field accessed via selector expression belongs to a tracked struct,

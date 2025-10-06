@@ -2,17 +2,11 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type ExecutionResultsReader interface {
 	// ByID retrieves an execution result by its ID. Returns `ErrNotFound` if `resultID` is unknown.
 	ByID(resultID flow.Identifier) (*flow.ExecutionResult, error)
-
-	// ByIDTx returns a functor which retrieves the execution result by its ID, as part of a future database transaction.
-	// When executing the functor, it returns `ErrNotFound` if no execution result with the respective ID is known.
-	// deprecated
-	ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error)
 
 	// ByBlockID retrieves an execution result by block ID.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)

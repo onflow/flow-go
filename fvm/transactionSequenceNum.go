@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -54,29 +53,30 @@ func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	accounts := environment.NewAccounts(txnState)
 	proposalKey := proc.Transaction.ProposalKey
 
-	var accountKey flow.AccountPublicKey
-
-	accountKey, err = accounts.GetAccountPublicKey(proposalKey.Address, proposalKey.KeyIndex)
+	revoked, err := accounts.GetAccountPublicKeyRevokedStatus(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(proposalKey, err)
 	}
 
-	if accountKey.Revoked {
+	if revoked {
 		return errors.NewInvalidProposalSignatureError(
 			proposalKey,
 			fmt.Errorf("proposal key has been revoked"))
 	}
 
-	// Note that proposal key verification happens at the txVerifier and not here.
-	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
-
-	if !valid {
-		return errors.NewInvalidProposalSeqNumberError(proposalKey, accountKey.SeqNumber)
+	seqNumber, err := accounts.GetAccountPublicKeySequenceNumber(proposalKey.Address, proposalKey.KeyIndex)
+	if err != nil {
+		return err
 	}
 
-	accountKey.SeqNumber++
+	// Note that proposal key verification happens at the txVerifier and not here.
+	valid := seqNumber == proposalKey.SequenceNumber
 
-	_, err = accounts.SetAccountPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
+	if !valid {
+		return errors.NewInvalidProposalSeqNumberError(proposalKey, seqNumber)
+	}
+
+	err = accounts.IncrementAccountPublicKeySequenceNumber(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
 		restartError := txnState.RestartNestedTransaction(nestedTxnId)
 		if restartError != nil {

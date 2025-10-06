@@ -2,6 +2,7 @@ package reporters
 
 import (
 	"bufio"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -34,6 +35,8 @@ const (
 	// ReportFormatJSONL should be used when report might be large enough to
 	// crash tools like jq (if JSON array is used instead of JSONL).
 	ReportFormatJSONL
+
+	ReportFormatCSV
 )
 
 func NewReportFileWriterFactory(outputDir string, log zerolog.Logger) *ReportFileWriterFactory {
@@ -57,6 +60,9 @@ func (r *ReportFileWriterFactory) Filename(dataNamespace string) string {
 	case ReportFormatJSONL:
 		return path.Join(r.outputDir, fmt.Sprintf("%s_%d.jsonl", dataNamespace, r.fileSuffix))
 
+	case ReportFormatCSV:
+		return path.Join(r.outputDir, fmt.Sprintf("%s_%d.csv", dataNamespace, r.fileSuffix))
+
 	default:
 		panic(fmt.Sprintf("unrecognized report format: %d", r.format))
 	}
@@ -70,11 +76,26 @@ func (r *ReportFileWriterFactory) ReportWriter(dataNamespace string) ReportWrite
 
 var _ ReportWriterFactory = &ReportFileWriterFactory{}
 
+const reportFileWriteBufferSize = 100
+
+func NewReportFileWriter(fileName string, log zerolog.Logger, format ReportFormat) ReportWriter {
+	switch format {
+	case ReportFormatCSV:
+		return NewCSVReportFileWriter(fileName, log)
+	case ReportFormatJSONArray, ReportFormatJSONL:
+		return NewJSONReportFileWriter(fileName, log, format)
+	default:
+		panic(fmt.Sprintf("report format %d not supported", format))
+	}
+}
+
 // ReportWriter writes data from reports
 type ReportWriter interface {
 	Write(dataPoint interface{})
 	Close()
 }
+
+// ReportNilWriter
 
 // ReportNilWriter does nothing. Can be used as the final fallback writer
 type ReportNilWriter struct {
@@ -88,9 +109,9 @@ func (r ReportNilWriter) Write(_ interface{}) {
 func (r ReportNilWriter) Close() {
 }
 
-var _ ReportWriter = &ReportFileWriter{}
+// JSONReportFileWriter
 
-type ReportFileWriter struct {
+type JSONReportFileWriter struct {
 	f          *os.File
 	fileName   string
 	wg         *sync.WaitGroup
@@ -102,9 +123,9 @@ type ReportFileWriter struct {
 	firstWrite bool
 }
 
-const reportFileWriteBufferSize = 100
+var _ ReportWriter = &JSONReportFileWriter{}
 
-func NewReportFileWriter(fileName string, log zerolog.Logger, format ReportFormat) ReportWriter {
+func NewJSONReportFileWriter(fileName string, log zerolog.Logger, format ReportFormat) ReportWriter {
 	f, err := os.Create(fileName)
 	if err != nil {
 		log.Warn().Err(err).Msg("Error creating ReportFileWriter, defaulting to ReportNilWriter")
@@ -135,7 +156,7 @@ func NewReportFileWriter(fileName string, log zerolog.Logger, format ReportForma
 		}
 	}
 
-	fw := &ReportFileWriter{
+	fw := &JSONReportFileWriter{
 		f:          f,
 		fileName:   fileName,
 		writer:     writer,
@@ -158,11 +179,11 @@ func NewReportFileWriter(fileName string, log zerolog.Logger, format ReportForma
 	return fw
 }
 
-func (r *ReportFileWriter) Write(dataPoint interface{}) {
+func (r *JSONReportFileWriter) Write(dataPoint interface{}) {
 	r.writeChan <- dataPoint
 }
 
-func (r *ReportFileWriter) write(dataPoint interface{}) {
+func (r *JSONReportFileWriter) write(dataPoint interface{}) {
 	if r.faulty {
 		return
 	}
@@ -201,7 +222,7 @@ func (r *ReportFileWriter) write(dataPoint interface{}) {
 	}
 }
 
-func (r *ReportFileWriter) Close() {
+func (r *JSONReportFileWriter) Close() {
 	close(r.writeChan)
 	r.wg.Wait()
 
@@ -221,6 +242,86 @@ func (r *ReportFileWriter) Close() {
 	}
 
 	err = r.f.Close()
+	if err != nil {
+		r.log.Error().Err(err).Msg("Error closing report file")
+		panic(err)
+	}
+
+	r.log.Info().Str("filename", r.fileName).Msg("Created report file")
+}
+
+// CSVReportFileWriter
+
+type CSVReportFileWriter struct {
+	f         *os.File
+	fileName  string
+	wg        *sync.WaitGroup
+	writeChan chan []string
+	writer    *csv.Writer
+	log       zerolog.Logger
+	faulty    bool
+}
+
+var _ ReportWriter = &CSVReportFileWriter{}
+
+func NewCSVReportFileWriter(fileName string, log zerolog.Logger) ReportWriter {
+	f, err := os.Create(fileName)
+	if err != nil {
+		log.Warn().Err(err).Msg("Error creating ReportFileWriter, defaulting to ReportNilWriter")
+		return ReportNilWriter{}
+	}
+
+	writer := csv.NewWriter(f)
+
+	fw := &CSVReportFileWriter{
+		f:         f,
+		fileName:  fileName,
+		writer:    writer,
+		log:       log,
+		writeChan: make(chan []string, reportFileWriteBufferSize),
+		wg:        &sync.WaitGroup{},
+	}
+
+	fw.wg.Add(1)
+	go func() {
+
+		for d := range fw.writeChan {
+			fw.write(d)
+		}
+		fw.wg.Done()
+	}()
+
+	return fw
+}
+
+func (r *CSVReportFileWriter) Write(dataPoint interface{}) {
+	record, ok := dataPoint.([]string)
+	if !ok {
+		r.log.Warn().Msgf("cannot write %T to csv, skip this record", dataPoint)
+		return
+	}
+
+	r.writeChan <- record
+}
+
+func (r *CSVReportFileWriter) write(record []string) {
+	if r.faulty {
+		return
+	}
+	err := r.writer.Write(record)
+	if err != nil {
+		r.log.Warn().Err(err).Msg("error writing to csv file")
+		r.faulty = true
+	}
+}
+
+func (r *CSVReportFileWriter) Close() {
+	close(r.writeChan)
+	r.wg.Wait()
+
+	r.writer.Flush()
+
+	err := r.f.Close()
 	if err != nil {
 		r.log.Error().Err(err).Msg("Error closing report file")
 		panic(err)
