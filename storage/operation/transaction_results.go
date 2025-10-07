@@ -10,15 +10,15 @@ import (
 )
 
 func InsertTransactionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
-	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
-		return fmt.Errorf("InsertTransactionResult requires LockInsertOwnReceipt to be held")
+	if !lctx.HoldsLock(storage.LockInsertAndIndexTxResult) {
+		return fmt.Errorf("InsertTransactionResult requires LockInsertAndIndexTxResult to be held")
 	}
 	return UpsertByKey(w, MakePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
 func IndexTransactionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) error {
-	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
-		return fmt.Errorf("IndexTransactionResult requires LockInsertOwnReceipt to be held")
+	if !lctx.HoldsLock(storage.LockInsertAndIndexTxResult) {
+		return fmt.Errorf("IndexTransactionResult requires LockInsertAndIndexTxResult to be held")
 	}
 	return UpsertByKey(w, MakePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)
 }

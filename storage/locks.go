@@ -27,7 +27,9 @@ const (
 	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
-	LockInsertOwnReceipt = "lock_insert_own_receipt"
+	LockInsertOwnReceipt       = "lock_insert_own_receipt"
+	LockIndexStateCommitment   = "lock_index_state_commitment"
+	LockInsertAndIndexTxResult = "lock_insert_and_index_tx_result"
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
@@ -47,6 +49,8 @@ func Locks() []string {
 		LockInsertOrFinalizeClusterBlock,
 		LockInsertEvent,
 		LockInsertOwnReceipt,
+		LockIndexStateCommitment,
+		LockInsertAndIndexTxResult,
 		LockInsertCollection,
 		LockInsertLightTransactionResult,
 		LockBootstrapping,
@@ -79,8 +83,11 @@ func makeLockPolicy() lockctx.Policy {
 		Add(LockInsertBlock, LockFinalizeBlock).
 
 		// EN to save execution result
-		Add(LockInsertOwnReceipt, LockInsertEvent).
-		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
+		Add(LockInsertChunkDataPack, LockInsertEvent).
+		Add(LockInsertEvent, LockInsertAndIndexTxResult).
+		Add(LockInsertAndIndexTxResult, LockInsertOwnReceipt).
+		Add(LockInsertOwnReceipt, LockInsertAndIndexTxResult).
+		Add(LockInsertAndIndexTxResult, LockIndexStateCommitment).
 
 		// AN state sync to IndexBlockData
 		Add(LockInsertCollection, LockInsertEvent).

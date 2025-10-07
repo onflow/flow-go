@@ -410,8 +410,16 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
 	}
 
+	locks := []string{
+		storage.LockInsertChunkDataPack,
+		storage.LockInsertEvent,
+		storage.LockInsertAndIndexTxResult,
+		storage.LockInsertOwnReceipt,
+		storage.LockInsertAndIndexTxResult,
+		storage.LockIndexStateCommitment,
+	}
 	// Acquire locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
-	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertEvent, storage.LockInsertChunkDataPack}, func(lctx lockctx.Context) error {
+	return storage.WithLocks(s.lockManager, locks, func(lctx lockctx.Context) error {
 		err := s.chunkDataPacks.StoreByChunkID(lctx, chunks)
 		if err != nil {
 			return fmt.Errorf("can not store multiple chunk data pack: %w", err)
@@ -436,16 +444,19 @@ func (s *state) saveExecutionResults(
 				}
 			})
 
+			// require LockInsertEvent
 			err = s.events.BatchStore(lctx, blockID, []flow.EventsList{result.AllEvents()}, batch)
 			if err != nil {
 				return fmt.Errorf("cannot store events: %w", err)
 			}
 
+			// require LockInsertEvent
 			err = s.serviceEvents.BatchStore(lctx, blockID, result.AllServiceEvents(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store service events: %w", err)
 			}
 
+			// require LockInsertAndIndexTxResult
 			err = s.transactionResults.BatchStore(
 				lctx,
 				blockID,
@@ -456,12 +467,14 @@ func (s *state) saveExecutionResults(
 			}
 
 			executionResult := &result.ExecutionReceipt.ExecutionResult
+			// require [storage.LockInsertOwnReceipt] lock
 			// saving my receipts will also save the execution result
 			err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
 			if err != nil {
 				return fmt.Errorf("could not persist execution result: %w", err)
 			}
 
+			// require [storage.LockInsertOwnReceipt] lock
 			err = s.results.BatchIndex(lctx, batch, blockID, executionResult.ID())
 			if err != nil {
 				return fmt.Errorf("cannot index execution result: %w", err)
@@ -470,6 +483,7 @@ func (s *state) saveExecutionResults(
 			// the state commitment is the last data item to be stored, so that
 			// IsBlockExecuted can be implemented by checking whether state commitment exists
 			// in the database
+			// require [storage.LockIndexStateCommitment] lock
 			err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store state commitment: %w", err)

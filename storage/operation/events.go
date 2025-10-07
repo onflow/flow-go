@@ -21,8 +21,8 @@ func InsertEvent(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, 
 }
 
 func InsertServiceEvent(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, event flow.Event) error {
-	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
-		return fmt.Errorf("InsertServiceEvent requires LockInsertOwnReceipt to be held")
+	if !lctx.HoldsLock(storage.LockInsertEvent) {
+		return fmt.Errorf("InsertServiceEvent requires LockInsertEvent to be held")
 	}
 	return UpsertByKey(w, eventPrefix(codeServiceEvent, blockID, event), event)
 }
