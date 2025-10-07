@@ -56,9 +56,9 @@ func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 str
 	_m.Called(_a0, _a1)
 }
 
-// ExecutionCallbacksExecuted provides a mock function with given fields: callbackCount, processComputationUsed, executeComputationLimits
-func (_m *ExecutionMetrics) ExecutionCallbacksExecuted(callbackCount int, processComputationUsed uint64, executeComputationLimits uint64) {
-	_m.Called(callbackCount, processComputationUsed, executeComputationLimits)
+// ExecutionScheduledTransactionsExecuted provides a mock function with given fields: transactionCount, processComputationUsed, executeComputationLimits
+func (_m *ExecutionMetrics) ExecutionScheduledTransactionsExecuted(transactionCount int, processComputationUsed uint64, executeComputationLimits uint64) {
+	_m.Called(transactionCount, processComputationUsed, executeComputationLimits)
 }
 
 // ExecutionCheckpointSize provides a mock function with given fields: bytes

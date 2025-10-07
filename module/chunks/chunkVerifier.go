@@ -30,7 +30,7 @@ type ChunkVerifier struct {
 	vm             fvm.VM
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
-	callbackCtx    fvm.Context
+	scheduledTxCtx fvm.Context
 	logger         zerolog.Logger
 }
 
@@ -40,7 +40,7 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 		vm:             vm,
 		vmCtx:          vmCtx,
 		systemChunkCtx: computer.SystemChunkContext(vmCtx, metrics.NewNoopCollector()),
-		callbackCtx:    computer.CallbackContext(vmCtx, metrics.NewNoopCollector()),
+		scheduledTxCtx: computer.ScheduledTransactionContext(vmCtx, metrics.NewNoopCollector()),
 		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
@@ -57,13 +57,13 @@ func (fcv *ChunkVerifier) Verify(
 ) {
 
 	var ctx fvm.Context
-	var callbackCtx fvm.Context
+	var scheduledTxCtx fvm.Context
 	var transactions []*fvm.TransactionProcedure
 	derivedBlockData := derived.NewEmptyDerivedBlockData(logical.Time(vc.TransactionOffset))
 
 	if vc.IsSystemChunk {
 		ctx = contextFromVerifiableChunk(fcv.systemChunkCtx, vc, derivedBlockData)
-		callbackCtx = contextFromVerifiableChunk(fcv.callbackCtx, vc, derivedBlockData)
+		scheduledTxCtx = contextFromVerifiableChunk(fcv.scheduledTxCtx, vc, derivedBlockData)
 		// transactions will be dynamically created for system chunk
 	} else {
 		ctx = contextFromVerifiableChunk(fcv.vmCtx, vc, derivedBlockData)
@@ -80,7 +80,7 @@ func (fcv *ChunkVerifier) Verify(
 
 	res, err := fcv.verifyTransactionsInContext(
 		ctx,
-		callbackCtx,
+		scheduledTxCtx,
 		vc.TransactionOffset,
 		vc.Chunk,
 		vc.ChunkDataPack,
@@ -135,7 +135,7 @@ func (storage *partialLedgerStorageSnapshot) Get(
 
 func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context fvm.Context,
-	callbackCtx fvm.Context,
+	scheduledTxCtx fvm.Context,
 	transactionOffset uint32,
 	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
@@ -211,7 +211,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	if systemChunk {
 		transactions, processResult, err = fcv.createSystemChunk(
-			callbackCtx,
+			scheduledTxCtx,
 			&snapshotTree,
 			chunkState,
 			transactionOffset,
@@ -232,7 +232,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		txResults = make([]flow.LightTransactionResult, len(transactions))
 	}
 
-	// If system chunk, we already executed the process callback transaction so skip it
+	// If system chunk, we already executed the process scheduled transaction so skip it
 	// by setting the start index to 1 and assigning existing process result to tx results
 	if processResult != nil {
 		// if process was executed, transaction length should always be at least 2 (process + system)
@@ -240,16 +240,16 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		txStartIndex = 1
 	}
 
-	// Executes all transactions in this chunk (or remaining transactions for callbacks)
+	// Executes all transactions in this chunk (or remaining transactions for scheduled transactions)
 	for i := txStartIndex; i < len(transactions); i++ {
 		tx := transactions[i]
 		ctx := context
 
-		// For system chunks with callbacks:
-		// - Process callback transaction and callback executions use callbackCtx
+		// For system chunks with scheduled transactions:
+		// - Process scheduled transaction and scheduled transaction executions use scheduledTxCtx
 		// - System transaction (last one) uses the original system chunk context
-		if systemChunk && context.ScheduleCallbacksEnabled && i < len(transactions)-1 {
-			ctx = callbackCtx
+		if systemChunk && context.ScheduledTransactionsEnabled && i < len(transactions)-1 {
+			ctx = scheduledTxCtx
 		}
 
 		executionSnapshot, output, err := fcv.vm.Run(
@@ -376,7 +376,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	cedCollection := chunkDataPack.Collection
 	// the system chunk collection is not included in the chunkDataPack, but is included in the
 	// ChunkExecutionData. Create the collection here using the transaction bodies from the
-	// transactions list (includes process callback + callback executions + system transaction)
+	// transactions list (includes process scheduled transaction + scheduled transaction executions + system transaction)
 	if systemChunk {
 		systemTxBodies := make([]*flow.TransactionBody, len(transactions))
 		for i, tx := range transactions {
@@ -431,20 +431,20 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 }
 
 // createSystemChunk recreates the system chunk transactions and executes the
-// process callback transaction if scheduled callbacks are enabled.
+// process scheduled transaction if scheduled transactions are enabled.
 //
 // Returns system transaction list, which contains the system chunk transaction
-// and if the scheduled callbacks are enabled it also includes process / execute
-// callback transactions, and if callbacks enabled it returns the result of the
-// process callback transaction. No errors are expected during normal operation.
+// and if the scheduled transactions are enabled it also includes process / execute
+// scheduled transactions, and if scheduled transactions enabled it returns the result of the
+// process scheduled transaction. No errors are expected during normal operation.
 //
-// If scheduled callbacks are dissabled it will only contain the system transaction.
-// If scheduled callbacks are enabled we need to do the following actions:
-// 1. add and execute the process callback transaction that returns events for execute callbacks
-// 2. add one transaction for each callback event
+// If scheduled transactions are disabled it will only contain the system transaction.
+// If scheduled transactions are enabled we need to do the following actions:
+// 1. add and execute the process scheduled transaction that returns events for execute scheduled transactions
+// 2. add one transaction for each scheduled transaction event
 // 3. add the system transaction as last transaction
 func (fcv *ChunkVerifier) createSystemChunk(
-	callbackCtx fvm.Context,
+	scheduledTxCtx fvm.Context,
 	snapshotTree *snapshot.SnapshotTree,
 	chunkState *fvmState.ExecutionState,
 	transactionOffset uint32,
@@ -456,8 +456,8 @@ func (fcv *ChunkVerifier) createSystemChunk(
 ) ([]*fvm.TransactionProcedure, *flow.LightTransactionResult, error) {
 	txIndex := transactionOffset
 
-	// If scheduled callbacks are dissabled we only have the system transaction in the chunk
-	if !fcv.vmCtx.ScheduleCallbacksEnabled {
+	// If scheduled transactions are disabled we only have the system transaction in the chunk
+	if !fcv.vmCtx.ScheduledTransactionsEnabled {
 		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not get system chunk transaction: %w", err)
@@ -470,19 +470,19 @@ func (fcv *ChunkVerifier) createSystemChunk(
 		}, nil, nil
 	}
 
-	processBody, err := blueprints.ProcessCallbacksTransaction(fcv.vmCtx.Chain)
+	processBody, err := blueprints.ProcessScheduledTransactions(fcv.vmCtx.Chain)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not get process callback transaction: %w", err)
+		return nil, nil, fmt.Errorf("could not get process scheduled transaction: %w", err)
 	}
 	processTx := fvm.Transaction(processBody, txIndex)
 
-	// Execute process callback transaction
-	executionSnapshot, processOutput, err := fcv.vm.Run(callbackCtx, processTx, *snapshotTree)
+	// Execute process scheduled transaction
+	executionSnapshot, processOutput, err := fcv.vm.Run(scheduledTxCtx, processTx, *snapshotTree)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to execute process callback transaction: %w", err)
+		return nil, nil, fmt.Errorf("failed to execute process scheduled transaction: %w", err)
 	}
 	if processOutput.Err != nil {
-		return nil, nil, fmt.Errorf("process callback transaction failed: %w", processOutput.Err)
+		return nil, nil, fmt.Errorf("process scheduled transaction failed: %w", processOutput.Err)
 	}
 
 	processResult := &flow.LightTransactionResult{
@@ -499,18 +499,18 @@ func (fcv *ChunkVerifier) createSystemChunk(
 		return nil, nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, processTx.ID)
 	}
 
-	// Generate callback execution transactions from the events
-	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(fcv.vmCtx.Chain, processOutput.Events)
+	// Generate scheduled transaction execution transactions from the events
+	scheduledTxs, err := blueprints.ExecuteScheduledTransactions(fcv.vmCtx.Chain, processOutput.Events)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate callback execution transactions: %w", err)
+		return nil, nil, fmt.Errorf("failed to generate scheduled transaction execution transactions: %w", err)
 	}
 
-	// Build the final transaction list: [processCallback, ...callbackExecutions, systemTx]
-	transactions := make([]*fvm.TransactionProcedure, 0, len(callbackTxs)+2)
+	// Build the final transaction list: [processScheduled, ...scheduledExecutions, systemTx]
+	transactions := make([]*fvm.TransactionProcedure, 0, len(scheduledTxs)+2)
 	transactions = append(transactions, processTx)
 
-	// Add callback execution transactions
-	for _, c := range callbackTxs {
+	// Add scheduled transaction execution transactions
+	for _, c := range scheduledTxs {
 		txIndex++
 		transactions = append(transactions, fvm.Transaction(c, txIndex))
 	}
@@ -531,7 +531,7 @@ func (fcv *ChunkVerifier) createSystemChunk(
 	*snapshotTree = snapshotTree.Append(executionSnapshot)
 	err = chunkState.Merge(executionSnapshot)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to merge process callback: %w", err)
+		return nil, nil, fmt.Errorf("failed to merge process scheduled transaction: %w", err)
 	}
 
 	return transactions, processResult, nil

@@ -93,7 +93,7 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vmCtx := fvm.NewContext(
 		fvm.WithChain(testChain.Chain()),
-		fvm.WithScheduleCallbacksEnabled(true),
+		fvm.WithScheduledTransactionsEnabled(true),
 	)
 	vmMock := fvmmock.NewVM(s.T())
 
@@ -545,9 +545,9 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	assert.NoError(s.T(), err)
 }
 
-// TestSystemChunkWithNoScheduledCallbacks tests verification of system chunks
+// TestSystemChunkWithNoScheduledTransactions tests verification of system chunks
 // when scheduled callbacks are enabled but no callbacks are actually scheduled
-func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledCallbacks() {
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledTransactions() {
 	// Setup mock outputs for process callback transaction with no events
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
 		ComputationUsed: computationUsed,

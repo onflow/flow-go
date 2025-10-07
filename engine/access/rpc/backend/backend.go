@@ -110,15 +110,15 @@ type Params struct {
 	SubscriptionHandler      *subscription.SubscriptionHandler
 	MaxScriptAndArgumentSize uint
 
-	EventsIndex                *index.EventsIndex
-	TxResultQueryMode          query_mode.IndexQueryMode
-	TxResultsIndex             *index.TransactionResultsIndex
-	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
-	IndexReporter              state_synchronization.IndexReporter
-	VersionControl             *version.VersionControl
-	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
-	TxErrorMessageProvider     error_messages.Provider
-	ScheduledCallbacksEnabled  bool
+	EventsIndex                  *index.EventsIndex
+	TxResultQueryMode            query_mode.IndexQueryMode
+	TxResultsIndex               *index.TransactionResultsIndex
+	LastFullBlockHeight          *counters.PersistentStrictMonotonicCounter
+	IndexReporter                state_synchronization.IndexReporter
+	VersionControl               *version.VersionControl
+	ExecNodeIdentitiesProvider   *rpc.ExecutionNodeIdentitiesProvider
+	TxErrorMessageProvider       error_messages.Provider
+	ScheduledTransactionsEnabled bool
 }
 
 var _ access.API = (*Backend)(nil)
@@ -225,7 +225,7 @@ func New(params Params) (*Backend, error) {
 		systemTxID,
 		txStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -237,32 +237,32 @@ func New(params Params) (*Backend, error) {
 		txStatusDeriver,
 		systemTxID,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
 	txParams := transactions.Params{
-		Log:                         params.Log,
-		Metrics:                     params.AccessMetrics,
-		State:                       params.State,
-		ChainID:                     params.ChainID,
-		SystemTxID:                  systemTxID,
-		StaticCollectionRPCClient:   params.CollectionRPC,
-		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
-		NodeCommunicator:            params.Communicator,
-		ConnFactory:                 params.ConnFactory,
-		EnableRetries:               params.RetryEnabled,
-		NodeProvider:                params.ExecNodeIdentitiesProvider,
-		Blocks:                      params.Blocks,
-		Collections:                 params.Collections,
-		Transactions:                params.Transactions,
-		TxErrorMessageProvider:      params.TxErrorMessageProvider,
-		TxResultCache:               txResCache,
-		TxValidator:                 txValidator,
-		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 params.EventsIndex,
-		TxResultsIndex:              params.TxResultsIndex,
-		ScheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
+		Log:                          params.Log,
+		Metrics:                      params.AccessMetrics,
+		State:                        params.State,
+		ChainID:                      params.ChainID,
+		SystemTxID:                   systemTxID,
+		StaticCollectionRPCClient:    params.CollectionRPC,
+		HistoricalAccessNodeClients:  params.HistoricalAccessNodes,
+		NodeCommunicator:             params.Communicator,
+		ConnFactory:                  params.ConnFactory,
+		EnableRetries:                params.RetryEnabled,
+		NodeProvider:                 params.ExecNodeIdentitiesProvider,
+		Blocks:                       params.Blocks,
+		Collections:                  params.Collections,
+		Transactions:                 params.Transactions,
+		TxErrorMessageProvider:       params.TxErrorMessageProvider,
+		TxResultCache:                txResCache,
+		TxValidator:                  txValidator,
+		TxStatusDeriver:              txStatusDeriver,
+		EventsIndex:                  params.EventsIndex,
+		TxResultsIndex:               params.TxResultsIndex,
+		ScheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
 	}
 
 	switch params.TxResultQueryMode {

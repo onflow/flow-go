@@ -17,14 +17,14 @@ import (
 )
 
 func TestVerifyScheduledCallback(t *testing.T) {
-	suite.Run(t, new(VerifyScheduledCallbackSuite))
+	suite.Run(t, new(VerifyScheduledTransactionsuite))
 }
 
-type VerifyScheduledCallbackSuite struct {
+type VerifyScheduledTransactionsuite struct {
 	Suite
 }
 
-func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
+func (s *VerifyScheduledTransactionsuite) TestVerifyScheduledCallback() {
 	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
 
 	// Wait for next height finalized (potentially first height)

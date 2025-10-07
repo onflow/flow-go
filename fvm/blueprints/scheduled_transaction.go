@@ -14,19 +14,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
+const scheduledTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 
 // SystemCollection returns the re-created system collection after it has been already executed
-// using the events from the process callback transaction.
+// using the events from the process scheduled transaction.
 func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Collection, error) {
-	process, err := ProcessCallbacksTransaction(chain)
+	process, err := ProcessScheduledTransactions(chain)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
+		return nil, fmt.Errorf("failed to construct process scheduled transactions transaction: %w", err)
 	}
 
-	executes, err := ExecuteCallbacksTransactions(chain, processEvents)
+	executes, err := ExecuteScheduledTransactions(chain, processEvents)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
+		return nil, fmt.Errorf("failed to construct execute scheduled transactions: %w", err)
 	}
 
 	systemTx, err := SystemChunkTransaction(chain)
@@ -49,21 +49,21 @@ func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Co
 	return collection, nil
 }
 
-// ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
+// ProcessScheduledTransactions constructs a transaction for processing scheduled transactions.
 // No errors are expected during normal operation.
-func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+func ProcessScheduledTransactions(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	script := templates.GenerateProcessTransactionScript(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
 		SetScript(script).
-		SetComputeLimit(callbackTransactionGasLimit).Build()
+		SetComputeLimit(scheduledTransactionGasLimit).Build()
 }
 
-// ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
+// ExecuteScheduledTransactions constructs a list of transactions to execute scheduled transactions, for the given chain.
 // No errors are expected during normal operation.
-func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
+func ExecuteScheduledTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
 	env := systemcontracts.SystemContractsForChain(chainID.ChainID()).AsTemplateEnv()
 	sc := systemcontracts.SystemContractsForChain(chainID.ChainID())
@@ -77,14 +77,14 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 			continue
 		}
 
-		id, effort, err := callbackArgsFromEvent(event)
+		id, effort, err := scheduledTransactionArgsFromEvent(event)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
+			return nil, fmt.Errorf("failed to get scheduled transaction args from event: %w", err)
 		}
 
-		tx, err := executeCallbackTransaction(sc, env, id, effort)
+		tx, err := executeScheduledTransaction(sc, env, id, effort)
 		if err != nil {
-			return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
+			return nil, fmt.Errorf("failed to construct execute scheduled transactions: %w", err)
 		}
 		txs = append(txs, tx)
 	}
@@ -92,7 +92,7 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 	return txs, nil
 }
 
-func executeCallbackTransaction(
+func executeScheduledTransaction(
 	sc *systemcontracts.SystemContracts,
 	env templates.Environment,
 	id []byte,
@@ -108,15 +108,15 @@ func executeCallbackTransaction(
 		Build()
 }
 
-// callbackArgsFromEvent decodes the event payload and returns the callback ID and effort.
+// scheduledTransactionArgsFromEvent decodes the event payload and returns the scheduled transaction ID and effort.
 //
-// The event for processed callback event is emitted by the process callback transaction from
-// callback scheduler contract and has the following signature:
-// event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
-func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
+// The event for processed scheduled transaction event is emitted by the process scheduled transaction from
+// transaction scheduler contract and has the following signature:
+// event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, owner: Address)
+func scheduledTransactionArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 	const (
-		processedCallbackIDFieldName     = "id"
-		processedCallbackEffortFieldName = "executionEffort"
+		processedTransactionIDFieldName     = "id"
+		processedTransactionEffortFieldName = "executionEffort"
 	)
 
 	eventData, err := ccf.Decode(nil, event.Payload)
@@ -131,12 +131,12 @@ func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 
 	idValue := cadence.SearchFieldByName(
 		cadenceEvent,
-		processedCallbackIDFieldName,
+		processedTransactionIDFieldName,
 	)
 
 	effortValue := cadence.SearchFieldByName(
 		cadenceEvent,
-		processedCallbackEffortFieldName,
+		processedTransactionEffortFieldName,
 	)
 
 	id, ok := idValue.(cadence.UInt64)
@@ -169,7 +169,7 @@ func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
 	return event.Type == processedEventType
 }
 
-// PendingExecutionEventType returns the event type for FlowCallbackScheduler PendingExecution event
+// PendingExecutionEventType returns the event type for FlowTransactionScheduler PendingExecution event
 // for the provided environment.
 func PendingExecutionEventType(env templates.Environment) flow.EventType {
 	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"

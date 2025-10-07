@@ -1012,7 +1012,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.ScheduledCallbacksEnabled = true
+	params.ScheduledTransactionsEnabled = true
 
 	backend, err := New(params)
 	suite.Require().NoError(err)

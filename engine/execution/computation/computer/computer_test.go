@@ -1451,7 +1451,7 @@ func testScheduledCallbackWithError(
 	testLogger := NewTestLogger()
 
 	execCtx := fvm.NewContext(
-		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
+		fvm.WithScheduledTransactionsEnabled(true), // Enable callbacks
 		fvm.WithChain(chain),
 		fvm.WithLogger(testLogger.Logger),
 	)
