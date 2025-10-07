@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -66,7 +67,7 @@ type Transactions struct {
 
 	scheduledTransactionsEnabled bool
 
-	systemTxs map[flow.Identifier]*flow.TransactionBody
+	systemCollection *system.SystemCollection
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
@@ -76,8 +77,7 @@ type Params struct {
 	Metrics                      module.TransactionMetrics
 	State                        protocol.State
 	ChainID                      flow.ChainID
-	SystemTxs                    map[flow.Identifier]*flow.TransactionBody
-	SystemTxID                   flow.Identifier
+	SystemCollection             *system.SystemCollection
 	StaticCollectionRPCClient    accessproto.AccessAPIClient
 	HistoricalAccessNodeClients  []accessproto.AccessAPIClient
 	NodeCommunicator             node_communicator.Communicator
@@ -105,8 +105,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		metrics:                      params.Metrics,
 		state:                        params.State,
 		chainID:                      params.ChainID,
-		systemTxs:                    params.SystemTxs,
-		systemTxID:                   params.SystemTxID,
+		systemCollection:             params.SystemCollection,
 		collectionRPCClient:          params.StaticCollectionRPCClient,
 		historicalAccessNodeClients:  params.HistoricalAccessNodeClients,
 		nodeCommunicator:             params.NodeCommunicator,
@@ -282,7 +281,7 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 	}
 
 	// check if it is one of the static system txs
-	if tx, ok := t.systemTxs[txID]; ok {
+	if tx, ok := t.systemCollection.ByID(txID); ok {
 		return tx, nil
 	}
 
@@ -333,7 +332,7 @@ func (t *Transactions) GetTransactionResult(
 		}
 
 		// check if it is one of the static system txs
-		if _, ok := t.systemTxs[txID]; ok {
+		if _, ok := t.systemCollection.ByID(txID); ok {
 			return t.GetSystemTransactionResult(ctx, txID, blockID, requiredEventEncodingVersion)
 		}
 

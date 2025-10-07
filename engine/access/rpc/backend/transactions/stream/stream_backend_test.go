@@ -29,12 +29,12 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -101,9 +101,7 @@ type TransactionStreamSuite struct {
 	db                  storage.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
-
-	systemTxs     map[flow.Identifier]*flow.TransactionBody
-	stdSystemTxID flow.Identifier
+	systemCollection    *system.SystemCollection
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -148,14 +146,8 @@ func (s *TransactionStreamSuite) SetupTest() {
 	s.eventIndex = index.NewEventsIndex(s.indexReporter, s.events)
 	s.txResultIndex = index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults)
 
-	systemCollection, err := blueprints.SystemCollection(s.chainID.Chain(), nil)
+	s.systemCollection, err = system.DefaultSystemCollection(s.chainID)
 	s.Require().NoError(err)
-	s.Require().Len(systemCollection.Transactions, 2)
-	s.systemTxs = make(map[flow.Identifier]*flow.TransactionBody, len(systemCollection.Transactions))
-	for _, tx := range systemCollection.Transactions {
-		s.systemTxs[tx.ID()] = tx
-	}
-	s.stdSystemTxID = systemCollection.Transactions[1].ID()
 
 	s.fixedExecutionNodeIDs = nil
 	s.preferredExecutionNodeIDs = nil
@@ -248,7 +240,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.eventIndex,
 		s.txResultIndex,
 		errorMessageProvider,
-		s.systemTxs,
+		s.systemCollection,
 		txStatusDeriver,
 		s.chainID,
 		true, // scheduledTransactionsEnabled
@@ -262,8 +254,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		nodeCommunicator,
 		execNodeProvider,
 		txStatusDeriver,
-		s.stdSystemTxID,
-		s.systemTxs,
+		s.systemCollection,
 		s.chainID,
 		true, // scheduledTransactionsEnabled
 	)
@@ -315,8 +306,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Metrics:                     metrics.NewNoopCollector(),
 		State:                       s.state,
 		ChainID:                     s.chainID,
-		SystemTxs:                   s.systemTxs,
-		SystemTxID:                  s.stdSystemTxID,
+		SystemCollection:            s.systemCollection,
 		StaticCollectionRPCClient:   client,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,

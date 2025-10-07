@@ -25,12 +25,12 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -139,21 +139,10 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	// create the system collection with an empty set of events. this will generate the collection
-	// with no scheduled transactions, which is just the 2 static system txs.
-	systemCollection, err := blueprints.SystemCollection(params.ChainID.Chain(), nil)
+	systemCollection, err := system.DefaultSystemCollection(params.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct system collection: %w", err)
 	}
-	systemTxs := make(map[flow.Identifier]*flow.TransactionBody, len(systemCollection.Transactions))
-	for _, tx := range systemCollection.Transactions {
-		systemTxs[tx.ID()] = tx
-	}
-	stdSystemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
-	}
-	stdSystemTxID := stdSystemTx.ID()
 
 	accountsBackend, err := accounts.NewAccountsBackend(
 		params.Log,
@@ -232,7 +221,7 @@ func New(params Params) (*Backend, error) {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		systemTxs,
+		systemCollection,
 		txStatusDeriver,
 		params.ChainID,
 		params.ScheduledTransactionsEnabled,
@@ -245,8 +234,7 @@ func New(params Params) (*Backend, error) {
 		params.Communicator,
 		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
-		stdSystemTxID,
-		systemTxs,
+		systemCollection,
 		params.ChainID,
 		params.ScheduledTransactionsEnabled,
 	)
@@ -257,8 +245,7 @@ func New(params Params) (*Backend, error) {
 		Metrics:                      params.AccessMetrics,
 		State:                        params.State,
 		ChainID:                      params.ChainID,
-		SystemTxID:                   stdSystemTxID,
-		SystemTxs:                    systemTxs,
+		SystemCollection:             systemCollection,
 		StaticCollectionRPCClient:    params.CollectionRPC,
 		HistoricalAccessNodeClients:  params.HistoricalAccessNodes,
 		NodeCommunicator:             params.Communicator,

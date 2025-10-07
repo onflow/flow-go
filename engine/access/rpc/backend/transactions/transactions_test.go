@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -96,8 +97,7 @@ type Suite struct {
 	errorMessageProvider error_messages.Provider
 
 	chainID                              flow.ChainID
-	stdSystemTx                          *flow.TransactionBody
-	systemTxs                            map[flow.Identifier]*flow.TransactionBody
+	defaultSystemCollection              *system.SystemCollection
 	systemCollection                     *flow.Collection
 	pendingExecutionEvents               []flow.Event
 	processScheduledTransactionEventType flow.EventType
@@ -151,15 +151,8 @@ func (suite *Suite) SetupTest() {
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
 
 	// this is the system collection with no scheduled transactions used within the backend
-	systemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), nil)
+	suite.defaultSystemCollection, err = system.DefaultSystemCollection(suite.chainID)
 	suite.Require().NoError(err)
-	suite.systemTxs = make(map[flow.Identifier]*flow.TransactionBody, len(systemCollection.Transactions))
-	for _, tx := range systemCollection.Transactions {
-		suite.systemTxs[tx.ID()] = tx
-	}
-	suite.stdSystemTx, err = blueprints.SystemChunkTransaction(suite.chainID.Chain())
-	suite.Require().NoError(err)
-	suite.Require().Contains(suite.systemTxs, suite.stdSystemTx.ID())
 	suite.scheduledTransactionsEnabled = true
 
 	// this is the system collection with scheduled transactions used as block data
@@ -217,8 +210,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		nodeCommunicator,
 		nodeProvider,
 		txStatusDeriver,
-		suite.stdSystemTx.ID(),
-		suite.systemTxs,
+		suite.defaultSystemCollection,
 		suite.chainID,
 		suite.scheduledTransactionsEnabled,
 	)
@@ -228,8 +220,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Metrics:                      metrics.NewNoopCollector(),
 		State:                        suite.state,
 		ChainID:                      flow.Testnet,
-		SystemTxID:                   suite.stdSystemTx.ID(),
-		SystemTxs:                    suite.systemTxs,
+		SystemCollection:             suite.defaultSystemCollection,
 		StaticCollectionRPCClient:    suite.historicalAccessAPIClient,
 		HistoricalAccessNodeClients:  nil,
 		NodeCommunicator:             nodeCommunicator,
@@ -466,8 +457,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		params.NodeCommunicator,
 		params.NodeProvider,
 		params.TxStatusDeriver,
-		suite.stdSystemTx.ID(),
-		suite.systemTxs,
+		suite.defaultSystemCollection,
 		suite.chainID,
 		true,
 	)
@@ -479,8 +469,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		params.NodeCommunicator,
 		params.NodeProvider,
 		params.TxStatusDeriver,
-		suite.stdSystemTx.ID(),
-		suite.systemTxs,
+		suite.defaultSystemCollection,
 		suite.chainID,
 		false,
 	)
@@ -498,7 +487,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks DISABLED - system txID", func() {
@@ -509,10 +498,10 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.stdSystemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.defaultSystemCollection.SystemTxID(), blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks DISABLED - non-system txID fails", func() {
@@ -523,7 +512,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.defaultSystemCollection.SystemTxID(), blockID)
 		suite.Require().Error(err)
 		suite.Require().Nil(res)
 	})
@@ -539,7 +528,7 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks ENABLED - system txID", func() {
@@ -550,10 +539,10 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.stdSystemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.defaultSystemCollection.SystemTxID(), blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks ENABLED - system collection TX", func() {
@@ -571,11 +560,10 @@ func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		systemTx := suite.systemCollection.Transactions[2]
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.defaultSystemCollection.SystemTxID(), blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(systemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks ENABLED - non-system txID fails", func() {
@@ -611,7 +599,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		suite.systemTxs,
+		suite.defaultSystemCollection,
 		params.TxStatusDeriver,
 		suite.chainID,
 		true,
@@ -623,7 +611,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		suite.systemTxs,
+		suite.defaultSystemCollection,
 		params.TxStatusDeriver,
 		suite.chainID,
 		false,
@@ -642,7 +630,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks DISABLED - system txID", func() {
@@ -653,10 +641,10 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.stdSystemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.defaultSystemCollection.SystemTxID(), blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks DISABLED - non-system txID fails", func() {
@@ -683,7 +671,7 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks ENABLED - system txID", func() {
@@ -694,10 +682,10 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.stdSystemTx.ID(), blockID)
+		res, err := txBackend.GetSystemTransaction(context.Background(), suite.defaultSystemCollection.SystemTxID(), blockID)
 		suite.Require().NoError(err)
 
-		suite.Require().Equal(suite.stdSystemTx, res)
+		suite.Require().Equal(suite.defaultSystemCollection.SystemTx(), res)
 	})
 
 	suite.Run("scheduled callbacks ENABLED - system collection TX", func() {
@@ -773,7 +761,7 @@ func (suite *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
 		events := unittest.EventGenerator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 		eventMessages := convert.EventsToMessages(events)
 
-		systemTxID := suite.stdSystemTx.ID()
+		systemTxID := suite.defaultSystemCollection.SystemTxID()
 		expectedRequest := &execproto.GetTransactionResultRequest{
 			BlockId:       blockID[:],
 			TransactionId: systemTxID[:],
@@ -851,7 +839,7 @@ func (suite *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 	sysTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
 	suite.Require().NoError(err)
 	suite.Require().NotNil(sysTx)
-	txId := suite.stdSystemTx.ID()
+	txId := suite.defaultSystemCollection.SystemTxID()
 	blockId := block.ID()
 
 	suite.blocks.
@@ -898,7 +886,7 @@ func (suite *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		params.SystemTxs,
+		params.SystemCollection,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledTransactionsEnabled,
@@ -957,7 +945,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	eventsPerBlock := 10
 	eventMessages := make([]*entities.Event, eventsPerBlock)
 
-	systemTxID := suite.stdSystemTx.ID()
+	systemTxID := suite.defaultSystemCollection.SystemTxID()
 	expectedRequest := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: systemTxID[:],
@@ -1083,7 +1071,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		params.SystemTxs,
+		params.SystemCollection,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledTransactionsEnabled,
@@ -1176,7 +1164,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		params.SystemTxs,
+		params.SystemCollection,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledTransactionsEnabled,
@@ -1236,7 +1224,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	}
 	// simulate the system tx
 	lightTxResults = append(lightTxResults, flow.LightTransactionResult{
-		TransactionID:   suite.stdSystemTx.ID(),
+		TransactionID:   suite.defaultSystemCollection.SystemTxID(),
 		Failed:          false,
 		ComputationUsed: 10,
 	})
@@ -1293,7 +1281,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		params.SystemTxs,
+		params.SystemCollection,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledTransactionsEnabled,
@@ -1385,7 +1373,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			params.EventsIndex,
 			params.TxResultsIndex,
 			params.TxErrorMessageProvider,
-			params.SystemTxs,
+			params.SystemCollection,
 			params.TxStatusDeriver,
 			params.ChainID,
 			params.ScheduledTransactionsEnabled,
@@ -1447,8 +1435,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			params.NodeCommunicator,
 			params.NodeProvider,
 			params.TxStatusDeriver,
-			params.SystemTxID,
-			params.SystemTxs,
+			params.SystemCollection,
 			params.ChainID,
 			params.ScheduledTransactionsEnabled,
 		)
@@ -1601,8 +1588,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 		params.NodeCommunicator,
 		params.NodeProvider,
 		params.TxStatusDeriver,
-		params.SystemTxID,
-		params.SystemTxs,
+		params.SystemCollection,
 		params.ChainID,
 		params.ScheduledTransactionsEnabled,
 	)
@@ -1813,7 +1799,7 @@ func (suite *Suite) assertTransactionResultResponse(
 	suite.Assert().Equal(block.ID(), response.BlockID)
 	suite.Assert().Equal(block.Height, response.BlockHeight)
 	suite.Assert().Equal(txId, response.TransactionID)
-	if txId == suite.stdSystemTx.ID() {
+	if txId == suite.defaultSystemCollection.SystemTxID() {
 		suite.Assert().Equal(flow.ZeroID, response.CollectionID)
 	} else {
 		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response.CollectionID)

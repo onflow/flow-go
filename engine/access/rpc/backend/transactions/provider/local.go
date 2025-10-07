@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -35,7 +36,7 @@ type LocalTransactionProvider struct {
 	eventsIndex                  *index.EventsIndex
 	txResultsIndex               *index.TransactionResultsIndex
 	txErrorMessages              error_messages.Provider
-	systemTxs                    map[flow.Identifier]*flow.TransactionBody
+	systemCollection             *system.SystemCollection
 	txStatusDeriver              *txstatus.TxStatusDeriver
 	scheduledTransactionsEnabled bool
 	chainID                      flow.ChainID
@@ -50,7 +51,7 @@ func NewLocalTransactionProvider(
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
 	txErrorMessages error_messages.Provider,
-	systemTxs map[flow.Identifier]*flow.TransactionBody,
+	systemCollection *system.SystemCollection,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	chainID flow.ChainID,
 	scheduledTransactionsEnabled bool,
@@ -62,7 +63,7 @@ func NewLocalTransactionProvider(
 		eventsIndex:                  eventsIndex,
 		txResultsIndex:               txResultsIndex,
 		txErrorMessages:              txErrorMessages,
-		systemTxs:                    systemTxs,
+		systemCollection:             systemCollection,
 		txStatusDeriver:              txStatusDeriver,
 		scheduledTransactionsEnabled: scheduledTransactionsEnabled,
 		chainID:                      chainID,
@@ -242,12 +243,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 	}
 
 	if !t.scheduledTransactionsEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
-		if err != nil {
-			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
-		}
-
-		return append(transactions, systemTx), nil
+		return append(transactions, t.systemCollection.SystemTx()), nil
 	}
 
 	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
@@ -366,14 +362,15 @@ func (t *LocalTransactionProvider) SystemTransaction(
 ) (*flow.TransactionBody, error) {
 	blockID := block.ID()
 
-	if tx, ok := t.systemTxs[txID]; ok {
-		return tx, nil
+	if !t.scheduledTransactionsEnabled {
+		if txID == t.systemCollection.SystemTxID() {
+			return t.systemCollection.SystemTx(), nil
+		}
+		return nil, status.Errorf(codes.NotFound, "system transaction not found")
 	}
 
-	// the static system txs were already checked above. if scheduled tx are disabled, then this was
-	// not a system tx.
-	if !t.scheduledTransactionsEnabled {
-		return nil, status.Errorf(codes.NotFound, "system transaction not found")
+	if tx, ok := t.systemCollection.ByID(txID); ok {
+		return tx, nil
 	}
 
 	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
@@ -402,7 +399,7 @@ func (t *LocalTransactionProvider) SystemTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	// make sure the request is for a system transaction
-	if _, ok := t.systemTxs[txID]; !ok {
+	if _, ok := t.systemCollection.ByID(txID); !ok {
 		if _, err := t.SystemTransaction(ctx, block, txID); err != nil {
 			return nil, status.Errorf(codes.NotFound, "system transaction not found")
 		}

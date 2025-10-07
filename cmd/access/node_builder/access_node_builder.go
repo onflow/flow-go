@@ -292,7 +292,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
-		scheduledTransactionsEnabled:         fvm.DefaultScheduledTransactionsEnabled,
+		scheduledTransactionsEnabled:         fvm.DefaultScheduledCallbacksEnabled,
 	}
 }
 

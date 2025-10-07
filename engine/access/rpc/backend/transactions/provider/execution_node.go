@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -39,8 +40,7 @@ type ENTransactionProvider struct {
 
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	systemTxs                            map[flow.Identifier]*flow.TransactionBody
-	systemTxID                           flow.Identifier // Transaction ID of the standard system transaction
+	systemCollection                     *system.SystemCollection
 	scheduledTransactionsEnabled         bool
 	processScheduledTransactionEventType flow.EventType
 }
@@ -55,8 +55,7 @@ func NewENTransactionProvider(
 	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
-	systemTxID flow.Identifier,
-	systemTxs map[flow.Identifier]*flow.TransactionBody,
+	systemCollection *system.SystemCollection,
 	chainID flow.ChainID,
 	scheduledTransactionsEnabled bool,
 ) *ENTransactionProvider {
@@ -69,8 +68,7 @@ func NewENTransactionProvider(
 		nodeCommunicator:                     nodeCommunicator,
 		nodeProvider:                         execNodeIdentitiesProvider,
 		txStatusDeriver:                      txStatusDeriver,
-		systemTxs:                            systemTxs,
-		systemTxID:                           systemTxID,
+		systemCollection:                     systemCollection,
 		chainID:                              chainID,
 		scheduledTransactionsEnabled:         scheduledTransactionsEnabled,
 		processScheduledTransactionEventType: blueprints.PendingExecutionEventType(env),
@@ -152,12 +150,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
 	// transactions were enabled for this block. See https://github.com/onflow/flow-go/issues/7873
 	if !e.scheduledTransactionsEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
-		if err != nil {
-			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
-		}
-
-		return append(transactions, systemTx), nil
+		return append(transactions, e.systemCollection.SystemTx()), nil
 	}
 
 	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledTransactionEventType)
@@ -301,19 +294,18 @@ func (e *ENTransactionProvider) SystemTransaction(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	blockID := block.ID()
-
-	if tx, ok := e.systemTxs[txID]; ok {
-		return tx, nil
-	}
-
-	// the static system txs were already checked above. if scheduled tx are disabled, then this was
-	// not a system tx.
 	if !e.scheduledTransactionsEnabled {
+		if txID == e.systemCollection.SystemTxID() {
+			return e.systemCollection.SystemTx(), nil
+		}
 		return nil, status.Errorf(codes.NotFound, "system transaction not found")
 	}
 
-	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledTransactionEventType)
+	if tx, ok := e.systemCollection.ByID(txID); ok {
+		return tx, nil
+	}
+
+	events, err := e.getBlockEvents(ctx, block.ID(), e.processScheduledTransactionEventType)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
@@ -339,7 +331,7 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	// make sure the request is for a system transaction
-	if _, ok := e.systemTxs[txID]; !ok {
+	if _, ok := e.systemCollection.ByID(txID); !ok {
 		if _, err := e.SystemTransaction(ctx, block, txID); err != nil {
 			return nil, status.Errorf(codes.NotFound, "system transaction not found")
 		}
@@ -461,7 +453,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
 	// transactions were enabled for this block. See https://github.com/onflow/flow-go/issues/7873
 	if len(systemTxResults) == 1 {
-		return []flow.Identifier{e.systemTxID}, nil
+		return []flow.Identifier{e.systemCollection.SystemTxID()}, nil
 	}
 
 	// if scheduled callbacks are enabled, the first transaction will always be the "process" transaction
