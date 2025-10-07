@@ -554,12 +554,13 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithExecutionResultBlockID(blockID),
 			unittest.WithServiceEvents(3))
 
-		require.NoError(suite.T(), storage.WithLock(lockManager, storage.LockIndexFinalizedBlock, func(lctx lockctx.Context) error {
+		require.NoError(suite.T(), storage.WithLock(lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := all.Results.BatchStore(er, rw)
 				if err != nil {
 					return err
 				}
+				// requires LockInsertOwnReceipt
 				return all.Results.BatchIndex(lctx, rw, blockID, er.ID())
 			})
 		}))

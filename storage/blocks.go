@@ -88,7 +88,7 @@ type Blocks interface {
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
 	// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
-	// The caller must acquire a storage.LockIndexFinalizedBlock lock.
+	// The caller must acquire a storage.LockIndexCollectionsByBlock lock.
 	//
 	// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 	// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY

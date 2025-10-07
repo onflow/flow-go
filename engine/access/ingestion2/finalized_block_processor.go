@@ -153,27 +153,26 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 //
 // No errors are expected during normal operations.
 func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
-	err := storage.WithLock(p.lockManager, storage.LockIndexFinalizedBlock, func(lctx lockctx.Context) error {
-		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return p.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
-		})
-	})
-	if err != nil {
-		return fmt.Errorf("could not index block for collections: %w", err)
-	}
-
-	err = storage.WithLock(p.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// loop through seals and index ID -> result ID
-			for _, seal := range block.Payload.Seals {
-				err := p.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
+	err := storage.WithLocks(p.lockManager,
+		[]string{storage.LockIndexCollectionsByBlock, storage.LockInsertOwnReceipt}, func(lctx lockctx.Context) error {
+			return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// require storage.LockIndexCollectionsByBlock
+				err := p.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
 				if err != nil {
-					return fmt.Errorf("could not index block for execution result: %w", err)
+					return fmt.Errorf("could not index block for collections: %w", err)
 				}
-			}
-			return nil
+
+				// loop through seals and index ID -> result ID
+				for _, seal := range block.Payload.Seals {
+					// require storage.LockInsertOwnReceipt
+					err := p.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
+					if err != nil {
+						return fmt.Errorf("could not index block for execution result: %w", err)
+					}
+				}
+				return nil
+			})
 		})
-	})
 	if err != nil {
 		return fmt.Errorf("could not index execution results: %w", err)
 	}

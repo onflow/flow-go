@@ -216,7 +216,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 }
 
 // BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
-// The caller must acquire a storage.LockIndexFinalizedBlock lock.
+// The caller must acquire a storage.LockIndexCollectionByBlock lock.
 // Error returns:
 //   - storage.ErrAlreadyExists if any collection ID has already been indexed
 func (b *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {

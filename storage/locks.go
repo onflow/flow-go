@@ -35,9 +35,8 @@ const (
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
-	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
-	// LockIndexFinalizedBlock protects AN indexing finalized blocks by block ID.
-	LockIndexFinalizedBlock = "lock_index_finalized_block"
+	LockInsertChunkDataPack     = "lock_insert_chunk_data_pack"
+	LockIndexCollectionsByBlock = "lock_index_collections_by_block"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -55,7 +54,7 @@ func Locks() []string {
 		LockInsertLightTransactionResult,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
-		LockIndexFinalizedBlock,
+		LockIndexCollectionsByBlock,
 	}
 }
 
