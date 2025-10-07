@@ -415,7 +415,6 @@ func (s *state) saveExecutionResults(
 		storage.LockInsertEvent,
 		storage.LockInsertAndIndexTxResult,
 		storage.LockInsertOwnReceipt,
-		storage.LockInsertAndIndexTxResult,
 		storage.LockIndexStateCommitment,
 	}
 	// Acquire locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
