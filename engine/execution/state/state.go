@@ -426,7 +426,7 @@ func (s *state) saveExecutionResults(
 
 		// Save entire execution result (including all chunk data packs) within one batch to minimize
 		// the number of database interactions.
-		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+		return storage.SkipAlreadyExistsError(s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			batch.AddCallback(func(err error) {
 				// Rollback if an error occurs during batch operations
 				// Chunk data packs are saved in a separate database, there is a chance
@@ -456,13 +456,12 @@ func (s *state) saveExecutionResults(
 			}
 
 			// require LockInsertAndIndexTxResult
-			// skip already exists error to make it idempotent
-			err = storage.SkipAlreadyExistsError(s.transactionResults.BatchStore(
+			err = s.transactionResults.BatchStore(
 				lctx,
 				batch,
 				blockID,
 				result.AllTransactionResults(),
-			))
+			)
 			if err != nil {
 				return fmt.Errorf("cannot store transaction result: %w", err)
 			}
@@ -491,7 +490,7 @@ func (s *state) saveExecutionResults(
 			}
 
 			return nil
-		})
+		}))
 	})
 }
 
