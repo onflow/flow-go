@@ -64,25 +64,23 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 
 	}
 
-	blockExecutionData := snapshot.BlockExecutionData(ctx, blockID)
+	blockExecutionDataReader := snapshot.BlockExecutionData()
+	executionData, err := blockExecutionDataReader.ByBlockID(ctx, blockID)
+	if err != nil {
+		// need custom not found handler due to blob not found error
+		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) || errors.Is(err, subscription.ErrBlockNotReady) {
+			return nil, nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
+		}
 
-	//execDataCache := snapshot.ExecutionData()
-	//executionData, err := execDataCache.ByBlockID(ctx, blockID)
-	//if err != nil {
-	//	// need custom not found handler due to blob not found error
-	//	if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) || errors.Is(err, subscription.ErrBlockNotReady) {
-	//		return nil, nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
-	//	}
-	//
-	//	return nil, nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
-	//}
+		return nil, nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
+	}
 
 	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: executionResultID,
 		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
-	return &blockExecutionData, metadata, nil
+	return executionData.BlockExecutionData, metadata, nil
 }
 
 // SubscribeExecutionData is deprecated and will be removed in future versions.

@@ -75,6 +75,8 @@ packages:
       all: False
     interfaces:
       Core:
+      Snapshot:
+      BlockExecutionDataReader:
   github.com/onflow/flow-go/module/executiondatasync/tracker:
   github.com/onflow/flow-go/module/forest:
   github.com/onflow/flow-go/module/mempool:
