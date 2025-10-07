@@ -150,7 +150,7 @@ type ChunkDataPack struct {
 	ChunkID    Identifier      // ID of the chunk this data pack is for
 	StartState StateCommitment // commitment for starting state
 	Proof      StorageProof    // proof for all registers touched (read or written) during the chunk execution
-	Collection *Collection     // collection executed in this chunk
+	Collection *Collection     // collection executed in this chunk; nil for system chunk
 
 	// ExecutionDataRoot is the root data structure of an execution_data.BlockExecutionData.
 	// It contains the necessary information for a verification node to validate that the

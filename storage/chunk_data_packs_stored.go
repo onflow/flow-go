@@ -7,11 +7,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ChunkDataPacks represents persistent storage for chunk data packs.
+// StoredChunkDataPacks represents persistent storage for chunk data packs.
+// It works with the reduced representation `StoredChunkDataPack` for chunk data packs,
+// where instead of the full collection text, only the collection's hash (ID) is contained.
 type StoredChunkDataPacks interface {
 	// StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
 	// It returns the IDs of the stored chunk data packs.
-	// No error are expected during normal operation.
+	// No error returns are expected during normal operation.
 	StoreChunkDataPacks(cs []*StoredChunkDataPack) ([]flow.Identifier, error)
 
 	// ByID returns the StoredChunkDataPack for the given ID.
@@ -19,11 +21,11 @@ type StoredChunkDataPacks interface {
 	ByID(id flow.Identifier) (*StoredChunkDataPack, error)
 
 	// Remove removes multiple ChunkDataPacks cs keyed by their StoredChunkDataPack IDs in a batch.
-	// No errors are expected during normal operation.
+	// No errors returns are expected during normal operation.
 	Remove(cs []flow.Identifier) error
 
 	// BatchRemove removes multiple StoredChunkDataPacks cs keyed by their IDs in a batch using the provided
-	// No errors are expected during normal operation, even if no entries are matched.
+	// No errors returns are expected during normal operation, even if no entries are matched.
 	BatchRemove(cs []flow.Identifier, batch ReaderBatchWriter) error
 }
 
