@@ -57,3 +57,10 @@ func NewInvalidDKGStateTransitionErrorf(from, to flow.DKGState, msg string, args
 		err:  fmt.Errorf(msg, args...),
 	}
 }
+
+func SkipAlreadyExistsError(err error) error {
+	if errors.Is(err, ErrAlreadyExists) {
+		return nil
+	}
+	return err
+}

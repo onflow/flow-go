@@ -456,11 +456,13 @@ func (s *state) saveExecutionResults(
 			}
 
 			// require LockInsertAndIndexTxResult
-			err = s.transactionResults.BatchStore(
+			// skip already exists error to make it idempotent
+			err = storage.SkipAlreadyExistsError(s.transactionResults.BatchStore(
 				lctx,
+				batch,
 				blockID,
 				result.AllTransactionResults(),
-				batch)
+			))
 			if err != nil {
 				return fmt.Errorf("cannot store transaction result: %w", err)
 			}
