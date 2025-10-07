@@ -1,4 +1,4 @@
-package procedure
+package operation
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation"
 )
 
 // InsertIndex persists the given index keyed by the block ID
@@ -34,23 +33,23 @@ func InsertIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.
 	// If there is no header stored for the block ID, it means no index data for the same block ID
 	// was stored either, as long as the same lock is held, the data is guaranteed to be consistent.
 	w := rw.Writer()
-	err := operation.IndexPayloadGuarantees(lctx, w, blockID, index.GuaranteeIDs)
+	err := IndexPayloadGuarantees(lctx, w, blockID, index.GuaranteeIDs)
 	if err != nil {
 		return fmt.Errorf("could not store guarantee index: %w", err)
 	}
-	err = operation.IndexPayloadSeals(lctx, w, blockID, index.SealIDs)
+	err = IndexPayloadSeals(lctx, w, blockID, index.SealIDs)
 	if err != nil {
 		return fmt.Errorf("could not store seal index: %w", err)
 	}
-	err = operation.IndexPayloadReceipts(lctx, w, blockID, index.ReceiptIDs)
+	err = IndexPayloadReceipts(lctx, w, blockID, index.ReceiptIDs)
 	if err != nil {
 		return fmt.Errorf("could not store receipts index: %w", err)
 	}
-	err = operation.IndexPayloadResults(lctx, w, blockID, index.ResultIDs)
+	err = IndexPayloadResults(lctx, w, blockID, index.ResultIDs)
 	if err != nil {
 		return fmt.Errorf("could not store results index: %w", err)
 	}
-	err = operation.IndexPayloadProtocolStateID(lctx, w, blockID, index.ProtocolStateID)
+	err = IndexPayloadProtocolStateID(lctx, w, blockID, index.ProtocolStateID)
 	if err != nil {
 		return fmt.Errorf("could not store protocol state id: %w", err)
 	}
@@ -59,27 +58,27 @@ func InsertIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.
 
 func RetrieveIndex(r storage.Reader, blockID flow.Identifier, index *flow.Index) error {
 	var guaranteeIDs []flow.Identifier
-	err := operation.LookupPayloadGuarantees(r, blockID, &guaranteeIDs)
+	err := LookupPayloadGuarantees(r, blockID, &guaranteeIDs)
 	if err != nil {
 		return fmt.Errorf("could not retrieve guarantee index: %w", err)
 	}
 	var sealIDs []flow.Identifier
-	err = operation.LookupPayloadSeals(r, blockID, &sealIDs)
+	err = LookupPayloadSeals(r, blockID, &sealIDs)
 	if err != nil {
 		return fmt.Errorf("could not retrieve seal index: %w", err)
 	}
 	var receiptIDs []flow.Identifier
-	err = operation.LookupPayloadReceipts(r, blockID, &receiptIDs)
+	err = LookupPayloadReceipts(r, blockID, &receiptIDs)
 	if err != nil {
 		return fmt.Errorf("could not retrieve receipts index: %w", err)
 	}
 	var resultsIDs []flow.Identifier
-	err = operation.LookupPayloadResults(r, blockID, &resultsIDs)
+	err = LookupPayloadResults(r, blockID, &resultsIDs)
 	if err != nil {
 		return fmt.Errorf("could not retrieve results index: %w", err)
 	}
 	var stateID flow.Identifier
-	err = operation.LookupPayloadProtocolStateID(r, blockID, &stateID)
+	err = LookupPayloadProtocolStateID(r, blockID, &stateID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state id: %w", err)
 	}
