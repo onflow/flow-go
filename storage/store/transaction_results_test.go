@@ -250,6 +250,66 @@ func TestBatchStoreTransactionResultsErrAlreadyExists(t *testing.T) {
 	})
 }
 
+func TestBatchStoreTransactionResultsMissingLock(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := make([]flow.TransactionResult, 0)
+		for i := 0; i < 3; i++ {
+			txID := unittest.IdentifierFixture()
+			expected := flow.TransactionResult{
+				TransactionID: txID,
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+			}
+			txResults = append(txResults, expected)
+		}
+
+		// Create a context without any locks
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+
+		// Attempt to batch store without holding the required lock
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return st.BatchStore(lctx, rw, blockID, txResults)
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "LockInsertAndIndexTxResult")
+	})
+}
+
+func TestBatchStoreTransactionResultsWrongLock(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := make([]flow.TransactionResult, 0)
+		for i := 0; i < 3; i++ {
+			txID := unittest.IdentifierFixture()
+			expected := flow.TransactionResult{
+				TransactionID: txID,
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+			}
+			txResults = append(txResults, expected)
+		}
+
+		// Attempt to batch store with wrong lock (LockInsertBlock instead of LockInsertAndIndexTxResult)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return st.BatchStore(lctx, rw, blockID, txResults)
+			})
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "LockInsertAndIndexTxResult")
+	})
+}
+
 func BenchmarkTransactionResultCacheKey(b *testing.B) {
 	b.Run("new: create cache key", func(b *testing.B) {
 		blockID := unittest.IdentifierFixture()
