@@ -34,17 +34,17 @@ func (_m *TransactionResults) BatchRemoveByBlockID(id flow.Identifier, batch sto
 	return r0
 }
 
-// BatchStore provides a mock function with given fields: lctx, blockID, transactionResults, batch
-func (_m *TransactionResults) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(lctx, blockID, transactionResults, batch)
+// BatchStore provides a mock function with given fields: lctx, rw, blockID, transactionResults
+func (_m *TransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
+	ret := _m.Called(lctx, rw, blockID, transactionResults)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, []flow.TransactionResult, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(lctx, blockID, transactionResults, batch)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, []flow.TransactionResult) error); ok {
+		r0 = rf(lctx, rw, blockID, transactionResults)
 	} else {
 		r0 = ret.Error(0)
 	}
