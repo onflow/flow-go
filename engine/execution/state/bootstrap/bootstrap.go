@@ -104,6 +104,10 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 	if err != nil {
 		return err
 	}
+	err = lctx.AcquireLock(storage.LockIndexStateCommitment)
+	if err != nil {
+		return err
+	}
 
 	commit := rootSeal.FinalState
 	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
