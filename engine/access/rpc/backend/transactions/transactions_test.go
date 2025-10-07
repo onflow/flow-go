@@ -10,9 +10,6 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/onflow/cadence"
-	cadenceCommon "github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -38,13 +35,13 @@ import (
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
@@ -56,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
@@ -64,6 +62,7 @@ const expectedErrorMsg = "expected test error"
 type Suite struct {
 	suite.Suite
 
+	g        *fixtures.GeneratorSuite
 	log      zerolog.Logger
 	state    *protocolmock.State
 	snapshot *protocolmock.Snapshot
@@ -78,6 +77,7 @@ type Suite struct {
 	lightTxResults        *storagemock.LightTransactionResults
 	events                *storagemock.Events
 	txResultErrorMessages *storagemock.TransactionResultErrorMessages
+	scheduledTransactions *storagemock.ScheduledTransactions
 	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 
 	db                  *pebble.DB
@@ -113,9 +113,11 @@ func TestTransactionsBackend(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	suite.log = unittest.Logger()
-	suite.snapshot = protocolmock.NewSnapshot(suite.T())
+	suite.chainID = flow.Testnet
+	suite.g = fixtures.NewGeneratorSuite(fixtures.WithChainID(suite.chainID))
 
 	header := unittest.BlockHeaderFixture()
+	suite.snapshot = protocolmock.NewSnapshot(suite.T())
 	suite.params = protocolmock.NewParams(suite.T())
 	suite.params.On("FinalizedRoot").Return(header, nil).Maybe()
 	suite.params.On("SporkID").Return(unittest.IdentifierFixture(), nil).Maybe()
@@ -135,7 +137,7 @@ func (suite *Suite) SetupTest() {
 	suite.executionAPIClient = accessmock.NewExecutionAPIClient(suite.T())
 	suite.lightTxResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
-	suite.chainID = flow.Testnet
+	suite.scheduledTransactions = storagemock.NewScheduledTransactions(suite.T())
 	suite.historicalAccessAPIClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
@@ -156,7 +158,7 @@ func (suite *Suite) SetupTest() {
 	suite.scheduledTransactionsEnabled = true
 
 	// this is the system collection with scheduled transactions used as block data
-	suite.pendingExecutionEvents = suite.createPendingExecutionEvents(2) // 2 callbacks
+	suite.pendingExecutionEvents = suite.g.PendingExecutionEvents().List(2)
 	suite.systemCollection, err = blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
 	suite.Require().NoError(err)
 	suite.processScheduledTransactionEventType = suite.pendingExecutionEvents[0].Type
@@ -232,6 +234,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		Transactions:                 suite.transactions,
 		Events:                       suite.events,
 		TxErrorMessageProvider:       suite.errorMessageProvider,
+		ScheduledTransactions:        suite.scheduledTransactions,
 		TxResultCache:                suite.txResultCache,
 		TxProvider:                   txProvider,
 		TxValidator:                  txValidator,
@@ -1328,11 +1331,8 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 	)
 	blockID := block.ID()
 
-	// Create PendingExecution events for scheduled callbacks
-	pendingExecutionEvents := suite.createPendingExecutionEvents(2) // 2 callbacks
-
 	// Reconstruct expected system collection to get the actual transaction IDs
-	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
+	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
 	suite.Require().NoError(err)
 
 	// Expected transaction counts
@@ -1357,7 +1357,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 		// Mock the events storage to return PendingExecution events
 		suite.events.
 			On("ByBlockID", blockID).
-			Return(pendingExecutionEvents, nil).
+			Return(suite.pendingExecutionEvents, nil).
 			Once()
 
 		suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil)
@@ -1423,7 +1423,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			Return(&col, nil).
 			Once()
 
-		suite.setupExecutionGetEventsRequest(blockID, block.Height, pendingExecutionEvents)
+		suite.setupExecutionGetEventsRequest(blockID, block.Height, suite.pendingExecutionEvents)
 
 		// Set up the backend parameters with EN transaction provider
 		params := suite.defaultTransactionsParams()
@@ -1448,7 +1448,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 		suite.Require().NoError(err)
 
 		// For empty events, we expect: user transactions + process tx + system chunk tx (no execute callback txs)
-		expectedSystemCollectionEmpty, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
+		expectedSystemCollectionEmpty, err := blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
 		suite.Require().NoError(err)
 		expectedTotalCountEmpty := len(col.Transactions) + len(expectedSystemCollectionEmpty.Transactions)
 
@@ -1500,17 +1500,14 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 		}
 	}
 
-	// Create PendingExecution events that would be emitted by the process callback transaction
-	pendingExecutionEvents := suite.createPendingExecutionEvents(2) // 2 callbacks
-
 	// Convert PendingExecution events to protobuf messages for execution node response
-	pendingEventMessages := make([]*entities.Event, len(pendingExecutionEvents))
-	for i, event := range pendingExecutionEvents {
+	pendingEventMessages := make([]*entities.Event, len(suite.pendingExecutionEvents))
+	for i, event := range suite.pendingExecutionEvents {
 		pendingEventMessages[i] = convert.EventToMessage(event)
 	}
 
 	// Reconstruct the expected system collection to get the actual transaction IDs
-	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
+	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
 	suite.Require().NoError(err)
 
 	// Extract the expected transaction IDs in order: process, execute callbacks, system chunk
@@ -1816,68 +1813,6 @@ func (suite *Suite) assertTransactionResultResponse(
 	suite.Assert().Equal(flow.TransactionStatusSealed, response.Status)
 }
 
-// createPendingExecutionEvents creates properly formatted PendingExecution events
-// that blueprints.SystemCollection expects for reconstructing the system collection.
-func (suite *Suite) createPendingExecutionEvents(numCallbacks int) []flow.Event {
-	events := make([]flow.Event, numCallbacks)
-
-	// Get system contracts for the test chain
-	env := systemcontracts.SystemContractsForChain(suite.chainID).AsTemplateEnv()
-
-	for i := 0; i < numCallbacks; i++ {
-		// Create the PendingExecution event as it would be emitted by the process callback transaction
-		const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
-		eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowTransactionSchedulerAddress)
-
-		// Create Cadence event type
-		loc, err := cadenceCommon.HexToAddress(env.FlowTransactionSchedulerAddress)
-		suite.Require().NoError(err)
-		location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
-
-		eventType := cadence.NewEventType(
-			location,
-			"PendingExecution",
-			[]cadence.Field{
-				{Identifier: "id", Type: cadence.UInt64Type},
-				{Identifier: "priority", Type: cadence.UInt8Type},
-				{Identifier: "executionEffort", Type: cadence.UInt64Type},
-				{Identifier: "fees", Type: cadence.UFix64Type},
-				{Identifier: "callbackOwner", Type: cadence.AddressType},
-			},
-			nil,
-		)
-
-		fees, err := cadence.NewUFix64("0.0")
-		suite.Require().NoError(err)
-
-		// Create the Cadence event with proper values
-		event := cadence.NewEvent(
-			[]cadence.Value{
-				cadence.NewUInt64(uint64(i + 1)),           // id: unique callback ID
-				cadence.NewUInt8(1),                        // priority
-				cadence.NewUInt64(uint64((i+1)*100 + 100)), // executionEffort (200, 300, etc.)
-				fees,                          // fees: 0.0
-				cadence.NewAddress([8]byte{}), // callbackOwner
-			},
-		).WithType(eventType)
-
-		// Encode the event using CCF
-		payload, err := ccf.Encode(event)
-		suite.Require().NoError(err)
-
-		// Create the Flow event
-		events[i] = flow.Event{
-			Type:             flow.EventType(eventTypeString),
-			TransactionID:    unittest.IdentifierFixture(), // Process callback transaction ID
-			TransactionIndex: 0,
-			EventIndex:       uint32(i),
-			Payload:          payload,
-		}
-	}
-
-	return events
-}
-
 func (suite *Suite) setupExecutionGetEventsRequest(blockID flow.Identifier, blockHeight uint64, events []flow.Event) {
 	eventMessages := make([]*entities.Event, len(events))
 	for i, event := range events {
@@ -1908,4 +1843,181 @@ func (suite *Suite) setupExecutionGetEventsRequest(blockID flow.Identifier, bloc
 		On("GetExecutionAPIClient", mock.Anything).
 		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
 		Once()
+}
+
+func (suite *Suite) TestGetScheduledTransaction() {
+	scheduledTxID := uint64(42)
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
+
+	tx := suite.systemCollection.Transactions[1]
+	txID := tx.ID()
+
+	suite.Run("happy path", func() {
+		suite.scheduledTransactions.On("TransactionIDByID", scheduledTxID).Return(txID, nil).Once()
+		suite.scheduledTransactions.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
+
+		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
+		suite.events.On("ByBlockID", blockID).Return(suite.pendingExecutionEvents, nil).Once()
+
+		suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil).Once()
+		suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil).Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider.NewLocalTransactionProvider(
+			params.State,
+			params.Collections,
+			params.Blocks,
+			params.EventsIndex,
+			params.TxResultsIndex,
+			params.TxErrorMessageProvider,
+			params.SystemCollection,
+			params.TxStatusDeriver,
+			params.ChainID,
+			params.ScheduledTransactionsEnabled,
+		)
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(tx, res)
+	})
+
+	suite.Run("no scheduled transactions db", func() {
+		params := suite.defaultTransactionsParams()
+		params.ScheduledTransactions = nil
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+		suite.Require().Nil(res)
+		suite.Require().Equal(status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing."), err)
+	})
+
+	suite.Run("missing transaction index", func() {
+		suite.scheduledTransactions.On("TransactionIDByID", scheduledTxID).Return(txID, storage.ErrNotFound).Once()
+
+		params := suite.defaultTransactionsParams()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+		suite.Require().Nil(res)
+		suite.Require().Equal(status.Code(err), codes.NotFound)
+	})
+
+	suite.Run("missing block index", func() {
+		expectedError := fmt.Errorf("failed to find scheduled transaction's blockID index (id: %d, txID: %s): %w", scheduledTxID, txID, storage.ErrNotFound)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedError)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		suite.scheduledTransactions.On("TransactionIDByID", scheduledTxID).Return(txID, nil).Once()
+		suite.scheduledTransactions.On("BlockIDByTransactionID", txID).Return(nil, storage.ErrNotFound).Once()
+
+		params := suite.defaultTransactionsParams()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransaction(signalerCtx, scheduledTxID)
+		suite.Require().Nil(res)
+		suite.Require().Equal(expectedError, err)
+	})
+}
+
+func (suite *Suite) TestGetScheduledTransactionResult_HappyPath() {
+	scheduledTxID := uint64(42)
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
+
+	tx := suite.systemCollection.Transactions[1]
+	txID := tx.ID()
+	events := suite.g.Events().ForTransaction(txID, 1, 1)
+	txResult := suite.g.LightTransactionResults().Fixture(fixtures.LightTransactionResult.WithTransactionID(txID))
+
+	suite.Run("happy path", func() {
+		suite.scheduledTransactions.On("TransactionIDByID", scheduledTxID).Return(txID, nil).Once()
+		suite.scheduledTransactions.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
+
+		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
+		suite.lightTxResults.On("ByBlockIDTransactionID", blockID, txID).Return(&txResult, nil).Once()
+		suite.events.On("ByBlockIDTransactionID", blockID, txID).Return(events, nil).Once()
+		suite.events.On("ByBlockID", blockID).Return(suite.pendingExecutionEvents, nil).Once() // scheduled tx events lookup
+
+		suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil)
+		suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
+
+		suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider.NewLocalTransactionProvider(
+			params.State,
+			params.Collections,
+			params.Blocks,
+			params.EventsIndex,
+			params.TxResultsIndex,
+			params.TxErrorMessageProvider,
+			params.SystemCollection,
+			params.TxStatusDeriver,
+			params.ChainID,
+			params.ScheduledTransactionsEnabled,
+		)
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		expected := &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        flow.TransactionStatusSealed,
+			StatusCode:    uint(0),
+			Events:        events,
+			ErrorMessage:  "",
+			BlockID:       blockID,
+			BlockHeight:   block.Height,
+		}
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, entities.EventEncodingVersion_CCF_V0)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expected, res)
+	})
+
+	suite.Run("no scheduled transactions db", func() {
+		params := suite.defaultTransactionsParams()
+		params.ScheduledTransactions = nil
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, entities.EventEncodingVersion_CCF_V0)
+		suite.Require().Nil(res)
+		suite.Require().Equal(status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing."), err)
+	})
+
+	suite.Run("missing transaction index", func() {
+		suite.scheduledTransactions.On("TransactionIDByID", scheduledTxID).Return(txID, storage.ErrNotFound).Once()
+
+		params := suite.defaultTransactionsParams()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, entities.EventEncodingVersion_CCF_V0)
+		suite.Require().Nil(res)
+		suite.Require().Equal(status.Code(err), codes.NotFound)
+	})
+
+	suite.Run("missing block index", func() {
+		expectedError := fmt.Errorf("failed to find scheduled transaction's blockID index (id: %d, txID: %s): %w", scheduledTxID, txID, storage.ErrNotFound)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedError)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		suite.scheduledTransactions.On("TransactionIDByID", scheduledTxID).Return(txID, nil).Once()
+		suite.scheduledTransactions.On("BlockIDByTransactionID", txID).Return(nil, storage.ErrNotFound).Once()
+
+		params := suite.defaultTransactionsParams()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(signalerCtx, scheduledTxID, entities.EventEncodingVersion_CCF_V0)
+		suite.Require().Nil(res)
+		suite.Require().Equal(expectedError, err)
+	})
 }

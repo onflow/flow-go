@@ -44,8 +44,6 @@ type Transactions struct {
 	state   protocol.State
 	chainID flow.ChainID
 
-	systemTxID flow.Identifier
-
 	// RPC Clients & Network
 	collectionRPCClient         accessproto.AccessAPIClient // RPC client tied to a fixed collection node
 	historicalAccessNodeClients []accessproto.AccessAPIClient
@@ -547,7 +545,7 @@ func (t *Transactions) GetSystemTransaction(
 	}
 
 	if txID == flow.ZeroID {
-		txID = t.systemTxID
+		txID = t.systemCollection.SystemTxID()
 	}
 
 	return t.txProvider.SystemTransaction(ctx, block, txID)
@@ -566,7 +564,7 @@ func (t *Transactions) GetSystemTransactionResult(
 	}
 
 	if txID == flow.ZeroID {
-		txID = t.systemTxID
+		txID = t.systemCollection.SystemTxID()
 	}
 
 	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
