@@ -56,11 +56,6 @@ func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 str
 	_m.Called(_a0, _a1)
 }
 
-// ExecutionScheduledTransactionsExecuted provides a mock function with given fields: transactionCount, processComputationUsed, executeComputationLimits
-func (_m *ExecutionMetrics) ExecutionScheduledTransactionsExecuted(transactionCount int, processComputationUsed uint64, executeComputationLimits uint64) {
-	_m.Called(transactionCount, processComputationUsed, executeComputationLimits)
-}
-
 // ExecutionCheckpointSize provides a mock function with given fields: bytes
 func (_m *ExecutionMetrics) ExecutionCheckpointSize(bytes uint64) {
 	_m.Called(bytes)
@@ -104,6 +99,11 @@ func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 // ExecutionLastFinalizedExecutedBlockHeight provides a mock function with given fields: height
 func (_m *ExecutionMetrics) ExecutionLastFinalizedExecutedBlockHeight(height uint64) {
 	_m.Called(height)
+}
+
+// ExecutionScheduledTransactionsExecuted provides a mock function with given fields: transactionCount, processComputationUsed, executeComputationLimits
+func (_m *ExecutionMetrics) ExecutionScheduledTransactionsExecuted(transactionCount int, processComputationUsed uint64, executeComputationLimits uint64) {
+	_m.Called(transactionCount, processComputationUsed, executeComputationLimits)
 }
 
 // ExecutionScriptExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, memoryEstimate
