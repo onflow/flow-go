@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -204,7 +203,7 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 
 	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+			err := operation.FinalizeClusterBlock(lctx, rw, block.ID())
 			if err != nil {
 				return err
 			}
@@ -383,7 +382,7 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	// should be able to retrieve the block
 	r := suite.db.Reader()
 	var extended model.Block
-	err = procedure.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
+	err = operation.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
 	suite.Assert().Nil(err)
 	suite.Assert().Equal(proposal.Block.Payload, extended.Payload)
 
@@ -608,7 +607,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := *head
 		if conflicting {
-			err = procedure.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
+			err = operation.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)

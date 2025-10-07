@@ -1,4 +1,4 @@
-package procedure
+package operation_test
 
 import (
 	"testing"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -20,13 +21,13 @@ func TestInsertRetrieveIndex(t *testing.T) {
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return InsertIndex(lctx, rw, blockID, index)
+				return operation.InsertIndex(lctx, rw, blockID, index)
 			})
 		})
 		require.NoError(t, err)
 
 		var retrieved flow.Index
-		err = RetrieveIndex(db.Reader(), blockID, &retrieved)
+		err = operation.RetrieveIndex(db.Reader(), blockID, &retrieved)
 		require.NoError(t, err)
 
 		require.Equal(t, index, &retrieved)
