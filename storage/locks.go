@@ -75,7 +75,7 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		// for protocol to Bootstrap, during bootstrapping,
 		// we need to insert and finalize
-		Add(LockBootstrapping, LockFinalizeBlock).
+		Add(LockBootstrapping, LockInsertBlock).
 		Add(LockInsertBlock, LockFinalizeBlock).
 
 		// EN to save execution result
