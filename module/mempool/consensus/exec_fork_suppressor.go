@@ -46,6 +46,7 @@ type ExecForkSuppressor struct {
 	execForkDetected      atomic.Bool
 	onExecFork            ExecForkActor
 	execForkEvidenceStore storage.ExecutionForkEvidence
+	lockManager           storage.LockManager
 	log                   zerolog.Logger
 }
 
@@ -61,6 +62,7 @@ func NewExecStateForkSuppressor(
 	seals mempool.IncorporatedResultSeals,
 	onExecFork ExecForkActor,
 	db storage.DB,
+	lockManager storage.LockManager,
 	log zerolog.Logger,
 ) (*ExecForkSuppressor, error) {
 	executionForkEvidenceStore := store.NewExecutionForkEvidence(db)
@@ -83,6 +85,7 @@ func NewExecStateForkSuppressor(
 		execForkDetected:      *atomic.NewBool(execForkDetectedFlag),
 		onExecFork:            onExecFork,
 		execForkEvidenceStore: executionForkEvidenceStore,
+		lockManager:           lockManager,
 		log:                   log.With().Str("mempool", "ExecForkSuppressor").Logger(),
 	}
 

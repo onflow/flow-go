@@ -29,6 +29,8 @@ const (
 	LockBootstrapping = "lock_bootstrapping"
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
 	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	// LockInsertExecutionForkEvidence protects the insertion of execution fork evidence
+	LockInsertExecutionForkEvidence = "lock_insert_execution_fork_evidence"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -42,6 +44,7 @@ func Locks() []string {
 		LockInsertCollection,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
+		LockInsertExecutionForkEvidence,
 	}
 }
 
