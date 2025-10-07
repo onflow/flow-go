@@ -32,5 +32,6 @@ type LightTransactionResults interface {
 	LightTransactionResultsReader
 
 	// BatchStore inserts a batch of transaction result into a batch
+	// it requires the caller to hold [storage.LockInsertLightTransactionResult]
 	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw ReaderBatchWriter) error
 }

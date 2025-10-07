@@ -55,7 +55,7 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 
-		err := unittest.WithLock(t, lockManager, storage.LockIndexCollectionByBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockIndexCollectionsByBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, headerID, []flow.Identifier{collectionGuaranteeID})
 			})
