@@ -40,7 +40,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		}
 		err = unittest.WithLock(t, lockManager, storage.LockInsertAndIndexTxResult, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return st.BatchStore(lctx, blockID, txResults, rw)
+				return st.BatchStore(lctx, rw, blockID, txResults)
 			})
 		})
 		require.NoError(t, err)
@@ -101,9 +101,9 @@ func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
 
 		// Store transaction results of multiple blocks
 		err = storage.WithLock(lockManager, storage.LockInsertAndIndexTxResult, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				for _, blockID := range blockIDs {
-					err := st.BatchStore(lctx, blockID, txResults[blockID], rbw)
+					err := st.BatchStore(lctx, rw, blockID, txResults[blockID])
 					if err != nil {
 						return err
 					}

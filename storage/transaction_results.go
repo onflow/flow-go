@@ -22,7 +22,9 @@ type TransactionResults interface {
 	TransactionResultsReader
 
 	// BatchStore inserts a batch of transaction result into a batch
-	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.TransactionResult, batch ReaderBatchWriter) error
+	// It returns [ErrAlreadyExists] if transaction results for the block already exist.
+	// It requires the caller to hold [storage.LockInsertAndIndexTxResult]
+	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error
 
 	// RemoveByBlockID removes all transaction results for a block
 	BatchRemoveByBlockID(id flow.Identifier, batch ReaderBatchWriter) error

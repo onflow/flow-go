@@ -130,22 +130,15 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 }
 
 // BatchStore will store the transaction results for the given block ID in a batch
-func (tr *TransactionResults) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
-	w := batch.Writer()
-
-	for i, result := range transactionResults {
-		err := operation.InsertTransactionResult(lctx, w, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert tx result: %w", err)
-		}
-
-		err = operation.IndexTransactionResult(lctx, w, blockID, uint32(i), &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch index tx result: %w", err)
-		}
+// It returns [ErrAlreadyExists] if transaction results for the block already exist.
+// It requires the caller to hold [storage.LockInsertAndIndexTxResult]
+func (tr *TransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
+	err := operation.InsertAndIndexTransactionResults(lctx, rw, blockID, transactionResults)
+	if err != nil {
+		return fmt.Errorf("cannot batch insert and index tx results: %w", err)
 	}
 
-	storage.OnCommitSucceed(batch, func() {
+	storage.OnCommitSucceed(rw, func() {
 		for i, result := range transactionResults {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve

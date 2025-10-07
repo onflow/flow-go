@@ -9,17 +9,49 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertTransactionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
+// InsertAndIndexTransactionResults inserts and indexes multiple transaction results in a single batch write.
+// The caller must hold the [storage.LockInsertAndIndexTxResult] lock.
+// It returns [storage.ErrAlreadyExists] if transaction results for the block already exist.
+func InsertAndIndexTransactionResults(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
 	if !lctx.HoldsLock(storage.LockInsertAndIndexTxResult) {
 		return fmt.Errorf("InsertTransactionResult requires LockInsertAndIndexTxResult to be held")
 	}
+
+	// Check if transaction results for the block already exist
+	// We can exit early if we found one result exist
+	// Because regardless transactionResults is empty, or has one, or more results,
+	// we don't want to overwrite existing results
+	prefix := MakePrefix(codeTransactionResult, blockID)
+	checkExists := func(key []byte) error {
+		return fmt.Errorf("transaction results for block %v already exist: %w", blockID, storage.ErrAlreadyExists)
+	}
+	err := IterateKeysByPrefixRange(rw.GlobalReader(), prefix, prefix, checkExists)
+	if err != nil {
+		return err
+	}
+
+	// there is no existing transaction result for the block, we can proceed to insert
+	w := rw.Writer()
+	for i, result := range transactionResults {
+		err := insertTransactionResult(w, blockID, &result)
+		if err != nil {
+			return fmt.Errorf("cannot batch insert tx result: %w", err)
+		}
+
+		err = indexTransactionResult(w, blockID, uint32(i), &result)
+		if err != nil {
+			return fmt.Errorf("cannot batch index tx result: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func insertTransactionResult(w storage.Writer, blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
 	return UpsertByKey(w, MakePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func IndexTransactionResult(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) error {
-	if !lctx.HoldsLock(storage.LockInsertAndIndexTxResult) {
-		return fmt.Errorf("IndexTransactionResult requires LockInsertAndIndexTxResult to be held")
-	}
+func indexTransactionResult(w storage.Writer, blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) error {
 	return UpsertByKey(w, MakePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
