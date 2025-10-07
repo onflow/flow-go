@@ -64,59 +64,63 @@ type Transactions struct {
 	txProvider      provider.TransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	scheduledCallbacksEnabled bool
+	scheduledTransactionsEnabled bool
+
+	systemTxs map[flow.Identifier]*flow.TransactionBody
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
 
 type Params struct {
-	Log                         zerolog.Logger
-	Metrics                     module.TransactionMetrics
-	State                       protocol.State
-	ChainID                     flow.ChainID
-	SystemTxID                  flow.Identifier
-	StaticCollectionRPCClient   accessproto.AccessAPIClient
-	HistoricalAccessNodeClients []accessproto.AccessAPIClient
-	NodeCommunicator            node_communicator.Communicator
-	ConnFactory                 connection.ConnectionFactory
-	EnableRetries               bool
-	NodeProvider                *rpc.ExecutionNodeIdentitiesProvider
-	Blocks                      storage.Blocks
-	Collections                 storage.Collections
-	Transactions                storage.Transactions
-	Events                      storage.Events
-	ScheduledTransactions       storage.ScheduledTransactionsReader
-	TxErrorMessageProvider      error_messages.Provider
-	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
-	TxProvider                  provider.TransactionProvider
-	TxValidator                 *validator.TransactionValidator
-	TxStatusDeriver             *txstatus.TxStatusDeriver
-	EventsIndex                 *index.EventsIndex
-	TxResultsIndex              *index.TransactionResultsIndex
-	ScheduledCallbacksEnabled   bool
+	Log                          zerolog.Logger
+	Metrics                      module.TransactionMetrics
+	State                        protocol.State
+	ChainID                      flow.ChainID
+	SystemTxs                    map[flow.Identifier]*flow.TransactionBody
+	SystemTxID                   flow.Identifier
+	StaticCollectionRPCClient    accessproto.AccessAPIClient
+	HistoricalAccessNodeClients  []accessproto.AccessAPIClient
+	NodeCommunicator             node_communicator.Communicator
+	ConnFactory                  connection.ConnectionFactory
+	EnableRetries                bool
+	NodeProvider                 *rpc.ExecutionNodeIdentitiesProvider
+	Blocks                       storage.Blocks
+	Collections                  storage.Collections
+	Transactions                 storage.Transactions
+	Events                       storage.Events
+	ScheduledTransactions        storage.ScheduledTransactionsReader
+	TxErrorMessageProvider       error_messages.Provider
+	TxResultCache                *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
+	TxProvider                   provider.TransactionProvider
+	TxValidator                  *validator.TransactionValidator
+	TxStatusDeriver              *txstatus.TxStatusDeriver
+	EventsIndex                  *index.EventsIndex
+	TxResultsIndex               *index.TransactionResultsIndex
+	ScheduledTransactionsEnabled bool
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
 	txs := &Transactions{
-		log:                         params.Log,
-		metrics:                     params.Metrics,
-		state:                       params.State,
-		chainID:                     params.ChainID,
-		systemTxID:                  params.SystemTxID,
-		collectionRPCClient:         params.StaticCollectionRPCClient,
-		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
-		nodeCommunicator:            params.NodeCommunicator,
-		connectionFactory:           params.ConnFactory,
-		blocks:                      params.Blocks,
-		collections:                 params.Collections,
-		transactions:                params.Transactions,
-		events:                      params.Events,
-		scheduledTransactions:       params.ScheduledTransactions,
-		txResultCache:               params.TxResultCache,
-		txValidator:                 params.TxValidator,
-		txProvider:                  params.TxProvider,
-		txStatusDeriver:             params.TxStatusDeriver,
-		scheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
+		log:                          params.Log,
+		metrics:                      params.Metrics,
+		state:                        params.State,
+		chainID:                      params.ChainID,
+		systemTxs:                    params.SystemTxs,
+		systemTxID:                   params.SystemTxID,
+		collectionRPCClient:          params.StaticCollectionRPCClient,
+		historicalAccessNodeClients:  params.HistoricalAccessNodeClients,
+		nodeCommunicator:             params.NodeCommunicator,
+		connectionFactory:            params.ConnFactory,
+		blocks:                       params.Blocks,
+		collections:                  params.Collections,
+		transactions:                 params.Transactions,
+		events:                       params.Events,
+		scheduledTransactions:        params.ScheduledTransactions,
+		txResultCache:                params.TxResultCache,
+		txValidator:                  params.TxValidator,
+		txProvider:                   params.TxProvider,
+		txStatusDeriver:              params.TxStatusDeriver,
+		scheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
 	}
 
 	if params.EnableRetries {
@@ -268,19 +272,35 @@ func (t *Transactions) SendRawTransaction(
 }
 
 func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
-	// look up transaction from storage
 	tx, err := t.transactions.ByID(txID)
-	txErr := rpc.ConvertStorageError(err)
-
-	if txErr != nil {
-		if status.Code(txErr) == codes.NotFound {
-			return t.getHistoricalTransaction(ctx, txID)
-		}
-		// Other Error trying to retrieve the transaction, return with err
-		return nil, txErr
+	if err == nil {
+		return tx, nil
 	}
 
-	return tx, nil
+	if !errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.Internal, "failed to lookup transaction: %v", err)
+	}
+
+	// check if it is one of the static system txs
+	if tx, ok := t.systemTxs[txID]; ok {
+		return tx, nil
+	}
+
+	// check if it is a scheduled transaction
+	if t.scheduledTransactions != nil {
+		scheduledTxBlockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
+		if err == nil {
+			return t.GetSystemTransaction(ctx, txID, scheduledTxBlockID)
+		}
+
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.Internal, "failed to lookup system transaction")
+		}
+		// else, this is not a system tx. continue with the normal lookup
+	}
+
+	// otherwise, check if it's a historic transaction
+	return t.getHistoricalTransaction(ctx, txID)
 }
 
 func (t *Transactions) GetTransactionsByBlockID(
@@ -308,9 +328,30 @@ func (t *Transactions) GetTransactionResult(
 
 	tx, err := t.transactions.ByID(txID)
 	if err != nil {
-		txErr := rpc.ConvertStorageError(err)
-		if status.Code(txErr) != codes.NotFound {
-			return nil, txErr
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.Internal, "failed to lookup transaction: %v", err)
+		}
+
+		// check if it is one of the static system txs
+		if _, ok := t.systemTxs[txID]; ok {
+			return t.GetSystemTransactionResult(ctx, txID, blockID, requiredEventEncodingVersion)
+		}
+
+		// check if it is a scheduled transaction
+		if t.scheduledTransactions != nil {
+			scheduledTxBlockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
+			if err == nil {
+				// if the user provided a blockID, it must match the value from the local index
+				if blockID != flow.ZeroID && scheduledTxBlockID != blockID {
+					return nil, status.Errorf(codes.NotFound, "scheduled transaction found in block %d, which is different from requested block %d",
+						scheduledTxBlockID, blockID)
+				}
+				return t.GetSystemTransactionResult(ctx, txID, blockID, requiredEventEncodingVersion)
+			}
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, status.Errorf(codes.Internal, "failed to lookup system transaction")
+			}
+			// else, this is not a system tx. continue with the normal lookup
 		}
 
 		// Tx not found. If we have historical Sporks setup, lets look through those as well

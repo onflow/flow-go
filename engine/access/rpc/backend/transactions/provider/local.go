@@ -29,16 +29,16 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
 // LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
 type LocalTransactionProvider struct {
-	state                     protocol.State
-	collections               storage.Collections
-	blocks                    storage.Blocks
-	eventsIndex               *index.EventsIndex
-	txResultsIndex            *index.TransactionResultsIndex
-	txErrorMessages           error_messages.Provider
-	systemTxID                flow.Identifier
-	txStatusDeriver           *txstatus.TxStatusDeriver
-	scheduledCallbacksEnabled bool
-	chainID                   flow.ChainID
+	state                        protocol.State
+	collections                  storage.Collections
+	blocks                       storage.Blocks
+	eventsIndex                  *index.EventsIndex
+	txResultsIndex               *index.TransactionResultsIndex
+	txErrorMessages              error_messages.Provider
+	systemTxs                    map[flow.Identifier]*flow.TransactionBody
+	txStatusDeriver              *txstatus.TxStatusDeriver
+	scheduledTransactionsEnabled bool
+	chainID                      flow.ChainID
 }
 
 var _ TransactionProvider = (*LocalTransactionProvider)(nil)
@@ -50,22 +50,22 @@ func NewLocalTransactionProvider(
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
 	txErrorMessages error_messages.Provider,
-	systemTxID flow.Identifier,
+	systemTxs map[flow.Identifier]*flow.TransactionBody,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	chainID flow.ChainID,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
-		state:                     state,
-		collections:               collections,
-		blocks:                    blocks,
-		eventsIndex:               eventsIndex,
-		txResultsIndex:            txResultsIndex,
-		txErrorMessages:           txErrorMessages,
-		systemTxID:                systemTxID,
-		txStatusDeriver:           txStatusDeriver,
-		scheduledCallbacksEnabled: scheduledCallbacksEnabled,
-		chainID:                   chainID,
+		state:                        state,
+		collections:                  collections,
+		blocks:                       blocks,
+		eventsIndex:                  eventsIndex,
+		txResultsIndex:               txResultsIndex,
+		txErrorMessages:              txErrorMessages,
+		systemTxs:                    systemTxs,
+		txStatusDeriver:              txStatusDeriver,
+		scheduledTransactionsEnabled: scheduledTransactionsEnabled,
+		chainID:                      chainID,
 	}
 }
 
@@ -241,7 +241,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	if !t.scheduledCallbacksEnabled {
+	if !t.scheduledTransactionsEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
@@ -366,16 +366,14 @@ func (t *LocalTransactionProvider) SystemTransaction(
 ) (*flow.TransactionBody, error) {
 	blockID := block.ID()
 
-	if txID == t.systemTxID || !t.scheduledCallbacksEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
-		}
+	if tx, ok := t.systemTxs[txID]; ok {
+		return tx, nil
+	}
 
-		if txID == systemTx.ID() {
-			return systemTx, nil
-		}
-		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	// the static system txs were already checked above. if scheduled tx are disabled, then this was
+	// not a system tx.
+	if !t.scheduledTransactionsEnabled {
+		return nil, status.Errorf(codes.NotFound, "system transaction not found")
 	}
 
 	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
@@ -404,7 +402,7 @@ func (t *LocalTransactionProvider) SystemTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	// make sure the request is for a system transaction
-	if txID != t.systemTxID {
+	if _, ok := t.systemTxs[txID]; !ok {
 		if _, err := t.SystemTransaction(ctx, block, txID); err != nil {
 			return nil, status.Errorf(codes.NotFound, "system transaction not found")
 		}

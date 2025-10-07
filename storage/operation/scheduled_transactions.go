@@ -14,8 +14,7 @@ func RetrieveTransactionIDByScheduledTransactionID(r storage.Reader, scheduledTx
 	return RetrieveByKey(r, MakePrefix(codeTransactionIDByScheduledTransactionID, scheduledTxID), txID)
 }
 
-// RetrieveBlockIDByScheduledTransactionID retrieves the block ID of the scheduled transaction by
-// its transaction ID.
+// RetrieveBlockIDByScheduledTransactionID retrieves the block ID of the scheduled transaction by its transaction ID.
 //
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound]: if no block ID is found for the given transaction ID

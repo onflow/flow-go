@@ -39,9 +39,10 @@ type ENTransactionProvider struct {
 
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	systemTxID                        flow.Identifier
-	scheduledCallbacksEnabled         bool
-	processScheduledCallbackEventType flow.EventType
+	systemTxs                            map[flow.Identifier]*flow.TransactionBody
+	systemTxID                           flow.Identifier // Transaction ID of the standard system transaction
+	scheduledTransactionsEnabled         bool
+	processScheduledTransactionEventType flow.EventType
 }
 
 var _ TransactionProvider = (*ENTransactionProvider)(nil)
@@ -55,22 +56,24 @@ func NewENTransactionProvider(
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	systemTxID flow.Identifier,
+	systemTxs map[flow.Identifier]*flow.TransactionBody,
 	chainID flow.ChainID,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) *ENTransactionProvider {
 	env := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
 	return &ENTransactionProvider{
-		log:                               log.With().Str("transaction_provider", "execution_node").Logger(),
-		state:                             state,
-		collections:                       collections,
-		connFactory:                       connFactory,
-		nodeCommunicator:                  nodeCommunicator,
-		nodeProvider:                      execNodeIdentitiesProvider,
-		txStatusDeriver:                   txStatusDeriver,
-		systemTxID:                        systemTxID,
-		chainID:                           chainID,
-		scheduledCallbacksEnabled:         scheduledCallbacksEnabled,
-		processScheduledCallbackEventType: blueprints.PendingExecutionEventType(env),
+		log:                                  log.With().Str("transaction_provider", "execution_node").Logger(),
+		state:                                state,
+		collections:                          collections,
+		connFactory:                          connFactory,
+		nodeCommunicator:                     nodeCommunicator,
+		nodeProvider:                         execNodeIdentitiesProvider,
+		txStatusDeriver:                      txStatusDeriver,
+		systemTxs:                            systemTxs,
+		systemTxID:                           systemTxID,
+		chainID:                              chainID,
+		scheduledTransactionsEnabled:         scheduledTransactionsEnabled,
+		processScheduledTransactionEventType: blueprints.PendingExecutionEventType(env),
 	}
 }
 
@@ -148,7 +151,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 	// system transactions
 	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
 	// transactions were enabled for this block. See https://github.com/onflow/flow-go/issues/7873
-	if !e.scheduledCallbacksEnabled {
+	if !e.scheduledTransactionsEnabled {
 		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
@@ -157,7 +160,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		return append(transactions, systemTx), nil
 	}
 
-	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledCallbackEventType)
+	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledTransactionEventType)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
@@ -300,19 +303,17 @@ func (e *ENTransactionProvider) SystemTransaction(
 ) (*flow.TransactionBody, error) {
 	blockID := block.ID()
 
-	if txID == e.systemTxID || !e.scheduledCallbacksEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(e.chainID.Chain())
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
-		}
-
-		if txID == systemTx.ID() {
-			return systemTx, nil
-		}
-		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
+	if tx, ok := e.systemTxs[txID]; ok {
+		return tx, nil
 	}
 
-	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledCallbackEventType)
+	// the static system txs were already checked above. if scheduled tx are disabled, then this was
+	// not a system tx.
+	if !e.scheduledTransactionsEnabled {
+		return nil, status.Errorf(codes.NotFound, "system transaction not found")
+	}
+
+	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledTransactionEventType)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
@@ -338,7 +339,7 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	// make sure the request is for a system transaction
-	if txID != e.systemTxID {
+	if _, ok := e.systemTxs[txID]; !ok {
 		if _, err := e.SystemTransaction(ctx, block, txID); err != nil {
 			return nil, status.Errorf(codes.NotFound, "system transaction not found")
 		}

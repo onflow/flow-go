@@ -111,15 +111,15 @@ type Params struct {
 	SubscriptionHandler      *subscription.SubscriptionHandler
 	MaxScriptAndArgumentSize uint
 
-	EventsIndex                *index.EventsIndex
-	TxResultQueryMode          query_mode.IndexQueryMode
-	TxResultsIndex             *index.TransactionResultsIndex
-	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
-	IndexReporter              state_synchronization.IndexReporter
-	VersionControl             *version.VersionControl
-	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
-	TxErrorMessageProvider     error_messages.Provider
-	ScheduledCallbacksEnabled  bool
+	EventsIndex                  *index.EventsIndex
+	TxResultQueryMode            query_mode.IndexQueryMode
+	TxResultsIndex               *index.TransactionResultsIndex
+	LastFullBlockHeight          *counters.PersistentStrictMonotonicCounter
+	IndexReporter                state_synchronization.IndexReporter
+	VersionControl               *version.VersionControl
+	ExecNodeIdentitiesProvider   *rpc.ExecutionNodeIdentitiesProvider
+	TxErrorMessageProvider       error_messages.Provider
+	ScheduledTransactionsEnabled bool
 }
 
 var _ access.API = (*Backend)(nil)
@@ -139,12 +139,21 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	// the system tx is hardcoded and never changes during runtime
-	systemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
+	// create the system collection with an empty set of events. this will generate the collection
+	// with no scheduled transactions, which is just the 2 static system txs.
+	systemCollection, err := blueprints.SystemCollection(params.ChainID.Chain(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
+		return nil, fmt.Errorf("failed to construct system collection: %w", err)
 	}
-	systemTxID := systemTx.ID()
+	systemTxs := make(map[flow.Identifier]*flow.TransactionBody, len(systemCollection.Transactions))
+	for _, tx := range systemCollection.Transactions {
+		systemTxs[tx.ID()] = tx
+	}
+	stdSystemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+	}
+	stdSystemTxID := stdSystemTx.ID()
 
 	accountsBackend, err := accounts.NewAccountsBackend(
 		params.Log,
@@ -223,10 +232,10 @@ func New(params Params) (*Backend, error) {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		systemTxID,
+		systemTxs,
 		txStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -236,35 +245,37 @@ func New(params Params) (*Backend, error) {
 		params.Communicator,
 		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
-		systemTxID,
+		stdSystemTxID,
+		systemTxs,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
 	txParams := transactions.Params{
-		Log:                         params.Log,
-		Metrics:                     params.AccessMetrics,
-		State:                       params.State,
-		ChainID:                     params.ChainID,
-		SystemTxID:                  systemTxID,
-		StaticCollectionRPCClient:   params.CollectionRPC,
-		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
-		NodeCommunicator:            params.Communicator,
-		ConnFactory:                 params.ConnFactory,
-		EnableRetries:               params.RetryEnabled,
-		NodeProvider:                params.ExecNodeIdentitiesProvider,
-		Blocks:                      params.Blocks,
-		Collections:                 params.Collections,
-		Transactions:                params.Transactions,
-		TxErrorMessageProvider:      params.TxErrorMessageProvider,
-		ScheduledTransactions:       params.ScheduledTransactions,
-		TxResultCache:               txResCache,
-		TxValidator:                 txValidator,
-		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 params.EventsIndex,
-		TxResultsIndex:              params.TxResultsIndex,
-		ScheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
+		Log:                          params.Log,
+		Metrics:                      params.AccessMetrics,
+		State:                        params.State,
+		ChainID:                      params.ChainID,
+		SystemTxID:                   stdSystemTxID,
+		SystemTxs:                    systemTxs,
+		StaticCollectionRPCClient:    params.CollectionRPC,
+		HistoricalAccessNodeClients:  params.HistoricalAccessNodes,
+		NodeCommunicator:             params.Communicator,
+		ConnFactory:                  params.ConnFactory,
+		EnableRetries:                params.RetryEnabled,
+		NodeProvider:                 params.ExecNodeIdentitiesProvider,
+		Blocks:                       params.Blocks,
+		Collections:                  params.Collections,
+		Transactions:                 params.Transactions,
+		TxErrorMessageProvider:       params.TxErrorMessageProvider,
+		ScheduledTransactions:        params.ScheduledTransactions,
+		TxResultCache:                txResCache,
+		TxValidator:                  txValidator,
+		TxStatusDeriver:              txStatusDeriver,
+		EventsIndex:                  params.EventsIndex,
+		TxResultsIndex:               params.TxResultsIndex,
+		ScheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
 	}
 
 	switch params.TxResultQueryMode {
