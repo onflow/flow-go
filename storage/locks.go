@@ -86,7 +86,6 @@ func makeLockPolicy() lockctx.Policy {
 		Add(LockInsertChunkDataPack, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertAndIndexTxResult).
 		Add(LockInsertAndIndexTxResult, LockInsertOwnReceipt).
-		Add(LockInsertAndIndexTxResult, LockIndexStateCommitment).
 		Add(LockInsertOwnReceipt, LockIndexStateCommitment).
 
 		// AN state sync to IndexBlockData
