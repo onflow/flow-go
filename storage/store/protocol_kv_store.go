@@ -104,13 +104,6 @@ func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.
 //
 // CAUTION:
 //   - The caller must acquire the lock [storage.LockInsertBlock] and hold it until the database write has been committed.
-//   - OVERWRITES existing data (potential for data corruption):
-//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
-//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
-//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
-//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
-//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
-//     ATOMICALLY with this write operation.
 //
 // Expected errors during normal operations:
 // - [storage.ErrAlreadyExist] if a KV store for the given blockID has already been indexed.

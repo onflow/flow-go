@@ -47,8 +47,7 @@ func newProposalSignatures(collector module.CacheMetrics, db storage.DB) *propos
 // CAUTION:
 //   - The caller must acquire either the lock [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock]
 //     but not both and hold the lock until the database write has been committed.
-//   - OVERWRITES existing data (potential for data corruption):
-//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK
+//   - The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK
 //     is done elsewhere ATOMICALLY with this write operation. It is intended that this function is called only for new
 //     blocks, i.e. no signature was previously persisted for it.
 //
