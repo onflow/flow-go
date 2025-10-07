@@ -189,6 +189,67 @@ func TestIndexKeyConversion(t *testing.T) {
 	require.Equal(t, txIndex, tID)
 }
 
+func TestBatchStoreTransactionResultsErrAlreadyExists(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		st, err := store.NewTransactionResults(metrics, db, 1000)
+		require.NoError(t, err)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := make([]flow.TransactionResult, 0)
+		for i := 0; i < 3; i++ {
+			txID := unittest.IdentifierFixture()
+			expected := flow.TransactionResult{
+				TransactionID: txID,
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+			}
+			txResults = append(txResults, expected)
+		}
+
+		// First batch store should succeed
+		err = unittest.WithLock(t, lockManager, storage.LockInsertAndIndexTxResult, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return st.BatchStore(lctx, rw, blockID, txResults)
+			})
+		})
+		require.NoError(t, err)
+
+		// Second batch store with the same blockID should fail with ErrAlreadyExists
+		duplicateTxResults := make([]flow.TransactionResult, 0)
+		for i := 0; i < 2; i++ {
+			txID := unittest.IdentifierFixture()
+			expected := flow.TransactionResult{
+				TransactionID: txID,
+				ErrorMessage:  fmt.Sprintf("duplicate error %d", i),
+			}
+			duplicateTxResults = append(duplicateTxResults, expected)
+		}
+
+		err = unittest.WithLock(t, lockManager, storage.LockInsertAndIndexTxResult, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return st.BatchStore(lctx, rw, blockID, duplicateTxResults)
+			})
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+
+		// Verify that the original transaction results are still there and unchanged
+		for _, txResult := range txResults {
+			actual, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+			require.NoError(t, err)
+			assert.Equal(t, txResult, *actual)
+		}
+
+		// Verify that the duplicate transaction results were not stored
+		for _, txResult := range duplicateTxResults {
+			_, err := st.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+			require.Error(t, err)
+			require.ErrorIs(t, err, storage.ErrNotFound)
+		}
+	})
+}
+
 func BenchmarkTransactionResultCacheKey(b *testing.B) {
 	b.Run("new: create cache key", func(b *testing.B) {
 		blockID := unittest.IdentifierFixture()
