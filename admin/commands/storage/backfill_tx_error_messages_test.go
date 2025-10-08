@@ -534,7 +534,7 @@ func (suite *BackfillTxErrorMessagesSuite) mockStoreTxErrorMessages(
 		}
 	}
 
-	suite.txErrorMessages.On("Store", blockID, txErrorMessages).Return(nil).Once()
+	suite.txErrorMessages.On("Store", mock.Anything, blockID, txErrorMessages).Return(nil).Once()
 }
 
 // assertAllExpectations asserts that all the expectations set on various mocks are met,
