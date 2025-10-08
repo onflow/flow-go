@@ -150,15 +150,20 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 
 	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
 
+	// Events store always calls BatchStore regardless of data
+	p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+
+	// Transaction result error messages store always calls BatchStore regardless of data
+	p.txResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
+
 	err = p.persister.Persist()
 	p.Require().NoError(err)
 
 	// Verify other storages were not called since the data is empty
-	p.events.AssertNotCalled(t, "BatchStore")
+	// Note: events and txResultErrMsg stores always call BatchStore regardless of data
 	p.results.AssertNotCalled(t, "BatchStore")
 	p.collections.AssertNotCalled(t, "BatchStoreAndIndexByTransaction")
 	p.transactions.AssertNotCalled(t, "BatchStore")
-	p.txResultErrMsg.AssertNotCalled(t, "BatchStore")
 }
 
 func (p *PersisterSuite) TestPersister_PersistWithData() {
@@ -176,8 +181,8 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 		storedEvents = se
 	}).Return(nil)
 
-	p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		sr, ok := args.Get(1).([]flow.LightTransactionResult)
+	p.results.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+		sr, ok := args.Get(3).([]flow.LightTransactionResult)
 		p.Require().True(ok)
 		storedResults = sr
 	}).Return(nil)
@@ -237,7 +242,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			name: "ResultsBatchStoreError",
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
+				p.results.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not add transaction results to batch",
 		},
@@ -245,7 +250,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			name: "CollectionsStoreError",
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				p.results.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
 				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&flow.LightCollection{}, assert.AnError).Once()
 			},
 			expectedError: "could not add light collections to batch",
@@ -254,7 +259,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			name: "TransactionsStoreError",
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				p.results.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
 				numberOfCollections := len(p.inMemoryCollections.Data())
 				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&flow.LightCollection{}, nil).Times(numberOfCollections)
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError).Once()
@@ -265,7 +270,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			name: "TxResultErrMsgStoreError",
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				p.results.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
 				numberOfCollections := len(p.inMemoryCollections.Data())
 				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&flow.LightCollection{}, nil).Times(numberOfCollections)
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
@@ -278,7 +283,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 			name: "LatestPersistedSealedResultStoreError",
 			setupMocks: func() {
 				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				p.results.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
 				numberOfCollections := len(p.inMemoryCollections.Data())
 				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&flow.LightCollection{}, nil).Times(numberOfCollections)
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
