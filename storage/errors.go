@@ -58,6 +58,9 @@ func NewInvalidDKGStateTransitionErrorf(from, to flow.DKGState, msg string, args
 	}
 }
 
+// SkipAlreadyExistsError returns nil if the provided error is ErrAlreadyExists, otherwise returns the original error.
+// It usually means the storage operation to insert a record was skipped because the key of the record already exists.
+// CAUTION : it does NOT check the equality of the value of the record.
 func SkipAlreadyExistsError(err error) error {
 	if errors.Is(err, ErrAlreadyExists) {
 		return nil
