@@ -24,11 +24,6 @@ type EventsReader interface {
 type Events interface {
 	EventsReader
 
-	// Store will store events for the given block ID
-	// it requires the caller to hold [storage.LockInsertEvent]
-	// deprecated (leo)
-	Store(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList) error
-
 	// BatchStore will store events for the given block ID in a given batch
 	// it requires the caller to hold [storage.LockInsertEvent]
 	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error

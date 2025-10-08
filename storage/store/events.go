@@ -70,14 +70,6 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 	return nil
 }
 
-// Store will store events for the given block ID
-// TODO (leo) deprecate, only used by AN, AN should use BatchStore instead
-func (e *Events) Store(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList) error {
-	return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return e.BatchStore(lctx, blockID, blockEvents, rw)
-	})
-}
-
 // ByBlockID returns the events for the given block ID
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {

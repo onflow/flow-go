@@ -176,7 +176,9 @@ func TestEventStoreAndRemove(t *testing.T) {
 		}
 
 		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
-			return store.Store(lctx, blockID, expected)
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, blockID, expected, rw)
+			})
 		})
 		require.NoError(t, err)
 

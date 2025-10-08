@@ -172,24 +172,6 @@ func (_m *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uin
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: lctx, blockID, blockEvents
-func (_m *Events) Store(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList) error {
-	ret := _m.Called(lctx, blockID, blockEvents)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, []flow.EventsList) error); ok {
-		r0 = rf(lctx, blockID, blockEvents)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewEvents creates a new instance of Events. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewEvents(t interface {
