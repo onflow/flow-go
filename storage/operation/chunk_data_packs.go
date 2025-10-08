@@ -42,7 +42,7 @@ func RetrieveChunkDataPackID(r storage.Reader, chunkID flow.Identifier, storedCh
 }
 
 // RemoveChunkDataPackID removes the mapping from chunk ID to stored chunk data pack ID.
-// Any errors are exceptions.
+// Non-existing keys are no-ops. Any errors are exceptions.
 func RemoveChunkDataPackID(w storage.Writer, chunkID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeChunkDataPackID, chunkID))
 }
@@ -61,7 +61,7 @@ func RetrieveStoredChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Ide
 }
 
 // RemoveStoredChunkDataPack removes the chunk data pack with the given stored chunk data pack ID.
-// Any error are exceptions.
+// Non-existing keys are no-ops. Any errors are exceptions.
 func RemoveStoredChunkDataPack(w storage.Writer, storedChunkDataPackID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeStoredChunkDataPack, storedChunkDataPackID))
 }
