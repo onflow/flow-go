@@ -153,6 +153,9 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	// Events store always calls BatchStore regardless of data
 	p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
 
+	// Results store always calls BatchStore regardless of data
+	p.results.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
+
 	// Transaction result error messages store always calls BatchStore regardless of data
 	p.txResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
 
@@ -160,8 +163,7 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	p.Require().NoError(err)
 
 	// Verify other storages were not called since the data is empty
-	// Note: events and txResultErrMsg stores always call BatchStore regardless of data
-	p.results.AssertNotCalled(t, "BatchStore")
+	// Note: events, results, and txResultErrMsg stores always call BatchStore regardless of data
 	p.collections.AssertNotCalled(t, "BatchStoreAndIndexByTransaction")
 	p.transactions.AssertNotCalled(t, "BatchStore")
 }
