@@ -32,6 +32,7 @@ func NewResultsStore(
 }
 
 // Persist adds results to the batch.
+// requires [storage.LockInsertLightTransactionResult] to be hold
 // No errors are expected during normal operations
 func (r *ResultsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
 	results, err := r.inMemoryResults.ByBlockID(r.blockID)
@@ -39,6 +40,7 @@ func (r *ResultsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWrit
 		return fmt.Errorf("could not get results: %w", err)
 	}
 
+	// requires [storage.LockInsertLightTransactionResult] to be hold
 	err = r.persistedResults.BatchStore(lctx, batch, r.blockID, results)
 	if err != nil {
 		return fmt.Errorf("could not add transaction results to batch: %w", err)

@@ -71,6 +71,9 @@ func makeLockPolicy() lockctx.Policy {
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
 		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
+
+		// module/executiondatasync/optimistic_sync/persisters/block.go#Persist
+		Add(LockInsertCollection, LockInsertLightTransactionResult).
 		Build()
 }
 
