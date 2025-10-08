@@ -32,9 +32,10 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 // 1. Execution Node indexes its own executed block's result when finish executing a block
 // 2. Execution Node indexes the sealed root block's result during bootstrapping
 // 3. Access Node indexes the sealed result during syncing from EN.
-// The caller must acquire either storage.LockIndexExecutionResult]
+// The caller must acquire [storage.LockIndexExecutionResult]
 //
-// No errors are expected during normal operation.
+// It returns [storage.ErrDataMismatch] if there is already an indexed result for the given blockID,
+// but it is different from the given resultID.
 func IndexOwnOrSealedExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
 	// during bootstrapping, we index the sealed root block or the spork root block, which is not
 	// produced by the node itself, but we still need to index its execution result to be able to

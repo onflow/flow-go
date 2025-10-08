@@ -381,8 +381,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// index the block storage with each of the collection guarantee
 	err := storage.WithLocks(e.lockManager, []string{
 		storage.LockIndexCollectionsByBlock,
-		// TODO (leo): consider change to LockIndexResultByBlock lock
-		storage.LockInsertOwnReceipt,
+		storage.LockIndexExecutionResult,
 	}, func(lctx lockctx.Context) error {
 		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// requires [storage.LockIndexCollectionsByBlock] lock
@@ -393,7 +392,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 
 			// loop through seals and index ID -> result ID
 			for _, seal := range block.Payload.Seals {
-				// requires [storage.LockInsertOwnReceipt] lock
+				// requires [storage.LockIndexExecutionResult] lock
 				err := e.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
 				if err != nil {
 					return fmt.Errorf("could not index block for execution result: %w", err)

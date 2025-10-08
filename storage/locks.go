@@ -95,6 +95,9 @@ func makeLockPolicy() lockctx.Policy {
 		Add(LockInsertOwnReceipt, LockIndexExecutionResult).
 		Add(LockIndexExecutionResult, LockIndexStateCommitment).
 
+		// AN ingestion engine processing finalized block
+		Add(LockIndexCollectionsByBlock, LockIndexExecutionResult).
+
 		// AN state sync to IndexBlockData
 		Add(LockInsertCollection, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertServiceEvent).

@@ -24,6 +24,9 @@ type ExecutionResults interface {
 	BatchStore(result *flow.ExecutionResult, batch ReaderBatchWriter) error
 
 	// BatchIndex indexes an execution result by block ID in a given batch
+	// The caller must acquire [storage.LockIndexExecutionResult]
+	// It returns [storage.ErrDataMismatch] if there is already an indexed result for the given blockID,
+	// but it is different from the given resultID.
 	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error
 
 	// BatchRemoveIndexByBlockID removes blockID-to-executionResultID index entries keyed by blockID in a provided batch.
