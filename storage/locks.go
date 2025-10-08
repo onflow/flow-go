@@ -23,6 +23,8 @@ const (
 	// LockInsertEvent protects the insertion of events.
 	// This lock is reused by both EN storing its own receipt and AN indexing execution data
 	LockInsertEvent = "lock_insert_event"
+	// LockInsertServiceEvent protects the insertion of service events.
+	LockInsertServiceEvent = "lock_insert_service_event"
 	// LockInsertLightTransactionResult protects the insertion of light transaction results.
 	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
@@ -47,6 +49,7 @@ func Locks() []string {
 		LockIndexResultApproval,
 		LockInsertOrFinalizeClusterBlock,
 		LockInsertEvent,
+		LockInsertServiceEvent,
 		LockInsertOwnReceipt,
 		LockIndexStateCommitment,
 		LockInsertAndIndexTxResult,
@@ -83,14 +86,15 @@ func makeLockPolicy() lockctx.Policy {
 
 		// EN to save execution result
 		Add(LockInsertChunkDataPack, LockInsertEvent).
-		Add(LockInsertEvent, LockInsertAndIndexTxResult).
+		Add(LockInsertEvent, LockInsertServiceEvent).
+		Add(LockInsertServiceEvent, LockInsertAndIndexTxResult).
 		Add(LockInsertAndIndexTxResult, LockInsertOwnReceipt).
 		Add(LockInsertOwnReceipt, LockIndexStateCommitment).
 
 		// AN state sync to IndexBlockData
 		Add(LockInsertCollection, LockInsertEvent).
-		Add(LockInsertCollection, LockInsertLightTransactionResult).
-		Add(LockInsertEvent, LockInsertLightTransactionResult).
+		Add(LockInsertEvent, LockInsertServiceEvent).
+		Add(LockInsertServiceEvent, LockInsertLightTransactionResult).
 		Build()
 }
 

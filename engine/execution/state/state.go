@@ -413,6 +413,7 @@ func (s *state) saveExecutionResults(
 	locks := []string{
 		storage.LockInsertChunkDataPack,
 		storage.LockInsertEvent,
+		storage.LockInsertServiceEvent,
 		storage.LockInsertAndIndexTxResult,
 		storage.LockInsertOwnReceipt,
 		storage.LockIndexStateCommitment,
@@ -449,7 +450,7 @@ func (s *state) saveExecutionResults(
 				return fmt.Errorf("cannot store events: %w", err)
 			}
 
-			// require LockInsertEvent
+			// require LockInsertServiceEvent
 			err = s.serviceEvents.BatchStore(lctx, blockID, result.AllServiceEvents(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store service events: %w", err)
