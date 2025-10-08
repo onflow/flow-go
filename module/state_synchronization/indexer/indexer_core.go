@@ -308,7 +308,7 @@ func (c *IndexerCore) collectScheduledTransactionMapping(systemChunkResults []fl
 		return nil, fmt.Errorf("system chunk contained 0 transaction results")
 	}
 
-	scheduledTransactionData := make(map[flow.Identifier]uint64, 0)
+	scheduledTransactionIDs := make([]uint64, 0)
 	processCallbackEvents := make([]flow.Event, 0)
 
 	// extract the pending execution events and create a mapping from transaction ID to scheduled transaction ID
@@ -318,14 +318,9 @@ func (c *IndexerCore) collectScheduledTransactionMapping(systemChunkResults []fl
 			if err != nil {
 				return nil, fmt.Errorf("could not get callback details from event %d: %w", i, err)
 			}
-			scheduledTransactionData[event.TransactionID] = uint64(id)
+			scheduledTransactionIDs = append(scheduledTransactionIDs, uint64(id))
 			processCallbackEvents = append(processCallbackEvents, event)
 		}
-	}
-
-	// sanity check: there should not be any duplicate txIDs in the process callback events
-	if len(scheduledTransactionData) != len(processCallbackEvents) {
-		return nil, fmt.Errorf("system chunk contained %d process callback events, but found %d unique scheduled transaction IDs", len(systemChunkResults), len(processCallbackEvents))
 	}
 
 	// there are 3 possible valid cases:
@@ -339,7 +334,8 @@ func (c *IndexerCore) collectScheduledTransactionMapping(systemChunkResults []fl
 	// we simply check that there are either 1 or 2 results when there are 0 scheduled transactions.
 	// eventually, we should check using the execution version from the dynamic protocol state.
 
-	if len(scheduledTransactionData) == 0 {
+	scheduledTransactionData := make(map[flow.Identifier]uint64)
+	if len(scheduledTransactionIDs) == 0 {
 		if len(systemChunkResults) > 2 {
 			return nil, fmt.Errorf("system chunk contained %d results, and 0 scheduled transactions", len(systemChunkResults))
 		}
@@ -349,8 +345,8 @@ func (c *IndexerCore) collectScheduledTransactionMapping(systemChunkResults []fl
 
 	// if there were scheduled transactions, there should be exactly 2 more results than there were
 	// scheduled transactions.
-	if len(scheduledTransactionData) != len(systemChunkResults)-2 {
-		return nil, fmt.Errorf("system chunk contained %d results, but only found %d scheduled callbacks", len(systemChunkResults), len(scheduledTransactionData)+2)
+	if len(scheduledTransactionIDs) != len(systemChunkResults)-2 {
+		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled callbacks", len(systemChunkResults), len(scheduledTransactionIDs))
 	}
 
 	// reconstruct the system collection, and verify that the results match the expected transaction
@@ -359,6 +355,9 @@ func (c *IndexerCore) collectScheduledTransactionMapping(systemChunkResults []fl
 		return nil, fmt.Errorf("could not construct system collection: %w", err)
 	}
 
+	// sanity check that the following loop will behave as expected. since we already check the expected
+	// number of results, this should never fail unless expectations about the number of tx changes
+	// and there is a bug.
 	if len(systemChunkResults) != len(systemCollection.Transactions) {
 		return nil, fmt.Errorf("system chunk contained %d results, but expected %d", len(systemChunkResults), len(systemCollection.Transactions))
 	}
@@ -368,12 +367,8 @@ func (c *IndexerCore) collectScheduledTransactionMapping(systemChunkResults []fl
 		if txID != systemChunkResults[i].TransactionID {
 			return nil, fmt.Errorf("system chunk result at index %d does not match expected. got: %v, expected: %v", i, systemChunkResults[i].TransactionID, txID)
 		}
-
-		// make sure that the txID included in the event matches the scheduled transaction result
 		if i > 0 && i < len(systemChunkResults)-1 {
-			if _, ok := scheduledTransactionData[txID]; !ok {
-				return nil, fmt.Errorf("scheduled transaction ID not found for transaction %s", txID)
-			}
+			scheduledTransactionData[txID] = scheduledTransactionIDs[i-1]
 		}
 	}
 

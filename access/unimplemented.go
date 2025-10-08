@@ -3,9 +3,10 @@ package access
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"

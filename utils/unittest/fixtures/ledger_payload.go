@@ -38,15 +38,18 @@ type LedgerPayloadGenerator struct {
 	ledgerPayloadFactory
 
 	random       *RandomGenerator
+	addresses    *AddressGenerator
 	ledgerValues *LedgerValueGenerator
 }
 
 func NewLedgerPayloadGenerator(
 	random *RandomGenerator,
+	addresses *AddressGenerator,
 	ledgerValues *LedgerValueGenerator,
 ) *LedgerPayloadGenerator {
 	return &LedgerPayloadGenerator{
 		random:       random,
+		addresses:    addresses,
 		ledgerValues: ledgerValues,
 	}
 }
@@ -83,8 +86,10 @@ func (g *LedgerPayloadGenerator) List(n int, opts ...LedgerPayloadOption) []*led
 // generatePayload returns a random [ledger.Payload].
 func (g *LedgerPayloadGenerator) generatePayload(minByteSize int, maxByteSize int, value ledger.Value) *ledger.Payload {
 	keyByteSize := g.random.IntInRange(minByteSize, maxByteSize)
-	keydata := g.random.RandomBytes(keyByteSize)
-	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
-
+	parts := []ledger.KeyPart{
+		ledger.NewKeyPart(ledger.KeyPartOwner, g.addresses.Fixture().Bytes()),
+		ledger.NewKeyPart(ledger.KeyPartKey, g.random.RandomBytes(keyByteSize)),
+	}
+	key := ledger.NewKey(parts)
 	return ledger.NewPayload(key, value)
 }

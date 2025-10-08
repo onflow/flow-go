@@ -115,6 +115,10 @@ func NewPendingExecutionEventGenerator(
 func (g *PendingExecutionEventGenerator) Fixture(opts ...PendingExecutionEventOption) flow.Event {
 	env := systemcontracts.SystemContractsForChain(g.chainID).AsTemplateEnv()
 	eventType := blueprints.PendingExecutionEventType(env)
+
+	processCallbackTx, err := blueprints.ProcessCallbacksTransaction(g.chainID.Chain())
+	NoError(err)
+
 	config := &pendingExecutionEventConfig{
 		id:              g.random.Uint64(),
 		priority:        g.random.Uint8n(3), // high(0), medium(1), low(2)
@@ -123,6 +127,7 @@ func (g *PendingExecutionEventGenerator) Fixture(opts ...PendingExecutionEventOp
 		callbackOwner:   g.addresses.Fixture(),
 		event: g.events.Fixture(
 			Event.WithEventType(eventType),
+			Event.WithTransactionID(processCallbackTx.ID()),
 			Event.WithPayload([]byte{}), // prevent payload generation
 		),
 	}
@@ -140,7 +145,8 @@ func (g *PendingExecutionEventGenerator) Fixture(opts ...PendingExecutionEventOp
 func (g *PendingExecutionEventGenerator) List(n int, opts ...PendingExecutionEventOption) []flow.Event {
 	events := make([]flow.Event, n)
 	for i := range n {
-		events[i] = g.Fixture(opts...)
+		nOpts := append(opts, PendingExecutionEvent.WithEventIndex(uint32(i)))
+		events[i] = g.Fixture(nOpts...)
 	}
 	return events
 }

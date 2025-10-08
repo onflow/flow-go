@@ -263,7 +263,7 @@ func (g *GeneratorSuite) LedgerPaths() *LedgerPathGenerator {
 
 // LedgerPayloads returns a generator for [ledger.Payload].
 func (g *GeneratorSuite) LedgerPayloads() *LedgerPayloadGenerator {
-	return NewLedgerPayloadGenerator(g.Random(), g.LedgerValues())
+	return NewLedgerPayloadGenerator(g.Random(), g.Addresses(), g.LedgerValues())
 }
 
 // LedgerValues returns a generator for [ledger.Value].
