@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
@@ -107,6 +109,7 @@ func (t *TransactionResultErrorMessages) ByBlockID(id flow.Identifier) ([]flow.T
 //
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) Store(
+	lctx lockctx.Proof,
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
 ) error {
@@ -139,6 +142,6 @@ func (t *TransactionResultErrorMessages) Data() []flow.TransactionResultErrorMes
 
 // BatchStore inserts a batch of transaction result error messages into a batch
 // This method is not implemented and will always return an error.
-func (t *TransactionResultErrorMessages) BatchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.ReaderBatchWriter) error {
+func (t *TransactionResultErrorMessages) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
 	return fmt.Errorf("not implemented")
 }

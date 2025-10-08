@@ -18,6 +18,7 @@ import (
 
 func TestBatchStoringLightTransactionResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewLightTransactionResults(metrics, db, 1000)
 
@@ -25,7 +26,6 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 		txResults := getLightTransactionResultsFixture(10)
 
 		t.Run("batch store1 results", func(t *testing.T) {
-			lockManager := storage.NewTestingLockManager()
 			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return store1.BatchStore(lctx, rw, blockID, txResults)

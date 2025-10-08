@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -19,6 +20,7 @@ import (
 
 func TestStoringTransactionResultErrorMessages(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewTransactionResultErrorMessages(metrics, db, 1000)
 
@@ -44,7 +46,9 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 			}
 			txErrorMessages = append(txErrorMessages, expected)
 		}
-		err = store1.Store(blockID, txErrorMessages)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+			return store1.Store(lctx, blockID, txErrorMessages)
+		})
 		require.NoError(t, err)
 
 		// test db Exists by block id
