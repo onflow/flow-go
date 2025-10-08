@@ -53,7 +53,7 @@ func (s *ScheduledTransactionsSuite) TestScheduleTransaction_ScheduledAndExecute
 	// Deploy the test contract first
 	err := lib.DeployScheduledTransactionTestContract(
 		s.AccessClient(),
-		sdk.Address(sc.FlowTransactionScheduler.Address),
+		sdk.Address(sc.FlowCallbackScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
 		sdk.Address(sc.FungibleToken.Address),
 		sdk.Identifier(s.net.Root().ID()),

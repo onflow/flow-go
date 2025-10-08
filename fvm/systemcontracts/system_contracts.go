@@ -32,7 +32,7 @@ const (
 	ContractNameServiceAccount             = "FlowServiceAccount"
 	ContractNameFlowFees                   = "FlowFees"
 	ContractNameStorageFees                = "FlowStorageFees"
-	ContractNameFlowCallbackScheduler      = "FlowTransactionScheduler"
+	ContractNameFlowTransactionScheduler   = "FlowTransactionScheduler"
 	ContractNameNodeVersionBeacon          = "NodeVersionBeacon"
 	ContractNameRandomBeaconHistory        = "RandomBeaconHistory"
 	ContractNameFungibleToken              = "FungibleToken"
@@ -162,7 +162,7 @@ type SystemContracts struct {
 
 	// service account related contracts
 	FlowServiceAccount         SystemContract
-	FlowCallbackScheduler      SystemContract
+	FlowTransactionScheduler   SystemContract
 	NodeVersionBeacon          SystemContract
 	RandomBeaconHistory        SystemContract
 	FlowStorageFees            SystemContract
@@ -210,7 +210,7 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
-		FlowTransactionSchedulerAddress:   c.FlowCallbackScheduler.Address.Hex(),
+		FlowTransactionSchedulerAddress:   c.FlowTransactionScheduler.Address.Hex(),
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
 		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
@@ -234,7 +234,7 @@ func (c SystemContracts) All() []SystemContract {
 		c.DKG,
 
 		c.FlowServiceAccount,
-		c.FlowCallbackScheduler,
+		c.FlowTransactionScheduler,
 		c.NodeVersionBeacon,
 		c.RandomBeaconHistory,
 		c.FlowStorageFees,
@@ -390,7 +390,7 @@ func init() {
 		ContractNameRandomBeaconHistory:       serviceAddressFunc,
 		ContractNameServiceAccount:            serviceAddressFunc,
 		ContractNameStorageFees:               serviceAddressFunc,
-		ContractNameFlowCallbackScheduler:     serviceAddressFunc,
+		ContractNameFlowTransactionScheduler:  serviceAddressFunc,
 		AccountNameExecutionParametersAccount: executionParametersAccountFunc,
 
 		ContractNameFlowFees:                   nthAddressFunc(FlowFeesAccountIndex),
@@ -448,7 +448,7 @@ func init() {
 			DKG:            addressOfContract(ContractNameDKG),
 
 			FlowServiceAccount:         addressOfContract(ContractNameServiceAccount),
-			FlowCallbackScheduler:      addressOfContract(ContractNameFlowCallbackScheduler),
+			FlowTransactionScheduler:   addressOfContract(ContractNameFlowTransactionScheduler),
 			NodeVersionBeacon:          addressOfContract(ContractNameNodeVersionBeacon),
 			RandomBeaconHistory:        addressOfContract(ContractNameRandomBeaconHistory),
 			FlowStorageFees:            addressOfContract(ContractNameStorageFees),
