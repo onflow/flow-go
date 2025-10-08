@@ -32,19 +32,18 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 // 1. Execution Node indexes its own executed block's result when finish executing a block
 // 2. Execution Node indexes the sealed root block's result during bootstrapping
 // 3. Access Node indexes the sealed result during syncing from EN.
-// The caller must acquire either storage.LockInsertOwnReceipt] or [storage.LockBootstrapping]
+// The caller must acquire either storage.LockIndexExecutionResult]
 //
 // No errors are expected during normal operation.
 func IndexOwnOrSealedExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
 	// TOOD (leo): I think we should just check if holding
 	// LockIndexExecutionResult instead of these 2 locks
-	held := lctx.HoldsLock(storage.LockInsertOwnReceipt) ||
-		// during bootstrapping, we index the sealed root block or the spork root block, which is not
-		// produced by the node itself, but we still need to index its execution result to be able to
-		// execute next block
-		lctx.HoldsLock(storage.LockBootstrapping)
+	held := lctx.HoldsLock(storage.LockIndexExecutionResult)
+	// during bootstrapping, we index the sealed root block or the spork root block, which is not
+	// produced by the node itself, but we still need to index its execution result to be able to
+	// execute next block
 	if !held {
-		return fmt.Errorf("missing require locks: %s or %s", storage.LockInsertOwnReceipt, storage.LockBootstrapping)
+		return fmt.Errorf("missing require locks: %s", storage.LockIndexExecutionResult)
 	}
 
 	key := MakePrefix(codeIndexExecutionResultByBlock, blockID)

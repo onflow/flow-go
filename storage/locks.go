@@ -30,6 +30,7 @@ const (
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
 	LockInsertOwnReceipt       = "lock_insert_own_receipt"
+	LockIndexExecutionResult   = "lock_index_execution_result"
 	LockIndexStateCommitment   = "lock_index_state_commitment"
 	LockInsertAndIndexTxResult = "lock_insert_and_index_tx_result"
 	// LockInsertCollection protects the insertion of collections.
@@ -51,6 +52,7 @@ func Locks() []string {
 		LockInsertEvent,
 		LockInsertServiceEvent,
 		LockInsertOwnReceipt,
+		LockIndexExecutionResult,
 		LockIndexStateCommitment,
 		LockInsertAndIndexTxResult,
 		LockInsertCollection,
@@ -81,7 +83,8 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		// for protocol to Bootstrap, during bootstrapping,
 		// we need to insert and finalize
-		Add(LockBootstrapping, LockInsertBlock).
+		Add(LockBootstrapping, LockIndexExecutionResult).
+		Add(LockIndexExecutionResult, LockInsertBlock).
 		Add(LockInsertBlock, LockFinalizeBlock).
 
 		// EN to save execution result

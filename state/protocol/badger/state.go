@@ -116,6 +116,10 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
+	err = lctx.AcquireLock(storage.LockIndexExecutionResult)
+	if err != nil {
+		return nil, err
+	}
 	err = lctx.AcquireLock(storage.LockInsertBlock)
 	if err != nil {
 		return nil, err
@@ -285,7 +289,7 @@ func bootstrapProtocolState(
 //     history is covered. The spork root block is persisted as a root proposal without proposer
 //     signature (by convention).
 //
-// It requires [storage.LockInsertOwnReceipt] lock
+// It requires [storage.LockIndexExecutionResult] lock
 func bootstrapSealingSegment(
 	lctx lockctx.Proof,
 	db storage.DB,

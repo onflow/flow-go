@@ -100,7 +100,7 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 
 	lctx := manager.NewContext()
 	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOwnReceipt)
+	err := lctx.AcquireLock(storage.LockIndexExecutionResult)
 	if err != nil {
 		return err
 	}
