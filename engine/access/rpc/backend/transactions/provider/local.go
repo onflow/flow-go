@@ -360,8 +360,6 @@ func (t *LocalTransactionProvider) SystemTransaction(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	blockID := block.ID()
-
 	if !t.scheduledTransactionsEnabled {
 		if txID == t.systemCollection.SystemTxID() {
 			return t.systemCollection.SystemTx(), nil
@@ -369,11 +367,13 @@ func (t *LocalTransactionProvider) SystemTransaction(
 		return nil, status.Errorf(codes.NotFound, "system transaction not found")
 	}
 
+	// check if it's one of the static system tx
 	if tx, ok := t.systemCollection.ByID(txID); ok {
 		return tx, nil
 	}
 
-	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
+	// check if it's a scheduled system transaction
+	events, err := t.eventsIndex.ByBlockID(block.ID(), block.Height)
 	if err != nil {
 		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 	}
@@ -399,9 +399,10 @@ func (t *LocalTransactionProvider) SystemTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	// make sure the request is for a system transaction
+	// if it's not a static system transaction, use the SystemTransaction method to perform the lookup
 	if _, ok := t.systemCollection.ByID(txID); !ok {
 		if _, err := t.SystemTransaction(ctx, block, txID); err != nil {
-			return nil, status.Errorf(codes.NotFound, "system transaction not found")
+			return nil, err
 		}
 	}
 	return t.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)

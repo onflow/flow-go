@@ -251,7 +251,6 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	}
 
 	userTxResults, err := e.userTransactionResults(
-		ctx,
 		executionResponse,
 		block,
 		blockID,
@@ -301,10 +300,12 @@ func (e *ENTransactionProvider) SystemTransaction(
 		return nil, status.Errorf(codes.NotFound, "system transaction not found")
 	}
 
+	// check if it's one of the static system tx
 	if tx, ok := e.systemCollection.ByID(txID); ok {
 		return tx, nil
 	}
 
+	// check if it's a scheduled system transaction
 	events, err := e.getBlockEvents(ctx, block.ID(), e.processScheduledTransactionEventType)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
@@ -331,9 +332,10 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	// make sure the request is for a system transaction
+	// if it's not a static system transaction, use the SystemTransaction method to perform the lookup
 	if _, ok := e.systemCollection.ByID(txID); !ok {
 		if _, err := e.SystemTransaction(ctx, block, txID); err != nil {
-			return nil, status.Errorf(codes.NotFound, "system transaction not found")
+			return nil, err
 		}
 	}
 	return e.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)
@@ -345,7 +347,6 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 // It does so by iterating through all user collections (without system collection) in the block
 // and constructing the transaction results.
 func (e *ENTransactionProvider) userTransactionResults(
-	ctx context.Context,
 	resp *execproto.GetTransactionResultsResponse,
 	block *flow.Block,
 	blockID flow.Identifier,
