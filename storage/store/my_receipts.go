@@ -95,12 +95,6 @@ func (m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.Executio
 	return m.myReceipt(blockID)
 }
 
-func (m *MyExecutionReceipts) RemoveIndexByBlockID(blockID flow.Identifier) error {
-	return m.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return m.BatchRemoveIndexByBlockID(blockID, rw)
-	})
-}
-
 // BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 func (m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {

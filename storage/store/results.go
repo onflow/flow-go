@@ -78,33 +78,35 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	return r.byID(resultID)
 }
 
+// BatchIndex indexes an execution result by block ID in a given batch
+// The caller must acquire [storage.LockIndexExecutionResult]
+// It returns [storage.ErrDataMismatch] if there is already an indexed result for the given blockID,
+// but it is different from the given resultID.
 func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
 	return r.indexCache.PutWithLockTx(lctx, rw, blockID, resultID)
 }
 
+// BatchStore stores an execution result in a given batch
+// No error is expected during normal operation.
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.ReaderBatchWriter) error {
 	return r.store(batch, result)
 }
 
+// ByID retrieves an execution result by its ID. Returns `ErrNotFound` if `resultID` is unknown.
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	return r.byID(resultID)
 }
 
+// ByBlockID retrieves an execution result by block ID.
+// It returns [storage.ErrNotFound] if `blockID` does not refer to a block executed by this node
 func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
 	return r.byBlockID(blockID)
 }
 
+// IDByBlockID retrieves an execution result ID by block ID.
+// It returns [storage.ErrNotFound] if `blockID` does not refer to a block executed by this node
 func (r *ExecutionResults) IDByBlockID(blockID flow.Identifier) (flow.Identifier, error) {
 	return r.indexCache.Get(r.db.Reader(), blockID)
-}
-
-func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
-	return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		storage.OnCommitSucceed(rw, func() {
-			r.indexCache.Remove(blockID)
-		})
-		return operation.RemoveExecutionResultIndex(rw.Writer(), blockID)
-	})
 }
 
 // BatchRemoveIndexByBlockID removes blockID-to-executionResultID index entries keyed by blockID in a provided batch.
