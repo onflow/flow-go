@@ -32,17 +32,20 @@ The bootstrapping will generate the following information:
   - public networking key
   - weight
 
+
+#### Collector clusters
+_Each cluster_ of collector nodes needs to have its own root Block and root QC
+* Root clustering: assignment of collector nodes to clusters
+* For each cluster:
+  * Root `cluster.Block`
+  * Root QC: votes from collector nodes for the respective root `cluster.Block`
+
+
 #### Root Block for main consensus
 * Root Block
 * Root QC: votes from consensus nodes for the root block (required to start consensus)
 * Root Execution Result: execution result for the initial execution state
 * Root Block Seal: block seal for the initial execution result
-
-
-#### Root Blocks for Collector clusters
-_Each cluster_ of collector nodes needs to have its own root Block and root QC
-* Root `cluster.Block`
-* Root QC from cluster for their respective `cluster.Block`: votes from collector nodes for the root block
 
 
 # Usage
