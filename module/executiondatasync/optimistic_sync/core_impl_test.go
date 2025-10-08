@@ -445,11 +445,11 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 		indexerData := core.workingData.indexerData
 		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil)
-		c.persistentEvents.On("BatchStore", mock.Anything, mock.Anything, blockID, []flow.EventsList{indexerData.Events}).Return(nil)
+		c.persistentEvents.On("BatchStore", blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(nil)
 		c.persistentCollections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		c.persistentResults.On("BatchStore", mock.Anything, mock.Anything, blockID, indexerData.Results).Return(nil)
 		c.persistentTxResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, blockID, core.workingData.txResultErrMsgsData).Return(nil)
-		c.latestPersistedSealedResult.On("BatchSet", mock.Anything, mock.Anything, tf.exeResult.ID(), tf.block.Height, mock.Anything).Return(nil)
+		c.latestPersistedSealedResult.On("BatchSet", tf.exeResult.ID(), tf.block.Height, mock.Anything).Return(nil)
 
 		err = core.Persist()
 		c.Require().NoError(err)
