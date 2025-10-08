@@ -49,20 +49,19 @@ func RemoveChunkDataPackID(w storage.Writer, chunkID flow.Identifier) error {
 
 // InsertStoredChunkDataPack inserts a [storage.StoredChunkDataPack] into the database, keyed by its own ID.
 // The caller must ensure the storedChunkDataPackID is the same as c.ID().
-//
-// No error returns during normal operations
+// No error returns expected during normal operations.
 func InsertStoredChunkDataPack(rw storage.ReaderBatchWriter, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
 	return UpsertByKey(rw.Writer(), MakePrefix(codeStoredChunkDataPack, storeChunkDataPackID), c)
 }
 
 // RetrieveStoredChunkDataPack retrieves a chunk data pack by stored chunk data pack ID.
-// it returns [storage.ErrNotFound] if the chunk data pack is not found
+// It returns [storage.ErrNotFound] if the chunk data pack is not found
 func RetrieveStoredChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
 	return RetrieveByKey(r, MakePrefix(codeStoredChunkDataPack, storeChunkDataPackID), c)
 }
 
 // RemoveStoredChunkDataPack removes the chunk data pack with the given stored chunk data pack ID.
-// any error are exceptions
+// Any error are exceptions.
 func RemoveStoredChunkDataPack(w storage.Writer, storedChunkDataPackID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeStoredChunkDataPack, storedChunkDataPackID))
 }
