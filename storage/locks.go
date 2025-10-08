@@ -101,7 +101,7 @@ func makeLockPolicy() lockctx.Policy {
 		// AN state sync to IndexBlockData
 		Add(LockInsertCollection, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertServiceEvent).
-		Add(LockInsertServiceEvent, LockInsertLightTransactionResult).
+		Add(LockInsertEvent, LockInsertLightTransactionResult).
 		Build()
 }
 
