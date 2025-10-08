@@ -28,7 +28,8 @@ const (
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
-	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	LockInsertChunkDataPack               = "lock_insert_chunk_data_pack"
+	LockInsertTransactionResultErrMessage = "lock_insert_transaction_result_message"
 )
 
 // Locks returns a list of all named locks used by the storage layer.

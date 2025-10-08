@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -99,27 +100,21 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 }
 
 // BatchStore inserts a batch of transaction result error messages into a batch
-//
+// the caller must hold [storage.LockInsertTransactionResultErrMessage] lock
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) BatchStore(
+	lctx lockctx.Proof,
+	rw storage.ReaderBatchWriter,
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
-	batch storage.ReaderBatchWriter,
 ) error {
-	writer := batch.Writer()
-	for _, result := range transactionResultErrorMessages {
-		err := operation.BatchInsertTransactionResultErrorMessage(writer, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert tx result error message: %w", err)
-		}
-
-		err = operation.BatchIndexTransactionResultErrorMessage(writer, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch index tx result error message: %w", err)
-		}
+	// requires [storage.LockInsertTransactionResultErrMessage]
+	err := operation.BatchInsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, transactionResultErrorMessages)
+	if err != nil {
+		return err
 	}
 
-	storage.OnCommitSucceed(batch, func() {
+	storage.OnCommitSucceed(rw, func() {
 		for _, result := range transactionResultErrorMessages {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve

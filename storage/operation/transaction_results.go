@@ -3,6 +3,7 @@ package operation
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -102,15 +103,52 @@ func LookupLightTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID 
 	return TraverseByPrefix(r, MakePrefix(codeLightTransactionResultIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
 }
 
-// BatchInsertTransactionResultErrorMessage inserts a transaction result error message by block ID and transaction ID
+// BatchInsertAndIndexTransactionResultErrorMessages inserts and indexes a batch of transaction result error messages
+// the caller must hold [storage.LockInsertTransactionResultErrMessage] lock
+// It returns storage.ErrAlreadyExists if tx result error messages for the block already exist
+func BatchInsertAndIndexTransactionResultErrorMessages(
+	lctx lockctx.Proof, rw storage.ReaderBatchWriter,
+	blockID flow.Identifier,
+	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
+) error {
+	if !lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage) {
+		return fmt.Errorf("lock %s is not held", storage.LockInsertTransactionResultErrMessage)
+	}
+
+	// ensure we don't overwrite existing tx result error messages for this block
+	prefix := MakePrefix(codeTransactionResultErrorMessage, blockID)
+	checkExists := func(key []byte) error {
+		return fmt.Errorf("transaction result error messages for block %s already exist: %w", blockID, storage.ErrAlreadyExists)
+	}
+	err := IterateKeysByPrefixRange(rw.GlobalReader(), prefix, prefix, checkExists)
+	if err != nil {
+		return err
+	}
+
+	w := rw.Writer()
+	for _, result := range transactionResultErrorMessages {
+		err := batchInsertTransactionResultErrorMessage(w, blockID, &result)
+		if err != nil {
+			return fmt.Errorf("cannot batch insert tx result error message: %w", err)
+		}
+
+		err = batchIndexTransactionResultErrorMessage(w, blockID, &result)
+		if err != nil {
+			return fmt.Errorf("cannot batch index tx result error message: %w", err)
+		}
+	}
+	return nil
+}
+
+// batchInsertTransactionResultErrorMessage inserts a transaction result error message by block ID and transaction ID
 // into the database using a batch write.
-func BatchInsertTransactionResultErrorMessage(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
+func batchInsertTransactionResultErrorMessage(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
 	return UpsertByKey(w, MakePrefix(codeTransactionResultErrorMessage, blockID, transactionResultErrorMessage.TransactionID), transactionResultErrorMessage)
 }
 
-// BatchIndexTransactionResultErrorMessage indexes a transaction result error message by index within the block using a
+// batchIndexTransactionResultErrorMessage indexes a transaction result error message by index within the block using a
 // batch write.
-func BatchIndexTransactionResultErrorMessage(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
+func batchIndexTransactionResultErrorMessage(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
 	return UpsertByKey(w, MakePrefix(codeTransactionResultErrorMessageIndex, blockID, transactionResultErrorMessage.Index), transactionResultErrorMessage)
 }
 

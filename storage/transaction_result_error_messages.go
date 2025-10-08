@@ -1,6 +1,9 @@
 package storage
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/jordanschalm/lockctx"
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // TransactionResultErrorMessagesReader represents persistent storage read operations for transaction result error messages
 type TransactionResultErrorMessagesReader interface {
@@ -38,7 +41,7 @@ type TransactionResultErrorMessages interface {
 	Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error
 
 	// BatchStore inserts a batch of transaction result error messages into a batch
-	//
+	// caller must hold [storage.LockInsertTransactionResultErrMessage] lock
 	// No errors are expected during normal operation.
-	BatchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch ReaderBatchWriter) error
+	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch ReaderBatchWriter) error
 }
