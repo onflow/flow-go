@@ -6,6 +6,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -21,11 +22,9 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 				// insert random events
 				b := unittest.IdentifierFixture()
 				events := unittest.EventsFixture(30)
-				for _, evt := range events {
-					err := operation.InsertEvent(lctx, rw.Writer(), b, evt)
-					if err != nil {
-						return err
-					}
+				err := operation.InsertBlockEvents(lctx, rw, b, []flow.EventsList{events})
+				if err != nil {
+					return err
 				}
 
 				// insert 100 chunk data packs

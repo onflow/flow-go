@@ -41,9 +41,12 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 
 // BatchStore stores events keyed by a blockID in provided batch
 // No errors are expected during normal operation, but it may return generic error
-// if badger fails to process request
 func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.ReaderBatchWriter) error {
-	writer := batch.Writer()
+	// Use the new InsertBlockEvents operation to store all events
+	err := operation.InsertBlockEvents(lctx, batch, blockID, blockEvents)
+	if err != nil {
+		return fmt.Errorf("cannot batch insert events: %w", err)
+	}
 
 	// pre-allocating and indexing slice is faster than appending
 	sliceSize := 0
@@ -52,24 +55,18 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 	}
 
 	combinedEvents := make([]flow.Event, sliceSize)
-
 	eventIndex := 0
 
 	for _, events := range blockEvents {
 		for _, event := range events {
-			err := operation.InsertEvent(lctx, writer, blockID, event)
-			if err != nil {
-				return fmt.Errorf("cannot batch insert event: %w", err)
-			}
 			combinedEvents[eventIndex] = event
 			eventIndex++
 		}
 	}
 
-	callback := func() {
+	storage.OnCommitSucceed(batch, func() {
 		e.cache.Insert(blockID, combinedEvents)
-	}
-	storage.OnCommitSucceed(batch, callback)
+	})
 	return nil
 }
 
@@ -151,7 +148,6 @@ func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
 
 // BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	return e.cache.RemoveTx(rw, blockID)
 }
@@ -183,14 +179,11 @@ func NewServiceEvents(collector module.CacheMetrics, db storage.DB) *ServiceEven
 
 // BatchStore stores service events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *ServiceEvents) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.Event, rw storage.ReaderBatchWriter) error {
-	writer := rw.Writer()
-	for _, event := range events {
-		err := operation.InsertServiceEvent(lctx, writer, blockID, event)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert service event: %w", err)
-		}
+	// Use the new InsertBlockServiceEvents operation to store all service events
+	err := operation.InsertBlockServiceEvents(lctx, rw, blockID, events)
+	if err != nil {
+		return fmt.Errorf("cannot batch insert service events: %w", err)
 	}
 
 	callback := func() {
@@ -218,7 +211,6 @@ func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
 
 // BatchRemoveByBlockID removes service events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	return e.cache.RemoveTx(rw, blockID)
 }

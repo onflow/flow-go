@@ -26,6 +26,7 @@ type Events interface {
 
 	// Store will store events for the given block ID
 	// it requires the caller to hold [storage.LockInsertEvent]
+	// deprecated (leo)
 	Store(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList) error
 
 	// BatchStore will store events for the given block ID in a given batch
