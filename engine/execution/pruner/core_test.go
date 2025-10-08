@@ -73,7 +73,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				})
 			})
 			require.NoError(t, err)
-			err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			err = unittest.WithLock(t, lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					err := results.BatchStore(chunk.Result, rw)
 					require.NoError(t, err)

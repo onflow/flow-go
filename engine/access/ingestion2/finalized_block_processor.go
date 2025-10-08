@@ -154,7 +154,7 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 // No errors are expected during normal operations.
 func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
 	err := storage.WithLocks(p.lockManager,
-		[]string{storage.LockIndexCollectionsByBlock, storage.LockInsertOwnReceipt}, func(lctx lockctx.Context) error {
+		[]string{storage.LockIndexCollectionsByBlock, storage.LockIndexExecutionResult}, func(lctx lockctx.Context) error {
 			return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// require storage.LockIndexCollectionsByBlock
 				err := p.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
@@ -164,7 +164,7 @@ func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
 
 				// loop through seals and index ID -> result ID
 				for _, seal := range block.Payload.Seals {
-					// require storage.LockInsertOwnReceipt
+					// require storage.LockIndexExecutionResult
 					err := p.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
 					if err != nil {
 						return fmt.Errorf("could not index block for execution result: %w", err)

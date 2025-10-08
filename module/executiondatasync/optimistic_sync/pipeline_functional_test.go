@@ -154,7 +154,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	require.NoError(t, err)
 
 	// Store and index sealed block execution result
-	err = unittest.WithLock(t, p.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+	err = unittest.WithLock(t, p.lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			err := p.results.BatchStore(sealedExecutionResult, rw)
 			p.Require().NoError(err)

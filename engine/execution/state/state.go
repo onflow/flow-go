@@ -476,7 +476,7 @@ func (s *state) saveExecutionResults(
 				return fmt.Errorf("could not persist execution result: %w", err)
 			}
 
-			// require [storage.LockInsertOwnReceipt] lock
+			// require [storage.LockIndexExecutionResult] lock
 			err = s.results.BatchIndex(lctx, batch, blockID, executionResult.ID())
 			if err != nil {
 				return fmt.Errorf("cannot index execution result: %w", err)
