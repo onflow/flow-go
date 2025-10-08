@@ -36,13 +36,10 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 //
 // No errors are expected during normal operation.
 func IndexOwnOrSealedExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
-	// TOOD (leo): I think we should just check if holding
-	// LockIndexExecutionResult instead of these 2 locks
-	held := lctx.HoldsLock(storage.LockIndexExecutionResult)
 	// during bootstrapping, we index the sealed root block or the spork root block, which is not
 	// produced by the node itself, but we still need to index its execution result to be able to
 	// execute next block
-	if !held {
+	if !lctx.HoldsLock(storage.LockIndexExecutionResult) {
 		return fmt.Errorf("missing require locks: %s", storage.LockIndexExecutionResult)
 	}
 
