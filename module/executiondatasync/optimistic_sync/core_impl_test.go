@@ -445,7 +445,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 		indexerData := core.workingData.indexerData
 		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil)
-		c.persistentEvents.On("BatchStore", blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(nil)
+		c.persistentEvents.On("BatchStore", mock.Anything, blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(nil)
 		c.persistentCollections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		c.persistentResults.On("BatchStore", blockID, indexerData.Results, mock.Anything).Return(nil)
 		c.persistentTxResultErrMsg.On("BatchStore", blockID, core.workingData.txResultErrMsgsData, mock.Anything).Return(nil)
@@ -499,7 +499,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 		indexerData := core.workingData.indexerData
 		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil).Once()
-		c.persistentEvents.On("BatchStore", blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(expectedErr).Once()
+		c.persistentEvents.On("BatchStore", mock.Anything, blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(expectedErr).Once()
 
 		err = core.Persist()
 		c.ErrorIs(err, expectedErr)
