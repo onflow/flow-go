@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -41,14 +40,14 @@ func TestReadClusterRange(t *testing.T) {
 		for _, block := range blocks {
 			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+					return operation.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
 				})
 				if err != nil {
 					return err
 				}
 
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return procedure.FinalizeClusterBlock(lctx, rw, block.ID())
+					return operation.FinalizeClusterBlock(lctx, rw, block.ID())
 				})
 			})
 			require.NoError(t, err)

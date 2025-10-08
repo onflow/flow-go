@@ -32,7 +32,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
 			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestInterpreterRuntime{
+				&testutil.TestRuntime{
 					ReadStoredFunc: readStored,
 				},
 				runtime.Config{},
@@ -162,7 +162,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
 			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestInterpreterRuntime{
+				&testutil.TestRuntime{
 					ReadStoredFunc: readStored,
 				},
 				runtime.Config{},

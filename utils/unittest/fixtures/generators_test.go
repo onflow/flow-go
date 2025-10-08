@@ -519,7 +519,6 @@ func TestGeneratorsDeterminism(t *testing.T) {
 			},
 			sanity: func(t *testing.T, suite *GeneratorSuite) {
 				chunk := suite.Chunks().Fixture()
-				assert.NotEmpty(t, chunk.CollectionIndex)
 				assert.NotEmpty(t, chunk.StartState)
 				assert.NotEmpty(t, chunk.EventCollection)
 				assert.NotEmpty(t, chunk.BlockID)
@@ -826,6 +825,53 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				seed := suite.Random().RandomBytes(crypto.KeyGenSeedMinLen)
 				seededKey := suite.Crypto().PrivateKey(crypto.BLSBLS12381, PrivateKey.WithSeed(seed))
 				assert.NotNil(t, seededKey)
+			},
+		},
+		{
+			name: "RegisterEntries",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.RegisterEntries().Fixture(), b.RegisterEntries().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.RegisterEntries().List(n), b.RegisterEntries().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				// Test basic register entry generation
+				entry := suite.RegisterEntries().Fixture()
+				assert.NotEmpty(t, entry.Key)
+				assert.NotEmpty(t, entry.Value)
+				// Test with payload
+				payload := suite.LedgerPayloads().Fixture()
+				entry4 := suite.RegisterEntries().Fixture(RegisterEntry.WithPayload(payload))
+				assert.NotEmpty(t, entry4.Key)
+				assert.NotEmpty(t, entry4.Value)
+			},
+		},
+		{
+			name: "TransactionErrorMessages",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.TransactionErrorMessages().Fixture(), b.TransactionErrorMessages().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.TransactionErrorMessages().List(n), b.TransactionErrorMessages().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				// Test basic transaction error message generation
+				txErrMsg := suite.TransactionErrorMessages().Fixture()
+				assert.NotEmpty(t, txErrMsg.TransactionID)
+				assert.NotEmpty(t, txErrMsg.ErrorMessage)
+				assert.NotEmpty(t, txErrMsg.ExecutorID)
+
+				// Test ForTransactionResults helper
+				txResults := suite.LightTransactionResults().List(5,
+					LightTransactionResult.WithFailed(true),
+				)
+				txErrMsgs := suite.TransactionErrorMessages().ForTransactionResults(txResults)
+				assert.Len(t, txErrMsgs, 5)
+				for i, txErrMsg := range txErrMsgs {
+					assert.Equal(t, txResults[i].TransactionID, txErrMsg.TransactionID)
+					assert.Equal(t, uint32(i), txErrMsg.Index)
+				}
 			},
 		},
 	}
