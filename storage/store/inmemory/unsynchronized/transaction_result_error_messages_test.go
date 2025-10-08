@@ -3,6 +3,7 @@ package unsynchronized
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -34,10 +35,9 @@ func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 
 	// Store error messages
 	lockManager := storage.NewTestingLockManager()
-	lctx := lockManager.NewContext()
-	defer lctx.Release()
-	
-	err := store.Store(lctx, block.ID(), errorMessages)
+	err := storage.WithLock(lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+		return store.Store(lctx, block.ID(), errorMessages)
+	})
 	require.NoError(t, err)
 
 	// Retrieve by BlockID and TransactionID
