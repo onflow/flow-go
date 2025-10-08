@@ -1564,7 +1564,7 @@ func testScheduledCallbackWithError(
 
 	// expect callback execution metrics if there are callbacks
 	if len(callbackEvents) > 0 {
-		exemetrics.On("ExecutionCallbacksExecuted",
+		exemetrics.On("ExecutionScheduledTransactionsExecuted",
 			mock.Anything,
 			mock.Anything,
 			mock.Anything).
