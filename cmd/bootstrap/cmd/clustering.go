@@ -51,6 +51,9 @@ func addClusterAssignmentCmdFlags() {
 	cmd.MarkFlagRequired(clusterAssignmentCmd, "partner-dir")
 	cmd.MarkFlagRequired(clusterAssignmentCmd, "partner-weights")
 
+	// optional parameters for cluster assignment
+	clusterAssignmentCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
+
 	// required parameters for generation of cluster root blocks
 	clusterAssignmentCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
 	cmd.MarkFlagRequired(clusterAssignmentCmd, "epoch-counter")
