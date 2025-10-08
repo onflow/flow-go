@@ -26,6 +26,7 @@ type Events interface {
 
 	// BatchStore will store events for the given block ID in a given batch
 	// it requires the caller to hold [storage.LockInsertEvent]
+	// It returns [storage.ErrAlreadyExists] if events for the block already exist.
 	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error
 
 	// BatchRemoveByBlockID removes events keyed by a blockID in provided batch
@@ -37,8 +38,8 @@ type Events interface {
 type ServiceEvents interface {
 	// BatchStore stores service events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
-	// it requires the caller to hold [storage.LockInsertEvent]
-	// If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	// it requires the caller to hold [storage.LockInsertServiceEvent]
+	// It returns [storage.ErrAlreadyExists] if events for the block already exist.
 	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.Event, batch ReaderBatchWriter) error
 
 	// ByBlockID returns the events for the given block ID

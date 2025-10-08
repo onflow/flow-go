@@ -107,7 +107,6 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	transactions := make([]*flow.TransactionBody, 0)
 	registerUpdates := make(map[ledger.Path]*ledger.Payload)
 
-	// Process all chunk data in a single pass
 	for idx, chunk := range data.ChunkExecutionDatas {
 		events = append(events, chunk.Events...)
 		results = append(results, chunk.TransactionResults...)
