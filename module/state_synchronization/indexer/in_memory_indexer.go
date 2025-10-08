@@ -68,7 +68,11 @@ func NewInMemoryIndexer(
 // IndexTxResultErrorMessagesData index transaction result error messages
 // No errors are expected during normal operation.
 func (i *InMemoryIndexer) IndexTxResultErrorMessagesData(txResultErrMsgs []flow.TransactionResultErrorMessage) error {
-	if err := i.txResultErrMsgs.Store(i.executionResult.BlockID, txResultErrMsgs); err != nil {
+	err := storage.WithLock(i.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+		// requires the [storage.LockInsertTransactionResultErrMessage] lock to be held
+		return i.txResultErrMsgs.Store(lctx, i.executionResult.BlockID, txResultErrMsgs)
+	})
+	if err != nil {
 		return fmt.Errorf("could not index transaction result error messages: %w", err)
 	}
 	return nil

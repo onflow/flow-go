@@ -55,6 +55,7 @@ type TxErrorMessagesEngineSuite struct {
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
 	txResultsIndex *index.TransactionResultsIndex
+	lockManager    storage.LockManager
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
@@ -105,6 +106,9 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	err := s.indexReporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
+	
+	// Initialize lock manager for tests
+	s.lockManager = storage.NewTestingLockManager()
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
@@ -177,6 +181,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
+		s.lockManager,
 	)
 
 	eng, err := New(

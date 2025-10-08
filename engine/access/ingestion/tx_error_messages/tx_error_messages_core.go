@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
@@ -24,6 +25,7 @@ type TxErrorMessagesCore struct {
 	txErrorMessageProvider         error_messages.Provider
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	execNodeIdentitiesProvider     *commonrpc.ExecutionNodeIdentitiesProvider
+	lockManager                    storage.LockManager
 }
 
 // NewTxErrorMessagesCore creates a new instance of TxErrorMessagesCore.
@@ -32,12 +34,14 @@ func NewTxErrorMessagesCore(
 	txErrorMessageProvider error_messages.Provider,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
+	lockManager storage.LockManager,
 ) *TxErrorMessagesCore {
 	return &TxErrorMessagesCore{
 		log:                            log.With().Str("module", "tx_error_messages_core").Logger(),
 		txErrorMessageProvider:         txErrorMessageProvider,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		execNodeIdentitiesProvider:     execNodeIdentitiesProvider,
+		lockManager:                    lockManager,
 	}
 }
 
@@ -124,7 +128,10 @@ func (c *TxErrorMessagesCore) storeTransactionResultErrorMessages(
 		errorMessages = append(errorMessages, errorMessage)
 	}
 
-	err := c.transactionResultErrorMessages.Store(blockID, errorMessages)
+	err := storage.WithLock(c.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+		// requires the [storage.LockInsertTransactionResultErrMessage] lock
+		return c.transactionResultErrorMessages.Store(lctx, blockID, errorMessages)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to store transaction error messages: %w", err)
 	}

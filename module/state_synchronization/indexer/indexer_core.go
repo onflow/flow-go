@@ -148,17 +148,20 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			results = append(results, chunk.TransactionResults...)
 		}
 
-		err := c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
-			if err != nil {
-				return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
-			}
+		err = storage.WithLock(c.lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+			return c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
+				if err != nil {
+					return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
+				}
 
-			err = c.results.BatchStore(data.BlockID, results, rw)
-			if err != nil {
-				return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
-			}
-			return nil
+				// requires the [storage.LockInsertLightTransactionResult] lock
+				err = c.results.BatchStore(lctx, rw, data.BlockID, results)
+				if err != nil {
+					return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
+				}
+				return nil
+			})
 		})
 
 		if err != nil {

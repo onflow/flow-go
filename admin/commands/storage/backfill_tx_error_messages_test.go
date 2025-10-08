@@ -77,6 +77,7 @@ func TestBackfillTxErrorMessages(t *testing.T) {
 func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
 
+	lockManager := storage.NewTestingLockManager()
 	suite.state = new(protocolmock.State)
 	suite.headers = new(storagemock.Headers)
 	suite.receipts = new(storagemock.ExecutionReceipts)
@@ -160,6 +161,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		errorMessageProvider,
 		suite.txErrorMessages,
 		executionNodeIdentitiesProvider,
+		lockManager,
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(

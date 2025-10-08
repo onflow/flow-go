@@ -21,7 +21,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -37,13 +38,14 @@ type TxErrorMessagesCoreSuite struct {
 		params   *protocol.Params
 	}
 
-	receipts        *storage.ExecutionReceipts
-	txErrorMessages *storage.TransactionResultErrorMessages
-	lightTxResults  *storage.LightTransactionResults
+	receipts        *storagemock.ExecutionReceipts
+	txErrorMessages *storagemock.TransactionResultErrorMessages
+	lightTxResults  *storagemock.LightTransactionResults
 
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
 	txResultsIndex *index.TransactionResultsIndex
+	lockManager    storage.LockManager
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
@@ -79,17 +81,20 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.proto.params = protocol.NewParams(s.T())
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
-	s.receipts = storage.NewExecutionReceipts(s.T())
-	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
+	s.receipts = storagemock.NewExecutionReceipts(s.T())
+	s.txErrorMessages = storagemock.NewTransactionResultErrorMessages(s.T())
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
-	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.lightTxResults = storagemock.NewLightTransactionResults(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
 	s.indexReporter = index.NewReporter()
 	err := s.indexReporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
+	
+	// Initialize lock manager for tests
+	s.lockManager = storage.NewTestingLockManager()
 
 	s.proto.state.On("Params").Return(s.proto.params)
 
@@ -268,6 +273,7 @@ func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
 		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
+		s.lockManager,
 	)
 	return core
 }
