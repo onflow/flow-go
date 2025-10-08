@@ -74,10 +74,11 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db storage
 
 // Store will store transaction result error messages for the given block ID.
 //
+// the caller must hold [storage.LockInsertTransactionResultErrMessage] lock
 // No errors are expected during normal operation.
-func (t *TransactionResultErrorMessages) Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+func (t *TransactionResultErrorMessages) Store(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
 	return t.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return t.BatchStore(blockID, transactionResultErrorMessages, rw)
+		return t.BatchStore(lctx, rw, blockID, transactionResultErrorMessages)
 	})
 }
 

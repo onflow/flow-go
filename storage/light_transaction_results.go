@@ -1,6 +1,9 @@
 package storage
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/jordanschalm/lockctx"
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // LightTransactionResultsReader represents persistent storage read operations for light transaction result
 type LightTransactionResultsReader interface {
@@ -28,7 +31,9 @@ type LightTransactionResults interface {
 	LightTransactionResultsReader
 
 	// BatchStore inserts a batch of transaction result into a batch
-	BatchStore(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw ReaderBatchWriter) error
+	// It returns [ErrAlreadyExists] if light transaction results for the block already exist.
+	// It requires the caller to hold [storage.LockInsertLightTransactionResult]
+	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error
 
 	// Deprecated: deprecated as a part of transition from Badger to Pebble. use BatchStore instead
 	BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch BatchStorage) error

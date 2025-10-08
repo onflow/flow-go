@@ -30,6 +30,8 @@ const (
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
 	LockInsertChunkDataPack               = "lock_insert_chunk_data_pack"
 	LockInsertTransactionResultErrMessage = "lock_insert_transaction_result_message"
+	// LockInsertLightTransactionResult protects the insertion of light transaction results
+	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -43,6 +45,8 @@ func Locks() []string {
 		LockInsertCollection,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
+		LockInsertTransactionResultErrMessage,
+		LockInsertLightTransactionResult,
 	}
 }
 

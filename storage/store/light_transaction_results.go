@@ -1,7 +1,7 @@
 package store
 
 import (
-	"fmt"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -71,19 +71,11 @@ func NewLightTransactionResults(collector module.CacheMetrics, db storage.DB, tr
 	}
 }
 
-func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw storage.ReaderBatchWriter) error {
-	w := rw.Writer()
-
-	for i, result := range transactionResults {
-		err := operation.BatchInsertLightTransactionResult(w, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert tx result: %w", err)
-		}
-
-		err = operation.BatchIndexLightTransactionResult(w, blockID, uint32(i), &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch index tx result: %w", err)
-		}
+func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error {
+	// requires [storage.LockInsertLightTransactionResult]
+	err := operation.BatchInsertAndIndexLightTransactionResults(lctx, rw, blockID, transactionResults)
+	if err != nil {
+		return err
 	}
 
 	storage.OnCommitSucceed(rw, func() {

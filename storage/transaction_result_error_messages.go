@@ -38,10 +38,10 @@ type TransactionResultErrorMessages interface {
 	// Store will store transaction result error messages for the given block ID.
 	//
 	// No errors are expected during normal operation.
-	Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error
+	Store(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error
 
 	// BatchStore inserts a batch of transaction result error messages into a batch
-	// caller must hold [storage.LockInsertTransactionResultErrMessage] lock
-	// No errors are expected during normal operation.
-	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch ReaderBatchWriter) error
+	// It returns [ErrAlreadyExists] if transaction result error messages for the block already exist.
+	// It requires the caller to hold [storage.LockInsertTransactionResultErrMessage]
+	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error
 }
