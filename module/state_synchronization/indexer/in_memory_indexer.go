@@ -4,191 +4,198 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
-// InMemoryIndexer handles indexing of block execution data in memory.
-// It stores data in unsynchronized in-memory caches that are designed
-// to be populated once before being read.
+// <component_spec>
+// InMemoryIndexer indexes block execution data for a single ExecutionResult into a mempool. It is
+// designed to be used as part of the optimistic syncing processing pipeline, to index data for
+// unsealed execution results which is eventually persisted when the execution result is sealed.
+//
+// The data contained within the BlockExecutionData is verified by verifications nodes as part of the
+// approval process. Once the execution result is sealed, the Access node can accept it as valid
+// without further verification. However, with optimistic syncing, the Access node may index data
+// for execution results that are not sealed. Since this data is not certified by the protocol, it
+// must not be persisted to disk. It may be used by the Access node to serve Access API requests,
+// with the understanding that it may be later determined to be invalid.
+//
+// The provided BlockExecutionData is received over the network and its hash is compared to the value
+// included in an ExecutionResult within a certified block. This guarantees it is the same data that
+// was produced by an execution node whose stake is at risk if the data is incorrect. It is not
+// practical for an Access node to verify all data, but the indexer may perform opportunistic checks
+// to ensure the data is generally consistent.
+//
+// Transaction error messages are received directly from execution nodes with no protocol guarantees.
+// The node must validate that there is a one-to-one mapping between failed transactions and
+// transaction error messages.
+// Since the error messages are requested directly from the execution nodes, it's possible that they
+// are delayed. To avoid blocking the indexing process if ENs are unresponsive, the processing pipeline
+// may skip the call to `ValidateTxErrors()` if the error messages are not ready. In this case, the
+// the error messages may be validated and backfilled later.
+// </component_spec>
+//
+// Safe for concurrent use.
 type InMemoryIndexer struct {
 	log             zerolog.Logger
-	registers       *unsynchronized.Registers
-	events          *unsynchronized.Events
-	collections     *unsynchronized.Collections
-	results         *unsynchronized.LightTransactionResults
-	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages
+	block           *flow.Block
 	executionResult *flow.ExecutionResult
-	header          *flow.Header
-	lockManager     storage.LockManager
 }
 
-// NewInMemoryIndexer creates a new indexer that uses in-memory storage implementations.
-// This is designed for processing unsealed blocks in the optimistic syncing pipeline.
-// The caches are created externally and passed to the indexer, as they will also be used
-// by the persister to save data permanently when a block is sealed.
+// IndexerData is the collection of data ingested by the indexer.
+type IndexerData struct {
+	Events       []flow.Event
+	Collections  []*flow.Collection
+	Transactions []*flow.TransactionBody
+	Results      []flow.LightTransactionResult
+	Registers    []flow.RegisterEntry
+}
+
+// NewInMemoryIndexer returns a new indexer that indexes block execution data and error messages for
+// a single ExecutionResult.
+//
+// No error returns are expected during normal operations.
 func NewInMemoryIndexer(
 	log zerolog.Logger,
-	registers *unsynchronized.Registers,
-	events *unsynchronized.Events,
-	collections *unsynchronized.Collections,
-	results *unsynchronized.LightTransactionResults,
-	txResultErrMsgs *unsynchronized.TransactionResultErrorMessages,
+	block *flow.Block,
 	executionResult *flow.ExecutionResult,
-	header *flow.Header,
-	lockManager storage.LockManager,
-) *InMemoryIndexer {
-	indexer := &InMemoryIndexer{
-		log:             log.With().Str("component", "in_memory_indexer").Logger(),
-		registers:       registers,
-		events:          events,
-		collections:     collections,
-		results:         results,
-		txResultErrMsgs: txResultErrMsgs,
+) (*InMemoryIndexer, error) {
+	if block.ID() != executionResult.BlockID {
+		return nil, fmt.Errorf("block ID and execution result block ID must match")
+	}
+
+	return &InMemoryIndexer{
+		log: log.With().
+			Str("component", "in_memory_indexer").
+			Str("execution_result_id", executionResult.ExecutionDataID.String()).
+			Str("block_id", executionResult.BlockID.String()).
+			Logger(),
+		block:           block,
 		executionResult: executionResult,
-		header:          header,
-		lockManager:     lockManager,
-	}
-
-	indexer.log.Info().
-		Uint64("latest_height", header.Height).
-		Msg("indexer initialized")
-
-	return indexer
-}
-
-// IndexTxResultErrorMessagesData index transaction result error messages
-// No errors are expected during normal operation.
-func (i *InMemoryIndexer) IndexTxResultErrorMessagesData(txResultErrMsgs []flow.TransactionResultErrorMessage) error {
-	err := storage.SkipAlreadyExistsError( // Note: if the data already exists, we will not overwrite
-		storage.WithLock(i.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
-			// requires the [storage.LockInsertTransactionResultErrMessage] lock to be held
-			return i.txResultErrMsgs.Store(lctx, i.executionResult.BlockID, txResultErrMsgs)
-		}))
-	if err != nil {
-		return fmt.Errorf("could not index transaction result error messages: %w", err)
-	}
-	return nil
+	}, nil
 }
 
 // IndexBlockData indexes all execution block data.
-// No errors are expected during normal operation.
-func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
-	log := i.log.With().Hex("block_id", logging.ID(data.BlockID)).Logger()
-	log.Debug().Msg("indexing block data")
+//
+// The method is idempotent and does not modify the state of the indexer.
+//
+// All error returns are benign and side-effect free for the node. They indicate that the BlockExecutionData
+// is inconsistent with the execution result and its block, which points to invalid data produced by
+// an external node.
+func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData) (*IndexerData, error) {
+	if data.BlockID != i.executionResult.BlockID {
+		return nil, fmt.Errorf("unexpected block execution data: expected block_id=%s, actual block_id=%s", i.executionResult.BlockID, data.BlockID)
+	}
 
-	if i.executionResult.BlockID != data.BlockID {
-		return fmt.Errorf("invalid block execution data. expected block_id=%s, actual block_id=%s", i.executionResult.BlockID, data.BlockID)
+	// sanity check: the execution data should contain data for all collections in the block, plus
+	// the system chunk
+	if len(data.ChunkExecutionDatas) != len(i.block.Payload.Guarantees)+1 {
+		return nil, fmt.Errorf("block execution data chunk (%d) count does not match block guarantee (%d) plus system chunk",
+			len(data.ChunkExecutionDatas), len(i.block.Payload.Guarantees))
 	}
 
 	start := time.Now()
+	i.log.Debug().Msg("indexing block data")
 
 	events := make([]flow.Event, 0)
 	results := make([]flow.LightTransactionResult, 0)
-	registers := make(map[ledger.Path]*ledger.Payload)
-	indexedCollections := 0
+	collections := make([]*flow.Collection, 0)
+	transactions := make([]*flow.TransactionBody, 0)
+	registerUpdates := make(map[ledger.Path]*ledger.Payload)
 
-	lctx := i.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for collection insert: %w", err)
-	}
-	defer lctx.Release()
-
-	// Process all chunk data in a single pass
 	for idx, chunk := range data.ChunkExecutionDatas {
-		// Collect events
 		events = append(events, chunk.Events...)
-
-		// Collect transaction results
 		results = append(results, chunk.TransactionResults...)
 
-		// Process collections (except system chunk)
+		// do not index tx and collections from the system chunk since they can be generated on demand
 		if idx < len(data.ChunkExecutionDatas)-1 {
-			if err := i.indexCollection(lctx, chunk.Collection); err != nil {
-				return fmt.Errorf("could not handle collection: %w", err)
-			}
-			indexedCollections++
+			collections = append(collections, chunk.Collection)
+			transactions = append(transactions, chunk.Collection.Transactions...)
 		}
 
-		// Process register updates
+		// sanity check: there must be a one-to-one mapping between transactions and results
+		if len(chunk.Collection.Transactions) != len(chunk.TransactionResults) {
+			return nil, fmt.Errorf("number of transactions (%d) does not match number of results (%d)",
+				len(chunk.Collection.Transactions), len(chunk.TransactionResults))
+		}
+
+		// collect register updates
 		if chunk.TrieUpdate != nil {
-			// Verify trie update integrity
+			// sanity check: there must be a one-to-one mapping between paths and payloads
 			if len(chunk.TrieUpdate.Paths) != len(chunk.TrieUpdate.Payloads) {
-				return fmt.Errorf("update paths length is %d and registers length is %d and they don't match",
+				return nil, fmt.Errorf("number of ledger paths (%d) does not match number of ledger payloads (%d)",
 					len(chunk.TrieUpdate.Paths), len(chunk.TrieUpdate.Payloads))
 			}
 
-			// Collect registers (last one for a path wins)
+			// collect registers (last update for a path within the block is persisted)
 			for i, path := range chunk.TrieUpdate.Paths {
-				registers[path] = chunk.TrieUpdate.Payloads[i]
+				registerUpdates[path] = chunk.TrieUpdate.Payloads[i]
 			}
 		}
 	}
 
-	if err := i.events.Store(data.BlockID, []flow.EventsList{events}); err != nil {
-		return fmt.Errorf("could not index events: %w", err)
-	}
-
-	if err := i.results.Store(data.BlockID, results); err != nil {
-		return fmt.Errorf("could not index transaction results: %w", err)
-	}
-
-	if err := i.indexRegisters(registers, i.header.Height); err != nil {
-		return fmt.Errorf("could not index registers: %w", err)
-	}
-
-	log.Debug().
-		Dur("duration_ms", time.Since(start)).
-		Int("event_count", len(events)).
-		Int("register_count", len(registers)).
-		Int("result_count", len(results)).
-		Int("collection_count", indexedCollections).
-		Msg("indexed block data")
-
-	return nil
-}
-
-// indexRegisters processes register payloads and stores them in the register database.
-// No errors are expected during normal operation.
-func (i *InMemoryIndexer) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
-	regEntries := make(flow.RegisterEntries, 0, len(registers))
-
-	for _, register := range registers {
-		k, err := register.Key()
+	// convert final payloads to register entries
+	registerEntries := make([]flow.RegisterEntry, 0, len(registerUpdates))
+	for path, payload := range registerUpdates {
+		key, value, err := convert.PayloadToRegister(payload)
 		if err != nil {
-			return fmt.Errorf("failed to get ledger key: %w", err)
+			return nil, fmt.Errorf("failed to convert payload to register entry (path: %s): %w", path.String(), err)
 		}
 
-		id, err := convert.LedgerKeyToRegisterID(k)
-		if err != nil {
-			return fmt.Errorf("failed to convert ledger key to register id: %w", err)
-		}
-
-		regEntries = append(regEntries, flow.RegisterEntry{
-			Key:   id,
-			Value: register.Value(),
+		registerEntries = append(registerEntries, flow.RegisterEntry{
+			Key:   key,
+			Value: value,
 		})
 	}
 
-	return i.registers.Store(regEntries, height)
+	i.log.Debug().
+		Dur("duration_ms", time.Since(start)).
+		Int("event_count", len(events)).
+		Int("register_count", len(registerEntries)).
+		Int("result_count", len(results)).
+		Int("collection_count", len(collections)).
+		Msg("indexed block data")
+
+	return &IndexerData{
+		Events:       events,
+		Collections:  collections,
+		Transactions: transactions,
+		Results:      results,
+		Registers:    registerEntries,
+	}, nil
 }
 
-// indexCollection processes a collection and its associated transactions.
-// No errors are expected during normal operation.
-func (i *InMemoryIndexer) indexCollection(lctx lockctx.Proof, collection *flow.Collection) error {
-	// Store the light collection and index by transaction
-	_, err := i.collections.StoreAndIndexByTransaction(lctx, collection)
-	if err != nil {
-		return err
+// ValidateTxErrors validates that the transaction results and error messages are consistent, and
+// returns an error if they are not.
+//
+// All error returns are benign and side-effect free for the node. They indicate that the transaction
+// results and error messages are inconsistent, which points to invalid data produced by an external
+// node.
+func ValidateTxErrors(results []flow.LightTransactionResult, txResultErrMsgs []flow.TransactionResultErrorMessage) error {
+	txWithErrors := make(map[flow.Identifier]bool)
+	for _, txResult := range txResultErrMsgs {
+		txWithErrors[txResult.TransactionID] = true
+	}
+
+	failedCount := 0
+	for _, txResult := range results {
+		if !txResult.Failed {
+			continue
+		}
+		failedCount++
+
+		if !txWithErrors[txResult.TransactionID] {
+			return fmt.Errorf("transaction %s failed but no error message was provided", txResult.TransactionID)
+		}
+	}
+
+	// make sure there are not extra error messages
+	if failedCount != len(txWithErrors) {
+		return fmt.Errorf("number of failed transactions (%d) does not match number of transaction error messages (%d)", failedCount, len(txWithErrors))
 	}
 
 	return nil

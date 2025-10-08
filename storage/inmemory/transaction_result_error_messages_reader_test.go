@@ -1,22 +1,19 @@
-package unsynchronized
+package inmemory
 
 import (
 	"testing"
 
-	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
-	store := NewTransactionResultErrorMessages()
 
 	// Define block ID and error messages
-	block := unittest.BlockFixture()
+	blockID := unittest.IdentifierFixture()
 	txResults := unittest.TransactionResultsFixture(2)
 	errorMessages := []flow.TransactionResultErrorMessage{
 		{
@@ -33,31 +30,21 @@ func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 		},
 	}
 
-	// Store error messages
-	lockManager := storage.NewTestingLockManager()
-	err := storage.WithLock(lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
-		return store.Store(lctx, block.ID(), errorMessages)
-	})
-	require.NoError(t, err)
+	storage := NewTransactionResultErrorMessages(blockID, errorMessages)
 
 	// Retrieve by BlockID and TransactionID
-	retrievedErrorMessage, err := store.ByBlockIDTransactionID(block.ID(), errorMessages[0].TransactionID)
+	retrievedErrorMessage, err := storage.ByBlockIDTransactionID(blockID, errorMessages[0].TransactionID)
 	require.NoError(t, err)
 	assert.Equal(t, &errorMessages[0], retrievedErrorMessage)
 
 	// Retrieve by BlockID and Index
-	retrievedErrorMessageByIndex, err := store.ByBlockIDTransactionIndex(block.ID(), 0)
+	retrievedErrorMessageByIndex, err := storage.ByBlockIDTransactionIndex(blockID, 0)
 	require.NoError(t, err)
 	assert.Equal(t, &errorMessages[0], retrievedErrorMessageByIndex)
 
 	// Retrieve by BlockID
-	retrievedErrorMessages, err := store.ByBlockID(block.ID())
+	retrievedErrorMessages, err := storage.ByBlockID(blockID)
 	require.NoError(t, err)
 	assert.Len(t, retrievedErrorMessages, len(errorMessages))
 	assert.Equal(t, errorMessages, retrievedErrorMessages)
-
-	// Extract structured data
-	messages := store.Data()
-	require.Len(t, messages, len(errorMessages))
-	require.ElementsMatch(t, messages, errorMessages)
 }

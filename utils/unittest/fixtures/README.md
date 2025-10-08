@@ -101,6 +101,7 @@ utils/unittest/fixtures/
 ├── collection_guarantee.go                      # Collection guarantee generator
 ├── transaction_result.go                        # Transaction result generator
 ├── transaction_signature.go                     # Transaction signature generator
+├── transaction_error_messages.go                # Transaction error messages generator
 ├── proposal_key.go                              # Proposal key generator
 ├── *Events*
 ├── event.go                                     # Event generator
@@ -118,6 +119,7 @@ utils/unittest/fixtures/
 ├── ledger_path.go                               # Ledger path generator
 ├── ledger_payload.go                            # Ledger payload generator
 ├── ledger_value.go                              # Ledger value generator
+├── register_entry.go                            # Register entry generator
 ├── state_commitment.go                          # State commitment generator
 ├── *Cryptographic Components*
 ├── crypto.go                                    # Cryptographic generator
@@ -253,6 +255,7 @@ str := random.RandomString(16)
 | Collection Guarantees | `CollectionGuarantees()` | Generate collection guarantees |
 | Transaction Results | `TransactionResults()` | Generate transaction results |
 | Light Transaction Results | `LightTransactionResults()` | Generate light transaction results |
+| Transaction Error Messages | `TransactionErrorMessages()` | Generate transaction error messages |
 | Transaction Signatures | `TransactionSignatures()` | Generate transaction signatures |
 | Proposal Keys | `ProposalKeys()` | Generate proposal keys |
 | **Block Components** | | |
@@ -274,6 +277,7 @@ str := random.RandomString(16)
 | Ledger Paths | `LedgerPaths()` | Generate ledger paths |
 | Ledger Payloads | `LedgerPayloads()` | Generate ledger payloads |
 | Ledger Values | `LedgerValues()` | Generate ledger values |
+| Register Entries | `RegisterEntries()` | Generate register entries |
 | State Commitments | `StateCommitments()` | Generate state commitments |
 | **Cryptographic Components** | | |
 | Crypto | `Crypto()` | Generate cryptographic keys and signatures |
@@ -750,6 +754,41 @@ ltr := ltrGen.Fixture(
 ltrList := ltrGen.List(2)
 ```
 
+#### Transaction Error Message Generator
+```go
+txErrMsgGen := suite.TransactionErrorMessages()
+
+// Basic transaction error message
+txErrMsg := txErrMsgGen.Fixture()
+
+// With specific transaction ID
+txErrMsg := txErrMsgGen.Fixture(
+    txErrMsgGen.WithTransactionID(txID),
+)
+
+// With specific index
+txErrMsg := txErrMsgGen.Fixture(
+    txErrMsgGen.WithIndex(42),
+)
+
+// With specific error message
+txErrMsg := txErrMsgGen.Fixture(
+    txErrMsgGen.WithErrorMessage("custom error"),
+)
+
+// With specific executor ID
+txErrMsg := txErrMsgGen.Fixture(
+    txErrMsgGen.WithExecutorID(executorID),
+)
+
+// Generate error messages for failed transaction results
+txResults := suite.LightTransactionResults().List(5, LightTransactionResult.WithFailed(true))
+txErrMsgs := txErrMsgGen.ForTransactionResults(txResults)
+
+// List of error messages
+txErrMsgList := txErrMsgGen.List(2)
+```
+
 ### Transaction Component Generators
 
 #### Transaction Signature Generator
@@ -1015,6 +1054,40 @@ values := valueGen.List(3)
 
 // List of values with specific size
 largeValues := valueGen.List(2, valueGen.WithSize(8, 32))
+```
+
+### Register Entry Generator
+
+Generates register entries with consistent randomness. Register entries combine a register key with a register value.
+
+**Options:**
+- `WithKey(key flow.RegisterID)`: Sets the register key
+- `WithValue(value flow.RegisterValue)`: Sets the register value
+- `WithPayload(payload *ledger.Payload)`: Converts a ledger payload to a register entry
+
+**Methods:**
+- `Fixture(opts ...RegisterEntryOption)`: Generates a single register entry
+- `List(n int, opts ...RegisterEntryOption)`: Generates a list of register entries
+
+```go
+registerEntryGen := suite.RegisterEntries()
+
+// Basic register entry
+entry := registerEntryGen.Fixture()
+
+// Register entry with specific key
+entry := registerEntryGen.Fixture(RegisterEntry.WithKey(key))
+
+// Register entry with specific value
+value := []byte("some value")
+entry := registerEntryGen.Fixture(RegisterEntry.WithValue(value))
+
+// Register entry from ledger payload
+payload := suite.LedgerPayloads().Fixture()
+entry := registerEntryGen.Fixture(RegisterEntry.WithPayload(payload))
+
+// List of register entries
+entries := registerEntryGen.List(3)
 ```
 
 ## Migration Guide

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	osmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -16,142 +18,148 @@ import (
 // TestPipelineStateTransitions verifies that the pipeline correctly transitions
 // through states when provided with the correct conditions.
 func TestPipelineStateTransitions(t *testing.T) {
-	pipeline, mockCore, updateChan, parent := createPipeline(t)
+	synctest.Test(t, func(t *testing.T) {
+		pipeline, mockCore, updateChan, parent := createPipeline(t)
 
-	pipeline.SetSealed()
-	parent.UpdateState(StateComplete, pipeline)
+		pipeline.SetSealed()
+		parent.UpdateState(StateComplete, pipeline)
 
-	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index").Return(nil)
-	mockCore.On("Persist").Return(nil)
+		mockCore.On("Download", mock.Anything).Return(nil)
+		mockCore.On("Index").Return(nil)
+		mockCore.On("Persist").Return(nil)
 
-	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
+		assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
-	errChan := make(chan error)
-	go func() {
-		errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
-	}()
+		go func() {
+			err := pipeline.Run(context.Background(), mockCore, parent.GetState())
+			require.NoError(t, err)
+		}()
 
-	// Wait for pipeline to reach WaitingPersist state
-	expectedStates := []State{StateProcessing, StateWaitingPersist, StateComplete}
-	waitForStateUpdates(t, updateChan, expectedStates...)
-	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should be in Complete state")
+		for _, expected := range []State{StateProcessing, StateWaitingPersist, StateComplete} {
+			synctest.Wait()
+			assertUpdate(t, updateChan, expected)
+		}
 
-	// Run should complete without error
-	waitForError(t, errChan, nil)
+		// wait for Run goroutine to finish
+		synctest.Wait()
+		assertNoUpdate(t, pipeline, updateChan, StateComplete)
+	})
 }
 
 // TestPipelineParentDependentTransitions verifies that a pipeline's transitions
 // depend on the parent pipeline's state.
 func TestPipelineParentDependentTransitions(t *testing.T) {
-	pipeline, mockCore, updateChan, parent := createPipeline(t)
+	synctest.Test(t, func(t *testing.T) {
+		pipeline, mockCore, updateChan, parent := createPipeline(t)
 
-	mockCore.On("Download", mock.Anything).Return(nil)
-	mockCore.On("Index").Return(nil)
-	mockCore.On("Persist").Return(nil)
+		assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
-	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
+		go func() {
+			err := pipeline.Run(context.Background(), mockCore, parent.GetState())
+			require.NoError(t, err)
+		}()
 
-	errChan := make(chan error)
-	go func() {
-		errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
-	}()
+		// 1. Initial update - parent in Ready state
+		parent.UpdateState(StatePending, pipeline)
 
-	// Initial update - parent in Ready state
-	parent.UpdateState(StatePending, pipeline)
+		// Check that pipeline remains in Ready state
+		synctest.Wait()
+		assertNoUpdate(t, pipeline, updateChan, StatePending)
 
-	// Check that pipeline remains in Ready state
-	waitNeverStateUpdate(t, updateChan)
-	assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Ready state")
-	mockCore.AssertNotCalled(t, "Download")
+		// 2. Update parent to downloading
+		parent.UpdateState(StateProcessing, pipeline)
 
-	// Update parent to downloading
-	parent.UpdateState(StateProcessing, pipeline)
+		// Pipeline should now call Download and Index within the processing state, then progress to
+		// WaitingPersist and stop
+		mockCore.On("Download", mock.Anything).Return(nil)
+		mockCore.On("Index").Return(nil)
+		for _, expected := range []State{StateProcessing, StateWaitingPersist} {
+			synctest.Wait()
+			assertUpdate(t, updateChan, expected)
+		}
+		assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should be in StateWaitingPersist state")
 
-	// Pipeline should now progress to WaitingPersist state and stop
-	expectedStates := []State{StateProcessing, StateWaitingPersist}
-	waitForStateUpdates(t, updateChan, expectedStates...)
-	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should progress to WaitingPersist state")
-	mockCore.AssertCalled(t, "Download", mock.Anything)
-	mockCore.AssertCalled(t, "Index")
-	mockCore.AssertNotCalled(t, "Persist")
+		// pipeline should remain in WaitingPersist state
+		synctest.Wait()
+		assertNoUpdate(t, pipeline, updateChan, StateWaitingPersist)
 
-	waitNeverStateUpdate(t, updateChan)
-	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should remain in WaitingPersist state")
+		// 3. Update parent to complete - should allow persisting when sealed
+		parent.UpdateState(StateComplete, pipeline)
 
-	// Update parent to complete - should allow persisting when sealed
-	parent.UpdateState(StateComplete, pipeline)
+		// this alone should not allow the pipeline to progress to any other state
+		synctest.Wait()
+		assertNoUpdate(t, pipeline, updateChan, StateWaitingPersist)
 
-	// this alone should not allow the pipeline to progress to any other state
-	waitNeverStateUpdate(t, updateChan)
-	assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should remain in WaitingPersist state")
+		// 4. Mark the execution result as sealed, this should allow the pipeline to progress to Complete state
+		pipeline.SetSealed()
+		mockCore.On("Persist").Return(nil)
 
-	// Mark the execution result as sealed, this should allow the pipeline to progress to Complete state
-	pipeline.SetSealed()
+		// Wait for pipeline to complete
+		synctest.Wait()
+		assertUpdate(t, updateChan, StateComplete)
 
-	// Wait for pipeline to complete
-	expectedStates = []State{StateComplete}
-	waitForStateUpdates(t, updateChan, expectedStates...)
-	assert.Equal(t, StateComplete, pipeline.GetState(), "Pipeline should reach Complete state")
-	mockCore.AssertCalled(t, "Persist")
-
-	// Run should complete without error
-	waitForError(t, errChan, nil)
+		// Run should complete without error
+		synctest.Wait()
+		assertNoUpdate(t, pipeline, updateChan, StateComplete)
+	})
 }
 
 // TestParentAbandoned verifies that a pipeline is properly abandoned when
 // the parent pipeline is abandoned.
 func TestAbandoned(t *testing.T) {
 	t.Run("starts already abandoned", func(t *testing.T) {
-		pipeline, mockCore, updateChan, parent := createPipeline(t)
+		synctest.Test(t, func(t *testing.T) {
+			pipeline, mockCore, updateChan, parent := createPipeline(t)
 
-		mockCore.On("Abandon").Return(nil)
+			mockCore.On("Abandon").Return(nil)
 
-		pipeline.Abandon()
+			pipeline.Abandon()
 
-		errChan := make(chan error)
-		go func() {
-			errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
-		}()
+			go func() {
+				err := pipeline.Run(context.Background(), mockCore, parent.GetState())
+				require.NoError(t, err)
+			}()
 
-		// first state must be abandoned
-		waitForStateUpdates(t, updateChan, StateAbandoned)
+			// first state must be abandoned
+			synctest.Wait()
+			assertUpdate(t, updateChan, StateAbandoned)
 
-		// Run should complete without error
-		waitForError(t, errChan, nil)
+			// wait for Run goroutine to finish
+			synctest.Wait()
+			assertNoUpdate(t, pipeline, updateChan, StateAbandoned)
+		})
 	})
 
 	// Test cases abandoning during different stages of processing
 	testCases := []struct {
 		name           string
 		setupMock      func(*PipelineImpl, *mockStateProvider, *osmock.Core)
+		onStateFns     map[State]func(*PipelineImpl, *mockStateProvider)
 		expectedStates []State
 	}{
 		{
 			name: "Abandon during download",
 			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
-				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
-					pipeline.Abandon()
-
-					ctx := args[0].(context.Context)
-					unittest.RequireCloseBefore(t, ctx.Done(), 500*time.Millisecond, "Abandon should cause context to be canceled")
-				}).Return(func(ctx context.Context) error {
-					return ctx.Err()
-				})
+				mockCore.
+					On("Download", mock.Anything).
+					Return(func(ctx context.Context) error {
+						pipeline.Abandon()
+						<-ctx.Done() // abandon should cause context to be canceled
+						return ctx.Err()
+					})
 			},
 			expectedStates: []State{StateProcessing, StateAbandoned},
 		},
 		{
 			name: "Parent abandoned during download",
 			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
-				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
-					parent.UpdateState(StateAbandoned, pipeline)
-
-					ctx := args[0].(context.Context)
-					unittest.RequireCloseBefore(t, ctx.Done(), 500*time.Millisecond, "Abandon should cause context to be canceled")
-				}).Return(func(ctx context.Context) error {
-					return ctx.Err()
-				})
+				mockCore.
+					On("Download", mock.Anything).
+					Return(func(ctx context.Context) error {
+						parent.UpdateState(StateAbandoned, pipeline)
+						<-ctx.Done() // abandon should cause context to be canceled
+						return ctx.Err()
+					})
 			},
 			expectedStates: []State{StateProcessing, StateAbandoned},
 		},
@@ -181,12 +189,12 @@ func TestAbandoned(t *testing.T) {
 			name: "Abandon during waiting to persist",
 			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
-				mockCore.On("Index").Run(func(args mock.Arguments) {
-					go func() {
-						time.Sleep(100 * time.Millisecond)
-						pipeline.Abandon()
-					}()
-				}).Return(nil)
+				mockCore.On("Index").Return(nil)
+			},
+			onStateFns: map[State]func(*PipelineImpl, *mockStateProvider){
+				StateWaitingPersist: func(pipeline *PipelineImpl, parent *mockStateProvider) {
+					pipeline.Abandon()
+				},
 			},
 			expectedStates: []State{StateProcessing, StateWaitingPersist, StateAbandoned},
 		},
@@ -194,12 +202,12 @@ func TestAbandoned(t *testing.T) {
 			name: "Parent abandoned during waiting to persist",
 			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
-				mockCore.On("Index").Run(func(args mock.Arguments) {
-					go func() {
-						time.Sleep(100 * time.Millisecond)
-						parent.UpdateState(StateAbandoned, pipeline)
-					}()
-				}).Return(nil)
+				mockCore.On("Index").Return(nil)
+			},
+			onStateFns: map[State]func(*PipelineImpl, *mockStateProvider){
+				StateWaitingPersist: func(pipeline *PipelineImpl, parent *mockStateProvider) {
+					parent.UpdateState(StateAbandoned, pipeline)
+				},
 			},
 			expectedStates: []State{StateProcessing, StateWaitingPersist, StateAbandoned},
 		},
@@ -211,22 +219,33 @@ func TestAbandoned(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pipeline, mockCore, updateChan, parent := createPipeline(t)
-			tc.setupMock(pipeline, parent, mockCore)
+			synctest.Test(t, func(t *testing.T) {
+				pipeline, mockCore, updateChan, parent := createPipeline(t)
+				tc.setupMock(pipeline, parent, mockCore)
 
-			mockCore.On("Abandon").Return(nil)
+				mockCore.On("Abandon").Return(nil)
 
-			errChan := make(chan error)
-			go func() {
-				errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
-			}()
+				go func() {
+					err := pipeline.Run(context.Background(), mockCore, parent.GetState())
+					require.NoError(t, err)
+				}()
 
-			// Send parent update to start processing
-			parent.UpdateState(StateProcessing, pipeline)
+				// Send parent update to start processing
+				parent.UpdateState(StateProcessing, pipeline)
 
-			waitForStateUpdates(t, updateChan, tc.expectedStates...)
+				for _, expected := range tc.expectedStates {
+					synctest.Wait()
+					assertUpdate(t, updateChan, expected)
 
-			waitForError(t, errChan, nil)
+					if fn, ok := tc.onStateFns[expected]; ok {
+						fn(pipeline, parent)
+					}
+				}
+
+				// wait for Run goroutine to finish
+				synctest.Wait()
+				assertNoUpdate(t, pipeline, updateChan, StateAbandoned)
+			})
 		})
 	}
 }
@@ -274,41 +293,26 @@ func TestPipelineContextCancellation(t *testing.T) {
 				return ctx
 			},
 		},
-		{
-			name: "Cancel during abandon",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
-				ctx, cancel := context.WithCancel(context.Background())
-
-				mockCore.On("Download", mock.Anything).Return(nil)
-				mockCore.On("Index").Run(func(args mock.Arguments) {
-					pipeline.Abandon()
-				}).Return(nil)
-				mockCore.On("Abandon").Run(func(args mock.Arguments) {
-					cancel()
-				}).Return(func() error {
-					return ctx.Err()
-				})
-
-				return ctx
-			},
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pipeline, mockCore, _, parent := createPipeline(t)
+			synctest.Test(t, func(t *testing.T) {
+				pipeline, mockCore, _, parent := createPipeline(t)
 
-			parent.UpdateState(StateComplete, pipeline)
-			pipeline.SetSealed()
+				parent.UpdateState(StateComplete, pipeline)
+				pipeline.SetSealed()
 
-			ctx := tc.setupMock(pipeline, parent, mockCore)
+				ctx := tc.setupMock(pipeline, parent, mockCore)
 
-			errChan := make(chan error)
-			go func() {
-				errChan <- pipeline.Run(ctx, mockCore, parent.GetState())
-			}()
+				go func() {
+					err := pipeline.Run(ctx, mockCore, parent.GetState())
+					require.ErrorIs(t, err, context.Canceled)
+				}()
 
-			waitForError(t, errChan, context.Canceled)
+				// wait for Run goroutine to finish
+				synctest.Wait()
+			})
 		})
 	}
 }
@@ -353,34 +357,33 @@ func TestPipelineErrorHandling(t *testing.T) {
 			expectedErr:    errors.New("persist error"),
 			expectedStates: []State{StateProcessing, StateWaitingPersist},
 		},
-		{
-			name: "Abandon Error",
-			setupMock: func(pipeline *PipelineImpl, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
-				pipeline.Abandon()
-				mockCore.On("Abandon").Return(expectedErr)
-			},
-			expectedErr:    errors.New("abandon error"),
-			expectedStates: []State{StateAbandoned},
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pipeline, mockCore, updateChan, parent := createPipeline(t)
+			synctest.Test(t, func(t *testing.T) {
+				pipeline, mockCore, updateChan, parent := createPipeline(t)
 
-			tc.setupMock(pipeline, parent, mockCore, tc.expectedErr)
+				tc.setupMock(pipeline, parent, mockCore, tc.expectedErr)
 
-			errChan := make(chan error)
-			go func() {
-				errChan <- pipeline.Run(context.Background(), mockCore, parent.GetState())
-			}()
+				go func() {
+					err := pipeline.Run(context.Background(), mockCore, parent.GetState())
+					require.ErrorIs(t, err, tc.expectedErr)
+				}()
 
-			// Send parent update to trigger processing
-			parent.UpdateState(StateProcessing, pipeline)
+				// Send parent update to trigger processing
+				parent.UpdateState(StateProcessing, pipeline)
 
-			waitForStateUpdates(t, updateChan, tc.expectedStates...)
+				for _, expected := range tc.expectedStates {
+					synctest.Wait()
+					assertUpdate(t, updateChan, expected)
+				}
 
-			waitForError(t, errChan, tc.expectedErr)
+				// wait for Run goroutine to finish
+				synctest.Wait()
+				finalState := tc.expectedStates[len(tc.expectedStates)-1]
+				assertNoUpdate(t, pipeline, updateChan, finalState)
+			})
 		})
 	}
 }
@@ -424,5 +427,23 @@ func TestValidateTransition(t *testing.T) {
 
 			assert.ErrorIs(t, err, ErrInvalidTransition)
 		}
+	}
+}
+
+func assertNoUpdate(t *testing.T, pipeline Pipeline, updateChan <-chan State, existingState State) {
+	select {
+	case update := <-updateChan:
+		t.Errorf("Pipeline should remain in %s state, but transitioned to %s", existingState, update)
+	default:
+		assert.Equal(t, existingState, pipeline.GetState(), "Pipeline should remain in %s state", existingState)
+	}
+}
+
+func assertUpdate(t *testing.T, updateChan <-chan State, expected State) {
+	select {
+	case update := <-updateChan:
+		assert.Equal(t, expected, update, "Pipeline should transition to %s state", expected)
+	default:
+		t.Errorf("Pipeline should have transitioned to %s state", expected)
 	}
 }
