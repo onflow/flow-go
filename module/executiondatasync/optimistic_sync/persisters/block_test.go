@@ -82,7 +82,7 @@ func (p *PersisterSuite) SetupTest() {
 		p.header,
 		[]stores.PersisterStore{
 			stores.NewEventsStore(p.inMemoryEvents, p.events, p.executionResult.BlockID),
-			stores.NewResultsStore(p.inMemoryResults, p.results, p.executionResult.BlockID, p.lockManager),
+			stores.NewResultsStore(p.inMemoryResults, p.results, p.executionResult.BlockID),
 			stores.NewCollectionsStore(p.inMemoryCollections, p.collections, p.lockManager),
 			stores.NewTransactionsStore(p.inMemoryTransactions, p.transactions),
 			stores.NewTxResultErrMsgStore(p.inMemoryTxResultErrMsg, p.txResultErrMsg, p.executionResult.BlockID, p.lockManager),

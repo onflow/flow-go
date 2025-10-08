@@ -148,7 +148,7 @@ func NewCoreImpl(
 
 	persisterStores := []stores.PersisterStore{
 		stores.NewEventsStore(inmemEvents, persistentEvents, executionResult.BlockID),
-		stores.NewResultsStore(inmemResults, persistentResults, executionResult.BlockID, lockManager),
+		stores.NewResultsStore(inmemResults, persistentResults, executionResult.BlockID),
 		stores.NewCollectionsStore(inmemCollections, persistentCollections, lockManager),
 		stores.NewTxResultErrMsgStore(inmemTxResultErrMsgs, persistentTxResultErrMsg, executionResult.BlockID, lockManager),
 		stores.NewLatestSealedResultStore(latestPersistedSealedResult, executionResult.ID(), header.Height),
