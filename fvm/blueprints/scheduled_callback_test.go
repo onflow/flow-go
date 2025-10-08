@@ -183,6 +183,27 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	assert.Equal(t, tx.GasLimit, uint64(effort))
 }
 
+func TestIsPendingExecutionEvent(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Mainnet.Chain()
+	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
+	assert.True(t, blueprints.IsPendingExecutionEvent(env, createValidCallbackEvent(t, 1, 100)))
+}
+
+func TestCallbackDetailsFromEvent(t *testing.T) {
+	t.Parallel()
+
+	expectedID := uint64(123)
+	expectedEffort := uint64(456)
+	event := createValidCallbackEvent(t, expectedID, expectedEffort)
+
+	actualID, actualEffort, err := blueprints.CallbackDetailsFromEvent(event)
+	require.NoError(t, err)
+	assert.Equal(t, expectedID, uint64(actualID))
+	assert.Equal(t, expectedEffort, uint64(actualEffort))
+}
+
 func createValidCallbackEvent(t *testing.T, id uint64, effort uint64) flow.Event {
 	const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
 	env := systemcontracts.SystemContractsForChain(flow.Mainnet.Chain().ChainID()).AsTemplateEnv()

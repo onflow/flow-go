@@ -74,6 +74,16 @@ func (g *TransactionResultGenerator) List(n int, opts ...TransactionResultOption
 	return list
 }
 
+// ForTransactions generates a list of [flow.TransactionResult] for multiple transactions.
+func (g *TransactionResultGenerator) ForTransactions(transactions []*flow.TransactionBody, opts ...TransactionResultOption) []flow.TransactionResult {
+	list := make([]flow.TransactionResult, len(transactions))
+	for i, tx := range transactions {
+		nOpts := append(opts, TransactionResult.WithTransactionID(tx.ID()))
+		list[i] = g.Fixture(nOpts...)
+	}
+	return list
+}
+
 var LightTransactionResult lightTransactionResultFactory
 
 type lightTransactionResultFactory struct{}
@@ -134,6 +144,16 @@ func (g *LightTransactionResultGenerator) List(n int, opts ...LightTransactionRe
 	list := make([]flow.LightTransactionResult, n)
 	for i := range n {
 		list[i] = g.Fixture(opts...)
+	}
+	return list
+}
+
+// ForTransactions generates a list of [flow.LightTransactionResult] for multiple transactions.
+func (g *LightTransactionResultGenerator) ForTransactions(transactions []*flow.TransactionBody, opts ...LightTransactionResultOption) []flow.LightTransactionResult {
+	list := make([]flow.LightTransactionResult, len(transactions))
+	for i, tx := range transactions {
+		nOpts := append(opts, LightTransactionResult.WithTransactionID(tx.ID()))
+		list[i] = g.Fixture(nOpts...)
 	}
 	return list
 }
