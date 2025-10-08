@@ -21,11 +21,11 @@ type StoredChunkDataPacks interface {
 	ByID(id flow.Identifier) (*StoredChunkDataPack, error)
 
 	// Remove removes multiple ChunkDataPacks cs keyed by their StoredChunkDataPack IDs in a batch.
-	// No errors returns are expected during normal operation.
+	// No error returns are expected during normal operation, even if none of the referenced objects exist in storage.
 	Remove(cs []flow.Identifier) error
 
 	// BatchRemove removes multiple StoredChunkDataPacks cs keyed by their IDs in a batch using the provided
-	// No errors returns are expected during normal operation, even if no entries are matched.
+	// No error returns are expected during normal operation, even if none of the referenced objects exist in storage.
 	BatchRemove(cs []flow.Identifier, batch ReaderBatchWriter) error
 }
 
