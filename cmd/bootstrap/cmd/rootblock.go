@@ -383,7 +383,7 @@ func validateEpochConfig() error {
 	return nil
 }
 
-// readIntermediaryBootstrappingData reads intermediary clustering data file from disk.
+// readIntermediaryClusteringData reads intermediary clustering data file from disk.
 // This file needs to be prepared with the clustering bootstrap command
 func readIntermediaryClusteringData() *IntermediaryClusteringData {
 	intermediaryData, err := utils.ReadData[IntermediaryClusteringData](flagIntermediaryClusteringDataPath)
@@ -395,6 +395,7 @@ func readIntermediaryClusteringData() *IntermediaryClusteringData {
 
 // readClusterBlockVotes reads votes for root cluster blocks.
 // It sorts the votes into the appropriate clusters according to the given assignment list.
+// The returned list of votes is in cluster index order (first list of votes is for cluster 0, etc.)
 func readClusterBlockVotes(al flow.AssignmentList) [][]*hotstuff.Vote {
 	votes := make([][]*hotstuff.Vote, len(al))
 	files, err := common.FilesInDir(flagRootClusterBlockVotesDir)
@@ -424,7 +425,7 @@ func readClusterBlockVotes(al flow.AssignmentList) [][]*hotstuff.Vote {
 			}
 		}
 		if !found {
-			log.Warn().Msgf("ignoring vote for block %v from signerID %v not part of the assignment", vote.BlockID, vote.SignerID)
+			log.Fatal().Msgf("Halting because found vote for block %v from signerID %v not part of the assignment", vote.BlockID, vote.SignerID)
 		}
 	}
 	return votes

@@ -13,7 +13,7 @@ import (
 
 var pullClusteringCmd = &cobra.Command{
 	Use:   "pull-clustering",
-	Short: "Pull epoch clustering",
+	Short: "Pull clustering assignment for the first epoch of this spork. This is used to generate a root cluster block vote for this node's assigned cluster.",
 	Run:   pullClustering,
 }
 
