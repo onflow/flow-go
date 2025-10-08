@@ -112,3 +112,124 @@ func TestReadingNotStoreTransactionResultErrorMessage(t *testing.T) {
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
+
+func TestBatchStoreTransactionResultErrorMessagesErrAlreadyExists(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		st := store.NewTransactionResultErrorMessages(metrics, db, 1000)
+
+		blockID := unittest.IdentifierFixture()
+		txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
+		for i := 0; i < 3; i++ {
+			expected := flow.TransactionResultErrorMessage{
+				TransactionID: unittest.IdentifierFixture(),
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+				Index:         uint32(i),
+				ExecutorID:    unittest.IdentifierFixture(),
+			}
+			txResultErrMsgs = append(txResultErrMsgs, expected)
+		}
+
+		// First batch store should succeed
+		err := unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return st.BatchStore(lctx, rw, blockID, txResultErrMsgs)
+			})
+		})
+		require.NoError(t, err)
+
+		// Second batch store with the same blockID should fail with ErrAlreadyExists
+		duplicateTxResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
+		for i := 0; i < 2; i++ {
+			expected := flow.TransactionResultErrorMessage{
+				TransactionID: unittest.IdentifierFixture(),
+				ErrorMessage:  fmt.Sprintf("duplicate error %d", i),
+				Index:         uint32(i),
+				ExecutorID:    unittest.IdentifierFixture(),
+			}
+			duplicateTxResultErrMsgs = append(duplicateTxResultErrMsgs, expected)
+		}
+
+		err = unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return st.BatchStore(lctx, rw, blockID, duplicateTxResultErrMsgs)
+			})
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+
+		// Verify that the original transaction result error messages are still there and unchanged
+		for _, txResultErrMsg := range txResultErrMsgs {
+			actual, err := st.ByBlockIDTransactionID(blockID, txResultErrMsg.TransactionID)
+			require.NoError(t, err)
+			assert.Equal(t, txResultErrMsg, *actual)
+		}
+
+		// Verify that the duplicate transaction result error messages were not stored
+		for _, txResultErrMsg := range duplicateTxResultErrMsgs {
+			_, err := st.ByBlockIDTransactionID(blockID, txResultErrMsg.TransactionID)
+			require.Error(t, err)
+			require.ErrorIs(t, err, storage.ErrNotFound)
+		}
+	})
+}
+
+func TestBatchStoreTransactionResultErrorMessagesMissingLock(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		st := store.NewTransactionResultErrorMessages(metrics, db, 1000)
+
+		blockID := unittest.IdentifierFixture()
+		txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
+		for i := 0; i < 3; i++ {
+			expected := flow.TransactionResultErrorMessage{
+				TransactionID: unittest.IdentifierFixture(),
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+				Index:         uint32(i),
+				ExecutorID:    unittest.IdentifierFixture(),
+			}
+			txResultErrMsgs = append(txResultErrMsgs, expected)
+		}
+
+		// Create a context without the required lock
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return st.BatchStore(lctx, rw, blockID, txResultErrMsgs)
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "lock_insert_transaction_result_message")
+	})
+}
+
+func TestBatchStoreTransactionResultErrorMessagesWrongLock(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		st := store.NewTransactionResultErrorMessages(metrics, db, 1000)
+
+		blockID := unittest.IdentifierFixture()
+		txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
+		for i := 0; i < 3; i++ {
+			expected := flow.TransactionResultErrorMessage{
+				TransactionID: unittest.IdentifierFixture(),
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
+				Index:         uint32(i),
+				ExecutorID:    unittest.IdentifierFixture(),
+			}
+			txResultErrMsgs = append(txResultErrMsgs, expected)
+		}
+
+		// Try to use the wrong lock
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return st.BatchStore(lctx, rw, blockID, txResultErrMsgs)
+			})
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "lock_insert_transaction_result_message")
+	})
+}
