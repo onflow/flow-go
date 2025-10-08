@@ -87,8 +87,9 @@ type Blocks interface {
 	//     to decode an existing database value
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
-	// IndexBlockContainingCollectionGuarantees populates an index `guaranteeID->blockID` for each guarantee
-	// which appears in the block.
+	// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
+	// The caller must acquire a storage.LockIndexCollectionsByBlock lock.
+	//
 	// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 	// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
 	// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
@@ -96,6 +97,7 @@ type Blocks interface {
 	// (one-to-many mapping) for soft finality and the mature protocol.
 	//
 	// Error returns:
+	//   - storage.ErrAlreadyExists if any collection guarantee is already indexed
 	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	IndexBlockContainingCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error
+	BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error
 }

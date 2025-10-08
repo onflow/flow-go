@@ -20,15 +20,26 @@ const (
 	// The reason they are combined is because insertion process reads some data updated by finalization process,
 	// in order to prevent dirty reads, we need to acquire the lock for both operations.
 	LockInsertOrFinalizeClusterBlock = "lock_insert_or_finalize_cluster_block"
+	// LockInsertEvent protects the insertion of events.
+	// This lock is reused by both EN storing its own receipt and AN indexing execution data
+	LockInsertEvent = "lock_insert_event"
+	// LockInsertServiceEvent protects the insertion of service events.
+	LockInsertServiceEvent = "lock_insert_service_event"
+	// LockInsertLightTransactionResult protects the insertion of light transaction results.
+	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
-	LockInsertOwnReceipt = "lock_insert_own_receipt"
+	LockInsertOwnReceipt       = "lock_insert_own_receipt"
+	LockIndexExecutionResult   = "lock_index_execution_result"
+	LockIndexStateCommitment   = "lock_index_state_commitment"
+	LockInsertAndIndexTxResult = "lock_insert_and_index_tx_result"
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
-	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	LockInsertChunkDataPack     = "lock_insert_chunk_data_pack"
+	LockIndexCollectionsByBlock = "lock_index_collections_by_block"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -38,10 +49,17 @@ func Locks() []string {
 		LockFinalizeBlock,
 		LockIndexResultApproval,
 		LockInsertOrFinalizeClusterBlock,
+		LockInsertEvent,
+		LockInsertServiceEvent,
 		LockInsertOwnReceipt,
+		LockIndexExecutionResult,
+		LockIndexStateCommitment,
+		LockInsertAndIndexTxResult,
 		LockInsertCollection,
+		LockInsertLightTransactionResult,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
+		LockIndexCollectionsByBlock,
 	}
 }
 
@@ -63,9 +81,24 @@ type LockManager = lockctx.Manager
 // This function will panic if a policy is created which does not prevent deadlocks.
 func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
+		// for protocol to Bootstrap, during bootstrapping,
+		// we need to insert and finalize
+		Add(LockBootstrapping, LockIndexExecutionResult).
+		Add(LockIndexExecutionResult, LockInsertBlock).
 		Add(LockInsertBlock, LockFinalizeBlock).
-		Add(LockFinalizeBlock, LockBootstrapping).
-		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
+
+		// EN to save execution result
+		Add(LockInsertChunkDataPack, LockInsertEvent).
+		Add(LockInsertEvent, LockInsertServiceEvent).
+		Add(LockInsertServiceEvent, LockInsertAndIndexTxResult).
+		Add(LockInsertAndIndexTxResult, LockInsertOwnReceipt).
+		Add(LockInsertOwnReceipt, LockIndexExecutionResult).
+		Add(LockIndexExecutionResult, LockIndexStateCommitment).
+
+		// AN state sync to IndexBlockData
+		Add(LockInsertCollection, LockInsertEvent).
+		Add(LockInsertEvent, LockInsertServiceEvent).
+		Add(LockInsertServiceEvent, LockInsertLightTransactionResult).
 		Build()
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -18,6 +19,7 @@ import (
 // TestRetrieveEventByBlockIDTxID tests event insertion, event retrieval by block id, block id and transaction id,
 // and block id and event type
 func TestRetrieveEventByBlockIDTxID(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
 		// create block ids, transaction ids and event types slices
@@ -53,10 +55,12 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					)
 
 					// insert event into the db
-					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return operation.InsertEvent(rw.Writer(), b, event)
+					err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+						return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+							return operation.InsertBlockEvents(lctx, rw, b, []flow.EventsList{[]flow.Event{event}})
+						})
 					})
-					require.Nil(t, err)
+					require.NoError(t, err)
 
 					// update event arrays in the maps
 					bEvents = append(bEvents, event)

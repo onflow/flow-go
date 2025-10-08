@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -16,6 +17,7 @@ import (
 )
 
 func TestBatchStoringLightTransactionResults(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store1 := store.NewLightTransactionResults(metrics, db, 1000)
@@ -24,14 +26,20 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 		txResults := getLightTransactionResultsFixture(10)
 
 		t.Run("batch store1 results", func(t *testing.T) {
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return store1.BatchStore(blockID, txResults, rw)
-			}))
+			err := unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return store1.BatchStore(lctx, blockID, txResults, rw)
+				})
+			})
+			require.NoError(t, err)
 
 			// add a results to a new block to validate they are not included in lookups
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return store1.BatchStore(unittest.IdentifierFixture(), getLightTransactionResultsFixture(2), rw)
-			}))
+			err = unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return store1.BatchStore(lctx, unittest.IdentifierFixture(), getLightTransactionResultsFixture(2), rw)
+				})
+			})
+			require.NoError(t, err)
 
 		})
 

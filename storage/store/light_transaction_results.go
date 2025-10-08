@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -71,7 +73,10 @@ func NewLightTransactionResults(collector module.CacheMetrics, db storage.DB, tr
 	}
 }
 
-func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw storage.ReaderBatchWriter) error {
+func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw storage.ReaderBatchWriter) error {
+	if !lctx.HoldsLock(storage.LockInsertLightTransactionResult) {
+		return fmt.Errorf("BatchStore LightTransactionResults requires %v", storage.LockInsertLightTransactionResult)
+	}
 	w := rw.Writer()
 
 	for i, result := range transactionResults {
@@ -101,10 +106,6 @@ func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 		tr.blockCache.Insert(blockID, transactionResults)
 	})
 	return nil
-}
-
-func (tr *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch storage.BatchStorage) error {
-	panic("LightTransactionResults BatchStoreBadger not implemented")
 }
 
 // ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
