@@ -17,17 +17,20 @@ type ResultsStore struct {
 	inMemoryResults  *unsynchronized.LightTransactionResults
 	persistedResults storage.LightTransactionResults
 	blockID          flow.Identifier
+	lockManager      storage.LockManager
 }
 
 func NewResultsStore(
 	inMemoryResults *unsynchronized.LightTransactionResults,
 	persistedResults storage.LightTransactionResults,
 	blockID flow.Identifier,
+	lockManager storage.LockManager,
 ) *ResultsStore {
 	return &ResultsStore{
 		inMemoryResults:  inMemoryResults,
 		persistedResults: persistedResults,
 		blockID:          blockID,
+		lockManager:      lockManager,
 	}
 }
 
@@ -40,7 +43,11 @@ func (r *ResultsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWrit
 	}
 
 	if len(results) > 0 {
-		if err := r.persistedResults.BatchStore(r.blockID, results, batch); err != nil {
+		// Use storage.WithLock to acquire the necessary lock and store the results
+		err := storage.WithLock(r.lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+			return r.persistedResults.BatchStore(lctx, batch, r.blockID, results)
+		})
+		if err != nil {
 			return fmt.Errorf("could not add transaction results to batch: %w", err)
 		}
 	}

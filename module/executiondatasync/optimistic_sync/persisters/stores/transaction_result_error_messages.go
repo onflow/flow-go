@@ -17,17 +17,20 @@ type TxResultErrMsgStore struct {
 	inMemoryTxResultErrMsg  *unsynchronized.TransactionResultErrorMessages
 	persistedTxResultErrMsg storage.TransactionResultErrorMessages
 	blockID                 flow.Identifier
+	lockManager             storage.LockManager
 }
 
 func NewTxResultErrMsgStore(
 	inMemoryTxResultErrMsg *unsynchronized.TransactionResultErrorMessages,
 	persistedTxResultErrMsg storage.TransactionResultErrorMessages,
 	blockID flow.Identifier,
+	lockManager storage.LockManager,
 ) *TxResultErrMsgStore {
 	return &TxResultErrMsgStore{
 		inMemoryTxResultErrMsg:  inMemoryTxResultErrMsg,
 		persistedTxResultErrMsg: persistedTxResultErrMsg,
 		blockID:                 blockID,
+		lockManager:             lockManager,
 	}
 }
 
@@ -40,7 +43,11 @@ func (t *TxResultErrMsgStore) Persist(lctx lockctx.Proof, batch storage.ReaderBa
 	}
 
 	if len(txResultErrMsgs) > 0 {
-		if err := t.persistedTxResultErrMsg.BatchStore(t.blockID, txResultErrMsgs, batch); err != nil {
+		// Use storage.WithLock to acquire the necessary lock and store the error messages
+		err := storage.WithLock(t.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+			return t.persistedTxResultErrMsg.BatchStore(lctx, batch, t.blockID, txResultErrMsgs)
+		})
+		if err != nil {
 			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 		}
 	}

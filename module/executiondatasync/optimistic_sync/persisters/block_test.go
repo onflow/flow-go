@@ -3,6 +3,7 @@ package persisters
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,6 +26,7 @@ type PersisterSuite struct {
 	inMemoryTransactions        *unsynchronized.Transactions
 	inMemoryResults             *unsynchronized.LightTransactionResults
 	inMemoryTxResultErrMsg      *unsynchronized.TransactionResultErrorMessages
+	lockManager                 storage.LockManager
 	registers                   *storagemock.RegisterIndex
 	events                      *storagemock.Events
 	collections                 *storagemock.Collections
@@ -43,7 +45,7 @@ func TestPersisterSuite(t *testing.T) {
 }
 
 func (p *PersisterSuite) SetupTest() {
-	lockManager := storage.NewTestingLockManager()
+	p.lockManager = storage.NewTestingLockManager()
 	t := p.T()
 
 	block := unittest.BlockFixture()
@@ -75,15 +77,15 @@ func (p *PersisterSuite) SetupTest() {
 	p.persister = NewBlockPersister(
 		zerolog.Nop(),
 		p.database,
-		lockManager,
+		p.lockManager,
 		p.executionResult,
 		p.header,
 		[]stores.PersisterStore{
 			stores.NewEventsStore(p.inMemoryEvents, p.events, p.executionResult.BlockID),
-			stores.NewResultsStore(p.inMemoryResults, p.results, p.executionResult.BlockID),
-			stores.NewCollectionsStore(p.inMemoryCollections, p.collections, lockManager),
+			stores.NewResultsStore(p.inMemoryResults, p.results, p.executionResult.BlockID, p.lockManager),
+			stores.NewCollectionsStore(p.inMemoryCollections, p.collections, p.lockManager),
 			stores.NewTransactionsStore(p.inMemoryTransactions, p.transactions),
-			stores.NewTxResultErrMsgStore(p.inMemoryTxResultErrMsg, p.txResultErrMsg, p.executionResult.BlockID),
+			stores.NewTxResultErrMsgStore(p.inMemoryTxResultErrMsg, p.txResultErrMsg, p.executionResult.BlockID, p.lockManager),
 			stores.NewLatestSealedResultStore(p.latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
 		},
 	)
@@ -126,7 +128,9 @@ func (p *PersisterSuite) populateInMemoryStorages() {
 			ExecutorID:    executorID,
 		}
 	}
-	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, txResultErrMsgs)
+	err = storage.WithLock(p.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+		return p.inMemoryTxResultErrMsg.Store(lctx, p.executionResult.BlockID, txResultErrMsgs)
+	})
 	p.Require().NoError(err)
 }
 
@@ -139,7 +143,9 @@ func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
 	err = p.inMemoryResults.Store(p.executionResult.BlockID, []flow.LightTransactionResult{})
 	p.Require().NoError(err)
 
-	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, []flow.TransactionResultErrorMessage{})
+	err = storage.WithLock(p.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+		return p.inMemoryTxResultErrMsg.Store(lctx, p.executionResult.BlockID, []flow.TransactionResultErrorMessage{})
+	})
 	p.Require().NoError(err)
 
 	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
