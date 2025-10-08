@@ -33,6 +33,7 @@ func TestChunkDataPackPruner(t *testing.T) {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return results.BatchStore(result1, rw)
 		})
+		require.NoError(t, err)
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 			return chunks.StoreByChunkID(lctx, cdp1)
 		}))
