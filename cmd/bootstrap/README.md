@@ -41,8 +41,8 @@ The bootstrapping will generate the following information:
 
 #### Root Blocks for Collector clusters
 _Each cluster_ of collector nodes needs to have its own root Block and root QC
-* Root `ClusterBlockProposal`
-* Root QC from cluster for their respective `ClusterBlockProposal`
+* Root `cluster.Block`
+* Root QC from cluster for their respective `cluster.Block`: votes from collector nodes for the root block
 
 
 # Usage
@@ -97,6 +97,8 @@ Each input is a config file specified as a command line parameter:
 * folder containing the `<NodeID>.node-info.pub.json` files for _all_ partner nodes (see `.example_files/partner-node-infos`)
 * `json` containing the weight value for all partner nodes (see `./example_files/partner-weights.json`).
   Format: ```<NodeID>: <weight value>```
+* random seed for the new collector node clustering and epoch RandomSource (min 32 bytes in hex encoding)
+  Provided seeds should be derived from a verifiable random source, such as the previous epoch's RandomSource.
 
 #### Example
 ```bash
@@ -122,6 +124,19 @@ go run . keygen \
 ```
 
 ```bash
+go run . cluster-assignment \
+    --epoch-counter 0 \
+    --collection-clusters 1 \
+    --clustering-random-seed 00000000000000000000000000000000000000000000000000000000deadbeef \
+    --config ./bootstrap-example/node-config.json \
+    -o ./bootstrap-example \
+    --partner-dir ./example_files/partner-node-infos \
+    --partner-weights ./example_files/partner-weights.json \
+    --internal-priv-dir ./bootstrap-example/keys
+
+```
+
+```bash
 go run . rootblock  \
     --root-chain bench \
     --root-height 0 \
@@ -131,15 +146,19 @@ go run . rootblock  \
     --epoch-length 30000 \
     --epoch-staking-phase-length 20000 \
     --epoch-dkg-phase-length 2000 \
+    --random-seed 00000000000000000000000000000000000000000000000000000000deadbeef \
     --collection-clusters 1 \
     --protocol-version=0 \
     --use-default-epoch-timing \
-    --epoch-commit-safety-threshold=1000 \
+    --kvstore-finalization-safety-threshold=1000 \
+    --kvstore-epoch-extension-view-count=2000 \
     --config ./bootstrap-example/node-config.json \
     -o ./bootstrap-example \
     --partner-dir ./example_files/partner-node-infos \
     --partner-weights ./example_files/partner-weights.json \
-    --internal-priv-dir ./bootstrap-example/keys
+    --internal-priv-dir ./bootstrap-example/keys \
+    --intermediary-clustering-data ./bootstrap-example/public-root-information/root-clustering.json \
+    --cluster-votes-dir ./bootstrap-example/public-root-information/root-block-votes/
 ```
 
 ```bash
@@ -187,14 +206,6 @@ go run . finalize \
 * file `dkg-data.pub.json`
    - REQUIRED at NODE START by all nodes
 
-* file `<ClusterID>.root-cluster-block.json`
-   - root `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
-   - REQUIRED at NODE START by all collectors of the respective cluster
-   - file can be made accessible to all nodes at boot up (or recovery after crash)
-* file `<ClusterID>.root-cluster-qc.json`
-   - root Quorum Certificate for `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
-   - REQUIRED at NODE START by all collectors of the respective cluster
-   - file can be made accessible to all nodes at boot up (or recovery after crash)
 
 ## Generating networking key for Observer
 
