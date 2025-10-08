@@ -36,6 +36,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 		for _, b := range blockIDs {
 
 			bEvents := make([]flow.Event, 0)
+			allEventsForBlock := make([]flow.Event, 0)
 
 			// all blocks share the same transactions
 			for i, tx := range txIDs {
@@ -54,15 +55,8 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 						unittest.Event.WithTransactionID(tx),
 					)
 
-					// insert event into the db
-					err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
-						return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-							return operation.InsertBlockEvents(lctx, rw, b, []flow.EventsList{[]flow.Event{event}})
-						})
-					})
-					require.NoError(t, err)
-
-					// update event arrays in the maps
+					// collect events for batch insertion
+					allEventsForBlock = append(allEventsForBlock, event)
 					bEvents = append(bEvents, event)
 					tEvents = append(tEvents, event)
 					eEvents = append(eEvents, event)
@@ -76,6 +70,15 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 				}
 				txMap[b.String()+"_"+tx.String()] = tEvents
 			}
+
+			// insert all events for this block in one batch
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertBlockEvents(lctx, rw, b, []flow.EventsList{allEventsForBlock})
+				})
+			})
+			require.NoError(t, err)
+
 			blockMap[b.String()] = bEvents
 		}
 
