@@ -9,7 +9,7 @@ import (
 
 // StoredChunkDataPacks represents persistent storage for chunk data packs.
 // It works with the reduced representation `StoredChunkDataPack` for chunk data packs,
-// where instead of the full collection text, only the collection's hash (ID) is contained.
+// where instead of the full collection data, only the collection's hash (ID) is contained.
 type StoredChunkDataPacks interface {
 	// StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
 	// It returns the IDs of the stored chunk data packs.
