@@ -92,7 +92,7 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	err := s.indexReporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
-	
+
 	// Initialize lock manager for tests
 	s.lockManager = storage.NewTestingLockManager()
 
@@ -148,7 +148,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
 
 	// Mock the storage of the fetched error messages into the protocol database.
-	s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
+	s.txErrorMessages.On("Store", mock.Anything, blockId, expectedStoreTxErrorMessages).
 		Return(nil).Once()
 
 	core := s.initCore()
@@ -233,7 +233,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 
 		// Simulate an error when attempting to store the fetched transaction error messages in storage.
 		expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-		s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
+		s.txErrorMessages.On("Store", mock.Anything, blockId, expectedStoreTxErrorMessages).
 			Return(fmt.Errorf("storage error")).Once()
 
 		core := s.initCore()
@@ -317,7 +317,7 @@ func mockTransactionResultsByBlock(count int) []flow.LightTransactionResult {
 
 // setupReceiptsForBlock sets up mock execution receipts for a block and returns the receipts along
 // with the identities of the execution nodes that processed them.
-func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier) {
+func setupReceiptsForBlock(receipts *storagemock.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier) {
 	receipt1 := unittest.ReceiptForBlockFixture(block)
 	receipt1.ExecutorID = eNodeID
 	receipt2 := unittest.ReceiptForBlockFixture(block)
@@ -334,7 +334,7 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 }
 
 // setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
-func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, executionResult *flow.ExecutionResult, executorIDs ...flow.Identifier) {
+func setupReceiptsForBlockWithResult(receipts *storagemock.ExecutionReceipts, executionResult *flow.ExecutionResult, executorIDs ...flow.Identifier) {
 	receiptList := make(flow.ExecutionReceiptList, 0, len(executorIDs))
 	for _, enID := range executorIDs {
 		receiptList = append(receiptList, unittest.ExecutionReceiptFixture(

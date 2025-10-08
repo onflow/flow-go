@@ -106,7 +106,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	err := s.indexReporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
-	
+
 	// Initialize lock manager for tests
 	s.lockManager = storage.NewTestingLockManager()
 
@@ -250,7 +250,7 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 		expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
 
 		// Mock the storage of the fetched error messages into the protocol database.
-		s.txErrorMessages.On("Store", blockID, expectedStoreTxErrorMessages).Return(nil).
+		s.txErrorMessages.On("Store", mock.Anything, blockID, expectedStoreTxErrorMessages).Return(nil).
 			Run(func(args mock.Arguments) {
 				// Ensure the test does not complete its work faster than necessary
 				wg.Done()

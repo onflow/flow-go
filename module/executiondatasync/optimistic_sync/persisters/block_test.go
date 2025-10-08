@@ -195,8 +195,8 @@ func (p *PersisterSuite) TestPersister_PersistWithData() {
 		storedTransactions = append(storedTransactions, *transaction)
 	}).Return(nil).Times(len(p.inMemoryTransactions.Data()))
 
-	p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		terrm, ok := args.Get(1).([]flow.TransactionResultErrorMessage)
+	p.txResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+		terrm, ok := args.Get(3).([]flow.TransactionResultErrorMessage)
 		p.Require().True(ok)
 		storedTxResultErrMsgs = terrm
 	}).Return(nil)
@@ -270,7 +270,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&flow.LightCollection{}, nil).Times(numberOfCollections)
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
-				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
+				p.txResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not add transaction result error messages to batch",
 		},
@@ -283,7 +283,7 @@ func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
 				p.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&flow.LightCollection{}, nil).Times(numberOfCollections)
 				numberOfTransactions := len(p.inMemoryTransactions.Data())
 				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
-				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
+				p.txResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, p.executionResult.BlockID, mock.Anything).Return(nil).Once()
 				p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(assert.AnError).Once()
 			},
 			expectedError: "could not persist latest sealed result",
