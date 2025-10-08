@@ -1,4 +1,4 @@
-package unsynchronized
+package inmemory
 
 import (
 	"testing"
@@ -11,11 +11,8 @@ import (
 )
 
 func TestEvents_HappyPath(t *testing.T) {
-	// Create an instance of Events
-	eventsStore := NewEvents()
-
 	// Define test block and transaction
-	block := unittest.BlockFixture()
+	blockID := unittest.IdentifierFixture()
 	transaction1 := unittest.TransactionFixture()
 	transaction2 := unittest.TransactionFixture()
 
@@ -38,13 +35,13 @@ func TestEvents_HappyPath(t *testing.T) {
 		unittest.Event.WithTransactionID(transaction2.ID()),
 	)
 
+	expectedStoredEvents := []flow.Event{event1, event2, event3}
+
 	// Store events
-	expectedStoredEvents := flow.EventsList{event1, event2, event3}
-	err := eventsStore.Store(block.ID(), []flow.EventsList{expectedStoredEvents})
-	require.NoError(t, err)
+	eventsStore := NewEvents(blockID, expectedStoredEvents)
 
 	// Retrieve events by block ID
-	storedEvents, err := eventsStore.ByBlockID(block.ID())
+	storedEvents, err := eventsStore.ByBlockID(blockID)
 	require.NoError(t, err)
 	assert.Len(t, storedEvents, len(expectedStoredEvents))
 	assert.Contains(t, storedEvents, event1)
@@ -52,27 +49,22 @@ func TestEvents_HappyPath(t *testing.T) {
 	assert.Contains(t, storedEvents, event3)
 
 	// Retrieve events by transaction ID
-	txEvents, err := eventsStore.ByBlockIDTransactionID(block.ID(), transaction1.ID())
+	txEvents, err := eventsStore.ByBlockIDTransactionID(blockID, transaction1.ID())
 	require.NoError(t, err)
 	assert.Len(t, txEvents, 2)
 	assert.Equal(t, event1, txEvents[0])
 	assert.Equal(t, event2, txEvents[1])
 
 	// Retrieve events by transaction index
-	indexEvents, err := eventsStore.ByBlockIDTransactionIndex(block.ID(), 1)
+	indexEvents, err := eventsStore.ByBlockIDTransactionIndex(blockID, 1)
 	require.NoError(t, err)
 	assert.Len(t, indexEvents, 1)
 	assert.Equal(t, event3, indexEvents[0])
 
 	// Retrieve events by event type
-	typeEvents, err := eventsStore.ByBlockIDEventType(block.ID(), flow.EventAccountCreated)
+	typeEvents, err := eventsStore.ByBlockIDEventType(blockID, flow.EventAccountCreated)
 	require.NoError(t, err)
 	assert.Len(t, typeEvents, 2)
 	assert.Contains(t, typeEvents, event1)
 	assert.Contains(t, typeEvents, event3)
-
-	// Extract structured data
-	events := eventsStore.Data()
-	require.Len(t, events, len(expectedStoredEvents))
-	require.ElementsMatch(t, events, expectedStoredEvents)
 }
