@@ -42,14 +42,12 @@ func (t *TxResultErrMsgStore) Persist(lctx lockctx.Proof, batch storage.ReaderBa
 		return fmt.Errorf("could not get transaction result error messages: %w", err)
 	}
 
-	if len(txResultErrMsgs) > 0 {
-		// Use storage.WithLock to acquire the necessary lock and store the error messages
-		err := storage.WithLock(t.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+	err = storage.SkipAlreadyExistsError( // Note: if the data already exists, we will not overwrite
+		storage.WithLock(t.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
 			return t.persistedTxResultErrMsg.BatchStore(lctx, batch, t.blockID, txResultErrMsgs)
-		})
-		if err != nil {
-			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
-		}
+		}))
+	if err != nil {
+		return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 	}
 
 	return nil

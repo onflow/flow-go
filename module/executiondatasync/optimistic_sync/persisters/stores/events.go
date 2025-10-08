@@ -39,10 +39,12 @@ func (e *EventsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWrite
 		return fmt.Errorf("could not get events: %w", err)
 	}
 
-	if len(eventsList) > 0 {
-		if err := e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{eventsList}, batch); err != nil {
-			return fmt.Errorf("could not add events to batch: %w", err)
-		}
+	err = storage.SkipAlreadyExistsError( // Note: if the data already exists, we will not overwrite
+		e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{eventsList}, batch),
+	)
+
+	if err != nil {
+		return fmt.Errorf("could not add events to batch: %w", err)
 	}
 
 	return nil
