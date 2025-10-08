@@ -225,7 +225,7 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 			blockID := result.BlockID
 
 			api := ssmock.NewAPI(t)
-			api.On("GetExecutionDataByBlockID", mock.Anything, blockID).Return(result, nil)
+			api.On("GetExecutionDataByBlockID", mock.Anything, blockID, mock.Anything).Return(result, nil, nil)
 
 			h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
 
