@@ -2,7 +2,8 @@
 
 The transit script is an utility used by node operators to upload and download relevant data before and after a Flow spork.
 It is used to download the root snapshot after a spork.
-Additionally, for a consensus node, it is used to upload transit keys and to submit root block votes.
+Additionally, for a consensus node, it is used to upload transit keys and to submit root block votes,
+and for a collection node, it is used to submit cluster root block votes.
 
 ## Server token
 
@@ -83,3 +84,30 @@ Running `transit push-transit-key` will perform the following actions:
    - `transit-key.priv.<id>`
 1. Upload the node's public files to the server
    - `transit-key.pub.<id>`
+
+## Collection nodes
+
+The transit script has three commands applicable to collection nodes:
+
+```shell
+$ transit pull-clustering -t ${server-token} -d ${bootstrap-dir}
+$ transit generate-cluster-block-vote -t ${server-token} -d ${bootstrap-dir}
+$ transit push-cluster-block-vote -t ${server-token} -d ${bootstrap-dir} -v ${vote-file}
+```
+
+### Pull Clustering Assignment
+
+Running `transit pull-clustering` will perform the following actions:
+
+1. Fetch the assignment of collection nodes to clusters for the upcoming spork and write it to `<bootstrap-dir>/public-root-information/root-clustering.json`
+
+### Sign Cluster Root Block
+
+After the root block and random beacon key have been fetched, running `transit generate-cluster-block-vote` will:
+
+1. Create a signature over the cluster root block, for the cluster the node is assigned to, using the node's private staking key.
+2. Store the resulting vote to the file `<bootstrap-dir>/private-root-information/private-node-info_<node_id>/root-cluster-block-vote.json`
+
+### Upload Vote
+
+Once a vote has been generated, running `transit push-cluster-block-vote` will upload the vote file to the server.

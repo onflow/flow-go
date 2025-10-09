@@ -6,7 +6,7 @@ import (
 )
 
 // IntermediaryBootstrappingData stores data which needs to be passed between the
-// 2 steps of the bootstrapping process: `rootblock` and `finalize`.
+// last 2 steps of the bootstrapping process: `rootblock` and `finalize`.
 // This structure is created in `rootblock`, written to disk, then read in `finalize`.
 type IntermediaryBootstrappingData struct {
 	IntermediaryParamsData
@@ -30,4 +30,13 @@ type IntermediaryEpochData struct {
 	ExecutionStateConfig epochs.EpochConfig
 	RootEpochSetup       *flow.EpochSetup
 	RootEpochCommit      *flow.EpochCommit
+}
+
+// IntermediaryClusteringData stores the collector cluster assignment and epoch counter.
+// This is used for the collection nodes to construct and vote on their cluster root blocks,
+// and also to pass data between the clustering command and the rootblock command.
+type IntermediaryClusteringData struct {
+	EpochCounter uint64
+	Assignments  flow.AssignmentList
+	Clusters     flow.ClusterList
 }

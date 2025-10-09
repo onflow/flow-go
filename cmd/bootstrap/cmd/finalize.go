@@ -31,11 +31,9 @@ import (
 )
 
 var (
-	flagConfig                  string
-	flagInternalNodePrivInfoDir string
-	flagPartnerNodeInfoDir      string
-	// Deprecated: use flagPartnerWeights instead
-	deprecatedFlagPartnerStakes           string
+	flagConfig                            string
+	flagInternalNodePrivInfoDir           string
+	flagPartnerNodeInfoDir                string
 	flagPartnerWeights                    string
 	flagDKGDataPath                       string
 	flagRootBlockPath                     string
@@ -70,8 +68,6 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
 		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
 		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey, StakingKeyPoP)")
-	// Deprecated: remove this flag
-	finalizeCmd.Flags().StringVar(&deprecatedFlagPartnerStakes, "partner-stakes", "", "deprecated: use partner-weights instead")
 	finalizeCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their weight")
 	finalizeCmd.Flags().StringVar(&flagDKGDataPath, "dkg-data", "", "path to a JSON file containing data as output from the random beacon key generation")
@@ -102,17 +98,6 @@ func addFinalizeCmdFlags() {
 }
 
 func finalize(cmd *cobra.Command, args []string) {
-
-	// maintain backward compatibility with old flag name
-	if deprecatedFlagPartnerStakes != "" {
-		log.Warn().Msg("using deprecated flag --partner-stakes (use --partner-weights instead)")
-		if flagPartnerWeights == "" {
-			flagPartnerWeights = deprecatedFlagPartnerStakes
-		} else {
-			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
-		}
-	}
-
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
 	if err != nil {
