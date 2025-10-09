@@ -34,8 +34,8 @@ func runTest(t *testing.T, g *fixtures.GeneratorSuite, db storage.DB, store *Sch
 	blockID := g.Identifiers().Fixture()
 	txIDs := g.Identifiers().List(50)
 	data := make(map[flow.Identifier]uint64, len(txIDs))
-	for i, txID := range txIDs {
-		data[txID] = uint64(i)
+	for _, txID := range txIDs {
+		data[txID] = g.Random().Uint64()
 	}
 
 	// index data within a batch
