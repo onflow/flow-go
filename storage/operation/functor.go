@@ -85,6 +85,13 @@ func Overwriting(key []byte, val interface{}) Functor {
 	}
 }
 
+// OverwritingMul returns a functor that overwrites multiple key-value pairs in the storage.
+// The values are serialized using msgpack encoding. If any of the keys already exist,
+// the values will be overwritten without any checks.
+//
+// This is the batch version of Overwriting, useful for operations where we want to
+// update multiple entries atomically or where we don't care about potential conflicts.
+// The keys and vals slices must have the same length.
 func OverwritingMul(keys [][]byte, vals []any) Functor {
 	if len(keys) != len(vals) {
 		return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
@@ -191,6 +198,14 @@ func InsertingWithMismatchCheck(key []byte, val interface{}) Functor {
 	}
 }
 
+// InsertingMulWithMismatchCheck returns a functor that inserts multiple key-value pairs
+// with conflict detection. For each key, if it already exists, it compares the existing
+// value with the new value. If they differ, it returns storage.ErrDataMismatch.
+// If they are the same, the operation succeeds without modification.
+//
+// This is the batch version of InsertingWithMismatchCheck, useful for operations where
+// we want to ensure data consistency and detect potential race conditions or conflicting
+// updates across multiple entries atomically. The keys and vals slices must have the same length.
 func InsertingMulWithMismatchCheck(keys [][]byte, vals []any) Functor {
 	if len(keys) != len(vals) {
 		return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
@@ -243,6 +258,12 @@ func InsertingMulWithMismatchCheck(keys [][]byte, vals []any) Functor {
 
 }
 
+// OnCommitSucceedFunctor returns a functor that registers a callback to be executed
+// when the database transaction commits successfully. The callback is executed after
+// the transaction is committed but before the batch writer is closed.
+//
+// This is useful for operations that need to perform additional actions (like notifications
+// or cache updates) only after the database changes are permanently stored.
 func OnCommitSucceedFunctor(callback func()) Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		storage.OnCommitSucceed(rw, callback)
@@ -250,6 +271,9 @@ func OnCommitSucceedFunctor(callback func()) Functor {
 	}
 }
 
+// NoOpFunctor returns a functor that performs no operation and always succeeds.
+// This is useful as a placeholder in functor compositions or when a conditional
+// operation needs to be skipped without affecting the overall composition.
 func NoOpFunctor() Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		return nil
