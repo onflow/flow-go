@@ -256,7 +256,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// insert finalized height and root height
 	db := bs.db
-	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockBootstrapping, storage.LockIndexExecutionResult, storage.LockInsertBlock, storage.LockFinalizeBlock}, func(lctx lockctx.Context) error {
+	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockInsertInstanceParams, storage.LockIndexExecutionResult, storage.LockInsertBlock, storage.LockFinalizeBlock}, func(lctx lockctx.Context) error {
 		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			enc, err := datastore.NewVersionedInstanceParams(
 				datastore.DefaultInstanceParamsVersion,

@@ -35,8 +35,8 @@ const (
 	LockInsertAndIndexTxResult = "lock_insert_and_index_tx_result"
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
-	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
-	LockBootstrapping = "lock_bootstrapping"
+	// LockInsertInstanceParams protects data that is *exclusively* written during bootstrapping.
+	LockInsertInstanceParams = "lock_insert_instance_params"
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
 	LockInsertChunkDataPack     = "lock_insert_chunk_data_pack"
 	LockIndexCollectionsByBlock = "lock_index_collections_by_block"
@@ -57,7 +57,7 @@ func Locks() []string {
 		LockInsertAndIndexTxResult,
 		LockInsertCollection,
 		LockInsertLightTransactionResult,
-		LockBootstrapping,
+		LockInsertInstanceParams,
 		LockInsertChunkDataPack,
 		LockIndexCollectionsByBlock,
 	}
@@ -84,7 +84,7 @@ func makeLockPolicy() lockctx.Policy {
 		// for protocol to Bootstrap, during bootstrapping,
 		// we need to insert and finalize
 		// state/protocol/badger/state.go#Bootstrap
-		Add(LockBootstrapping, LockIndexExecutionResult).
+		Add(LockInsertInstanceParams, LockIndexExecutionResult).
 
 		// EN to bootstrap
 		// engine/execution/state/bootstrap/bootstrap.go#Bootstrapper.BootstrapExecutionDatabase

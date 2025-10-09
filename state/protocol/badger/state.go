@@ -112,7 +112,7 @@ func Bootstrap(
 	// trusted root snapshot are presumed to be finalized)
 	lctx := lockManager.NewContext()
 	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockBootstrapping)
+	err := lctx.AcquireLock(storage.LockInsertInstanceParams)
 	if err != nil {
 		return nil, err
 	}

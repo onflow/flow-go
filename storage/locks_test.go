@@ -62,7 +62,7 @@ func TestHeldOneLock(t *testing.T) {
 	t.Run("holds different lock", func(t *testing.T) {
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
-		err := lctx.AcquireLock(LockBootstrapping)
+		err := lctx.AcquireLock(LockInsertInstanceParams)
 		require.NoError(t, err)
 
 		held, msg := HeldOneLock(lctx, LockInsertBlock, LockFinalizeBlock)
