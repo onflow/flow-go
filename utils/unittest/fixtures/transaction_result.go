@@ -74,7 +74,7 @@ func (g *TransactionResultGenerator) List(n int, opts ...TransactionResultOption
 	return list
 }
 
-// ForTransactions generates a list of [flow.TransactionResult] for multiple transactions.
+// ForTransactions generates a [flow.TransactionResult] for each of the provided transactions.
 func (g *TransactionResultGenerator) ForTransactions(transactions []*flow.TransactionBody, opts ...TransactionResultOption) []flow.TransactionResult {
 	list := make([]flow.TransactionResult, len(transactions))
 	for i, tx := range transactions {
@@ -148,7 +148,7 @@ func (g *LightTransactionResultGenerator) List(n int, opts ...LightTransactionRe
 	return list
 }
 
-// ForTransactions generates a list of [flow.LightTransactionResult] for multiple transactions.
+// ForTransactions generates a [flow.LightTransactionResult] for each of the provided transactions.
 func (g *LightTransactionResultGenerator) ForTransactions(transactions []*flow.TransactionBody, opts ...LightTransactionResultOption) []flow.LightTransactionResult {
 	list := make([]flow.LightTransactionResult, len(transactions))
 	for i, tx := range transactions {

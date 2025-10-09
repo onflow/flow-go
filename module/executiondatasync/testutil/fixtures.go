@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
+// TestFixture contains complete random data for testing BlockExecutionData related processing.
+// It also includes expected parsed data for easy assertions.
 type TestFixture struct {
 	Block           *flow.Block
 	ExecutionResult *flow.ExecutionResult

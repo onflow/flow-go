@@ -114,7 +114,7 @@ func executeCallbackTransaction(
 // callback scheduler contract and has the following signature:
 // event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
 func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
-	cadenceId, cadenceEffort, err := CallbackDetailsFromEvent(event)
+	cadenceId, cadenceEffort, err := ParsePendingExecutionEvent(event)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -134,8 +134,9 @@ func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 	return encID, uint64(effort), nil
 }
 
-// CallbackDetailsFromEvent decodes the event payload and returns the callback ID and effort.
-func CallbackDetailsFromEvent(event flow.Event) (cadence.UInt64, cadence.UInt64, error) {
+// ParsePendingExecutionEvent decodes the PendingExecution event payload and returns the scheduled
+// transaction's id and effort.
+func ParsePendingExecutionEvent(event flow.Event) (cadence.UInt64, cadence.UInt64, error) {
 	const (
 		processedCallbackIDFieldName     = "id"
 		processedCallbackEffortFieldName = "executionEffort"

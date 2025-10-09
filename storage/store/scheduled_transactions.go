@@ -12,6 +12,10 @@ import (
 
 var _ storage.ScheduledTransactions = (*ScheduledTransactions)(nil)
 
+// ScheduledTransactions represents persistent storage for scheduled transaction indices.
+// Note: no scheduled transactions are stored. Transaction bodies can be generated on-demand using
+// the blueprints package. This interface provides access to indices used to lookup the block ID
+// that the scheduled transaction was executed in, which allows querying its transaction result.
 type ScheduledTransactions struct {
 	db           storage.DB
 	cacheTxID    *Cache[uint64, flow.Identifier]

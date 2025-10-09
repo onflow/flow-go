@@ -22,14 +22,14 @@ func RetrieveBlockIDByScheduledTransactionID(r storage.Reader, txID flow.Identif
 	return RetrieveByKey(r, MakePrefix(codeBlockIDByScheduledTransactionID, txID), blockID)
 }
 
-// BatchIndexScheduledTransactionID indexes the scheduled transaction by its scheduled transaction ID and transaction ID.
+// BatchIndexScheduledTransactionID indexes the scheduled transaction's transaction ID by its scheduled transaction ID.
 //
 // No errors are expected during normal operation.
 func BatchIndexScheduledTransactionID(w storage.Writer, scheduledTxID uint64, txID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeTransactionIDByScheduledTransactionID, scheduledTxID), txID)
 }
 
-// BatchIndexScheduledTransactionBlockID indexes the scheduled transaction by its transaction ID and block ID.
+// BatchIndexScheduledTransactionBlockID indexes the scheduled transaction's block ID by its transaction ID.
 //
 // No errors are expected during normal operation.
 func BatchIndexScheduledTransactionBlockID(w storage.Writer, txID flow.Identifier, blockID flow.Identifier) error {

@@ -191,14 +191,14 @@ func TestIsPendingExecutionEvent(t *testing.T) {
 	assert.True(t, blueprints.IsPendingExecutionEvent(env, createValidCallbackEvent(t, 1, 100)))
 }
 
-func TestCallbackDetailsFromEvent(t *testing.T) {
+func TestParsePendingExecutionEvent(t *testing.T) {
 	t.Parallel()
 
 	expectedID := uint64(123)
 	expectedEffort := uint64(456)
 	event := createValidCallbackEvent(t, expectedID, expectedEffort)
 
-	actualID, actualEffort, err := blueprints.CallbackDetailsFromEvent(event)
+	actualID, actualEffort, err := blueprints.ParsePendingExecutionEvent(event)
 	require.NoError(t, err)
 	assert.Equal(t, expectedID, uint64(actualID))
 	assert.Equal(t, expectedEffort, uint64(actualEffort))

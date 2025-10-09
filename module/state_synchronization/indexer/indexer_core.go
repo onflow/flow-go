@@ -321,7 +321,7 @@ func collectScheduledTransactions(
 	// extract the pending execution events and create a mapping from transaction ID to scheduled transaction ID
 	for i, event := range systemChunkEvents {
 		if blueprints.IsPendingExecutionEvent(fvmEnv, event) {
-			id, _, err := blueprints.CallbackDetailsFromEvent(event)
+			id, _, err := blueprints.ParsePendingExecutionEvent(event)
 			if err != nil {
 				return nil, fmt.Errorf("could not get callback details from event %d: %w", i, err)
 			}
