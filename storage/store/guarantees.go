@@ -50,7 +50,6 @@ func NewGuarantees(
 	// However, the finalization status of guarantees is not yet verified by consensus nodes,
 	// nor is the possibility of byzantine collection nodes dealt with, so we check here that
 	// there are no conflicting guarantees for the same collection.
-	indexByCollectionID := operation.IndexGuarantee
 
 	lookupByCollectionID := func(r storage.Reader, collID flow.Identifier) (flow.Identifier, error) {
 		var guaranteeID flow.Identifier
@@ -69,7 +68,7 @@ func NewGuarantees(
 			withRetrieve(retrieveByGuaranteeID)),
 		byCollectionIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceGuaranteeByCollectionID,
 			withLimit[flow.Identifier, flow.Identifier](byCollectionIDCacheSize),
-			withStoreWithLock(indexByCollectionID),
+			withStoreWithLock(operation.IndexGuarantee),
 			withRetrieve(lookupByCollectionID)),
 	}
 
