@@ -42,7 +42,6 @@ func addClusterAssignmentCmdFlags() {
 	clusterAssignmentCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
 		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
 		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
-	clusterAssignmentCmd.Flags().StringVar(&deprecatedFlagPartnerStakes, "partner-stakes", "", "deprecated: use --partner-weights")
 	clusterAssignmentCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 
@@ -64,15 +63,6 @@ func addClusterAssignmentCmdFlags() {
 }
 
 func clusterAssignment(cmd *cobra.Command, args []string) {
-	// maintain backward compatibility with old flag name
-	if deprecatedFlagPartnerStakes != "" {
-		log.Warn().Msg("using deprecated flag --partner-stakes (use --partner-weights instead)")
-		if flagPartnerWeights == "" {
-			flagPartnerWeights = deprecatedFlagPartnerStakes
-		} else {
-			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
-		}
-	}
 	// Read partner node's information and internal node's information.
 	// With "internal nodes" we reference nodes, whose private keys we have. In comparison,
 	// for "partner nodes" we generally do not have their keys. However, we allow some overlap,
