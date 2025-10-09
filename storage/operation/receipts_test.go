@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,12 +34,15 @@ func TestReceipts_InsertRetrieve(t *testing.T) {
 
 func TestReceipts_Index(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
 		receipt := unittest.ExecutionReceiptFixture()
 		expected := receipt.ID()
 		blockID := receipt.ExecutionResult.BlockID
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexOwnExecutionReceipt(rw.Writer(), blockID, expected)
+		err := storage.WithLock(lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexOwnExecutionReceipt(lctx, rw, blockID, expected)
+			})
 		})
 		require.Nil(t, err)
 

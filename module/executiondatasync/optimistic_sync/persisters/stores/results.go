@@ -33,8 +33,8 @@ func NewResultsStore(
 // Persist adds results to the batch.
 //
 // No error returns are expected during normal operations
-func (r *ResultsStore) Persist(_ lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	if err := r.persistedResults.BatchStore(r.blockID, r.data, batch); err != nil {
+func (r *ResultsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
+	if err := r.persistedResults.BatchStore(lctx, r.blockID, r.data, batch); err != nil {
 		return fmt.Errorf("could not add transaction results to batch: %w", err)
 	}
 	return nil

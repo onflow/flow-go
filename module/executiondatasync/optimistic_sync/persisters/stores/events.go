@@ -33,8 +33,8 @@ func NewEventsStore(
 // Persist adds events to the batch.
 //
 // No error returns are expected during normal operations
-func (e *EventsStore) Persist(_ lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	if err := e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{e.data}, batch); err != nil {
+func (e *EventsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
+	if err := e.persistedEvents.BatchStore(lctx, e.blockID, []flow.EventsList{e.data}, batch); err != nil {
 		return fmt.Errorf("could not add events to batch: %w", err)
 	}
 	return nil

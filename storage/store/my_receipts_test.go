@@ -154,7 +154,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			for err := range errChan {
 				if err != nil {
 					errCount++
-					require.Contains(t, err.Error(), "different receipt")
+					require.Contains(t, err.Error(), "data for key is different")
 				}
 			}
 			require.Equal(t, 1, errCount, "Exactly one of the operations should fail")

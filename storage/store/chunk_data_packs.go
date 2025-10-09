@@ -79,7 +79,6 @@ func (ch *ChunkDataPacks) StoreByChunkID(lctx lockctx.Proof, cs []*flow.ChunkDat
 
 // BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	storage.OnCommitSucceed(rw, func() {
 		ch.byChunkIDCache.Remove(chunkID)

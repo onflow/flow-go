@@ -215,24 +215,10 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// IndexBlockContainingCollectionGuarantees populates an index `guaranteeID->blockID` for each guarantee
-// which appears in the block.
-// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
-// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
-// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
-// Hence, this function should be treated as a temporary solution, which requires generalization
-// (one-to-many mapping) for soft finality and the mature protocol.
-//
+// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
+// The caller must acquire a storage.LockIndexCollectionByBlock lock.
 // Error returns:
-//   - generic error in case of unexpected failure from the database layer or encoding failure.
-func (b *Blocks) IndexBlockContainingCollectionGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
-	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		for _, guaranteeID := range guaranteeIDs {
-			err := operation.IndexBlockContainingCollectionGuarantee(rw.Writer(), guaranteeID, blockID)
-			if err != nil {
-				return fmt.Errorf("could not index collection block (%x): %w", guaranteeID, err)
-			}
-		}
-		return nil
-	})
+//   - storage.ErrAlreadyExists if any collection ID has already been indexed
+func (b *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {
+	return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, blockID, collIDs)
 }

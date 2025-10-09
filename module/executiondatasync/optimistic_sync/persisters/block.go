@@ -61,11 +61,21 @@ func (p *BlockPersister) Persist() error {
 	start := time.Now()
 
 	lctx := p.lockManager.NewContext()
+	defer lctx.Release()
 	err := lctx.AcquireLock(storage.LockInsertCollection)
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
 	}
-	defer lctx.Release()
+
+	err = lctx.AcquireLock(storage.LockInsertEvent)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for inserting events: %w", err)
+	}
+
+	err = lctx.AcquireLock(storage.LockInsertLightTransactionResult)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for inserting light transaction results: %w", err)
+	}
 
 	err = p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 		for _, persister := range p.persisterStores {

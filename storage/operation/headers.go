@@ -124,21 +124,44 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 	return KeyExists(r, MakePrefix(codeHeader, blockID))
 }
 
-// IndexBlockContainingCollectionGuarantee produces a mapping from the ID of a [flow.CollectionGuarantee] to the block ID containing this guarantee.
+// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
+// The caller must acquire a storage.LockIndexCollectionsByBlock lock.
 //
-// CAUTION:
-//   - The caller must acquire the lock ??? and hold it until the database write has been committed.
-//     TODO: USE LOCK, we want to protect this mapping from accidental overwrites (because the key is not derived from the value via a collision-resistant hash)
-//   - A collection can be included in multiple *unfinalized* blocks. However, the implementation
-//     assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
-//     *and* only in the ABSENCE of BYZANTINE collector CLUSTERS (which the mature protocol must tolerate).
-//     Hence, this function should be treated as a temporary solution, which requires generalization
-//     (one-to-many mapping) for soft finality and the mature protocol.
+// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
+// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
+// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
+// Hence, this function should be treated as a temporary solution, which requires generalization
+// (one-to-many mapping) for soft finality and the mature protocol.
 //
 // Expected errors during normal operations:
-// TODO: return [storage.ErrAlreadyExists] or [storage.ErrDataMismatch]
-func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
+//   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
+func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockIndexCollectionsByBlock) {
+		return fmt.Errorf("BatchIndexBlockContainingCollectionGuarantees requires %v", storage.LockIndexCollectionsByBlock)
+	}
+
+	// Check if any keys already exist
+	for _, collID := range collIDs {
+		key := MakePrefix(codeCollectionBlock, collID)
+		exists, err := KeyExists(rw.GlobalReader(), key)
+		if err != nil {
+			return fmt.Errorf("could not check if collection guarantee is already indexed: %w", err)
+		}
+		if exists {
+			return fmt.Errorf("collection guarantee (%x) is already indexed: %w", collID, storage.ErrAlreadyExists)
+		}
+	}
+
+	// Index all collection guarantees
+	for _, collID := range collIDs {
+		key := MakePrefix(codeCollectionBlock, collID)
+		err := UpsertByKey(rw.Writer(), key, blockID)
+		if err != nil {
+			return fmt.Errorf("could not index collection guarantee (%x): %w", collID, err)
+		}
+	}
+
+	return nil
 }
 
 // LookupBlockContainingCollectionGuarantee retrieves the block containing the [flow.CollectionGuarantee] with the given ID.

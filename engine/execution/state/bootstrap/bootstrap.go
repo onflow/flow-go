@@ -100,7 +100,11 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 
 	lctx := manager.NewContext()
 	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOwnReceipt)
+	err := lctx.AcquireLock(storage.LockIndexExecutionResult)
+	if err != nil {
+		return err
+	}
+	err = lctx.AcquireLock(storage.LockIndexStateCommitment)
 	if err != nil {
 		return err
 	}
@@ -113,7 +117,7 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
 		}
 
-		err = operation.IndexExecutionResult(w, rootSeal.BlockID, rootSeal.ResultID)
+		err = operation.IndexOwnOrSealedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not index result for root result: %w", err)
 		}
