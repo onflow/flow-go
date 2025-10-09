@@ -1,3 +1,6 @@
+// Package operation provides functional programming utilities for database operations
+// with lock context support. It defines functors that can be composed to create
+// complex database operations while ensuring proper lock acquisition and error handling.
 package operation
 
 import (
@@ -13,8 +16,14 @@ import (
 	"github.com/onflow/flow-go/utils/merr"
 )
 
+// Functor represents a database operation that requires a lock context proof
+// and a batch writer. It encapsulates the pattern of acquiring locks before
+// performing database operations and ensures proper error handling.
 type Functor func(lockctx.Proof, storage.ReaderBatchWriter) error
 
+// BindFunctors composes multiple functors into a single functor that executes
+// them sequentially. If any functor fails, the execution stops and returns the error.
+// This enables functional composition of database operations.
 func BindFunctors(functors ...Functor) Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		for _, fn := range functors {
@@ -27,6 +36,9 @@ func BindFunctors(functors ...Functor) Functor {
 	}
 }
 
+// HoldingLock creates a functor that validates the lock context holds the specified lock.
+// This is used as a guard to ensure operations are only performed when the required lock is held.
+// Returns an error if the lock is not held, otherwise returns nil.
 func HoldingLock(lockID string) Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		if !lctx.HoldsLock(lockID) {
@@ -36,6 +48,9 @@ func HoldingLock(lockID string) Functor {
 	}
 }
 
+// WrapError creates a functor that wraps any error returned by the provided functor
+// with additional context. This is useful for providing more descriptive error messages
+// when composing complex operations.
 func WrapError(wrapMsg string, fn Functor) Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		err := fn(lctx, rw)
@@ -46,8 +61,12 @@ func WrapError(wrapMsg string, fn Functor) Functor {
 	}
 }
 
-// Overwriting returns a functor, whose execution will append the given key-value-pair to the provided
-// storage writer (typically a pending batch of database writes).
+// Overwriting returns a functor that overwrites a key-value pair in the storage.
+// The value is serialized using msgpack encoding. If the key already exists,
+// the value will be overwritten without any checks.
+//
+// This is typically used for operations where we want to update existing data
+// or where we don't care about potential conflicts.
 func Overwriting(key []byte, val interface{}) Functor {
 	value, err := msgpack.Marshal(val)
 	if err != nil {
@@ -66,6 +85,12 @@ func Overwriting(key []byte, val interface{}) Functor {
 	}
 }
 
+// InsertingWithExistenceCheck returns a functor that inserts a key-value pair
+// only if the key does not already exist. If the key exists, it returns
+// storage.ErrAlreadyExists error.
+//
+// This is used for operations where we want to ensure uniqueness and prevent
+// accidental overwrites of existing data.
 func InsertingWithExistenceCheck(key []byte, val interface{}) Functor {
 	value, err := msgpack.Marshal(val)
 	if err != nil {
@@ -93,6 +118,13 @@ func InsertingWithExistenceCheck(key []byte, val interface{}) Functor {
 	}
 }
 
+// InsertingWithMismatchCheck returns a functor that inserts a key-value pair
+// with conflict detection. If the key already exists, it compares the existing
+// value with the new value. If they differ, it returns storage.ErrDataMismatch.
+// If they are the same, the operation succeeds without modification.
+//
+// This is used for operations where we want to ensure data consistency and
+// detect potential race conditions or conflicting updates.
 func InsertingWithMismatchCheck(key []byte, val interface{}) Functor {
 	value, err := msgpack.Marshal(val)
 	if err != nil {
