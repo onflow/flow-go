@@ -85,6 +85,36 @@ func Overwriting(key []byte, val interface{}) Functor {
 	}
 }
 
+func OverwritingMul(keys [][]byte, vals []any) Functor {
+	if len(keys) != len(vals) {
+		return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+			return irrecoverable.NewExceptionf("keys and vals length mismatch: %d vs %d", len(keys), len(vals))
+		}
+	}
+
+	values := make([][]byte, len(vals))
+	for i, val := range vals {
+		value, err := msgpack.Marshal(val)
+		if err != nil {
+			return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+				return irrecoverable.NewExceptionf("failed to encode value at index %d: %w", i, err)
+			}
+		}
+		values[i] = value
+	}
+
+	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+		for i, key := range keys {
+			err := rw.Writer().Set(key, values[i])
+			if err != nil {
+				return irrecoverable.NewExceptionf("failed to store data at index %d: %w", i, err)
+			}
+		}
+
+		return nil
+	}
+}
+
 // InsertingWithExistenceCheck returns a functor that inserts a key-value pair
 // only if the key does not already exist. If the key exists, it returns
 // storage.ErrAlreadyExists error.
@@ -157,6 +187,71 @@ func InsertingWithMismatchCheck(key []byte, val interface{}) Functor {
 			return fmt.Errorf("attempting to insert existing key with different value: %x: %w", key, storage.ErrDataMismatch)
 		}
 
+		return nil
+	}
+}
+
+func InsertingMulWithMismatchCheck(keys [][]byte, vals []any) Functor {
+	if len(keys) != len(vals) {
+		return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+			return irrecoverable.NewExceptionf("keys and vals length mismatch: %d vs %d", len(keys), len(vals))
+		}
+	}
+
+	values := make([][]byte, len(vals))
+	for i, val := range vals {
+		value, err := msgpack.Marshal(val)
+		if err != nil {
+			return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+				return irrecoverable.NewExceptionf("failed to encode value at index %d: %w", i, err)
+			}
+		}
+		values[i] = value
+	}
+
+	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) (errToReturn error) {
+		for i, key := range keys {
+			existing, closer, err := rw.GlobalReader().Get(key)
+			if err != nil {
+				if !errors.Is(err, storage.ErrNotFound) {
+					return irrecoverable.NewExceptionf("could not load existing data when inserting new data at index %d: %x: %w",
+						i, key, err)
+				}
+
+				// no existing data stored under this key, proceed with insert
+				err = rw.Writer().Set(key, values[i])
+				if err != nil {
+					return irrecoverable.NewExceptionf("failed to store data at index %d: %x: %w", i, key, err)
+				}
+
+				continue
+			}
+
+			errToReturn = merr.CloseAndMergeError(closer, errToReturn)
+			if errToReturn != nil {
+				return errToReturn
+			}
+
+			if !bytes.Equal(existing, values[i]) {
+				return fmt.Errorf("attempting to insert existing key with different value at index %d: %x: %w",
+					i, key, storage.ErrDataMismatch)
+			}
+		}
+
+		return nil
+	}
+
+}
+
+func OnCommitSucceedFunctor(callback func()) Functor {
+	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+		storage.OnCommitSucceed(rw, callback)
+		return nil
+	}
+}
+
+func NoOpFunctor() Functor {
+	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		return nil
 	}
 }
