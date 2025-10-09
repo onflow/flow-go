@@ -83,11 +83,16 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		// for protocol to Bootstrap, during bootstrapping,
 		// we need to insert and finalize
+		// state/protocol/badger/state.go#Bootstrap
 		Add(LockBootstrapping, LockIndexExecutionResult).
+
+		// EN to bootstrap
+		// engine/execution/state/bootstrap/bootstrap.go#Bootstrapper.BootstrapExecutionDatabase
 		Add(LockIndexExecutionResult, LockInsertBlock).
 		Add(LockInsertBlock, LockFinalizeBlock).
 
 		// EN to save execution result
+		// engine/execution/state/state.go#state.saveExecutionResults
 		Add(LockInsertChunkDataPack, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertServiceEvent).
 		Add(LockInsertServiceEvent, LockInsertAndIndexTxResult).
@@ -96,11 +101,12 @@ func makeLockPolicy() lockctx.Policy {
 		Add(LockIndexExecutionResult, LockIndexStateCommitment).
 
 		// AN ingestion engine processing finalized block
+		// engine/access/ingestion/engine.go#Engine.processFinalizedBlock
 		Add(LockIndexCollectionsByBlock, LockIndexExecutionResult).
 
-		// AN state sync to IndexBlockData
+		// AN optimistic syncing
+		// module/executiondatasync/optimistic_sync/persisters/block.go#BlockPersister.Persist
 		Add(LockInsertCollection, LockInsertEvent).
-		Add(LockInsertEvent, LockInsertServiceEvent).
 		Add(LockInsertEvent, LockInsertLightTransactionResult).
 		Build()
 }
