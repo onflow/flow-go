@@ -11,7 +11,7 @@ require (
 	github.com/dapperlabs/testingdock v0.4.5-0.20231020233342-a2853fe18724
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/ethereum/go-ethereum v1.16.3
+	github.com/ethereum/go-ethereum v1.16.4
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/websocket v1.5.3
@@ -25,7 +25,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.0
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
-	github.com/onflow/flow-go-sdk v1.8.4
+	github.com/onflow/flow-go-sdk v1.9.0
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.16
 	github.com/prometheus/client_golang v1.20.5
@@ -102,7 +102,7 @@ require (
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.4.0 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
@@ -126,7 +126,8 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.3 // indirect
+	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
@@ -325,7 +326,7 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/supranational/blst v0.3.14 // indirect
+	github.com/supranational/blst v0.3.16-0.20250831170142-f48500c1fdbe // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
@@ -362,7 +363,7 @@ require (
 	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
