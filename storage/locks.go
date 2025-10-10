@@ -85,6 +85,7 @@ func makeLockPolicy() lockctx.Policy {
 
 		// module/executiondatasync/optimistic_sync/persisters/block.go#Persist
 		Add(LockInsertCollection, LockInsertLightTransactionResult).
+		Add(LockInsertLightTransactionResult, LockInsertTransactionResultErrMessage).
 		Build()
 }
 
