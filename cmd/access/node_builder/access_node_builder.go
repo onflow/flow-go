@@ -567,15 +567,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
-func (b *FlowAccessNodeBuilder) initCoreStores(node *cmd.NodeConfig) error {
-	b.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
-	if b.events == nil {
-		return fmt.Errorf("events store not initialized")
-	}
-
-	return nil
-}
-
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
@@ -1774,11 +1765,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
 	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 
-	builder.Module("events storage initialization", func(node *cmd.NodeConfig) error {
-		err := builder.initCoreStores(node)
-		if err != nil {
-			return err
-		}
+	builder.Module("events storage", func(node *cmd.NodeConfig) error {
+		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 		return nil
 	})
 
