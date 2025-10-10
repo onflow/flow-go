@@ -15,7 +15,6 @@ type CollectionCollector struct {
 	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
 	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
 	maxCollectionSize    prometheus.Gauge         // tracks the maximum collection size
-	proposals            *prometheus.HistogramVec // tracks the number/size of PROPOSED collections
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
 	collectionSize       *prometheus.HistogramVec
 	priorityTxns         *prometheus.HistogramVec
@@ -47,14 +46,6 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 			Name:      "max_collection_size",
 			Help:      "last used max collection size",
 		}),
-
-		proposals: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: namespaceCollection,
-			Subsystem: subsystemProposal,
-			Buckets:   []float64{1, 2, 5, 10, 20},
-			Name:      "proposals_size_transactions",
-			Help:      "size/number of proposed collections",
-		}, []string{LabelChain}),
 
 		guarantees: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
@@ -88,14 +79,6 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 // from being created to being included as part of a collection.
 func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
 	cc.transactionsIngested.Inc()
-}
-
-// ClusterBlockProposed tracks the size and number of proposals, as well as
-// starting the collection->guarantee span.
-func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
-	cc.proposals.
-		With(prometheus.Labels{LabelChain: block.ChainID.String()}).
-		Observe(float64(block.Payload.Collection.Len()))
 }
 
 // ClusterBlockFinalized updates the guaranteed collection size gauge and

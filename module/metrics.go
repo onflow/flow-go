@@ -615,10 +615,6 @@ type CollectionMetrics interface {
 	// a tx->col span for the transaction.
 	TransactionIngested(txID flow.Identifier)
 
-	// ClusterBlockProposed is called when a new collection is proposed by us or
-	// any other node in the cluster.
-	ClusterBlockProposed(block *cluster.Block)
-
 	// ClusterBlockFinalized is called when a collection is finalized.
 	ClusterBlockFinalized(block *cluster.Block)
 
