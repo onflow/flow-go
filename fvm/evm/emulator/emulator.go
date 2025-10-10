@@ -6,6 +6,7 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
@@ -304,9 +305,9 @@ func (bl *BlockView) DryRunTransaction(
 
 	// use the from as the signer
 	msg.From = from
-	// we need to skip nonce/eoa check for dry run
+	// we need to skip nonce/transaction checks for dry run
 	msg.SkipNonceChecks = true
-	msg.SkipFromEOACheck = true
+	msg.SkipTransactionChecks = true
 
 	// run and return without committing the state changes
 	return proc.run(msg, tx.Hash(), tx.Type())
@@ -595,7 +596,7 @@ func (proc *procedure) deployAt(
 	res.DeployedContractAddress = &call.To
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
-	proc.state.SetCode(addr, ret)
+	proc.state.SetCode(addr, ret, tracing.CodeChangeContractCreation)
 	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }

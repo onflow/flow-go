@@ -77,7 +77,7 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, db.Error())
 
 		// should have code to be able to set state
-		db.SetCode(addr1, []byte{1, 2, 3})
+		db.SetCode(addr1, []byte{1, 2, 3}, gethTracing.CodeChangeContractCreation)
 		require.NoError(t, db.Error())
 
 		db.SetState(addr1, key1, value1)
@@ -356,7 +356,7 @@ func TestStateDB(t *testing.T) {
 		// add slots to the account
 		key := testutils.RandomCommonHash(t)
 		value := testutils.RandomCommonHash(t)
-		db.SetCode(addr1, []byte("somecode"))
+		db.SetCode(addr1, []byte("somecode"), gethTracing.CodeChangeContractCreation)
 		require.NoError(t, db.Error())
 		db.SetState(addr1, key, value)
 		require.NoError(t, db.Error())
@@ -381,7 +381,7 @@ func TestStateDB(t *testing.T) {
 		balance1 := uint256.NewInt(100)
 		code1 := []byte("some code")
 		db.CreateAccount(addr1)
-		db.SetCode(addr1, code1)
+		db.SetCode(addr1, code1, gethTracing.CodeChangeContractCreation)
 		db.AddBalance(addr1, balance1, gethTracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
 		commit, err := db.Commit(true)
@@ -425,7 +425,7 @@ func TestStateDB(t *testing.T) {
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// set code and call contract creation
-		db.SetCode(addr2, code1)
+		db.SetCode(addr2, code1, gethTracing.CodeChangeContractCreation)
 		db.CreateContract(addr2)
 		require.Equal(t, code1, db.GetCode(addr2))
 		// now calling selfdestruct should do the job
@@ -451,7 +451,7 @@ func TestStateDB(t *testing.T) {
 		value := testutils.RandomCommonHash(t)
 		db.CreateAccount(addr3)
 		db.CreateContract(addr3)
-		db.SetCode(addr3, code1)
+		db.SetCode(addr3, code1, gethTracing.CodeChangeContractCreation)
 		db.SetState(addr3, key, value)
 		db.AddBalance(addr3, balance3, gethTracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
