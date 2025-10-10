@@ -1,6 +1,7 @@
 package stores
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -37,11 +38,11 @@ func NewTxResultErrMsgStore(
 //
 // No error returns are expected during normal operations
 func (t *TxResultErrMsgStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
-	err := storage.SkipAlreadyExistsError( // Note: if the data already exists, we will not overwrite
-		storage.WithLock(t.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
-			return t.persistedTxResultErrMsg.BatchStore(lctx, rw, t.blockID, t.data)
-		}))
+	err := t.persistedTxResultErrMsg.BatchStore(lctx, rw, t.blockID, t.data)
 	if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
+		}
 		return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 	}
 	return nil

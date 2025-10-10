@@ -103,7 +103,7 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 
 // BatchStore inserts a batch of transaction result error messages into a batch
 // the caller must hold [storage.LockInsertTransactionResultErrMessage] lock
-// No errors are expected during normal operation.
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist
 func (t *TransactionResultErrorMessages) BatchStore(
 	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
