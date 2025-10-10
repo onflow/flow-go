@@ -692,7 +692,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				*executionDataStoreCache,
 			)
 			snapshotEvents := snapshot.Events()
-			if snapshotEvents != nil {
+
+			if builder.events == nil {
+				return fmt.Errorf("builder events has no Events store: %w", fmt.Errorf("failed to get builder.events "))
+			}
+
+			if snapshotEvents == nil {
 				return fmt.Errorf("snapshot has no Events store: %w", fmt.Errorf("failed to get events for block "))
 			}
 

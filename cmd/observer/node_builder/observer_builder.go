@@ -1245,9 +1245,14 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				nil,
 				*executionDataStoreCache,
 			)
+
+			if builder.events == nil {
+				return fmt.Errorf("builder events has no Events store: %w", fmt.Errorf("failed to get builder.events "))
+			}
+
 			snapshotEvents := snapshot.Events()
-			if snapshotEvents != nil {
-				return fmt.Errorf("snapshot has no Events store: %w", fmt.Errorf("failed to get events for block "))
+			if snapshotEvents == nil {
+				return fmt.Errorf("snapshot has no Events store: %w", fmt.Errorf("failed to get events for block"))
 			}
 
 			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
