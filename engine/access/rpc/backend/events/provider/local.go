@@ -60,12 +60,7 @@ func (l *LocalEventProvider) Events(
 				rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		eventsStore := snapshot.Events()
-		if eventsStore == nil {
-			return Response{}, nil, rpc.ConvertError(fmt.Errorf("failed to get events for block %s", blockInfo.ID), "snapshot has no Events store", codes.Internal)
-		}
-		events, err := eventsStore.ByBlockID(blockInfo.ID)
-
+		events, err := snapshot.Events().ByBlockID(blockInfo.ID)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) ||
