@@ -2,15 +2,18 @@ package emulator
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	gethCore "github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
@@ -111,6 +114,14 @@ type BlockView struct {
 
 // DirectCall executes a direct call
 func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err error) {
+	if call.GasLimit > gethParams.MaxTxGas {
+		res := &types.Result{
+			TxType:          call.Type,
+			TxHash:          call.Hash(),
+			ValidationError: fmt.Errorf("%w (cap: %d, tx: %d)", core.ErrGasLimitTooHigh, params.MaxTxGas, call.GasLimit),
+		}
+		return res, nil
+	}
 	// construct a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
