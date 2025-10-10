@@ -10,8 +10,10 @@ import (
 type ChunkDataPacks interface {
 
 	// Store stores multiple ChunkDataPacks in a two-phase process:
-	// 1. First phase: Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
-	// 2. Second phase: Create index mappings from ChunkID to storedChunkDataPackID in protocol database
+	// 1. Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+	//    This phase occurs immediately when Store is called
+	// 2. Populate index mapping from ChunkID to storedChunkDataPackID in protocol database.
+	//    This phase is deferred until the caller of Store invokes the returned functor.
 	//
 	// The reason it's a two-phase process is that, the chunk data pack and the other execution data are stored in different databases.
 	// The two-phase approach ensures that:
