@@ -93,8 +93,10 @@ const (
 	codeJobQueuePointer      = 72
 
 	// codes for indexing multiple identifiers by identifier -- continued from 40-49
-	codeBlockIDToProposalSignature = 80 // index of proposer signatures by block ID
-	codeGuaranteeByCollectionID    = 81 // index of collection guarantee by collection ID
+	codeBlockIDToProposalSignature            = 80 // index of proposer signatures by block ID
+	codeGuaranteeByCollectionID               = 81 // index of collection guarantee by collection ID
+	codeTransactionIDByScheduledTransactionID = 82 // index of transaction ID by scheduled transaction ID
+	codeBlockIDByScheduledTransactionID       = 83 // index of block ID by scheduled transaction ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                      = 100
