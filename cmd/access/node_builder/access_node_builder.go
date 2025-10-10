@@ -567,6 +567,15 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
+func (b *FlowAccessNodeBuilder) initCoreStores(node *cmd.NodeConfig) error {
+	b.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+	if b.events == nil {
+		return fmt.Errorf("events store not initialized")
+	}
+
+	return nil
+}
+
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
@@ -683,24 +692,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
-				builder.events,
-				builder.collections,
-				builder.transactions,
-				builder.lightTransactionResults,
-				builder.transactionResultErrorMessages,
+				notNil(builder.events),
+				notNil(builder.collections),
+				notNil(builder.transactions),
+				notNil(builder.lightTransactionResults),
+				notNil(builder.transactionResultErrorMessages),
 				nil,
 				*executionDataStoreCache,
 			)
-			snapshotEvents := snapshot.Events()
-
-			if builder.events == nil {
-				return fmt.Errorf("builder events has no Events store: %w", fmt.Errorf("failed to get builder.events "))
-			}
-
-			if snapshotEvents == nil {
-				return fmt.Errorf("snapshot has no Events store: %w", fmt.Errorf("failed to get events for block "))
-			}
-
 			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 
 			return nil
@@ -1775,6 +1774,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
 	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 
+	builder.Module("events storage initialization", func(node *cmd.NodeConfig) error {
+		err := builder.initCoreStores(node)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
@@ -1979,10 +1986,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
 			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
-			return nil
-		}).
-		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {

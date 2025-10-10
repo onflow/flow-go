@@ -1208,6 +1208,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			return nil
 		}).
+		Module("events storage", func(node *cmd.NodeConfig) error {
+			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+			return nil
+		}).
 		Module("execution state cache", func(node *cmd.NodeConfig) error {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1245,16 +1249,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				nil,
 				*executionDataStoreCache,
 			)
-
-			if builder.events == nil {
-				return fmt.Errorf("builder events has no Events store: %w", fmt.Errorf("failed to get builder.events "))
-			}
-
-			snapshotEvents := snapshot.Events()
-			if snapshotEvents == nil {
-				return fmt.Errorf("snapshot has no Events store: %w", fmt.Errorf("failed to get events for block"))
-			}
-
 			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 
 			return nil
@@ -1866,10 +1860,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	})
 	builder.Module("async register store", func(node *cmd.NodeConfig) error {
 		builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
-		return nil
-	})
-	builder.Module("events storage", func(node *cmd.NodeConfig) error {
-		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 		return nil
 	})
 	builder.Module("reporter", func(node *cmd.NodeConfig) error {
