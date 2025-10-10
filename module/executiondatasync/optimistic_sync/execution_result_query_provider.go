@@ -12,9 +12,9 @@ type Criteria struct {
 	RequiredExecutors flow.IdentifierList
 }
 
-// OverrideWith overrides the original criteria with the incoming criteria, returning a new Criteria object.
+// WithOverridesFrom overrides the original criteria with the incoming criteria, returning a new Criteria object.
 // Fields from `override` criteria take precedence when set.
-func (c *Criteria) OverrideWith(override Criteria) Criteria {
+func (c *Criteria) WithOverridesFrom(override Criteria) Criteria {
 	newCriteria := *c
 
 	if override.AgreeingExecutorsCount > 0 {
