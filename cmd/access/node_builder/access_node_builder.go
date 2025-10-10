@@ -691,6 +691,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				nil,
 				*executionDataStoreCache,
 			)
+			snapshotEvents := snapshot.Events()
+			if snapshotEvents != nil {
+				return fmt.Errorf("snapshot has no Events store: %w", fmt.Errorf("failed to get events for block "))
+			}
+
 			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 
 			return nil
