@@ -128,8 +128,8 @@ const (
 	ResourceBlockVoteQueue                        = "vote_aggregator_queue"                     // consensus/collection node, vote aggregator
 	ResourceTimeoutObjectQueue                    = "timeout_aggregator_queue"                  // consensus/collection node, timeout aggregator
 	ResourceCollectionGuaranteesQueue             = "ingestion_col_guarantee_queue"             // consensus node, ingestion engine
+	ResourceChunkIDToChunkDataPackIndex           = "chunk_data_pack_index"                     // execution node
 	ResourceChunkDataPack                         = "chunk_data_pack"                           // execution node
-	ResourceStoredChunkDataPack                   = "chunk_data_pack_stored"                    // execution node
 	ResourceChunkDataPackRequests                 = "chunk_data_pack_request"                   // execution node
 	ResourceEvents                                = "events"                                    // execution node
 	ResourceServiceEvents                         = "service_events"                            // execution node
