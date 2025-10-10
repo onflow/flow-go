@@ -129,7 +129,6 @@ func (c *TxErrorMessagesCore) storeTransactionResultErrorMessages(
 	}
 
 	err := storage.WithLock(c.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
-		// requires the [storage.LockInsertTransactionResultErrMessage] lock
 		return c.transactionResultErrorMessages.Store(lctx, blockID, errorMessages)
 	})
 	if err != nil {
