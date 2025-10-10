@@ -60,7 +60,9 @@ func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 	return sc
 }
 
-func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack {
+func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack {// ToStoredChunkDataPack converts the given ChunkDataPacks to their reduced representation,
+// by replacing the full collection data with its ID (collision-resistant hash).
+func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 	scs := make([]*StoredChunkDataPack, 0, len(cs))
 	for _, c := range cs {
 		scs = append(scs, ToStoredChunkDataPack(c))

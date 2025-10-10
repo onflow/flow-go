@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestChunkDataPack tests basic operation for storing ChunkDataPacks themselves.
+// The data is typically stored in the chunk data packs database.
 func TestChunkDataPack(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		collectionID := unittest.IdentifierFixture()
@@ -55,7 +57,10 @@ func TestChunkDataPack(t *testing.T) {
 	})
 }
 
-// TestInsertChunkDataPackID tests the InsertChunkDataPackID operation
+// TestInsertChunkDataPackID tests populating the index mapping from chunkID to the resulting chunk data pack's ID.
+// Essentially, the chunk ID describes the work to be done, and the chunk data pack describes the result of that work.
+// The index from chunk ID to chunk data pack ID is typically stored in the protocol database.
+func TestInsertChunkDataPackID(t *testing.T) {
 func TestInsertChunkDataPackID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -70,7 +75,7 @@ func TestInsertChunkDataPackID(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Verify the chunk data pack ID was stored
+			// Verify the chunk data pack ID was indexed
 			var retrievedID flow.Identifier
 			err = operation.RetrieveChunkDataPackID(db.Reader(), chunkID, &retrievedID)
 			require.NoError(t, err)
@@ -133,13 +138,16 @@ func TestInsertChunkDataPackID(t *testing.T) {
 				})
 			})
 			require.Error(t, err)
+			require.NotErrorIs(t, err, storage.ErrDataMismatch) // wrong lock should not be erroneously represented as mismatching data
 			assert.Contains(t, err.Error(), "missing required lock")
 			assert.Contains(t, err.Error(), storage.LockInsertOwnReceipt)
 		})
 	})
 }
 
-// TestRetrieveChunkDataPackID tests the RetrieveChunkDataPackID operation
+// TestRetrieveChunkDataPackID tests reading the index mapping from chunkID to the resulting chunk data pack's ID.
+// Essentially, the chunk ID describes the work to be done, and the chunk data pack describes the result of that work.
+// The index from chunk ID to chunk data pack ID is typically stored in the protocol database.
 func TestRetrieveChunkDataPackID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -236,13 +244,11 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 		})
 
 		t.Run("remove multiple", func(t *testing.T) {
-			chunkIDs := make([]flow.Identifier, 3)
-			storedChunkDataPackIDs := make([]flow.Identifier, 3)
+			chunkIDs := unittest.IdentifierListFixture(3)
+			storedChunkDataPackIDs := unittest.IdentifierListFixture(3)
 
 			// Insert multiple chunk data pack IDs
 			for i := 0; i < 3; i++ {
-				chunkIDs[i] = unittest.IdentifierFixture()
-				storedChunkDataPackIDs[i] = unittest.IdentifierFixture()
 
 				err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

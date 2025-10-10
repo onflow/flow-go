@@ -19,11 +19,10 @@ type ChunkDataPacks interface {
 	//   - Index mappings are created within the same atomic batch update in protocol database
 	//
 	// The Store method returns:
-	//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function to index the chunk id with
-	// 		 chunk data pack hash within batch update to store along with other execution data into protocol database,
-	//     this function might return [storage.ErrDataMismatch] when an existing chunk data pack ID is found for
-	//     the same chunk ID, and is different from the one being stored.
-	//     the caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
+	//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function for updating the chunk data pack database
+	//     and protocol database within a batch update. This function returns [storage.ErrDataMismatch] when an _different_
+	//     chunk data pack ID for the same chunk ID has already been stored.
+	//     The caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
 	//   - error: No error should be returned during normal operation. Any error indicates a failure in the first phase.
 	Store(cs []*flow.ChunkDataPack) (func(lctx lockctx.Proof, rw ReaderBatchWriter) error, error)
 
@@ -31,7 +30,8 @@ type ChunkDataPacks interface {
 	// It returns [storage.ErrNotFound] if no entry exists for the given chunk ID.
 	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
 
-	// BatchRemove remove multiple ChunkDataPacks with the given chunk IDs.
+	// BatchRemove schedules all ChunkDataPacks with the given IDs to be deleted from the databases,
+	// part of the provided write batches. Unknown IDs are silently ignored.
 	// It performs a two-phase removal:
 	// 1. First phase: Remove index mappings from ChunkID to storedChunkDataPackID in the protocol database
 	// 2. Second phase: Remove chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
