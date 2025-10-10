@@ -624,6 +624,9 @@ type CollectionMetrics interface {
 
 	// CollectionMaxSize measures the current maximum size of a collection.
 	CollectionMaxSize(size uint)
+
+	// ClusterBlockCreated informs about cluster block being created.
+	ClusterBlockCreated(block *cluster.Block, priorityTxnsCount uint)
 }
 
 type ConsensusMetrics interface {

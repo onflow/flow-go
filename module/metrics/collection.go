@@ -17,6 +17,8 @@ type CollectionCollector struct {
 	maxCollectionSize    prometheus.Gauge         // tracks the maximum collection size
 	proposals            *prometheus.HistogramVec // tracks the number/size of PROPOSED collections
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
+	collectionSize       *prometheus.HistogramVec
+	priorityTxns         *prometheus.HistogramVec
 }
 
 var _ module.CollectionMetrics = (*CollectionCollector)(nil)
@@ -61,6 +63,22 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 			Name:      "guarantees_size_transactions",
 			Help:      "size/number of guaranteed/finalized collections",
 		}, []string{LabelChain}),
+
+		collectionSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
+			Buckets:   []float64{1, 2, 5, 10, 20},
+			Name:      "collection_size",
+			Help:      "number of transactions included in the block",
+		}, []string{LabelChain}),
+
+		priorityTxns: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
+			Buckets:   []float64{1, 2, 5, 10, 20},
+			Name:      "priority_transactions_count",
+			Help:      "number of priority transactions included in the block",
+		}, []string{LabelChain}),
 	}
 
 	return cc
@@ -75,17 +93,14 @@ func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
 // ClusterBlockProposed tracks the size and number of proposals, as well as
 // starting the collection->guarantee span.
 func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
-	collection := block.Payload.Collection.Light()
-
 	cc.proposals.
 		With(prometheus.Labels{LabelChain: block.ChainID.String()}).
-		Observe(float64(collection.Len()))
+		Observe(float64(block.Payload.Collection.Len()))
 }
 
 // ClusterBlockFinalized updates the guaranteed collection size gauge and
 // finishes the tx->collection span for each constituent transaction.
 func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
-	collection := block.Payload.Collection.Light()
 	chainID := block.ChainID
 
 	cc.finalizedHeight.
@@ -95,10 +110,24 @@ func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
 		With(prometheus.Labels{
 			LabelChain: chainID.String(),
 		}).
-		Observe(float64(collection.Len()))
+		Observe(float64(block.Payload.Collection.Len()))
 }
 
 // CollectionMaxSize measures the current maximum size of a collection.
 func (cc *CollectionCollector) CollectionMaxSize(size uint) {
 	cc.maxCollectionSize.Set(float64(size))
+}
+
+// ClusterBlockCreated informs about cluster block being created.
+// It reports several metrics, specifically how many transactions have been included and how many of them are priority txns.
+func (cc *CollectionCollector) ClusterBlockCreated(block *cluster.Block, priorityTxnsCount uint) {
+	chainID := block.ChainID
+
+	cc.collectionSize.
+		With(prometheus.Labels{LabelChain: chainID.String()}).
+		Observe(float64(block.Payload.Collection.Len()))
+
+	cc.priorityTxns.
+		With(prometheus.Labels{LabelChain: chainID.String()}).
+		Observe(float64(priorityTxnsCount))
 }
