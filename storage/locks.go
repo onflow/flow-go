@@ -29,6 +29,8 @@ const (
 	LockBootstrapping = "lock_bootstrapping"
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
 	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	LockInsertSafetyData    = "lock_insert_safety_data"
+	LockInsertLivenessData  = "lock_insert_liveness_data"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -42,6 +44,8 @@ func Locks() []string {
 		LockInsertCollection,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
+		LockInsertSafetyData,
+		LockInsertLivenessData,
 	}
 }
 
@@ -65,6 +69,9 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockBootstrapping, LockInsertSafetyData).
+		Add(LockInsertSafetyData, LockInsertLivenessData).
+		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
 		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
 		Build()
 }

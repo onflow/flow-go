@@ -621,7 +621,7 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist, err := persister.New(node.ProtocolDB, node.RootChainID)
+			persist, err := persister.New(node.ProtocolDB, node.RootChainID, node.StorageLockMgr)
 			if err != nil {
 				return nil, err
 			}
