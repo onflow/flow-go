@@ -103,6 +103,8 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		// checks are skipped:
 		// - From is not verified to be an EOA
 		// - GasLimit is not checked against the protocol defined tx gaslimit
+		// This is necessary for COA interactions, as a COA is a smart wallet,
+		// which has non-empty code, hence it would fail the EOA check.
 		SkipTransactionChecks: true,
 	}
 }
