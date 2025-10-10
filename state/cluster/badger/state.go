@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/cluster/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 type State struct {
@@ -35,6 +34,14 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertOrFinalizeClusterBlock` for inserting cluster block: %w", err)
+	}
+	err = lctx.AcquireLock(storage.LockInsertSafetyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertSafetyData` for inserting safety data: %w", err)
+	}
+	err = lctx.AcquireLock(storage.LockInsertLivenessData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertLivenessData` for inserting liveness data: %w", err)
 	}
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
@@ -61,7 +68,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 		if err != nil {
 			return fmt.Errorf("could not build root cluster proposal: %w", err)
 		}
-		err = procedure.InsertClusterBlock(lctx, rw, proposal)
+		err = operation.InsertClusterBlock(lctx, rw, proposal)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
@@ -86,12 +93,12 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 			NewestQC:    rootQC,
 		}
 		// insert safety data
-		err = operation.UpsertSafetyData(rw.Writer(), chainID, safetyData)
+		err = operation.UpsertSafetyData(lctx, rw, chainID, safetyData)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
 		// insert liveness data
-		err = operation.UpsertLivenessData(rw.Writer(), chainID, livenessData)
+		err = operation.UpsertLivenessData(lctx, rw, chainID, livenessData)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}

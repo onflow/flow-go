@@ -656,10 +656,15 @@ func (e *blockComputer) executeProcessCallback(
 	}
 
 	if txn.Output().Err != nil {
-		return nil, 0, fmt.Errorf(
-			"process callback transaction %s error: %v",
-			request.txnIdStr,
-			txn.Output().Err)
+		// if the process transaction fails we log the critical error but don't return an error
+		// so that block execution continues and only the scheduled transactions halt
+		callbackLogger.Error().
+			Err(txn.Output().Err).
+			Bool("critical_error", true).
+			Uint64("height", request.ctx.BlockHeader.Height).
+			Msg("system process transaction output error")
+
+		return nil, txnIndex, nil
 	}
 
 	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(e.vmCtx.Chain, txn.Output().Events)
