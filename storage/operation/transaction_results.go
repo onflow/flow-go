@@ -28,7 +28,6 @@ func RetrieveTransactionResultByIndex(r storage.Reader, blockID flow.Identifier,
 // LookupTransactionResultsByBlockIDUsingIndex retrieves all tx results for a block, by using
 // tx_index index. This correctly handles cases of duplicate transactions within block.
 func LookupTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID flow.Identifier, txResults *[]flow.TransactionResult) error {
-
 	txErrIterFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
 		var val flow.TransactionResult
 		err = getValue(&val)
@@ -60,9 +59,10 @@ func InsertLightTransactionResult(w storage.Writer, blockID flow.Identifier, tra
 	return UpsertByKey(w, MakePrefix(codeLightTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-// InsertAndIndexLightTransactionResults inserts and indexes a batch of light transaction results
-// the caller must hold [storage.LockInsertLightTransactionResult] lock
-// It returns storage.ErrAlreadyExists if light transaction results for the block already exist
+// InsertAndIndexLightTransactionResults persists and indexes all transaction results (light representation) for the given blockID
+// as part of the provided batch. The caller must acquire [storage.LockInsertLightTransactionResult] and hold it until the write
+// batch has been committed.
+// It returns [storage.ErrAlreadyExists] if light transaction results for the block already exist.
 func InsertAndIndexLightTransactionResults(
 	lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 	blockID flow.Identifier,
@@ -109,10 +109,18 @@ func indexLightTransactionResultByBlockIDAndTxIndex(w storage.Writer, blockID fl
 	return UpsertByKey(w, MakePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
+// RetrieveLightTransactionResult retrieves the result (light representation) of the specified transaction
+// within the specified block.
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no result of a transaction with the specified ID is known
 func RetrieveLightTransactionResult(r storage.Reader, blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.LightTransactionResult) error {
 	return RetrieveByKey(r, MakePrefix(codeLightTransactionResult, blockID, transactionID), transactionResult)
 }
 
+// RetrieveLightTransactionResultByIndex retrieves the result (light representation) of the
+// transaction at the given index within the specified block.
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no result of a transaction at `txIndex` in `blockID` is known
 func RetrieveLightTransactionResultByIndex(r storage.Reader, blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) error {
 	return RetrieveByKey(r, MakePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)
 }
@@ -134,9 +142,10 @@ func LookupLightTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID 
 	return TraverseByPrefix(r, MakePrefix(codeLightTransactionResultIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
 }
 
-// InsertAndIndexTransactionResultErrorMessages inserts and indexes a batch of transaction result error messages
-// the caller must hold [storage.LockInsertTransactionResultErrMessage] lock
-// It returns storage.ErrAlreadyExists if tx result error messages for the block already exist
+// InsertAndIndexTransactionResultErrorMessages persists and indexes all transaction result error messages for the given blockID
+// as part of the provided batch. The caller must acquire [storage.LockInsertTransactionResultErrMessage] and hold it until the
+// write batch has been committed.
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist
 func InsertAndIndexTransactionResultErrorMessages(
 	lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 	blockID flow.Identifier,
@@ -183,17 +192,24 @@ func indexTransactionResultErrorMessageBlockIDTxIndex(w storage.Writer, blockID 
 	return UpsertByKey(w, MakePrefix(codeTransactionResultErrorMessageIndex, blockID, transactionResultErrorMessage.Index), transactionResultErrorMessage)
 }
 
-// RetrieveTransactionResultErrorMessage retrieves a transaction result error message by block ID and transaction ID.
+// RetrieveTransactionResultErrorMessage retrieves a transaction result error message of the specified transaction
+// within the specified block.
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no result of a transaction with the specified ID is known
 func RetrieveTransactionResultErrorMessage(r storage.Reader, blockID flow.Identifier, transactionID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
 	return RetrieveByKey(r, MakePrefix(codeTransactionResultErrorMessage, blockID, transactionID), transactionResultErrorMessage)
 }
 
-// RetrieveTransactionResultErrorMessageByIndex retrieves a transaction result error message by block ID and index.
+// RetrieveTransactionResultErrorMessageByIndex retrieves the transaction result error message of the
+// transaction at the given index within the specified block.
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no result of a transaction at `txIndex` in `blockID` is known
 func RetrieveTransactionResultErrorMessageByIndex(r storage.Reader, blockID flow.Identifier, txIndex uint32, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
 	return RetrieveByKey(r, MakePrefix(codeTransactionResultErrorMessageIndex, blockID, txIndex), transactionResultErrorMessage)
 }
 
 // TransactionResultErrorMessagesExists checks whether tx result error messages exist in the database.
+// No error returns are expected during normal operations.
 func TransactionResultErrorMessagesExists(r storage.Reader, blockID flow.Identifier, blockExists *bool) error {
 	exists, err := KeyExists(r, MakePrefix(codeTransactionResultErrorMessageIndex, blockID))
 	if err != nil {
@@ -203,8 +219,10 @@ func TransactionResultErrorMessagesExists(r storage.Reader, blockID flow.Identif
 	return nil
 }
 
-// LookupTransactionResultErrorMessagesByBlockIDUsingIndex retrieves all tx result error messages for a block, by using
-// tx_index index. This correctly handles cases of duplicate transactions within block.
+// LookupTransactionResultErrorMessagesByBlockIDUsingIndex retrieves the transaction result error messages of all
+// failed transactions for the specified block.
+// CAUTION: this function returns the empty list in case for block IDs without known results.
+// No error returns are expected during normal operations.
 func LookupTransactionResultErrorMessagesByBlockIDUsingIndex(r storage.Reader, blockID flow.Identifier, txResultErrorMessages *[]flow.TransactionResultErrorMessage) error {
 	txErrIterFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
 		var val flow.TransactionResultErrorMessage
