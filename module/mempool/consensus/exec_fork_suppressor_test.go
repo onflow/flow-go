@@ -286,7 +286,7 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 
 		// This function retrieves conflicting seals from the same underlying database with a new instance of storage.DB.
 		func(t *testing.T, db storage.DB) {
-			lockManager2 := storage.NewTestingLockManager()
+			lockManager := storage.NewTestingLockManager()
 
 			wrappedMempool2 := &poolmock.IncorporatedResultSeals{}
 			execForkActor2 := &actormock.ExecForkActor{}
@@ -295,7 +295,7 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 					conflictingSeals := args.Get(0).([]*flow.IncorporatedResultSeal)
 					require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, conflictingSeals)
 				}).Return().Once()
-			wrapper2, _ := NewExecStateForkSuppressor(wrappedMempool2, execForkActor2.OnExecFork, db, lockManager2, zerolog.New(os.Stderr))
+			wrapper2, _ := NewExecStateForkSuppressor(wrappedMempool2, execForkActor2.OnExecFork, db, lockManager, zerolog.New(os.Stderr))
 
 			// add another (non-conflicting) seal to ExecForkSuppressor
 			// fail test if seal is added to wrapped mempool
