@@ -683,11 +683,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
-				notNil(builder.events),
-				notNil(builder.collections),
-				notNil(builder.transactions),
-				notNil(builder.lightTransactionResults),
-				notNil(builder.transactionResultErrorMessages),
+				builder.events,
+				builder.collections,
+				builder.transactions,
+				builder.lightTransactionResults,
+				builder.transactionResultErrorMessages,
 				nil,
 				*executionDataStoreCache,
 			)
