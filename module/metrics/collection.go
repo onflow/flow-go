@@ -60,15 +60,15 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 			Subsystem: subsystemProposal,
 			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "collection_size",
-			Help:      "number of transactions included in the block",
+			Help:      "number of transactions included ONLY in the cluster blocks proposed by this node",
 		}, []string{LabelChain}),
 
 		priorityTxns: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
 			Buckets:   []float64{1, 2, 5, 10, 20},
-			Name:      "priority_transactions_count",
-			Help:      "number of priority transactions included in the block",
+			Name:      "priority_transactions",
+			Help:      "number of priority transactions included ONLY in cluster blocks proposed by this node",
 		}, []string{LabelChain}),
 	}
 
@@ -101,7 +101,9 @@ func (cc *CollectionCollector) CollectionMaxSize(size uint) {
 	cc.maxCollectionSize.Set(float64(size))
 }
 
-// ClusterBlockCreated informs about cluster block being created.
+// ClusterBlockCreated informs about cluster block being proposed by this node.
+// CAUTION: These metrics will represent a partial picture of cluster block creation across the network,
+// as each node will only report on cluster blocks where they are the proposer.
 // It reports several metrics, specifically how many transactions have been included and how many of them are priority txns.
 func (cc *CollectionCollector) ClusterBlockCreated(block *cluster.Block, priorityTxnsCount uint) {
 	chainID := block.ChainID
