@@ -158,12 +158,12 @@ func InsertAndIndexTransactionResultErrorMessages(
 
 	w := rw.Writer()
 	for _, result := range transactionResultErrorMessages {
-		err := batchInsertTransactionResultErrorMessage(w, blockID, &result)
+		err := insertTransactionResultErrorMessageByTxID(w, blockID, &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result error message: %w", err)
 		}
 
-		err = batchIndexTransactionResultErrorMessage(w, blockID, &result)
+		err = indexTransactionResultErrorMessageBlockIDTxIndex(w, blockID, &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch index tx result error message: %w", err)
 		}
@@ -171,15 +171,15 @@ func InsertAndIndexTransactionResultErrorMessages(
 	return nil
 }
 
-// batchInsertTransactionResultErrorMessage inserts a transaction result error message by block ID and transaction ID
+// insertTransactionResultErrorMessageByTxID inserts a transaction result error message by block ID and transaction ID
 // into the database using a batch write.
-func batchInsertTransactionResultErrorMessage(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
+func insertTransactionResultErrorMessageByTxID(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
 	return UpsertByKey(w, MakePrefix(codeTransactionResultErrorMessage, blockID, transactionResultErrorMessage.TransactionID), transactionResultErrorMessage)
 }
 
-// batchIndexTransactionResultErrorMessage indexes a transaction result error message by index within the block using a
+// indexTransactionResultErrorMessageBlockIDTxIndex indexes a transaction result error message by index within the block using a
 // batch write.
-func batchIndexTransactionResultErrorMessage(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
+func indexTransactionResultErrorMessageBlockIDTxIndex(w storage.Writer, blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
 	return UpsertByKey(w, MakePrefix(codeTransactionResultErrorMessageIndex, blockID, transactionResultErrorMessage.Index), transactionResultErrorMessage)
 }
 
