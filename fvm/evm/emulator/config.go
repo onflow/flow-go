@@ -111,6 +111,8 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		chainConfig.PragueTime = &MainnetPragueActivation
 	}
 
+	chainConfig.OsakaTime = &zero
+
 	return chainConfig
 }
 
