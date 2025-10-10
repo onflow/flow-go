@@ -351,7 +351,7 @@ func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest
 }
 
 // canDispatchRequest returns whether chunk data request for this chunk ID can be dispatched.
-func (e *Engine) canDispatchRequest(chunkID flow.Identifier) (bool, string) {
+func (e *Engine) canDispatchRequest(chunkID flow.Identifier) (canDispatch bool, reasonMsg string) {
 	attempts, lastAttempt, retryAfter, exists := e.pendingRequests.RequestHistory(chunkID)
 	if !exists {
 		return false, fmt.Sprintf("not found in mempool for chunk id: %s", chunkID)

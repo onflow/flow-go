@@ -364,7 +364,7 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 }
 
 // SaveExecutionResults saves all data related to the execution of a block.
-// It is concurrent-safe
+// It is concurrent safe because chunk data packs store is conflict-free (storing data by hash), and protocol data requires a lock to store, which will be synchronized.
 // It returns [storage.ErrDataMismatch] if there is data already stored for the same block ID but with different content.
 func (s *state) SaveExecutionResults(
 	ctx context.Context,
@@ -419,7 +419,7 @@ func (s *state) saveExecutionResults(
 	}
 
 	return storage.WithLock(s.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
-		// The batch update writes all execution result data in a single atomic operation.
+		// The batch update writes all execution result data (except chunk data pack!) atomically.
 		// Since the chunk data pack itself was already stored in a separate database (s.chunkDataPacks)
 		// during the previous step, this step stores only the mapping between chunk ID
 		// and chunk data pack ID together with the execution result data in the same batch.

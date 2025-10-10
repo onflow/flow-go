@@ -9,7 +9,7 @@ import (
 // the last time it has been requested, and the duration at which the chunk can be retried after, returns either true or false.
 //
 // The return value of this function determines whether the chunk request can be dispatched to the network.
-type RequestQualifierFunc func(attempts uint64, lastRequested time.Time, retryAfter time.Duration) (bool, string)
+type RequestQualifierFunc func(attempts uint64, lastRequested time.Time, retryAfter time.Duration) (requestQualifies bool, reasonMsg string)
 
 // MaxAttemptQualifier only qualifies a chunk request if it has been requested less than the specified number of attempts.
 func MaxAttemptQualifier(maxAttempts uint64) RequestQualifierFunc {
