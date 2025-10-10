@@ -25,9 +25,9 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.0
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
-	github.com/onflow/flow-go-sdk v1.8.2
+	github.com/onflow/flow-go-sdk v1.8.3
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.15
+	github.com/onflow/flow/protobuf/go/flow v0.4.16
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.61.0
@@ -39,7 +39,7 @@ require (
 	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 	golang.org/x/sync v0.16.0
-	google.golang.org/grpc v1.75.0
+	google.golang.org/grpc v1.75.1
 	google.golang.org/protobuf v1.36.9
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -66,20 +66,20 @@ require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.39.0 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.31.8 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.18.12 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.39.1 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.31.9 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.18.13 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.7 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.7 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.7 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.8 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.8 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.7.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.15.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.29.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.34.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.34.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.4 // indirect
 	github.com/aws/smithy-go v1.23.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
@@ -136,6 +136,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829 // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
+	github.com/fxamacker/golang-lru/v2 v2.0.0-20250716153046-22c8d17dc4ee // indirect
 	github.com/gabriel-vasile/mimetype v1.4.6 // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/gammazero/workerpool v1.1.3 // indirect
@@ -270,8 +271,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
-	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
-	github.com/pierrec/lz4/v4 v4.1.18 // indirect
+	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
 	github.com/pion/ice/v2 v2.3.37 // indirect
@@ -387,5 +387,8 @@ replace github.com/onflow/flow-go/insecure => ../insecure
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
+
+// Using custom fork until https://github.com/ipfs/go-ds-pebble/issues/64 is merged
+replace github.com/ipfs/go-ds-pebble => github.com/onflow/go-ds-pebble v0.0.0-20251003225212-131edca3a897
 
 replace github.com/hashicorp/golang-lru/v2 => github.com/fxamacker/golang-lru/v2 v2.0.0-20250430153159-6f72f038a30f

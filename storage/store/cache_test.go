@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -16,10 +18,47 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestCache_Exists tests existence checking items in the cache.
-func TestCache_Exists(t *testing.T) {
-	cache := newCache[flow.Identifier, any](metrics.NewNoopCollector(), "test")
+type cache[K comparable, V any] interface {
+	IsCached(K) bool
+	Get(storage.Reader, K) (V, error)
+	Insert(K, V)
+	Remove(K)
+	PutTx(storage.ReaderBatchWriter, K, V) error
+}
 
+func mustNewGroupCache[G comparable, K comparable, V any](
+	t testing.TB,
+	collector module.CacheMetrics,
+	resourceName string,
+	groupFromKey func(K) G,
+	options ...func(*Cache[K, V]),
+) *GroupCache[G, K, V] {
+	cache, err := newGroupCache(collector, resourceName, groupFromKey, options...)
+	require.NoError(t, err)
+	return cache
+}
+
+// TestCacheExists tests existence checking items in the cache.
+func TestCacheExists(t *testing.T) {
+	caches := []cache[flow.Identifier, any]{
+		newCache[flow.Identifier, any](
+			metrics.NewNoopCollector(),
+			"test",
+		),
+		mustNewGroupCache[string, flow.Identifier, any](
+			t,
+			metrics.NewNoopCollector(),
+			"test",
+			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },
+		),
+	}
+
+	for _, cache := range caches {
+		testCacheExists(t, cache)
+	}
+}
+
+func testCacheExists(t *testing.T, cache cache[flow.Identifier, any]) {
 	t.Run("non-existent", func(t *testing.T) {
 		key := unittest.IdentifierFixture()
 		exists := cache.IsCached(key)
@@ -47,27 +86,48 @@ func TestCache_Exists(t *testing.T) {
 
 // Test storing an item will be cached, and when cache hit,
 // the retrieve function is only called once
-func TestCache_CachedHit(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		retrieved := atomic.NewUint64(0)
+func TestCacheCachedHit(t *testing.T) {
+	retrieved := atomic.NewUint64(0)
 
-		store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val []byte) error {
-			return operation.UpsertByKey(rw.Writer(), key[:], val)
+	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val []byte) error {
+		return operation.UpsertByKey(rw.Writer(), key[:], val)
+	}
+	retrieve := func(r storage.Reader, key flow.Identifier) ([]byte, error) {
+		retrieved.Inc()
+		var val []byte
+		err := operation.RetrieveByKey(r, key[:], &val)
+		if err != nil {
+			return nil, err
 		}
-		retrieve := func(r storage.Reader, key flow.Identifier) ([]byte, error) {
-			retrieved.Inc()
-			var val []byte
-			err := operation.RetrieveByKey(r, key[:], &val)
-			if err != nil {
-				return nil, err
-			}
-			return val, nil
-		}
+		return val, nil
+	}
 
-		cache := newCache(metrics.NewNoopCollector(), "test",
+	caches := []cache[flow.Identifier, []byte]{
+		newCache(
+			metrics.NewNoopCollector(),
+			"test",
 			withStore(store),
 			withRetrieve(retrieve),
-		)
+		),
+
+		mustNewGroupCache(
+			t,
+			metrics.NewNoopCollector(),
+			"test",
+			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },
+			withStore(store),
+			withRetrieve(retrieve),
+		),
+	}
+
+	for _, cache := range caches {
+		testCacheCachedHit(t, cache, retrieved)
+	}
+}
+
+func testCacheCachedHit(t *testing.T, cache cache[flow.Identifier, []byte], retrieved *atomic.Uint64) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		retrieved.Store(0)
 
 		key := unittest.IdentifierFixture()
 		val := unittest.RandomBytes(128)
@@ -105,17 +165,37 @@ func TestCache_CachedHit(t *testing.T) {
 
 // Test storage.ErrNotFound is returned when cache is missing
 // and is not cached
-func TestCache_NotFoundReturned(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		retrieved := atomic.NewUint64(0)
-		retrieve := func(r storage.Reader, key flow.Identifier) ([]byte, error) {
-			retrieved.Inc()
-			return nil, storage.ErrNotFound
-		}
+func TestCacheNotFoundReturned(t *testing.T) {
+	retrieved := atomic.NewUint64(0)
+	retrieve := func(storage.Reader, flow.Identifier) ([]byte, error) {
+		retrieved.Inc()
+		return nil, storage.ErrNotFound
+	}
 
-		cache := newCache(metrics.NewNoopCollector(), "test",
+	caches := []cache[flow.Identifier, []byte]{
+		newCache(
+			metrics.NewNoopCollector(),
+			"test",
 			withRetrieve(retrieve),
-		)
+		),
+
+		mustNewGroupCache(
+			t,
+			metrics.NewNoopCollector(),
+			"test",
+			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },
+			withRetrieve(retrieve),
+		),
+	}
+
+	for _, cache := range caches {
+		testCacheNotFoundReturned(t, cache, retrieved)
+	}
+}
+
+func testCacheNotFoundReturned(t *testing.T, cache cache[flow.Identifier, []byte], retrieved *atomic.Uint64) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		retrieved.Store(0)
 
 		// Create a random identifier to use as a key
 		notExist := unittest.IdentifierFixture()
@@ -132,30 +212,53 @@ func TestCache_NotFoundReturned(t *testing.T) {
 	})
 }
 
+var errStoreException = fmt.Errorf("storing exception")
+
 // Test when store return exception error, the key value is not cached,
-func TestCache_ExceptionNotCached(t *testing.T) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		storeException := fmt.Errorf("storing exception")
-		stored, retrieved := atomic.NewUint64(0), atomic.NewUint64(0)
+func TestCacheExceptionNotCached(t *testing.T) {
+	stored, retrieved := atomic.NewUint64(0), atomic.NewUint64(0)
 
-		store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val []byte) error {
-			stored.Inc()
-			return storeException
-		}
-		retrieve := func(r storage.Reader, key flow.Identifier) ([]byte, error) {
-			retrieved.Inc()
-			var val []byte
-			err := operation.RetrieveByKey(r, key[:], &val)
-			if err != nil {
-				return nil, err
-			}
-			return val, nil
-		}
+	store := func(storage.ReaderBatchWriter, flow.Identifier, []byte) error {
+		stored.Inc()
+		return errStoreException
+	}
 
-		cache := newCache(metrics.NewNoopCollector(), "test",
+	retrieve := func(r storage.Reader, key flow.Identifier) ([]byte, error) {
+		retrieved.Inc()
+		var val []byte
+		err := operation.RetrieveByKey(r, key[:], &val)
+		if err != nil {
+			return nil, err
+		}
+		return val, nil
+	}
+
+	caches := []cache[flow.Identifier, []byte]{
+		newCache(
+			metrics.NewNoopCollector(),
+			"test",
 			withStore(store),
 			withRetrieve(retrieve),
-		)
+		),
+
+		mustNewGroupCache(
+			t,
+			metrics.NewNoopCollector(),
+			"test",
+			func(id flow.Identifier) string { return strconv.Itoa(int(id[0])) },
+			withStore(store),
+			withRetrieve(retrieve),
+		),
+	}
+
+	for _, cache := range caches {
+		testCacheExceptionNotCached(t, cache)
+	}
+}
+
+func testCacheExceptionNotCached(t *testing.T, cache cache[flow.Identifier, []byte]) {
+
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
 		key := unittest.IdentifierFixture()
 		val := unittest.RandomBytes(128)
@@ -165,7 +268,7 @@ func TestCache_ExceptionNotCached(t *testing.T) {
 			return cache.PutTx(rw, key, val)
 		})
 
-		require.ErrorIs(t, err, storeException)
+		require.ErrorIs(t, err, errStoreException)
 
 		// assert key value is not cached
 		_, err = cache.Get(db.Reader(), key)
@@ -192,6 +295,7 @@ func BenchmarkCacheRemove(b *testing.B) {
 		{name: "cache size 9,000, remove count 25", cacheSize: 9_000, removeCount: 25},
 		{name: "cache size 10,000, remove count 25", cacheSize: 10_000, removeCount: 25},
 		{name: "cache size 20,000, remove count 25", cacheSize: 20_000, removeCount: 25},
+		{name: "cache size 10,000, remove count 5,000", cacheSize: 10_000, removeCount: 5_000},
 	}
 
 	for _, bm := range benchmarks {
@@ -208,7 +312,7 @@ func BenchmarkCacheRemove(b *testing.B) {
 				txIDs[i] = unittest.IdentifierFixture()
 			}
 
-			removeIDs := make([]string, 0, bm.removeCount)
+			removeIDs := make([]TwoIdentifier, 0, bm.removeCount)
 
 			blockIDIndex := len(blockIDs) - 1
 			txIDIndex := len(txIDs) - 1
@@ -217,12 +321,16 @@ func BenchmarkCacheRemove(b *testing.B) {
 				blockIDIndex--
 
 				for range txCountPerBlock {
-					key := fmt.Sprintf("%x%x", blockID, txIDs[txIDIndex])
+					var key TwoIdentifier
+					n := copy(key[:], blockID[:])
+					copy(key[n:], txIDs[txIDIndex][:])
 					removeIDs = append(removeIDs, key)
 
 					txIDIndex--
 				}
 			}
+
+			b.ResetTimer()
 
 			for range b.N {
 				b.StopTimer()
@@ -230,14 +338,17 @@ func BenchmarkCacheRemove(b *testing.B) {
 				cache := newCache(
 					metrics.NewNoopCollector(),
 					metrics.ResourceTransactionResults,
-					withLimit[string, struct{}](uint(bm.cacheSize)),
-					withStore(noopStore[string, struct{}]),
-					withRetrieve(noRetrieve[string, struct{}]),
+					withLimit[TwoIdentifier, struct{}](uint(bm.cacheSize)),
+					withStore(noopStore[TwoIdentifier, struct{}]),
+					withRetrieve(noRetrieve[TwoIdentifier, struct{}]),
 				)
 
 				for i, blockID := range blockIDs {
 					for _, txID := range txIDs[i*txCountPerBlock : (i+1)*txCountPerBlock] {
-						key := fmt.Sprintf("%x%x", blockID, txID)
+						var key TwoIdentifier
+						n := copy(key[:], blockID[:])
+						copy(key[n:], txID[:])
+
 						cache.Insert(key, struct{}{})
 					}
 				}

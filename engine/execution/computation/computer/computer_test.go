@@ -1,7 +1,9 @@
 package computer_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -586,6 +588,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.LessOrEqual(t, vm.CallCount(), (1+totalTransactionCount)/2*totalTransactionCount)
 	})
 
+	// TODO: this test is flaky with a low probability of failing
 	t.Run(
 		"service events are emitted", func(t *testing.T) {
 			execCtx := fvm.NewContext(
@@ -1421,26 +1424,36 @@ func Test_ScheduledCallback(t *testing.T) {
 
 	t.Run("process callback transaction execution error", func(t *testing.T) {
 		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback execution failed")
-		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError)
+		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError, nil)
 	})
 
 	t.Run("process callback transaction output error", func(t *testing.T) {
 		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback output error")
-		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError)
+		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 2, nil, processCallbackError)
 	})
 }
 
 func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int) {
-	testScheduledCallbackWithError(t, chain, callbackEvents, expectedTransactionCount, nil)
+	testScheduledCallbackWithError(t, chain, callbackEvents, expectedTransactionCount, nil, nil)
 }
 
-func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int, processCallbackError fvmErrors.CodedError) {
+func testScheduledCallbackWithError(
+	t *testing.T,
+	chain flow.Chain,
+	callbackEvents []cadence.Event,
+	expectedTransactionCount int,
+	processExecuteError fvmErrors.CodedError,
+	processOutputError fvmErrors.CodedError,
+) {
 	rag := &RandomAddressGenerator{}
 	executorID := unittest.IdentifierFixture()
+
+	testLogger := NewTestLogger()
 
 	execCtx := fvm.NewContext(
 		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
 		fvm.WithChain(chain),
+		fvm.WithLogger(testLogger.Logger),
 	)
 
 	// track which transactions were executed and their details
@@ -1473,9 +1486,10 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 	vm := &callbackTestVM{
 		testVM: testVM{
 			t:                    t,
-			eventsPerTransaction: 0,                    // we'll handle events manually
-			err:                  processCallbackError, // inject error if provided
+			eventsPerTransaction: 0,                   // we'll handle events manually
+			err:                  processExecuteError, // inject error if provided
 		},
+		processOutputErr:     processOutputError,
 		executedTransactions: executedTransactions,
 		executedMutex:        &executedTransactionsMutex,
 		eventPayloads:        eventPayloads,
@@ -1506,15 +1520,34 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 		Return(nil).
 		Times(1)
 
-	// expect the specified number of transactions
-	exemetrics.On("ExecutionTransactionExecuted",
-		mock.Anything,
-		mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
-			return !arg.Failed && arg.SystemTransaction
-		}),
-		mock.Anything).
-		Return(nil).
-		Times(expectedTransactionCount)
+	if processOutputError != nil {
+		// expect 1 failed transaction (process callback) + 1 successful transaction (system chunk)
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return arg.Failed && (arg.SystemTransaction || arg.ScheduledTransaction)
+			}),
+			mock.Anything).
+			Return(nil).
+			Times(1)
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return !arg.Failed && (arg.SystemTransaction || arg.ScheduledTransaction)
+			}),
+			mock.Anything).
+			Return(nil).
+			Times(expectedTransactionCount - 1)
+	} else {
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return !arg.Failed && (arg.SystemTransaction || arg.ScheduledTransaction)
+			}),
+			mock.Anything).
+			Return(nil).
+			Times(expectedTransactionCount)
+	}
 
 	exemetrics.On(
 		"ExecutionChunkDataPackGenerated",
@@ -1555,7 +1588,7 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 		execCtx,
 		exemetrics,
 		trace.NewNoopTracer(),
-		zerolog.Nop(),
+		testLogger.Logger,
 		committer,
 		me,
 		prov,
@@ -1576,9 +1609,29 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 		derived.NewEmptyDerivedBlockData(0))
 
 	// If we expect an error, verify it and return early
-	if processCallbackError != nil {
+	if processExecuteError != nil {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "system process transaction")
+		return
+	}
+
+	if processOutputError != nil {
+		require.NoError(t, err)
+		require.Truef(
+			t,
+			testLogger.HasLogWithField("system process transaction output error", "critical_error", true),
+			"expected critical error log not found",
+		)
+
+		// verify the process callback transaction failed as expected
+		require.Len(t, result.AllTransactionResults(), expectedTransactionCount)
+		processCallbackResult := result.AllTransactionResults()[0]
+		require.NotEmpty(t, processCallbackResult.ErrorMessage, "process callback transaction should have failed")
+		require.Contains(t, processCallbackResult.ErrorMessage, "process callback output error")
+
+		// verify system chunk transaction succeeded
+		systemChunkResult := result.AllTransactionResults()[1]
+		require.Empty(t, systemChunkResult.ErrorMessage, "system chunk transaction should not have failed")
 		return
 	}
 
@@ -1639,7 +1692,8 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 
 // callbackTestVM is a custom VM for testing callback execution
 type callbackTestVM struct {
-	testVM               // Embed testVM
+	testVM
+	processOutputErr     fvmErrors.CodedError
 	executedTransactions map[string]string
 	executedMutex        *sync.Mutex
 	eventPayloads        [][]byte
@@ -1688,17 +1742,18 @@ func (c *callbackTestExecutor) Execute() error {
 // from the output of the procedure executor
 func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 	// Return error if one was injected for process callback transaction
-	if c.vm.err != nil {
+	if c.vm.processOutputErr != nil {
 		txProc, ok := c.proc.(*fvm.TransactionProcedure)
 		if ok {
 			script := string(txProc.Transaction.Script)
 			if strings.Contains(script, "scheduler.process") {
 				return fvm.ProcedureOutput{
-					Err: c.vm.err,
+					Err: c.vm.processOutputErr,
 				}
 			}
 		}
 	}
+
 	c.vm.executedMutex.Lock()
 	defer c.vm.executedMutex.Unlock()
 
@@ -2064,4 +2119,68 @@ func (p *programLoader) Compute(
 	error,
 ) {
 	return p.load()
+}
+
+// TestLogger captures log output for testing and provides methods to verify logged messages.
+type TestLogger struct {
+	buffer bytes.Buffer
+	Logger zerolog.Logger
+}
+
+func NewTestLogger() *TestLogger {
+	tl := &TestLogger{}
+	tl.Logger = zerolog.New(&tl.buffer).Level(zerolog.DebugLevel)
+	return tl
+}
+
+type LogEntry struct {
+	Level   string
+	Message string
+	Fields  map[string]interface{}
+}
+
+func (tl *TestLogger) Logs() []LogEntry {
+	var entries []LogEntry
+	lines := strings.Split(tl.buffer.String(), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var rawEntry map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &rawEntry); err != nil {
+			continue
+		}
+		entry := LogEntry{
+			Fields: make(map[string]interface{}),
+		}
+		for k, v := range rawEntry {
+			switch k {
+			case "level":
+				entry.Level = fmt.Sprintf("%v", v)
+			case "message":
+				entry.Message = fmt.Sprintf("%v", v)
+			default:
+				entry.Fields[k] = v
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+func (tl *TestLogger) HasLog(message string) bool {
+	return strings.Contains(tl.buffer.String(), message)
+}
+
+func (tl *TestLogger) HasLogWithField(message string, fieldName string, fieldValue interface{}) bool {
+	for _, entry := range tl.Logs() {
+		if strings.Contains(entry.Message, message) {
+			if val, ok := entry.Fields[fieldName]; ok {
+				if val == fieldValue {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

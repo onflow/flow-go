@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -39,8 +40,9 @@ import (
 type TxErrorMessagesEngineSuite struct {
 	suite.Suite
 
-	log   zerolog.Logger
-	proto struct {
+	log     zerolog.Logger
+	metrics module.TransactionErrorMessagesMetrics
+	proto   struct {
 		state    *protocol.FollowerState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
@@ -82,7 +84,8 @@ func (s *TxErrorMessagesEngineSuite) TearDownTest() {
 }
 
 func (s *TxErrorMessagesEngineSuite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
+	s.metrics = metrics.NewNoopCollector()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	pdb, dbDir := unittest.TempPebbleDB(s.T())
 	s.db = pebbleimpl.ToDB(pdb)
@@ -178,6 +181,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 
 	eng, err := New(
 		s.log,
+		s.metrics,
 		s.proto.state,
 		s.headers,
 		processedTxErrorMessagesBlockHeight,

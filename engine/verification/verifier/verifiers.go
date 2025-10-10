@@ -164,14 +164,14 @@ func verifyConcurrently(
 	defer cancel() // Ensure cancel is called to release resources
 
 	var lowestErr error
-	var lowestErrHeight uint64 = ^uint64(0) // Initialize to max value of uint64
-	var mu sync.Mutex                       // To protect access to lowestErr and lowestErrHeight
+	var lowestErrHeight = ^uint64(0) // Initialize to max value of uint64
+	var mu sync.Mutex                // To protect access to lowestErr and lowestErrHeight
 
 	lg := util.LogProgress(
 		log.Logger,
 		util.DefaultLogProgressConfig(
 			fmt.Sprintf("verifying heights progress for [%v:%v]", from, to),
-			int(to+1-from),
+			to+1-from,
 		),
 	)
 

@@ -801,6 +801,8 @@ type ExecutionDataRequesterMetrics interface {
 	ExecutionDataFetchStarted()
 
 	// ExecutionDataFetchFinished records a completed download
+	// Pass the highest consecutive height to ensure the metrics reflect the height up to which the
+	// requester has completed downloads. This allows us to easily see when downloading gets stuck.
 	ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64)
 
 	// NotificationSent reports that ExecutionData received notifications were sent for a block height
@@ -821,6 +823,22 @@ type ExecutionStateIndexerMetrics interface {
 	// This should only be used during startup. After startup, use BlockIndexed to record newly
 	// indexed heights.
 	InitializeLatestHeight(height uint64)
+}
+
+type TransactionErrorMessagesMetrics interface {
+	// TxErrorsInitialHeight records the initial height of the transaction error messages.
+	TxErrorsInitialHeight(height uint64)
+
+	// TxErrorsFetchStarted records that a transaction error messages download has started.
+	TxErrorsFetchStarted()
+
+	// TxErrorsFetchFinished records that a transaction error messages download has finished.
+	// Pass the highest consecutive height to ensure the metrics reflect the height up to which the
+	// requester has completed downloads. This allows us to easily see when downloading gets stuck.
+	TxErrorsFetchFinished(duration time.Duration, success bool, height uint64)
+
+	// TxErrorsFetchRetried records that a transaction error messages download has been retried.
+	TxErrorsFetchRetried()
 }
 
 type RuntimeMetrics interface {
@@ -946,6 +964,7 @@ type TransactionExecutionResultStats struct {
 	ExecutionResultStats
 	NumberOfTxnConflictRetries int
 	Failed                     bool
+	ScheduledTransaction       bool
 	SystemTransaction          bool
 	ComputationIntensities     meter.MeteredComputationIntensities
 }
