@@ -111,7 +111,7 @@ func (t *TransactionResultErrorMessages) BatchStore(
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
 ) error {
 	// requires [storage.LockInsertTransactionResultErrMessage]
-	err := operation.BatchInsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, transactionResultErrorMessages)
+	err := operation.InsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, transactionResultErrorMessages)
 	if err != nil {
 		return err
 	}

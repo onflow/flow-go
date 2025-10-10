@@ -73,7 +73,7 @@ func NewLightTransactionResults(collector module.CacheMetrics, db storage.DB, tr
 
 func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error {
 	// requires [storage.LockInsertLightTransactionResult]
-	err := operation.BatchInsertAndIndexLightTransactionResults(lctx, rw, blockID, transactionResults)
+	err := operation.InsertAndIndexLightTransactionResults(lctx, rw, blockID, transactionResults)
 	if err != nil {
 		return err
 	}

@@ -42,23 +42,12 @@ func LookupTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID flow.
 	return TraverseByPrefix(r, MakePrefix(codeTransactionResultIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
 }
 
-// RemoveTransactionResultsByBlockID removes the transaction results for the given blockID
-func RemoveTransactionResultsByBlockID(r storage.Reader, w storage.Writer, blockID flow.Identifier) error {
-	prefix := MakePrefix(codeTransactionResult, blockID)
-	err := RemoveByKeyPrefix(r, w, prefix)
-	if err != nil {
-		return fmt.Errorf("could not remove transaction results for block %v: %w", blockID, err)
-	}
-
-	return nil
-}
-
-// BatchRemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
+// RemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if badger fails to process request
-func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
+func RemoveTransactionResultsByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	prefix := MakePrefix(codeTransactionResult, blockID)
-	err := RemoveByKeyPrefix(batch.GlobalReader(), batch.Writer(), prefix)
+	err := RemoveByKeyPrefix(rw.GlobalReader(), rw.Writer(), prefix)
 	if err != nil {
 		return fmt.Errorf("could not remove transaction results for block %v: %w", blockID, err)
 	}
@@ -71,10 +60,10 @@ func InsertLightTransactionResult(w storage.Writer, blockID flow.Identifier, tra
 	return UpsertByKey(w, MakePrefix(codeLightTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-// BatchInsertAndIndexLightTransactionResults inserts and indexes a batch of light transaction results
+// InsertAndIndexLightTransactionResults inserts and indexes a batch of light transaction results
 // the caller must hold [storage.LockInsertLightTransactionResult] lock
 // It returns storage.ErrAlreadyExists if light transaction results for the block already exist
-func BatchInsertAndIndexLightTransactionResults(
+func InsertAndIndexLightTransactionResults(
 	lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 	blockID flow.Identifier,
 	transactionResults []flow.LightTransactionResult,
@@ -95,12 +84,12 @@ func BatchInsertAndIndexLightTransactionResults(
 
 	w := rw.Writer()
 	for i, result := range transactionResults {
-		err := batchInsertLightTransactionResult(w, blockID, &result)
+		err := insertLightTransactionResult(w, blockID, &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert light tx result: %w", err)
 		}
 
-		err = batchIndexLightTransactionResult(w, blockID, uint32(i), &result)
+		err = indexLightTransactionResultByBlockIDAndTxIndex(w, blockID, uint32(i), &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch index light tx result: %w", err)
 		}
@@ -108,15 +97,15 @@ func BatchInsertAndIndexLightTransactionResults(
 	return nil
 }
 
-// batchInsertLightTransactionResult inserts a light transaction result by block ID and transaction ID
+// insertLightTransactionResult inserts a light transaction result by block ID and transaction ID
 // into the database using a batch write.
-func batchInsertLightTransactionResult(w storage.Writer, blockID flow.Identifier, transactionResult *flow.LightTransactionResult) error {
+func insertLightTransactionResult(w storage.Writer, blockID flow.Identifier, transactionResult *flow.LightTransactionResult) error {
 	return UpsertByKey(w, MakePrefix(codeLightTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-// batchIndexLightTransactionResult indexes a light transaction result by index within the block using a
+// indexLightTransactionResultByBlockIDAndTxIndex indexes a light transaction result by index within the block using a
 // batch write.
-func batchIndexLightTransactionResult(w storage.Writer, blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) error {
+func indexLightTransactionResultByBlockIDAndTxIndex(w storage.Writer, blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) error {
 	return UpsertByKey(w, MakePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
@@ -145,10 +134,10 @@ func LookupLightTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID 
 	return TraverseByPrefix(r, MakePrefix(codeLightTransactionResultIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
 }
 
-// BatchInsertAndIndexTransactionResultErrorMessages inserts and indexes a batch of transaction result error messages
+// InsertAndIndexTransactionResultErrorMessages inserts and indexes a batch of transaction result error messages
 // the caller must hold [storage.LockInsertTransactionResultErrMessage] lock
 // It returns storage.ErrAlreadyExists if tx result error messages for the block already exist
-func BatchInsertAndIndexTransactionResultErrorMessages(
+func InsertAndIndexTransactionResultErrorMessages(
 	lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
