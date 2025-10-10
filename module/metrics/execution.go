@@ -97,11 +97,11 @@ type ExecutionCollector struct {
 	totalFailedEVMDirectCallsCounter        prometheus.Counter
 	evmTransactionGasUsed                   prometheus.Histogram
 	evmBlockTxCount                         prometheus.Histogram
-	evmBlockGasUsed                         prometheus.Histogram
-	callbacksExecutedCount                  prometheus.Histogram
-	callbacksExecutedTotal                  prometheus.Counter
-	callbacksProcessComputationUsed         prometheus.Histogram
-	callbacksExecuteComputationLimits       prometheus.Histogram
+	evmBlockGasUsed                                  prometheus.Histogram
+	scheduledTransactionsExecutedCount               prometheus.Histogram
+	scheduledTransactionsExecutedTotal               prometheus.Counter
+	scheduledTransactionsProcessComputationUsed      prometheus.Histogram
+	scheduledTransactionsExecuteComputationLimits    prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -798,34 +798,34 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the total amount of flow deposited to EVM (in FLOW)",
 		}),
 
-		callbacksExecutedCount: promauto.NewHistogram(prometheus.HistogramOpts{
+		scheduledTransactionsExecutedCount: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "callbacks_executed_count",
-			Help:      "the number of callbacks executed",
+			Name:      "scheduled_transactions_executed_count",
+			Help:      "the number of scheduled transactions executed",
 			Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
 		}),
 
-		callbacksExecutedTotal: promauto.NewCounter(prometheus.CounterOpts{
+		scheduledTransactionsExecutedTotal: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "callbacks_executed_total",
-			Help:      "the total number of callbacks executed",
+			Name:      "scheduled_transactions_executed_total",
+			Help:      "the total number of scheduled transactions executed",
 		}),
 
-		callbacksProcessComputationUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+		scheduledTransactionsProcessComputationUsed: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "callbacks_process_computation_used",
-			Help:      "the computation used by the process callback transaction",
+			Name:      "scheduled_transactions_process_computation_used",
+			Help:      "the computation used by the process scheduled transaction",
 			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
 		}),
 
-		callbacksExecuteComputationLimits: promauto.NewHistogram(prometheus.HistogramOpts{
+		scheduledTransactionsExecuteComputationLimits: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "callbacks_execute_computation_limits",
-			Help:      "the total computation limits for execute callback transactions",
+			Name:      "scheduled_transactions_execute_computation_limits",
+			Help:      "the total computation limits for execute scheduled transactions",
 			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
 		}),
 	}
@@ -918,12 +918,12 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 }
 
-// ExecutionCallbacksExecuted reports callback execution metrics
-func (ec *ExecutionCollector) ExecutionCallbacksExecuted(callbackCount int, processComputationUsed, executeComputationLimits uint64) {
-	ec.callbacksExecutedCount.Observe(float64(callbackCount))
-	ec.callbacksExecutedTotal.Add(float64(callbackCount))
-	ec.callbacksProcessComputationUsed.Observe(float64(processComputationUsed))
-	ec.callbacksExecuteComputationLimits.Observe(float64(executeComputationLimits))
+// ExecutionScheduledTransactionsExecuted reports scheduled transaction execution metrics
+func (ec *ExecutionCollector) ExecutionScheduledTransactionsExecuted(transactionCount int, processComputationUsed, executeComputationLimits uint64) {
+	ec.scheduledTransactionsExecutedCount.Observe(float64(transactionCount))
+	ec.scheduledTransactionsExecutedTotal.Add(float64(transactionCount))
+	ec.scheduledTransactionsProcessComputationUsed.Observe(float64(processComputationUsed))
+	ec.scheduledTransactionsExecuteComputationLimits.Observe(float64(executeComputationLimits))
 }
 
 // ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes

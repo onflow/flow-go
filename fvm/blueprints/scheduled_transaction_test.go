@@ -24,7 +24,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Mainnet.Chain()
-	tx, err := blueprints.ProcessCallbacksTransaction(chain)
+	tx, err := blueprints.ProcessScheduledTransactions(chain)
 	require.NoError(t, err)
 
 	assert.NotNil(t, tx)
@@ -119,7 +119,7 @@ func TestExecuteCallbacksTransactions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			txs, err := blueprints.ExecuteCallbacksTransactions(chain, tt.events)
+			txs, err := blueprints.ExecuteScheduledTransactions(chain, tt.events)
 
 			if tt.expectError {
 				assert.Errorf(t, err, tt.name)
@@ -164,7 +164,7 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	const id = 123
 	const effort = 456
 	event := createValidCallbackEvent(t, id, effort)
-	txs, err := blueprints.ExecuteCallbacksTransactions(chain, []flow.Event{event})
+	txs, err := blueprints.ExecuteScheduledTransactions(chain, []flow.Event{event})
 
 	require.NoError(t, err)
 	require.Len(t, txs, 1)

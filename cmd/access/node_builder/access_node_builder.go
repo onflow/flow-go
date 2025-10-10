@@ -183,7 +183,7 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
-	scheduledCallbacksEnabled            bool
+	scheduledTransactionsEnabled         bool
 }
 
 type PublicNetworkConfig struct {
@@ -292,7 +292,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
-		scheduledCallbacksEnabled:            fvm.DefaultScheduledCallbacksEnabled,
+		scheduledTransactionsEnabled:         fvm.DefaultScheduledTransactionsEnabled,
 	}
 }
 
@@ -1322,10 +1322,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
-		flags.BoolVar(&builder.scheduledCallbacksEnabled,
-			"scheduled-callbacks-enabled",
-			defaultConfig.scheduledCallbacksEnabled,
-			"whether to include scheduled callback transactions in system collections.")
+		flags.BoolVar(&builder.scheduledTransactionsEnabled,
+			"scheduled-transactions-enabled",
+			defaultConfig.scheduledTransactionsEnabled,
+			"whether to include scheduled transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -2155,7 +2155,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
 				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
-				ScheduledCallbacksEnabled:  builder.scheduledCallbacksEnabled,
+				ScheduledTransactionsEnabled: builder.scheduledTransactionsEnabled,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

@@ -93,7 +93,7 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vmCtx := fvm.NewContext(
 		fvm.WithChain(testChain.Chain()),
-		fvm.WithScheduleCallbacksEnabled(true),
+		fvm.WithScheduledTransactionsEnabled(true),
 	)
 	vmMock := fvmmock.NewVM(s.T())
 
@@ -139,7 +139,7 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 	require.NoError(s.T(), err)
 	serviceTxBody = txBody
 
-	processTxBody, err = blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	processTxBody, err = blueprints.ProcessScheduledTransactions(testChain.Chain())
 	require.NoError(s.T(), err)
 }
 
@@ -287,7 +287,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 		Events:                 meta.ChunkEvents,
 	}
 
-	processTxBody, err := blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	processTxBody, err := blueprints.ProcessScheduledTransactions(testChain.Chain())
 	require.NoError(s.T(), err)
 
 	s.snapshots[string(processTxBody.Script)] = &snapshot.ExecutionSnapshot{}
@@ -462,7 +462,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	// create the event returned for processed callback
 	processedEventName := fmt.Sprintf(
 		"A.%s.FlowTransactionScheduler.PendingExecution",
-		systemContracts.FlowCallbackScheduler.Address,
+		systemContracts.FlowTransactionScheduler.Address,
 	)
 	callbackEventPayload, err := ccf.Encode(cadence.NewEvent(
 		[]cadence.Value{
@@ -495,7 +495,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	}
 
 	// Create execute callback transaction body
-	executeCallbackTxs, err := blueprints.ExecuteCallbacksTransactions(testChain.Chain(), flow.EventsList{processEvent})
+	executeCallbackTxs, err := blueprints.ExecuteScheduledTransactions(testChain.Chain(), flow.EventsList{processEvent})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), executeCallbackTxs, 1)
 
@@ -545,9 +545,9 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	assert.NoError(s.T(), err)
 }
 
-// TestSystemChunkWithNoScheduledCallbacks tests verification of system chunks
+// TestSystemChunkWithNoScheduledTransactions tests verification of system chunks
 // when scheduled callbacks are enabled but no callbacks are actually scheduled
-func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledCallbacks() {
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledTransactions() {
 	// Setup mock outputs for process callback transaction with no events
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
 		ComputationUsed: computationUsed,
