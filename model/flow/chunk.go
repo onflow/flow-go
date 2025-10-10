@@ -8,6 +8,8 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var EmptyEventCollectionID Identifier
@@ -129,6 +131,32 @@ func (ch *Chunk) ID() Identifier {
 	return MakeID(ch)
 }
 
+type ChunkDataPackHeader struct {
+	ChunkID    Identifier      // ID of the chunk this data pack is for
+	StartState StateCommitment // commitment for starting state
+	Proof      Identifier      // Hash of the proof for all registers touched (read or written) during the chunk execution
+	Collection Identifier      // ID of collection executed in this chunk; [flow.ZeroID] for system chunk
+
+	// ExecutionDataRoot is the root data structure of an execution_data.BlockExecutionData.
+	// It contains the necessary information for a verification node to validate that the
+	// BlockExecutionData produced is valid.
+	ExecutionDataRoot BlockExecutionDataRoot
+}
+
+func NewChunkDataPackHeader(ChunkID Identifier, StartState StateCommitment, ProofID Identifier, CollectionID Identifier, ExecutionDataRoot BlockExecutionDataRoot) *ChunkDataPackHeader {
+	return &ChunkDataPackHeader{
+		ChunkID:           ChunkID,
+		StartState:        StartState,
+		Proof:             ProofID,
+		Collection:        CollectionID,
+		ExecutionDataRoot: ExecutionDataRoot,
+	}
+}
+
+func (c *ChunkDataPackHeader) ID() Identifier {
+	return MakeID(c)
+}
+
 // ChunkDataPack holds all register touches (any read, or write).
 //
 // Note that we have to include merkle paths as storage proof for all registers touched (read or written) for
@@ -205,7 +233,14 @@ func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) 
 
 // ID returns a collision-resistant hash of the ChunkDataPack struct.
 func (c *ChunkDataPack) ID() Identifier {
-	return MakeID(c)
+	var collectionID Identifier
+	if c.Collection != nil {
+		collectionID = c.Collection.ID()
+	} else {
+		collectionID = flow.ZeroID
+	}
+
+	return NewChunkDataPackHeader(c.ChunkID, c.StartState, c.Proof.ID(), collectionID, c.ExecutionDataRoot).ID()
 }
 
 // TODO: This is the basic version of the list, we need to substitute it with something like Merkle tree at some point
