@@ -22,17 +22,17 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		store1 := store.NewTransactionResultErrorMessages(metrics, db, 1000)
+		txErrMsgStore := store.NewTransactionResultErrorMessages(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 
 		// test db Exists by block id
-		exists, err := store1.Exists(blockID)
+		exists, err := txErrMsgStore.Exists(blockID)
 		require.NoError(t, err)
 		require.False(t, exists)
 
 		// check retrieving by ByBlockID
-		messages, err := store1.ByBlockID(blockID)
+		messages, err := txErrMsgStore.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Nil(t, messages)
 
@@ -47,31 +47,31 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 			txErrorMessages = append(txErrorMessages, expected)
 		}
 		err = unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
-			return store1.Store(lctx, blockID, txErrorMessages)
+			return txErrMsgStore.Store(lctx, blockID, txErrorMessages)
 		})
 		require.NoError(t, err)
 
 		// test db Exists by block id
-		exists, err = store1.Exists(blockID)
+		exists, err = txErrMsgStore.Exists(blockID)
 		require.NoError(t, err)
 		require.True(t, exists)
 
 		// check retrieving by ByBlockIDTransactionID
 		for _, txErrorMessage := range txErrorMessages {
-			actual, err := store1.ByBlockIDTransactionID(blockID, txErrorMessage.TransactionID)
+			actual, err := txErrMsgStore.ByBlockIDTransactionID(blockID, txErrorMessage.TransactionID)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessage, *actual)
 		}
 
 		// check retrieving by ByBlockIDTransactionIndex
 		for _, txErrorMessage := range txErrorMessages {
-			actual, err := store1.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
+			actual, err := txErrMsgStore.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessage, *actual)
 		}
 
 		// check retrieving by ByBlockID
-		actual, err := store1.ByBlockID(blockID)
+		actual, err := txErrMsgStore.ByBlockID(blockID)
 		require.NoError(t, err)
 		assert.Equal(t, txErrorMessages, actual)
 
@@ -85,7 +85,7 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 
 		// check retrieving by index from both cache and db
 		for i, txErrorMessage := range txErrorMessages {
-			actual, err := store1.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
+			actual, err := txErrMsgStore.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessages[i], *actual)
 
@@ -99,16 +99,16 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 func TestReadingNotStoreTransactionResultErrorMessage(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store1 := store.NewTransactionResultErrorMessages(metrics, db, 1000)
+		txErrMsgStore := store.NewTransactionResultErrorMessages(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
 		txIndex := rand.Uint32()
 
-		_, err := store1.ByBlockIDTransactionID(blockID, txID)
+		_, err := txErrMsgStore.ByBlockIDTransactionID(blockID, txID)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		_, err = store1.ByBlockIDTransactionIndex(blockID, txIndex)
+		_, err = txErrMsgStore.ByBlockIDTransactionIndex(blockID, txIndex)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
