@@ -37,10 +37,10 @@ func RemoveExecutionForkEvidence(w storage.Writer) error {
 // No errors are expected during normal operations.
 func InsertExecutionForkEvidence(lctx lockctx.Proof, rw storage.ReaderBatchWriter, conflictingSeals []*flow.IncorporatedResultSeal) error {
 	if !lctx.HoldsLock(storage.LockInsertExecutionForkEvidence) {
-		return fmt.Errorf("InsertExecutionForkEvidence requires LockInsertBlock to be held")
+		return fmt.Errorf("InsertExecutionForkEvidence requires LockInsertExecutionForkEvidence to be held")
 	}
 	key := MakePrefix(codeExecutionFork)
-	exist, err := KeyExists(rw.GlobalReader(), MakePrefix(codeExecutionFork))
+	exist, err := KeyExists(rw.GlobalReader(), key)
 	if err != nil {
 		return fmt.Errorf("failed to check if execution fork evidence exists: %w", err)
 	}

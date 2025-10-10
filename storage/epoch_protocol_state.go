@@ -34,11 +34,13 @@ type EpochProtocolStateEntries interface {
 	//
 	// CAUTION:
 	//   - The caller must acquire the lock [storage.LockInsertBlock] and hold it until the database write has been committed.
-	//   - The lock proof serves as a reminder that the CALLER is responsible to ensure that the operation.InsertHeader is
-	//		 done ATOMICALLY with this write operation.
+//   - OVERWRITES existing data (potential for data corruption):
+//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY within this write operation. Currently it's done by operation.InsertHeader where it performs a check
+//     to ensure the blockID is new, therefore any data indexed by this blockID is new as well.
 	//
 	// Expected errors during normal operations:
-	//   - [storage.ErrAlreadyExists] if a KV store for the given blockID has already been indexed
+// No expected errors during normal operations.
 	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateID flow.Identifier) error
 
 	// ByID returns the flow.RichEpochStateEntry by its ID.
