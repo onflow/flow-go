@@ -26,6 +26,8 @@ func makeBlockExecutionResultFixture(serviceEventsPerChunk []int) *BlockExecutio
 
 // Tests that ServiceEventCountForChunk method works as expected under various circumstances:
 func TestBlockExecutionResult_ServiceEventCountForChunk(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no service events", func(t *testing.T) {
 		nChunks := rand.Intn(10) + 1 // always contains at least system chunk
 		blockResult := makeBlockExecutionResultFixture(make([]int, nChunks))
