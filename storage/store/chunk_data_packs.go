@@ -44,9 +44,14 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 		return storedChunkDataPackID, err
 	}
 
+	remove := func(rw storage.ReaderBatchWriter, chunkID flow.Identifier) error {
+		return operation.RemoveChunkDataPackID(rw.Writer(), chunkID)
+	}
+
 	cache := newCache(collector, metrics.ResourceChunkIDToChunkDataPackIndex,
 		withLimit[flow.Identifier, flow.Identifier](chunkIDToStoredChunkDataPackIDCacheSize),
 		withStoreWithLock(operation.IndexChunkDataPackByChunkID),
+		withRemove[flow.Identifier, flow.Identifier](remove),
 		withRetrieve(retrieve),
 	)
 
@@ -178,7 +183,10 @@ func (ch *ChunkDataPacks) BatchRemove(
 
 	// Remove the chunk data pack ID mappings and update cache
 	for _, chunkID := range chunkIDs {
-		ch.chunkIDToStoredChunkDataPackIDCache.RemoveTx(protocolDBBatch, chunkID)
+		err := ch.chunkIDToStoredChunkDataPackIDCache.RemoveTx(protocolDBBatch, chunkID)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
