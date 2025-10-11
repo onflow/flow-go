@@ -99,6 +99,7 @@ func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.Rea
 	return nil
 }
 
+// Deprecated: panics
 func (tr *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch storage.BatchStorage) error {
 	panic("LightTransactionResults BatchStoreBadger not implemented")
 }
