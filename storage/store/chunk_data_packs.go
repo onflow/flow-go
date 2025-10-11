@@ -85,10 +85,12 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 //     the caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
 //   - error: No error should be returned during normal operation. Any error indicates a failure in the first phase.
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
-	func(lctx lockctx.Proof, protocolDBBatch storage.ReaderBatchWriter) error, error) {
+	func(lctx lockctx.Proof, protocolDBBatch storage.ReaderBatchWriter) error,
+	error,
+) {
 
-	// Phase 1: Store chunk data packs in the separate stored storage layer
-	// This converts the ChunkDataPacks to StoredChunkDataPacks format and stores them
+	// Phase 1: Store chunk data packs in dedicated (separate) database. This converts the
+	// ChunkDataPacks to the reduced StoredChunkDataPacks representation and stores them.
 	storedChunkDataPacks := storage.ToStoredChunkDataPacks(cs)
 
 	// Store the chunk data packs and get back their unique IDs
@@ -111,7 +113,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 				// Rollback the stored chunk data packs if the batch operation fails
 				err := ch.stored.Remove(storedChunkDataPackIDs) // rollback stored chunk data packs on failure
 				if err != nil {
-					log.Error().Msgf("cannot rollback stored chunk data packs: %v", err) // log the error, but do not override the original error
+					log.Err(err).Fatal().Msgf("cannot rollback stored chunk data packs") // log the error, but do not override the original error
 				}
 			}
 		})
@@ -149,7 +151,7 @@ func (ch *ChunkDataPacks) BatchRemove(
 	// First, collect all stored chunk data pack IDs that need to be removed
 	var storedChunkDataPackIDs []flow.Identifier
 	for _, chunkID := range chunkIDs {
-		storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(protocolDBBatch.GlobalReader(), chunkID) // remove from cache optimistically
+		storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(protocolDBBatch.GlobalReader(), chunkID)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				// If we can't find the stored chunk data pack ID, continue with other removals
