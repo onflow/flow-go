@@ -17,7 +17,7 @@ func IndexChunkDataPackByChunkID(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertOwnReceipt)
 	}
-	key := MakePrefix(codeChunkDataPackID, chunkID)
+	key := MakePrefix(codeIndexChunkDataPackByChunkID, chunkID)
 	var existing flow.Identifier
 	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
 	if err == nil {
@@ -37,30 +37,30 @@ func IndexChunkDataPackByChunkID(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 // RetrieveChunkDataPackID retrieves the stored chunk data pack ID for a given chunk ID.
 // Returns [storage.ErrNotFound] if no mapping exists for the given chunk ID.
 func RetrieveChunkDataPackID(r storage.Reader, chunkID flow.Identifier, storedChunkDataPackID *flow.Identifier) error {
-	return RetrieveByKey(r, MakePrefix(codeChunkDataPackID, chunkID), storedChunkDataPackID)
+	return RetrieveByKey(r, MakePrefix(codeIndexChunkDataPackByChunkID, chunkID), storedChunkDataPackID)
 }
 
 // RemoveChunkDataPackID removes the mapping from chunk ID to stored chunk data pack ID.
 // Non-existing keys are no-ops. Any errors are exceptions.
 func RemoveChunkDataPackID(w storage.Writer, chunkID flow.Identifier) error {
-	return RemoveByKey(w, MakePrefix(codeChunkDataPackID, chunkID))
+	return RemoveByKey(w, MakePrefix(codeIndexChunkDataPackByChunkID, chunkID))
 }
 
 // InsertStoredChunkDataPack inserts a [storage.StoredChunkDataPack] into the database, keyed by its own ID.
 // The caller must ensure the storedChunkDataPackID is the same as c.ID().
 // No error returns expected during normal operations.
 func InsertStoredChunkDataPack(rw storage.ReaderBatchWriter, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
-	return UpsertByKey(rw.Writer(), MakePrefix(codeStoredChunkDataPack, storeChunkDataPackID), c)
+	return UpsertByKey(rw.Writer(), MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
 }
 
 // RetrieveStoredChunkDataPack retrieves a chunk data pack by stored chunk data pack ID.
 // It returns [storage.ErrNotFound] if the chunk data pack is not found
 func RetrieveStoredChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
-	return RetrieveByKey(r, MakePrefix(codeStoredChunkDataPack, storeChunkDataPackID), c)
+	return RetrieveByKey(r, MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
 }
 
 // RemoveChunkDataPack removes the chunk data pack with the given stored chunk data pack ID.
 // Non-existing keys are no-ops. Any errors are exceptions.
 func RemoveChunkDataPack(w storage.Writer, storedChunkDataPackID flow.Identifier) error {
-	return RemoveByKey(w, MakePrefix(codeStoredChunkDataPack, storedChunkDataPackID))
+	return RemoveByKey(w, MakePrefix(codeChunkDataPack, storedChunkDataPackID))
 }
