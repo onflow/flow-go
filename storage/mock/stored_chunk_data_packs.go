@@ -62,9 +62,9 @@ func (_m *StoredChunkDataPacks) ByID(id flow.Identifier) (*storage.StoredChunkDa
 	return r0, r1
 }
 
-// Remove provides a mock function with given fields: cs
-func (_m *StoredChunkDataPacks) Remove(cs []flow.Identifier) error {
-	ret := _m.Called(cs)
+// Remove provides a mock function with given fields: chunkDataPackIDs
+func (_m *StoredChunkDataPacks) Remove(chunkDataPackIDs []flow.Identifier) error {
+	ret := _m.Called(chunkDataPackIDs)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Remove")
@@ -72,7 +72,7 @@ func (_m *StoredChunkDataPacks) Remove(cs []flow.Identifier) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func([]flow.Identifier) error); ok {
-		r0 = rf(cs)
+		r0 = rf(chunkDataPackIDs)
 	} else {
 		r0 = ret.Error(0)
 	}
