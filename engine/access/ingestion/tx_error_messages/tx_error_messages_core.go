@@ -69,6 +69,11 @@ func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID fl
 // FetchErrorMessagesByENs requests the transaction result error messages for the specified block ID from
 // any of the given execution nodes and persists them once retrieved. This function blocks until ingesting
 // the tx error messages is completed or failed.
+//
+// Note that transaction error messages are auxiliary data provided by the Execution Nodes on a goodwill basis and
+// not protected by the protocol. Execution Error messages might be non-deterministic, i.e. potentially different
+// for different execution nodes. Hence, we also persist which execution node (`execNode) provided the error message.
+//
 // It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	ctx context.Context,
@@ -109,10 +114,6 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 
 // storeTransactionResultErrorMessages persists and indexes all transaction result error messages for the given blockID.
 // The caller must acquire [storage.LockInsertTransactionResultErrMessage] and hold it until the write batch has been committed.
-//
-// Note that transaction error messages are auxiliary data provided by the Execution Nodes on a goodwill basis and
-// not protected by the protocol. Execution Error messages might be non-deterministic, i.e. potentially different
-// for different execution nodes. Hence, we also persist which execution node (`execNode) provided the error message.
 //
 // It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (c *TxErrorMessagesCore) storeTransactionResultErrorMessages(
