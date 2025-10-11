@@ -85,15 +85,16 @@ func (s *TxErrorMessagesEngineSuite) TearDownTest() {
 }
 
 func (s *TxErrorMessagesEngineSuite) SetupTest() {
+	s.log = unittest.Logger()
+	s.metrics = metrics.NewNoopCollector()
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+
 	// Initialize database and lock manager
 	pdb, dbDir := unittest.TempPebbleDB(s.T())
 	s.db = pebbleimpl.ToDB(pdb)
 	s.dbDir = dbDir
 	s.lockManager = storage.NewTestingLockManager()
 
-	s.log = unittest.Logger()
-	s.metrics = metrics.NewNoopCollector()
-	s.ctx, s.cancel = context.WithCancel(context.Background())
 	// mock out protocol state
 	s.proto.state = protocol.NewFollowerState(s.T())
 	s.proto.snapshot = protocol.NewSnapshot(s.T())
