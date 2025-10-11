@@ -377,6 +377,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Log,
 		node.Me,
 		db,
+		node.LockManager,
 		node.State,
 		node.Metrics,
 		node.Metrics,

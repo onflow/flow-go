@@ -1,9 +1,8 @@
-package unsynchronized
+package inmemory
 
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -12,12 +11,6 @@ import (
 )
 
 func TestRegisters_HappyPath(t *testing.T) {
-	height := uint64(42)
-	registers := NewRegisters(height)
-
-	require.Equal(t, height, registers.FirstHeight())
-	require.Equal(t, height, registers.LatestHeight())
-
 	// Prepare register entries
 	entry1 := unittest.RegisterEntryFixture()
 	entry1.Key = flow.RegisterID{Owner: "owner1", Key: "key1"}
@@ -27,9 +20,11 @@ func TestRegisters_HappyPath(t *testing.T) {
 
 	entries := flow.RegisterEntries{entry1, entry2}
 
-	// Store entries (height is ignored)
-	err := registers.Store(entries, height)
-	require.NoError(t, err)
+	height := uint64(42)
+	registers := NewRegisters(height, entries)
+
+	require.Equal(t, height, registers.FirstHeight())
+	require.Equal(t, height, registers.LatestHeight())
 
 	// Retrieve both entries
 	got1, err := registers.Get(entry1.Key, height)
@@ -44,18 +39,7 @@ func TestRegisters_HappyPath(t *testing.T) {
 	_, err = registers.Get(entry1.Key, height+1)
 	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 
-	// Try storing at the wrong height
-	err = registers.Store(entries, height+1)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to store registers: height mismatch:")
-
 	// Try getting a non-existent key
 	_, err = registers.Get(unittest.RegisterIDFixture(), height)
 	require.ErrorIs(t, err, storage.ErrNotFound)
-
-	// Extract registers
-	data, err := registers.Data(height)
-	require.NoError(t, err)
-	require.Len(t, data, len(entries))
-	require.ElementsMatch(t, entries, data)
 }

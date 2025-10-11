@@ -27,6 +27,12 @@ const (
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
+	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
+	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	// LockInsertExecutionForkEvidence protects the insertion of execution fork evidence
+	LockInsertExecutionForkEvidence = "lock_insert_execution_fork_evidence"
+	LockInsertSafetyData            = "lock_insert_safety_data"
+	LockInsertLivenessData          = "lock_insert_liveness_data"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -39,6 +45,10 @@ func Locks() []string {
 		LockInsertOwnReceipt,
 		LockInsertCollection,
 		LockBootstrapping,
+		LockInsertChunkDataPack,
+		LockInsertExecutionForkEvidence,
+		LockInsertSafetyData,
+		LockInsertLivenessData,
 	}
 }
 
@@ -62,6 +72,10 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockBootstrapping, LockInsertSafetyData).
+		Add(LockInsertSafetyData, LockInsertLivenessData).
+		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
+		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
 		Build()
 }
 
