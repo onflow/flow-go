@@ -201,7 +201,7 @@ type UntrustedChunkDataPack ChunkDataPack
 // Construction ChunkDataPack allowed only within the constructor.
 //
 // All errors indicate a valid ChunkDataPack cannot be constructed from the input.
-func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
+func FromUntrustedChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
 	if untrusted.ChunkID == ZeroID {
 		return nil, fmt.Errorf("ChunkID must not be empty")
 	}
@@ -222,13 +222,23 @@ func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) 
 		return nil, fmt.Errorf("ExecutionDataRoot.ChunkExecutionDataIDs must not be empty")
 	}
 
+	return NewChunkDataPack(
+		untrusted.ChunkID,
+		untrusted.StartState,
+		untrusted.Proof,
+		untrusted.Collection,
+		untrusted.ExecutionDataRoot,
+	), nil
+}
+
+func NewChunkDataPack(chunkID Identifier, startState StateCommitment, proof StorageProof, collection *Collection, executionDataRoot BlockExecutionDataRoot) *ChunkDataPack {
 	return &ChunkDataPack{
-		ChunkID:           untrusted.ChunkID,
-		StartState:        untrusted.StartState,
-		Proof:             untrusted.Proof,
-		Collection:        untrusted.Collection,
-		ExecutionDataRoot: untrusted.ExecutionDataRoot,
-	}, nil
+		ChunkID:           chunkID,
+		StartState:        startState,
+		Proof:             proof,
+		Collection:        collection,
+		ExecutionDataRoot: executionDataRoot,
+	}
 }
 
 // ID returns a collision-resistant hash of the ChunkDataPack struct.

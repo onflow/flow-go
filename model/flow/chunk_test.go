@@ -141,7 +141,7 @@ func TestChunkDataPackMalleability(t *testing.T) {
 	)
 }
 
-// TestNewChunkDataPack verifies the behavior of the NewChunkDataPack constructor.
+// TestFromUntrustedChunkDataPack verifies the behavior of the FromUntrustedChunkDataPack constructor.
 // It ensures that a fully‐populated UntrustedChunkDataPack yields a valid ChunkDataPack,
 // and that missing or invalid required fields produce an error.
 //
@@ -173,7 +173,7 @@ func TestChunkDataPackMalleability(t *testing.T) {
 //
 // 9. Empty ExecutionDataRoot.ChunkExecutionDataIDs:
 //   - Ensures an error is returned when ChunkExecutionDataIDs is empty.
-func TestNewChunkDataPack(t *testing.T) {
+func TestFromUntrustedChunkDataPack(t *testing.T) {
 	chunkID := unittest.IdentifierFixture()
 	startState := unittest.StateCommitmentFixture()
 	proof := []byte{0x1, 0x2}
@@ -192,7 +192,7 @@ func TestNewChunkDataPack(t *testing.T) {
 	}
 
 	t.Run("valid chunk data pack", func(t *testing.T) {
-		pack, err := flow.NewChunkDataPack(baseChunkDataPack)
+		pack, err := flow.FromUntrustedChunkDataPack(baseChunkDataPack)
 		assert.NoError(t, err)
 		assert.NotNil(t, pack)
 		assert.Equal(t, *pack, flow.ChunkDataPack(baseChunkDataPack))
@@ -202,7 +202,7 @@ func TestNewChunkDataPack(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.ChunkID = flow.ZeroID
 
-		pack, err := flow.NewChunkDataPack(untrusted)
+		pack, err := flow.FromUntrustedChunkDataPack(untrusted)
 		assert.Error(t, err)
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "ChunkID")
@@ -212,7 +212,7 @@ func TestNewChunkDataPack(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.StartState = flow.StateCommitment{}
 
-		pack, err := flow.NewChunkDataPack(untrusted)
+		pack, err := flow.FromUntrustedChunkDataPack(untrusted)
 		assert.Error(t, err)
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "StartState")
@@ -222,7 +222,7 @@ func TestNewChunkDataPack(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.Proof = nil
 
-		pack, err := flow.NewChunkDataPack(untrusted)
+		pack, err := flow.FromUntrustedChunkDataPack(untrusted)
 		assert.Error(t, err)
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "Proof")
@@ -232,7 +232,7 @@ func TestNewChunkDataPack(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.Proof = []byte{}
 
-		pack, err := flow.NewChunkDataPack(untrusted)
+		pack, err := flow.FromUntrustedChunkDataPack(untrusted)
 		assert.Error(t, err)
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "Proof")
@@ -242,7 +242,7 @@ func TestNewChunkDataPack(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.ExecutionDataRoot.BlockID = flow.ZeroID
 
-		pack, err := flow.NewChunkDataPack(untrusted)
+		pack, err := flow.FromUntrustedChunkDataPack(untrusted)
 		assert.Error(t, err)
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "ExecutionDataRoot.BlockID")
@@ -252,7 +252,7 @@ func TestNewChunkDataPack(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.ExecutionDataRoot.ChunkExecutionDataIDs = nil
 
-		pack, err := flow.NewChunkDataPack(untrusted)
+		pack, err := flow.FromUntrustedChunkDataPack(untrusted)
 		assert.Error(t, err)
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "ExecutionDataRoot.ChunkExecutionDataIDs")
@@ -262,7 +262,7 @@ func TestNewChunkDataPack(t *testing.T) {
 		untrusted := baseChunkDataPack
 		untrusted.ExecutionDataRoot.ChunkExecutionDataIDs = []cid.Cid{}
 
-		pack, err := flow.NewChunkDataPack(untrusted)
+		pack, err := flow.FromUntrustedChunkDataPack(untrusted)
 		assert.Error(t, err)
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "ExecutionDataRoot.ChunkExecutionDataIDs")
