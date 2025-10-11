@@ -38,6 +38,9 @@ func NewTxResultErrMsgStore(
 //
 // No error returns are expected during normal operations
 func (t *TxResultErrMsgStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+	// CAUTION: here we assume that if something is already stored for our blockID, then the data is identical.
+	// This only holds true for sealed execution results, whose consistency has previously been verified by
+	// comparing the data's hash to commitments in the execution result.
 	err := t.persistedTxResultErrMsg.BatchStore(lctx, rw, t.blockID, t.data)
 	if err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {

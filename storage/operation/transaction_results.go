@@ -112,7 +112,7 @@ func indexLightTransactionResultByBlockIDAndTxIndex(w storage.Writer, blockID fl
 // RetrieveLightTransactionResult retrieves the result (light representation) of the specified transaction
 // within the specified block.
 // Expected error returns during normal operations:
-//   - [storage.ErrNotFound] if no result of a transaction with the specified ID is known
+//   - [storage.ErrNotFound] if no result of a transaction with the specified ID in `blockID` is known
 func RetrieveLightTransactionResult(r storage.Reader, blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.LightTransactionResult) error {
 	return RetrieveByKey(r, MakePrefix(codeLightTransactionResult, blockID, transactionID), transactionResult)
 }
@@ -195,7 +195,7 @@ func indexTransactionResultErrorMessageBlockIDTxIndex(w storage.Writer, blockID 
 // RetrieveTransactionResultErrorMessage retrieves a transaction result error message of the specified transaction
 // within the specified block.
 // Expected error returns during normal operations:
-//   - [storage.ErrNotFound] if no result of a transaction with the specified ID is known
+//   - [storage.ErrNotFound] if no result error message of a transaction with the specified ID in `blockID` is known
 func RetrieveTransactionResultErrorMessage(r storage.Reader, blockID flow.Identifier, transactionID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) error {
 	return RetrieveByKey(r, MakePrefix(codeTransactionResultErrorMessage, blockID, transactionID), transactionResultErrorMessage)
 }

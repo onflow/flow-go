@@ -106,8 +106,8 @@ func (c *IndexerCore) RegisterValue(ID flow.RegisterID, height uint64) (flow.Reg
 
 // IndexBlockData indexes all execution block data by height.
 // This method shouldn't be used concurrently.
-// Expected errors:
-// - storage.ErrNotFound if the block for execution data was not found
+// Expected error returns during normal operations:
+// - [storage.ErrNotFound] if the block for execution data was not found
 func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
 	header, err := c.headers.ByBlockID(data.BlockID)
 	if err != nil {
