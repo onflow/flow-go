@@ -27,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -67,6 +69,11 @@ type BackendExecutionDataSuite struct {
 	executionDataTracker     *trackermock.ExecutionDataTracker
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
+
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	executionDataSnapshot   *osyncmock.Snapshot
+	criteria                optimistic_sync.Criteria
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -169,6 +176,11 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
+	s.criteria = optimistic_sync.Criteria{}
+
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	s.blockMap[s.rootBlock.Height] = s.rootBlock
@@ -261,6 +273,8 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 			subscription.DefaultSendBufferSize,
 		),
 		s.executionDataTracker,
+		s.executionResultProvider,
+		s.executionStateCache,
 	)
 	require.NoError(s.T(), err)
 
@@ -288,6 +302,7 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 	s.executionDataTracker.On("GetHighestHeight").Return(func() uint64 {
 		return s.highestBlockHeader.Height
 	}).Maybe()
+
 }
 
 // generateMockEvents generates a set of mock events for a block split into multiple tx with
@@ -335,12 +350,39 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	// notify backend block is available
 	s.highestBlockHeader = block.ToHeader()
 
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+
+	s.executionResultProvider.
+		On("ExecutionResultInfo", mock.Anything, mock.Anything).
+		Return(&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: result.ID(),
+			ExecutionNodes:    executionNodes.ToSkeleton(),
+		}, nil).
+		Maybe()
+
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionDataSnapshot, nil).
+		Maybe()
+
+	reader := osyncmock.NewBlockExecutionDataReader(s.T())
+	s.executionDataSnapshot.
+		On("BlockExecutionData").
+		Return(reader).
+		Maybe()
+
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
-		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(execData, nil).
+			Once()
+
+		res, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.NotNil(s.T(), metadata)
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
@@ -350,8 +392,14 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
-		execDataRes, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
 		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
 		assert.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 }
