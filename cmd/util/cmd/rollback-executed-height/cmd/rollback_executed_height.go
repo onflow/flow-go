@@ -92,11 +92,11 @@ func runE(*cobra.Command, []string) error {
 		chunkBatch := chunkDataPacksDB.NewBatch()
 		defer chunkBatch.Close()
 
-		writeBatch := db.NewBatch()
-		defer writeBatch.Close()
+		protocolDBBatch := db.NewBatch()
+		defer protocolDBBatch.Close()
 
 		err = removeExecutionResultsFromHeight(
-			writeBatch,
+			protocolDBBatch,
 			chunkBatch,
 			state,
 			transactionResults,
@@ -118,7 +118,7 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("could not commit chunk batch at %v: %w", flagHeight, err)
 		}
 
-		err = writeBatch.Commit()
+		err = protocolDBBatch.Commit()
 		if err != nil {
 			return fmt.Errorf("could not flush write batch at %v: %w", flagHeight, err)
 		}
@@ -142,7 +142,7 @@ func runE(*cobra.Command, []string) error {
 // use badger instances directly instead of stroage interfaces so that the interface don't
 // need to include the Remove methods
 func removeExecutionResultsFromHeight(
-	writeBatch storage.Batch,
+	protocolDBBatch storage.Batch,
 	chunkBatch storage.Batch,
 	protoState protocol.State,
 	transactionResults storage.TransactionResults,
@@ -182,7 +182,7 @@ func removeExecutionResultsFromHeight(
 
 		blockID := head.ID()
 
-		err = removeForBlockID(writeBatch, chunkBatch, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
+		err = removeForBlockID(protocolDBBatch, chunkBatch, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
 		if err != nil {
 			return fmt.Errorf("could not remove result for finalized block: %v, %w", blockID, err)
 		}
@@ -201,7 +201,7 @@ func removeExecutionResultsFromHeight(
 	total = len(pendings)
 
 	for _, pending := range pendings {
-		err = removeForBlockID(writeBatch, chunkBatch, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, pending)
+		err = removeForBlockID(protocolDBBatch, chunkBatch, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, pending)
 
 		if err != nil {
 			return fmt.Errorf("could not remove result for pending block %v: %w", pending, err)
@@ -221,7 +221,7 @@ func removeExecutionResultsFromHeight(
 // All data to be removed will be removed in a batch write.
 // It bubbles up any error encountered
 func removeForBlockID(
-	writeBatch storage.Batch,
+	protocolDBBatch storage.Batch,
 	chunkBatch storage.Batch,
 	commits storage.Commits,
 	transactionResults storage.TransactionResults,
@@ -249,14 +249,14 @@ func removeForBlockID(
 	}
 
 	if len(chunkIDs) > 0 {
-		err := chunks.BatchRemove(chunkIDs, writeBatch, chunkBatch)
+		err := chunks.BatchRemove(chunkIDs, protocolDBBatch, chunkBatch)
 		if err != nil {
 			return fmt.Errorf("could not remove chunk data packs for block id %v: %w", blockID, err)
 		}
 	}
 
 	// remove commits
-	err = commits.BatchRemoveByBlockID(blockID, writeBatch)
+	err = commits.BatchRemoveByBlockID(blockID, protocolDBBatch)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not remove by block ID %v: %w", blockID, err)
@@ -266,13 +266,13 @@ func removeForBlockID(
 	}
 
 	// remove transaction results
-	err = transactionResults.BatchRemoveByBlockID(blockID, writeBatch)
+	err = transactionResults.BatchRemoveByBlockID(blockID, protocolDBBatch)
 	if err != nil {
 		return fmt.Errorf("could not remove transaction results by BlockID %v: %w", blockID, err)
 	}
 
 	// remove own execution results index
-	err = myReceipts.BatchRemoveIndexByBlockID(blockID, writeBatch)
+	err = myReceipts.BatchRemoveIndexByBlockID(blockID, protocolDBBatch)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not remove own receipt by BlockID %v: %w", blockID, err)
@@ -282,19 +282,19 @@ func removeForBlockID(
 	}
 
 	// remove events
-	err = events.BatchRemoveByBlockID(blockID, writeBatch)
+	err = events.BatchRemoveByBlockID(blockID, protocolDBBatch)
 	if err != nil {
 		return fmt.Errorf("could not remove events by BlockID %v: %w", blockID, err)
 	}
 
 	// remove service events
-	err = serviceEvents.BatchRemoveByBlockID(blockID, writeBatch)
+	err = serviceEvents.BatchRemoveByBlockID(blockID, protocolDBBatch)
 	if err != nil {
 		return fmt.Errorf("could not remove service events by blockID %v: %w", blockID, err)
 	}
 
 	// remove execution result index
-	err = results.BatchRemoveIndexByBlockID(blockID, writeBatch)
+	err = results.BatchRemoveIndexByBlockID(blockID, protocolDBBatch)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not remove result by BlockID %v: %w", blockID, err)
