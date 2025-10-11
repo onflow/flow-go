@@ -15,7 +15,7 @@ import (
 )
 
 type ChunkDataPacks struct {
-	// the protocol DB is used for storing index mappings from chunk ID to stored chunk data pack ID
+	// the protocol DB is used for storing index mappings from chunk ID to chunk data pack ID
 	db storage.DB
 
 	// the actual chunk data pack is stored here, which is a separate storage from protocol DB
@@ -59,14 +59,23 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	return &ch
 }
 
-// Store stores multiple ChunkDataPacks in a two-phase process:
-// 1. First phase: Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
-// 2. Second phase: Create index mappings from ChunkID to storedChunkDataPackID in protocol database
+// Store persists multiple ChunkDataPacks in a two-phase process:
+// 1. Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+// 2. Populate index mapping from ChunkID to storedChunkDataPackID in protocol database.
 //
-// The reason it's a two-phase process is that, the chunk data pack and the other execution data are stored in different databases.
-// The two-phase approach ensures that:
-//   - Chunk data pack content is stored atomically in the chunk data pack database
-//   - Index mappings are created within the same atomic batch update in protocol database
+// Reasoning for two-phase approach: the chunk data pack and the other execution data are stored in different databases.
+//   - Chunk data pack content is stored in the chunk data pack database by its hash (ID). Conceptually, it would be possible
+//     to store multiple different (disagreeing) chunk data packs here. Each chunk data pack is stored using its own collision
+//     resistant hash as key, so different chunk data packs will be stored under different keys. So from the perspective of the
+//     storage layer, we _could_ in phase 1 store all known chunk data packs. However, an Execution Node may only commit to a single
+//     chunk data pack (or it will get slashed). This mapping from chunk ID to the ID of the chunk data pack that the Execution Node
+//     actually committed to is stored in the protocol database, in the following phase 2.
+//   - In the second phase, we populate the index mappings from ChunkID to one "distinguished" chunk data pack ID. This mapping
+//     is stored in the protocol database. Typically, en Execution Node uses this for indexing its own chunk data packs which it
+//     publicly committed to.
+//   - This function can approximately be described as an atomic operation. When it completes successfully, either both databases
+//     have been updated, or neither. However, this is an approximation only, because interim states exist, where the chunk data
+//     packs already have been stored in the chunk data pack database, but the index mappings do not yet exist.
 //
 // The Store method returns:
 //   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function to index the chunk id with

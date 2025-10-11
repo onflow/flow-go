@@ -123,6 +123,7 @@ func TestInsertChunkDataPackID(t *testing.T) {
 				return operation.InsertChunkDataPackID(lctx, rw, newChunkID, newStoredChunkDataPackID)
 			})
 			require.Error(t, err)
+			require.NotErrorIs(t, err, storage.ErrDataMismatch) // missing lock should not be erroneously represented as mismatching data
 			assert.Contains(t, err.Error(), "missing required lock")
 			assert.Contains(t, err.Error(), storage.LockInsertOwnReceipt)
 		})
