@@ -12,7 +12,7 @@ import (
 // where instead of the full collection data, only the collection's hash (ID) is contained.
 type StoredChunkDataPacks interface {
 	// StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
-	// It returns the IDs of the stored chunk data packs.
+	// It returns the chunk data pack IDs
 	// No error returns are expected during normal operation.
 	StoreChunkDataPacks(cs []*StoredChunkDataPack) ([]flow.Identifier, error)
 
@@ -20,9 +20,9 @@ type StoredChunkDataPacks interface {
 	// It returns [storage.ErrNotFound] if no entry exists for the given ID.
 	ByID(id flow.Identifier) (*StoredChunkDataPack, error)
 
-	// Remove removes multiple ChunkDataPacks cs keyed by their StoredChunkDataPack IDs in a batch.
+	// Remove removes multiple ChunkDataPacks cs keyed by their IDs in a batch.
 	// No error returns are expected during normal operation, even if none of the referenced objects exist in storage.
-	Remove(cs []flow.Identifier) error
+	Remove(chunkDataPackIDs []flow.Identifier) error
 
 	// BatchRemove removes multiple ChunkDataPacks with the given IDs from storage as part of the provided write batch.
 	// No error returns are expected during normal operation, even if no entries are matched.
@@ -106,6 +106,8 @@ func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) (bool, string) {
 	return true, ""
 }
 
+// ID returns the identifier of the chunk data pack, which is derived from its contents.
+// Note, StoredChunkDataPack.ID() is the same as ChunkDataPack.ID()
 func (c StoredChunkDataPack) ID() flow.Identifier {
 	return flow.NewChunkDataPackHeader(c.ChunkID, c.StartState, flow.MakeID(c.Proof), c.CollectionID, c.ExecutionDataRoot).ID()
 }

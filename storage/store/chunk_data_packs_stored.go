@@ -85,7 +85,7 @@ func (ch *StoredChunkDataPacks) batchRemove(chunkDataPackID flow.Identifier, rw 
 }
 
 // StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
-// It returns the IDs of the stored chunk data packs.
+// It returns the chunk data pack IDs
 // No error returns are expected during normal operation.
 func (ch *StoredChunkDataPacks) StoreChunkDataPacks(cs []*storage.StoredChunkDataPack) ([]flow.Identifier, error) {
 	if len(cs) == 0 {
