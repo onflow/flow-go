@@ -10,9 +10,9 @@ import (
 type ChunkDataPacks interface {
 
 	// Store stores multiple ChunkDataPacks in a two-phase process:
-	// 1. Store chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+	// 1. Store chunk data packs (StoredChunkDataPack) by its hash (chunkDataPackID) in chunk data pack database.
 	//    This phase occurs immediately when Store is called
-	// 2. Populate index mapping from ChunkID to storedChunkDataPackID in protocol database.
+	// 2. Populate index mapping from ChunkID to chunkDataPackID in protocol database.
 	//    This phase is deferred until the caller of Store invokes the returned functor.
 	//
 	// Reasoning for two-phase approach: the chunk data pack and the other execution data are stored in different databases.
@@ -34,10 +34,10 @@ type ChunkDataPacks interface {
 
 	// BatchRemove schedules all ChunkDataPacks with the given IDs to be deleted from the databases,
 	// part of the provided write batches. Unknown IDs are silently ignored.
-	// It returns the list of chunk data pack IDs (storedChunkDataPackID) that were scheduled for removal from the chunk data pack database.
+	// It returns the list of chunk data pack IDs (chunkDataPackID) that were scheduled for removal from the chunk data pack database.
 	// It performs a two-phase removal:
-	// 1. First phase: Remove index mappings from ChunkID to storedChunkDataPackID in the protocol database
-	// 2. Second phase: Remove chunk data packs (StoredChunkDataPack) by its hash (storedChunkDataPackID) in chunk data pack database.
+	// 1. First phase: Remove index mappings from ChunkID to chunkDataPackID in the protocol database
+	// 2. Second phase: Remove chunk data packs (StoredChunkDataPack) by its hash (chunkDataPackID) in chunk data pack database.
 	//  This phase is deferred until the caller of BatchRemove invokes the returned functor.
 	//
 	// Note: it does not remove the collection referred by the chunk data pack.
@@ -46,7 +46,7 @@ type ChunkDataPacks interface {
 	BatchRemove(chunkIDs []flow.Identifier, rw ReaderBatchWriter) (chunkDataPackIDs []flow.Identifier, err error)
 
 	// BatchRemoveChunkDataPacksOnly removes multiple ChunkDataPacks with the given chunk IDs from chunk data pack database only.
-	// It does not remove the index mappings from ChunkID to storedChunkDataPackID in the protocol database.
+	// It does not remove the index mappings from ChunkID to chunkDataPackID in the protocol database.
 	// This method is useful for the runtime chunk data pack pruner to batch remove chunk data packs associated with a set of blocks.
 	// No errors are expected during normal operation, even if no entries are matched.
 	BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifier) error

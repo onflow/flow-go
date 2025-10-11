@@ -110,8 +110,8 @@ const (
 	codeTransactionResultErrorMessage      = 110
 	codeTransactionResultErrorMessageIndex = 111
 	// Compared to the deprecated `codeChunkDataPack`, which stored chunkID -> storedChunkDataPack relationship:
-	//  - `codeIndexChunkDataPackByChunkID` stores the chunkID->storedChunkDataPackID index, and
-	//  - `codeChunkDataPack` stores storedChunkDataPackID -> storedChunkDataPack relationship.
+	//  - `codeIndexChunkDataPackByChunkID` stores the chunkID->chunkDataPackID index, and
+	//  - `codeChunkDataPack` stores chunkDataPackID -> storedChunkDataPack relationship.
 	// This breakup allows us to store chunk data packs in a different database in a concurrent safe way
 	codeIndexChunkDataPackByChunkID  = 112
 	codeChunkDataPack                = 113
