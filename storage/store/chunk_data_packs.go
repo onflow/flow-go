@@ -26,7 +26,7 @@ type ChunkDataPacks struct {
 	collections storage.Collections
 
 	// cache chunkID -> chunkDataPackID
-	chunkIDToStoredChunkDataPackIDCache *Cache[flow.Identifier, flow.Identifier]
+	chunkIDToChunkDataPackIDCache *Cache[flow.Identifier, flow.Identifier]
 
 	// it takes 3 look ups to return chunk data pack by chunk ID:
 	// 1. a cache lookup for chunkID -> chunkDataPackID
@@ -36,7 +36,7 @@ type ChunkDataPacks struct {
 
 var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
-func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored storage.StoredChunkDataPacks, collections storage.Collections, chunkIDToStoredChunkDataPackIDCacheSize uint) *ChunkDataPacks {
+func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored storage.StoredChunkDataPacks, collections storage.Collections, chunkIDToChunkDataPackIDCacheSize uint) *ChunkDataPacks {
 
 	retrieve := func(r storage.Reader, chunkID flow.Identifier) (flow.Identifier, error) {
 		var chunkDataPackID flow.Identifier
@@ -49,17 +49,17 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	}
 
 	cache := newCache(collector, metrics.ResourceChunkIDToChunkDataPackIndex,
-		withLimit[flow.Identifier, flow.Identifier](chunkIDToStoredChunkDataPackIDCacheSize),
+		withLimit[flow.Identifier, flow.Identifier](chunkIDToChunkDataPackIDCacheSize),
 		withStoreWithLock(operation.IndexChunkDataPackByChunkID),
 		withRemove[flow.Identifier, flow.Identifier](remove),
 		withRetrieve(retrieve),
 	)
 
 	ch := ChunkDataPacks{
-		protocolDB:                          db,
-		chunkIDToStoredChunkDataPackIDCache: cache,
-		stored:                              stored,
-		collections:                         collections,
+		protocolDB:                    db,
+		chunkIDToChunkDataPackIDCache: cache,
+		stored:                        stored,
+		collections:                   collections,
 	}
 	return &ch
 }
@@ -128,7 +128,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 		for i, c := range cs {
 			chunkDataPackID := chunkDataPackIDs[i]
 			// Index the stored chunk data pack ID by chunk ID for fast retrieval
-			err := ch.chunkIDToStoredChunkDataPackIDCache.PutWithLockTx(
+			err := ch.chunkIDToChunkDataPackIDCache.PutWithLockTx(
 				lctx, protocolDBBatch, c.ChunkID, chunkDataPackID)
 			if err != nil {
 				return fmt.Errorf("cannot index stored chunk data pack ID by chunk ID: %w", err)
@@ -156,7 +156,7 @@ func (ch *ChunkDataPacks) BatchRemove(
 	// First, collect all stored chunk data pack IDs that need to be removed
 	var chunkDataPackIDs []flow.Identifier
 	for _, chunkID := range chunkIDs {
-		chunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(protocolDBBatch.GlobalReader(), chunkID)
+		chunkDataPackID, err := ch.chunkIDToChunkDataPackIDCache.Get(protocolDBBatch.GlobalReader(), chunkID)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				// If we can't find the stored chunk data pack ID, continue with other removals
@@ -182,7 +182,7 @@ func (ch *ChunkDataPacks) BatchRemove(
 
 	// Remove the chunk data pack ID mappings and update cache
 	for _, chunkID := range chunkIDs {
-		err := ch.chunkIDToStoredChunkDataPackIDCache.RemoveTx(protocolDBBatch, chunkID)
+		err := ch.chunkIDToChunkDataPackIDCache.RemoveTx(protocolDBBatch, chunkID)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func (ch *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifi
 	// First, collect all stored chunk data pack IDs that need to be removed
 	var chunkDataPackIDs []flow.Identifier
 	for _, chunkID := range chunkIDs {
-		chunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(ch.protocolDB.Reader(), chunkID) // remove from cache optimistically
+		chunkDataPackID, err := ch.chunkIDToChunkDataPackIDCache.Get(ch.protocolDB.Reader(), chunkID) // remove from cache optimistically
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				// If we can't find the stored chunk data pack ID, continue with other removals
@@ -223,7 +223,7 @@ func (ch *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifi
 	// Remove from cache and protocol DB
 	return ch.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, chunkID := range chunkIDs {
-			err := ch.chunkIDToStoredChunkDataPackIDCache.RemoveTx(rw, chunkID)
+			err := ch.chunkIDToChunkDataPackIDCache.RemoveTx(rw, chunkID)
 			if err != nil {
 				return err
 			}
@@ -235,8 +235,8 @@ func (ch *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifi
 // ByChunkID returns the chunk data for the given chunk ID.
 // It returns [storage.ErrNotFound] if no entry exists for the given chunk ID.
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	// First, retrieve the stored chunk data pack ID (using cache if available)
-	chunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(ch.protocolDB.Reader(), chunkID)
+	// First, retrieve the chunk data pack ID (using cache if available)
+	chunkDataPackID, err := ch.chunkIDToChunkDataPackIDCache.Get(ch.protocolDB.Reader(), chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack ID for chunk %x: %w", chunkID, err)
 	}
