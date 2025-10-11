@@ -61,11 +61,11 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 
 		for i := 0; i < 256; i++ {
 			count := 0
-			if i == 102 { // events
+			if i == 102 { // events (codeEvent)
 				count = 30
-			} else if i == 113 { // CDP
+			} else if i == 100 { // CDP (codeChunkDataPack)
 				count = 100
-			} else if i == 36 { // results
+			} else if i == 36 { // results (codeExecutionResult)
 				count = 20
 			}
 			require.Equal(t, count, stats[byte(i)].Count, "byte %d", i)
