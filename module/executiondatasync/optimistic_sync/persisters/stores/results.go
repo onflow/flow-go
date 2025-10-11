@@ -30,8 +30,9 @@ func NewResultsStore(
 	}
 }
 
-// Persist adds results to the batch.
-// requires [storage.LockInsertLightTransactionResult] to be hold
+// Persist saves and indexes all transaction results (light representation) for our block as part of the
+// provided database batch. The caller must acquire [storage.LockInsertLightTransactionResult] and hold
+// it until the write batch has been committed.
 // No error returns are expected during normal operations
 func (r *ResultsStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 	if err := r.persistedResults.BatchStore(lctx, rw, r.blockID, r.data); err != nil {
