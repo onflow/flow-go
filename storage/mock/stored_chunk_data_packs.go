@@ -14,9 +14,9 @@ type StoredChunkDataPacks struct {
 	mock.Mock
 }
 
-// BatchRemove provides a mock function with given fields: cs, batch
-func (_m *StoredChunkDataPacks) BatchRemove(cs []flow.Identifier, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(cs, batch)
+// BatchRemove provides a mock function with given fields: chunkDataPackIDs, rw
+func (_m *StoredChunkDataPacks) BatchRemove(chunkDataPackIDs []flow.Identifier, rw storage.ReaderBatchWriter) error {
+	ret := _m.Called(chunkDataPackIDs, rw)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchRemove")
@@ -24,7 +24,7 @@ func (_m *StoredChunkDataPacks) BatchRemove(cs []flow.Identifier, batch storage.
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func([]flow.Identifier, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(cs, batch)
+		r0 = rf(chunkDataPackIDs, rw)
 	} else {
 		r0 = ret.Error(0)
 	}

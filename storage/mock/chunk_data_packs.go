@@ -16,27 +16,39 @@ type ChunkDataPacks struct {
 	mock.Mock
 }
 
-// BatchRemove provides a mock function with given fields: chunkIDs, protocolDBBatch, chunkDataPackDBBatch
-func (_m *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, protocolDBBatch storage.ReaderBatchWriter, chunkDataPackDBBatch storage.ReaderBatchWriter) error {
-	ret := _m.Called(chunkIDs, protocolDBBatch, chunkDataPackDBBatch)
+// BatchRemove provides a mock function with given fields: chunkIDs, rw
+func (_m *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, rw storage.ReaderBatchWriter) ([]flow.Identifier, error) {
+	ret := _m.Called(chunkIDs, rw)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchRemove")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]flow.Identifier, storage.ReaderBatchWriter, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(chunkIDs, protocolDBBatch, chunkDataPackDBBatch)
+	var r0 []flow.Identifier
+	var r1 error
+	if rf, ok := ret.Get(0).(func([]flow.Identifier, storage.ReaderBatchWriter) ([]flow.Identifier, error)); ok {
+		return rf(chunkIDs, rw)
+	}
+	if rf, ok := ret.Get(0).(func([]flow.Identifier, storage.ReaderBatchWriter) []flow.Identifier); ok {
+		r0 = rf(chunkIDs, rw)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.Identifier)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func([]flow.Identifier, storage.ReaderBatchWriter) error); ok {
+		r1 = rf(chunkIDs, rw)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// BatchRemoveChunkDataPacksOnly provides a mock function with given fields: chunkIDs, chunkDataPackDBBatch
-func (_m *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch storage.ReaderBatchWriter) error {
-	ret := _m.Called(chunkIDs, chunkDataPackDBBatch)
+// BatchRemoveChunkDataPacksOnly provides a mock function with given fields: chunkIDs, chunkDataPackBatch
+func (_m *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackBatch storage.ReaderBatchWriter) error {
+	ret := _m.Called(chunkIDs, chunkDataPackBatch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchRemoveChunkDataPacksOnly")
@@ -44,7 +56,7 @@ func (_m *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifi
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func([]flow.Identifier, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(chunkIDs, chunkDataPackDBBatch)
+		r0 = rf(chunkIDs, chunkDataPackBatch)
 	} else {
 		r0 = ret.Error(0)
 	}
