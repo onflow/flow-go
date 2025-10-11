@@ -46,7 +46,7 @@ func TestChunkDataPack(t *testing.T) {
 
 		t.Run("Remove", func(t *testing.T) {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.RemoveStoredChunkDataPack(rw.Writer(), expected.ID())
+				return operation.RemoveChunkDataPack(rw.Writer(), expected.ID())
 			})
 			require.NoError(t, err)
 

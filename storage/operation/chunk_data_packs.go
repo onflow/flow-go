@@ -59,8 +59,8 @@ func RetrieveStoredChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Ide
 	return RetrieveByKey(r, MakePrefix(codeStoredChunkDataPack, storeChunkDataPackID), c)
 }
 
-// RemoveStoredChunkDataPack removes the chunk data pack with the given stored chunk data pack ID.
+// RemoveChunkDataPack removes the chunk data pack with the given stored chunk data pack ID.
 // Non-existing keys are no-ops. Any errors are exceptions.
-func RemoveStoredChunkDataPack(w storage.Writer, storedChunkDataPackID flow.Identifier) error {
+func RemoveChunkDataPack(w storage.Writer, storedChunkDataPackID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeStoredChunkDataPack, storedChunkDataPackID))
 }

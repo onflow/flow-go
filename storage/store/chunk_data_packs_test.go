@@ -133,9 +133,9 @@ func TestChunkDataPacks_BatchRemove(t *testing.T) {
 	})
 }
 
-// TestChunkDataPacks_BatchRemoveStoredChunkDataPacksOnly tests the BatchRemoveStoredChunkDataPacksOnly method
+// TestChunkDataPacks_BatchRemoveChunkDataPacksOnly tests the BatchRemoveChunkDataPacksOnly method
 // which removes only from chunk data pack DB, leaving protocol DB mappings intact.
-func TestChunkDataPacks_BatchRemoveStoredChunkDataPacksOnly(t *testing.T) {
+func TestChunkDataPacks_BatchRemoveChunkDataPacksOnly(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(protocolPdb *pebble.DB) {
 		unittest.RunWithPebbleDB(t, func(chunkDataPackPdb *pebble.DB) {
 			lockManager := storage.NewTestingLockManager()
@@ -177,9 +177,9 @@ func TestChunkDataPacks_BatchRemoveStoredChunkDataPacksOnly(t *testing.T) {
 				chunkIDs[i] = chunkDataPack.ChunkID
 			}
 
-			// Test BatchRemoveStoredChunkDataPacksOnly - verify it can be called without error
+			// Test BatchRemoveChunkDataPacksOnly - verify it can be called without error
 			require.NoError(t, chunkDataPackDB.WithReaderBatchWriter(func(chunkDataPackDBBatch storage.ReaderBatchWriter) error {
-				return chunkDataPackStore.BatchRemoveStoredChunkDataPacksOnly(chunkIDs, chunkDataPackDBBatch)
+				return chunkDataPackStore.BatchRemoveChunkDataPacksOnly(chunkIDs, chunkDataPackDBBatch)
 			}))
 
 			// Note: The exact behavior after removal may depend on caching and implementation details
@@ -216,8 +216,8 @@ func TestChunkDataPacks_BatchRemoveNonExistent(t *testing.T) {
 	})
 }
 
-// TestChunkDataPacks_BatchRemoveStoredChunkDataPacksOnlyNonExistent tests that BatchRemoveStoredChunkDataPacksOnly handles non-existent chunk IDs gracefully.
-func TestChunkDataPacks_BatchRemoveStoredChunkDataPacksOnlyNonExistent(t *testing.T) {
+// TestChunkDataPacks_BatchRemoveChunkDataPacksOnlyNonExistent tests that BatchRemoveChunkDataPacksOnly handles non-existent chunk IDs gracefully.
+func TestChunkDataPacks_BatchRemoveChunkDataPacksOnlyNonExistent(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(protocolPdb *pebble.DB) {
 		unittest.RunWithPebbleDB(t, func(chunkDataPackPdb *pebble.DB) {
 			protocolDB := pebbleimpl.ToDB(protocolPdb)
@@ -234,9 +234,9 @@ func TestChunkDataPacks_BatchRemoveStoredChunkDataPacksOnlyNonExistent(t *testin
 				nonExistentChunkIDs[i] = unittest.IdentifierFixture()
 			}
 
-			// Test BatchRemoveStoredChunkDataPacksOnly with non-existent chunk IDs should not error
+			// Test BatchRemoveChunkDataPacksOnly with non-existent chunk IDs should not error
 			require.NoError(t, chunkDataPackDB.WithReaderBatchWriter(func(chunkDataPackDBBatch storage.ReaderBatchWriter) error {
-				return chunkDataPackStore.BatchRemoveStoredChunkDataPacksOnly(nonExistentChunkIDs, chunkDataPackDBBatch)
+				return chunkDataPackStore.BatchRemoveChunkDataPacksOnly(nonExistentChunkIDs, chunkDataPackDBBatch)
 			}))
 		})
 	})

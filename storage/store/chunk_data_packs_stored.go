@@ -28,7 +28,9 @@ func NewStoredChunkDataPacks(collector module.CacheMetrics, db storage.DB, byIDC
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
 		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byIDCacheSize),
 		withStore(operation.InsertStoredChunkDataPack),
-		withRemove[flow.Identifier, *storage.StoredChunkDataPack](operation.RemoveStoredChunkDataPack),		
+		withRemove[flow.Identifier, *storage.StoredChunkDataPack](func(rw storage.ReaderBatchWriter, id flow.Identifier) error {
+			return operation.RemoveChunkDataPack(rw.Writer(), id)
+		}),
 		withRetrieve(retrieve),
 	)
 
@@ -73,7 +75,7 @@ func (ch *StoredChunkDataPacks) batchRemove(storedChunkDataPackID flow.Identifie
 	storage.OnCommitSucceed(rw, func() {
 		ch.byIDCache.Remove(storedChunkDataPackID)
 	})
-	return operation.RemoveStoredChunkDataPack(rw.Writer(), storedChunkDataPackID)
+	return operation.RemoveChunkDataPack(rw.Writer(), storedChunkDataPackID)
 }
 
 // StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
@@ -84,7 +86,6 @@ func (ch *StoredChunkDataPacks) StoreChunkDataPacks(cs []*storage.StoredChunkDat
 		return nil, nil
 	}
 	ids := make([]flow.Identifier, 0, len(cs))
-	
 
 	err := ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, sc := range cs {

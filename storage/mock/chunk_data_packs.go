@@ -34,12 +34,12 @@ func (_m *ChunkDataPacks) BatchRemove(chunkIDs []flow.Identifier, protocolDBBatc
 	return r0
 }
 
-// BatchRemoveStoredChunkDataPacksOnly provides a mock function with given fields: chunkIDs, chunkDataPackDBBatch
-func (_m *ChunkDataPacks) BatchRemoveStoredChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch storage.ReaderBatchWriter) error {
+// BatchRemoveChunkDataPacksOnly provides a mock function with given fields: chunkIDs, chunkDataPackDBBatch
+func (_m *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch storage.ReaderBatchWriter) error {
 	ret := _m.Called(chunkIDs, chunkDataPackDBBatch)
 
 	if len(ret) == 0 {
-		panic("no return value specified for BatchRemoveStoredChunkDataPacksOnly")
+		panic("no return value specified for BatchRemoveChunkDataPacksOnly")
 	}
 
 	var r0 error

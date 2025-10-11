@@ -182,11 +182,11 @@ func (ch *ChunkDataPacks) BatchRemove(
 	return nil
 }
 
-// BatchRemoveStoredChunkDataPacksOnly removes multiple ChunkDataPacks with the given chunk IDs from chunk data pack database only.
+// BatchRemoveChunkDataPacksOnly removes multiple ChunkDataPacks with the given chunk IDs from chunk data pack database only.
 // It does not remove the index mappings from ChunkID to storedChunkDataPackID in the protocol database.
 // This method is useful for the runtime chunk data pack pruner to batch remove chunk data packs associated with a set of blocks.
 // No errors are expected during normal operation, even if no entries are matched.
-func (ch *ChunkDataPacks) BatchRemoveStoredChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch storage.ReaderBatchWriter) error {
+func (ch *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackDBBatch storage.ReaderBatchWriter) error {
 	// First, collect all stored chunk data pack IDs that need to be removed
 	var storedChunkDataPackIDs []flow.Identifier
 	for _, chunkID := range chunkIDs {
