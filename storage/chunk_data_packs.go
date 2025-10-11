@@ -15,8 +15,8 @@ type ChunkDataPacks interface {
 	// 2. Populate index mapping from ChunkID to storedChunkDataPackID in protocol database.
 	//    This phase is deferred until the caller of Store invokes the returned functor.
 	//
-	// The reason it's a two-phase process is that, the chunk data pack and the other execution data are stored in different databases.
-	// The two-phase approach ensures that:
+	// Reasoning for two-phase approach: the chunk data pack and the other execution data are stored in different databases.
+	// Guarantees by two-phase approach:
 	//   - Chunk data pack content is stored atomically in the chunk data pack database
 	//   - Index mappings are created within the same atomic batch update in protocol database
 	//
