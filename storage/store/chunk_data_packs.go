@@ -16,7 +16,7 @@ import (
 
 type ChunkDataPacks struct {
 	// the protocol DB is used for storing index mappings from chunk ID to chunk data pack ID
-	db storage.DB
+	protocolDB storage.DB
 
 	// the actual chunk data pack is stored here, which is a separate storage from protocol DB
 	stored storage.StoredChunkDataPacks
@@ -51,7 +51,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	)
 
 	ch := ChunkDataPacks{
-		db:                                  db,
+		protocolDB:                          db,
 		chunkIDToStoredChunkDataPackIDCache: cache,
 		stored:                              stored,
 		collections:                         collections,
@@ -227,7 +227,7 @@ func (ch *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifi
 // It returns [storage.ErrNotFound] if no entry exists for the given chunk ID.
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	// First, retrieve the stored chunk data pack ID (using cache if available)
-	storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(ch.db.Reader(), chunkID)
+	storedChunkDataPackID, err := ch.chunkIDToStoredChunkDataPackIDCache.Get(ch.protocolDB.Reader(), chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack ID for chunk %x: %w", chunkID, err)
 	}
