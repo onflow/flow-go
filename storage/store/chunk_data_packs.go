@@ -78,11 +78,12 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 //     packs already have been stored in the chunk data pack database, but the index mappings do not yet exist.
 //
 // The Store method returns:
-//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function to index the chunk id with
-//     chunk data pack hash within batch update to store along with other execution data into protocol database,
-//     this function might return [storage.ErrDataMismatch] when an existing chunk data pack ID is found for
-//     the same chunk ID, and is different from the one being stored.
-//     the caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
+//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function for populating the index mapping from chunkID
+//     to chunk data pack ID in the protocol database. This mapping persists that the Execution Node committed to the result
+//     represented by this chunk data pack. This function returns [storage.ErrDataMismatch] when a _different_ chunk data pack
+//     ID for the same chunk ID has already been stored (changing which result an execution Node committed to would be a
+//     slashable protocol violation). The caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database
+//     write has been committed.
 //   - error: No error should be returned during normal operation. Any error indicates a failure in the first phase.
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	func(lctx lockctx.Proof, protocolDBBatch storage.ReaderBatchWriter) error,
