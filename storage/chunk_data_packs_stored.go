@@ -32,6 +32,8 @@ type StoredChunkDataPacks interface {
 // StoredChunkDataPack is an in-storage representation of chunk data pack.
 // Its prime difference is instead of an actual collection, it keeps a collection ID hence relying on maintaining
 // the collection on a secondary storage.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type StoredChunkDataPack struct {
 	ChunkID           flow.Identifier
 	StartState        flow.StateCommitment
@@ -60,9 +62,7 @@ func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 	return sc
 }
 
-func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack {// ToStoredChunkDataPack converts the given ChunkDataPacks to their reduced representation,
-// by replacing the full collection data with its ID (collision-resistant hash).
-func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
+func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack { // ToStoredChunkDataPack converts the given ChunkDataPacks to their reduced representation,
 	scs := make([]*StoredChunkDataPack, 0, len(cs))
 	for _, c := range cs {
 		scs = append(scs, ToStoredChunkDataPack(c))
