@@ -71,6 +71,10 @@ func NewLightTransactionResults(collector module.CacheMetrics, db storage.DB, tr
 	}
 }
 
+// BatchStore persists and indexes all transaction results (light representation) for the given blockID
+// as part of the provided batch. The caller must acquire [storage.LockInsertLightTransactionResult] and
+// hold it until the write batch has been committed.
+// It returns [storage.ErrAlreadyExists] if light transaction results for the block already exist.
 func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error {
 	// requires [storage.LockInsertLightTransactionResult]
 	err := operation.InsertAndIndexLightTransactionResults(lctx, rw, blockID, transactionResults)
@@ -120,6 +124,9 @@ func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identi
 }
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if light transaction results at given blockID weren't found.
 func (tr *LightTransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
 	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), blockID)
 	if err != nil {

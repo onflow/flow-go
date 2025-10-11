@@ -125,10 +125,10 @@ func RetrieveLightTransactionResultByIndex(r storage.Reader, blockID flow.Identi
 	return RetrieveByKey(r, MakePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
-// LookupLightTransactionResultsByBlockIDUsingIndex retrieves all tx results for a block, but using
-// tx_index index. This correctly handles cases of duplicate transactions within block.
+// LookupLightTransactionResultsByBlockIDUsingIndex retrieves all tx results for the specified block.
+// CAUTION: this function returns the empty list in case for block IDs without known results.
+// No error returns are expected during normal operations.
 func LookupLightTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID flow.Identifier, txResults *[]flow.LightTransactionResult) error {
-
 	txErrIterFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
 		var val flow.LightTransactionResult
 		err = getValue(&val)
