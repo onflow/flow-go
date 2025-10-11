@@ -64,12 +64,12 @@ func TestIndexChunkDataPackByChunkID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		chunkID := unittest.IdentifierFixture()
-		storedChunkDataPackID := unittest.IdentifierFixture()
+		chunkDataPackID := unittest.IdentifierFixture()
 
 		t.Run("successful insert", func(t *testing.T) {
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, chunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -78,14 +78,14 @@ func TestIndexChunkDataPackByChunkID(t *testing.T) {
 			var retrievedID flow.Identifier
 			err = operation.RetrieveChunkDataPackID(db.Reader(), chunkID, &retrievedID)
 			require.NoError(t, err)
-			assert.Equal(t, storedChunkDataPackID, retrievedID)
+			assert.Equal(t, chunkDataPackID, retrievedID)
 		})
 
 		t.Run("idempotent insert", func(t *testing.T) {
 			// Insert the same chunk data pack ID again should be idempotent
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, chunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestIndexChunkDataPackByChunkID(t *testing.T) {
 			var retrievedID flow.Identifier
 			err = operation.RetrieveChunkDataPackID(db.Reader(), chunkID, &retrievedID)
 			require.NoError(t, err)
-			assert.Equal(t, storedChunkDataPackID, retrievedID)
+			assert.Equal(t, chunkDataPackID, retrievedID)
 		})
 
 		t.Run("data mismatch error", func(t *testing.T) {
@@ -152,7 +152,7 @@ func TestRetrieveChunkDataPackID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		chunkID := unittest.IdentifierFixture()
-		storedChunkDataPackID := unittest.IdentifierFixture()
+		chunkDataPackID := unittest.IdentifierFixture()
 
 		t.Run("retrieve non-existent", func(t *testing.T) {
 			var retrievedID flow.Identifier
@@ -165,7 +165,7 @@ func TestRetrieveChunkDataPackID(t *testing.T) {
 			// First insert a chunk data pack ID
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, chunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -174,14 +174,14 @@ func TestRetrieveChunkDataPackID(t *testing.T) {
 			var retrievedID flow.Identifier
 			err = operation.RetrieveChunkDataPackID(db.Reader(), chunkID, &retrievedID)
 			require.NoError(t, err)
-			assert.Equal(t, storedChunkDataPackID, retrievedID)
+			assert.Equal(t, chunkDataPackID, retrievedID)
 		})
 
 		t.Run("retrieve after removal", func(t *testing.T) {
 			// Insert a chunk data pack ID
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, chunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -206,7 +206,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		chunkID := unittest.IdentifierFixture()
-		storedChunkDataPackID := unittest.IdentifierFixture()
+		chunkDataPackID := unittest.IdentifierFixture()
 
 		t.Run("remove non-existent", func(t *testing.T) {
 			// Removing a non-existent chunk data pack ID should not error
@@ -220,7 +220,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 			// First insert a chunk data pack ID
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, chunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -229,7 +229,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 			var retrievedID flow.Identifier
 			err = operation.RetrieveChunkDataPackID(db.Reader(), chunkID, &retrievedID)
 			require.NoError(t, err)
-			assert.Equal(t, storedChunkDataPackID, retrievedID)
+			assert.Equal(t, chunkDataPackID, retrievedID)
 
 			// Remove it
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -245,14 +245,14 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 
 		t.Run("remove multiple", func(t *testing.T) {
 			chunkIDs := unittest.IdentifierListFixture(3)
-			storedChunkDataPackIDs := unittest.IdentifierListFixture(3)
+			chunkDataPackIDs := unittest.IdentifierListFixture(3)
 
 			// Insert multiple chunk data pack IDs
 			for i := 0; i < 3; i++ {
 
 				err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkIDs[i], storedChunkDataPackIDs[i])
+						return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkIDs[i], chunkDataPackIDs[i])
 					})
 				})
 				require.NoError(t, err)
