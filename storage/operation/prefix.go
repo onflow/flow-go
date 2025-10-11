@@ -109,10 +109,15 @@ const (
 	codeLightTransactionResultIndex        = 109
 	codeTransactionResultErrorMessage      = 110
 	codeTransactionResultErrorMessageIndex = 111
-	codeIndexCollection                    = 200
-	codeIndexExecutionResultByBlock        = 202
-	codeIndexCollectionByTransaction       = 203
-	codeIndexResultApprovalByChunk         = 204
+	// Compared to the deprecated `codeChunkDataPack`, which stored chunkID -> storedChunkDataPack relationship:
+	//  - `codeIndexChunkDataPackByChunkID` stores the chunkID->chunkDataPackID index, and
+	//  - `codeChunkDataPack` stores chunkDataPackID -> storedChunkDataPack relationship.
+	// This breakup allows us to store chunk data packs in a different database in a concurrent safe way
+	codeIndexChunkDataPackByChunkID  = 112
+	codeIndexCollection              = 200
+	codeIndexExecutionResultByBlock  = 202
+	codeIndexCollectionByTransaction = 203
+	codeIndexResultApprovalByChunk   = 204
 
 	// TEMPORARY codes
 	disallowedNodeIDs = 205 // manual override for adding node IDs to list of ejected nodes, applies to networking layer only

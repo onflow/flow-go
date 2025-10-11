@@ -129,6 +129,32 @@ func (ch *Chunk) ID() Identifier {
 	return MakeID(ch)
 }
 
+type ChunkDataPackHeader struct {
+	ChunkID    Identifier      // ID of the chunk this data pack is for
+	StartState StateCommitment // commitment for starting state
+	Proof      Identifier      // Hash of the proof for all registers touched (read or written) during the chunk execution
+	Collection Identifier      // ID of collection executed in this chunk; [flow.ZeroID] for system chunk
+
+	// ExecutionDataRoot is the root data structure of an execution_data.BlockExecutionData.
+	// It contains the necessary information for a verification node to validate that the
+	// BlockExecutionData produced is valid.
+	ExecutionDataRoot BlockExecutionDataRoot
+}
+
+func NewChunkDataPackHeader(ChunkID Identifier, StartState StateCommitment, ProofID Identifier, CollectionID Identifier, ExecutionDataRoot BlockExecutionDataRoot) *ChunkDataPackHeader {
+	return &ChunkDataPackHeader{
+		ChunkID:           ChunkID,
+		StartState:        StartState,
+		Proof:             ProofID,
+		Collection:        CollectionID,
+		ExecutionDataRoot: ExecutionDataRoot,
+	}
+}
+
+func (c *ChunkDataPackHeader) ID() Identifier {
+	return MakeID(c)
+}
+
 // ChunkDataPack holds all register touches (any read, or write).
 //
 // Note that we have to include merkle paths as storage proof for all registers touched (read or written) for
@@ -146,11 +172,13 @@ func (ch *Chunk) ID() Identifier {
 // during the execution of the chunk.
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ChunkDataPack struct {
 	ChunkID    Identifier      // ID of the chunk this data pack is for
 	StartState StateCommitment // commitment for starting state
 	Proof      StorageProof    // proof for all registers touched (read or written) during the chunk execution
-	Collection *Collection     // collection executed in this chunk
+	Collection *Collection     // collection executed in this chunk; nil for system chunk
 
 	// ExecutionDataRoot is the root data structure of an execution_data.BlockExecutionData.
 	// It contains the necessary information for a verification node to validate that the
@@ -173,7 +201,7 @@ type UntrustedChunkDataPack ChunkDataPack
 // Construction ChunkDataPack allowed only within the constructor.
 //
 // All errors indicate a valid ChunkDataPack cannot be constructed from the input.
-func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
+func FromUntrustedChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
 	if untrusted.ChunkID == ZeroID {
 		return nil, fmt.Errorf("ChunkID must not be empty")
 	}
@@ -194,18 +222,35 @@ func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) 
 		return nil, fmt.Errorf("ExecutionDataRoot.ChunkExecutionDataIDs must not be empty")
 	}
 
+	return NewChunkDataPack(
+		untrusted.ChunkID,
+		untrusted.StartState,
+		untrusted.Proof,
+		untrusted.Collection,
+		untrusted.ExecutionDataRoot,
+	), nil
+}
+
+func NewChunkDataPack(chunkID Identifier, startState StateCommitment, proof StorageProof, collection *Collection, executionDataRoot BlockExecutionDataRoot) *ChunkDataPack {
 	return &ChunkDataPack{
-		ChunkID:           untrusted.ChunkID,
-		StartState:        untrusted.StartState,
-		Proof:             untrusted.Proof,
-		Collection:        untrusted.Collection,
-		ExecutionDataRoot: untrusted.ExecutionDataRoot,
-	}, nil
+		ChunkID:           chunkID,
+		StartState:        startState,
+		Proof:             proof,
+		Collection:        collection,
+		ExecutionDataRoot: executionDataRoot,
+	}
 }
 
 // ID returns a collision-resistant hash of the ChunkDataPack struct.
 func (c *ChunkDataPack) ID() Identifier {
-	return MakeID(c)
+	var collectionID Identifier
+	if c.Collection != nil {
+		collectionID = c.Collection.ID()
+	} else {
+		collectionID = ZeroID
+	}
+
+	return NewChunkDataPackHeader(c.ChunkID, c.StartState, MakeID(c.Proof), collectionID, c.ExecutionDataRoot).ID()
 }
 
 // TODO: This is the basic version of the list, we need to substitute it with something like Merkle tree at some point
@@ -365,12 +410,10 @@ func stringsToCids(strs []string) ([]cid.Cid, error) {
 
 // Equals returns true if and only if receiver BlockExecutionDataRoot is equal to the `other`.
 func (b BlockExecutionDataRoot) Equals(other BlockExecutionDataRoot) bool {
-	// Compare BlockID fields
 	if b.BlockID != other.BlockID {
 		return false
 	}
 
-	// Compare ChunkExecutionDataIDs slices
 	if len(b.ChunkExecutionDataIDs) != len(other.ChunkExecutionDataIDs) {
 		return false
 	}

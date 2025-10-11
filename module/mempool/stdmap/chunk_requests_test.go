@@ -26,8 +26,9 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 		expectedAttempts := 10
 
 		withUpdaterScenario(t, chunks, expectedAttempts, incUpdater, func(t *testing.T, attempts uint64, lastTried time.Time, retryAfter time.Duration) {
-			require.Equal(t, expectedAttempts, int(attempts))           // each chunk request should be attempted 10 times.
-			require.True(t, qualifier(attempts, lastTried, retryAfter)) // request should be immediately qualified for retrial.
+			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, qualified) // request should be immediately qualified for retrial.
 		})
 	})
 
@@ -44,7 +45,8 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, !qualifier(attempts, lastTried, retryAfter))
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, !qualified)
 
 			// retryAfter should be equal to 2^(attempts-1) * minInterval.
 			// note that after the first attempt, retry after is set to minInterval.
@@ -69,7 +71,8 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, !qualifier(attempts, lastTried, retryAfter))
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, !qualified)
 
 			// expected retry after should be equal to the min interval, since updates should always underflow due
 			// to the very small multiplier.
@@ -91,7 +94,8 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, !qualifier(attempts, lastTried, retryAfter))
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, !qualified)
 
 			// expected retry after should be equal to the maxInterval, since updates should eventually overflow due
 			// to the very small maxInterval and quite noticeable multiplier (2).

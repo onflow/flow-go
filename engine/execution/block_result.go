@@ -267,7 +267,7 @@ func (ar *BlockAttestationResult) ChunkDataPackAt(index int) (*flow.ChunkDataPac
 		return nil, fmt.Errorf("could not build chunk: %w", err)
 	}
 
-	chunkDataPack, err := flow.NewChunkDataPack(flow.UntrustedChunkDataPack{
+	chunkDataPack, err := flow.FromUntrustedChunkDataPack(flow.UntrustedChunkDataPack{
 		ChunkID:           chunk.ID(), // TODO(ramtin): optimize this
 		StartState:        attestRes.startStateCommit,
 		Proof:             attestRes.stateProof,

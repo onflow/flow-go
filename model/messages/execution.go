@@ -28,7 +28,7 @@ type ChunkDataResponse struct {
 //
 // All errors indicate that the decode target contains a structurally invalid representation of the internal flow.ChunkDataResponse.
 func (c *ChunkDataResponse) ToInternal() (any, error) {
-	chunkDataPack, err := flow.NewChunkDataPack(c.ChunkDataPack)
+	chunkDataPack, err := flow.FromUntrustedChunkDataPack(c.ChunkDataPack)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert %T to internal type: %w", c.ChunkDataPack, err)
 	}
