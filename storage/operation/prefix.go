@@ -97,7 +97,7 @@ const (
 	codeGuaranteeByCollectionID    = 81 // index of collection guarantee by collection ID
 
 	// legacy codes (should be cleaned up)
-	_                                      = 100 // codeChunkDataPack (100) is deprecated
+	codeChunkDataPack                      = 100
 	codeCommit                             = 101
 	codeEvent                              = 102
 	codeExecutionStateInteractions         = 103
@@ -114,7 +114,6 @@ const (
 	//  - `codeChunkDataPack` stores chunkDataPackID -> storedChunkDataPack relationship.
 	// This breakup allows us to store chunk data packs in a different database in a concurrent safe way
 	codeIndexChunkDataPackByChunkID  = 112
-	codeChunkDataPack                = 113
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
