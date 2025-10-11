@@ -77,6 +77,7 @@ func TestBackfillTxErrorMessages(t *testing.T) {
 func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
 
+	lockManager := storage.NewTestingLockManager()
 	suite.state = new(protocolmock.State)
 	suite.headers = new(storagemock.Headers)
 	suite.receipts = new(storagemock.ExecutionReceipts)
@@ -160,6 +161,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		errorMessageProvider,
 		suite.txErrorMessages,
 		executionNodeIdentitiesProvider,
+		lockManager,
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(
@@ -532,7 +534,7 @@ func (suite *BackfillTxErrorMessagesSuite) mockStoreTxErrorMessages(
 		}
 	}
 
-	suite.txErrorMessages.On("Store", blockID, txErrorMessages).Return(nil).Once()
+	suite.txErrorMessages.On("Store", mock.Anything, blockID, txErrorMessages).Return(nil).Once()
 }
 
 // assertAllExpectations asserts that all the expectations set on various mocks are met,

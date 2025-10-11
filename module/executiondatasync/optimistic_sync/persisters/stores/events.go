@@ -1,6 +1,7 @@
 package stores
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -34,8 +35,14 @@ func NewEventsStore(
 //
 // No error returns are expected during normal operations
 func (e *EventsStore) Persist(_ lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	if err := e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{e.data}, batch); err != nil {
+	err := e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{e.data}, batch)
+	if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			// we don't overwrite, it's ideompotent
+			return nil
+		}
 		return fmt.Errorf("could not add events to batch: %w", err)
 	}
+
 	return nil
 }
