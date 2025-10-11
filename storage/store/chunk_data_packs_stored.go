@@ -28,6 +28,7 @@ func NewStoredChunkDataPacks(collector module.CacheMetrics, db storage.DB, byIDC
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
 		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byIDCacheSize),
 		withStore(operation.InsertStoredChunkDataPack),
+		withRemove[flow.Identifier, *storage.StoredChunkDataPack](operation.RemoveStoredChunkDataPack),		
 		withRetrieve(retrieve),
 	)
 
@@ -79,11 +80,11 @@ func (ch *StoredChunkDataPacks) batchRemove(storedChunkDataPackID flow.Identifie
 // It returns the IDs of the stored chunk data packs.
 // No error returns are expected during normal operation.
 func (ch *StoredChunkDataPacks) StoreChunkDataPacks(cs []*storage.StoredChunkDataPack) ([]flow.Identifier, error) {
-	ids := make([]flow.Identifier, 0, len(cs))
-
 	if len(cs) == 0 {
-		return ids, nil
+		return nil, nil
 	}
+	ids := make([]flow.Identifier, 0, len(cs))
+	
 
 	err := ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		for _, sc := range cs {

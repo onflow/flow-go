@@ -155,21 +155,18 @@ func (ch *ChunkDataPacks) BatchRemove(
 
 	// Remove the stored chunk data packs
 	if len(storedChunkDataPackIDs) > 0 {
-		err := ch.stored.BatchRemove(storedChunkDataPackIDs, chunkDataPackDBBatch)
-		if err != nil {
-			return fmt.Errorf("cannot remove stored chunk data packs: %w", err)
-		}
+		storage.OnCommitSucceed(protocolDBBatch, func() {
+			// no errors expected during normal operation, even if no entries exist with the given IDs
+			err := ch.stored.BatchRemove(storedChunkDataPackIDs, chunkDataPackDBBatch)
+			if err != nil {
+				panic("cannot remove stored chunk data packs: " + err.Error())
+			}
+		})
 	}
 
 	// Remove the chunk data pack ID mappings and update cache
 	for _, chunkID := range chunkIDs {
-		storage.OnCommitSucceed(protocolDBBatch, func() {
-			ch.chunkIDToStoredChunkDataPackIDCache.Remove(chunkID)
-		})
-		err := operation.RemoveChunkDataPackID(protocolDBBatch.Writer(), chunkID)
-		if err != nil {
-			return fmt.Errorf("cannot remove chunk data pack %x: %w", chunkID, err)
-		}
+		ch.chunkIDToStoredChunkDataPackIDCache.RemoveTx(protocolDBBatch, chunkID)
 	}
 	return nil
 }
@@ -224,7 +221,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack ID for chunk %x: %w", chunkID, err)
 	}
 
-	// Then retrieve the actual stored chunk data pack using the ID
+	// Then retrieve the reduced representation of the chunk data pack via its ID.
 	schdp, err := ch.stored.ByID(storedChunkDataPackID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack %x for chunk %x: %w", storedChunkDataPackID, chunkID, err)
