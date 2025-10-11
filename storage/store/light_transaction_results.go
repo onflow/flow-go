@@ -104,6 +104,9 @@ func (tr *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, tra
 }
 
 // ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if light transaction result at given blockID wasn't found.
 func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.LightTransactionResult, error) {
 	key := KeyFromBlockIDTransactionID(blockID, txID)
 	transactionResult, err := tr.cache.Get(tr.db.Reader(), key)
@@ -114,6 +117,9 @@ func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifie
 }
 
 // ByBlockIDTransactionIndex returns the transaction result for the given blockID and transaction index
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if light transaction result at given blockID and txIndex wasn't found.
 func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error) {
 	key := KeyFromBlockIDIndex(blockID, txIndex)
 	transactionResult, err := tr.indexCache.Get(tr.db.Reader(), key)

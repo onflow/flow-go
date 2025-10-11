@@ -221,7 +221,7 @@ func TransactionResultErrorMessagesExists(r storage.Reader, blockID flow.Identif
 
 // LookupTransactionResultErrorMessagesByBlockIDUsingIndex retrieves the transaction result error messages of all
 // failed transactions for the specified block.
-// CAUTION: this function returns the empty list in case for block IDs without known results.
+// CAUTION: This method returns an empty slice if transaction results/errors for the block are not indexed yet OR if the block does not have any errors.
 // No error returns are expected during normal operations.
 func LookupTransactionResultErrorMessagesByBlockIDUsingIndex(r storage.Reader, blockID flow.Identifier, txResultErrorMessages *[]flow.TransactionResultErrorMessage) error {
 	txErrIterFunc := func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
