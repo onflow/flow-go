@@ -145,7 +145,7 @@ func LookupLightTransactionResultsByBlockIDUsingIndex(r storage.Reader, blockID 
 // InsertAndIndexTransactionResultErrorMessages persists and indexes all transaction result error messages for the given blockID
 // as part of the provided batch. The caller must acquire [storage.LockInsertTransactionResultErrMessage] and hold it until the
 // write batch has been committed.
-// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func InsertAndIndexTransactionResultErrorMessages(
 	lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 	blockID flow.Identifier,
