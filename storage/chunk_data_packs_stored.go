@@ -86,8 +86,9 @@ func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack { /
 }
 
 // Equals compares two StoredChunkDataPack for equality.
-// The second return value is a string describing the first found mismatch, or empty if they are equal.
-func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) (bool, string) {
+// It returns (true, "") if they are equal, otherwise (false, reason) where reason is the first
+// found reason for the mismatch.
+func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) (equal bool, diffReason string) {
 	if c.ChunkID != other.ChunkID {
 		return false, fmt.Errorf("chunk ID mismatch: %s != %s", c.ChunkID, other.ChunkID).Error()
 	}
