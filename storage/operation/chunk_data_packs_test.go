@@ -57,11 +57,10 @@ func TestChunkDataPack(t *testing.T) {
 	})
 }
 
-// TestInsertChunkDataPackID tests populating the index mapping from chunkID to the resulting chunk data pack's ID.
+// TestIndexChunkDataPackByChunkID tests populating the index mapping from chunkID to the resulting chunk data pack's ID.
 // Essentially, the chunk ID describes the work to be done, and the chunk data pack describes the result of that work.
 // The index from chunk ID to chunk data pack ID is typically stored in the protocol database.
-func TestInsertChunkDataPackID(t *testing.T) {
-func TestInsertChunkDataPackID(t *testing.T) {
+func TestIndexChunkDataPackByChunkID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		chunkID := unittest.IdentifierFixture()
@@ -70,7 +69,7 @@ func TestInsertChunkDataPackID(t *testing.T) {
 		t.Run("successful insert", func(t *testing.T) {
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPackID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -86,7 +85,7 @@ func TestInsertChunkDataPackID(t *testing.T) {
 			// Insert the same chunk data pack ID again should be idempotent
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPackID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -103,7 +102,7 @@ func TestInsertChunkDataPackID(t *testing.T) {
 
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPackID(lctx, rw, chunkID, differentStoredChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, differentStoredChunkDataPackID)
 				})
 			})
 			require.Error(t, err)
@@ -120,7 +119,7 @@ func TestInsertChunkDataPackID(t *testing.T) {
 			defer lctx.Release()
 
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertChunkDataPackID(lctx, rw, newChunkID, newStoredChunkDataPackID)
+				return operation.IndexChunkDataPackByChunkID(lctx, rw, newChunkID, newStoredChunkDataPackID)
 			})
 			require.Error(t, err)
 			require.NotErrorIs(t, err, storage.ErrDataMismatch) // missing lock should not be erroneously represented as mismatching data
@@ -135,7 +134,7 @@ func TestInsertChunkDataPackID(t *testing.T) {
 			// Use wrong lock type
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPackID(lctx, rw, newChunkID, newStoredChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, newChunkID, newStoredChunkDataPackID)
 				})
 			})
 			require.Error(t, err)
@@ -166,7 +165,7 @@ func TestRetrieveChunkDataPackID(t *testing.T) {
 			// First insert a chunk data pack ID
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPackID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -182,7 +181,7 @@ func TestRetrieveChunkDataPackID(t *testing.T) {
 			// Insert a chunk data pack ID
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPackID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -221,7 +220,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 			// First insert a chunk data pack ID
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPackID(lctx, rw, chunkID, storedChunkDataPackID)
+					return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkID, storedChunkDataPackID)
 				})
 			})
 			require.NoError(t, err)
@@ -253,7 +252,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 
 				err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
 					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return operation.InsertChunkDataPackID(lctx, rw, chunkIDs[i], storedChunkDataPackIDs[i])
+						return operation.IndexChunkDataPackByChunkID(lctx, rw, chunkIDs[i], storedChunkDataPackIDs[i])
 					})
 				})
 				require.NoError(t, err)

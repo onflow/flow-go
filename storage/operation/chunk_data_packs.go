@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertChunkDataPackID inserts a mapping from chunk ID to stored chunk data pack ID.
+// IndexChunkDataPackByChunkID inserts a mapping from chunk ID to stored chunk data pack ID.
 // It requires the [storage.LockInsertOwnReceipt] lock to be held by the caller.
 // Returns [storage.ErrDataMismatch] if a different chunk data pack ID already exists for the given chunk ID.
-func InsertChunkDataPackID(lctx lockctx.Proof, rw storage.ReaderBatchWriter, chunkID flow.Identifier, storedChunkDataPackID flow.Identifier) error {
+func IndexChunkDataPackByChunkID(lctx lockctx.Proof, rw storage.ReaderBatchWriter, chunkID flow.Identifier, storedChunkDataPackID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertOwnReceipt)
 	}
