@@ -65,6 +65,18 @@ func (ch *StoredChunkDataPacks) Remove(ids []flow.Identifier) error {
 	})
 }
 
+// BatchRemove removes multiple ChunkDataPacks with the given IDs from storage as part of the provided write batch.
+// No error returns are expected during normal operation, even if no entries are matched.
+func (ch *StoredChunkDataPacks) BatchRemove(chunkDataPackIDs []flow.Identifier, rw storage.ReaderBatchWriter) error {
+	for _, id := range chunkDataPackIDs {
+		err := ch.batchRemove(id, rw)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (ch *StoredChunkDataPacks) batchRemove(chunkDataPackID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	storage.OnCommitSucceed(rw, func() {
 		ch.byIDCache.Remove(chunkDataPackID)

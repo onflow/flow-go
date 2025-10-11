@@ -48,6 +48,7 @@ type ChunkDataPacks interface {
 	// BatchRemoveChunkDataPacksOnly removes multiple ChunkDataPacks with the given chunk IDs from chunk data pack database only.
 	// It does not remove the index mappings from ChunkID to chunkDataPackID in the protocol database.
 	// This method is useful for the runtime chunk data pack pruner to batch remove chunk data packs associated with a set of blocks.
+	// CAUTION: the chunk data pack batch is for chunk data pack database only, DO NOT pass a batch writer for protocol database.
 	// No errors are expected during normal operation, even if no entries are matched.
-	BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifier) error
+	BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifier, chunkDataPackBatch ReaderBatchWriter) error
 }
