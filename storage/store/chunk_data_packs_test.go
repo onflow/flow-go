@@ -119,9 +119,8 @@ func TestChunkDataPacks_BatchRemove(t *testing.T) {
 
 			// Test BatchRemove
 			require.NoError(t, protocolDB.WithReaderBatchWriter(func(protocolDBBatch storage.ReaderBatchWriter) error {
-				return chunkDataPackDB.WithReaderBatchWriter(func(chunkDataPackDBBatch storage.ReaderBatchWriter) error {
-					return chunkDataPackStore.BatchRemove(chunkIDs, protocolDBBatch, chunkDataPackDBBatch)
-				})
+				_, err := chunkDataPackStore.BatchRemove(chunkIDs, protocolDBBatch)
+				return err
 			}))
 
 			// Verify chunk data packs are removed from both protocol and chunk data pack DBs
@@ -208,9 +207,8 @@ func TestChunkDataPacks_BatchRemoveNonExistent(t *testing.T) {
 
 			// Test BatchRemove with non-existent chunk IDs should not error
 			require.NoError(t, protocolDB.WithReaderBatchWriter(func(protocolDBBatch storage.ReaderBatchWriter) error {
-				return chunkDataPackDB.WithReaderBatchWriter(func(chunkDataPackDBBatch storage.ReaderBatchWriter) error {
-					return chunkDataPackStore.BatchRemove(nonExistentChunkIDs, protocolDBBatch, chunkDataPackDBBatch)
-				})
+				_, err := chunkDataPackStore.BatchRemove(nonExistentChunkIDs, protocolDBBatch)
+				return err
 			}))
 		})
 	})
