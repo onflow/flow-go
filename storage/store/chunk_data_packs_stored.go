@@ -55,20 +55,14 @@ func (ch *StoredChunkDataPacks) ByID(storedChunkDataPackID flow.Identifier) (*st
 // No error returns are expected during normal operation, even if none of the referenced objects exist in storage.
 func (ch *StoredChunkDataPacks) Remove(ids []flow.Identifier) error {
 	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return ch.BatchRemove(ids, rw)
-	})
-}
-
-// BatchRemove removes multiple StoredChunkDataPacks cs keyed by their IDs in a batch using the provided
-// No error returns are expected during normal operation, even if none of the referenced objects exist in storage.
-func (ch *StoredChunkDataPacks) BatchRemove(ids []flow.Identifier, rw storage.ReaderBatchWriter) error {
-	for _, id := range ids {
-		err := ch.batchRemove(id, rw)
-		if err != nil {
-			return fmt.Errorf("cannot remove chunk data pack: %w", err)
+		for _, id := range ids {
+			err := ch.batchRemove(id, rw)
+			if err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (ch *StoredChunkDataPacks) batchRemove(storedChunkDataPackID flow.Identifier, rw storage.ReaderBatchWriter) error {
