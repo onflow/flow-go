@@ -39,27 +39,42 @@ type StoredChunkDataPack struct {
 	StartState        flow.StateCommitment
 	Proof             flow.StorageProof
 	CollectionID      flow.Identifier
-	SystemChunk       bool
 	ExecutionDataRoot flow.BlockExecutionDataRoot
 }
 
+func NewStoredChunkDataPack(
+	chunkID flow.Identifier,
+	startState flow.StateCommitment,
+	proof flow.StorageProof,
+	collectionID flow.Identifier,
+	executionDataRoot flow.BlockExecutionDataRoot,
+) *StoredChunkDataPack {
+	return &StoredChunkDataPack{
+		ChunkID:           chunkID,
+		StartState:        startState,
+		Proof:             proof,
+		CollectionID:      collectionID,
+		ExecutionDataRoot: executionDataRoot,
+	}
+}
+
+func (s *StoredChunkDataPack) IsSystemChunk() bool {
+	return s.CollectionID == flow.ZeroID
+}
+
 func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
-	sc := &StoredChunkDataPack{
-		ChunkID:           c.ChunkID,
-		StartState:        c.StartState,
-		Proof:             c.Proof,
-		SystemChunk:       false,
-		ExecutionDataRoot: c.ExecutionDataRoot,
-	}
-
+	collectionID := flow.ZeroID
 	if c.Collection != nil {
-		// non system chunk
-		sc.CollectionID = c.Collection.ID()
-	} else {
-		sc.SystemChunk = true
+		collectionID = c.Collection.ID()
 	}
 
-	return sc
+	return NewStoredChunkDataPack(
+		c.ChunkID,
+		c.StartState,
+		c.Proof,
+		collectionID,
+		c.ExecutionDataRoot,
+	)
 }
 
 func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack { // ToStoredChunkDataPack converts the given ChunkDataPacks to their reduced representation,
@@ -81,9 +96,6 @@ func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) (bool, string) {
 	}
 	if !c.ExecutionDataRoot.Equals(other.ExecutionDataRoot) {
 		return false, fmt.Sprintf("execution data root mismatch: %s != %s", c.ExecutionDataRoot, other.ExecutionDataRoot)
-	}
-	if c.SystemChunk != other.SystemChunk {
-		return false, fmt.Sprintf("system chunk flag mismatch: %t != %t", c.SystemChunk, other.SystemChunk)
 	}
 	if !bytes.Equal(c.Proof, other.Proof) {
 		return false, "storage proof mismatch"

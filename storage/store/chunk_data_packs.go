@@ -254,7 +254,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		ExecutionDataRoot: schdp.ExecutionDataRoot,
 	}
 
-	if !schdp.SystemChunk {
+	if !schdp.IsSystemChunk() {
 		collection, err := ch.collections.ByID(schdp.CollectionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
