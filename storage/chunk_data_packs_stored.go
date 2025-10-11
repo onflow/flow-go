@@ -95,5 +95,5 @@ func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) (bool, string) {
 }
 
 func (c StoredChunkDataPack) ID() flow.Identifier {
-	return flow.NewChunkDataPackHeader(c.ChunkID, c.StartState, c.Proof.ID(), c.CollectionID, c.ExecutionDataRoot).ID()
+	return flow.NewChunkDataPackHeader(c.ChunkID, c.StartState, flow.MakeID(c.Proof), c.CollectionID, c.ExecutionDataRoot).ID()
 }

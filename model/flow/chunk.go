@@ -8,8 +8,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 var EmptyEventCollectionID Identifier
@@ -239,10 +237,10 @@ func (c *ChunkDataPack) ID() Identifier {
 	if c.Collection != nil {
 		collectionID = c.Collection.ID()
 	} else {
-		collectionID = flow.ZeroID
+		collectionID = ZeroID
 	}
 
-	return NewChunkDataPackHeader(c.ChunkID, c.StartState, c.Proof.ID(), collectionID, c.ExecutionDataRoot).ID()
+	return NewChunkDataPackHeader(c.ChunkID, c.StartState, MakeID(c.Proof), collectionID, c.ExecutionDataRoot).ID()
 }
 
 // TODO: This is the basic version of the list, we need to substitute it with something like Merkle tree at some point
