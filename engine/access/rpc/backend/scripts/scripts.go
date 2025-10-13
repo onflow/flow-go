@@ -116,7 +116,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
-	criteria optimistic_sync.Criteria,
+	userCriteria optimistic_sync.Criteria,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
 		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
@@ -132,7 +132,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(
 		latestHeader.ID(),
-		criteria,
+		userCriteria,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", latestHeader.ID(), err)
@@ -158,7 +158,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	blockID flow.Identifier,
 	script []byte,
 	arguments [][]byte,
-	criteria optimistic_sync.Criteria,
+	userCriteria optimistic_sync.Criteria,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
 		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
@@ -169,7 +169,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 		return nil, nil, commonrpc.ConvertStorageError(err)
 	}
 
-	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, userCriteria)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", blockID.String(), err)
 	}
@@ -193,7 +193,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 	blockHeight uint64,
 	script []byte,
 	arguments [][]byte,
-	criteria optimistic_sync.Criteria,
+	userCriteria optimistic_sync.Criteria,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
 		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
@@ -204,7 +204,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		return nil, nil, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
 	}
 
-	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
+	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), userCriteria)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", header.ID(), err)
 	}
