@@ -111,7 +111,9 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		chainConfig.PragueTime = &MainnetPragueActivation
 	}
 
-	chainConfig.OsakaTime = &zero
+	if chainID.Cmp(types.FlowEVMPreviewNetChainID) == 0 {
+		chainConfig.OsakaTime = &zero
+	}
 
 	return chainConfig
 }
