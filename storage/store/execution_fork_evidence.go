@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -23,28 +25,11 @@ func NewExecutionForkEvidence(db storage.DB) *ExecutionForkEvidence {
 
 // StoreIfNotExists stores the given conflictingSeals to the database.
 // This is a no-op if there is already a record in the database with the same key.
+// The caller must hold the [storage.LockInsertExecutionForkEvidence] lock.
 // No errors are expected during normal operations.
-// CAUTION: This function is not safe for concurrent use by multiple goroutines.  For safety,
-// we rely on the fact that Execution Fork Evidence has a very small surface area of use
-// in the Execution Fork Suppressor.  The Execution Fork Suppressor is responsible for
-// ensuring mutually exclusive access to this function.
-func (efe *ExecutionForkEvidence) StoreIfNotExists(conflictingSeals []*flow.IncorporatedResultSeal) error {
+func (efe *ExecutionForkEvidence) StoreIfNotExists(lctx lockctx.Proof, conflictingSeals []*flow.IncorporatedResultSeal) error {
 	return efe.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		found, err := operation.HasExecutionForkEvidence(rw.GlobalReader())
-		if err != nil {
-			return fmt.Errorf("failed to check if evidence about execution fork exists: %w", err)
-		}
-		if found {
-			// Some evidence about execution fork already stored;
-			// We only keep the first evidence => nothing more to do
-			return nil
-		}
-
-		err = operation.InsertExecutionForkEvidence(rw.Writer(), conflictingSeals)
-		if err != nil {
-			return fmt.Errorf("failed to store evidence about execution fork: %w", err)
-		}
-		return nil
+		return operation.InsertExecutionForkEvidence(lctx, rw, conflictingSeals)
 	})
 }
 

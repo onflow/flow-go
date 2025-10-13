@@ -396,6 +396,7 @@ func main() {
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
 				node.ProtocolDB,
+				node.StorageLockMgr,
 				node.Logger,
 			)
 			if err != nil {
