@@ -114,7 +114,7 @@ type BlockView struct {
 
 // DirectCall executes a direct call
 func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err error) {
-	if call.GasLimit > gethParams.MaxTxGas {
+	if call.TxGasLimitEnabled() && call.GasLimit > gethParams.MaxTxGas {
 		res := &types.Result{
 			TxType:          call.Type,
 			TxHash:          call.Hash(),

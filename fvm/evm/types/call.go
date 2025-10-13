@@ -54,6 +54,8 @@ type DirectCall struct {
 	Value    *big.Int
 	GasLimit uint64
 	Nonce    uint64
+
+	skipTxGasLimitCheck bool
 }
 
 // DirectCallFromEncoded constructs a DirectCall from encoded data
@@ -130,6 +132,14 @@ func (dc *DirectCall) Transaction() *gethTypes.Transaction {
 // EmptyToField returns true if `to` field contains an empty address
 func (dc *DirectCall) EmptyToField() bool {
 	return dc.To == EmptyAddress
+}
+
+func (dc *DirectCall) SkipTxGasLimitCheck() {
+	dc.skipTxGasLimitCheck = true
+}
+
+func (dc *DirectCall) TxGasLimitEnabled() bool {
+	return dc.skipTxGasLimitCheck == false
 }
 
 func (dc *DirectCall) to() *gethCommon.Address {
