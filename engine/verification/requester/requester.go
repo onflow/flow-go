@@ -155,7 +155,7 @@ func (e *Engine) Done() <-chan struct{} {
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *messages.ChunkDataResponse:
+	case *flow.ChunkDataResponse:
 		e.handleChunkDataPackWithTracing(originID, &resource.ChunkDataPack)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)

@@ -153,9 +153,10 @@ type ValidationStep struct {
 	failReason string
 }
 
-// TransactionValidator performs validation of transactions before they are processed.
-// It enforces correctness, safety, and economic checks by running a series of validation steps
-// to ensure that transactions are well-formed, valid, and executable.
+// TransactionValidator implements transaction validation logic for Access and Collection Nodes.
+// NOTE: This validation logic is a simplified interim approach: Collection/Access Nodes cannot reliably validate transaction signatures or payer balance.
+// The long-term design for extending validation to cover these cases is described in the Sweet Onion Plan
+// (https://flowfoundation.notion.site/Sweet-Onion-Plan-eae4db664feb459598879b49ccf2aa85).
 type TransactionValidator struct {
 	blocks                       Blocks     // for looking up blocks to check transaction expiry
 	chain                        flow.Chain // for checking validity of addresses

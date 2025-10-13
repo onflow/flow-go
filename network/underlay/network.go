@@ -1192,7 +1192,16 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		return
 	}
 
-	scope, err := message.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
+	internalMsg, err := decodedMsgPayload.ToInternal()
+	if err != nil {
+		err = fmt.Errorf("failed to convert message to internal: %w", err)
+		violation := &network.Violation{
+			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		n.slashingViolationsConsumer.OnInvalidMsgError(violation)
+		return
+	}
+	scope, err := message.NewIncomingScope(originId, protocol, msg, internalMsg)
 	if err != nil {
 		n.logger.Error().
 			Err(err).

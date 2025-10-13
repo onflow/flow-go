@@ -25,7 +25,7 @@ const (
 
 	// DefaultScheduledCallbacksEnabled is the default value for the scheduled callbacks enabled flag
 	// used by Execution, Verification, and Access nodes.
-	DefaultScheduledCallbacksEnabled = false
+	DefaultScheduledCallbacksEnabled = true
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.

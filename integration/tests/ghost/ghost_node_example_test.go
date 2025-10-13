@@ -8,10 +8,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -60,7 +60,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	assert.NoError(t, err)
 
 	// generate a test transaction
-	tx := unittest.TransactionBodyFixture()
+	tx := (messages.TransactionBody)(unittest.TransactionBodyFixture())
 
 	// send the transaction as an event to a real collection node
 	err = ghostClient.Send(ctx, channels.PushTransactions, &tx, realCollNode.Identifier)
@@ -124,10 +124,8 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
-		case *flow.UntrustedProposal:
-			proposalTrusted, err := flow.NewProposal(*v)
-			require.NoError(t, err)
-			fmt.Printf("Received block proposal: %s from %s\n", proposalTrusted.Block.ID().String(), from.String())
+		case *flow.Proposal:
+			fmt.Printf("Received block proposal: %s from %s\n", v.Block.ID().String(), from.String())
 			i++
 		default:
 			t.Logf(" ignoring event: :%T: %v", v, v)

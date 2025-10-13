@@ -12,6 +12,7 @@ import (
 	collectionmock "github.com/onflow/flow-go/engine/collection/mock"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
@@ -40,25 +41,23 @@ func TestFinalizer(t *testing.T) {
 		state, err := cluster.Bootstrap(db, lockManager, stateRoot)
 		require.NoError(t, err)
 
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock.ToHeader())
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock.ToHeader())
+			})
 		})
 		require.NoError(t, err)
-		lctx.Release()
 		return state
 	}
 
 	// a helper function to insert a block
 	insert := func(db storage.DB, lockManager lockctx.Manager, block *model.Block) {
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return procedure.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(block))
+			})
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	// Run each test with its own fresh database
@@ -198,7 +197,7 @@ func TestFinalizer(t *testing.T) {
 			insert(db, lockManager, block)
 
 			// block should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block.ChainID,
@@ -268,14 +267,14 @@ func TestFinalizer(t *testing.T) {
 			insert(db, lockManager, block2)
 
 			// blocks should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block1.ChainID,
 				SignerIndices:    block1.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block2.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block2.ChainID,
@@ -344,7 +343,7 @@ func TestFinalizer(t *testing.T) {
 			insert(db, lockManager, block2)
 
 			// block1 should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block1.ChainID,
@@ -414,7 +413,7 @@ func TestFinalizer(t *testing.T) {
 			insert(db, lockManager, block2)
 
 			// block should be passed to pusher
-			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &messages.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ClusterChainID:   block1.ChainID,
@@ -445,10 +444,9 @@ func TestFinalizer(t *testing.T) {
 // finalization.
 func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, lockManager lockctx.Manager, db storage.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
 	var ids []flow.Identifier
-	lctx := lockManager.NewContext()
-	defer lctx.Release()
-	require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), refHeight, refHeight, &ids)
+	err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return operation.LookupClusterBlocksByReferenceHeightRange(lctx, db.Reader(), refHeight, refHeight, &ids)
+	})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, clusterBlockIDs, ids)
 }

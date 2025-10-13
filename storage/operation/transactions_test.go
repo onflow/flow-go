@@ -13,24 +13,24 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestTransactions tests storage, deletion and retrieval of transactions
 func TestTransactions(t *testing.T) {
-
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		// storing a tx
-		expected := unittest.TransactionFixture()
+		expected := unittest.TransactionBodyFixture()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertTransaction(rw.Writer(), expected.ID(), &expected.TransactionBody)
+			return operation.UpsertTransaction(rw.Writer(), expected.ID(), &expected)
 		})
 		require.NoError(t, err)
 
 		// verify can be retrieved
-		var actual flow.Transaction
-		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual.TransactionBody)
+		var actual flow.TransactionBody
+		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 
 		// retrieve non exist
-		err = operation.RetrieveTransaction(db.Reader(), unittest.IdentifierFixture(), &actual.TransactionBody)
+		err = operation.RetrieveTransaction(db.Reader(), unittest.IdentifierFixture(), &actual)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -41,7 +41,7 @@ func TestTransactions(t *testing.T) {
 		require.NoError(t, err)
 
 		// verify has been deleted
-		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual.TransactionBody)
+		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 

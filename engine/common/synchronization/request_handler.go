@@ -115,7 +115,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncRequest)
+				_, ok := msg.Payload.(*flow.SyncRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 				}
@@ -125,7 +125,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.RangeRequest)
+				_, ok := msg.Payload.(*flow.RangeRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 				}
@@ -135,7 +135,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BatchRequest)
+				_, ok := msg.Payload.(*flow.BatchRequest)
 				if ok {
 					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 				}
@@ -150,7 +150,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 // No errors are expected during normal operation.
-func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
+func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *flow.SyncRequest) error {
 	finalizedHeader := r.finalizedHeaderCache.Get()
 
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
@@ -187,7 +187,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 
 // onRangeRequest processes a request for a range of blocks by height.
 // No errors are expected during normal operation.
-func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *flow.RangeRequest) error {
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().Msg("received new range request")
 
@@ -260,7 +260,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 }
 
 // onBatchRequest processes a request for a specific block by block ID.
-func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *flow.BatchRequest) error {
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().Msg("received new batch request")
 
@@ -342,7 +342,7 @@ func (r *RequestHandler) processAvailableRequests(ctx context.Context) error {
 
 		msg, ok := r.pendingSyncRequests.Get()
 		if ok {
-			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
+			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*flow.SyncRequest))
 			if err != nil {
 				return fmt.Errorf("processing sync request failed: %w", err)
 			}
@@ -351,7 +351,7 @@ func (r *RequestHandler) processAvailableRequests(ctx context.Context) error {
 
 		msg, ok = r.pendingRangeRequests.Get()
 		if ok {
-			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
+			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*flow.RangeRequest))
 			if err != nil {
 				return fmt.Errorf("processing range request failed: %w", err)
 			}
@@ -360,7 +360,7 @@ func (r *RequestHandler) processAvailableRequests(ctx context.Context) error {
 
 		msg, ok = r.pendingBatchRequests.Get()
 		if ok {
-			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
+			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*flow.BatchRequest))
 			if err != nil {
 				return fmt.Errorf("processing batch request failed: %w", err)
 			}

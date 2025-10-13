@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -30,49 +31,45 @@ var (
 var Cmd = &cobra.Command{
 	Use:   "snapshot",
 	Short: "Retrieves a protocol state snapshot from the database, which can be used to instantiate another node",
-	Run:   run,
+	RunE:  runE,
 }
 
 func init() {
 
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
-		"directory that stores the protocol state")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 	_ = Cmd.MarkFlagRequired("datadir")
 
 	Cmd.Flags().Uint64Var(&flagHeight, "height", 0, "the height of the snapshot to retrieve")
 	_ = Cmd.MarkFlagRequired("height")
 }
 
-func run(*cobra.Command, []string) {
+func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
 
-	db, err := common.InitStorage(flagDatadir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not init storage")
-	}
-	defer db.Close()
+	return common.WithStorage(flagDatadir, func(db storage.DB) error {
+		storages := common.InitStorages(db)
+		state, err := common.OpenProtocolState(lockManager, db, storages)
+		if err != nil {
+			return fmt.Errorf("could not open protocol state: %w", err)
+		}
 
-	storages := common.InitStorages(db)
-	state, err := common.OpenProtocolState(lockManager, db, storages)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not open protocol state")
-	}
+		log := log.With().Uint64("block_height", flagHeight).Logger()
 
-	log := log.With().Uint64("block_height", flagHeight).Logger()
+		snap := state.AtHeight(flagHeight)
+		encoded, err := convert.SnapshotToBytes(snap)
+		if err != nil {
+			return fmt.Errorf("failed to encode snapshot: %w", err)
+		}
 
-	snap := state.AtHeight(flagHeight)
-	encoded, err := convert.SnapshotToBytes(snap)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to encode snapshot")
-	}
+		dir := filepath.Join(".", "root-protocol-state-snapshot.json")
 
-	dir := filepath.Join(".", "root-protocol-state-snapshot.json")
+		log.Info().Msgf("going to write snapshot to %s", dir)
+		err = os.WriteFile(dir, encoded, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to write snapshot: %w", err)
+		}
 
-	log.Info().Msgf("going to write snapshot to %s", dir)
-	err = os.WriteFile(dir, encoded, 0600)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to write snapshot")
-	}
-
-	log.Info().Msgf("successfully wrote snapshot to %s", dir)
+		log.Info().Msgf("successfully wrote snapshot to %s", dir)
+		return nil
+	})
 }

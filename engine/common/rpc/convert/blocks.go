@@ -78,6 +78,20 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
+
+	if IsRootBlockHeader(m.BlockHeader) {
+		block, err := flow.NewRootBlock(
+			flow.UntrustedBlock{
+				HeaderBody: header.HeaderBody,
+				Payload:    *payload,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root block: %w", err)
+		}
+		return block, nil
+	}
+
 	block, err := flow.NewBlock(
 		flow.UntrustedBlock{
 			HeaderBody: header.HeaderBody,

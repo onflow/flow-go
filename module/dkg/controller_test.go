@@ -98,7 +98,7 @@ type broker struct {
 // PrivateSend implements the crypto.DKGProcessor interface.
 func (b *broker) PrivateSend(dest int, data []byte) {
 	b.privateChannels[dest] <- msg.PrivDKGMessageIn{
-		DKGMessage:           msg.NewDKGMessage(data, b.dkgInstanceID),
+		DKGMessage:           msg.DKGMessage{Data: data, DKGInstanceID: b.dkgInstanceID},
 		CommitteeMemberIndex: uint64(b.id),
 	}
 }
@@ -117,7 +117,7 @@ func (b *broker) Broadcast(data []byte) {
 		}
 		// epoch and phase are not relevant at the controller level
 		b.broadcastChannels[i] <- msg.BroadcastDKGMessage{
-			DKGMessage:           msg.NewDKGMessage(data, b.dkgInstanceID),
+			DKGMessage:           msg.DKGMessage{Data: data, DKGInstanceID: b.dkgInstanceID},
 			CommitteeMemberIndex: uint64(b.id),
 		}
 	}
