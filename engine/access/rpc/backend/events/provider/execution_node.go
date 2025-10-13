@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -90,7 +91,7 @@ func (e *ENEventProvider) Events(
 
 	metadata := &access.ExecutorMetadata{
 		ExecutionResultID: execResultInfo.ExecutionResultID,
-		ExecutorIDs:       orderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
+		ExecutorIDs:       common.OrderedExecutors(node.NodeID, execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	return Response{
@@ -199,20 +200,4 @@ func verifyAndConvertToAccessEvents(
 	}
 
 	return results, nil
-}
-
-// orderedExecutors creates an ordered list of executors for the same execution result
-// - respondingExecutor is the executor who returned an execution result.
-// - executorList is the full list of executors who produced the same execution result.
-func orderedExecutors(respondingExecutor flow.Identifier, executorList flow.IdentifierList) flow.IdentifierList {
-	ordered := make(flow.IdentifierList, 0, len(executorList))
-	ordered = append(ordered, respondingExecutor)
-
-	for _, nodeID := range executorList {
-		if nodeID != respondingExecutor {
-			ordered = append(ordered, nodeID)
-		}
-	}
-
-	return ordered
 }

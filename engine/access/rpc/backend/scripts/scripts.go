@@ -138,16 +138,9 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", latestHeader.ID(), err)
 	}
 
-	executionResultID := executionResultInfo.ExecutionResultID
-	//TODO(Uliana): add constructor for ExecutorMetadata
-	metadata := &accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
-
-	res, _, err := b.executor.Execute(
+	res, metadata, _, err := b.executor.Execute(
 		ctx,
-		executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments, executionResultID),
+		executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments, executionResultInfo),
 	)
 	return res, metadata, err
 }
@@ -174,15 +167,9 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", blockID.String(), err)
 	}
 
-	executionResultID := executionResultInfo.ExecutionResultID
-	metadata := &accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
-
-	res, _, err := b.executor.Execute(
+	res, metadata, _, err := b.executor.Execute(
 		ctx,
-		executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments, executionResultID),
+		executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments, executionResultInfo),
 	)
 	return res, metadata, err
 }
@@ -209,15 +196,9 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", header.ID(), err)
 	}
 
-	executionResultID := executionResultInfo.ExecutionResultID
-	metadata := &accessmodel.ExecutorMetadata{
-		ExecutionResultID: executionResultID,
-		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
-	}
-
-	res, _, err := b.executor.Execute(
+	res, metadata, _, err := b.executor.Execute(
 		ctx,
-		executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments, executionResultID),
+		executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments, executionResultInfo),
 	)
 	return res, metadata, err
 }

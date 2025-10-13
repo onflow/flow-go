@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -49,12 +50,13 @@ func NewLocalScriptExecutor(
 func (l *LocalScriptExecutor) Execute(
 	ctx context.Context,
 	r *Request,
-) ([]byte, time.Duration, error) {
+) ([]byte, *accessmodel.ExecutorMetadata, time.Duration, error) {
 	execStartTime := time.Now()
 
-	snapshot, err := l.executionStateCache.Snapshot(r.executionResultID)
+	executionResultID := r.execResultInfo.ExecutionResultID
+	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get snapshot for execution result %s: %w", r.executionResultID, err)
+		return nil, nil, 0, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
 
 	result, err := l.scriptExecutor.ExecuteAtBlockHeight(
@@ -93,13 +95,18 @@ func (l *LocalScriptExecutor) Execute(
 			l.metrics.ScriptExecutionErrorLocal() //TODO: this should be called in above cases as well?
 		}
 
-		return nil, execDuration, convertedErr
+		return nil, nil, execDuration, convertedErr
 	}
 
 	l.scriptCache.LogExecutedScript(r.blockID, insecureScriptHash, execEndTime, "localhost", r.script, execDuration)
 	l.metrics.ScriptExecuted(execDuration, len(r.script))
 
-	return result, execDuration, nil
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       r.execResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return result, metadata, execDuration, nil
 }
 
 // convertScriptExecutionError converts the script execution error to a gRPC error

@@ -11,10 +11,12 @@ import (
 
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -51,13 +53,7 @@ func NewENScriptExecutor(
 	}
 }
 
-func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, time.Duration, error) {
-	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	executors, err := e.nodeProvider.ExecutionNodesForBlockID(ctx, request.blockID)
-	if err != nil {
-		return nil, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", request.blockID.String(), err)
-	}
-
+func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, *accessmodel.ExecutorMetadata, time.Duration, error) {
 	// encode to MD5 as low compute/memory lookup key
 	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
@@ -66,8 +62,10 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 	var result []byte
 	var executionTime time.Time
 	var execDuration time.Duration
+	var nodeID flow.Identifier
+	var err error
 	errToReturn := e.nodeCommunicator.CallAvailableNode(
-		executors,
+		request.execResultInfo.ExecutionNodes,
 		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
 
@@ -75,6 +73,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 
 			executionTime = time.Now()
 			execDuration = executionTime.Sub(execStartTime)
+			nodeID = node.NodeID
 
 			if err != nil {
 				return err
@@ -99,10 +98,15 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 			e.metrics.ScriptExecutionErrorOnExecutionNode()
 			e.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
-		return nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
+		return nil, nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
 	}
 
-	return result, execDuration, nil
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: request.execResultInfo.ExecutionResultID,
+		ExecutorIDs:       common.OrderedExecutors(nodeID, request.execResultInfo.ExecutionNodes.NodeIDs()),
+	}
+
+	return result, metadata, execDuration, nil
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.

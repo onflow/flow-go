@@ -6,6 +6,8 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
 // TODO(Uliana): add godoc to whole file
@@ -23,17 +25,17 @@ func NewFailoverScriptExecutor(localExecutor ScriptExecutor, execNodeExecutor Sc
 	}
 }
 
-func (f *FailoverScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, time.Duration, error) {
-	localResult, localDuration, localErr := f.localExecutor.Execute(ctx, request)
+func (f *FailoverScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, *accessmodel.ExecutorMetadata, time.Duration, error) {
+	localResult, localMetadata, localDuration, localErr := f.localExecutor.Execute(ctx, request)
 
 	isInvalidArgument := status.Code(localErr) == codes.InvalidArgument
 	isCanceled := status.Code(localErr) == codes.Canceled
 	if localErr == nil || isInvalidArgument || isCanceled {
-		return localResult, localDuration, localErr
+		return localResult, localMetadata, localDuration, localErr
 	}
 
 	// Note: scripts that timeout are retried on the execution nodes since ANs may have performance
 	// issues for some scripts.
-	execResult, execDuration, execErr := f.executionNodeExecutor.Execute(ctx, request)
-	return execResult, execDuration, execErr
+	execResult, execMetadata, execDuration, execErr := f.executionNodeExecutor.Execute(ctx, request)
+	return execResult, execMetadata, execDuration, execErr
 }
