@@ -140,7 +140,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		userCriteria,
 	)
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound, common.InsufficientExecutionReceipts{})
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", latestHeader.ID(), err)
 		return nil, nil, access.NewDataNotFoundError("execution result info", err)
 	}
@@ -182,7 +182,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, userCriteria)
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound, common.InsufficientExecutionReceipts{})
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", blockID.String(), err)
 		return nil, nil, access.NewDataNotFoundError("execution result info", err)
 	}
@@ -225,7 +225,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), userCriteria)
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound, common.InsufficientExecutionReceipts{})
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", header.ID(), err)
 		return nil, nil, access.NewDataNotFoundError("execution result info", err)
 	}
