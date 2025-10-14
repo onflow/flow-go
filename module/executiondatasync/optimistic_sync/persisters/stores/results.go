@@ -36,11 +36,11 @@ func NewResultsStore(
 // it until the write batch has been committed.
 // No error returns are expected during normal operations
 func (r *ResultsStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
-	// CAUTION: here we assume that if something is already stored for our blockID, then the data is identical.
-	// This only holds true for sealed execution results, whose consistency has previously been verified by
-	// comparing the data's hash to commitments in the execution result.
 	err := r.persistedResults.BatchStore(lctx, rw, r.blockID, r.data)
 	if err != nil {
+		// CAUTION: here we assume that if something is already stored for our blockID, then the data is identical.
+		// This only holds true for sealed execution results, whose consistency has previously been verified by
+		// comparing the data's hash to commitments in the execution result.
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			return nil
 		}
