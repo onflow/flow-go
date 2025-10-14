@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/access"
 	"testing"
 	"time"
 
@@ -400,7 +401,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
 		assert.Nil(s.T(), execDataRes)
 		assert.Nil(s.T(), metadata)
-		assert.Equal(s.T(), codes.NotFound, status.Code(err))
+		s.Require().True(access.IsDataNotFoundError(err))
 	})
 }
 

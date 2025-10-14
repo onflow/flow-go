@@ -4,11 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/access"
 	"time"
-
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -18,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 )
 
 type ExecutionDataResponse struct {
@@ -39,6 +38,22 @@ type ExecutionDataBackend struct {
 	executionStateCache     optimistic_sync.ExecutionStateCache
 }
 
+// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected errors:
+//   - access.DataNotFoundError - Returned when the requested data is not (yet) available.
+//     This includes:
+//   - Missing execution result info for the given block ID
+//   - Missing snapshot for the selected execution result
+//   - Missing block execution data
+//
+// Other errors:
+//   - An internal error converted via rpc.ConvertError (gRPC codes.Internal) may be returned for unexpected
+//     failures while reading from storage.
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -46,21 +61,18 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 ) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error) {
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "could not find execution result info: %v", err)
-		}
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", blockID.String(), err)
+		return nil, nil, access.NewDataNotFoundError("execution result info", err)
 
-		return nil, nil, rpc.ConvertError(err, "could not get execution result", codes.Internal)
 	}
 
 	executionResultID := execResultInfo.ExecutionResultID
 	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "could not find snapshot for execution result %s: %v", executionResultID, err)
-		}
-
-		return nil, nil, rpc.ConvertError(err, "failed to get snapshot for execution result", codes.Internal)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
+		return nil, nil, access.NewDataNotFoundError("snapshot", err)
 
 	}
 
@@ -68,10 +80,14 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	executionData, err := blockExecutionDataReader.ByBlockID(ctx, blockID)
 	if err != nil {
 		// need custom not found handler due to blob not found error
-		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) || errors.Is(err, subscription.ErrBlockNotReady) {
-			return nil, nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
+		if errors.Is(err, storage.ErrNotFound) ||
+			execution_data.IsBlobNotFoundError(err) ||
+			errors.Is(err, subscription.ErrBlockNotReady) {
+			err = fmt.Errorf("could not find execution data for block %s: %w", blockID, err)
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		}
 
+		// Anything else is unexpected; convert to internal and return (still benign for the node).
 		return nil, nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
 	}
 

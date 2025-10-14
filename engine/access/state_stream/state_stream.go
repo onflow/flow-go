@@ -18,6 +18,10 @@ const (
 // API represents an interface that defines methods for interacting with a blockchain's execution data and events.
 type API interface {
 	// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier, criteria optimistic_sync.Criteria) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error)
 	// SubscribeExecutionData is deprecated and will be removed in future versions.
 	// Use SubscribeExecutionDataFromStartBlockID, SubscribeExecutionDataFromStartBlockHeight or SubscribeExecutionDataFromLatest.
