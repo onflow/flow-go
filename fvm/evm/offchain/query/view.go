@@ -147,15 +147,15 @@ func (v *View) DryCall(
 		return nil, err
 	}
 
-	res, err := bv.DirectCall(
-		&types.DirectCall{
-			From:     types.NewAddress(from),
-			To:       types.NewAddress(to),
-			Data:     data,
-			Value:    value,
-			GasLimit: gasLimit,
-		},
-	)
+	call := &types.DirectCall{
+		From:     types.NewAddress(from),
+		To:       types.NewAddress(to),
+		Data:     data,
+		Value:    value,
+		GasLimit: gasLimit,
+	}
+	call.SkipTxGasLimitCheck()
+	res, err := bv.DirectCall(call)
 	if err != nil {
 		return nil, err
 	}
