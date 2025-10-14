@@ -21,9 +21,8 @@ type LightTransactionResultsReader interface {
 	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error)
 
 	// ByBlockID gets all transaction results for a block, ordered by transaction index
-	//
-	// Expected error returns during normal operation:
-	//   - [storage.ErrNotFound] if light transaction results at given blockID weren't found.
+	// CAUTION: this function returns the empty list in case for block IDs without known results.
+	// No error returns are expected during normal operations.
 	ByBlockID(id flow.Identifier) ([]flow.LightTransactionResult, error)
 }
 
@@ -36,7 +35,4 @@ type LightTransactionResults interface {
 	// hold it until the write batch has been committed.
 	// It returns [storage.ErrAlreadyExists] if light transaction results for the block already exist.
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error
-
-	// Deprecated: deprecated as a part of transition from Badger to Pebble. use BatchStore instead
-	BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch BatchStorage) error
 }

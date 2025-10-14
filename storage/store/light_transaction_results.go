@@ -99,11 +99,6 @@ func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.Rea
 	return nil
 }
 
-// Deprecated: panics
-func (tr *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch storage.BatchStorage) error {
-	panic("LightTransactionResults BatchStoreBadger not implemented")
-}
-
 // ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 //
 // Expected error returns during normal operation:
@@ -131,9 +126,8 @@ func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identi
 }
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
-//
-// Expected error returns during normal operation:
-//   - [storage.ErrNotFound] if light transaction results at given blockID weren't found.
+// CAUTION: this function returns the empty list in case for block IDs without known results.
+// No error returns are expected during normal operations.
 func (tr *LightTransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
 	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), blockID)
 	if err != nil {
