@@ -262,8 +262,8 @@ func TestScripts_Errors(t *testing.T) {
 			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
-		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
-		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
+		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
+		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
 
 		backend.AssertExpectations(t)
 	})
@@ -282,8 +282,8 @@ func TestScripts_Errors(t *testing.T) {
 			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
-		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
-		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
+		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
+		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
 
 		backend.AssertExpectations(t)
 	})
@@ -301,8 +301,8 @@ func TestScripts_Errors(t *testing.T) {
 			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
 			Once()
 
-		expectedResp := `{"code":400, "message":"Invalid Flow request: internal server error"}`
-		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
+		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
+		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
 
 		backend.AssertExpectations(t)
 	})
