@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -15,8 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
 )
 
 type ExecutionDataResponse struct {
