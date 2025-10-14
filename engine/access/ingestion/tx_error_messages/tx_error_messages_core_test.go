@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -149,7 +150,10 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 
 	// Mock the storage of the fetched error messages into the protocol database.
 	s.txErrorMessages.On("Store", mock.Anything, blockId, expectedStoreTxErrorMessages).
-		Return(nil).Once()
+		Return(func(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+			require.True(s.T(), lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage))
+			return nil
+		}).Once()
 
 	core := s.initCore()
 	err := core.FetchErrorMessages(irrecoverableCtx, blockId)
@@ -234,7 +238,10 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 		// Simulate an error when attempting to store the fetched transaction error messages in storage.
 		expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
 		s.txErrorMessages.On("Store", mock.Anything, blockId, expectedStoreTxErrorMessages).
-			Return(fmt.Errorf("storage error")).Once()
+			Return(func(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+				require.True(s.T(), lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage))
+				return fmt.Errorf("storage error")
+			}).Once()
 
 		core := s.initCore()
 		err := core.FetchErrorMessages(irrecoverableCtx, blockId)

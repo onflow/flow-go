@@ -144,6 +144,7 @@ func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Ident
 	i.results.
 		On("BatchStore", mock.Anything, mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
 		Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, blockID flow.Identifier, results []flow.LightTransactionResult) error {
+			require.True(i.t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, results)
 		})
@@ -177,7 +178,11 @@ func (i *indexCoreTest) useDefaultEvents() *indexCoreTest {
 func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 	i.results.
 		On("BatchStore", mock.Anything, mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
-		Return(nil)
+		Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, _ flow.Identifier, _ []flow.LightTransactionResult) error {
+			require.True(i.t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
+			require.NotNil(i.t, batch)
+			return nil
+		})
 	return i
 }
 

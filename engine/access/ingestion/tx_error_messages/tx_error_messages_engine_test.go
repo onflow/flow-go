@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -253,8 +254,10 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 		// Mock the storage of the fetched error messages into the protocol database.
 		s.txErrorMessages.On("Store", mock.Anything, blockID, expectedStoreTxErrorMessages).Return(nil).
 			Run(func(args mock.Arguments) {
-				// Ensure the test does not complete its work faster than necessary
-				wg.Done()
+				lctx, ok := args[0].(lockctx.Proof)
+				require.True(s.T(), ok, "expecting lock proof, but cast failed")
+				require.True(s.T(), lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage))
+				wg.Done() // Ensure the test does not complete its work faster than necessary
 			}).Once()
 	}
 
