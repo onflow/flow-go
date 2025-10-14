@@ -54,7 +54,7 @@ type VerificationConfig struct {
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
-	stopAtHeight                uint64 // height to stop the node on
+	stopAtHeight                 uint64 // height to stop the node on
 	scheduledTransactionsEnabled bool   // enable execution of scheduled transactions
 }
 

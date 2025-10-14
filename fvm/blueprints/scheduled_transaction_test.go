@@ -29,7 +29,7 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
-	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve callback scheduler import")
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve transaction scheduler import")
 	assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 	assert.Equal(t, tx.Authorizers, []flow.Address{chain.ServiceAddress()})
 	assert.Empty(t, tx.Arguments)
@@ -172,7 +172,7 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	tx := txs[0]
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
-	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve callback scheduler import")
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve transaction scheduler import")
 	assert.Equal(t, uint64(effort), tx.GasLimit)
 	assert.Len(t, tx.Arguments, 1)
 
