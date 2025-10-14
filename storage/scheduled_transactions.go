@@ -29,10 +29,11 @@ type ScheduledTransactions interface {
 	ScheduledTransactionsReader
 
 	// BatchIndex indexes the scheduled transaction by its block ID, transaction ID, and scheduled transaction ID.
-	// `scheduledTxID` is the uint64 id field returned by the system smart contract.
 	// `txID` is be the TransactionBody.ID of the scheduled transaction.
+	// `scheduledTxID` is the uint64 id field returned by the system smart contract.
 	// Requires the lock: [storage.LockIndexScheduledTransaction]
 	//
-	// No errors are expected during normal operation.
+	// Expected error returns during normal operation:
+	//   - [storage.ErrAlreadyExists]: if the scheduled transaction is already indexed
 	BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch ReaderBatchWriter) error
 }
