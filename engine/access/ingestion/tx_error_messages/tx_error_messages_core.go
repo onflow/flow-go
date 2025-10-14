@@ -66,6 +66,15 @@ func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID fl
 	return c.FetchErrorMessagesByENs(ctx, blockID, execNodes)
 }
 
+// FetchErrorMessagesByENs requests the transaction result error messages for the specified block ID from
+// any of the given execution nodes and persists them once retrieved. This function blocks until ingesting
+// the tx error messages is completed or failed.
+//
+// Note that transaction error messages are auxiliary data provided by the Execution Nodes on a goodwill basis and
+// not protected by the protocol. Execution Error messages might be non-deterministic, i.e. potentially different
+// for different execution nodes. Hence, we also persist which execution node (`execNode) provided the error message.
+//
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -75,7 +84,6 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	if err != nil {
 		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
 	}
-
 	if exists {
 		return nil
 	}
@@ -104,14 +112,10 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	return nil
 }
 
-// storeTransactionResultErrorMessages stores the transaction result error messages for a given block ID.
+// storeTransactionResultErrorMessages persists and indexes all transaction result error messages for the given blockID.
+// The caller must acquire [storage.LockInsertTransactionResultErrMessage] and hold it until the write batch has been committed.
 //
-// Parameters:
-// - blockID: The identifier of the block for which the error messages are to be stored.
-// - errorMessagesResponses: A slice of responses containing the error messages to be stored.
-// - execNode: The execution node associated with the error messages.
-//
-// No errors are expected during normal operation.
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (c *TxErrorMessagesCore) storeTransactionResultErrorMessages(
 	blockID flow.Identifier,
 	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,

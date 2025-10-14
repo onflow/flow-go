@@ -71,6 +71,10 @@ func NewLightTransactionResults(collector module.CacheMetrics, db storage.DB, tr
 	}
 }
 
+// BatchStore persists and indexes all transaction results (light representation) for the given blockID
+// as part of the provided batch. The caller must acquire [storage.LockInsertLightTransactionResult] and
+// hold it until the write batch has been committed.
+// It returns [storage.ErrAlreadyExists] if light transaction results for the block already exist.
 func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error {
 	// requires [storage.LockInsertLightTransactionResult]
 	err := operation.InsertAndIndexLightTransactionResults(lctx, rw, blockID, transactionResults)
@@ -95,11 +99,15 @@ func (tr *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.Rea
 	return nil
 }
 
+// Deprecated: panics
 func (tr *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch storage.BatchStorage) error {
 	panic("LightTransactionResults BatchStoreBadger not implemented")
 }
 
 // ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if light transaction result at given blockID wasn't found.
 func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.LightTransactionResult, error) {
 	key := KeyFromBlockIDTransactionID(blockID, txID)
 	transactionResult, err := tr.cache.Get(tr.db.Reader(), key)
@@ -110,6 +118,9 @@ func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifie
 }
 
 // ByBlockIDTransactionIndex returns the transaction result for the given blockID and transaction index
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if light transaction result at given blockID and txIndex wasn't found.
 func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error) {
 	key := KeyFromBlockIDIndex(blockID, txIndex)
 	transactionResult, err := tr.indexCache.Get(tr.db.Reader(), key)
@@ -120,6 +131,9 @@ func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identi
 }
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if light transaction results at given blockID weren't found.
 func (tr *LightTransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
 	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), blockID)
 	if err != nil {

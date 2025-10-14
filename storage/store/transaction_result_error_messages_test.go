@@ -113,6 +113,8 @@ func TestReadingNotStoreTransactionResultErrorMessage(t *testing.T) {
 	})
 }
 
+// Test that attempting to batch store transaction result error messages for a block ID that already exists
+// results in a [storage.ErrAlreadyExists] error, and that the original messages remain unchanged.
 func TestBatchStoreTransactionResultErrorMessagesErrAlreadyExists(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -175,6 +177,9 @@ func TestBatchStoreTransactionResultErrorMessagesErrAlreadyExists(t *testing.T) 
 	})
 }
 
+// Test that attempting to batch store transaction result error messages without holding the required lock
+// results in an error indicating the missing lock. The implementation should not conflate this error
+// case with data for the same key already existing, ie. it should not return [storage.ErrAlreadyExists].
 func TestBatchStoreTransactionResultErrorMessagesMissingLock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -201,10 +206,14 @@ func TestBatchStoreTransactionResultErrorMessagesMissingLock(t *testing.T) {
 			return st.BatchStore(lctx, rw, blockID, txResultErrMsgs)
 		})
 		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrAlreadyExists)
 		require.Contains(t, err.Error(), "lock_insert_transaction_result_message")
 	})
 }
 
+// Test that attempting to batch store transaction result error messages while holding the wrong lock
+// results in an error indicating the incorrect lock. The implementation should not conflate this error
+// case with data for the same key already existing, ie. it should not return [storage.ErrAlreadyExists].
 func TestBatchStoreTransactionResultErrorMessagesWrongLock(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -230,6 +239,7 @@ func TestBatchStoreTransactionResultErrorMessagesWrongLock(t *testing.T) {
 			})
 		})
 		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrAlreadyExists)
 		require.Contains(t, err.Error(), "lock_insert_transaction_result_message")
 	})
 }

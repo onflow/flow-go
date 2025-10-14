@@ -88,9 +88,13 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.metrics = metrics.NewNoopCollector()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
+
+	// Initialize database and lock manager
 	pdb, dbDir := unittest.TempPebbleDB(s.T())
 	s.db = pebbleimpl.ToDB(pdb)
 	s.dbDir = dbDir
+	s.lockManager = storage.NewTestingLockManager()
+
 	// mock out protocol state
 	s.proto.state = protocol.NewFollowerState(s.T())
 	s.proto.snapshot = protocol.NewSnapshot(s.T())
@@ -106,9 +110,6 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	err := s.indexReporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
-
-	// Initialize lock manager for tests
-	s.lockManager = storage.NewTestingLockManager()
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
