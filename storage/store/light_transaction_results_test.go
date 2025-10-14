@@ -20,22 +20,22 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		store1 := store.NewLightTransactionResults(metrics, db, 1000)
+		txResultsStore := store.NewLightTransactionResults(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txResults := getLightTransactionResultsFixture(10)
 
-		t.Run("batch store1 results", func(t *testing.T) {
+		t.Run("batch txResultsStore results", func(t *testing.T) {
 			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return store1.BatchStore(lctx, rw, blockID, txResults)
+					return txResultsStore.BatchStore(lctx, rw, blockID, txResults)
 				})
 			}))
 
 			// add a results to a new block to validate they are not included in lookups
 			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return store1.BatchStore(lctx, rw, unittest.IdentifierFixture(), getLightTransactionResultsFixture(2))
+					return txResultsStore.BatchStore(lctx, rw, unittest.IdentifierFixture(), getLightTransactionResultsFixture(2))
 				})
 			}))
 
@@ -43,7 +43,7 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 
 		t.Run("read results with cache", func(t *testing.T) {
 			for _, txResult := range txResults {
-				actual, err := store1.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+				actual, err := txResultsStore.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 				require.NoError(t, err)
 				assert.Equal(t, txResult, *actual)
 			}
@@ -63,7 +63,7 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 		t.Run("cached and non-cached results are equal", func(t *testing.T) {
 			// check retrieving by index from both cache and db
 			for i := len(txResults) - 1; i >= 0; i-- {
-				actual, err := store1.ByBlockIDTransactionIndex(blockID, uint32(i))
+				actual, err := txResultsStore.ByBlockIDTransactionIndex(blockID, uint32(i))
 				require.NoError(t, err)
 				assert.Equal(t, txResults[i], *actual)
 
@@ -74,7 +74,7 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 		})
 
 		t.Run("read all results for block", func(t *testing.T) {
-			actuals, err := store1.ByBlockID(blockID)
+			actuals, err := txResultsStore.ByBlockID(blockID)
 			require.NoError(t, err)
 
 			assert.Equal(t, len(txResults), len(actuals))
@@ -88,16 +88,16 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 func TestReadingNotStoredLightTransactionResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store1 := store.NewLightTransactionResults(metrics, db, 1000)
+		txResultsStore := store.NewLightTransactionResults(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
 		txIndex := rand.Uint32()
 
-		_, err := store1.ByBlockIDTransactionID(blockID, txID)
+		_, err := txResultsStore.ByBlockIDTransactionID(blockID, txID)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		_, err = store1.ByBlockIDTransactionIndex(blockID, txIndex)
+		_, err = txResultsStore.ByBlockIDTransactionIndex(blockID, txIndex)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
