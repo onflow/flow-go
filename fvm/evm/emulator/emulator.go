@@ -114,18 +114,26 @@ type BlockView struct {
 
 // DirectCall executes a direct call
 func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err error) {
-	if call.TxGasLimitEnabled() && call.GasLimit > gethParams.MaxTxGas {
-		res := &types.Result{
-			TxType:          call.Type,
-			TxHash:          call.Hash(),
-			ValidationError: fmt.Errorf("%w (cap: %d, tx: %d)", core.ErrGasLimitTooHigh, params.MaxTxGas, call.GasLimit),
-		}
-		return res, nil
-	}
 	// construct a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
+	}
+
+	if (proc.config.BlockContext.Time >= *bl.config.ChainConfig.OsakaTime) && call.TxGasLimitEnabled() && (call.GasLimit > gethParams.MaxTxGas) {
+		res := &types.Result{
+			TxType: call.Type,
+			TxHash: call.Hash(),
+		}
+		res.SetValidationError(
+			fmt.Errorf(
+				"%w (cap: %d, tx: %d)",
+				core.ErrGasLimitTooHigh,
+				params.MaxTxGas,
+				call.GasLimit,
+			),
+		)
+		return res, nil
 	}
 
 	// Set the nonce for the call (needed for some operations like deployment)

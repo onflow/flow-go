@@ -21,6 +21,10 @@ var (
 	PreviewnetPragueActivation = uint64(0)          // already on Prague for PreviewNet
 	TestnetPragueActivation    = uint64(1746723600) // Thu May 08 2025 17:00:00 GMT+0000 (10am PDT)
 	MainnetPragueActivation    = uint64(1747328400) // Thu May 15 2025 17:00:00 GMT+0000 (10am PDT)
+
+	PreviewnetFusakaActivation = uint64(0)          // already on Fusaka for PreviewNet
+	TestnetFusakaActivation    = uint64(1761695999) // Tuesday, October 28, 2025 11:59:59 PM
+	MainnetFusakaActivation    = uint64(1764806399) // Wednesday, December 3, 2025 11:59:59 PM
 )
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
@@ -100,6 +104,7 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		ShanghaiTime: &zero, // already on Shanghai
 		CancunTime:   &zero, // already on Cancun
 		PragueTime:   nil,   // this is conditionally set below
+		OsakaTime:    nil,   // this is conditionally set below
 		VerkleTime:   nil,   // not on Verkle
 	}
 
@@ -113,6 +118,10 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 
 	if chainID.Cmp(types.FlowEVMPreviewNetChainID) == 0 {
 		chainConfig.OsakaTime = &zero
+	} else if chainID.Cmp(types.FlowEVMTestNetChainID) == 0 {
+		chainConfig.OsakaTime = &TestnetFusakaActivation
+	} else if chainID.Cmp(types.FlowEVMMainNetChainID) == 0 {
+		chainConfig.OsakaTime = &MainnetFusakaActivation
 	}
 
 	return chainConfig
