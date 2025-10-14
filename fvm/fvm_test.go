@@ -2926,7 +2926,7 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 			})
 }
 
-func TestFlowCallbackScheduler(t *testing.T) {
+func TestFlowTransactionScheduler(t *testing.T) {
 	ctxOpts := []fvm.Option{
 		fvm.WithScheduledTransactionsEnabled(true),
 	}

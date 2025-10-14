@@ -35,7 +35,7 @@ func (s *VerifyScheduledTransactionsuite) TestVerifyScheduledCallback() {
 	// Deploy the test contract first
 	err := lib.DeployScheduledTransactionTestContract(
 		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
+		sdk.Address(sc.FlowTransactionScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
 		sdk.Address(sc.FungibleToken.Address),
 		sdk.Identifier(s.net.Root().ID()),
@@ -53,7 +53,7 @@ func (s *VerifyScheduledTransactionsuite) TestVerifyScheduledCallback() {
 	callbackID, err := lib.ScheduleTransactionAtTimestamp(
 		futureTimestamp,
 		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
+		sdk.Address(sc.FlowTransactionScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
 		sdk.Address(sc.FungibleToken.Address),
 	)
@@ -71,7 +71,7 @@ func (s *VerifyScheduledTransactionsuite) TestVerifyScheduledCallback() {
 	}, 30*time.Second, 1000*time.Millisecond)
 
 	// make sure callback executed event was emitted
-	eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.Executed", sc.FlowCallbackScheduler.Address)
+	eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.Executed", sc.FlowTransactionScheduler.Address)
 	events, err := s.AccessClient().GetEventsForHeightRange(context.Background(), eventTypeString, blockA.HeaderBody.Height, sealedBlock.Height)
 	require.NoError(s.T(), err)
 
