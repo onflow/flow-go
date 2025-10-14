@@ -102,6 +102,94 @@ func TestReadingNotStoredLightTransactionResults(t *testing.T) {
 	})
 }
 
+// Test that attempting to batch store light transaction results for a block ID that already exists
+// results in a [storage.ErrAlreadyExists] error, and that the original data remains unchanged.
+func TestBatchStoreLightTransactionResultsErrAlreadyExists(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		txResultsStore := store.NewLightTransactionResults(metrics, db, 1000)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := getLightTransactionResultsFixture(3)
+
+		// First batch store should succeed
+		err := unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return txResultsStore.BatchStore(lctx, rw, blockID, txResults)
+			})
+		})
+		require.NoError(t, err)
+
+		// Second batch store with the same blockID should fail with ErrAlreadyExists
+		duplicateTxResults := getLightTransactionResultsFixture(2)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertLightTransactionResult, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return txResultsStore.BatchStore(lctx, rw, blockID, duplicateTxResults)
+			})
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+
+		// Verify that the original data is unchanged
+		actuals, err := txResultsStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Equal(t, len(txResults), len(actuals))
+		for i := range txResults {
+			assert.Equal(t, txResults[i], actuals[i])
+		}
+	})
+}
+
+// Test that attempting to batch store light transaction results without holding the required lock
+// results in an error indicating the missing lock. The implementation should not conflate this error
+// case with data for the same key already existing, ie. it should not return [storage.ErrAlreadyExists].
+func TestBatchStoreLightTransactionResultsMissingLock(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		txResultsStore := store.NewLightTransactionResults(metrics, db, 1000)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := getLightTransactionResultsFixture(3)
+
+		// Create a context without the required lock
+		lockManager := storage.NewTestingLockManager()
+		lctx := lockManager.NewContext()
+		defer lctx.Release()
+
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return txResultsStore.BatchStore(lctx, rw, blockID, txResults)
+		})
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrAlreadyExists)
+		require.Contains(t, err.Error(), "lock_insert_light_transaction_result")
+	})
+}
+
+// Test that attempting to batch store light transaction results while holding the wrong lock
+// results in an error indicating the incorrect lock. The implementation should not conflate this error
+// case with data for the same key already existing, ie. it should not return [storage.ErrAlreadyExists].
+func TestBatchStoreLightTransactionResultsWrongLock(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		txResultsStore := store.NewLightTransactionResults(metrics, db, 1000)
+
+		blockID := unittest.IdentifierFixture()
+		txResults := getLightTransactionResultsFixture(3)
+
+		// Try to use the wrong lock
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return txResultsStore.BatchStore(lctx, rw, blockID, txResults)
+			})
+		})
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrAlreadyExists)
+		require.Contains(t, err.Error(), "lock_insert_light_transaction_result")
+	})
+}
+
 func getLightTransactionResultsFixture(n int) []flow.LightTransactionResult {
 	txResults := make([]flow.LightTransactionResult, 0, n)
 	for i := 0; i < n; i++ {
