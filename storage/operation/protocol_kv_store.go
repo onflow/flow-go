@@ -11,7 +11,8 @@ import (
 )
 
 // InsertProtocolKVStore inserts a protocol KV store by protocol kv store ID.
-// The caller must ensure the protocolKVStoreID is the hash of the given kvStore,
+// This function can be called, and does not require the caller to hold any lock proof,
+// but the caller must ensure the protocolKVStoreID is the hash of the given kvStore,
 // This is currently true, see makeVersionedModelID in state/protocol/protocol_state/kvstore/models.go
 // No expected error returns during normal operations.
 func InsertProtocolKVStore(rw storage.ReaderBatchWriter, protocolKVStoreID flow.Identifier, kvStore *flow.PSKeyValueStoreData) error {
@@ -27,9 +28,12 @@ func RetrieveProtocolKVStore(r storage.Reader, protocolKVStoreID flow.Identifier
 
 // IndexProtocolKVStore indexes a protocol KV store by block ID.
 //
-// CAUTION: To prevent data corruption, we need to guarantee atomicity of existence-check and the subsequent
-// database write. Hence, we require the caller to acquire [storage.LockInsertBlock] and hold it until the
-// database write has been committed.
+// CAUTION:
+//   - The caller must acquire the lock [storage.LockInsertBlock] and hold it until the database write has been committed.
+//   - OVERWRITES existing data (potential for data corruption):
+//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY within this write operation. Currently it's done by operation.InsertHeader where it performs a check
+//     to ensure the blockID is new, therefore any data indexed by this blockID is new as well.
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if a KV store for the given blockID has already been indexed
