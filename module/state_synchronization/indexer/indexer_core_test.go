@@ -223,7 +223,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	blocks := g.Blocks().List(4)
 
-	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1].ToHeader())
+	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1])
 	blockID := tf.Block.ID()
 
 	blocks = append(blocks, tf.Block)
@@ -497,7 +497,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 func TestCollectScheduledTransactions(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	blocks := g.Blocks().List(5)
-	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1].ToHeader())
+	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1])
 
 	chainID := g.ChainID()
 	fvmEnv := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()

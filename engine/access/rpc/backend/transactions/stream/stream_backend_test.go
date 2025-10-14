@@ -8,14 +8,13 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -30,12 +29,12 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -102,8 +101,7 @@ type TransactionStreamSuite struct {
 	db                  storage.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
-
-	systemTx *flow.TransactionBody
+	systemCollection    *system.SystemCollection
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -148,7 +146,7 @@ func (s *TransactionStreamSuite) SetupTest() {
 	s.eventIndex = index.NewEventsIndex(s.indexReporter, s.events)
 	s.txResultIndex = index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults)
 
-	s.systemTx, err = blueprints.SystemChunkTransaction(s.chainID.Chain())
+	s.systemCollection, err = system.DefaultSystemCollection(s.chainID, true)
 	s.Require().NoError(err)
 
 	s.fixedExecutionNodeIDs = nil
@@ -242,10 +240,10 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.eventIndex,
 		s.txResultIndex,
 		errorMessageProvider,
-		s.systemTx.ID(),
+		s.systemCollection,
 		txStatusDeriver,
 		s.chainID,
-		true, // scheduledCallbacksEnabled
+		true, // scheduledTransactionsEnabled
 	)
 
 	execNodeTxProvider := provider.NewENTransactionProvider(
@@ -256,9 +254,9 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		nodeCommunicator,
 		execNodeProvider,
 		txStatusDeriver,
-		s.systemTx.ID(),
+		s.systemCollection,
 		s.chainID,
-		true, // scheduledCallbacksEnabled
+		true, // scheduledTransactionsEnabled
 	)
 
 	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
@@ -308,7 +306,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Metrics:                     metrics.NewNoopCollector(),
 		State:                       s.state,
 		ChainID:                     s.chainID,
-		SystemTxID:                  s.systemTx.ID(),
+		SystemCollection:            s.systemCollection,
 		StaticCollectionRPCClient:   client,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,
