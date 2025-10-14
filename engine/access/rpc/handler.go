@@ -821,7 +821,7 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 	}, nil
 }
 
-// ExecuteScriptAtLatestBlock executes a script at a the latest block.
+// ExecuteScriptAtLatestBlock executes a script at the latest block.
 func (h *Handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.ExecuteScriptAtLatestBlockRequest,
@@ -842,7 +842,7 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 		convert.NewCriteria(executionState),
 	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
@@ -878,7 +878,7 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 		convert.NewCriteria(executionState),
 	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
@@ -913,7 +913,7 @@ func (h *Handler) ExecuteScriptAtBlockID(
 		convert.NewCriteria(executionState),
 	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
@@ -1580,7 +1580,7 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 // buildMetadataResponse builds and returns the metadata response object.
 // Expected errors during normal operation:
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-//   - storage.ErrHeightNotIndexed when data is unavailable
+//   - codes.OutOfRange when data is unavailable
 func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()

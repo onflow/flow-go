@@ -303,10 +303,17 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flo
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -319,7 +326,7 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err, "ExecuteScriptAtLatestBlock")
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -330,7 +337,15 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	return executeScriptAtLatestBlockResponse.Value, metadata, nil
 }
 
-// ExecuteScriptAtBlockHeight executes script at the given block height .
+// ExecuteScriptAtBlockHeight executes script at the given block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+// - access.DataNotFoundError - No header with the given height was found
 func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -340,7 +355,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -354,7 +369,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err, "ExecuteScriptAtBlockHeight")
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -365,7 +380,15 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	return executeScriptAtBlockHeightResponse.Value, metadata, nil
 }
 
-// ExecuteScriptAtBlockID executes script at the given block id .
+// ExecuteScriptAtBlockID executes script at the given block id.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+// - access.DataNotFoundError - No header with the given ID was found
 func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -375,7 +398,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -389,7 +412,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err, "ExecuteScriptAtBlockID")
 	}
 
 	var metadata *accessmodel.ExecutorMetadata

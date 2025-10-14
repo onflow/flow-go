@@ -8,8 +8,6 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -23,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -112,6 +109,15 @@ func NewScriptsBackend(
 }
 
 // ExecuteScriptAtLatestBlock executes provided script at the latest sealed block.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected errors:
+//   - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+//   - access.DataNotFoundError - no execution result info with the given block ID was found
 func (b *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
@@ -119,15 +125,14 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	userCriteria optimistic_sync.Criteria,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, nil, access.NewInvalidRequestError(commonrpc.ErrScriptTooLarge)
 	}
 
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, nil, err
+		err = fmt.Errorf("failed to lookup latest sealed header: %w", err)
+		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(
@@ -135,7 +140,9 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		userCriteria,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", latestHeader.ID(), err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound, common.InsufficientExecutionReceipts{})
+		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", latestHeader.ID(), err)
+		return nil, nil, access.NewDataNotFoundError("execution result info", err)
 	}
 
 	res, metadata, _, err := b.executor.Execute(
@@ -146,6 +153,15 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 }
 
 // ExecuteScriptAtBlockID executes provided script at the provided block ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected errors:
+//   - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+//   - access.DataNotFoundError - no header or execution result info with the given block ID was found
 func (b *Scripts) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -154,17 +170,21 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	userCriteria optimistic_sync.Criteria,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, nil, access.NewInvalidRequestError(commonrpc.ErrScriptTooLarge)
 	}
 
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
-		return nil, nil, commonrpc.ConvertStorageError(err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to find header by ID: %w", err)
+		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, userCriteria)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", blockID.String(), err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound, common.InsufficientExecutionReceipts{})
+		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", blockID.String(), err)
+		return nil, nil, access.NewDataNotFoundError("execution result info", err)
 	}
 
 	res, metadata, _, err := b.executor.Execute(
@@ -175,6 +195,15 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 }
 
 // ExecuteScriptAtBlockHeight executes provided script at the provided block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected errors:
+//   - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+//   - access.DataNotFoundError - no header with the given height or execution result info with the given block ID was found
 func (b *Scripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -183,17 +212,22 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 	userCriteria optimistic_sync.Criteria,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	if !commonrpc.CheckScriptSize(script, arguments, b.maxScriptAndArgumentSize) {
-		return nil, nil, status.Error(codes.InvalidArgument, commonrpc.ErrScriptTooLarge.Error())
+		return nil, nil, access.NewInvalidRequestError(commonrpc.ErrScriptTooLarge)
 	}
 
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, nil, commonrpc.ConvertStorageError(common.ResolveHeightError(b.state.Params(), blockHeight, err))
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = common.ResolveHeightError(b.state.Params(), blockHeight, err)
+		err = fmt.Errorf("failed to find header by height: %w", err)
+		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), userCriteria)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result for block ID %s: %w", header.ID(), err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound, common.InsufficientExecutionReceipts{})
+		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", header.ID(), err)
+		return nil, nil, access.NewDataNotFoundError("execution result info", err)
 	}
 
 	res, metadata, _, err := b.executor.Execute(

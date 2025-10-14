@@ -47,6 +47,9 @@ func NewLocalScriptExecutor(
 	}
 }
 
+// Execute
+// Expected errors during normal operation:
+//   - storage.ErrNotFound - result is not available, not ready for querying, or does not descend from the latest sealed result.
 func (l *LocalScriptExecutor) Execute(
 	ctx context.Context,
 	r *Request,

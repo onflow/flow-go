@@ -50,7 +50,7 @@ func NewExecutionResultInfoProvider(
 // based on the provided criteria.
 //
 // Expected errors during normal operations:
-//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - common.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - storage.ErrNotFound - if the request is for the spork root block and the node was bootstrapped
 //     from a newer block.
 func (e *Provider) ExecutionResultInfo(

@@ -43,7 +43,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToStatusError(err)
 		}
 
 		return buildResponse(value, executorMetadata), nil
@@ -58,7 +58,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToStatusError(err)
 		}
 
 		return buildResponse(value, executorMetadata), nil
@@ -67,7 +67,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 	if req.BlockHeight == request.FinalHeight {
 		finalBlock, _, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.BlockHeight = finalBlock.Height
 	}
@@ -80,7 +80,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 		models.NewCriteria(req.ExecutionState),
 	)
 	if err != nil {
-		return nil, err
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	return buildResponse(value, executorMetadata), nil

@@ -45,8 +45,35 @@ type EventsAPI interface {
 }
 
 type ScriptsAPI interface {
+	// ExecuteScriptAtLatestBlock executes script at latest block.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+	// - access.DataNotFoundError - no execution result info with the given block ID was found
 	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
+	// ExecuteScriptAtBlockHeight executes script at the given block height .
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+	// - access.DataNotFoundError - No header with the given height was found
 	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
+	// ExecuteScriptAtBlockID executes script at the given block id .
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected sentinel errors providing details to clients about failed requests:
+	// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+	// - access.DataNotFoundError - No header with the given ID was found
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 }
 
