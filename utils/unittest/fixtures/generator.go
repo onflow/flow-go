@@ -263,7 +263,7 @@ func (g *GeneratorSuite) LedgerPaths() *LedgerPathGenerator {
 
 // LedgerPayloads returns a generator for [ledger.Payload].
 func (g *GeneratorSuite) LedgerPayloads() *LedgerPayloadGenerator {
-	return NewLedgerPayloadGenerator(g.Random(), g.LedgerValues())
+	return NewLedgerPayloadGenerator(g.Random(), g.Addresses(), g.LedgerValues())
 }
 
 // LedgerValues returns a generator for [ledger.Value].
@@ -385,4 +385,14 @@ func (g *GeneratorSuite) EpochRecovers() *EpochRecoverGenerator {
 		g.EpochSetups(),
 		g.EpochCommits(),
 	)
+}
+
+// RegisterEntries returns a generator for [flow.RegisterEntry].
+func (g *GeneratorSuite) RegisterEntries() *RegisterEntryGenerator {
+	return NewRegisterEntryGenerator(g.Random(), g.LedgerPayloads())
+}
+
+// TransactionErrorMessages returns a generator for [flow.TransactionResultErrorMessage].
+func (g *GeneratorSuite) TransactionErrorMessages() *TransactionErrorMessageGenerator {
+	return NewTransactionErrorMessageGenerator(g.Random(), g.Identifiers())
 }

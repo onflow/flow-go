@@ -1,4 +1,4 @@
-package unsynchronized
+package inmemory
 
 import (
 	"testing"
@@ -11,10 +11,9 @@ import (
 )
 
 func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
-	storage := NewTransactionResultErrorMessages()
 
 	// Define block ID and error messages
-	block := unittest.BlockFixture()
+	blockID := unittest.IdentifierFixture()
 	txResults := unittest.TransactionResultsFixture(2)
 	errorMessages := []flow.TransactionResultErrorMessage{
 		{
@@ -31,28 +30,21 @@ func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 		},
 	}
 
-	// Store error messages
-	err := storage.Store(block.ID(), errorMessages)
-	require.NoError(t, err)
+	storage := NewTransactionResultErrorMessages(blockID, errorMessages)
 
 	// Retrieve by BlockID and TransactionID
-	retrievedErrorMessage, err := storage.ByBlockIDTransactionID(block.ID(), errorMessages[0].TransactionID)
+	retrievedErrorMessage, err := storage.ByBlockIDTransactionID(blockID, errorMessages[0].TransactionID)
 	require.NoError(t, err)
 	assert.Equal(t, &errorMessages[0], retrievedErrorMessage)
 
 	// Retrieve by BlockID and Index
-	retrievedErrorMessageByIndex, err := storage.ByBlockIDTransactionIndex(block.ID(), 0)
+	retrievedErrorMessageByIndex, err := storage.ByBlockIDTransactionIndex(blockID, 0)
 	require.NoError(t, err)
 	assert.Equal(t, &errorMessages[0], retrievedErrorMessageByIndex)
 
 	// Retrieve by BlockID
-	retrievedErrorMessages, err := storage.ByBlockID(block.ID())
+	retrievedErrorMessages, err := storage.ByBlockID(blockID)
 	require.NoError(t, err)
 	assert.Len(t, retrievedErrorMessages, len(errorMessages))
 	assert.Equal(t, errorMessages, retrievedErrorMessages)
-
-	// Extract structured data
-	messages := storage.Data()
-	require.Len(t, messages, len(errorMessages))
-	require.ElementsMatch(t, messages, errorMessages)
 }
