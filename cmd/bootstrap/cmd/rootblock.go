@@ -238,7 +238,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	// read the previously created cluster assignment (see cmd/bootstrap/cmd/clustering.go)
 	clusteringData := readIntermediaryClusteringData()
 	if flagEpochCounter != clusteringData.EpochCounter {
-		log.Fatal().Msgf("Epoch counter does not match the one used to generate collector clusters")
+		log.Fatal().Msgf("epoch counter does not match the one used to generate collector clusters")
 	}
 	clusters := clusteringData.Clusters
 	log.Info().Msg("reading votes for collection node cluster root blocks")
