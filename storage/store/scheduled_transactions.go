@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -57,19 +58,19 @@ func NewScheduledTransactions(collector module.CacheMetrics, db storage.DB, cach
 }
 
 // BatchIndex indexes the scheduled transaction by its block ID, transaction ID, and scheduled transaction ID.
-// `scheduledTxID` is the uint64 id field returned by the system smart contract.
 // `txID` is be the TransactionBody.ID of the scheduled transaction.
+// `scheduledTxID` is the uint64 id field returned by the system smart contract.
+// Requires the lock: [storage.LockIndexScheduledTransaction]
 //
-// No errors are expected during normal operation.
-func (st *ScheduledTransactions) BatchIndex(blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
-	writer := batch.Writer()
-
-	err := operation.BatchIndexScheduledTransactionID(writer, scheduledTxID, txID)
+// Expected error returns during normal operation:
+//   - [storage.ErrAlreadyExists]: if the scheduled transaction is already indexed
+func (st *ScheduledTransactions) BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
+	err := operation.IndexScheduledTransactionID(lctx, batch, scheduledTxID, txID)
 	if err != nil {
 		return fmt.Errorf("failed to batch index scheduled transaction: %w", err)
 	}
 
-	err = operation.BatchIndexScheduledTransactionBlockID(writer, txID, blockID)
+	err = operation.IndexScheduledTransactionBlockID(lctx, batch, txID, blockID)
 	if err != nil {
 		return fmt.Errorf("failed to batch index scheduled transaction block ID: %w", err)
 	}

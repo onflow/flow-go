@@ -1,6 +1,9 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -22,16 +25,44 @@ func RetrieveBlockIDByScheduledTransactionID(r storage.Reader, txID flow.Identif
 	return RetrieveByKey(r, MakePrefix(codeBlockIDByScheduledTransactionID, txID), blockID)
 }
 
-// BatchIndexScheduledTransactionID indexes the scheduled transaction's transaction ID by its scheduled transaction ID.
+// IndexScheduledTransactionID indexes the scheduled transaction's transaction ID by its scheduled transaction ID.
 //
-// No errors are expected during normal operation.
-func BatchIndexScheduledTransactionID(w storage.Writer, scheduledTxID uint64, txID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeTransactionIDByScheduledTransactionID, scheduledTxID), txID)
+// Expected error returns during normal operation:
+//   - [storage.ErrAlreadyExists]: if the scheduled transaction ID is already indexed
+func IndexScheduledTransactionID(lctx lockctx.Proof, rw storage.ReaderBatchWriter, scheduledTxID uint64, txID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockIndexScheduledTransaction) {
+		return fmt.Errorf("missing lock: %v", storage.LockIndexScheduledTransaction)
+	}
+
+	key := MakePrefix(codeTransactionIDByScheduledTransactionID, scheduledTxID)
+	exists, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("scheduled transaction ID already indexed: %w", storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, txID)
 }
 
-// BatchIndexScheduledTransactionBlockID indexes the scheduled transaction's block ID by its transaction ID.
+// IndexScheduledTransactionBlockID indexes the scheduled transaction's block ID by its transaction ID.
 //
-// No errors are expected during normal operation.
-func BatchIndexScheduledTransactionBlockID(w storage.Writer, txID flow.Identifier, blockID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeBlockIDByScheduledTransactionID, txID), blockID)
+// Expected error returns during normal operation:
+//   - [storage.ErrAlreadyExists]: if the scheduled transaction block ID is already indexed
+func IndexScheduledTransactionBlockID(lctx lockctx.Proof, rw storage.ReaderBatchWriter, txID flow.Identifier, blockID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockIndexScheduledTransaction) {
+		return fmt.Errorf("missing lock: %v", storage.LockIndexScheduledTransaction)
+	}
+
+	key := MakePrefix(codeBlockIDByScheduledTransactionID, txID)
+	exists, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("scheduled transaction block ID already indexed: %w", storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, blockID)
 }

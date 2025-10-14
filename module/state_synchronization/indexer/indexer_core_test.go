@@ -245,7 +245,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			test.collections.On("StoreAndIndexByTransaction", mock.Anything, collection).Return(&flow.LightCollection{}, nil)
 		}
 		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
-			test.scheduledTransactions.On("BatchIndex", blockID, txID, scheduledTxID, mock.Anything).Return(nil)
+			test.scheduledTransactions.On("BatchIndex", mock.Anything, blockID, txID, scheduledTxID, mock.Anything).Return(nil)
 		}
 
 		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())

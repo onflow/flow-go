@@ -38,12 +38,19 @@ func runTest(t *testing.T, g *fixtures.GeneratorSuite, db storage.DB, store *Sch
 		data[txID] = g.Random().Uint64()
 	}
 
+	lockManager := storage.NewTestingLockManager()
+	lctx := lockManager.NewContext()
+	defer lctx.Release()
+	if err := lctx.AcquireLock(storage.LockIndexScheduledTransaction); err != nil {
+		t.Fatalf("could not acquire lock for indexing scheduled transactions: %v", err)
+	}
+
 	// index data within a batch
 	batch := db.NewBatch()
 	defer batch.Close()
 
 	for txID, scheduledTxID := range data {
-		err := store.BatchIndex(blockID, txID, scheduledTxID, batch)
+		err := store.BatchIndex(lctx, blockID, txID, scheduledTxID, batch)
 		require.NoError(t, err)
 	}
 

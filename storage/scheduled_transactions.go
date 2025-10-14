@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -30,7 +31,8 @@ type ScheduledTransactions interface {
 	// BatchIndex indexes the scheduled transaction by its block ID, transaction ID, and scheduled transaction ID.
 	// `scheduledTxID` is the uint64 id field returned by the system smart contract.
 	// `txID` is be the TransactionBody.ID of the scheduled transaction.
+	// Requires the lock: [storage.LockIndexScheduledTransaction]
 	//
 	// No errors are expected during normal operation.
-	BatchIndex(blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch ReaderBatchWriter) error
+	BatchIndex(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch ReaderBatchWriter) error
 }

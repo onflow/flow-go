@@ -27,8 +27,10 @@ const (
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
-	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
+	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere)
 	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	// LockIndexScheduledTransaction protects the indexing of scheduled transactions.
+	LockIndexScheduledTransaction = "lock_index_scheduled_transaction"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -42,6 +44,7 @@ func Locks() []string {
 		LockInsertCollection,
 		LockBootstrapping,
 		LockInsertChunkDataPack,
+		LockIndexScheduledTransaction,
 	}
 }
 

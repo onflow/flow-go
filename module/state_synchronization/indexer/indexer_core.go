@@ -171,6 +171,12 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
 		}
 
+		lctx := c.lockManager.NewContext()
+		defer lctx.Release()
+		if err = lctx.AcquireLock(storage.LockIndexScheduledTransaction); err != nil {
+			return fmt.Errorf("could not acquire lock for indexing scheduled transactions: %w", err)
+		}
+
 		err = c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
 			if err != nil {
@@ -183,7 +189,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			}
 
 			for txID, scheduledTxID := range scheduledTransactionData {
-				err = c.scheduledTransactions.BatchIndex(data.BlockID, txID, scheduledTxID, rw)
+				err = c.scheduledTransactions.BatchIndex(lctx, data.BlockID, txID, scheduledTxID, rw)
 				if err != nil {
 					return fmt.Errorf("could not index scheduled transaction (%d) %s at height %d: %w", scheduledTxID, txID, header.Height, err)
 				}
