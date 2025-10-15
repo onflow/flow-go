@@ -28,7 +28,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 				}
 
 				// insert 100 chunk data packs
-				return unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx2 lockctx.Context) error {
+				return unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
 					for i := 0; i < 100; i++ {
 						collectionID := unittest.IdentifierFixture()
 						cdp := &storage.StoredChunkDataPack{
@@ -37,7 +37,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 							Proof:        []byte{'p'},
 							CollectionID: collectionID,
 						}
-						err := operation.InsertChunkDataPack(lctx2, rw, cdp)
+						err := operation.InsertChunkDataPack(rw, cdp.ID(), cdp)
 						if err != nil {
 							return err
 						}
@@ -70,11 +70,11 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 
 		for i := 0; i < 256; i++ {
 			count := 0
-			if i == 102 { // events
+			if i == 102 { // events (codeEvent)
 				count = 30
-			} else if i == 100 { // CDP
+			} else if i == 100 { // CDP (codeChunkDataPack)
 				count = 100
-			} else if i == 36 { // results
+			} else if i == 36 { // results (codeExecutionResult)
 				count = 20
 			}
 			require.Equal(t, count, stats[byte(i)].Count, "byte %d", i)

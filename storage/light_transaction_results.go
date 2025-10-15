@@ -10,20 +10,19 @@ import (
 type LightTransactionResultsReader interface {
 	// ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 	//
-	// Expected errors during normal operation:
-	//   - `storage.ErrNotFound` if light transaction result at given blockID wasn't found.
+	// Expected error returns during normal operation:
+	//   - [storage.ErrNotFound] if light transaction result at given blockID wasn't found.
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.LightTransactionResult, error)
 
 	// ByBlockIDTransactionIndex returns the transaction result for the given blockID and transaction index
 	//
-	// Expected errors during normal operation:
-	//   - `storage.ErrNotFound` if light transaction result at given blockID and txIndex wasn't found.
+	// Expected error returns during normal operation:
+	//   - [storage.ErrNotFound] if light transaction result at given blockID and txIndex wasn't found.
 	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error)
 
 	// ByBlockID gets all transaction results for a block, ordered by transaction index
-	//
-	// Expected errors during normal operation:
-	//   - `storage.ErrNotFound` if light transaction results at given blockID weren't found.
+	// CAUTION: this function returns the empty list in case for block IDs without known results.
+	// No error returns are expected during normal operations.
 	ByBlockID(id flow.Identifier) ([]flow.LightTransactionResult, error)
 }
 
@@ -31,7 +30,9 @@ type LightTransactionResultsReader interface {
 type LightTransactionResults interface {
 	LightTransactionResultsReader
 
-	// BatchStore inserts a batch of transaction result into a batch
-	// it requires the caller to hold [storage.LockInsertLightTransactionResult]
-	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw ReaderBatchWriter) error
+	// BatchStore persists and indexes all transaction results (light representation) for the given blockID
+	// as part of the provided batch. The caller must acquire [storage.LockInsertLightTransactionResult] and
+	// hold it until the write batch has been committed.
+	// It returns [storage.ErrAlreadyExists] if light transaction results for the block already exist.
+	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error
 }

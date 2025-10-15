@@ -228,7 +228,7 @@ func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batc
 
 	saveBlockIDInBatchData(batch, batchDataKey, blockID)
 
-	return operation.BatchRemoveTransactionResultsByBlockID(blockID, batch)
+	return operation.RemoveTransactionResultsByBlockID(blockID, batch)
 }
 
 func saveBlockIDInBatchData(batch storage.ReaderBatchWriter, batchDataKey string, blockID flow.Identifier) {

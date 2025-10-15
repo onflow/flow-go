@@ -25,8 +25,6 @@ const (
 	LockInsertEvent = "lock_insert_event"
 	// LockInsertServiceEvent protects the insertion of service events.
 	LockInsertServiceEvent = "lock_insert_service_event"
-	// LockInsertLightTransactionResult protects the insertion of light transaction results.
-	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
 	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
 	LockInsertOwnReceipt       = "lock_insert_own_receipt"
@@ -40,6 +38,20 @@ const (
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
 	LockInsertChunkDataPack     = "lock_insert_chunk_data_pack"
 	LockIndexCollectionsByBlock = "lock_index_collections_by_block"
+	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
+	LockBootstrapping = "lock_bootstrapping"
+	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs
+	LockIndexChunkDataPackByChunkID = "lock_index_chunk_data_pack_by_chunk_id"
+	// LockInsertTransactionResultErrMessage protects the insertion of transaction result error messages
+	LockInsertTransactionResultErrMessage = "lock_insert_transaction_result_message"
+	// LockInsertLightTransactionResult protects the insertion of light transaction results
+	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
+	// LockInsertExecutionForkEvidence protects the insertion of execution fork evidence
+	LockInsertExecutionForkEvidence = "lock_insert_execution_fork_evidence"
+	LockInsertSafetyData            = "lock_insert_safety_data"
+	LockInsertLivenessData          = "lock_insert_liveness_data"
+	// LockIndexScheduledTransaction protects the indexing of scheduled transactions.
+	LockIndexScheduledTransaction = "lock_index_scheduled_transaction"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -60,6 +72,14 @@ func Locks() []string {
 		LockInsertInstanceParams,
 		LockInsertChunkDataPack,
 		LockIndexCollectionsByBlock,
+		LockBootstrapping,
+		LockIndexChunkDataPackByChunkID,
+		LockInsertTransactionResultErrMessage,
+		LockInsertLightTransactionResult,
+		LockInsertExecutionForkEvidence,
+		LockInsertSafetyData,
+		LockInsertLivenessData,
+		LockIndexScheduledTransaction,
 	}
 }
 
@@ -93,6 +113,7 @@ func makeLockPolicy() lockctx.Policy {
 
 		// EN to save execution result
 		// engine/execution/state/state.go#state.saveExecutionResults
+		Add(LockIndexChunkDataPackByChunkID, LockInsertOwnReceipt).
 		Add(LockInsertChunkDataPack, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertServiceEvent).
 		Add(LockInsertServiceEvent, LockInsertAndIndexTxResult).
@@ -108,6 +129,15 @@ func makeLockPolicy() lockctx.Policy {
 		// module/executiondatasync/optimistic_sync/persisters/block.go#BlockPersister.Persist
 		Add(LockInsertCollection, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertLightTransactionResult).
+		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockBootstrapping, LockInsertSafetyData).
+		Add(LockInsertSafetyData, LockInsertLivenessData).
+		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
+
+		// module/executiondatasync/optimistic_sync/persisters/block.go#Persist
+		Add(LockInsertCollection, LockInsertLightTransactionResult).
+		Add(LockInsertLightTransactionResult, LockInsertTransactionResultErrMessage).
+		Add(LockInsertLightTransactionResult, LockIndexScheduledTransaction).
 		Build()
 }
 

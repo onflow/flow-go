@@ -16,17 +16,17 @@ type LightTransactionResults struct {
 	mock.Mock
 }
 
-// BatchStore provides a mock function with given fields: lctx, blockID, transactionResults, rw
-func (_m *LightTransactionResults) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw storage.ReaderBatchWriter) error {
-	ret := _m.Called(lctx, blockID, transactionResults, rw)
+// BatchStore provides a mock function with given fields: lctx, rw, blockID, transactionResults
+func (_m *LightTransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error {
+	ret := _m.Called(lctx, rw, blockID, transactionResults)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, []flow.LightTransactionResult, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(lctx, blockID, transactionResults, rw)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, []flow.LightTransactionResult) error); ok {
+		r0 = rf(lctx, rw, blockID, transactionResults)
 	} else {
 		r0 = ret.Error(0)
 	}

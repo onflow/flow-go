@@ -196,3 +196,20 @@ func TestInsertAndIndexTransactionResults_MultipleResultsWithSameTransactionID(t
 		assert.Equal(t, results[1], actual) // Should be the last one stored
 	})
 }
+
+// TestRetrieveAllTxResultsForBlock verifies the working of persisting, indexing and retrieving
+// [flow.LightTransactionResult] by block, transaction ID, and transaction index.
+func TestRetrieveAllTxResultsForBlock(t *testing.T) {
+	t.Run("looking up transaction results for unknown block yields empty list", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			unknownBlockID := unittest.IdentifierFixture()
+			transactionResults := make([]flow.LightTransactionResult, 0)
+
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.LookupLightTransactionResultsByBlockIDUsingIndex(rw.GlobalReader(), unknownBlockID, &transactionResults)
+			})
+			require.NoError(t, err)
+			require.Empty(t, transactionResults)
+		})
+	})
+}

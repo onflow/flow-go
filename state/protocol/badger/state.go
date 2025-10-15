@@ -128,6 +128,20 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
+
+	err = lctx.AcquireLock(storage.LockBootstrapping)
+	if err != nil {
+		return nil, err
+	}
+	err = lctx.AcquireLock(storage.LockInsertSafetyData)
+	if err != nil {
+		return nil, err
+	}
+	err = lctx.AcquireLock(storage.LockInsertLivenessData)
+	if err != nil {
+		return nil, err
+	}
+
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
 		opt(config)
@@ -590,13 +604,12 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		NewestQC:    qcForLatestFinalizedBlock,
 	}
 
-	w := rw.Writer()
 	// persist safety and liveness data plus the QuorumCertificate for the latest finalized block for HotStuff/Jolteon consensus
-	err = operation.UpsertSafetyData(w, lastFinalized.ChainID, safetyData)
+	err = operation.UpsertSafetyData(lctx, rw, lastFinalized.ChainID, safetyData)
 	if err != nil {
 		return fmt.Errorf("could not insert safety data: %w", err)
 	}
-	err = operation.UpsertLivenessData(w, lastFinalized.ChainID, livenessData)
+	err = operation.UpsertLivenessData(lctx, rw, lastFinalized.ChainID, livenessData)
 	if err != nil {
 		return fmt.Errorf("could not insert liveness data: %w", err)
 	}
@@ -605,6 +618,7 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		return fmt.Errorf("could not insert quorum certificate for the latest finalized block: %w", err)
 	}
 
+	w := rw.Writer()
 	// insert height pointers
 	err = operation.UpsertFinalizedHeight(lctx, w, lastFinalized.Height)
 	if err != nil {
