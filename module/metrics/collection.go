@@ -84,14 +84,14 @@ func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
 // ClusterBlockFinalized updates the guaranteed collection size gauge and
 // finishes the tx->collection span for each constituent transaction.
 func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
-	chainID := block.ChainID
+	chainID := block.ChainID.String()
 
 	cc.finalizedHeight.
-		With(prometheus.Labels{LabelChain: chainID.String()}).
+		With(prometheus.Labels{LabelChain: chainID}).
 		Set(float64(block.Height))
 	cc.guarantees.
 		With(prometheus.Labels{
-			LabelChain: chainID.String(),
+			LabelChain: chainID,
 		}).
 		Observe(float64(block.Payload.Collection.Len()))
 }
@@ -106,13 +106,13 @@ func (cc *CollectionCollector) CollectionMaxSize(size uint) {
 // as each node will only report on cluster blocks where they are the proposer.
 // It reports several metrics, specifically how many transactions have been included and how many of them are priority txns.
 func (cc *CollectionCollector) ClusterBlockCreated(block *cluster.Block, priorityTxnsCount uint) {
-	chainID := block.ChainID
+	chainID := block.ChainID.String()
 
 	cc.collectionSize.
-		With(prometheus.Labels{LabelChain: chainID.String()}).
+		With(prometheus.Labels{LabelChain: chainID}).
 		Observe(float64(block.Payload.Collection.Len()))
 
 	cc.priorityTxns.
-		With(prometheus.Labels{LabelChain: chainID.String()}).
+		With(prometheus.Labels{LabelChain: chainID}).
 		Observe(float64(priorityTxnsCount))
 }
