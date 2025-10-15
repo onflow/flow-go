@@ -173,7 +173,6 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		err = storage.WithLocks(c.lockManager, []string{
 			storage.LockInsertEvent,
 			storage.LockInsertLightTransactionResult,
-			storage.LockInsertLightTransactionResult,
 			storage.LockIndexScheduledTransaction,
 		},
 			func(lctx lockctx.Context) error {

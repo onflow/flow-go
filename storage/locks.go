@@ -34,9 +34,7 @@ const (
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
 	// LockInsertInstanceParams protects data that is *exclusively* written during bootstrapping.
-	LockInsertInstanceParams = "lock_insert_instance_params"
-	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
-	LockInsertChunkDataPack     = "lock_insert_chunk_data_pack"
+	LockInsertInstanceParams    = "lock_insert_instance_params"
 	LockIndexCollectionsByBlock = "lock_index_collections_by_block"
 	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs
 	LockIndexChunkDataPackByChunkID = "lock_index_chunk_data_pack_by_chunk_id"
@@ -68,7 +66,6 @@ func Locks() []string {
 		LockInsertCollection,
 		LockInsertLightTransactionResult,
 		LockInsertInstanceParams,
-		LockInsertChunkDataPack,
 		LockIndexCollectionsByBlock,
 		LockIndexChunkDataPackByChunkID,
 		LockInsertTransactionResultErrMessage,
@@ -110,8 +107,7 @@ func makeLockPolicy() lockctx.Policy {
 
 		// EN to save execution result
 		// engine/execution/state/state.go#state.saveExecutionResults
-		Add(LockIndexChunkDataPackByChunkID, LockInsertOwnReceipt).
-		Add(LockInsertChunkDataPack, LockInsertEvent).
+		Add(LockIndexChunkDataPackByChunkID, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertServiceEvent).
 		Add(LockInsertServiceEvent, LockInsertAndIndexTxResult).
 		Add(LockInsertAndIndexTxResult, LockInsertOwnReceipt).
@@ -126,14 +122,15 @@ func makeLockPolicy() lockctx.Policy {
 		// module/executiondatasync/optimistic_sync/persisters/block.go#BlockPersister.Persist
 		Add(LockInsertCollection, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertLightTransactionResult).
+		Add(LockInsertLightTransactionResult, LockInsertTransactionResultErrMessage).
+
+		// AN execution state sync
+		// module/state_synchronization/indexer/indexer_core.go#IndexerCore.IndexBlockData
+		Add(LockInsertEvent, LockInsertLightTransactionResult). // it's ok to have duplication
+		Add(LockInsertLightTransactionResult, LockIndexScheduledTransaction).
 		Add(LockFinalizeBlock, LockInsertSafetyData).
 		Add(LockInsertSafetyData, LockInsertLivenessData).
 		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
-
-		// module/executiondatasync/optimistic_sync/persisters/block.go#Persist
-		Add(LockInsertCollection, LockInsertLightTransactionResult).
-		Add(LockInsertLightTransactionResult, LockInsertTransactionResultErrMessage).
-		Add(LockInsertLightTransactionResult, LockIndexScheduledTransaction).
 		Build()
 }
 

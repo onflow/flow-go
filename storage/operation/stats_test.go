@@ -28,22 +28,20 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 				}
 
 				// insert 100 chunk data packs
-				return unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
-					for i := 0; i < 100; i++ {
-						collectionID := unittest.IdentifierFixture()
-						cdp := &storage.StoredChunkDataPack{
-							ChunkID:      unittest.IdentifierFixture(),
-							StartState:   unittest.StateCommitmentFixture(),
-							Proof:        []byte{'p'},
-							CollectionID: collectionID,
-						}
-						err := operation.InsertChunkDataPack(rw, cdp.ID(), cdp)
-						if err != nil {
-							return err
-						}
+				for i := 0; i < 100; i++ {
+					collectionID := unittest.IdentifierFixture()
+					cdp := &storage.StoredChunkDataPack{
+						ChunkID:      unittest.IdentifierFixture(),
+						StartState:   unittest.StateCommitmentFixture(),
+						Proof:        []byte{'p'},
+						CollectionID: collectionID,
 					}
-					return nil
-				})
+					err := operation.InsertChunkDataPack(rw, cdp.ID(), cdp)
+					if err != nil {
+						return err
+					}
+				}
+				return nil
 			})
 		})
 		require.NoError(t, err)
