@@ -31,9 +31,9 @@ func TestChunkDataPackPruner(t *testing.T) {
 
 		// store the chunks
 		cdp1, result1 := unittest.ChunkDataPacksFixtureAndResult()
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return results.BatchStore(result1, rw)
-		})
+		}))
 		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
 			storeFunc, err := chunks.Store(cdp1)
 			if err != nil {
@@ -52,7 +52,7 @@ func TestChunkDataPackPruner(t *testing.T) {
 		}))
 
 		// verify they are pruned
-		_, err = chunks.ByChunkID(cdp1[0].ChunkID)
+		_, err := chunks.ByChunkID(cdp1[0].ChunkID)
 		require.True(t, errors.Is(err, storage.ErrNotFound), fmt.Errorf("expected ErrNotFound but got %v", err))
 
 		// prune again should not return error
