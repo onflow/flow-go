@@ -16,8 +16,8 @@ type CollectionCollector struct {
 	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
 	maxCollectionSize    prometheus.Gauge         // tracks the maximum collection size
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
-	collectionSize *prometheus.HistogramVec // number of transactions included ONLY in the cluster blocks proposed by this node
-	priorityTxns   *prometheus.HistogramVec // number of priority transactions included ONLY in cluster blocks proposed by this node
+	collectionSize       *prometheus.HistogramVec // number of transactions included ONLY in the cluster blocks proposed by this node
+	priorityTxns         *prometheus.HistogramVec // number of priority transactions included ONLY in cluster blocks proposed by this node
 }
 
 var _ module.CollectionMetrics = (*CollectionCollector)(nil)
