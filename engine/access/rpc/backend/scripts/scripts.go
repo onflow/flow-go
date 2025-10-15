@@ -26,7 +26,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TODO(Uliana): add godoc to whole file
+// Scripts implements the script-related part of the Access API.
+//
+// It provides methods to execute Cadence scripts against the Flow blockchain state
+// at a specific block height, block ID, or the latest sealed block.
+//
+// The execution strategy depends on the configured query mode and can run scripts
+// locally, on remote execution nodes, or in a failover mode combining both.
 type Scripts struct {
 	headers                  storage.Headers
 	state                    protocol.State
@@ -39,6 +45,9 @@ type Scripts struct {
 
 var _ access.ScriptsAPI = (*Scripts)(nil)
 
+// NewScriptsBackend constructs and initializes a new Scripts backend instance.
+//
+// No errors are expected during normal operation.
 func NewScriptsBackend(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,

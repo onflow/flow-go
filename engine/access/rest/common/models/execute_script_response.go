@@ -4,7 +4,10 @@ import (
 	"github.com/onflow/flow-go/model/access"
 )
 
-// TODO(Uliana): add godoc
+// NewExecuteScriptResponse creates a new ExecuteScriptResponse.
+//
+// It wraps the provided script execution result and, if requested,
+// includes the corresponding executor metadata in the response.
 func NewExecuteScriptResponse(
 	value []byte,
 	executorMetadata *access.ExecutorMetadata,
