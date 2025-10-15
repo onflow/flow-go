@@ -283,7 +283,7 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 		if isScheduledTx {
 			return tx, nil
 		}
-		// else, this is not a system tx. continue with the normal lookup
+		// else, this is not a system collection tx. continue with the normal lookup
 	}
 
 	// otherwise, check if it's a historic transaction
@@ -316,7 +316,7 @@ func (t *Transactions) lookupScheduledTransaction(ctx context.Context, txID flow
 
 	scheduledTxs, err := t.txProvider.ScheduledTransactionsByBlockID(ctx, header)
 	if err != nil {
-		return nil, true, rpc.ConvertError(err, "failed to scheduled transactions", codes.Internal)
+		return nil, true, rpc.ConvertError(err, "failed to get scheduled transactions", codes.Internal)
 	}
 
 	for _, tx := range scheduledTxs {
@@ -363,8 +363,6 @@ func (t *Transactions) GetTransactionResult(
 		}
 	}()
 
-	// TODO: this is expecting to pass collection into the provider, but it currently doesn't.
-
 	txResult, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion)
 	if err != nil {
 		return nil, err
@@ -373,12 +371,16 @@ func (t *Transactions) GetTransactionResult(
 		return txResult, nil
 	}
 
-	txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, blockID, encodingVersion)
-	if err != nil {
-		return nil, err
-	}
-	if isScheduledTx {
-		return txResult, nil
+	// if the node is not indexing scheduled transactions, then fallback to the normal lookup. if the
+	// request was for a scheduled transaction, it will fail with a not found error.
+	if t.scheduledTransactions != nil {
+		txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, blockID, encodingVersion)
+		if err != nil {
+			return nil, err
+		}
+		if isScheduledTx {
+			return txResult, nil
+		}
 	}
 
 	txResult, tx, err := t.lookupSubmittedTransactionResult(ctx, txID, blockID, collectionID, encodingVersion)
@@ -433,7 +435,9 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	if err != nil {
 		// this is an exception. the block/collection index must exist if the collection/tx is indexed,
 		// otherwise the stored state is inconsistent.
-		return nil, nil, status.Errorf(codes.Internal, "failed to find block for collection %v: %v", collectionID, err)
+		err = fmt.Errorf("failed to find block for collection %v: %w", collectionID, err)
+		irrecoverable.Throw(ctx, err)
+		return nil, nil, err
 	}
 	actualBlockID := block.ID()
 	if blockID == flow.ZeroID {
@@ -448,32 +452,15 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 	}
 
-	if txResult != nil {
-		tx, err := t.transactions.ByID(txID)
-		if err != nil {
-			// the transaction should exist in storage if we have a result
-			return nil, nil, status.Errorf(codes.Internal, "failed to get transaction from storage: %v", err)
-		}
-		return txResult, tx, nil
-	}
-
-	// If there is still no transaction result, provide a placeholder based on available information.
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, false)
+	tx, err := t.transactions.ByID(txID)
 	if err != nil {
-		// this is not possible given the current implementation since the only code path when executed=false
-		// always returns flow.TransactionStatusFinalized. Leaving the check here to future proof the code.
-		err := fmt.Errorf("failed to derive finalized transaction status: %w", err)
+		// if we've gotten this far, the transaction must exist in storage otherwise the node is in
+		// an inconsistent state
+		err = fmt.Errorf("failed to get transaction from storage: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, nil, err
 	}
-
-	return &accessmodel.TransactionResult{
-		BlockID:       blockID,
-		BlockHeight:   block.Height,
-		TransactionID: txID,
-		CollectionID:  collectionID,
-		Status:        txStatus,
-	}, nil, nil
+	return txResult, tx, nil
 }
 
 // lookupSystemTransactionResult looks up the transaction result for a system transaction.
@@ -491,7 +478,7 @@ func (t *Transactions) lookupSystemTransactionResult(
 	// TODO: system transactions can change over time. Use the blockID to get the correct system tx
 	// for the provided block.
 	if _, ok := t.systemCollection.ByID(txID); !ok {
-		return nil, false, nil // happy path -> tx is not a system tx
+		return nil, false, nil // tx is not a system tx
 	}
 
 	// block must be provided to get the correct system tx result
@@ -523,7 +510,7 @@ func (t *Transactions) lookupScheduledTransactionResult(
 	scheduledTxBlockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, false, nil // happy path -> tx is not a scheduled tx
+			return nil, false, nil // tx is not a scheduled tx
 		}
 		return nil, false, status.Errorf(codes.Internal, "failed to get scheduled transaction block ID: %v", err)
 	}
@@ -563,6 +550,9 @@ func (t *Transactions) getUnknownTransactionResult(
 		// this node.
 		txStatus, err := t.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, status.Errorf(codes.NotFound, "transaction's reference block not found")
+			}
 			err = fmt.Errorf("failed to derive transaction status: %w", err)
 			irrecoverable.Throw(ctx, err)
 			return nil, err
@@ -665,7 +655,7 @@ func (t *Transactions) GetSystemTransaction(
 
 	tx, ok := t.systemCollection.ByID(txID)
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "system transaction not found")
+		return nil, status.Errorf(codes.NotFound, "no system transaction with the provided ID found")
 	}
 
 	// TODO: system tx can change. we should lookup the correct system tx for the block instead of
@@ -696,7 +686,7 @@ func (t *Transactions) GetSystemTransactionResult(
 		return nil, err
 	}
 	if !isSystemTx {
-		return nil, status.Errorf(codes.NotFound, "system transaction not found")
+		return nil, status.Errorf(codes.NotFound, "no system transaction with the provided ID found")
 	}
 	return txResult, nil
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	providermock "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -867,36 +866,6 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		suite.Require().Equal(expectedResult, res)
 	})
 
-	suite.Run("happy path - not executed", func() {
-		suite.collections.
-			On("LightByTransactionID", txID).
-			Return(lightCollection, nil).
-			Once()
-
-		suite.blocks.
-			On("ByCollectionID", collectionID).
-			Return(block, nil).
-			Once()
-
-		provider := providermock.NewTransactionProvider(suite.T())
-		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
-			Return(nil, nil)
-
-		params := suite.defaultTransactionsParams()
-		params.TxProvider = provider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		expected := *expectedResult
-		expected.Status = flow.TransactionStatusFinalized
-
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
-		suite.Require().NoError(err)
-		suite.Require().Equal(expected, *res)
-	})
-
 	suite.Run("collection ID mismatch", func() {
 		suite.collections.
 			On("LightByTransactionID", txID).
@@ -959,7 +928,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		suite.Require().Nil(res)
 	})
 
-	suite.Run("block lookup error", func() {
+	suite.Run("block lookup failure throws exception", func() {
 		suite.collections.
 			On("LightByTransactionID", txID).
 			Return(lightCollection, nil).
@@ -976,9 +945,12 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
+		expectedErr := fmt.Errorf("failed to find block for collection %v: %w", collectionID, storage.ErrNotFound)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedErr)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		res, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion)
+		suite.Require().Error(err) // specific error doen't matter since it's thrown
 		suite.Require().Nil(res)
 	})
 
@@ -1011,7 +983,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		suite.Require().Nil(res)
 	})
 
-	suite.Run("tx body lookup error", func() {
+	suite.Run("tx body lookup failure throws exception", func() {
 		suite.collections.
 			On("LightByTransactionID", txID).
 			Return(lightCollection, nil).
@@ -1038,9 +1010,12 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		expectedErr := fmt.Errorf("failed to get transaction from storage: %w", storage.ErrNotFound)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedErr)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		res, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion)
 		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(res)
 	})
 }
@@ -2191,8 +2166,6 @@ func (suite *Suite) TestSendTransaction() {
 		configureClustering(suite.T(), flow.IdentityList{nodes[0]}, finalSnapshot)
 
 		params := suite.defaultTransactionsParams()
-		params.EnableRetries = false
-
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
@@ -2218,7 +2191,6 @@ func (suite *Suite) TestSendTransaction() {
 
 		params := suite.defaultTransactionsParams()
 		params.StaticCollectionRPCClient = client
-		params.EnableRetries = false
 
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
@@ -2247,8 +2219,6 @@ func (suite *Suite) TestSendTransaction() {
 		configureClustering(suite.T(), nodes, finalSnapshot)
 
 		params := suite.defaultTransactionsParams()
-		params.EnableRetries = false
-
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
@@ -2277,123 +2247,4 @@ func (suite *Suite) addCollectionClient(address string) *accessmock.AccessAPICli
 		Once()
 
 	return client
-}
-
-// TestTransactionRetry tests that the retry mechanism will send retries at specific times
-func (suite *Suite) TestSendTransaction_WithRetries() {
-	finalBlock := suite.g.Headers().Fixture(
-		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-		fixtures.Header.WithHeight(flow.DefaultTransactionExpiry + 1),
-	)
-	refBlock := suite.g.Headers().Fixture(
-		fixtures.Header.WithParentHeader(finalBlock),
-	)
-	refBlockID := refBlock.ID()
-	tx := suite.g.Transactions().Fixture(fixtures.Transaction.WithReferenceBlockID(refBlockID))
-
-	finalSnapshot := protocolmock.NewSnapshot(suite.T())
-	finalSnapshot.On("Head").Return(finalBlock, nil).Once()
-	suite.state.On("Final").Return(finalSnapshot, nil).Once()
-
-	// used twice: once when registring the transaction, once when checking the transaction status
-	refBlockSnapshot := protocolmock.NewSnapshot(suite.T())
-	refBlockSnapshot.On("Head").Return(refBlock, nil).Twice()
-	suite.state.On("AtBlockID", refBlock.ID()).Return(refBlockSnapshot, nil).Twice()
-
-	// simulate transaction not yet indexed
-	suite.collections.
-		On("LightByTransactionID", tx.ID()).
-		Return(nil, storage.ErrNotFound).
-		Once()
-
-	expectedRequest := &access.SendTransactionRequest{
-		Transaction: convert.TransactionToMessage(*tx),
-	}
-
-	client := accessmock.NewAccessAPIClient(suite.T())
-
-	params := suite.defaultTransactionsParams()
-	params.StaticCollectionRPCClient = client
-
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	retry := retrier.NewRetrier(
-		suite.log,
-		suite.state,
-		suite.blocks,
-		suite.collections,
-		txBackend,
-		txBackend.txStatusDeriver,
-	)
-	retry.RegisterTransaction(tx)
-
-	// SendTransaction should not be called on the first retry since it has not yet exceeded the retry frequency
-	err = retry.Retry(refBlock.Height + 1)
-	suite.Require().NoError(err)
-
-	// Now it should be called
-	client.On("SendTransaction", mock.Anything, expectedRequest).Return(&access.SendTransactionResponse{}, nil).Once()
-
-	err = retry.Retry(refBlock.Height + retrier.RetryFrequency)
-	suite.Require().NoError(err)
-
-	// do not retry if expired
-	err = retry.Retry(refBlock.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
-	suite.Require().NoError(err)
-}
-
-// TestSendTransaction_WithRetries_SuccessfulTxDoNotRetry tests that successful transactions is not
-// retried.
-func (suite *Suite) TestSendTransaction_WithRetries_SuccessfulTxDoNotRetry() {
-	finalBlock := suite.g.Headers().Fixture(
-		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-		fixtures.Header.WithHeight(flow.DefaultTransactionExpiry + 1),
-	)
-	refBlock := suite.g.Headers().Fixture(
-		fixtures.Header.WithParentHeader(finalBlock),
-	)
-	refBlockID := refBlock.ID()
-	block := suite.g.Blocks().Fixture(fixtures.Block.WithParentHeader(refBlock))
-	tx := suite.g.Transactions().Fixture(fixtures.Transaction.WithReferenceBlockID(refBlockID))
-	txID := tx.ID()
-
-	collection := suite.g.Collections().Fixture(fixtures.Collection.WithTransactions(tx))
-	light := collection.Light()
-
-	refBlockSnapshot := protocolmock.NewSnapshot(suite.T())
-	refBlockSnapshot.On("Head").Return(refBlock, nil).Once()
-	suite.state.On("AtBlockID", refBlock.ID()).Return(refBlockSnapshot, nil).Once()
-
-	// simulate transaction indexed (finalized)
-	suite.collections.On("LightByTransactionID", txID).Return(light, nil).Once()
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(block, nil).Once()
-
-	params := suite.defaultTransactionsParams()
-	params.StaticCollectionRPCClient = accessmock.NewAccessAPIClient(suite.T())
-	// SendTransaction should never be called
-
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	retry := retrier.NewRetrier(
-		suite.log,
-		suite.state,
-		suite.blocks,
-		suite.collections,
-		txBackend,
-		txBackend.txStatusDeriver,
-	)
-	retry.RegisterTransaction(tx)
-
-	// SendTransaction should not be called on the first retry since it has not yet exceeded the retry frequency
-	err = retry.Retry(refBlock.Height + 1)
-	suite.Require().NoError(err)
-
-	err = retry.Retry(refBlock.Height + retrier.RetryFrequency)
-	suite.Require().NoError(err)
-
-	// do not retry if expired
-	err = retry.Retry(refBlock.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
-	suite.Require().NoError(err)
 }

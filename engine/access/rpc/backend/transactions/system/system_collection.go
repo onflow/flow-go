@@ -31,10 +31,15 @@ func DefaultSystemCollection(chainID flow.ChainID, scheduledTransactionsEnabled 
 	}
 	systemTxID := systemTx.ID()
 
+	collection, err := flow.NewCollection(flow.UntrustedCollection{
+		Transactions: []*flow.TransactionBody{systemTx},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+	}
+
 	return &SystemCollection{
-		collection: &flow.Collection{
-			Transactions: []*flow.TransactionBody{systemTx},
-		},
+		collection: collection,
 		lookup: map[flow.Identifier]*flow.TransactionBody{
 			systemTxID: systemTx,
 		},

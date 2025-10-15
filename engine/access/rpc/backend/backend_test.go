@@ -70,15 +70,16 @@ type Suite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks             *storagemock.Blocks
-	headers            *storagemock.Headers
-	collections        *storagemock.Collections
-	transactions       *storagemock.Transactions
-	receipts           *storagemock.ExecutionReceipts
-	results            *storagemock.ExecutionResults
-	transactionResults *storagemock.LightTransactionResults
-	events             *storagemock.Events
-	txErrorMessages    *storagemock.TransactionResultErrorMessages
+	blocks                *storagemock.Blocks
+	headers               *storagemock.Headers
+	collections           *storagemock.Collections
+	transactions          *storagemock.Transactions
+	receipts              *storagemock.ExecutionReceipts
+	results               *storagemock.ExecutionResults
+	transactionResults    *storagemock.LightTransactionResults
+	events                *storagemock.Events
+	scheduledTransactions *storagemock.ScheduledTransactions
+	txErrorMessages       *storagemock.TransactionResultErrorMessages
 
 	db                  storage.DB
 	dbDir               string
@@ -126,6 +127,7 @@ func (suite *Suite) SetupTest() {
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
+	suite.scheduledTransactions = storagemock.NewScheduledTransactions(suite.T())
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
