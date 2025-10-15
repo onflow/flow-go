@@ -424,7 +424,10 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not store chunk data packs for block ID: %v: %w", blockID, err)
 	}
 
-	return storage.WithLock(s.lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+	return storage.WithLocks(s.lockManager, []string{
+		storage.LockIndexChunkDataPackByChunkID,
+		storage.LockInsertOwnReceipt,
+	}, func(lctx lockctx.Context) error {
 		// The batch update writes all execution result data (except chunk data pack!) atomically.
 		// Since the chunk data pack itself was already stored in a separate database (s.chunkDataPacks)
 		// during the previous step, this step stores only the mapping between chunk ID

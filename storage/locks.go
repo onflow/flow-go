@@ -27,8 +27,8 @@ const (
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
-	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere)
-	LockInsertChunkDataPack = "lock_insert_chunk_data_pack"
+	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs
+	LockIndexChunkDataPackByChunkID = "lock_index_chunk_data_pack_by_chunk_id"
 	// LockInsertExecutionForkEvidence protects the insertion of execution fork evidence
 	LockInsertExecutionForkEvidence = "lock_insert_execution_fork_evidence"
 	LockInsertSafetyData            = "lock_insert_safety_data"
@@ -47,7 +47,7 @@ func Locks() []string {
 		LockInsertOwnReceipt,
 		LockInsertCollection,
 		LockBootstrapping,
-		LockInsertChunkDataPack,
+		LockIndexChunkDataPackByChunkID,
 		LockInsertExecutionForkEvidence,
 		LockInsertSafetyData,
 		LockInsertLivenessData,
@@ -78,7 +78,7 @@ func makeLockPolicy() lockctx.Policy {
 		Add(LockBootstrapping, LockInsertSafetyData).
 		Add(LockInsertSafetyData, LockInsertLivenessData).
 		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
-		Add(LockInsertOwnReceipt, LockInsertChunkDataPack).
+		Add(LockIndexChunkDataPackByChunkID, LockInsertOwnReceipt).
 		Build()
 }
 

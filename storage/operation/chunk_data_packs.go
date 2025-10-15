@@ -11,11 +11,11 @@ import (
 )
 
 // IndexChunkDataPackByChunkID inserts a mapping from chunk ID to stored chunk data pack ID. It requires
-// the [storage.LockInsertOwnReceipt] lock to be acquired by the caller and held until the write batch has been committed.
+// the [storage.LockIndexChunkDataPackByChunkID] lock to be acquired by the caller and held until the write batch has been committed.
 // Returns [storage.ErrDataMismatch] if a different chunk data pack ID already exists for the given chunk ID.
 func IndexChunkDataPackByChunkID(lctx lockctx.Proof, rw storage.ReaderBatchWriter, chunkID flow.Identifier, chunkDataPackID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertOwnReceipt)
+	if !lctx.HoldsLock(storage.LockIndexChunkDataPackByChunkID) {
+		return fmt.Errorf("missing required lock: %s", storage.LockIndexChunkDataPackByChunkID)
 	}
 	key := MakePrefix(codeIndexChunkDataPackByChunkID, chunkID)
 	var existing flow.Identifier
