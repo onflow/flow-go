@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -222,7 +221,6 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,
 		ConnFactory:                 suite.connectionFactory,
-		EnableRetries:               true,
 		NodeProvider:                nodeProvider,
 		Blocks:                      suite.blocks,
 		Collections:                 suite.collections,
@@ -1622,150 +1620,6 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 		suite.Assert().Equal(flow.TransactionStatusSealed, response[systemTxIndex].Status)
 		suite.Assert().Equal(expectedSystemTxIDs[i], response[userTxCount+i].TransactionID, "system transaction %d should match reconstructed ID", i)
 	}
-}
-
-// TestTransactionRetry tests that the retry mechanism will send retries at specific times
-func (suite *Suite) TestTransactionRetry() {
-	block := unittest.BlockFixture(
-		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1),
-	)
-	transactionBody := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(block.ID()))
-	headBlock := unittest.BlockFixture()
-	headBlock.Height = block.Height - 1 // head is behind the current block
-	suite.state.On("Final").Return(suite.snapshot, nil)
-
-	suite.snapshot.On("Head").Return(headBlock.ToHeader(), nil)
-	snapshotAtBlock := protocolmock.NewSnapshot(suite.T())
-	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
-	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
-
-	// collection storage returns a not found error
-	suite.collections.
-		On("LightByTransactionID", transactionBody.ID()).
-		Return(nil, storage.ErrNotFound)
-
-	client := accessmock.NewAccessAPIClient(suite.T())
-	params := suite.defaultTransactionsParams()
-	params.StaticCollectionRPCClient = client
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	retry := retrier.NewRetrier(
-		suite.log,
-		suite.blocks,
-		suite.collections,
-		txBackend,
-		txBackend.txStatusDeriver,
-	)
-	retry.RegisterTransaction(block.Height, &transactionBody)
-
-	client.On("SendTransaction", mock.Anything, mock.Anything).Return(&access.SendTransactionResponse{}, nil)
-
-	// Don't retry on every height
-	err = retry.Retry(block.Height + 1)
-	suite.Require().NoError(err)
-
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
-
-	// Retry every `retryFrequency`
-	err = retry.Retry(block.Height + retrier.RetryFrequency)
-	suite.Require().NoError(err)
-
-	client.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
-
-	// do not retry if expired
-	err = retry.Retry(block.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
-	suite.Require().NoError(err)
-
-	// Should've still only been called once
-	client.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
-}
-
-// TestSuccessfulTransactionsDontRetry tests that the retry mechanism will send retries at specific times
-func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
-	collection := unittest.CollectionFixture(1)
-	light := collection.Light()
-	transactionBody := collection.Transactions[0]
-	txID := transactionBody.ID()
-
-	block := unittest.BlockFixture()
-	blockID := block.ID()
-
-	// setup chain state
-	_, fixedENIDs := suite.setupReceipts(block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-
-	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(light, nil)
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(block, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-
-	exeEventReq := execproto.GetTransactionResultRequest{
-		BlockId:       blockID[:],
-		TransactionId: txID[:],
-	}
-	exeEventResp := execproto.GetTransactionResultResponse{
-		Events: nil,
-	}
-	suite.executionAPIClient.
-		On("GetTransactionResult", context.Background(), &exeEventReq).
-		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
-		Times(len(fixedENIDs)) // should call each EN once
-
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Times(len(fixedENIDs))
-
-	params := suite.defaultTransactionsParams()
-	client := accessmock.NewAccessAPIClient(suite.T())
-	params.StaticCollectionRPCClient = client
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	retry := retrier.NewRetrier(
-		suite.log,
-		suite.blocks,
-		suite.collections,
-		txBackend,
-		txBackend.txStatusDeriver,
-	)
-	retry.RegisterTransaction(block.Height, transactionBody)
-
-	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := txBackend.GetTransactionResult(
-		context.Background(),
-		txID,
-		flow.ZeroID,
-		flow.ZeroID,
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().NotNil(result)
-
-	// status should be finalized since the sealed Blocks is smaller in height
-	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
-
-	// Don't retry when block is finalized
-	err = retry.Retry(block.Height + 1)
-	suite.Require().NoError(err)
-
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
-
-	// Don't retry when block is finalized
-	err = retry.Retry(block.Height + retrier.RetryFrequency)
-	suite.Require().NoError(err)
-
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
-
-	// Don't retry when block is finalized
-	err = retry.Retry(block.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
-	suite.Require().NoError(err)
-
-	// Should've still should not be called
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 }
 
 func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
