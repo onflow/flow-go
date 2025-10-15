@@ -108,6 +108,12 @@ func TestIndexChunkDataPackByChunkID(t *testing.T) {
 			require.Error(t, err)
 			assert.ErrorIs(t, err, storage.ErrDataMismatch)
 			assert.Contains(t, err.Error(), "different one exist")
+
+			// Verify the chunk data pack ID is unchanged
+			var retrievedID flow.Identifier
+			err = operation.RetrieveChunkDataPackID(db.Reader(), chunkID, &retrievedID)
+			require.NoError(t, err)
+			assert.Equal(t, chunkDataPackID, retrievedID)
 		})
 
 		t.Run("missing required lock", func(t *testing.T) {
