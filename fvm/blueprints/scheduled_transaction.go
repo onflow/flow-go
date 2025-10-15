@@ -73,7 +73,7 @@ func ExecuteScheduledTransactions(chainID flow.Chain, processEvents flow.EventsL
 		// event.EventIndex
 
 		// skip any fee events or other events that are not pending execution events
-		if !isPendingExecutionEvent(env, event) {
+		if !IsPendingExecutionEvent(env, event) {
 			continue
 		}
 
@@ -114,6 +114,29 @@ func executeScheduledTransaction(
 // transaction scheduler contract and has the following signature:
 // event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, owner: Address)
 func scheduledTransactionArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
+	cadenceId, cadenceEffort, err := ParsePendingExecutionEvent(event)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	effort := uint64(cadenceEffort)
+
+	if effort > flow.DefaultMaxTransactionGasLimit {
+		log.Warn().Uint64("effort", effort).Msg("effort is greater than max transaction gas limit, setting to max")
+		effort = flow.DefaultMaxTransactionGasLimit
+	}
+
+	encID, err := jsoncdc.Encode(cadenceId)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to encode id: %w", err)
+	}
+
+	return encID, uint64(effort), nil
+}
+
+// ParsePendingExecutionEvent decodes the PendingExecution event payload and returns the scheduled
+// transaction's id and effort.
+func ParsePendingExecutionEvent(event flow.Event) (cadence.UInt64, cadence.UInt64, error) {
 	const (
 		processedTransactionIDFieldName     = "id"
 		processedTransactionEffortFieldName = "executionEffort"
@@ -121,12 +144,12 @@ func scheduledTransactionArgsFromEvent(event flow.Event) ([]byte, uint64, error)
 
 	eventData, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to decode event: %w", err)
+		return 0, 0, fmt.Errorf("failed to decode event: %w", err)
 	}
 
 	cadenceEvent, ok := eventData.(cadence.Event)
 	if !ok {
-		return nil, 0, fmt.Errorf("event data is not a cadence event")
+		return 0, 0, fmt.Errorf("event data is not a cadence event")
 	}
 
 	idValue := cadence.SearchFieldByName(
@@ -139,32 +162,21 @@ func scheduledTransactionArgsFromEvent(event flow.Event) ([]byte, uint64, error)
 		processedTransactionEffortFieldName,
 	)
 
-	id, ok := idValue.(cadence.UInt64)
+	cadenceId, ok := idValue.(cadence.UInt64)
 	if !ok {
-		return nil, 0, fmt.Errorf("id is not uint64")
+		return 0, 0, fmt.Errorf("id is not uint64")
 	}
 
 	cadenceEffort, ok := effortValue.(cadence.UInt64)
 	if !ok {
-		return nil, 0, fmt.Errorf("effort is not uint64")
+		return 0, 0, fmt.Errorf("effort is not uint64")
 	}
 
-	effort := uint64(cadenceEffort)
-
-	if effort > flow.DefaultMaxTransactionGasLimit {
-		log.Warn().Uint64("effort", effort).Msg("effort is greater than max transaction gas limit, setting to max")
-		effort = flow.DefaultMaxTransactionGasLimit
-	}
-
-	encID, err := jsoncdc.Encode(id)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to encode id: %w", err)
-	}
-
-	return encID, uint64(effort), nil
+	return cadenceId, cadenceEffort, nil
 }
 
-func isPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
+// IsPendingExecutionEvent returns true if the event is a pending execution event.
+func IsPendingExecutionEvent(env templates.Environment, event flow.Event) bool {
 	processedEventType := PendingExecutionEventType(env)
 	return event.Type == processedEventType
 }
