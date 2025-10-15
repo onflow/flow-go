@@ -143,12 +143,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	storeChunkDataPacksFunc := func(lctx lockctx.Proof, protocolDBBatch storage.ReaderBatchWriter) error {
 		protocolDBBatch.AddCallback(func(err error) {
 			if err != nil {
-				log.Warn().Err(err).Msgf("batch operation failed, rolling back stored chunk data packs for chunks: %v", cs)
-				// Rollback the stored chunk data packs if the batch operation fails
-				err := ch.stored.Remove(chunkDataPackIDs) // rollback stored chunk data packs on failure
-				if err != nil {
-					log.Fatal().Err(err).Msgf("cannot rollback stored chunk data packs") // log the error, but do not override the original error
-				}
+				log.Warn().Err(err).Msgf("indexing chunkID -> chunkDataPackID mapping failed, chunkDataPackIDs: %v", chunkDataPackIDs)
 			}
 		})
 
