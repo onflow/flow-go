@@ -111,14 +111,9 @@ func runE(*cobra.Command, []string) error {
 
 		// remove chunk data packs first, because otherwise the index to find chunk data pack will be removed.
 		if len(chunkIDs) > 0 {
-			chunkDataPackIDs, err := chunkDataPacks.BatchRemove(chunkIDs, protocolDBBatch)
+			_, err := chunkDataPacks.BatchRemove(chunkIDs, protocolDBBatch)
 			if err != nil {
 				return fmt.Errorf("could not remove chunk data packs at %v: %w", flagHeight, err)
-			}
-
-			err = storedChunkDataPacks.Remove(chunkDataPackIDs)
-			if err != nil {
-				return fmt.Errorf("could not commit chunk batch at %v: %w", flagHeight, err)
 			}
 		}
 
@@ -143,8 +138,11 @@ func runE(*cobra.Command, []string) error {
 	})
 }
 
-// use badger instances directly instead of stroage interfaces so that the interface don't
-// need to include the Remove methods
+// removeExecutionResultsFromHeight removes all execution results and related data
+// from the specified block height onward to roll back the protocol state.
+// It returns the chunk IDs removed from the protocol state DB,
+// which can then be used to delete the corresponding chunk data packs from chunk
+// data pack database.
 func removeExecutionResultsFromHeight(
 	protocolDBBatch storage.Batch,
 	protoState protocol.State,

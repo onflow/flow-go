@@ -419,7 +419,7 @@ func (s *state) saveExecutionResults(
 	// in the protocol database (signifying the node's slashable commitment to the respective result) is
 	// done by the functor returned by `Store`. The functor's is invoked as part of the atomic batch update
 	// of the protocol database below.
-	storeFunc, err := s.chunkDataPacks.Store(chunks)
+	storeChunkDataPacksFunc, err := s.chunkDataPacks.Store(chunks)
 	if err != nil {
 		return fmt.Errorf("can not store chunk data packs for block ID: %v: %w", blockID, err)
 	}
@@ -446,7 +446,7 @@ func (s *state) saveExecutionResults(
 		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			// store the ChunkID -> StoredChunkDataPack.ID() mapping
 			// in s.db (protocol database along with other execution data in a single batch)
-			err := storeFunc(lctx, batch)
+			err := storeChunkDataPacksFunc(lctx, batch)
 			if err != nil {
 				return fmt.Errorf("cannot store chunk data packs: %w", err)
 			}
