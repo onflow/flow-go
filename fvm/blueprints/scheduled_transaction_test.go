@@ -295,7 +295,7 @@ func TestSystemCollection(t *testing.T) {
 			expectedTxCount: 5, // process + 3 executes + system chunk
 		},
 		{
-			name: "mixed events - valid callbacks and invalid types",
+			name: "mixed events - valid transactions and invalid types",
 			events: []flow.Event{
 				createValidCallbackEvent(t, 1, 100),
 				createInvalidTypeEvent(),
@@ -312,7 +312,7 @@ func TestSystemCollection(t *testing.T) {
 		{
 			name:         "invalid CCF payload in callback event",
 			events:       []flow.Event{createPendingExecutionEventWithPayload([]byte{0xFF, 0xAB, 0xCD})},
-			errorMessage: "failed to construct execute callbacks transactions",
+			errorMessage: "failed to construct execute scheduled transactions",
 		},
 	}
 
