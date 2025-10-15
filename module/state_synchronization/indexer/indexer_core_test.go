@@ -144,7 +144,6 @@ func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flo
 	return i
 }
 
-
 func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Identifier, []flow.LightTransactionResult) error) *indexCoreTest {
 	i.results.
 		On("BatchStore", mock.Anything, mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
