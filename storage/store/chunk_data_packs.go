@@ -179,7 +179,7 @@ func (ch *ChunkDataPacks) BatchRemove(
 	protocolDBBatch storage.ReaderBatchWriter,
 ) ([]flow.Identifier, error) {
 	// First, collect all stored chunk data pack IDs that need to be removed
-	var chunkDataPackIDs []flow.Identifier
+	chunkDataPackIDs := make([]flow.Identifier, 0, len(chunkIDs))
 	for _, chunkID := range chunkIDs {
 		chunkDataPackID, err := ch.chunkIDToChunkDataPackIDCache.Get(protocolDBBatch.GlobalReader(), chunkID)
 		if err != nil {
