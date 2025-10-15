@@ -257,10 +257,10 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index AllTheThings", func(t *testing.T) {
 		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
 
-		test.events.On("BatchStore", mock.Anything, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
-			Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+		test.events.On("BatchStore", mock.Anything, blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(func(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+				require.True(t, lctx.HoldsLock(storage.LockInsertEvent))
 				require.NotNil(t, batch)
-				// Events BatchStore doesn't require specific locks, but we validate the batch is provided
 				return nil
 			})
 		test.results.On("BatchStore", mock.Anything, mock.Anything, blockID, tf.ExpectedResults).
