@@ -22,9 +22,10 @@ func init() {
 
 func runGetSafetyData(*cobra.Command, []string) {
 	err := common.WithStorage(flagDatadir, func(db storage.DB) error {
+		lockManager := storage.NewTestingLockManager()
 
 		chainID := flow.ChainID(flagChain)
-		reader, err := persister.NewReader(db, chainID)
+		reader, err := persister.NewReader(db, chainID, lockManager)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not create reader from db")
 		}

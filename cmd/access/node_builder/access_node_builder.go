@@ -351,6 +351,7 @@ type FlowAccessNodeBuilder struct {
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	transactions                   storage.Transactions
 	collections                    storage.Collections
+	scheduledTransactions          storage.ScheduledTransactions
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -862,6 +863,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 				return nil
 			}).
+			Module("scheduled transactions storage", func(node *cmd.NodeConfig) error {
+				builder.scheduledTransactions = store.NewScheduledTransactions(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+				return nil
+			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
@@ -947,7 +952,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("could not create derived chain data: %w", err)
 				}
 
-				indexerCore, err := indexer.New(
+				builder.ExecutionIndexerCore = indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
 					notNil(builder.ProtocolDB),
@@ -957,15 +962,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.collections),
 					notNil(builder.transactions),
 					notNil(builder.lightTransactionResults),
-					builder.RootChainID.Chain(),
+					notNil(builder.scheduledTransactions),
+					builder.RootChainID,
 					indexerDerivedChainData,
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
 				)
-				if err != nil {
-					return nil, err
-				}
-				builder.ExecutionIndexerCore = indexerCore
 
 				// start processing from the first height of the registers db, which is initialized from
 				// the checkpoint. this ensures a consistent starting point for the indexed data.
@@ -979,7 +981,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Logger,
 					registers.FirstHeight(),
 					registers,
-					indexerCore,
+					builder.ExecutionIndexerCore,
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
@@ -1618,6 +1620,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			return errors.New("rpc-max-execution-response-message-size must be greater than 0")
 		}
 
+		// indexing tx error messages is only supported when tx results are also indexed
+		if builder.storeTxResultErrorMessages && !builder.executionDataIndexingEnabled {
+			return errors.New("execution-data-indexing-enabled must be set if store-tx-result-error-messages is enabled")
+		}
+
 		return nil
 	})
 }
@@ -1973,13 +1980,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
-		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-			if builder.storeTxResultErrorMessages {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
-			}
-
-			return nil
-		}).
 		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if !builder.versionControlEnabled {
 				noop := &module.NoopReadyDoneAware{}
@@ -2285,40 +2285,51 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.Logger,
 				builder.State,
 				builder.TxResultErrorMessagesCore,
 			)
 		})
 
 	if builder.storeTxResultErrorMessages {
-		builder.Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedTxErrorMessagesBlockHeightInitializer = store.NewConsumerProgress(
-				builder.ProtocolDB,
-				module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
-			)
-			return nil
-		})
-		builder.Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// start processing from the earliest block in storage (sealed root block height)
-			processedTxErrorMessagesBlockHeight, err := processedTxErrorMessagesBlockHeightInitializer.Initialize(node.SealedRootBlock.Height)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize processed tx error messages block height: %w", err)
-			}
+		builder.
+			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(
+					node.Metrics.Cache,
+					node.ProtocolDB,
+					bstorage.DefaultCacheSize,
+				)
+				return nil
+			}).
+			Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
+				processedTxErrorMessagesBlockHeightInitializer = store.NewConsumerProgress(
+					builder.ProtocolDB,
+					module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
+				)
+				return nil
+			}).
+			Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				// start processing from the earliest block in storage (sealed root block height)
+				processedTxErrorMessagesBlockHeight, err := processedTxErrorMessagesBlockHeightInitializer.Initialize(node.SealedRootBlock.Height)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize processed tx error messages block height: %w", err)
+				}
+        
+				engine, err := tx_error_messages.New(
+					node.Logger,
+					metrics.NewTransactionErrorMessagesCollector(),
+					node.State,
+					node.Storage.Headers,
+					processedTxErrorMessagesBlockHeight,
+					builder.TxResultErrorMessagesCore,
+				)
+				if err != nil {
+					return nil, err
+				}
+				builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
-			engine, err := tx_error_messages.New(
-				node.Logger,
-				node.State,
-				node.Storage.Headers,
-				processedTxErrorMessagesBlockHeight,
-				builder.TxResultErrorMessagesCore,
-			)
-			if err != nil {
-				return nil, err
-			}
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
-
-			return engine, nil
-		})
+				return engine, nil
+			})
 	}
 
 	if builder.supportsObserver {
