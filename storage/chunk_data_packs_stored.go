@@ -38,7 +38,7 @@ type StoredChunkDataPack struct {
 	ChunkID           flow.Identifier
 	StartState        flow.StateCommitment
 	Proof             flow.StorageProof
-	CollectionID      flow.Identifier
+	CollectionID      flow.Identifier // flow.ZeroID for system chunks
 	ExecutionDataRoot flow.BlockExecutionDataRoot
 }
 
@@ -58,6 +58,7 @@ func NewStoredChunkDataPack(
 	}
 }
 
+// IsSystemChunk returns true if this chunk data pack is for a system chunk.
 func (s *StoredChunkDataPack) IsSystemChunk() bool {
 	return s.CollectionID == flow.ZeroID
 }
@@ -67,7 +68,6 @@ func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 	if c.Collection != nil {
 		collectionID = c.Collection.ID()
 	}
-
 	return NewStoredChunkDataPack(
 		c.ChunkID,
 		c.StartState,
@@ -77,7 +77,10 @@ func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 	)
 }
 
-func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack { // ToStoredChunkDataPack converts the given ChunkDataPacks to their reduced representation,
+// ToStoredChunkDataPacks converts the given Chunk Data Packs to their reduced representation.
+// This is useful for reducing storage consumption, by avoiding repeated storage of the full collections
+// (stored individually anyway).
+func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack {
 	scs := make([]*StoredChunkDataPack, 0, len(cs))
 	for _, c := range cs {
 		scs = append(scs, ToStoredChunkDataPack(c))

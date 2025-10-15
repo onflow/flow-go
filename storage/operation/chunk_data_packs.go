@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// IndexChunkDataPackByChunkID inserts a mapping from chunk ID to stored chunk data pack ID.
-// It requires the [storage.LockInsertOwnReceipt] lock to be held by the caller.
+// IndexChunkDataPackByChunkID inserts a mapping from chunk ID to stored chunk data pack ID. It requires
+// the [storage.LockInsertOwnReceipt] lock to be acquired by the caller and held until the write batch has been committed.
 // Returns [storage.ErrDataMismatch] if a different chunk data pack ID already exists for the given chunk ID.
 func IndexChunkDataPackByChunkID(lctx lockctx.Proof, rw storage.ReaderBatchWriter, chunkID flow.Identifier, chunkDataPackID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
@@ -35,7 +35,7 @@ func IndexChunkDataPackByChunkID(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 }
 
 // RetrieveChunkDataPackID retrieves the stored chunk data pack ID for a given chunk ID.
-// Returns [storage.ErrNotFound] if no mapping exists for the given chunk ID.
+// Returns [storage.ErrNotFound] if no chunk data pack has been indexed as result for the given chunk ID.
 func RetrieveChunkDataPackID(r storage.Reader, chunkID flow.Identifier, chunkDataPackID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeIndexChunkDataPackByChunkID, chunkID), chunkDataPackID)
 }
@@ -47,14 +47,18 @@ func RemoveChunkDataPackID(w storage.Writer, chunkID flow.Identifier) error {
 }
 
 // InsertStoredChunkDataPack inserts a [storage.StoredChunkDataPack] into the database, keyed by its own ID.
-// The caller must ensure the chunkDataPackID is the same as c.ID().
+//
+// CAUTION: The caller must ensure `storeChunkDataPackID` is the same as `c.ID()`, ie. a collision-resistant
+// hash of the chunk data pack! This method silently overrides existing data, which is safe only if for the
+// same key, we always write the same value.
+//
 // No error returns expected during normal operations.
 func InsertStoredChunkDataPack(rw storage.ReaderBatchWriter, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
 	return UpsertByKey(rw.Writer(), MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
 }
 
 // RetrieveStoredChunkDataPack retrieves a chunk data pack by stored chunk data pack ID.
-// It returns [storage.ErrNotFound] if the chunk data pack is not found
+// It returns [storage.ErrNotFound] if no chunk data pack with the given ID is known.
 func RetrieveStoredChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
 	return RetrieveByKey(r, MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
 }
