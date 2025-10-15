@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -353,37 +354,48 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 
-	s.executionResultProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(&optimistic_sync.ExecutionResultInfo{
-			ExecutionResultID: result.ID(),
-			ExecutionNodes:    executionNodes.ToSkeleton(),
-		}, nil).
-		Maybe()
-
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil).
-		Maybe()
-
-	reader := osyncmock.NewBlockExecutionDataReader(s.T())
-	s.executionDataSnapshot.
-		On("BlockExecutionData").
-		Return(reader).
-		Maybe()
-
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
+
+		metadata := &accessmodel.ExecutorMetadata{
+			ExecutionResultID: result.ID(),
+			ExecutorIDs:       executionNodes.NodeIDs(),
+		}
+
+		s.executionResultProvider.
+			On("ExecutionResultInfo", mock.Anything, mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		reader := osyncmock.NewBlockExecutionDataReader(s.T())
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
 
 		reader.
 			On("ByBlockID", mock.Anything, block.ID()).
 			Return(execData, nil).
 			Once()
 
-		res, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
-		assert.NotNil(s.T(), metadata)
+		res, resMetadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+
+		s.executionStateCache.AssertExpectations(s.T())
+		s.executionDataSnapshot.AssertExpectations(s.T())
+		reader.AssertExpectations(s.T())
+
+		assert.NotNil(s.T(), resMetadata)
+		assert.Equal(s.T(), metadata, resMetadata)
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
@@ -393,12 +405,36 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
+		s.executionResultProvider.
+			On("ExecutionResultInfo", mock.Anything, mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		reader := osyncmock.NewBlockExecutionDataReader(s.T())
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+
 		reader.
 			On("ByBlockID", mock.Anything, block.ID()).
 			Return(nil, storage.ErrNotFound).
 			Once()
 
 		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+
+		s.executionStateCache.AssertExpectations(s.T())
+		s.executionDataSnapshot.AssertExpectations(s.T())
+		reader.AssertExpectations(s.T())
+
 		assert.Nil(s.T(), execDataRes)
 		assert.Nil(s.T(), metadata)
 		s.Require().True(access.IsDataNotFoundError(err))

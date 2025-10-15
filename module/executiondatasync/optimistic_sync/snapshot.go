@@ -24,6 +24,6 @@ type Snapshot interface {
 	// Registers returns a reader for querying register data.
 	Registers() storage.RegisterIndexReader
 
-	//BlockExecutionData returns a reader for querying execution data.
+	// BlockExecutionData returns a reader for querying execution data.
 	BlockExecutionData() BlockExecutionDataReader
 }

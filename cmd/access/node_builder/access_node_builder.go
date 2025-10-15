@@ -689,7 +689,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.lightTransactionResults,
 				builder.transactionResultErrorMessages,
 				nil,
-				*executionDataStoreCache,
+				executionDataStoreCache,
 			)
 			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 

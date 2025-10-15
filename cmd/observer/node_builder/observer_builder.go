@@ -1247,7 +1247,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.lightTransactionResults,
 				nil,
 				nil,
-				*executionDataStoreCache,
+				executionDataStoreCache,
 			)
 			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 
