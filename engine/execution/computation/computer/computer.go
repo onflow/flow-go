@@ -114,12 +114,12 @@ type blockComputer struct {
 	vm                    fvm.VM
 	vmCtx                 fvm.Context
 	systemChunkCtx        fvm.Context
-	callbackCtx           fvm.Context
+	scheduledTxCtx        fvm.Context
 	metrics               module.ExecutionMetrics
 	tracer                module.Tracer
 	log                   zerolog.Logger
 	systemTxn             *flow.TransactionBody
-	processCallbackTxn    *flow.TransactionBody
+	processScheduledTxn   *flow.TransactionBody
 	committer             ViewCommitter
 	executionDataProvider provider.Provider
 	signer                module.Local
@@ -148,8 +148,8 @@ func SystemChunkContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.
 	)
 }
 
-// CallbackContext is the context for the scheduled callback transactions.
-func CallbackContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.Context {
+// ScheduledTransactionContext is the context for the scheduled transactions.
+func ScheduledTransactionContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithAuthorizationChecksEnabled(false),
@@ -193,21 +193,21 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)
 	}
 
-	processCallbackTxn, err := blueprints.ProcessCallbacksTransaction(vmCtx.Chain)
+	processScheduledTxn, err := blueprints.ProcessScheduledTransactions(vmCtx.Chain)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate callbacks script: %w", err)
+		return nil, fmt.Errorf("failed to generate scheduled transactions script: %w", err)
 	}
 
 	return &blockComputer{
 		vm:                    vm,
 		vmCtx:                 vmCtx,
-		callbackCtx:           CallbackContext(vmCtx, metrics),
+		scheduledTxCtx:        ScheduledTransactionContext(vmCtx, metrics),
 		systemChunkCtx:        SystemChunkContext(vmCtx, metrics),
 		metrics:               metrics,
 		tracer:                tracer,
 		log:                   logger,
 		systemTxn:             systemTxn,
-		processCallbackTxn:    processCallbackTxn,
+		processScheduledTxn:   processScheduledTxn,
 		committer:             committer,
 		executionDataProvider: executionDataProvider,
 		signer:                signer,
@@ -315,11 +315,11 @@ func (e *blockComputer) queueUserTransactions(
 }
 
 func (e *blockComputer) queueSystemTransactions(
-	callbackCtx fvm.Context,
+	scheduledTxCtx fvm.Context,
 	systemChunkCtx fvm.Context,
 	systemCollection collectionInfo,
 	systemTxn *flow.TransactionBody,
-	executeCallbackTxs []*flow.TransactionBody,
+	executeScheduledTxs []*flow.TransactionBody,
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) chan TransactionRequest {
@@ -334,13 +334,13 @@ func (e *blockComputer) queueSystemTransactions(
 		Bool("scheduled_transaction", true).
 		Logger()
 
-	txQueue := make(chan TransactionRequest, len(executeCallbackTxs)+1)
+	txQueue := make(chan TransactionRequest, len(executeScheduledTxs)+1)
 	defer close(txQueue)
 
-	for _, txBody := range executeCallbackTxs {
+	for _, txBody := range executeScheduledTxs {
 		txQueue <- newTransactionRequest(
 			systemCollection,
-			callbackCtx,
+			scheduledTxCtx,
 			scheduledTxLogger,
 			txnIndex,
 			txBody,
@@ -473,14 +473,14 @@ func (e *blockComputer) executeUserTransactions(
 
 // executeSystemTransactions executes all system transactions in the block as part of the system collection.
 //
-// When scheduled callbacks are enabled, system transactions are executed in the following order:
-//  1. Process callback transaction - queries the scheduler contract to identify ready callbacks
-//     and emits events containing callback IDs and execution effort requirements
-//  2. Callback execution transactions - one transaction per callback ID from step 1 events,
-//     each executing a single scheduled callback with its specified effort limit
+// When scheduled transactions are enabled, system transactions are executed in the following order:
+//  1. Process scheduled transaction - queries the scheduler contract to identify ready scheduled transactions
+//     and emits events containing transaction IDs and execution effort requirements
+//  2. Scheduled transaction execution - one transaction per scheduled transaction ID from step 1 events,
+//     each executing a single scheduled transaction with its specified effort limit
 //  3. System chunk transaction - performs standard system operations
 //
-// When scheduled callbacks are disabled, only the system chunk transaction is executed.
+// When scheduled transactions are disabled, only the system chunk transaction is executed.
 //
 // All errors are indicators of bugs or corrupted internal state (continuation impossible)
 func (e *blockComputer) executeSystemTransactions(
@@ -493,8 +493,8 @@ func (e *blockComputer) executeSystemTransactions(
 	userCollectionCount := len(rawCollections)
 	txIndex := uint32(userTxCount)
 
-	callbackCtx := fvm.NewContextFromParent(
-		e.callbackCtx,
+	scheduledTxCtx := fvm.NewContextFromParent(
+		e.scheduledTxCtx,
 		fvm.WithBlockHeader(block.Block.ToHeader()),
 		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(block.BlockID())),
 	)
@@ -510,19 +510,19 @@ func (e *blockComputer) executeSystemTransactions(
 		blockIdStr:         block.BlockID().String(),
 		blockHeight:        block.Block.Height,
 		collectionIndex:    userCollectionCount,
-		CompleteCollection: nil, // We do not yet know all the scheduled callbacks, so postpone construction of the collection.
+		CompleteCollection: nil, // We do not yet know all the scheduled transactions, so postpone construction of the collection.
 	}
 
-	systemChunkLogger := callbackCtx.Logger.With().
+	systemChunkLogger := scheduledTxCtx.Logger.With().
 		Str("block_id", block.BlockID().String()).
 		Uint64("height", block.Block.Height).
 		Bool("system_chunk", true).
 		Int("num_collections", userCollectionCount).
 		Logger()
 
-	var callbackTxs []*flow.TransactionBody
+	var scheduledTxs []*flow.TransactionBody
 
-	if e.vmCtx.ScheduleCallbacksEnabled {
+	if e.vmCtx.ScheduledTransactionsEnabled {
 		// We pass in the `systemCollectionInfo` here. However, note that at this point, the composition of the system chunk
 		// is not yet known. Specifically, the `entity.CompleteCollection` represents the *final* output of a process and is
 		// immutable by protocol mandate. If we had a bug in our software that accidentally illegally mutated such structs,
@@ -530,8 +530,8 @@ func (e *blockComputer) executeSystemTransactions(
 		// be compromised. Therefore, we have the rigorous convention in our code base that the `CompleteCollection` is only
 		// constructed once the final composition of the system chunk has been determined.
 		// To that end, the CompleteCollection is nil here, such that any attempt to access the Collection will panic.
-		callbacks, updatedTxnIndex, err := e.executeProcessCallback(
-			callbackCtx,
+		scheduled, updatedTxnIndex, err := e.executeProcessScheduledTransactions(
+			scheduledTxCtx,
 			systemCollectionInfo,
 			database,
 			blockSpan,
@@ -542,11 +542,11 @@ func (e *blockComputer) executeSystemTransactions(
 			return err
 		}
 
-		callbackTxs = callbacks
+		scheduledTxs = scheduled
 		txIndex = updatedTxnIndex
 
 		finalCollection, err := flow.NewCollection(flow.UntrustedCollection{
-			Transactions: append(append([]*flow.TransactionBody{e.processCallbackTxn}, callbackTxs...), e.systemTxn),
+			Transactions: append(append([]*flow.TransactionBody{e.processScheduledTxn}, scheduledTxs...), e.systemTxn),
 		})
 		if err != nil {
 			return err
@@ -567,11 +567,11 @@ func (e *blockComputer) executeSystemTransactions(
 	}
 
 	txQueue := e.queueSystemTransactions(
-		callbackCtx,
+		scheduledTxCtx,
 		systemChunkCtx,
 		systemCollectionInfo,
 		e.systemTxn,
-		callbackTxs,
+		scheduledTxs,
 		txIndex,
 		systemChunkLogger,
 	)
@@ -601,21 +601,21 @@ func (e *blockComputer) executeQueue(
 	wg.Wait()
 }
 
-// executeProcessCallback submits a transaction that invokes the `process` method
-// on the callback scheduler contract.
+// executeProcessScheduledTransactions submits a transaction that invokes the `process` method
+// on the transaction scheduler contract.
 //
-// The `process` method scans for scheduled callbacks and emits an event for each that should
-// be executed. These emitted events are used to construct callback execution transactions,
+// The `process` method scans for scheduled transactions and emits an event for each that should
+// be executed. These emitted events are used to construct scheduled transaction execution transactions,
 // which are then added to the system transaction collection.
 //
 // If the `process` transaction fails, a fatal error is returned.
 //
 // Note: this transaction is executed serially and not concurrently with the system transaction.
-// This is because it's unclear whether the callback executions triggered by `process`
+// This is because it's unclear whether the scheduled transaction executions triggered by `process`
 // will result in additional system transactions.
 // In theory, if no additional transactions are emitted, concurrent execution could be optimized.
 // However, due to the added complexity, this optimization was deferred.
-func (e *blockComputer) executeProcessCallback(
+func (e *blockComputer) executeProcessScheduledTransactions(
 	systemCtx fvm.Context,
 	systemCollectionInfo collectionInfo,
 	database *transactionCoordinator,
@@ -623,16 +623,16 @@ func (e *blockComputer) executeProcessCallback(
 	txnIndex uint32,
 	systemLogger zerolog.Logger,
 ) ([]*flow.TransactionBody, uint32, error) {
-	callbackLogger := systemLogger.With().
+	scheduledLogger := systemLogger.With().
 		Bool("system_transaction", true).
 		Logger()
 
 	request := newTransactionRequest(
 		systemCollectionInfo,
 		systemCtx,
-		callbackLogger,
+		scheduledLogger,
 		txnIndex,
-		e.processCallbackTxn,
+		e.processScheduledTxn,
 		ComputerTransactionTypeSystem,
 		false)
 
@@ -658,7 +658,7 @@ func (e *blockComputer) executeProcessCallback(
 	if txn.Output().Err != nil {
 		// if the process transaction fails we log the critical error but don't return an error
 		// so that block execution continues and only the scheduled transactions halt
-		callbackLogger.Error().
+		scheduledLogger.Error().
 			Err(txn.Output().Err).
 			Bool("critical_error", true).
 			Uint64("height", request.ctx.BlockHeader.Height).
@@ -667,27 +667,27 @@ func (e *blockComputer) executeProcessCallback(
 		return nil, txnIndex, nil
 	}
 
-	callbackTxs, err := blueprints.ExecuteCallbacksTransactions(e.vmCtx.Chain, txn.Output().Events)
+	scheduledTxs, err := blueprints.ExecuteScheduledTransactions(e.vmCtx.Chain, txn.Output().Events)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	if len(callbackTxs) > 0 {
-		// calculate total computation limits for execute callback transactions
+	if len(scheduledTxs) > 0 {
+		// calculate total computation limits for execute scheduled transactions
 		var totalExecuteComputationLimits uint64
-		for _, tx := range callbackTxs {
+		for _, tx := range scheduledTxs {
 			totalExecuteComputationLimits += tx.GasLimit
 		}
 
-		// report metrics for callbacks executed
-		e.metrics.ExecutionCallbacksExecuted(
-			len(callbackTxs),
+		// report metrics for scheduled transactions executed
+		e.metrics.ExecutionScheduledTransactionsExecuted(
+			len(scheduledTxs),
 			txn.Output().ComputationUsed,
 			totalExecuteComputationLimits,
 		)
 	}
 
-	return callbackTxs, txnIndex, nil
+	return scheduledTxs, txnIndex, nil
 }
 
 func (e *blockComputer) executeTransactions(

@@ -24,12 +24,12 @@ func TestProcessCallbacksTransaction(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Mainnet.Chain()
-	tx, err := blueprints.ProcessCallbacksTransaction(chain)
+	tx, err := blueprints.ProcessScheduledTransactions(chain)
 	require.NoError(t, err)
 
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
-	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve callback scheduler import")
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve transaction scheduler import")
 	assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 	assert.Equal(t, tx.Authorizers, []flow.Address{chain.ServiceAddress()})
 	assert.Empty(t, tx.Arguments)
@@ -119,7 +119,7 @@ func TestExecuteCallbacksTransactions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			txs, err := blueprints.ExecuteCallbacksTransactions(chain, tt.events)
+			txs, err := blueprints.ExecuteScheduledTransactions(chain, tt.events)
 
 			if tt.expectError {
 				assert.Errorf(t, err, tt.name)
@@ -164,7 +164,7 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	const id = 123
 	const effort = 456
 	event := createValidCallbackEvent(t, id, effort)
-	txs, err := blueprints.ExecuteCallbacksTransactions(chain, []flow.Event{event})
+	txs, err := blueprints.ExecuteScheduledTransactions(chain, []flow.Event{event})
 
 	require.NoError(t, err)
 	require.Len(t, txs, 1)
@@ -172,7 +172,7 @@ func TestExecuteCallbackTransaction(t *testing.T) {
 	tx := txs[0]
 	assert.NotNil(t, tx)
 	assert.NotEmpty(t, tx.Script)
-	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve callback scheduler import")
+	require.False(t, strings.Contains(string(tx.Script), `import "FlowTransactionScheduler"`), "should resolve transaction scheduler import")
 	assert.Equal(t, uint64(effort), tx.GasLimit)
 	assert.Len(t, tx.Arguments, 1)
 
@@ -316,7 +316,7 @@ func TestSystemCollection(t *testing.T) {
 			expectedTxCount: 5, // process + 3 executes + system chunk
 		},
 		{
-			name: "mixed events - valid callbacks and invalid types",
+			name: "mixed events - valid transactions and invalid types",
 			events: []flow.Event{
 				createValidCallbackEvent(t, 1, 100),
 				createInvalidTypeEvent(),
@@ -333,7 +333,7 @@ func TestSystemCollection(t *testing.T) {
 		{
 			name:         "invalid CCF payload in callback event",
 			events:       []flow.Event{createPendingExecutionEventWithPayload([]byte{0xFF, 0xAB, 0xCD})},
-			errorMessage: "failed to construct execute callbacks transactions",
+			errorMessage: "failed to construct execute scheduled transactions",
 		},
 	}
 

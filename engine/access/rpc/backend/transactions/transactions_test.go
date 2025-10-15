@@ -95,12 +95,12 @@ type Suite struct {
 
 	errorMessageProvider error_messages.Provider
 
-	chainID                           flow.ChainID
-	systemTx                          *flow.TransactionBody
-	systemCollection                  *flow.Collection
-	pendingExecutionEvents            []flow.Event
-	processScheduledCallbackEventType flow.EventType
-	scheduledCallbacksEnabled         bool
+	chainID                               flow.ChainID
+	systemTx                              *flow.TransactionBody
+	systemCollection                      *flow.Collection
+	pendingExecutionEvents                []flow.Event
+	processScheduledTransactionsEventType flow.EventType
+	scheduledTransactionsEnabled          bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -151,12 +151,12 @@ func (suite *Suite) SetupTest() {
 
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	suite.Require().NoError(err)
-	suite.scheduledCallbacksEnabled = true
+	suite.scheduledTransactionsEnabled = true
 
 	suite.pendingExecutionEvents = suite.createPendingExecutionEvents(2) // 2 callbacks
 	suite.systemCollection, err = blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
 	suite.Require().NoError(err)
-	suite.processScheduledCallbackEventType = suite.pendingExecutionEvents[0].Type
+	suite.processScheduledTransactionsEventType = suite.pendingExecutionEvents[0].Type
 
 	suite.db, suite.dbDir = unittest.TempPebbleDB(suite.T())
 	progress, err := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
@@ -209,33 +209,33 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		txStatusDeriver,
 		suite.systemTx.ID(),
 		suite.chainID,
-		suite.scheduledCallbacksEnabled,
+		suite.scheduledTransactionsEnabled,
 	)
 
 	return Params{
-		Log:                         suite.log,
-		Metrics:                     metrics.NewNoopCollector(),
-		State:                       suite.state,
-		ChainID:                     flow.Testnet,
-		SystemTxID:                  suite.systemTx.ID(),
-		StaticCollectionRPCClient:   suite.historicalAccessAPIClient,
-		HistoricalAccessNodeClients: nil,
-		NodeCommunicator:            nodeCommunicator,
-		ConnFactory:                 suite.connectionFactory,
-		EnableRetries:               true,
-		NodeProvider:                nodeProvider,
-		Blocks:                      suite.blocks,
-		Collections:                 suite.collections,
-		Transactions:                suite.transactions,
-		Events:                      suite.events,
-		TxErrorMessageProvider:      suite.errorMessageProvider,
-		TxResultCache:               suite.txResultCache,
-		TxProvider:                  txProvider,
-		TxValidator:                 txValidator,
-		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 suite.eventsIndex,
-		TxResultsIndex:              suite.txResultsIndex,
-		ScheduledCallbacksEnabled:   suite.scheduledCallbacksEnabled,
+		Log:                          suite.log,
+		Metrics:                      metrics.NewNoopCollector(),
+		State:                        suite.state,
+		ChainID:                      flow.Testnet,
+		SystemTxID:                   suite.systemTx.ID(),
+		StaticCollectionRPCClient:    suite.historicalAccessAPIClient,
+		HistoricalAccessNodeClients:  nil,
+		NodeCommunicator:             nodeCommunicator,
+		ConnFactory:                  suite.connectionFactory,
+		EnableRetries:                true,
+		NodeProvider:                 nodeProvider,
+		Blocks:                       suite.blocks,
+		Collections:                  suite.collections,
+		Transactions:                 suite.transactions,
+		Events:                       suite.events,
+		TxErrorMessageProvider:       suite.errorMessageProvider,
+		TxResultCache:                suite.txResultCache,
+		TxProvider:                   txProvider,
+		TxValidator:                  txValidator,
+		TxStatusDeriver:              txStatusDeriver,
+		EventsIndex:                  suite.eventsIndex,
+		TxResultsIndex:               suite.txResultsIndex,
+		ScheduledTransactionsEnabled: suite.scheduledTransactionsEnabled,
 	}
 }
 
@@ -887,7 +887,7 @@ func (suite *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1072,7 +1072,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1165,7 +1165,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1282,7 +1282,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
@@ -1374,7 +1374,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			params.SystemTxID,
 			params.TxStatusDeriver,
 			params.ChainID,
-			params.ScheduledCallbacksEnabled,
+			params.ScheduledTransactionsEnabled,
 		)
 
 		txBackend, err := NewTransactionsBackend(params)
@@ -1435,7 +1435,7 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			params.TxStatusDeriver,
 			params.SystemTxID,
 			params.ChainID,
-			params.ScheduledCallbacksEnabled,
+			params.ScheduledTransactionsEnabled,
 		)
 
 		txBackend, err := NewTransactionsBackend(params)
@@ -1588,7 +1588,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
 		params.TxStatusDeriver,
 		params.SystemTxID,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
@@ -1882,7 +1882,7 @@ func (suite *Suite) setupExecutionGetEventsRequest(blockID flow.Identifier, bloc
 	}
 
 	request := &execproto.GetEventsForBlockIDsRequest{
-		Type:     string(suite.processScheduledCallbackEventType),
+		Type:     string(suite.processScheduledTransactionsEventType),
 		BlockIds: [][]byte{blockID[:]},
 	}
 	expectedResponse := &execproto.GetEventsForBlockIDsResponse{
