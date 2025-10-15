@@ -172,8 +172,10 @@ func TestChunkDataPacks_BatchRemoveChunkDataPacksOnly(t *testing.T) {
 
 			// Prepare chunk IDs for removal
 			chunkIDs := make([]flow.Identifier, len(chunkDataPacks))
+			chunkDataPackIDs := make([]flow.Identifier, len(chunkDataPacks))
 			for i, chunkDataPack := range chunkDataPacks {
 				chunkIDs[i] = chunkDataPack.ChunkID
+				chunkDataPackIDs = append(chunkDataPackIDs, chunkDataPack.ID())
 			}
 
 			// Test BatchRemoveChunkDataPacksOnly - verify it can be called without error
@@ -181,8 +183,11 @@ func TestChunkDataPacks_BatchRemoveChunkDataPacksOnly(t *testing.T) {
 				return chunkDataPackStore.BatchRemoveChunkDataPacksOnly(chunkIDs, chunkDataPackDBBatch)
 			}))
 
-			// Note: The exact behavior after removal may depend on caching and implementation details
-			// The main test is that the method can be called without error
+			// Verify the chunk data packs have been removed from chunk data pack DB
+			for _, id := range chunkDataPackIDs {
+				_, err := stored.ByID(id)
+				assert.ErrorIs(t, err, storage.ErrNotFound)
+			}
 		})
 	})
 }
