@@ -2201,8 +2201,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				VersionControl:              notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
-				ExecutionResultInfoProvider: builder.executionResultInfoProvider,
-				ExecutionStateCache:         builder.executionStateCache,
+				ExecutionResultInfoProvider: builder.executionResultInfoProvider, // notNil
+				ExecutionStateCache:         builder.executionStateCache,         // notNil
 				OperatorCriteria:            optimistic_sync.DefaultCriteria,
 				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 				ScheduledCallbacksEnabled:   builder.scheduledCallbacksEnabled,

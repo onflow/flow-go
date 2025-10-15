@@ -6,18 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog"
 )
 
 type ExecutionDataResponse struct {
@@ -46,15 +43,7 @@ type ExecutionDataBackend struct {
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected errors:
-//   - access.DataNotFoundError - Returned when the requested data is not (yet) available.
-//     This includes:
-//   - Missing execution result info for the given block ID
-//   - Missing snapshot for the selected execution result
-//   - Missing block execution data
-//
-// Other errors:
-//   - An internal error converted via rpc.ConvertError (gRPC codes.Internal) may be returned for unexpected
-//     failures while reading from storage.
+// - [access.DataNotFoundError]: when data required to process the request is not available.
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -63,9 +52,8 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", blockID.String(), err)
-		return nil, nil, access.NewDataNotFoundError("execution result info", err)
-
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
 	executionResultID := execResultInfo.ExecutionResultID
@@ -77,19 +65,17 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 
 	}
 
-	blockExecutionDataReader := snapshot.BlockExecutionData()
-	executionData, err := blockExecutionDataReader.ByBlockID(ctx, blockID)
+	executionData, err := snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
 	if err != nil {
 		// need custom not found handler due to blob not found error
 		if errors.Is(err, storage.ErrNotFound) ||
-			execution_data.IsBlobNotFoundError(err) ||
-			errors.Is(err, subscription.ErrBlockNotReady) {
+			execution_data.IsBlobNotFoundError(err) {
 			err = fmt.Errorf("could not find execution data for block %s: %w", blockID, err)
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		}
 
-		// Anything else is unexpected; convert to internal and return (still benign for the node).
-		return nil, nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
+		// any other error is unexpected exception and indicates there is a bug or inconsistent state.
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution data: %w", err))
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
