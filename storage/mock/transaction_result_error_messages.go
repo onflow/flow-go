@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -14,17 +16,17 @@ type TransactionResultErrorMessages struct {
 	mock.Mock
 }
 
-// BatchStore provides a mock function with given fields: blockID, transactionResultErrorMessages, batch
-func (_m *TransactionResultErrorMessages) BatchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(blockID, transactionResultErrorMessages, batch)
+// BatchStore provides a mock function with given fields: lctx, rw, blockID, transactionResultErrorMessages
+func (_m *TransactionResultErrorMessages) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+	ret := _m.Called(lctx, rw, blockID, transactionResultErrorMessages)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.TransactionResultErrorMessage, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(blockID, transactionResultErrorMessages, batch)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, []flow.TransactionResultErrorMessage) error); ok {
+		r0 = rf(lctx, rw, blockID, transactionResultErrorMessages)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -150,17 +152,17 @@ func (_m *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool,
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: blockID, transactionResultErrorMessages
-func (_m *TransactionResultErrorMessages) Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
-	ret := _m.Called(blockID, transactionResultErrorMessages)
+// Store provides a mock function with given fields: lctx, blockID, transactionResultErrorMessages
+func (_m *TransactionResultErrorMessages) Store(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+	ret := _m.Called(lctx, blockID, transactionResultErrorMessages)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.TransactionResultErrorMessage) error); ok {
-		r0 = rf(blockID, transactionResultErrorMessages)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, []flow.TransactionResultErrorMessage) error); ok {
+		r0 = rf(lctx, blockID, transactionResultErrorMessages)
 	} else {
 		r0 = ret.Error(0)
 	}
