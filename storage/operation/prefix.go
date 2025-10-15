@@ -98,8 +98,15 @@ const (
 	codeTransactionIDByScheduledTransactionID = 82 // index of transaction ID by scheduled transaction ID
 	codeBlockIDByScheduledTransactionID       = 83 // index of block ID by scheduled transaction ID
 
+	// The storage prefixes `codeChunkDataPack` and `codeIndexChunkDataPackByChunkID` are used primarily by execution nodes
+	// to persist their own results for chunks they executed.
+	//  - `codeIndexChunkDataPackByChunkID` stores the chunkID → chunkDataPackID index, and
+	//  - `codeChunkDataPack` stores the chunk data pack by its own ID.
+	// This breakup allows us to store chunk data packs in a different database in a concurrent safe way.
+	codeIndexChunkDataPackByChunkID = 99
+	codeChunkDataPack               = 100
+
 	// legacy codes (should be cleaned up)
-	codeChunkDataPack                      = 100
 	codeCommit                             = 101
 	codeEvent                              = 102
 	codeExecutionStateInteractions         = 103
@@ -111,15 +118,10 @@ const (
 	codeLightTransactionResultIndex        = 109
 	codeTransactionResultErrorMessage      = 110
 	codeTransactionResultErrorMessageIndex = 111
-	// Compared to the deprecated `codeChunkDataPack`, which stored chunkID -> storedChunkDataPack relationship:
-	//  - `codeIndexChunkDataPackByChunkID` stores the chunkID->chunkDataPackID index, and
-	//  - `codeChunkDataPack` stores chunkDataPackID -> storedChunkDataPack relationship.
-	// This breakup allows us to store chunk data packs in a different database in a concurrent safe way
-	codeIndexChunkDataPackByChunkID  = 112
-	codeIndexCollection              = 200
-	codeIndexExecutionResultByBlock  = 202
-	codeIndexCollectionByTransaction = 203
-	codeIndexResultApprovalByChunk   = 204
+	codeIndexCollection                    = 200
+	codeIndexExecutionResultByBlock        = 202
+	codeIndexCollectionByTransaction       = 203
+	codeIndexResultApprovalByChunk         = 204
 
 	// TEMPORARY codes
 	disallowedNodeIDs = 205 // manual override for adding node IDs to list of ejected nodes, applies to networking layer only

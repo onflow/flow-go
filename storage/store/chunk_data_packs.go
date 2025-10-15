@@ -244,16 +244,10 @@ func (ch *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifi
 		}
 	}
 
-	// Remove from cache and protocol DB
-	return ch.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		for _, chunkID := range chunkIDs {
-			err := ch.chunkIDToChunkDataPackIDCache.RemoveTx(rw, chunkID)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	// The chunk data pack pruner only removes the stored chunk data packs (in ch.stored).
+	// It does not delete the corresponding index mappings from the protocol database.
+	// These mappings should be cleaned up by the protocol DB pruner, which will be implemented later.
+	return nil
 }
 
 // ByChunkID returns the chunk data for the given chunk ID.
