@@ -405,6 +405,11 @@ func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *block
 
 // buildPayload constructs a valid payload based on transactions available in the mempool.
 // If the mempool is empty, an empty payload will be returned.
+// Return values:
+//   - *cluster.Payload: the payload that has been built.
+//   - uint: number of prioritized transactions included in the payload.
+//   - error: exception if failed to build the payload.
+//
 // No errors are expected during normal operation.
 func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, uint, error) {
 	lookup := buildCtx.lookup
