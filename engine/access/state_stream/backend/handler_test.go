@@ -26,6 +26,7 @@ import (
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -224,17 +225,27 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 			)
 			blockID := result.BlockID
 
+			metadata := &accessmodel.ExecutorMetadata{
+				ExecutionResultID: unittest.IdentifierFixture(),
+				ExecutorIDs:       unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution)).NodeIDs(),
+			}
+
 			api := ssmock.NewAPI(t)
-			api.On("GetExecutionDataByBlockID", mock.Anything, blockID, mock.Anything).Return(result, nil, nil)
+			api.On("GetExecutionDataByBlockID", mock.Anything, blockID, mock.Anything).Return(result, metadata, nil).Once()
 
 			h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
 
 			response, err := h.GetExecutionDataByBlockID(ctx, &executiondata.GetExecutionDataByBlockIDRequest{
 				BlockId:              blockID[:],
 				EventEncodingVersion: test.eventVersion,
+				ExecutionStateQuery: &entities.ExecutionStateQuery{
+					IncludeExecutorMetadata: true,
+				},
 			})
 			require.NoError(t, err)
 			require.NotNil(t, response)
+			require.NotNil(t, response.ExecutorMetadata)
+			require.Equal(t, convert.ExecutorMetadataToMessage(metadata), response.ExecutorMetadata)
 
 			blockExecutionData := response.GetBlockExecutionData()
 			require.Equal(t, blockID[:], blockExecutionData.GetBlockId())

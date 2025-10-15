@@ -18,12 +18,14 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ExecutionDataResponse bundles the execution data returned for a single block.
 type ExecutionDataResponse struct {
 	Height         uint64
 	ExecutionData  *execution_data.BlockExecutionData
 	BlockTimestamp time.Time
 }
 
+// ExecutionDataBackend exposes read-only access to execution data.
 type ExecutionDataBackend struct {
 	log     zerolog.Logger
 	headers storage.Headers

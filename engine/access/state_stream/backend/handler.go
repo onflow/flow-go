@@ -59,7 +59,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 
 	execData, executorMetadata, err := h.api.GetExecutionDataByBlockID(ctx, blockID, convert.NewCriteria(query))
 	if err != nil {
-		return nil, rpc.ConvertError(err, "could no get execution data", codes.Internal)
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	message, err := convert.BlockExecutionDataToMessage(execData)
