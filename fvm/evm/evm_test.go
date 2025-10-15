@@ -579,6 +579,255 @@ func TestEVMRun(t *testing.T) {
 	})
 }
 
+func TestBlockFormationOptimization(t *testing.T) {
+	chain := flow.Emulator.Chain()
+
+	t.Run("batch run multiple valid transactions", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
+
+							assert(batchResults.length == txs.length, message: "invalid result length")
+							for res in batchResults {
+								assert(res.status == EVM.Status.successful, message: "unexpected status")
+								assert(res.errorCode == 0, message: "unexpected error code")
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				batchCount := 100
+				var storedValues []int64
+				txBytes := make([]cadence.Value, batchCount)
+				for i := 0; i < batchCount; i++ {
+					num := int64(i)
+					storedValues = append(storedValues, num)
+					// prepare batch of transaction payloads
+					tx := testAccount.PrepareSignAndEncodeTx(t,
+						testContract.DeployedAt.ToCommon(),
+						testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
+						big.NewInt(0),
+						uint64(100_000),
+						big.NewInt(1),
+					)
+
+					// build txs argument
+					txBytes[i] = cadence.NewArray(
+						unittest.BytesToCdcUInt8(tx),
+					).WithType(stdlib.EVMTransactionBytesCadenceType)
+				}
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					SetComputeLimit(flow.DefaultMaxTransactionGasLimit).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				require.Equal(t, uint64(829), output.ComputationUsed)
+
+				// append the state
+				snapshot = snapshot.Append(state)
+
+				require.Len(t, output.Events, batchCount+1)
+				txHashes := make(types.TransactionHashes, 0)
+				totalGasUsed := uint64(0)
+				for i, event := range output.Events {
+					if i == batchCount { // skip last one
+						continue
+					}
+
+					ev, err := ccf.Decode(nil, event.Payload)
+					require.NoError(t, err)
+					cadenceEvent, ok := ev.(cadence.Event)
+					require.True(t, ok)
+
+					event, err := events.DecodeTransactionEventPayload(cadenceEvent)
+					require.NoError(t, err)
+
+					txHashes = append(txHashes, event.Hash)
+					var logs []*gethTypes.Log
+					err = rlp.DecodeBytes(event.Logs, &logs)
+					require.NoError(t, err)
+
+					require.Len(t, logs, 1)
+
+					log := logs[0]
+					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
+					assert.Equal(t, storedValues[i], last.Big().Int64())
+					totalGasUsed += event.GasConsumed
+				}
+
+				// last event is fee transfer event
+				feeTransferEvent := output.Events[batchCount]
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				txHashes = append(txHashes, feeTranferEventPayload.Hash)
+
+				// check coinbase balance (note the gas price is 1)
+				coinbaseBalance = getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Equal(t, types.BalanceToBigInt(coinbaseBalance).Uint64(), totalGasUsed)
+
+				// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(2_859_788), blockEventPayload.TotalGasUsed)
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
+			})
+	})
+
+	t.Run("run multiple valid transactions", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+
+							for tx in txs {
+								let txResult = EVM.run(
+									tx: tx,
+									coinbase: coinbase
+								)
+								assert(txResult.status == EVM.Status.successful, message: "unexpected status")
+								assert(txResult.errorCode == 0, message: "unexpected error code")
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				batchCount := 50
+				txBytes := make([]cadence.Value, batchCount)
+				for i := 0; i < batchCount; i++ {
+					num := int64(i)
+					// prepare batch of transaction payloads
+					tx := testAccount.PrepareSignAndEncodeTx(t,
+						testContract.DeployedAt.ToCommon(),
+						testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
+						big.NewInt(0),
+						uint64(100_000),
+						big.NewInt(1),
+					)
+
+					// build txs argument
+					txBytes[i] = cadence.NewArray(
+						unittest.BytesToCdcUInt8(tx),
+					).WithType(stdlib.EVMTransactionBytesCadenceType)
+				}
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					SetComputeLimit(flow.DefaultMaxTransactionGasLimit).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				// require.Equal(t, uint64(6720), output.ComputationUsed)
+				// This now consumes 652 gas less.
+				require.Equal(t, uint64(6068), output.ComputationUsed)
+
+				// append the state
+				snapshot = snapshot.Append(state)
+
+				require.Len(t, output.Events, 2*batchCount)
+
+				// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(2_476_538), blockEventPayload.TotalGasUsed)
+			})
+	})
+}
+
 func TestEVMBatchRun(t *testing.T) {
 	chain := flow.Emulator.Chain()
 
@@ -3625,6 +3874,7 @@ func RunWithNewEnvironment(
 
 				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+					fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 				}
 
 				executionSnapshot, _, err := vm.Run(
