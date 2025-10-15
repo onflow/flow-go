@@ -43,11 +43,11 @@ type ChunkDataPacks struct {
 	protocolDB storage.DB
 
 	// the actual chunk data pack is stored here, which is a separate storage from protocol DB
-	stored storage.StoredChunkDataPacks
+	cdpStorage storage.StoredChunkDataPacks
 
-	// We assume that for every chunk data pack not for a system chunk, the executed collection has 
+	// We assume that for every chunk data pack not for a system chunk, the executed collection has
 	// previously been persisted in `storage.Collections`. We use this storage abstraction here only for
-	// retrieving collections. We assume that `storage.Collections` has its own caching already built in.  
+	// retrieving collections. We assume that `storage.Collections` has its own caching already built in.
 	collections storage.Collections
 
 	// cache chunkID -> chunkDataPackID
@@ -56,7 +56,7 @@ type ChunkDataPacks struct {
 
 var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
-func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored storage.StoredChunkDataPacks, collections storage.Collections, chunkIDToChunkDataPackIDCacheSize uint) *ChunkDataPacks {
+func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, cdpStorage storage.StoredChunkDataPacks, collections storage.Collections, chunkIDToChunkDataPackIDCacheSize uint) *ChunkDataPacks {
 
 	retrieve := func(r storage.Reader, chunkID flow.Identifier) (flow.Identifier, error) {
 		var chunkDataPackID flow.Identifier
@@ -78,7 +78,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 	ch := ChunkDataPacks{
 		protocolDB:                    db,
 		chunkIDToChunkDataPackIDCache: cache,
-		stored:                        stored,
+		cdpStorage:                    cdpStorage,
 		collections:                   collections,
 	}
 	return &ch
@@ -129,7 +129,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 	storedChunkDataPacks := storage.ToStoredChunkDataPacks(cs)
 
 	// Store the chunk data packs and get back their unique IDs
-	chunkDataPackIDs, err := ch.stored.StoreChunkDataPacks(storedChunkDataPacks)
+	chunkDataPackIDs, err := ch.cdpStorage.StoreChunkDataPacks(storedChunkDataPacks)
 	if err != nil {
 		return nil, fmt.Errorf("cannot store chunk data packs: %w", err)
 	}
@@ -198,7 +198,7 @@ func (ch *ChunkDataPacks) BatchRemove(
 	if len(chunkDataPackIDs) > 0 {
 		storage.OnCommitSucceed(protocolDBBatch, func() {
 			// no errors expected during normal operation, even if no entries exist with the given IDs
-			err := ch.stored.Remove(chunkDataPackIDs)
+			err := ch.cdpStorage.Remove(chunkDataPackIDs)
 			if err != nil {
 				log.Fatal().Msgf("cannot remove stored chunk data packs: %v", err)
 			}
@@ -239,7 +239,7 @@ func (ch *ChunkDataPacks) BatchRemoveChunkDataPacksOnly(chunkIDs []flow.Identifi
 
 	// Remove the stored chunk data packs
 	if len(chunkDataPackIDs) > 0 {
-		err := ch.stored.BatchRemove(chunkDataPackIDs, chunkDataPackBatch)
+		err := ch.cdpStorage.BatchRemove(chunkDataPackIDs, chunkDataPackBatch)
 		if err != nil {
 			return fmt.Errorf("cannot remove stored chunk data packs: %w", err)
 		}
@@ -261,7 +261,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	}
 
 	// Then retrieve the reduced representation of the chunk data pack via its ID.
-	schdp, err := ch.stored.ByID(chunkDataPackID)
+	schdp, err := ch.cdpStorage.ByID(chunkDataPackID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack %x for chunk %x: %w", chunkDataPackID, chunkID, err)
 	}
