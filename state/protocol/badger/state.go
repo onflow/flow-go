@@ -128,11 +128,6 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
-
-	err = lctx.AcquireLock(storage.LockBootstrapping)
-	if err != nil {
-		return nil, err
-	}
 	err = lctx.AcquireLock(storage.LockInsertSafetyData)
 	if err != nil {
 		return nil, err

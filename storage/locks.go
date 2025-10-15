@@ -38,8 +38,6 @@ const (
 	// LockInsertChunkDataPack protects the insertion of chunk data packs (not yet used anywhere
 	LockInsertChunkDataPack     = "lock_insert_chunk_data_pack"
 	LockIndexCollectionsByBlock = "lock_index_collections_by_block"
-	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
-	LockBootstrapping = "lock_bootstrapping"
 	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs
 	LockIndexChunkDataPackByChunkID = "lock_index_chunk_data_pack_by_chunk_id"
 	// LockInsertTransactionResultErrMessage protects the insertion of transaction result error messages
@@ -72,7 +70,6 @@ func Locks() []string {
 		LockInsertInstanceParams,
 		LockInsertChunkDataPack,
 		LockIndexCollectionsByBlock,
-		LockBootstrapping,
 		LockIndexChunkDataPackByChunkID,
 		LockInsertTransactionResultErrMessage,
 		LockInsertLightTransactionResult,
@@ -129,8 +126,7 @@ func makeLockPolicy() lockctx.Policy {
 		// module/executiondatasync/optimistic_sync/persisters/block.go#BlockPersister.Persist
 		Add(LockInsertCollection, LockInsertEvent).
 		Add(LockInsertEvent, LockInsertLightTransactionResult).
-		Add(LockFinalizeBlock, LockBootstrapping).
-		Add(LockBootstrapping, LockInsertSafetyData).
+		Add(LockFinalizeBlock, LockInsertSafetyData).
 		Add(LockInsertSafetyData, LockInsertLivenessData).
 		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
 
