@@ -257,8 +257,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index AllTheThings", func(t *testing.T) {
 		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
 
-		test.events.On("BatchStore", blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).Return(nil)
-		test.results.On("BatchStore", blockID, tf.ExpectedResults, mock.Anything).Return(nil)
+		test.events.On("BatchStore", mock.Anything, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).Return(nil)
+		test.results.On("BatchStore", mock.Anything, mock.Anything, blockID, tf.ExpectedResults).Return(nil)
 		test.registers.
 			On("Store", mock.Anything, tf.Block.Height).
 			Run(func(args mock.Arguments) {
