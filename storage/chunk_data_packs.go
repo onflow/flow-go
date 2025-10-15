@@ -21,11 +21,20 @@ type ChunkDataPacks interface {
 	//     chunk data pack (or it will get slashed). This mapping from chunk ID to the ID of the chunk data pack that the Execution Node
 	//     actually committed to is stored in the protocol database, in the following phase 2.
 	//   - In the second phase, we populate the index mappings from ChunkID to one "distinguished" chunk data pack ID. This mapping
-	//     is stored in the protocol database. Typically, en Execution Node uses this for indexing its own chunk data packs which it
+	//     is stored in the protocol database. Typically, an Execution Node uses this for indexing its own chunk data packs which it
 	//     publicly committed to.
-	//   - This function can approximately be described as an atomic operation. When it completes successfully, either both databases
-	//     have been updated, or neither. However, this is an approximation only, because interim states exist, where the chunk data
-	//     packs already have been stored in the chunk data pack database, but the index mappings do not yet exist.
+	//
+	// ATOMICITY:
+	// [ChunkDataPacks.Store] executes phase 1 immediately, persisting the chunk data packs in their dedicated database. However,
+	// the index mappings in phase 2 is deferred to the caller, who must invoke the returned functor to perform phase 2. This
+	// approach has the following benefits:
+	//   - Our API reflects that we are writing to two different databases here, with the chunk data pack database containing largely
+	//     specialized data subject to pruning. In contrast, the protocol database persists the commitments a node make (subject to
+	//     slashing). The caller receives the ability to persist this commitment in the form of the returned functor. The functor
+	//     may be discarded by the caller without corrupting the state (if anything, we have just stored some additional chunk data
+	//     packs).
+	//   - The serialization and storage of the comparatively large chunk data packs is separated from the protocol database writes.
+	//   - The locking duration of the protocol database is reduced.
 	//
 	// The Store method returns:
 	//   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function for populating the index mapping from chunkID
