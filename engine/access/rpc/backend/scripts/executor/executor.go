@@ -25,7 +25,7 @@ type Request struct {
 	execResultInfo *optimistic_sync.ExecutionResultInfo
 }
 
-// TODO(Uliana): add godoc
+// NewScriptExecutionRequest creates a new Request instance for script execution.
 func NewScriptExecutionRequest(
 	blockID flow.Identifier,
 	height uint64,
