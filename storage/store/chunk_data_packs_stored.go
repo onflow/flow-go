@@ -81,10 +81,7 @@ func (ch *StoredChunkDataPacks) BatchRemove(chunkDataPackIDs []flow.Identifier, 
 }
 
 func (ch *StoredChunkDataPacks) batchRemove(chunkDataPackID flow.Identifier, rw storage.ReaderBatchWriter) error {
-	storage.OnCommitSucceed(rw, func() {
-		ch.byIDCache.Remove(chunkDataPackID)
-	})
-	return operation.RemoveChunkDataPack(rw.Writer(), chunkDataPackID)
+	return ch.byIDCache.RemoveTx(rw, chunkDataPackID)
 }
 
 // StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
