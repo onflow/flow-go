@@ -46,20 +46,20 @@ func RemoveChunkDataPackID(w storage.Writer, chunkID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeIndexChunkDataPackByChunkID, chunkID))
 }
 
-// InsertStoredChunkDataPack inserts a [storage.StoredChunkDataPack] into the database, keyed by its own ID.
+// InsertChunkDataPack inserts a [storage.StoredChunkDataPack] into the database, keyed by its own ID.
 //
 // CAUTION: The caller must ensure `storeChunkDataPackID` is the same as `c.ID()`, ie. a collision-resistant
 // hash of the chunk data pack! This method silently overrides existing data, which is safe only if for the
 // same key, we always write the same value.
 //
 // No error returns expected during normal operations.
-func InsertStoredChunkDataPack(rw storage.ReaderBatchWriter, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
+func InsertChunkDataPack(rw storage.ReaderBatchWriter, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
 	return UpsertByKey(rw.Writer(), MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
 }
 
-// RetrieveStoredChunkDataPack retrieves a chunk data pack by stored chunk data pack ID.
+// RetrieveChunkDataPack retrieves a chunk data pack by stored chunk data pack ID.
 // It returns [storage.ErrNotFound] if no chunk data pack with the given ID is known.
-func RetrieveStoredChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
+func RetrieveChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
 	return RetrieveByKey(r, MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
 }
 

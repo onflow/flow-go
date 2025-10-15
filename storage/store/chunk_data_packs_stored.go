@@ -24,13 +24,13 @@ func NewStoredChunkDataPacks(collector module.CacheMetrics, db storage.DB, byIDC
 
 	retrieve := func(r storage.Reader, key flow.Identifier) (*storage.StoredChunkDataPack, error) {
 		var c storage.StoredChunkDataPack
-		err := operation.RetrieveStoredChunkDataPack(r, key, &c)
+		err := operation.RetrieveChunkDataPack(r, key, &c)
 		return &c, err
 	}
 
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
 		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byIDCacheSize),
-		withStore(operation.InsertStoredChunkDataPack),
+		withStore(operation.InsertChunkDataPack),
 		withRemove[flow.Identifier, *storage.StoredChunkDataPack](func(rw storage.ReaderBatchWriter, id flow.Identifier) error {
 			return operation.RemoveChunkDataPack(rw.Writer(), id)
 		}),

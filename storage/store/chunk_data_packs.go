@@ -274,11 +274,11 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		}
 	}
 
-	return flow.NewChunkDataPack(
-		schdp.ChunkID,
-		schdp.StartState,
-		schdp.Proof,
-		collection,
-		schdp.ExecutionDataRoot,
-	), nil
+	return flow.NewChunkDataPack(flow.UntrustedChunkDataPack{
+		ChunkID:           schdp.ChunkID,
+		StartState:        schdp.StartState,
+		Proof:             schdp.Proof,
+		Collection:        collection,
+		ExecutionDataRoot: schdp.ExecutionDataRoot,
+	})
 }

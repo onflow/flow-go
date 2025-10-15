@@ -33,7 +33,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 					Proof:        []byte{'p'},
 					CollectionID: collectionID,
 				}
-				err := operation.InsertStoredChunkDataPack(rw, cdp.ID(), cdp)
+				err := operation.InsertChunkDataPack(rw, cdp.ID(), cdp)
 				if err != nil {
 					return err
 				}

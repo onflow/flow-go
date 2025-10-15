@@ -204,12 +204,12 @@ type ChunkDataPack struct {
 // a trusted ChunkDataPack using NewChunkDataPack constructor.
 type UntrustedChunkDataPack ChunkDataPack
 
-// FromUntrustedChunkDataPack converts a chunk data pack from an untrusted source
+// NewChunkDataPack converts a chunk data pack from an untrusted source
 // into its canonical representation. Here, basic structural validation is performed.
 // Construction of ChunkDataPacks is ONLY allowed via THIS CONSTRUCTOR.
 //
 // All errors indicate a valid ChunkDataPack cannot be constructed from the input.
-func FromUntrustedChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
+func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
 	if untrusted.ChunkID == ZeroID {
 		return nil, fmt.Errorf("ChunkID must not be empty")
 	}
@@ -230,7 +230,7 @@ func FromUntrustedChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPac
 		return nil, fmt.Errorf("ExecutionDataRoot.ChunkExecutionDataIDs must not be empty")
 	}
 
-	return NewChunkDataPack(
+	return newChunkDataPack(
 		untrusted.ChunkID,
 		untrusted.StartState,
 		untrusted.Proof,
@@ -239,9 +239,9 @@ func FromUntrustedChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPac
 	), nil
 }
 
-// NewChunkDataPack instantiates an "immutable"  ChunkDataPack.
+// newChunkDataPack instantiates an "immutable"  ChunkDataPack.
 // The `collection` field is set to `nil` for system chunks.
-func NewChunkDataPack(chunkID Identifier, startState StateCommitment, proof StorageProof, collection *Collection, executionDataRoot BlockExecutionDataRoot) *ChunkDataPack {
+func newChunkDataPack(chunkID Identifier, startState StateCommitment, proof StorageProof, collection *Collection, executionDataRoot BlockExecutionDataRoot) *ChunkDataPack {
 	return &ChunkDataPack{
 		ChunkID:           chunkID,
 		StartState:        startState,
