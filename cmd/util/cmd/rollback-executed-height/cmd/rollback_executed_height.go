@@ -153,7 +153,8 @@ func removeExecutionResultsFromHeight(
 	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
-	fromHeight uint64) ([]flow.Identifier, error) {
+	fromHeight uint64,
+) ([]flow.Identifier, error) {
 	log.Info().Msgf("removing results for blocks from height: %v", fromHeight)
 
 	root := protoState.Params().FinalizedRoot()
