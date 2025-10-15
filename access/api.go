@@ -52,8 +52,8 @@ type ScriptsAPI interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-	// - access.DataNotFoundError - no execution result info with the given block ID was found
+	// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+	// - [access.DataNotFoundError] - when data required to process the request is not available.
 	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 	// ExecuteScriptAtBlockHeight executes script at the given block height .
 	//
@@ -62,8 +62,8 @@ type ScriptsAPI interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-	// - access.DataNotFoundError - No header with the given height was found
+	// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+	// - [access.DataNotFoundError] - when data required to process the request is not available.
 	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 	// ExecuteScriptAtBlockID executes script at the given block id .
 	//
@@ -72,8 +72,8 @@ type ScriptsAPI interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-	// - access.DataNotFoundError - No header with the given ID was found
+	// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+	// - [access.DataNotFoundError] - when data required to process the request is not available.
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 }
 

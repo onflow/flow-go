@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -116,8 +117,8 @@ func NewScriptsBackend(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected errors:
-//   - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-//   - access.DataNotFoundError - no execution result info with the given block ID was found
+//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size
+//   - [access.DataNotFoundError] - when data required to process the request is not available.
 func (b *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
@@ -131,7 +132,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
-		err = fmt.Errorf("failed to lookup latest sealed header: %w", err)
+		err = irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
 		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
@@ -141,8 +142,8 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", latestHeader.ID(), err)
-		return nil, nil, access.NewDataNotFoundError("execution result info", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
 	res, metadata, _, err := b.executor.Execute(
@@ -160,8 +161,8 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected errors:
-//   - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-//   - access.DataNotFoundError - no header or execution result info with the given block ID was found
+//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+//   - [access.DataNotFoundError] - when data required to process the request is not available.
 func (b *Scripts) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -183,8 +184,8 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, userCriteria)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", blockID.String(), err)
-		return nil, nil, access.NewDataNotFoundError("execution result info", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
 	res, metadata, _, err := b.executor.Execute(
@@ -202,8 +203,8 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected errors:
-//   - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-//   - access.DataNotFoundError - no header with the given height or execution result info with the given block ID was found
+//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+//   - [access.DataNotFoundError] - when data required to process the request is not available.
 func (b *Scripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -226,8 +227,8 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), userCriteria)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		err = fmt.Errorf("failed to get execution result info for block ID %s: %w", header.ID(), err)
-		return nil, nil, access.NewDataNotFoundError("execution result info", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
 	res, metadata, _, err := b.executor.Execute(
