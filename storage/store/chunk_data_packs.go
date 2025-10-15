@@ -45,8 +45,9 @@ type ChunkDataPacks struct {
 	// the actual chunk data pack is stored here, which is a separate storage from protocol DB
 	stored storage.StoredChunkDataPacks
 
-	// the collection is stored separately by the caller, it is only used here for retrieving collection
-	// when returning chunk data pack by chunk ID
+	// We assume that for every chunk data pack not for a system chunk, the executed collection has 
+	// previously been persisted in `storage.Collections`. We use this storage abstraction here only for
+	// retrieving collections. We assume that `storage.Collections` has its own caching already built in.  
 	collections storage.Collections
 
 	// cache chunkID -> chunkDataPackID
