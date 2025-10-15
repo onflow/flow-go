@@ -271,7 +271,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack %x for chunk %x: %w", chunkDataPackID, chunkID, err)
 	}
 
-	var collection *flow.Collection
+	var collection *flow.Collection // nil by default, which only represents system chunk
 	if schdp.CollectionID != flow.ZeroID {
 		collection, err = ch.collections.ByID(schdp.CollectionID)
 		if err != nil {

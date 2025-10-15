@@ -41,7 +41,7 @@ func TestChunkDataPacks_Store(t *testing.T) {
 				require.Equal(t, chunkDataPack, stored, "mismatched chunk data pack at index %d", i)
 			}
 
-			// Store again is idemopotent
+			// Store again is idempotent
 			storeFunc, err = chunkDataPackStore.Store(chunkDataPacks)
 			if err != nil {
 				return err

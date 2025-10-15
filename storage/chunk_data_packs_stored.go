@@ -29,9 +29,9 @@ type StoredChunkDataPacks interface {
 	BatchRemove(chunkDataPackIDs []flow.Identifier, rw ReaderBatchWriter) error
 }
 
-// StoredChunkDataPack is an in-storage representation of chunk data pack.
-// Its prime difference is instead of an actual collection, it keeps a collection ID hence relying on maintaining
-// the collection on a secondary storage.
+// StoredChunkDataPack is an in-storage representation of chunk data pack. Its prime difference is instead of an
+// actual collection, it keeps a collection ID hence relying on maintaining the collection on a secondary storage.
+// Note, StoredChunkDataPack.ID() is the same as ChunkDataPack.ID()
 //
 //structwrite:immutable - mutations allowed only within the constructor
 type StoredChunkDataPack struct {
@@ -42,6 +42,8 @@ type StoredChunkDataPack struct {
 	ExecutionDataRoot flow.BlockExecutionDataRoot
 }
 
+// NewStoredChunkDataPack instantiates an "immutable"  [StoredChunkDataPack].
+// The `collectionID` field is set to [flow.ZeroID] for system chunks.
 func NewStoredChunkDataPack(
 	chunkID flow.Identifier,
 	startState flow.StateCommitment,
@@ -63,6 +65,8 @@ func (s *StoredChunkDataPack) IsSystemChunk() bool {
 	return s.CollectionID == flow.ZeroID
 }
 
+// ToStoredChunkDataPack converts the given Chunk Data Pack to its reduced representation.
+// (Collections are stored separately and don't need to be included again here).
 func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 	collectionID := flow.ZeroID
 	if c.Collection != nil {
@@ -78,8 +82,7 @@ func ToStoredChunkDataPack(c *flow.ChunkDataPack) *StoredChunkDataPack {
 }
 
 // ToStoredChunkDataPacks converts the given Chunk Data Packs to their reduced representation.
-// This is useful for reducing storage consumption, by avoiding repeated storage of the full collections
-// (stored individually anyway).
+// (Collections are stored separately and don't need to be included again here).
 func ToStoredChunkDataPacks(cs []*flow.ChunkDataPack) []*StoredChunkDataPack {
 	scs := make([]*StoredChunkDataPack, 0, len(cs))
 	for _, c := range cs {

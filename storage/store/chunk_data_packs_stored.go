@@ -10,6 +10,9 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+// StoredChunkDataPacks represents persistent storage for chunk data packs.
+// It works with the reduced representation `StoredChunkDataPack` for chunk data packs,
+// where instead of the full collection data, only the collection's hash (ID) is contained.
 type StoredChunkDataPacks struct {
 	db        storage.DB
 	byIDCache *Cache[flow.Identifier, *storage.StoredChunkDataPack]
