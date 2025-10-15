@@ -874,6 +874,19 @@ func TestGeneratorsDeterminism(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "PendingExecutionEvents",
+			fixture: func(a, b *GeneratorSuite) (any, any) {
+				return a.PendingExecutionEvents().Fixture(), b.PendingExecutionEvents().Fixture()
+			},
+			list: func(a, b *GeneratorSuite, n int) (any, any) {
+				return a.PendingExecutionEvents().List(n), b.PendingExecutionEvents().List(n)
+			},
+			sanity: func(t *testing.T, suite *GeneratorSuite) {
+				event := suite.PendingExecutionEvents().Fixture()
+				assert.NotEmpty(t, event.Payload)
+			},
+		},
 	}
 
 	suite1 := NewGeneratorSuite(WithSeed(42))
