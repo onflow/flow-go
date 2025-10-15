@@ -1130,7 +1130,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				),
 				executionDataTracker,
 				builder.executionResultInfoProvider,
-				notNil(builder.executionStateCache),
+				builder.executionStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
