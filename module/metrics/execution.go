@@ -99,7 +99,6 @@ type ExecutionCollector struct {
 	evmBlockTxCount                         prometheus.Histogram
 	evmBlockGasUsed                         prometheus.Histogram
 	callbacksExecutedCount                  prometheus.Histogram
-	callbacksExecutedTotal                  prometheus.Counter
 	callbacksProcessComputationUsed         prometheus.Histogram
 	callbacksExecuteComputationLimits       prometheus.Histogram
 }
@@ -803,14 +802,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Subsystem: subsystemRuntime,
 			Name:      "callbacks_executed_count",
 			Help:      "the number of callbacks executed",
-			Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
-		}),
-
-		callbacksExecutedTotal: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
-			Name:      "callbacks_executed_total",
-			Help:      "the total number of callbacks executed",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 9),
 		}),
 
 		callbacksProcessComputationUsed: promauto.NewHistogram(prometheus.HistogramOpts{
@@ -921,7 +913,6 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 // ExecutionCallbacksExecuted reports callback execution metrics
 func (ec *ExecutionCollector) ExecutionCallbacksExecuted(callbackCount int, processComputationUsed, executeComputationLimits uint64) {
 	ec.callbacksExecutedCount.Observe(float64(callbackCount))
-	ec.callbacksExecutedTotal.Add(float64(callbackCount))
 	ec.callbacksProcessComputationUsed.Observe(float64(processComputationUsed))
 	ec.callbacksExecuteComputationLimits.Observe(float64(executeComputationLimits))
 }
