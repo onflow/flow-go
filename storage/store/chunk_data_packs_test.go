@@ -21,7 +21,7 @@ import (
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *store.ChunkDataPacks, protocolDB storage.DB, chunkDataPackDB storage.DB, lockManager storage.LockManager) {
-		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
 
 			storeFunc, err := chunkDataPackStore.Store(chunkDataPacks)
 			if err != nil {
@@ -95,7 +95,7 @@ func TestChunkDataPacks_BatchRemove(t *testing.T) {
 			}
 
 			// Store chunk data packs
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
 				storeFunc, err := chunkDataPackStore.Store(chunkDataPacks)
 				if err != nil {
 					return err
@@ -154,7 +154,7 @@ func TestChunkDataPacks_BatchRemoveChunkDataPacksOnly(t *testing.T) {
 			}
 
 			// Store chunk data packs
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
 				storeFunc, err := chunkDataPackStore.Store(chunkDataPacks)
 				if err != nil {
 					return err
