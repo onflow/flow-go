@@ -413,6 +413,12 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
 	}
 
+	// Within the following `Store` call, the chunk data packs themselves are going to be persisted into their
+	// dedicated database. However, we have not yet persisted that this execution node is committing to the
+	// result represented by the chunk data packs. Populating the index from chunk ID to chunk data pack ID
+	// in the protocol database (signifying the node's slashable commitment to the respective result) is
+	// done by the functor returned by `Store`. The functor's is invoked as part of the atomic batch update
+	// of the protocol database below.
 	storeFunc, err := s.chunkDataPacks.Store(chunks)
 	if err != nil {
 		return fmt.Errorf("can not store chunk data packs for block ID: %v: %w", blockID, err)
@@ -427,9 +433,11 @@ func (s *state) saveExecutionResults(
 		// This design guarantees consistency in two scenarios:
 		//
 		// Case 1: If the batch update is interrupted, the mapping has not yet been saved.
-		// Later, if we attempt to store another execution result that references a
-		// different chunk data pack but the same chunk ID, there is no conflict,
-		// because no previous mapping exists.
+		// Later, if we attempt to store another execution result that references a different
+		// chunk data pack but the same chunk ID, there is no conflict, because no previous mapping
+		// exists. By convention, a node should only share information once it has persisted its
+		// commitment in the database. Therefore, if the database write was interrupted, none of the
+		// information is stored and no binding commitment to a different result could have been made.
 		//
 		// Case 2: If the batch update succeeds, the mapping is saved. Later, if we
 		// attempt to store another execution result that references a different
@@ -484,7 +492,6 @@ func (s *state) saveExecutionResults(
 			return nil
 		})
 	})
-
 }
 
 func (s *state) UpdateLastExecutedBlock(ctx context.Context, executedID flow.Identifier) error {

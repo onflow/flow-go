@@ -14,6 +14,30 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+// ChunkDataPacks manages storage and retrieval of ChunkDataPacks, primarily serving the use case of EXECUTION NODES persisting
+// and indexing chunk data packs for their OWN RESULTS. Essentially, the chunk describes a batch of work to be done, and the
+// chunk data pack describes the result of that work. The storage of chunk data packs is segregated across different
+// storage components for efficiency and modularity reasons:
+//  0. Usually (ignoring the system chunk for a moment), the batch of work is given by the collection referenced in the chunk
+//     data pack. For any chunk data pack being stored, we assume that the executed collection has *previously* been persisted
+//     in [storage.Collections]. It is useful to persist the collections individually, so we can individually retrieve them.
+//  1. The actual chunk data pack itself is stored in a dedicated storage component `cdpStorage`. Note that for this storage
+//     component, no atomicity is required, as we are storing chunk data packs by their collision-resistant hashes, so
+//     different chunk data packs will be stored under different keys.
+//     Theoretically, nodes could store persist multiple different (disagreeing) chunk data packs for the same
+//     chunk in this step. However, for efficiency, Execution Nodes only store their own chunk data packs.
+//  2. The index mapping from ChunkID to chunkDataPackID is stored in the protocol database for fast retrieval.
+//     This index is intended to be populated by execution nodes when they commit to a specific result represented by the chunk
+//     data pack. Here, we require atomicity, as an execution node should not be changing / overwriting which chunk data pack
+//     it committed to (during normal operations).
+//
+// Since the executed collections are stored separately (step 0, above), we can just use the collection ID in context of the
+// chunk data pack storage (step 1, above). Therefore, we utilize the reduced representation [storage.StoredChunkDataPack]
+// internally. While removing redundant data from storage, it takes 3 look-ups to return chunk data pack by chunk ID:
+//
+//	i. a lookup for chunkID -> chunkDataPackID
+//	ii. a lookup for chunkDataPackID -> StoredChunkDataPack (only has CollectionID, no collection data)
+//	iii. a lookup for CollectionID -> Collection, then reconstruct the chunk data pack from the collection and the StoredChunkDataPack
 type ChunkDataPacks struct {
 	// the protocol DB is used for storing index mappings from chunk ID to chunk data pack ID
 	protocolDB storage.DB
@@ -27,11 +51,6 @@ type ChunkDataPacks struct {
 
 	// cache chunkID -> chunkDataPackID
 	chunkIDToChunkDataPackIDCache *Cache[flow.Identifier, flow.Identifier]
-
-	// it takes 3 look ups to return chunk data pack by chunk ID:
-	// 1. a cache lookup for chunkID -> chunkDataPackID
-	// 2. a lookup for chunkDataPackID -> StoredChunkDataPack (only has CollectionID, no collection data)
-	// 3. a lookup for CollectionID -> Collection, then restore the chunk data pack with the collection and the StoredChunkDataPack
 }
 
 var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
@@ -76,11 +95,20 @@ func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, stored stor
 //     chunk data pack (or it will get slashed). This mapping from chunk ID to the ID of the chunk data pack that the Execution Node
 //     actually committed to is stored in the protocol database, in the following phase 2.
 //   - In the second phase, we populate the index mappings from ChunkID to one "distinguished" chunk data pack ID. This mapping
-//     is stored in the protocol database. Typically, en Execution Node uses this for indexing its own chunk data packs which it
+//     is stored in the protocol database. Typically, an Execution Node uses this for indexing its own chunk data packs which it
 //     publicly committed to.
-//   - This function can approximately be described as an atomic operation. When it completes successfully, either both databases
-//     have been updated, or neither. However, this is an approximation only, because interim states exist, where the chunk data
-//     packs already have been stored in the chunk data pack database, but the index mappings do not yet exist.
+//
+// ATOMICITY:
+// [ChunkDataPacks.Store] executes phase 1 immediately, persisting the chunk data packs in their dedicated database. However,
+// the index mappings in phase 2 is deferred to the caller, who must invoke the returned functor to perform phase 2. This
+// approach has the following benefits:
+//   - Our API reflects that we are writing to two different databases here, with the chunk data pack database containing largely
+//     specialized data subject to pruning. In contrast, the protocol database persists the commitments a node make (subject to
+//     slashing). The caller receives the ability to persist this commitment in the form of the returned functor. The functor
+//     may be discarded by the caller without corrupting the state (if anything, we have just stored some additional chunk data
+//     packs).
+//   - The serialization and storage of the comparatively large chunk data packs is separated from the protocol database writes.
+//   - The locking duration of the protocol database is reduced.
 //
 // The Store method returns:
 //   - func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error: Function for populating the index mapping from chunkID
@@ -133,7 +161,8 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 		return nil
 	}
 
-	// Return the function that completes the storage process
+	// Returned Functor: when invoked, will add the deferred storage operations to the provided ReaderBatchWriter
+	// NOTE: until this functor is called, only the chunk data packs are stored by their respective IDs.
 	return storeChunkDataPacksFunc, nil
 }
 
@@ -242,7 +271,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		return nil, fmt.Errorf("cannot retrieve stored chunk data pack %x for chunk %x: %w", chunkDataPackID, chunkID, err)
 	}
 
-	var collection *flow.Collection
+	var collection *flow.Collection // nil by default, which only represents system chunk
 	if schdp.CollectionID != flow.ZeroID {
 		collection, err = ch.collections.ByID(schdp.CollectionID)
 		if err != nil {

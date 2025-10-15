@@ -129,6 +129,11 @@ func (ch *Chunk) ID() Identifier {
 	return MakeID(ch)
 }
 
+// ChunkDataPackHeader is a reduced representation of ChunkDataPack. In a nutshell, we substitute
+// the larger [ChunkDataPack.Proof] and [ChunkDataPack.Collection] with their collision-resistant hashes.
+// Note, ChunkDataPackHeader.ID() is the same as ChunkDataPack.ID().
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ChunkDataPackHeader struct {
 	ChunkID    Identifier      // ID of the chunk this data pack is for
 	StartState StateCommitment // commitment for starting state
@@ -141,6 +146,8 @@ type ChunkDataPackHeader struct {
 	ExecutionDataRoot BlockExecutionDataRoot
 }
 
+// NewChunkDataPackHeader instantiates an "immutable"  ChunkDataPackHeader.
+// The `CollectionID` field is set to [flow.ZeroID] for system chunks.
 func NewChunkDataPackHeader(ChunkID Identifier, StartState StateCommitment, ProofID Identifier, CollectionID Identifier, ExecutionDataRoot BlockExecutionDataRoot) *ChunkDataPackHeader {
 	return &ChunkDataPackHeader{
 		ChunkID:           ChunkID,
@@ -197,8 +204,9 @@ type ChunkDataPack struct {
 // a trusted ChunkDataPack using NewChunkDataPack constructor.
 type UntrustedChunkDataPack ChunkDataPack
 
-// NewChunkDataPack returns an initialized chunk data pack.
-// Construction ChunkDataPack allowed only within the constructor.
+// FromUntrustedChunkDataPack converts a chunk data pack from an untrusted source
+// into its canonical representation. Here, basic structural validation is performed.
+// Construction of ChunkDataPacks is ONLY allowed via THIS CONSTRUCTOR.
 //
 // All errors indicate a valid ChunkDataPack cannot be constructed from the input.
 func FromUntrustedChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) {
@@ -231,6 +239,8 @@ func FromUntrustedChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPac
 	), nil
 }
 
+// NewChunkDataPack instantiates an "immutable"  ChunkDataPack.
+// The `collection` field is set to `nil` for system chunks.
 func NewChunkDataPack(chunkID Identifier, startState StateCommitment, proof StorageProof, collection *Collection, executionDataRoot BlockExecutionDataRoot) *ChunkDataPack {
 	return &ChunkDataPack{
 		ChunkID:           chunkID,
