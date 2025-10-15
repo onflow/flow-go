@@ -139,6 +139,7 @@ const (
 	ResourceTransactionResultErrorMessagesIndices = "transaction_result_error_messages_indices" // execution node
 	ResourceTransactionResultByBlock              = "transaction_result_by_block"               // execution node
 	ResourceExecutionDataCache                    = "execution_data_cache"                      // access node
+	ResourceScheduledTransactionsIndices          = "scheduled_transactions_indices"            // access node
 )
 
 const (
