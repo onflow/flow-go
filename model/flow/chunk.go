@@ -230,25 +230,13 @@ func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) 
 		return nil, fmt.Errorf("ExecutionDataRoot.ChunkExecutionDataIDs must not be empty")
 	}
 
-	return newChunkDataPack(
-		untrusted.ChunkID,
-		untrusted.StartState,
-		untrusted.Proof,
-		untrusted.Collection,
-		untrusted.ExecutionDataRoot,
-	), nil
-}
-
-// newChunkDataPack instantiates an "immutable"  ChunkDataPack.
-// The `collection` field is set to `nil` for system chunks.
-func newChunkDataPack(chunkID Identifier, startState StateCommitment, proof StorageProof, collection *Collection, executionDataRoot BlockExecutionDataRoot) *ChunkDataPack {
 	return &ChunkDataPack{
-		ChunkID:           chunkID,
-		StartState:        startState,
-		Proof:             proof,
-		Collection:        collection,
-		ExecutionDataRoot: executionDataRoot,
-	}
+		ChunkID:           untrusted.ChunkID,
+		StartState:        untrusted.StartState,
+		Proof:             untrusted.Proof,
+		Collection:        untrusted.Collection,
+		ExecutionDataRoot: untrusted.ExecutionDataRoot,
+	}, nil
 }
 
 // ID returns a collision-resistant hash of the ChunkDataPack struct.
