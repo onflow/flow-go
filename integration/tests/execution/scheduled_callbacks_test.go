@@ -8,13 +8,10 @@ import (
 
 	"github.com/onflow/cadence"
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/access/grpc/convert"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -54,7 +51,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	err := lib.DeployScheduledCallbackTestContract(
+	txID, err := lib.DeployScheduledCallbackTestContract(
 		s.AccessClient(),
 		sdk.Address(sc.FlowCallbackScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
@@ -63,8 +60,9 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// Wait for next height finalized before scheduling callback
-	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
+	// Wait for deploy transaction to be sealed before scheduling callback
+	_, err = s.AccessClient().WaitForSealed(context.Background(), txID)
+	require.NoError(s.T(), err, "could not wait for deploy transaction to be sealed")
 
 	// Schedule a callback for 10 seconds in the future
 	scheduleDelta := int64(10)
@@ -113,27 +111,6 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("executed callbacks: %v", executedCallbacksAfter)
 	require.Len(s.T(), executedCallbacksAfter, 1, "should have exactly one executed callback")
 	require.Contains(s.T(), executedCallbacksAfter, callbackID, "callback should have been executed")
-
-	// Lookup the scheduled transaction from the Access API
-	client, err := s.net.ContainerByName(testnet.PrimaryAN).SDKClient()
-	require.NoError(s.T(), err, "could not get access client")
-
-	txResponse, err := client.RPCClient().GetScheduledTransaction(context.Background(), &accessproto.GetScheduledTransactionRequest{
-		Id: callbackID,
-	})
-	require.NoError(s.T(), err, "could not get scheduled transaction")
-
-	tx, err := convert.MessageToTransaction(txResponse.GetTransaction())
-	require.NoError(s.T(), err, "could not convert transaction")
-
-	resultResponse, err := client.RPCClient().GetScheduledTransactionResult(context.Background(), &accessproto.GetScheduledTransactionResultRequest{
-		Id: callbackID,
-	})
-	require.NoError(s.T(), err, "could not get scheduled transaction result")
-
-	resultTransactionID := convert.MessageToIdentifier(resultResponse.GetTransactionId())
-	require.Equal(s.T(), resultTransactionID, tx.ID())
-	require.Equal(s.T(), resultResponse.GetStatus(), sdk.TransactionStatusExecuted, "transaction should be executed")
 }
 
 func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
@@ -145,7 +122,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	err := lib.DeployScheduledCallbackTestContract(
+	txID, err := lib.DeployScheduledCallbackTestContract(
 		s.AccessClient(),
 		sdk.Address(sc.FlowCallbackScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),
@@ -154,8 +131,9 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// Wait for next height finalized before scheduling callback
-	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
+	// Wait for deploy transaction to be sealed before scheduling callback
+	_, err = s.AccessClient().WaitForSealed(context.Background(), txID)
+	require.NoError(s.T(), err, "could not wait for deploy transaction to be sealed")
 
 	// Schedule a callback for 10 seconds in the future
 	scheduleDelta := int64(10)

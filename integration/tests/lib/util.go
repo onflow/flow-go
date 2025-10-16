@@ -502,23 +502,23 @@ func DeployScheduledCallbackTestContract(
 	flowToken sdk.Address,
 	fungibleToken sdk.Address,
 	refID sdk.Identifier,
-) error {
+) (sdk.Identifier, error) {
 	testContract := TestFlowCallbackHandlerContract(callbackScheduler, flowToken, fungibleToken)
 	tx, err := client.DeployContract(context.Background(), refID, testContract)
 	if err != nil {
-		return fmt.Errorf("could not deploy test contract: %w", err)
+		return sdk.Identifier{}, fmt.Errorf("could not deploy test contract: %w", err)
 	}
 
 	res, err := client.WaitForExecuted(context.Background(), tx.ID())
 	if err != nil {
-		return fmt.Errorf("could not wait for deploy transaction to be sealed: %w", err)
+		return sdk.Identifier{}, fmt.Errorf("could not wait for deploy transaction to be sealed: %w", err)
 	}
 
 	if res.Error != nil {
-		return fmt.Errorf("deploy transaction should not have error: %w", res.Error)
+		return sdk.Identifier{}, fmt.Errorf("deploy transaction should not have error: %w", res.Error)
 	}
 
-	return nil
+	return tx.ID(), nil
 }
 
 func sendCallbackTx(client *testnet.Client, tx *sdk.Transaction) (uint64, error) {

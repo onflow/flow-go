@@ -33,7 +33,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	err := lib.DeployScheduledCallbackTestContract(
+	_, err := lib.DeployScheduledCallbackTestContract(
 		s.AccessClient(),
 		sdk.Address(sc.FlowCallbackScheduler.Address),
 		sdk.Address(sc.FlowToken.Address),

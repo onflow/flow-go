@@ -16,10 +16,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/utils/dsl"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -1156,4 +1159,69 @@ func (s *AccessAPISuite) TestRejectedInvalidSignatureFormat() {
 			s.Require().ErrorContains(err, "has invalid extension data")
 		})
 	}
+}
+
+// TestScheduledTransactions tests that scheduled transactions are properly indexed and can be
+// retrieved through the Access API.
+func (s *AccessAPISuite) TestScheduledTransactions() {
+	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
+
+	accessClient, err := s.net.ContainerByName("access_2").TestnetClient()
+	s.Require().NoError(err)
+
+	// Deploy the test contract first
+	txID, err := lib.DeployScheduledCallbackTestContract(
+		accessClient,
+		sdk.Address(sc.FlowCallbackScheduler.Address),
+		sdk.Address(sc.FlowToken.Address),
+		sdk.Address(sc.FungibleToken.Address),
+		sdk.Identifier(s.net.Root().ID()),
+	)
+	require.NoError(s.T(), err, "could not deploy test contract")
+
+	// wait for the tx to be sealed before attempting to schedule the callback. this helps make sure
+	// the proposer's sequence number is updated.
+	_, err = accessClient.WaitForSealed(s.ctx, txID)
+	s.Require().NoError(err)
+
+	// Schedule a callback for 10 seconds in the future. Use a larger wait time to ensure that there
+	// is enough time to submit the tx even on slower CI machines.
+	futureTimestamp := time.Now().Unix() + int64(10)
+
+	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	callbackID, err := lib.ScheduleCallbackAtTimestamp(
+		futureTimestamp,
+		accessClient,
+		sdk.Address(sc.FlowCallbackScheduler.Address),
+		sdk.Address(sc.FlowToken.Address),
+		sdk.Address(sc.FungibleToken.Address),
+	)
+	require.NoError(s.T(), err, "could not schedule callback transaction")
+	s.T().Logf("scheduled callback with ID: %d", callbackID)
+
+	rpcClient := s.an2Client.RPCClient()
+
+	// Block until the API returns the scheduled transaction.
+	require.Eventually(s.T(), func() bool {
+		_, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: callbackID})
+		return err == nil
+	}, 30*time.Second, 500*time.Millisecond)
+
+	// Verify the results of the scheduled transaction and its result.
+	scheduledTx, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: callbackID})
+	s.Require().NoError(err)
+	tx, err := convert.MessageToTransaction(scheduledTx.GetTransaction(), s.net.Root().ChainID.Chain())
+	s.Require().NoError(err)
+
+	scheduledTxResult, err := rpcClient.GetScheduledTransactionResult(s.ctx, &accessproto.GetScheduledTransactionResultRequest{Id: callbackID})
+	s.Require().NoError(err)
+	result, err := convert.MessageToTransactionResult(scheduledTxResult)
+	s.Require().NoError(err)
+
+	s.Greater(result.BlockHeight, uint64(0))                 // make block height is set
+	s.NotEqual(flow.ZeroID, flow.Identifier(result.BlockID)) // make sure block id is set
+	s.Equal(tx.ID(), result.TransactionID)
+	s.Equal(flow.TransactionStatusSealed, result.Status)
+	s.Equal(uint(0), result.StatusCode)
+	s.Empty(result.ErrorMessage)
 }
