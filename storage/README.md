@@ -33,7 +33,7 @@ Caching, if applicable, is implemented at this layer.
 ### Prefer content hash keys
 We consider two types of keys:
 1. Collision-resistant content hash of value (eg. `block.ID() -> block`) 
-2. Index keys (eg. `finalizedHeight -> block.Height`)
+2. Index keys (eg. `finalizedHeight -> block.ID()`)
 
 It is generally safe to upsert Type 1 keys without synchronization, because updates will not change existing values.
 For this reason, **prefer Type 1 keys wherever possible**.
