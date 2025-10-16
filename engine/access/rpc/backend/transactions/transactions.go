@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -50,7 +49,6 @@ type Transactions struct {
 	historicalAccessNodeClients []accessproto.AccessAPIClient
 	nodeCommunicator            node_communicator.Communicator
 	connectionFactory           connection.ConnectionFactory
-	retrier                     retrier.Retrier
 
 	// Storages
 	blocks       storage.Blocks
@@ -79,7 +77,6 @@ type Params struct {
 	HistoricalAccessNodeClients []accessproto.AccessAPIClient
 	NodeCommunicator            node_communicator.Communicator
 	ConnFactory                 connection.ConnectionFactory
-	EnableRetries               bool
 	NodeProvider                *rpc.ExecutionNodeIdentitiesProvider
 	Blocks                      storage.Blocks
 	Collections                 storage.Collections
@@ -117,18 +114,6 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		scheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
 	}
 
-	if params.EnableRetries {
-		txs.retrier = retrier.NewRetrier(
-			params.Log,
-			params.Blocks,
-			params.Collections,
-			txs,
-			params.TxStatusDeriver,
-		)
-	} else {
-		txs.retrier = retrier.NewNoopRetrier()
-	}
-
 	return txs, nil
 }
 
@@ -155,8 +140,6 @@ func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.Transaction
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
-
-	go t.registerTransactionForRetry(tx)
 
 	return nil
 }
@@ -626,22 +609,4 @@ func (t *Transactions) getHistoricalTransactionResult(
 		// TODO should we do something if the error isn't not found?
 	}
 	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
-}
-
-func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
-	referenceBlock, err := t.state.AtBlockID(tx.ReferenceBlockID).Head()
-	if err != nil {
-		return
-	}
-
-	t.retrier.RegisterTransaction(referenceBlock.Height, tx)
-}
-
-// ATTENTION: might be a source of problems in future. We run this code on finalization gorotuine,
-// potentially lagging finalization events if operations take long time.
-// We might need to move this logic on dedicated goroutine and provide a way to skip finalization events if they are delivered
-// too often for this engine. An example of similar approach - https://github.com/onflow/flow-go/blob/10b0fcbf7e2031674c00f3cdd280f27bd1b16c47/engine/common/follower/compliance_engine.go#L201..
-// No errors expected during normal operations.
-func (t *Transactions) ProcessFinalizedBlockHeight(height uint64) error {
-	return t.retrier.Retry(height)
 }

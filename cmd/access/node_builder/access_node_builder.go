@@ -157,7 +157,6 @@ type AccessNodeConfig struct {
 	logTxTimeToExecuted                  bool
 	logTxTimeToFinalizedExecuted         bool
 	logTxTimeToSealed                    bool
-	retryEnabled                         bool
 	rpcMetricsEnabled                    bool
 	executionDataSyncEnabled             bool
 	publicNetworkExecutionDataEnabled    bool
@@ -253,7 +252,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		logTxTimeToFinalizedExecuted: false,
 		logTxTimeToSealed:            false,
 		pingEnabled:                  false,
-		retryEnabled:                 false,
 		rpcMetricsEnabled:            false,
 		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
@@ -1288,7 +1286,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"ping-enabled",
 			defaultConfig.pingEnabled,
 			"whether to enable the ping process that pings all other peers and report the connectivity to metrics")
-		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
 		flags.StringVarP(&builder.nodeInfoFile,
@@ -2130,7 +2127,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ChainID:               node.RootChainID,
 				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
-				RetryEnabled:          builder.retryEnabled,
 				MaxHeightRange:        backendConfig.MaxHeightRange,
 				Log:                   node.Logger,
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
