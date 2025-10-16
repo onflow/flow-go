@@ -126,12 +126,16 @@ func (s *Suite) SetupTest() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// need one execution nodes
+	// at least 2 execution nodes are required to execute a script with the default AgreeingExecutorsCount, which is 2
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
+	exe2ID := unittest.IdentifierFixture()
+	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(exe2ID),
+		testnet.WithLogLevel(zerolog.InfoLevel))
+	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// need two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
