@@ -9,9 +9,8 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/slices"
 
-	"github.com/onflow/flow-go/state/protocol/prg"
-
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -19,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
 // GenerateRecoverEpochTxArgs generates the required transaction arguments for the `recoverEpoch` transaction.
@@ -303,8 +303,7 @@ func GenerateRecoverTxArgsWithDKG(
 // - nodeInfos: list of NodeInfos (must contain all internal nodes)
 // - clusterBlocks: list of root blocks (one for each cluster)
 // Returns:
-// - flow.AssignmentList: the generated assignment list.
-// - flow.ClusterList: the generate collection cluster list.
+// - The list of quorum certificates for all clusters.
 func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
 	if len(clusterBlocks) != len(clusterList) {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
@@ -317,6 +316,42 @@ func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterLis
 		log.Info().Msgf("producing QC for cluster (index: %d, size: %d) with %d internal signers", i, len(clusterMembers), len(signers))
 
 		qc, err := GenerateClusterRootQC(signers, clusterMembers, clusterBlocks[i])
+		if err != nil {
+			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
+		}
+		qcs[i] = qc
+	}
+
+	return qcs
+}
+
+// ConstructClusterRootQCsFromVotes constructs a root QC for each cluster in the list, based on the provided votes.
+// Args:
+// - log: the logger instance.
+// - clusterList: list of clusters
+// - nodeInfos: list of NodeInfos (must contain all internal nodes)
+// - clusterBlocks: list of root blocks (one for each cluster)
+// - votes: lists of votes for each cluster (one list for each cluster)
+// Returns:
+// - the list of quorum certificates for all clusters
+func ConstructClusterRootQCsFromVotes(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block, votes [][]*hotstuff.Vote) []*flow.QuorumCertificate {
+	if len(clusterBlocks) != len(clusterList) {
+		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
+			Msg("number of clusters needs to equal number of cluster blocks")
+	}
+	if len(votes) != len(clusterList) {
+		log.Fatal().Int("len(votes)", len(votes)).Int("len(clusterList)", len(clusterList)).
+			Msg("number of groups of votes needs to equal number of clusters")
+	}
+
+	qcs := make([]*flow.QuorumCertificate, len(clusterBlocks))
+	for i, clusterMembers := range clusterList {
+		clusterBlock := clusterBlocks[i]
+		clusterVotes := votes[i]
+		signers := filterClusterSigners(clusterMembers, nodeInfos)
+		log.Info().Msgf("producing QC for cluster (index: %d, size: %d) from %d votes", i, len(clusterMembers), len(votes))
+
+		qc, err := GenerateClusterRootQCFromVotes(signers, clusterMembers, clusterBlock, clusterVotes)
 		if err != nil {
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
 		}
