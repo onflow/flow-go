@@ -60,12 +60,7 @@ func (p *BlockPersister) Persist() error {
 	p.log.Debug().Msg("started to persist execution data")
 	start := time.Now()
 
-	err := storage.WithLocks(p.lockManager, []string{
-		storage.LockInsertCollection,
-		storage.LockInsertEvent,
-		storage.LockInsertLightTransactionResult,
-		storage.LockInsertTransactionResultErrMessage,
-	}, func(lctx lockctx.Context) error {
+	err := storage.WithLocks(p.lockManager, storage.LockGroupAccessOptimisticSyncBlockPersist, func(lctx lockctx.Context) error {
 		return p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			for _, persister := range p.persisterStores {
 				if err := persister.Persist(lctx, batch); err != nil {

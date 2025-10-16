@@ -98,47 +98,38 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 	rootSeal *flow.Seal,
 ) error {
 
-	lctx := manager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockIndexExecutionResult)
-	if err != nil {
-		return err
-	}
-	err = lctx.AcquireLock(storage.LockIndexStateCommitment)
-	if err != nil {
-		return err
-	}
-
 	commit := rootSeal.FinalState
-	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		w := rw.Writer()
-		err := operation.UpdateExecutedBlock(w, rootSeal.BlockID)
-		if err != nil {
-			return fmt.Errorf("could not index initial genesis execution block: %w", err)
-		}
+	return storage.WithLocks(manager, storage.LockGroupExecutionBootstrap, func(lctx lockctx.Context) error {
+		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			w := rw.Writer()
+			err := operation.UpdateExecutedBlock(w, rootSeal.BlockID)
+			if err != nil {
+				return fmt.Errorf("could not index initial genesis execution block: %w", err)
+			}
 
-		err = operation.IndexOwnOrSealedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index result for root result: %w", err)
-		}
+			err = operation.IndexOwnOrSealedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
+			if err != nil {
+				return fmt.Errorf("could not index result for root result: %w", err)
+			}
 
-		err = operation.IndexStateCommitment(lctx, rw, flow.ZeroID, commit)
-		if err != nil {
-			return fmt.Errorf("could not index void state commitment: %w", err)
-		}
+			err = operation.IndexStateCommitment(lctx, rw, flow.ZeroID, commit)
+			if err != nil {
+				return fmt.Errorf("could not index void state commitment: %w", err)
+			}
 
-		err = operation.IndexStateCommitment(lctx, rw, rootSeal.BlockID, commit)
-		if err != nil {
-			return fmt.Errorf("could not index genesis state commitment: %w", err)
-		}
+			err = operation.IndexStateCommitment(lctx, rw, rootSeal.BlockID, commit)
+			if err != nil {
+				return fmt.Errorf("could not index genesis state commitment: %w", err)
+			}
 
-		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
-		err = operation.InsertExecutionStateInteractions(w, rootSeal.BlockID, snapshots)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
-		}
+			snapshots := make([]*snapshot.ExecutionSnapshot, 0)
+			err = operation.InsertExecutionStateInteractions(w, rootSeal.BlockID, snapshots)
+			if err != nil {
+				return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
+			}
 
-		return nil
+			return nil
+		})
 	})
 }
 

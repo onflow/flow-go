@@ -170,11 +170,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
 		}
 
-		err = storage.WithLocks(c.lockManager, []string{
-			storage.LockInsertEvent,
-			storage.LockInsertLightTransactionResult,
-			storage.LockIndexScheduledTransaction,
-		},
+		err = storage.WithLocks(c.lockManager, storage.LockGroupAccessStateSyncIndexBlockData,
 			func(lctx lockctx.Context) error {
 				return c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					err := c.events.BatchStore(lctx, data.BlockID, []flow.EventsList{events}, rw)

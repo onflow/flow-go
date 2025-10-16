@@ -107,36 +107,6 @@ func Bootstrap(
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
 ) (*State, error) {
-	// we acquire both [storage.LockInsertBlock] and [storage.LockFinalizeBlock] because
-	// the bootstrapping process inserts and finalizes blocks (all blocks within the
-	// trusted root snapshot are presumed to be finalized)
-	lctx := lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertInstanceParams)
-	if err != nil {
-		return nil, err
-	}
-	err = lctx.AcquireLock(storage.LockIndexExecutionResult)
-	if err != nil {
-		return nil, err
-	}
-	err = lctx.AcquireLock(storage.LockInsertBlock)
-	if err != nil {
-		return nil, err
-	}
-	err = lctx.AcquireLock(storage.LockFinalizeBlock)
-	if err != nil {
-		return nil, err
-	}
-	err = lctx.AcquireLock(storage.LockInsertSafetyData)
-	if err != nil {
-		return nil, err
-	}
-	err = lctx.AcquireLock(storage.LockInsertLivenessData)
-	if err != nil {
-		return nil, err
-	}
-
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
 		opt(config)
@@ -171,55 +141,67 @@ func Bootstrap(
 	// (The lowest block in sealing segment is the last sealed block, but we don't use that here.)
 	lastFinalized := segment.Finalized() // highest block in sealing segment; finalized by protocol convention
 
-	// bootstrap the sealing segment
-	// creating sealed root block with the rootResult
-	// creating finalized root block with lastFinalized
-	err = bootstrapSealingSegment(lctx, db, blocks, qcs, segment, lastFinalized, rootSeal)
-	if err != nil {
-		return nil, fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
-	}
+	var state *State
 
-	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		// bootstrap dynamic protocol state
-		err = bootstrapProtocolState(lctx, rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
+	// we acquire both [storage.LockInsertBlock] and [storage.LockFinalizeBlock] because
+	// the bootstrapping process inserts and finalizes blocks (all blocks within the
+	// trusted root snapshot are presumed to be finalized)
+	err = storage.WithLocks(lockManager, storage.LockGroupProtocolStateBootstrap, func(lctx lockctx.Context) error {
+
+		// bootstrap the sealing segment
+		// creating sealed root block with the rootResult
+		// creating finalized root block with lastFinalized
+		err = bootstrapSealingSegment(lctx, db, blocks, qcs, segment, lastFinalized, rootSeal)
 		if err != nil {
-			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
 
-		// initialize version beacon
-		err = boostrapVersionBeacon(rw, root)
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// bootstrap dynamic protocol state
+			err = bootstrapProtocolState(lctx, rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
+			if err != nil {
+				return fmt.Errorf("could not bootstrap protocol state: %w", err)
+			}
+
+			// initialize version beacon
+			err = boostrapVersionBeacon(rw, root)
+			if err != nil {
+				return fmt.Errorf("could not bootstrap version beacon: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("could not bootstrap version beacon: %w", err)
+			return fmt.Errorf("bootstrapping failed: %w", err)
 		}
 
+		// CAUTION: INSERT FINALIZED HEIGHT must be LAST, because we use its existence in the database
+		// as indicator that the protocol database has been bootstrapped successfully. Before we write the
+		// final piece of data to complete the bootstrapping, we query the current state of the database
+		// (sanity check) to ensure that it is still considered as not properly bootstrapped.
+		isBootstrapped, err = IsBootstrapped(db)
+		if err != nil {
+			return fmt.Errorf("determining whether database is successfully bootstrapped failed with unexpected exception: %w", err)
+		}
+		if isBootstrapped { // we haven't written the latest finalized height yet, so this vaule must be false
+			return fmt.Errorf("sanity check failed: while bootstrapping has not yet completed, the implementation already considers the protocol state as successfully bootstrapped")
+		}
+		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// initialize the current protocol state height/view pointers
+			return bootstrapStatePointers(lctx, rw, root)
+		})
+		if err != nil {
+			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
+		}
+
+		state, err = OpenState(metrics, db, lockManager, headers, seals, results, blocks, qcs, setups, commits, epochProtocolStateSnapshots, protocolKVStoreSnapshots, versionBeacons)
+		if err != nil {
+			return fmt.Errorf("bootstrapping failed, because the resulting database state is rejected: %w", err)
+		}
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("bootstrapping failed: %w", err)
-	}
-
-	// CAUTION: INSERT FINALIZED HEIGHT must be LAST, because we use its existence in the database
-	// as indicator that the protocol database has been bootstrapped successfully. Before we write the
-	// final piece of data to complete the bootstrapping, we query the current state of the database
-	// (sanity check) to ensure that it is still considered as not properly bootstrapped.
-	isBootstrapped, err = IsBootstrapped(db)
-	if err != nil {
-		return nil, fmt.Errorf("determining whether database is successfully bootstrapped failed with unexpected exception: %w", err)
-	}
-	if isBootstrapped { // we haven't written the latest finalized height yet, so this vaule must be false
-		return nil, fmt.Errorf("sanity check failed: while bootstrapping has not yet completed, the implementation already considers the protocol state as successfully bootstrapped")
-	}
-	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		// initialize the current protocol state height/view pointers
-		return bootstrapStatePointers(lctx, rw, root)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not bootstrap height/view pointers: %w", err)
-	}
-
-	state, err := OpenState(metrics, db, lockManager, headers, seals, results, blocks, qcs, setups, commits, epochProtocolStateSnapshots, protocolKVStoreSnapshots, versionBeacons)
-	if err != nil {
-		return nil, fmt.Errorf("bootstrapping failed, because the resulting database state is rejected: %w", err)
+		return nil, err
 	}
 	return state, nil
 }

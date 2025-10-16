@@ -379,10 +379,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err := storage.WithLocks(e.lockManager, []string{
-		storage.LockIndexCollectionsByBlock,
-		storage.LockIndexExecutionResult,
-	}, func(lctx lockctx.Context) error {
+	err := storage.WithLocks(e.lockManager, storage.LockGroupAccessFinalizingBlock, func(lctx lockctx.Context) error {
 		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// requires [storage.LockIndexCollectionsByBlock] lock
 			err := e.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))

@@ -79,6 +79,62 @@ func Locks() []string {
 
 type LockManager = lockctx.Manager
 
+var LockGroupAccessStateSyncIndexBlockData = []string{
+	LockInsertEvent,
+	LockInsertLightTransactionResult,
+	LockIndexScheduledTransaction,
+}
+
+var LockGroupExecutionBootstrap = []string{
+	LockIndexExecutionResult,
+	LockIndexStateCommitment,
+}
+
+var LockGroupExecutionSaveExecutionResult = []string{
+	LockIndexChunkDataPackByChunkID,
+	LockInsertEvent,
+	LockInsertServiceEvent,
+	LockInsertAndIndexTxResult,
+	LockInsertOwnReceipt,
+	LockIndexExecutionResult,
+	LockIndexStateCommitment,
+}
+
+var LockGroupAccessFinalizingBlock = []string{
+	LockIndexCollectionsByBlock,
+	LockIndexExecutionResult,
+}
+
+var LockGroupAccessOptimisticSyncBlockPersist = []string{
+	LockInsertCollection,
+	LockInsertEvent,
+	LockInsertLightTransactionResult,
+	LockInsertTransactionResultErrMessage,
+}
+
+var LockGroupCollectionBootstrapClusterState = []string{
+	LockInsertOrFinalizeClusterBlock,
+	LockInsertSafetyData,
+	LockInsertLivenessData,
+}
+
+var LockGroupProtocolStateBootstrap = []string{
+	LockInsertInstanceParams,
+	LockIndexExecutionResult,
+	LockInsertBlock,
+	LockFinalizeBlock,
+	LockInsertSafetyData,
+	LockInsertLivenessData,
+}
+
+// addLocks adds a chain of locks to the builder in the order they appear in the locks slice.
+// This creates a directed acyclic graph where each lock can be acquired after the previous one.
+func addLocks(builder lockctx.DAGPolicyBuilder, locks []string) {
+	for i := 0; i < len(locks)-1; i++ {
+		builder.Add(locks[i], locks[i+1])
+	}
+}
+
 // makeLockPolicy constructs the policy used by the storage layer to prevent deadlocks.
 // We use a policy defined by a directed acyclic graph, where vertices represent named locks.
 // A directed edge between two vertices A, B means: I can acquire B next after acquiring A.
@@ -94,44 +150,17 @@ type LockManager = lockctx.Manager
 //
 // This function will panic if a policy is created which does not prevent deadlocks.
 func makeLockPolicy() lockctx.Policy {
-	return lockctx.NewDAGPolicyBuilder().
-		// for protocol to Bootstrap, during bootstrapping,
-		// we need to insert and finalize
-		// state/protocol/badger/state.go#Bootstrap
-		Add(LockInsertInstanceParams, LockIndexExecutionResult).
+	builder := lockctx.NewDAGPolicyBuilder()
 
-		// EN to bootstrap
-		// engine/execution/state/bootstrap/bootstrap.go#Bootstrapper.BootstrapExecutionDatabase
-		Add(LockIndexExecutionResult, LockInsertBlock).
-		Add(LockInsertBlock, LockFinalizeBlock).
+	addLocks(builder, LockGroupAccessFinalizingBlock)
+	addLocks(builder, LockGroupAccessStateSyncIndexBlockData)
+	addLocks(builder, LockGroupAccessOptimisticSyncBlockPersist)
+	addLocks(builder, LockGroupExecutionBootstrap)
+	addLocks(builder, LockGroupExecutionSaveExecutionResult)
+	addLocks(builder, LockGroupCollectionBootstrapClusterState)
+	addLocks(builder, LockGroupProtocolStateBootstrap)
 
-		// EN to save execution result
-		// engine/execution/state/state.go#state.saveExecutionResults
-		Add(LockIndexChunkDataPackByChunkID, LockInsertEvent).
-		Add(LockInsertEvent, LockInsertServiceEvent).
-		Add(LockInsertServiceEvent, LockInsertAndIndexTxResult).
-		Add(LockInsertAndIndexTxResult, LockInsertOwnReceipt).
-		Add(LockInsertOwnReceipt, LockIndexExecutionResult).
-		Add(LockIndexExecutionResult, LockIndexStateCommitment).
-
-		// AN ingestion engine processing finalized block
-		// engine/access/ingestion/engine.go#Engine.processFinalizedBlock
-		Add(LockIndexCollectionsByBlock, LockIndexExecutionResult).
-
-		// AN optimistic syncing
-		// module/executiondatasync/optimistic_sync/persisters/block.go#BlockPersister.Persist
-		Add(LockInsertCollection, LockInsertEvent).
-		Add(LockInsertEvent, LockInsertLightTransactionResult).
-		Add(LockInsertLightTransactionResult, LockInsertTransactionResultErrMessage).
-
-		// AN execution state sync
-		// module/state_synchronization/indexer/indexer_core.go#IndexerCore.IndexBlockData
-		Add(LockInsertEvent, LockInsertLightTransactionResult). // it's ok to have duplication
-		Add(LockInsertLightTransactionResult, LockIndexScheduledTransaction).
-		Add(LockFinalizeBlock, LockInsertSafetyData).
-		Add(LockInsertSafetyData, LockInsertLivenessData).
-		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
-		Build()
+	return builder.Build()
 }
 
 var makeLockManagerOnce sync.Once
