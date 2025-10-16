@@ -866,6 +866,41 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		suite.Require().Equal(expectedResult, res)
 	})
 
+	suite.Run("happy path - not executed", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			Return(nil, storage.ErrNotFound)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		expected := *expectedResult
+		expected.Status = flow.TransactionStatusFinalized
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expected, *res)
+	})
+
 	suite.Run("collection ID mismatch", func() {
 		suite.collections.
 			On("LightByTransactionID", txID).
@@ -954,35 +989,6 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		suite.Require().Nil(res)
 	})
 
-	suite.Run("provider error", func() {
-		expectedErr := status.Errorf(codes.Internal, "some other error")
-
-		suite.collections.
-			On("LightByTransactionID", txID).
-			Return(lightCollection, nil).
-			Once()
-
-		suite.blocks.
-			On("ByCollectionID", collectionID).
-			Return(block, nil).
-			Once()
-
-		provider := providermock.NewTransactionProvider(suite.T())
-		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
-			Return(nil, expectedErr)
-
-		params := suite.defaultTransactionsParams()
-		params.TxProvider = provider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, collectionID, encodingVersion)
-		suite.Require().ErrorIs(err, expectedErr)
-		suite.Require().Nil(res)
-	})
-
 	suite.Run("tx body lookup failure throws exception", func() {
 		suite.collections.
 			On("LightByTransactionID", txID).
@@ -999,14 +1005,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 			Return(nil, storage.ErrNotFound).
 			Once()
 
-		provider := providermock.NewTransactionProvider(suite.T())
-		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
-			Return(expectedResult, nil)
-
 		params := suite.defaultTransactionsParams()
-		params.TxProvider = provider
-
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
@@ -1016,6 +1015,40 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 
 		res, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion)
 		suite.Require().Error(err)
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("provider error", func() {
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		suite.Require().ErrorIs(err, expectedErr)
 		suite.Require().Nil(res)
 	})
 }

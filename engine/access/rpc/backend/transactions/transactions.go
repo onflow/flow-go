@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -112,10 +113,6 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		txProvider:                   params.TxProvider,
 		txStatusDeriver:              params.TxStatusDeriver,
 		scheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
-	}
-
-	if txs.txResultCache == nil {
-		txs.txResultCache = new(NoopTxResultCache)
 	}
 
 	if params.EnableRetries {
@@ -446,12 +443,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		return nil, nil, status.Errorf(codes.NotFound, "transaction found in block %s, but %s was provided", actualBlockID, blockID)
 	}
 
-	// 3. lookup the transaction result
-	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion)
-	if err != nil {
-		return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
-	}
-
+	// 3. lookup the transaction and its result
 	tx, err := t.transactions.ByID(txID)
 	if err != nil {
 		// if we've gotten this far, the transaction must exist in storage otherwise the node is in
@@ -460,6 +452,36 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		irrecoverable.Throw(ctx, err)
 		return nil, nil, err
 	}
+
+	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+		case errors.Is(err, indexer.ErrIndexNotInitialized):
+		case errors.Is(err, storage.ErrHeightNotIndexed):
+		case status.Code(err) == codes.NotFound:
+		default:
+			return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+		}
+		// all expected errors fall through to be processed as a known unexecuted transaction.
+
+		// The transaction is not executed yet
+		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, false)
+		if err != nil {
+			// this is an executed transaction. If we can't derive transaction status something is very wrong.
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+			return nil, nil, err
+		}
+
+		return &accessmodel.TransactionResult{
+			BlockID:       blockID,
+			BlockHeight:   block.Height,
+			TransactionID: txID,
+			Status:        txStatus,
+			CollectionID:  collectionID,
+		}, tx, nil
+	}
+
 	return txResult, tx, nil
 }
 

@@ -131,7 +131,7 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
-	var txResCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
+	var txResCache transactions.TxResultCache = new(transactions.NoopTxResultCache)
 	if params.TxResultCacheSize > 0 {
 		txResCache, err = lru.New[flow.Identifier, *accessmodel.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {

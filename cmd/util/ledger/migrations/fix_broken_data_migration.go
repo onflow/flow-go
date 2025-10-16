@@ -8,12 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/cadence/interpreter"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/atree"
-
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
