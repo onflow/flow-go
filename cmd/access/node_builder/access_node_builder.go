@@ -1101,7 +1101,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
-				builder.executionResultInfoProvider,
+				notNil(builder.executionResultInfoProvider),
 				builder.executionStateCache,
 			)
 			if err != nil {
@@ -2205,7 +2205,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				VersionControl:              notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
-				ExecutionResultInfoProvider: builder.executionResultInfoProvider, // notNil
+				ExecutionResultInfoProvider: notNil(builder.executionResultInfoProvider),
 				ExecutionStateCache:         builder.executionStateCache,
 				OperatorCriteria:            optimistic_sync.DefaultCriteria,
 				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
