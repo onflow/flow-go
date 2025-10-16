@@ -119,9 +119,8 @@ func (c *IndexerCore) RegisterValue(ID flow.RegisterID, height uint64) (flow.Reg
 
 // IndexBlockData indexes all execution block data by height.
 // This method shouldn't be used concurrently.
-//
-// Expected error returns during normal operation:
-//   - [storage.ErrNotFound]: if the block for execution data was not found
+// Expected error returns during normal operations:
+// - [storage.ErrNotFound] if the block for execution data was not found
 func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
 	header, err := c.headers.ByBlockID(data.BlockID)
 	if err != nil {
@@ -171,32 +170,33 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
 		}
 
-		lctx := c.lockManager.NewContext()
-		defer lctx.Release()
-		if err = lctx.AcquireLock(storage.LockIndexScheduledTransaction); err != nil {
-			return fmt.Errorf("could not acquire lock for indexing scheduled transactions: %w", err)
-		}
+		err = storage.WithLocks(c.lockManager, []string{
+			storage.LockInsertLightTransactionResult,
+			storage.LockIndexScheduledTransaction,
+		},
+			func(lctx lockctx.Context) error {
+				return c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
+					if err != nil {
+						return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
+					}
 
-		err = c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
-			if err != nil {
-				return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
-			}
+					// requires the [storage.LockInsertLightTransactionResult] lock
+					err = c.results.BatchStore(lctx, rw, data.BlockID, results)
+					if err != nil {
+						return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
+					}
 
-			err = c.results.BatchStore(data.BlockID, results, rw)
-			if err != nil {
-				return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
-			}
+					for txID, scheduledTxID := range scheduledTransactionData {
+						err = c.scheduledTransactions.BatchIndex(lctx, data.BlockID, txID, scheduledTxID, rw)
+						if err != nil {
+							return fmt.Errorf("could not index scheduled transaction (%d) %s at height %d: %w", scheduledTxID, txID, header.Height, err)
+						}
+					}
 
-			for txID, scheduledTxID := range scheduledTransactionData {
-				err = c.scheduledTransactions.BatchIndex(lctx, data.BlockID, txID, scheduledTxID, rw)
-				if err != nil {
-					return fmt.Errorf("could not index scheduled transaction (%d) %s at height %d: %w", scheduledTxID, txID, header.Height, err)
-				}
-			}
-
-			return nil
-		})
+					return nil
+				})
+			})
 
 		if err != nil {
 			return fmt.Errorf("could not commit block data: %w", err)

@@ -2218,6 +2218,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					notNil(builder.txResultErrorMessageProvider),
 					builder.transactionResultErrorMessages,
 					notNil(builder.ExecNodeIdentitiesProvider),
+					node.StorageLockMgr,
 				)
 			}
 

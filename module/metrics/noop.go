@@ -125,9 +125,9 @@ func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)    
 func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)               {}
 func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)                     {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                       {}
-func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                            {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                           {}
 func (nc *NoopCollector) CollectionMaxSize(uint)                                         {}
+func (nc *NoopCollector) ClusterBlockCreated(*cluster.Block, uint)                       {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)        {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)       {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                       {}
