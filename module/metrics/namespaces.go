@@ -96,6 +96,7 @@ const (
 	subsystemExecutionDataRequester = "execution_data_requester"
 	subsystemExecutionStateIndexer  = "execution_state_indexer"
 	subsystemExeDataBlobstore       = "blobstore"
+	subsystemTxErrorFetcher         = "tx_errors"
 )
 
 // module/synchronization core

@@ -37,7 +37,7 @@ const (
 
 var (
 	// canonicalExecutionDataID is the execution data ID of the canonical execution data.
-	canonicalExecutionDataID = flow.MustHexStringToIdentifier("637cf35656b86a647eca490d9370632a276137712ecfec65846ba8ec90bec627")
+	canonicalExecutionDataID = flow.MustHexStringToIdentifier("6796622b06907cc0894260c175fdec8960fe99c167084f901d238db22a676de3")
 )
 
 func getDatastore() datastore.Batching {
@@ -156,11 +156,18 @@ func TestGenerateExecutionDataRoot(t *testing.T) {
 	assert.Equal(t, expectedExecutionDataRoot, actualExecutionDataRoot)
 }
 
-// TestCalculateExecutionDataRootID tests that CalculateExecutionDataRootID calculates the correct ID given a static BlockExecutionDataRoot
+// TestCalculateExecutionDataRootID tests that CalculateExecutionDataRootID calculates the correct
+// ID given a static BlockExecutionDataRoot. This is used to ensure library updates or modification
+// to the provider do not change the ID calculation logic.
+//
+// CAUTION: Unintentional changes may cause execution forks!
+// Only modify this test if the hash calculation is expected to change.
 func TestCalculateExecutionDataRootID(t *testing.T) {
 	t.Parallel()
 
+	// ONLY modify this hash if it was expected to change. Unintentional changes may cause execution forks!
 	expected := flow.MustHexStringToIdentifier("ae80bb200545de7ff009d2f3e20970643198be635a9b90fffb9da1198a988deb")
+
 	edRoot := flow.BlockExecutionDataRoot{
 		BlockID: flow.MustHexStringToIdentifier("2b31c5e26b999a41d18dc62584ac68476742b071fc9412d68be9e516e1dfc79e"),
 		ChunkExecutionDataIDs: []cid.Cid{
@@ -179,15 +186,20 @@ func TestCalculateExecutionDataRootID(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-// TestCalculateChunkExecutionDataID tests that CalculateChunkExecutionDataID calculates the correct ID given a static ChunkExecutionData
-// This is used to ensure library updates or modification to the provider do not change the ID calculation logic
+// TestCalculateChunkExecutionDataID tests that CalculateChunkExecutionDataID calculates the correct
+// ID given a static ChunkExecutionData. This is used to ensure library updates or modification to
+// the provider do not change the ID calculation logic.
+//
+// CAUTION: Unintentional changes may cause execution forks!
+// Only modify this test if the hash calculation is expected to change.
 func TestCalculateChunkExecutionDataID(t *testing.T) {
 	t.Parallel()
 
 	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
 	require.NoError(t, err)
 
-	expected := cid.MustParse("QmWJsC7DTufdGijftpphuxZ6EbNsDar1knP2BnvgBaMf9n")
+	// ONLY modify this hash if it was expected to change. Unintentional changes may cause execution forks!
+	expected := cid.MustParse("QmSZ4sMzj8Be7kkZekjHKppmx2os87oAHV87WFUgZTMrWf")
 
 	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
@@ -221,9 +233,6 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	actual, err := cidProvider.CalculateChunkExecutionDataID(ced)
 	require.NoError(t, err)
 
-	// This can be used for updating the expected ID when the format is *intentionally* updated
-	t.Log(actual)
-
 	assert.Equal(t,
 		expected, actual,
 		"expected and actual CID do not match: expected %s, actual %s",
@@ -235,6 +244,8 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 // TestCalculateExecutionDataLifecycle tests that the execution data is reproduced correctly
 // at different stages of the lifecycle. This ensures that the data remains consistent, and
 // the hashing logic is correct.
+//
+// CAUTION: Unintentional changes may cause execution forks!
 func TestCalculateExecutionDataLifecycle(t *testing.T) {
 	t.Parallel()
 

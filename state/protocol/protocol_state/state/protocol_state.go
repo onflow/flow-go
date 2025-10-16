@@ -349,15 +349,11 @@ func (s *MutableProtocolState) build(
 
 	if parentStateID != resultingStateID {
 		deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-			err := s.kvStoreSnapshots.BatchStore(lctx, rw, resultingStateID, evolvingState)
+			// no need to hold any lock, because the resultingStateID is a full content hash of the value
+			err := s.kvStoreSnapshots.BatchStore(rw, resultingStateID, evolvingState)
 			if err == nil {
 				return nil
 			}
-			// The only error that `ProtocolKVStore.BatchStore` might return is `storage.ErrDataMismatch`.
-			// Repeated requests to store the same state for the same id should be no-ops. It should be noted
-			// that the `resultingStateID` is a collision-resistant hash of the encoded state (including the
-			// state's version). Hence, mismatching data for the same id indicates a security-critical bug
-			// or state corruption, making continuation impossible.
 			return irrecoverable.NewExceptionf("unexpected error while trying to store new protocol state: %w", err)
 		})
 	}

@@ -334,6 +334,7 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
+	var err error
 	db := node.ProtocolDB
 
 	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
@@ -342,7 +343,10 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
 	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
 	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
-	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+	exeNode.txResults, err = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+	if err != nil {
+		return err
+	}
 	exeNode.eventsReader = exeNode.events
 	exeNode.commitsReader = exeNode.commits
 	exeNode.resultsReader = exeNode.results
@@ -758,8 +762,12 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		return nil
 	})
+
+	chunkDB := pebbleimpl.ToDB(chunkDataPackDB)
+	storedChunkDataPacks := store.NewStoredChunkDataPacks(
+		node.Metrics.Cache, chunkDB, exeNode.exeConf.chunkDataPackCacheSize)
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
-		pebbleimpl.ToDB(chunkDataPackDB), exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
+		chunkDB, storedChunkDataPacks, exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	getLatestFinalized := func() (uint64, error) {
 		final, err := node.State.Final().Head()
