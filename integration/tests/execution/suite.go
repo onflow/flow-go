@@ -114,13 +114,7 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = nil
 	s.accessClient = nil
 
-	accessConfig := testnet.NewNodeConfig(flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
-		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
-	)
-	s.nodeConfigs = append(s.nodeConfigs, accessConfig)
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
