@@ -767,7 +767,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	storedChunkDataPacks := store.NewStoredChunkDataPacks(
 		node.Metrics.Cache, chunkDB, exeNode.exeConf.chunkDataPackCacheSize)
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
-		chunkDB, storedChunkDataPacks, exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
+		node.ProtocolDB, storedChunkDataPacks, exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	getLatestFinalized := func() (uint64, error) {
 		final, err := node.State.Final().Head()
