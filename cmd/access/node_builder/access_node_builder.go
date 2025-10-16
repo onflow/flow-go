@@ -653,34 +653,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution state cache", func(node *cmd.NodeConfig) error {
-			//backendConfig := builder.rpcConf.BackendConfig
-			//
-			//preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
-			//if err != nil {
-			//	return fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-			//}
-			//
-			//fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
-			//if err != nil {
-			//	return fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-			//}
-			//
-			//execNodeSelector := execution_result.NewExecutionNodeSelector(
-			//	preferredENIdentifiers,
-			//	fixedENIdentifiers,
-			//)
-			//
-			//builder.executionResultInfoProvider = execution_result.NewExecutionResultInfoProvider(
-			//	node.Logger,
-			//	node.State,
-			//	node.Storage.Receipts,
-			//	execNodeSelector,
-			//	optimistic_sync.DefaultCriteria,
-			//)
-			//if err != nil {
-			//	return fmt.Errorf("failed to create execution result provider: %w", err)
-			//}
-
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
 				builder.events,
