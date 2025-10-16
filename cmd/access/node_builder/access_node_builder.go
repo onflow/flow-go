@@ -1733,15 +1733,9 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 	})
 }
 
-func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
-	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
-
-	builder.Module("events storage", func(node *cmd.NodeConfig) error {
-		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
-		return nil
-	})
-
+// buildExecutionResultInfoProvider registers a module that wires the
+// optimistic_sync.ExecutionResultInfoProvider on the builder.
+func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAccessNodeBuilder {
 	builder.Module("execution result info provider", func(node *cmd.NodeConfig) error {
 		backendConfig := builder.rpcConf.BackendConfig
 
@@ -1767,12 +1761,21 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			execNodeSelector,
 			optimistic_sync.DefaultCriteria,
 		)
-		if err != nil {
-			return fmt.Errorf("failed to create execution result provider: %w", err)
-		}
 
 		return nil
 	})
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
+	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
+	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
+
+	builder.Module("events storage", func(node *cmd.NodeConfig) error {
+		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+		return nil
+	})
+	builder.buildExecutionResultInfoProvider()
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()

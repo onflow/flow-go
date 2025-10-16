@@ -1094,11 +1094,9 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 	}
 }
 
-// Build enqueues the sync engine and the follower engine for the observer.
-// Currently, the observer only runs the follower engine.
-func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
-	builder.BuildConsensusFollower()
-
+// buildExecutionResultInfoProvider registers a module that wires the
+// optimistic_sync.ExecutionResultInfoProvider on the builder.
+func (builder *ObserverServiceBuilder) buildExecutionResultInfoProvider() *ObserverServiceBuilder {
 	builder.Module("execution result info provider", func(node *cmd.NodeConfig) error {
 		backendConfig := builder.rpcConf.BackendConfig
 
@@ -1127,6 +1125,14 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 
 		return nil
 	})
+	return builder
+}
+
+// Build enqueues the sync engine and the follower engine for the observer.
+// Currently, the observer only runs the follower engine.
+func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
+	builder.BuildConsensusFollower()
+	builder.buildExecutionResultInfoProvider()
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
