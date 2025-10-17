@@ -30,6 +30,8 @@ type Suite struct {
 	exe2ID                  flow.Identifier
 	verID                   flow.Identifier // represents id of verification node
 	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
+
+	accessClient *testnet.Client
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -41,9 +43,12 @@ func (s *Suite) Ghost() *client.GhostClient {
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (s *Suite) AccessClient() *testnet.Client {
-	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
-	require.NoError(s.T(), err, "could not get access client")
-	return client
+	if s.accessClient == nil { // cache access client
+		client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+		require.NoError(s.T(), err, "could not get access client")
+		s.accessClient = client
+	}
+	return s.accessClient
 }
 
 // AccessPort returns the port number of access node api on testnet.
@@ -64,6 +69,10 @@ func (s *Suite) MetricsPort() string {
 func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
+
+	// Reset state to ensure clean state between tests
+	s.nodeConfigs = nil
+	s.accessClient = nil
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 

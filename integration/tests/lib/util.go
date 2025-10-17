@@ -15,6 +15,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -348,14 +349,16 @@ func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Log
 func ScheduleCallbackAtTimestamp(
 	timestamp int64,
 	client *testnet.Client,
-	flowCallbackScheduler sdk.Address,
-	flowToken sdk.Address,
-	fungibleToken sdk.Address,
+	sc *systemcontracts.SystemContracts,
 ) (uint64, error) {
 	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("could not get latest block ID: %w", err)
 	}
+
+	flowCallbackScheduler := sdk.Address(sc.FlowCallbackScheduler.Address)
+	flowToken := sdk.Address(sc.FlowToken.Address)
+	fungibleToken := sdk.Address(sc.FungibleToken.Address)
 
 	serviceAccountAddress := client.SDKServiceAddress()
 	script := []byte(fmt.Sprintf(`
@@ -426,15 +429,16 @@ func ScheduleCallbackAtTimestamp(
 func CancelCallbackByID(
 	callbackID uint64,
 	client *testnet.Client,
-	flowCallbackScheduler sdk.Address,
-	flowToken sdk.Address,
-	fungibleToken sdk.Address,
+	sc *systemcontracts.SystemContracts,
 ) (uint64, error) {
-
 	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("could not get latest block ID: %w", err)
 	}
+
+	flowCallbackScheduler := sdk.Address(sc.FlowCallbackScheduler.Address)
+	flowToken := sdk.Address(sc.FlowToken.Address)
+	fungibleToken := sdk.Address(sc.FungibleToken.Address)
 
 	serviceAccountAddress := client.SDKServiceAddress()
 	cancelTx := fmt.Sprintf(`
@@ -490,13 +494,19 @@ func ExtractCallbackIDFromEvents(result *sdk.TransactionResult) uint64 {
 // DeployScheduledCallbackTestContract deploys the test contract for scheduled callbacks.
 func DeployScheduledCallbackTestContract(
 	client *testnet.Client,
-	callbackScheduler sdk.Address,
-	flowToken sdk.Address,
-	fungibleToken sdk.Address,
-	refID sdk.Identifier,
+	sc *systemcontracts.SystemContracts,
 ) (sdk.Identifier, error) {
-	testContract := TestFlowCallbackHandlerContract(callbackScheduler, flowToken, fungibleToken)
-	tx, err := client.DeployContract(context.Background(), refID, testContract)
+	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	if err != nil {
+		return sdk.Identifier{}, fmt.Errorf("could not get latest block ID: %w", err)
+	}
+
+	flowCallbackScheduler := sdk.Address(sc.FlowCallbackScheduler.Address)
+	flowToken := sdk.Address(sc.FlowToken.Address)
+	fungibleToken := sdk.Address(sc.FungibleToken.Address)
+
+	testContract := TestFlowCallbackHandlerContract(flowCallbackScheduler, flowToken, fungibleToken)
+	tx, err := client.DeployContract(context.Background(), referenceBlock.ID, testContract)
 	if err != nil {
 		return sdk.Identifier{}, fmt.Errorf("could not deploy test contract: %w", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -51,31 +50,18 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	txID, err := lib.DeployScheduledCallbackTestContract(
-		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
-		sdk.Address(sc.FlowToken.Address),
-		sdk.Address(sc.FungibleToken.Address),
-		sdk.Identifier(s.net.Root().ID()),
-	)
+	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// Wait for deploy transaction to be sealed before scheduling callback
-	_, err = s.AccessClient().WaitForSealed(context.Background(), txID)
-	require.NoError(s.T(), err, "could not wait for deploy transaction to be sealed")
+	// Wait for next height finalized before scheduling callback
+	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
 	// Schedule a callback for 10 seconds in the future
 	scheduleDelta := int64(10)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 
 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID, err := lib.ScheduleCallbackAtTimestamp(
-		futureTimestamp,
-		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
-		sdk.Address(sc.FlowToken.Address),
-		sdk.Address(sc.FungibleToken.Address),
-	)
+	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not schedule callback transaction")
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
@@ -122,31 +108,18 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	txID, err := lib.DeployScheduledCallbackTestContract(
-		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
-		sdk.Address(sc.FlowToken.Address),
-		sdk.Address(sc.FungibleToken.Address),
-		sdk.Identifier(s.net.Root().ID()),
-	)
+	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// Wait for deploy transaction to be sealed before scheduling callback
-	_, err = s.AccessClient().WaitForSealed(context.Background(), txID)
-	require.NoError(s.T(), err, "could not wait for deploy transaction to be sealed")
+	// Wait for next height finalized before scheduling callback
+	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
 	// Schedule a callback for 10 seconds in the future
 	scheduleDelta := int64(10)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 
 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID, err := lib.ScheduleCallbackAtTimestamp(
-		futureTimestamp,
-		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
-		sdk.Address(sc.FlowToken.Address),
-		sdk.Address(sc.FungibleToken.Address),
-	)
+	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not schedule callback transaction")
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
@@ -168,13 +141,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	require.NotContains(s.T(), executedCallbacks, callbackID, "callback should not be executed immediately")
 
 	// Cancel the callback
-	canceledID, err := lib.CancelCallbackByID(
-		callbackID,
-		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
-		sdk.Address(sc.FlowToken.Address),
-		sdk.Address(sc.FungibleToken.Address),
-	)
+	canceledID, err := lib.CancelCallbackByID(callbackID, s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not cancel callback transaction")
 	require.Equal(s.T(), callbackID, canceledID, "canceled callback ID should be the same as scheduled")
 
