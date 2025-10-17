@@ -657,6 +657,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return fmt.Errorf("events store not initialized: ensure 'events storage' module runs before 'execution state cache'")
 			}
 
+			if builder.collections == nil {
+				return fmt.Errorf("collections store not initialized: ensure 'events storage' module runs before 'execution state cache'")
+			}
+
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
 				builder.events,
@@ -2546,7 +2550,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 // notNil ensures that the input is not nil and returns it
 // the usage is to ensure the dependencies are initialized before initializing a module.
 // for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
-// different function, so we need to ensure that the storage.Collections is initialized before
+// different function, so we need to ensure that the storage.Collections were initialized before
 // creating the IngestionEngine.
 func notNil[T any](dep T) T {
 	if any(dep) == nil {
