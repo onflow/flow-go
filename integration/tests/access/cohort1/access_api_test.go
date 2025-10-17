@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antihax/optional"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
@@ -20,9 +22,12 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+	restclient "github.com/onflow/flow/openapi/go-client-generated"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -1170,12 +1175,12 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 	rpcClient := s.an2Client.RPCClient()
 
 	// Deploy the test contract first
-	txID, err := lib.DeployScheduledCallbackTestContract(accessClient, sc)
+	deployTxID, err := lib.DeployScheduledCallbackTestContract(accessClient, sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
 	// wait for the tx to be sealed before attempting to schedule the callback. this helps make sure
 	// the proposer's sequence number is updated.
-	_, err = accessClient.WaitForSealed(s.ctx, txID)
+	_, err = accessClient.WaitForSealed(s.ctx, deployTxID)
 	s.Require().NoError(err)
 
 	// Schedule a callback for 10 seconds in the future. Use a larger wait time to ensure that there
@@ -1198,13 +1203,24 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 	// construct the expected scheduled transaction body to compare to the API responses
 	scheduledTxs, err := blueprints.ExecuteCallbacksTransactions(s.net.Root().ChainID.Chain(), []flow.Event{expectedPendingExecutionEvent})
 	require.NoError(s.T(), err, "could not execute callback transaction")
-	expectedTxID := scheduledTxs[0].ID()
+	expectedTx := scheduledTxs[0]
 
 	// Block until the API returns the scheduled transaction.
 	require.Eventually(s.T(), func() bool {
 		_, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: callbackID})
 		return err == nil
 	}, 30*time.Second, 500*time.Millisecond)
+
+	// test gRPC endpoints
+	scheduledTxResult := s.testScheduledTransactionsGrpc(callbackID, expectedTx)
+
+	// test REST endpoints
+	s.testScheduledTransactionsRest(callbackID, expectedTx, scheduledTxResult)
+}
+
+func (s *AccessAPISuite) testScheduledTransactionsGrpc(callbackID uint64, expectedTx *flow.TransactionBody) *accessmodel.TransactionResult {
+	expectedTxID := expectedTx.ID()
+	rpcClient := s.an2Client.RPCClient()
 
 	// Verify the results of the scheduled transaction and its result.
 	s.Run("GetScheduledTransaction", func() {
@@ -1252,6 +1268,90 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 		s.Require().NoError(err)
 		s.Equal(scheduledTxResult, actualTxResult)
 	})
+
+	return scheduledTxResult
+}
+
+func (s *AccessAPISuite) testScheduledTransactionsRest(callbackID uint64, expectedTx *flow.TransactionBody, scheduledTxResult *accessmodel.TransactionResult) {
+	expectedTxID := expectedTx.ID()
+
+	restClient := s.RestClient("access_2")
+
+	link := mockcommonmodels.NewLinkGenerator(s.T())
+	link.On("TransactionLink", expectedTxID).Return(fmt.Sprintf("/v1/transactions/%s", expectedTxID.String()), nil)
+	link.On("TransactionResultLink", expectedTxID).Return(fmt.Sprintf("/v1/transaction_results/%s", expectedTxID.String()), nil)
+
+	s.Run("/v1/transactions/{txID} without result", func() {
+		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, expectedTxID.String(), nil)
+		s.Require().NoError(err)
+
+		var expected commonmodels.Transaction
+		expected.Build(expectedTx, nil, link)
+
+		assertSystemTxResponse(s.T(), expected, &txResponse)
+	})
+
+	s.Run("REST /v1/transactions/{txID} with result", func() {
+		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, expectedTxID.String(), &restclient.TransactionsApiTransactionsIdGetOpts{
+			Expand: optional.NewInterface("result"),
+		})
+		s.Require().NoError(err)
+
+		var expected commonmodels.Transaction
+		expected.Build(expectedTx, scheduledTxResult, link)
+
+		assertSystemTxResponse(s.T(), expected, &txResponse)
+	})
+
+	s.Run("REST /v1/transactions/{scheduledTxID} without result", func() {
+		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, fmt.Sprint(callbackID), nil)
+		s.Require().NoError(err)
+
+		var expected commonmodels.Transaction
+		expected.Build(expectedTx, nil, link)
+
+		assertSystemTxResponse(s.T(), expected, &txResponse)
+	})
+
+	s.Run("REST /v1/transactions/{scheduledTxID} with result", func() {
+		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, fmt.Sprint(callbackID), &restclient.TransactionsApiTransactionsIdGetOpts{
+			Expand: optional.NewInterface("result"),
+		})
+		s.Require().NoError(err)
+
+		var expected commonmodels.Transaction
+		expected.Build(expectedTx, scheduledTxResult, link)
+
+		assertSystemTxResponse(s.T(), expected, &txResponse)
+	})
+
+	s.Run("REST /v1/transaction_results/{txID}", func() {
+		txResultResponse, _, err := restClient.TransactionsApi.TransactionResultsTransactionIdGet(s.ctx, expectedTxID.String(), nil)
+		s.Require().NoError(err)
+
+		var expected commonmodels.TransactionResult
+		expected.Build(scheduledTxResult, expectedTxID, link)
+
+		assertSystemTxResultResponse(s.T(), &expected, &txResultResponse)
+	})
+
+	s.Run("REST /v1/transaction_results/{scheduledTxID}", func() {
+		txResultResponse, _, err := restClient.TransactionsApi.TransactionResultsTransactionIdGet(s.ctx, fmt.Sprint(callbackID), nil)
+		s.Require().NoError(err)
+
+		var expected commonmodels.TransactionResult
+		expected.Build(scheduledTxResult, expectedTxID, link)
+
+		assertSystemTxResultResponse(s.T(), &expected, &txResultResponse)
+	})
+}
+
+func (s *AccessAPISuite) RestClient(containerName string) *restclient.APIClient {
+	restAddr := s.net.ContainerByName(containerName).Addr(testnet.RESTPort)
+
+	config := restclient.NewConfiguration()
+	config.BasePath = fmt.Sprintf("http://%s/v1", restAddr)
+	return restclient.NewAPIClient(config)
 }
 
 func (s *AccessAPISuite) TestSystemTransactions() {
@@ -1272,6 +1372,13 @@ func (s *AccessAPISuite) TestSystemTransactions() {
 	systemCollection, err := blueprints.SystemCollection(s.net.Root().ChainID.Chain(), nil)
 	s.Require().NoError(err)
 	s.Require().Len(systemCollection.Transactions, 2)
+
+	txResults := s.testSystemTransactionsGrpc(systemCollection, blockID)
+	s.testSystemTransactionsRest(systemCollection, blockID, txResults)
+}
+
+func (s *AccessAPISuite) testSystemTransactionsGrpc(systemCollection *flow.Collection, blockID flow.Identifier) []*accessmodel.TransactionResult {
+	rpcClient := s.an2Client.RPCClient()
 
 	systemTxs := make([]flow.Identifier, len(systemCollection.Transactions))
 	for i, tx := range systemCollection.Transactions {
@@ -1301,6 +1408,7 @@ func (s *AccessAPISuite) TestSystemTransactions() {
 		}
 	})
 
+	var txResults []*accessmodel.TransactionResult
 	s.Run("GetTransactionResult", func() {
 		for _, txID := range systemTxs {
 			txResultResponse, err := rpcClient.GetTransactionResult(s.ctx, &accessproto.GetTransactionRequest{Id: txID[:], BlockId: blockID[:]})
@@ -1313,6 +1421,8 @@ func (s *AccessAPISuite) TestSystemTransactions() {
 			s.Equal(blockID, actualTxResult.BlockID)
 			s.Equal(uint(0), actualTxResult.StatusCode)
 			s.Empty(actualTxResult.ErrorMessage)
+
+			txResults = append(txResults, actualTxResult)
 		}
 	})
 
@@ -1330,4 +1440,111 @@ func (s *AccessAPISuite) TestSystemTransactions() {
 			s.Empty(actualSystemTxResult.ErrorMessage)
 		}
 	})
+
+	return txResults
+}
+
+func (s *AccessAPISuite) testSystemTransactionsRest(systemCollection *flow.Collection, blockID flow.Identifier, txResults []*accessmodel.TransactionResult) {
+	restClient := s.RestClient("access_2")
+
+	link := mockcommonmodels.NewLinkGenerator(s.T())
+	for _, tx := range systemCollection.Transactions {
+		txID := tx.ID()
+		link.On("TransactionLink", txID).Return(fmt.Sprintf("/v1/transactions/%s", txID.String()), nil)
+		link.On("TransactionResultLink", txID).Return(fmt.Sprintf("/v1/transaction_results/%s", txID.String()), nil)
+	}
+
+	s.Run("REST /v1/transactions/{txID} without result", func() {
+		for _, tx := range systemCollection.Transactions {
+			txID := tx.ID()
+
+			txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, txID.String(), nil)
+			s.Require().NoError(err)
+
+			var expected commonmodels.Transaction
+			expected.Build(tx, nil, link)
+
+			assertSystemTxResponse(s.T(), expected, &txResponse)
+		}
+	})
+
+	s.Run("REST /v1/transactions/{txID} with result", func() {
+		for i, tx := range systemCollection.Transactions {
+			txID := tx.ID()
+			txResult := txResults[i]
+
+			txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, txID.String(), &restclient.TransactionsApiTransactionsIdGetOpts{
+				Expand:  optional.NewInterface("result"),
+				BlockId: optional.NewInterface(blockID.String()), // required to get system tx result
+			})
+			s.Require().NoError(err)
+
+			var expected commonmodels.Transaction
+			expected.Build(tx, txResult, link)
+
+			assertSystemTxResponse(s.T(), expected, &txResponse)
+		}
+	})
+
+	s.Run("REST /v1/transaction_results/{txID}", func() {
+		for i, tx := range systemCollection.Transactions {
+			txID := tx.ID()
+			txResult := txResults[i]
+
+			txResultResponse, _, err := restClient.TransactionsApi.TransactionResultsTransactionIdGet(s.ctx, txID.String(), &restclient.TransactionsApiTransactionResultsTransactionIdGetOpts{
+				BlockId: optional.NewInterface(blockID.String()), // required to get system tx result
+			})
+			s.Require().NoError(err)
+
+			var expected commonmodels.TransactionResult
+			expected.Build(txResult, txID, link)
+
+			assertSystemTxResultResponse(s.T(), &expected, &txResultResponse)
+		}
+	})
+}
+
+func assertSystemTxResponse(t *testing.T, expected commonmodels.Transaction, actual *restclient.Transaction) {
+	assert.Equal(t, expected.Script, actual.Script)
+	assert.Equal(t, expected.Arguments, actual.Arguments)
+	assert.Equal(t, expected.ReferenceBlockId, actual.ReferenceBlockId)
+	assert.Equal(t, expected.GasLimit, actual.GasLimit)
+	assert.Equal(t, expected.Payer, actual.Payer)
+	assert.Equal(t, expected.Authorizers, actual.Authorizers)
+
+	// these should always be empty for scheduled tx
+	assert.Equal(t, flow.EmptyAddress.Hex(), actual.ProposalKey.Address)
+	assert.Equal(t, "0", actual.ProposalKey.KeyIndex)
+	assert.Equal(t, "0", actual.ProposalKey.SequenceNumber)
+	assert.Len(t, actual.PayloadSignatures, 0)
+	assert.Len(t, actual.EnvelopeSignatures, 0)
+
+	assert.Equal(t, expected.Expandable.Result, actual.Expandable.Result)
+	assert.Equal(t, expected.Links.Self, actual.Links.Self)
+
+	if expected.Result == nil {
+		assert.Nil(t, actual.Result)
+	} else {
+		assertSystemTxResultResponse(t, expected.Result, actual.Result)
+	}
+}
+
+func assertSystemTxResultResponse(t *testing.T, expected *commonmodels.TransactionResult, actual *restclient.TransactionResult) {
+	assert.Equal(t, expected.BlockId, actual.BlockId)
+	assert.Equal(t, expected.CollectionId, actual.CollectionId)
+	assert.Equal(t, string(*expected.Execution), string(*actual.Execution))
+	assert.Equal(t, string(*expected.Status), string(*actual.Status))
+	assert.Equal(t, expected.StatusCode, actual.StatusCode)
+	assert.Equal(t, expected.ErrorMessage, actual.ErrorMessage)
+	assert.Equal(t, expected.ComputationUsed, actual.ComputationUsed)
+	assert.Equal(t, expected.Links.Self, actual.Links.Self)
+	assert.Equal(t, len(expected.Events), len(actual.Events))
+	for i, event := range expected.Events {
+		actualEvent := actual.Events[i]
+		assert.Equal(t, event.Type_, actualEvent.Type_)
+		assert.Equal(t, event.TransactionId, actualEvent.TransactionId)
+		assert.Equal(t, event.TransactionIndex, actualEvent.TransactionIndex)
+		assert.Equal(t, event.EventIndex, actualEvent.EventIndex)
+		assert.Equal(t, event.Payload, actualEvent.Payload)
+	}
 }

@@ -22,6 +22,7 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.7.1
 	github.com/onflow/crypto v0.25.3
+	github.com/onflow/flow v0.4.15
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.0
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
@@ -65,6 +66,7 @@ require (
 	github.com/SaveTheRbtz/mph v0.1.1-0.20240117162131-4166ec7869bc // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
+	github.com/antihax/optional v1.0.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.39.1 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.31.9 // indirect

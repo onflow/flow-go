@@ -87,7 +87,8 @@ func CreateTransaction(r *common.Request, backend access.API, link commonmodels.
 		return nil, err
 	}
 
-	response := commonmodels.NewTransaction(&req.Transaction, nil, link)
+	var response commonmodels.Transaction
+	response.Build(&req.Transaction, nil, link)
 	return response, nil
 }
 

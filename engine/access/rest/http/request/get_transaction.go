@@ -1,6 +1,9 @@
 package request
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
@@ -97,7 +100,7 @@ func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, err
 	raw := r.GetVar(idQuery)
 	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)
 	if err != nil {
-		return GetScheduledTransaction{}, fmt.Errorf("invalid scheduled transaction ID format: %w", err)
+		return GetScheduledTransaction{}, fmt.Errorf("invalid ID format")
 	}
 
 	var transactionOptionals TransactionOptionals
@@ -122,7 +125,7 @@ func NewGetScheduledTransactionResult(r *common.Request) (GetScheduledTransactio
 	raw := r.GetVar(idQuery)
 	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)
 	if err != nil {
-		return GetScheduledTransactionResult{}, fmt.Errorf("invalid scheduled transaction ID format: %w", err)
+		return GetScheduledTransactionResult{}, fmt.Errorf("invalid ID format")
 	}
 
 	var transactionOptionals TransactionOptionals
