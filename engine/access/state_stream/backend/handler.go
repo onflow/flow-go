@@ -55,9 +55,11 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert block ID: %v", err)
 	}
 
-	execData, err := h.api.GetExecutionDataByBlockID(ctx, blockID)
+	query := request.GetExecutionStateQuery()
+
+	execData, executorMetadata, err := h.api.GetExecutionDataByBlockID(ctx, blockID, convert.NewCriteria(query))
 	if err != nil {
-		return nil, rpc.ConvertError(err, "could no get execution data", codes.Internal)
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	message, err := convert.BlockExecutionDataToMessage(execData)
@@ -70,7 +72,15 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 	}
 
-	return &executiondata.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
+	response := &executiondata.GetExecutionDataByBlockIDResponse{
+		BlockExecutionData: message,
+	}
+
+	if query.GetIncludeExecutorMetadata() {
+		response.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
+	}
+
+	return response, nil
 }
 
 // SubscribeExecutionData is deprecated and will be removed in a future version.
