@@ -352,16 +352,12 @@ func ScheduleCallbackAtTimestamp(
 	flowToken sdk.Address,
 	fungibleToken sdk.Address,
 ) (uint64, error) {
-	header, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("could not get latest block ID: %w", err)
 	}
 
-	serviceAccount, err := client.GetAccountAtBlockHeight(context.Background(), client.SDKServiceAddress(), header.Height)
-	if err != nil {
-		return 0, fmt.Errorf("could not get account: %w", err)
-	}
-
+	serviceAccountAddress := client.SDKServiceAddress()
 	script := []byte(fmt.Sprintf(`
 		import FlowTransactionScheduler from 0x%s
 		import TestFlowCallbackHandler from 0x%s
@@ -404,7 +400,7 @@ func ScheduleCallbackAtTimestamp(
 				TestFlowCallbackHandler.addScheduledCallback(callback: <-scheduledCallback)
 			}
 		} 
-	`, serviceAccount.Address.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
+	`, serviceAccountAddress.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
 
 	timeArg, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
 	if err != nil {
@@ -413,10 +409,10 @@ func ScheduleCallbackAtTimestamp(
 
 	tx := sdk.NewTransaction().
 		SetScript(script).
-		SetReferenceBlockID(header.ID).
-		SetProposalKey(serviceAccount.Address, serviceAccount.Keys[0].Index, serviceAccount.Keys[0].SequenceNumber).
-		SetPayer(serviceAccount.Address).
-		AddAuthorizer(serviceAccount.Address)
+		SetReferenceBlockID(referenceBlock.ID).
+		SetProposalKey(serviceAccountAddress, 0, client.GetAndIncrementSeqNumber()).
+		SetPayer(serviceAccountAddress).
+		AddAuthorizer(serviceAccountAddress)
 
 	err = tx.AddArgument(timeArg)
 	if err != nil {
@@ -435,16 +431,12 @@ func CancelCallbackByID(
 	fungibleToken sdk.Address,
 ) (uint64, error) {
 
-	header, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("could not get latest block ID: %w", err)
 	}
 
-	serviceAccount, err := client.GetAccountAtBlockHeight(context.Background(), client.SDKServiceAddress(), header.Height)
-	if err != nil {
-		return 0, fmt.Errorf("could not get account: %w", err)
-	}
-
+	serviceAccountAddress := client.SDKServiceAddress()
 	cancelTx := fmt.Sprintf(`
 		import FlowTransactionScheduler from 0x%s
 		import TestFlowCallbackHandler from 0x%s
@@ -461,14 +453,14 @@ func CancelCallbackByID(
 				vault.deposit(from: <-TestFlowCallbackHandler.cancelCallback(id: id))
 			}
 		} 
-	`, serviceAccount.Address.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
+	`, serviceAccountAddress.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
 
 	tx := sdk.NewTransaction().
 		SetScript([]byte(cancelTx)).
-		SetReferenceBlockID(header.ID).
-		SetProposalKey(serviceAccount.Address, serviceAccount.Keys[0].Index, serviceAccount.Keys[0].SequenceNumber).
-		SetPayer(serviceAccount.Address).
-		AddAuthorizer(serviceAccount.Address)
+		SetReferenceBlockID(referenceBlock.ID).
+		SetProposalKey(serviceAccountAddress, 0, client.GetAndIncrementSeqNumber()).
+		SetPayer(serviceAccountAddress).
+		AddAuthorizer(serviceAccountAddress)
 
 	err = tx.AddArgument(cadence.UInt64(callbackID))
 	if err != nil {
