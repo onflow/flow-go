@@ -381,7 +381,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// index the block storage with each of the collection guarantee
 	err := storage.WithLocks(e.lockManager, storage.LockGroupAccessFinalizingBlock, func(lctx lockctx.Context) error {
 		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// requires [storage.LockIndexCollectionsByBlock] lock
+			// requires [storage.LockIndexBlockByPayloadGuarantees] lock
 			err := e.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
 			if err != nil {
 				return fmt.Errorf("could not index block for collections: %w", err)

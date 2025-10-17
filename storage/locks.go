@@ -34,8 +34,8 @@ const (
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
 	// LockInsertInstanceParams protects data that is *exclusively* written during bootstrapping.
-	LockInsertInstanceParams    = "lock_insert_instance_params"
-	LockIndexCollectionsByBlock = "lock_index_collections_by_block"
+	LockInsertInstanceParams          = "lock_insert_instance_params"
+	LockIndexBlockByPayloadGuarantees = "lock_index_block_by_payload_guarantees"
 	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs
 	LockIndexChunkDataPackByChunkID = "lock_index_chunk_data_pack_by_chunk_id"
 	// LockInsertTransactionResultErrMessage protects the insertion of transaction result error messages
@@ -66,7 +66,7 @@ func Locks() []string {
 		LockInsertCollection,
 		LockInsertLightTransactionResult,
 		LockInsertInstanceParams,
-		LockIndexCollectionsByBlock,
+		LockIndexBlockByPayloadGuarantees,
 		LockIndexChunkDataPackByChunkID,
 		LockInsertTransactionResultErrMessage,
 		LockInsertLightTransactionResult,
@@ -101,7 +101,7 @@ var LockGroupExecutionSaveExecutionResult = []string{
 }
 
 var LockGroupAccessFinalizingBlock = []string{
-	LockIndexCollectionsByBlock,
+	LockIndexBlockByPayloadGuarantees,
 	LockIndexExecutionResult,
 }
 

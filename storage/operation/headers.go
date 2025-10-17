@@ -125,7 +125,7 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 }
 
 // BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
-// The caller must acquire a storage.LockIndexCollectionsByBlock lock.
+// The caller must acquire a storage.LockIndexBlockByPayloadGuarantees lock.
 //
 // CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -136,8 +136,8 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 // Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
 func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockIndexCollectionsByBlock) {
-		return fmt.Errorf("BatchIndexBlockContainingCollectionGuarantees requires %v", storage.LockIndexCollectionsByBlock)
+	if !lctx.HoldsLock(storage.LockIndexBlockByPayloadGuarantees) {
+		return fmt.Errorf("BatchIndexBlockContainingCollectionGuarantees requires %v", storage.LockIndexBlockByPayloadGuarantees)
 	}
 
 	// Check if any keys already exist
