@@ -95,8 +95,7 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 			return nil
 		})
 	})
-
-	if err != nil {
+if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 	return state, nil

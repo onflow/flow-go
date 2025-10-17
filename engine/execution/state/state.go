@@ -499,7 +499,6 @@ func (s *state) saveExecutionResults(
 
 			return nil
 		})
-
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			return nil
 		}

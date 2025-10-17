@@ -183,7 +183,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("determining whether database is successfully bootstrapped failed with unexpected exception: %w", err)
 		}
-		if isBootstrapped { // we haven't written the latest finalized height yet, so this vaule must be false
+		if isBootstrapped { // we haven't written the latest finalized height yet, so this value must be false
 			return fmt.Errorf("sanity check failed: while bootstrapping has not yet completed, the implementation already considers the protocol state as successfully bootstrapped")
 		}
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

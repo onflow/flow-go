@@ -40,7 +40,9 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 }
 
 // BatchStore will store events for the given block ID in a given batch
-// it requires the caller to hold [storage.LockInsertEvent]
+// It requires the caller to hold [storage.LockInsertEvent]
+// Expected error returns:
+//   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.ReaderBatchWriter) error {
 	// Use the new InsertBlockEvents operation to store all events
 	err := operation.InsertBlockEvents(lctx, batch, blockID, blockEvents)
@@ -57,8 +59,8 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 	combinedEvents := make([]flow.Event, sliceSize)
 	eventIndex := 0
 
-	for _, events := range blockEvents {
-		for _, event := range events {
+for _, txEvents := range blockEvents {
+for _, event := range txEvents {
 			combinedEvents[eventIndex] = event
 			eventIndex++
 		}
@@ -170,7 +172,8 @@ func NewServiceEvents(collector module.CacheMetrics, db storage.DB) *ServiceEven
 }
 
 // BatchStore stores service events keyed by a blockID in provided batch
-// No errors are expected during normal operation, even if no entries are matched.
+// Expected error returns:
+//   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (e *ServiceEvents) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.Event, rw storage.ReaderBatchWriter) error {
 	// Use the new InsertBlockServiceEvents operation to store all service events
 	err := operation.InsertBlockServiceEvents(lctx, rw, blockID, events)

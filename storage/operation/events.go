@@ -23,9 +23,9 @@ func InsertBlockEvents(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID
 	}
 
 	// Check if events for the block already exist
-	// We can exit early if we found one exist
-	// Because regardless the list is empty, or has one, or more,
-	// we don't want to overwrite existing events indexed by the block
+	// We can exit early if we find one existing event E, assuming that the process which wrote E in the past 
+	// correctly inserted all other events for the block containing E.
+	// This function only inserts new events; it does not sanity check existing events or ever overwrite events.
 	prefix := MakePrefix(codeEvent, blockID)
 	checkExists := func(key []byte) error {
 		return fmt.Errorf("event with key %x already exists under prefix %x: %w", key, prefix, storage.ErrAlreadyExists)
@@ -67,10 +67,10 @@ func InsertBlockServiceEvents(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 	}
 
 	// Check if events for the block already exist
-	// We can exit early if we found one exist
-	// Because regardless the list is empty, or has one, or more,
-	// we don't want to overwrite existing events indexed by the block
-	prefix := MakePrefix(codeEvent, blockID)
+	// We can exit early if we find one existing event E, assuming that the process which wrote E in the past 
+	// correctly inserted all other events for the block containing E.
+	// This function only inserts new events; it does not sanity check existing events or ever overwrite events.
+	prefix := MakePrefix(codeServiceEvent, blockID)
 	checkExists := func(key []byte) error {
 		return fmt.Errorf("event with key %x already exists under prefix %x: %w", key, prefix, storage.ErrAlreadyExists)
 	}

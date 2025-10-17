@@ -98,7 +98,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 // ByBlockID retrieves an execution result by block ID.
-// It returns [storage.ErrNotFound] if `blockID` does not refer to a block executed by this node
+// It returns [storage.ErrNotFound] if `blockID` refers to a block which is unknown, or for which a trusted (sealed or executed by this node) execution result does not exist.
 func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
 	return r.byBlockID(blockID)
 }

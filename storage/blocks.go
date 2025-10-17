@@ -99,5 +99,5 @@ type Blocks interface {
 	// Error returns:
 	//   - storage.ErrAlreadyExists if any collection guarantee is already indexed
 	//   - generic error in case of unexpected failure from the database layer or encoding failure.
-	BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error
+	BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error
 }
