@@ -219,6 +219,6 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // The caller must acquire a storage.LockIndexCollectionByBlock lock.
 // Error returns:
 //   - storage.ErrAlreadyExists if any collection ID has already been indexed
-func (b *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {
-	return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, blockID, collIDs)
+func (b *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
+	return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, blockID, guaranteeIDs)
 }

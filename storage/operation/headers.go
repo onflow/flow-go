@@ -135,29 +135,29 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 //
 // Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
-func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, collIDs []flow.Identifier) error {
+func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockIndexBlockByPayloadGuarantees) {
 		return fmt.Errorf("BatchIndexBlockContainingCollectionGuarantees requires %v", storage.LockIndexBlockByPayloadGuarantees)
 	}
 
 	// Check if any keys already exist
-	for _, collID := range collIDs {
-		key := MakePrefix(codeCollectionBlock, collID)
+	for _, guaranteeID := range guaranteeIDs {
+		key := MakePrefix(codeCollectionBlock, guaranteeID)
 		exists, err := KeyExists(rw.GlobalReader(), key)
 		if err != nil {
 			return fmt.Errorf("could not check if collection guarantee is already indexed: %w", err)
 		}
 		if exists {
-			return fmt.Errorf("collection guarantee (%x) is already indexed: %w", collID, storage.ErrAlreadyExists)
+			return fmt.Errorf("collection guarantee (%x) is already indexed: %w", guaranteeID, storage.ErrAlreadyExists)
 		}
 	}
 
 	// Index all collection guarantees
-	for _, collID := range collIDs {
-		key := MakePrefix(codeCollectionBlock, collID)
+	for _, guaranteeID := range guaranteeIDs {
+		key := MakePrefix(codeCollectionBlock, guaranteeID)
 		err := UpsertByKey(rw.Writer(), key, blockID)
 		if err != nil {
-			return fmt.Errorf("could not index collection guarantee (%x): %w", collID, err)
+			return fmt.Errorf("could not index collection guarantee (%x): %w", guaranteeID, err)
 		}
 	}
 
