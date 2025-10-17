@@ -23,9 +23,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 	// TODO(mainnet #): remove this conditional: [TODO(Uliana): create an issue]
 	// "legacyParams" is only to temporarily support current behaviour.
 	// In the next spork, we should update this to always return an ExecuteScriptResponse.
-	legacyParams := executionState.AgreeingExecutorsCount == 0 &&
-		len(executionState.RequiredExecutorIDs) == 0 &&
-		!includeExecutorMetadata
+	legacyParams := !includeExecutorMetadata
 
 	buildResponse := func(value []byte, executorMetadata *accessmodel.ExecutorMetadata) interface{} {
 		if legacyParams {
@@ -40,7 +38,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			req.BlockID,
 			req.Script.Source,
 			req.Script.Args,
-			models.NewCriteria(req.ExecutionState),
+			models.NewCriteria(executionState),
 		)
 		if err != nil {
 			return nil, common.ErrorToStatusError(err)
@@ -55,7 +53,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			r.Context(),
 			req.Script.Source,
 			req.Script.Args,
-			models.NewCriteria(req.ExecutionState),
+			models.NewCriteria(executionState),
 		)
 		if err != nil {
 			return nil, common.ErrorToStatusError(err)
@@ -77,7 +75,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 		req.BlockHeight,
 		req.Script.Source,
 		req.Script.Args,
-		models.NewCriteria(req.ExecutionState),
+		models.NewCriteria(executionState),
 	)
 	if err != nil {
 		return nil, common.ErrorToStatusError(err)
