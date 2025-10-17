@@ -1615,6 +1615,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		if builder.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize <= 0 {
 			return errors.New("rpc-max-execution-response-message-size must be greater than 0")
 		}
+		if builder.executionResultAgreeingExecutorsCount <= 0 {
+			return errors.New("execution-result-agreeing-executors-count must be greater than 0")
+		}
 
 		return nil
 	})
@@ -2111,6 +2114,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for required EN list: %w", err)
 			}
+			operatorCriteria := optimistic_sync.Criteria{
+				AgreeingExecutorsCount: builder.executionResultAgreeingExecutorsCount,
+				RequiredExecutors:      requiredENIdentifiers,
+			}
 
 			builder.ExecNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
 				node.Logger,
@@ -2140,10 +2147,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				node.Storage.Receipts,
 				execNodeSelector,
-				optimistic_sync.Criteria{
-					AgreeingExecutorsCount: builder.executionResultAgreeingExecutorsCount,
-					RequiredExecutors:      requiredENIdentifiers,
-				},
+				operatorCriteria,
 			)
 
 			// TODO: use real objects instead of mocks once they're implemented
@@ -2199,7 +2203,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
 				ExecutionResultInfoProvider: execResultInfoProvider,
 				ExecutionStateCache:         execStateCache,
-				OperatorCriteria:            optimistic_sync.DefaultCriteria,
+				OperatorCriteria:            operatorCriteria,
 				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 				ScheduledCallbacksEnabled:   builder.scheduledCallbacksEnabled,
 			})
