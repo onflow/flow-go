@@ -365,7 +365,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 		}
 
 		s.executionResultProvider.
-			On("ExecutionResultInfo", mock.Anything, mock.Anything).
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(&optimistic_sync.ExecutionResultInfo{
 				ExecutionResultID: result.ID(),
 				ExecutionNodes:    executionNodes.ToSkeleton(),
@@ -373,7 +373,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			Once()
 
 		s.executionStateCache.
-			On("Snapshot", mock.Anything).
+			On("Snapshot", result.ID()).
 			Return(s.executionDataSnapshot, nil).
 			Once()
 
@@ -389,11 +389,6 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			Once()
 
 		res, resMetadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
-
-		s.executionStateCache.AssertExpectations(s.T())
-		s.executionDataSnapshot.AssertExpectations(s.T())
-		reader.AssertExpectations(s.T())
-
 		assert.NotNil(s.T(), resMetadata)
 		assert.Equal(s.T(), metadata, resMetadata)
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
@@ -406,7 +401,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
 		s.executionResultProvider.
-			On("ExecutionResultInfo", mock.Anything, mock.Anything).
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(&optimistic_sync.ExecutionResultInfo{
 				ExecutionResultID: result.ID(),
 				ExecutionNodes:    executionNodes.ToSkeleton(),
@@ -414,7 +409,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			Once()
 
 		s.executionStateCache.
-			On("Snapshot", mock.Anything).
+			On("Snapshot", result.ID()).
 			Return(s.executionDataSnapshot, nil).
 			Once()
 
@@ -430,11 +425,6 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			Once()
 
 		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
-
-		s.executionStateCache.AssertExpectations(s.T())
-		s.executionDataSnapshot.AssertExpectations(s.T())
-		reader.AssertExpectations(s.T())
-
 		assert.Nil(s.T(), execDataRes)
 		assert.Nil(s.T(), metadata)
 		s.Require().True(access.IsDataNotFoundError(err))

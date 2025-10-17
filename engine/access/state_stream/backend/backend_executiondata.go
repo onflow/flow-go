@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -54,9 +55,15 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 ) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error) {
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
-		return nil, nil, access.NewDataNotFoundError("execution data", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
 	executionResultID := execResultInfo.ExecutionResultID
@@ -78,7 +85,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 		}
 
 		// any other error is unexpected exception and indicates there is a bug or inconsistent state.
-		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("failed to get execution data: %w", err))
+		return nil, nil, access.RequireNoError(ctx, fmt.Errorf("unexpected error getting execution data: %w", err))
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
