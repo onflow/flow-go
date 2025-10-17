@@ -50,7 +50,7 @@ func NewExecutionResultInfoProvider(
 // based on the provided criteria.
 //
 // Expected errors during normal operations:
-//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - common.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - storage.ErrNotFound - if the request is for the spork root block and the node was bootstrapped
 //     from a newer block.
 func (e *Provider) ExecutionResultInfo(
@@ -117,7 +117,7 @@ func (e *Provider) ExecutionResultInfo(
 // results are found, then the result with the most executors is returned.
 //
 // Expected errors during normal operations:
-//   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - common.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 func (e *Provider) findResultAndExecutors(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
