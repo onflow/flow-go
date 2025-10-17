@@ -658,7 +658,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			if builder.collections == nil {
-				return fmt.Errorf("collections store not initialized: ensure 'events storage' module runs before 'execution state cache'")
+				return fmt.Errorf("collections store not initialized: ensure 'collections storage' module runs before 'execution state cache'")
+			}
+
+			if builder.transactions == nil {
+				return fmt.Errorf("transactions store not initialized: ensure 'transactions storage' module runs before 'execution state cache'")
 			}
 
 			// TODO: use real objects instead of mocks once they're implemented
@@ -667,9 +671,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.collections,
 				builder.transactions,
 				builder.lightTransactionResults,
-				builder.transactionResultErrorMessages,
+				builder.transactionResultErrorMessages, // might be nil depending on storeTxResultErrorMessages flag
 				nil,
-				executionDataStoreCache,
+				notNil(executionDataStoreCache),
 			)
 			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 
