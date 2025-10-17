@@ -16,7 +16,7 @@ import (
 type ExecutionResults struct {
 	db         storage.DB
 	cache      *Cache[flow.Identifier, *flow.ExecutionResult]
-	indexCache *Cache[flow.Identifier, flow.Identifier]
+	indexCache *Cache[flow.Identifier, flow.Identifier] // blockID -> resultID
 }
 
 var _ storage.ExecutionResults = (*ExecutionResults)(nil)
