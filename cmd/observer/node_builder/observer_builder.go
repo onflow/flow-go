@@ -1251,8 +1251,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
 				builder.events,
-				nil,
-				nil,
+				builder.Storage.Collections,
+				builder.Storage.Transactions,
 				builder.lightTransactionResults,
 				nil,
 				nil,
