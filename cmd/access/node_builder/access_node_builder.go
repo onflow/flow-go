@@ -1102,7 +1102,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				),
 				executionDataTracker,
 				notNil(builder.executionResultInfoProvider),
-				builder.executionStateCache,
+				builder.executionStateCache, // might be nil
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -2209,7 +2209,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
 				ExecutionResultInfoProvider: notNil(builder.executionResultInfoProvider),
-				ExecutionStateCache:         builder.executionStateCache,
+				ExecutionStateCache:         builder.executionStateCache, // might be nil
 				OperatorCriteria:            optimistic_sync.DefaultCriteria,
 				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 				ScheduledCallbacksEnabled:   builder.scheduledCallbacksEnabled,
