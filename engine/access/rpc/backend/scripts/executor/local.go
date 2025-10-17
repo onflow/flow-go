@@ -53,13 +53,13 @@ func NewLocalScriptExecutor(
 func (l *LocalScriptExecutor) Execute(
 	ctx context.Context,
 	r *Request,
-) ([]byte, *accessmodel.ExecutorMetadata, time.Duration, error) {
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	execStartTime := time.Now()
 
 	executionResultID := r.execResultInfo.ExecutionResultID
 	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
+		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
 
 	result, err := l.scriptExecutor.ExecuteAtBlockHeight(
@@ -83,7 +83,6 @@ func (l *LocalScriptExecutor) Execute(
 		Hex("block_id", logging.ID(r.blockID)).
 		Uint64("height", r.height).
 		Hex("script_hash", insecureScriptHash[:]).
-		Dur("execution_dur_ms", execDuration).
 		Logger()
 
 	if err != nil {
@@ -98,7 +97,7 @@ func (l *LocalScriptExecutor) Execute(
 			l.metrics.ScriptExecutionErrorLocal() //TODO: this should be called in above cases as well?
 		}
 
-		return nil, nil, execDuration, convertedErr
+		return nil, nil, convertedErr
 	}
 
 	l.scriptCache.LogExecutedScript(r.blockID, insecureScriptHash, execEndTime, "localhost", r.script, execDuration)
@@ -109,7 +108,7 @@ func (l *LocalScriptExecutor) Execute(
 		ExecutorIDs:       r.execResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
-	return result, metadata, execDuration, nil
+	return result, metadata, nil
 }
 
 // convertScriptExecutionError converts the script execution error to a gRPC error

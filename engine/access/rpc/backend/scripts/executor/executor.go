@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"time"
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -12,7 +11,7 @@ import (
 // TODO(Uliana): add godoc
 type ScriptExecutor interface {
 	// TODO(Uliana): add godoc
-	Execute(ctx context.Context, scriptRequest *Request) ([]byte, *accessmodel.ExecutorMetadata, time.Duration, error)
+	Execute(ctx context.Context, scriptRequest *Request) ([]byte, *accessmodel.ExecutorMetadata, error)
 }
 
 // Request encapsulates the data needed to execute a script to make it easier

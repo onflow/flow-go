@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,13 +24,13 @@ func NewFailoverScriptExecutor(localExecutor ScriptExecutor, execNodeExecutor Sc
 	}
 }
 
-func (f *FailoverScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, *accessmodel.ExecutorMetadata, time.Duration, error) {
-	localResult, localMetadata, localDuration, localErr := f.localExecutor.Execute(ctx, request)
+func (f *FailoverScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	localResult, localMetadata, localErr := f.localExecutor.Execute(ctx, request)
 
 	isInvalidArgument := status.Code(localErr) == codes.InvalidArgument
 	isCanceled := status.Code(localErr) == codes.Canceled
 	if localErr == nil || isInvalidArgument || isCanceled {
-		return localResult, localMetadata, localDuration, localErr
+		return localResult, localMetadata, localErr
 	}
 
 	// Note: scripts that timeout are retried on the execution nodes since ANs may have performance

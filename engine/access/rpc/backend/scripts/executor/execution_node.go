@@ -53,7 +53,7 @@ func NewENScriptExecutor(
 	}
 }
 
-func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, *accessmodel.ExecutorMetadata, time.Duration, error) {
+func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	// encode to MD5 as low compute/memory lookup key
 	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
@@ -98,7 +98,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 			e.metrics.ScriptExecutionErrorOnExecutionNode()
 			e.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
-		return nil, nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
+		return nil, nil, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -106,7 +106,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 		ExecutorIDs:       common.OrderedExecutors(nodeID, request.execResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
-	return result, metadata, execDuration, nil
+	return result, metadata, nil
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
