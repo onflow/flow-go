@@ -19,6 +19,7 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // TODO(Uliana): add godoc to whole file
@@ -53,7 +54,8 @@ func NewENScriptExecutor(
 	}
 }
 
-func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, *accessmodel.ExecutorMetadata, error) {
+func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	// encode to MD5 as low compute/memory lookup key
 	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
@@ -65,7 +67,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 	var nodeID flow.Identifier
 	var err error
 	errToReturn := e.nodeCommunicator.CallAvailableNode(
-		request.execResultInfo.ExecutionNodes,
+		executionResultInfo.ExecutionNodes,
 		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
 
@@ -102,8 +104,8 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
-		ExecutionResultID: request.execResultInfo.ExecutionResultID,
-		ExecutorIDs:       common.OrderedExecutors(nodeID, request.execResultInfo.ExecutionNodes.NodeIDs()),
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       common.OrderedExecutors(nodeID, executionResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	return result, metadata, nil

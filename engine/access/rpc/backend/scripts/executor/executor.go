@@ -11,17 +11,16 @@ import (
 // TODO(Uliana): add godoc
 type ScriptExecutor interface {
 	// TODO(Uliana): add godoc
-	Execute(ctx context.Context, scriptRequest *Request) ([]byte, *accessmodel.ExecutorMetadata, error)
+	Execute(ctx context.Context, scriptRequest *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo) ([]byte, *accessmodel.ExecutorMetadata, error)
 }
 
 // Request encapsulates the data needed to execute a script to make it easier
 // to pass around between the various methods involved in script execution
 type Request struct {
-	blockID        flow.Identifier
-	height         uint64
-	script         []byte
-	arguments      [][]byte
-	execResultInfo *optimistic_sync.ExecutionResultInfo
+	blockID   flow.Identifier
+	height    uint64
+	script    []byte
+	arguments [][]byte
 }
 
 // NewScriptExecutionRequest creates a new Request instance for script execution.
@@ -30,13 +29,11 @@ func NewScriptExecutionRequest(
 	height uint64,
 	script []byte,
 	arguments [][]byte,
-	execResultInfo *optimistic_sync.ExecutionResultInfo,
 ) *Request {
 	return &Request{
-		blockID:        blockID,
-		height:         height,
-		script:         script,
-		arguments:      arguments,
-		execResultInfo: execResultInfo,
+		blockID:   blockID,
+		height:    height,
+		script:    script,
+		arguments: arguments,
 	}
 }

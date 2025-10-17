@@ -50,13 +50,11 @@ func NewLocalScriptExecutor(
 // Execute
 // Expected errors during normal operation:
 //   - storage.ErrNotFound - result is not available, not ready for querying, or does not descend from the latest sealed result.
-func (l *LocalScriptExecutor) Execute(
-	ctx context.Context,
-	r *Request,
+func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	execStartTime := time.Now()
 
-	executionResultID := r.execResultInfo.ExecutionResultID
+	executionResultID := executionResultInfo.ExecutionResultID
 	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
@@ -105,7 +103,7 @@ func (l *LocalScriptExecutor) Execute(
 
 	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: executionResultID,
-		ExecutorIDs:       r.execResultInfo.ExecutionNodes.NodeIDs(),
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
 	return result, metadata, nil
