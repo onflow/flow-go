@@ -36,6 +36,5 @@ func (f *FailoverScriptExecutor) Execute(ctx context.Context, request *Request) 
 
 	// Note: scripts that timeout are retried on the execution nodes since ANs may have performance
 	// issues for some scripts.
-	execResult, execMetadata, execDuration, execErr := f.executionNodeExecutor.Execute(ctx, request)
-	return execResult, execMetadata, execDuration, execErr
+	return f.executionNodeExecutor.Execute(ctx, request)
 }

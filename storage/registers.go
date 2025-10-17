@@ -44,8 +44,7 @@ type RegisterIndex interface {
 // before returning a snapshot.
 type RegisterSnapshotReader interface {
 	RegisterIndexReader
-	// StorageSnapshot creates a snapshot view of register
-	// at the given block height.
+	// StorageSnapshot creates a snapshot view of register at the given block height.
 	//
 	// The snapshot allows reading registers by ID at the specified height. Range checks are
 	// performed before constructing the snapshot.

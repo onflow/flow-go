@@ -158,10 +158,8 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
-	res, metadata, _, err := b.executor.Execute(
-		ctx,
-		executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments, executionResultInfo),
-	)
+	request := executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments, executionResultInfo)
+	res, metadata, _, err := b.executor.Execute(ctx, request)
 	return res, metadata, err
 }
 
