@@ -446,7 +446,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 		indexerData := core.workingData.indexerData
 		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil)
-		c.persistentEvents.On("BatchStore", blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(nil)
+		c.persistentEvents.On("BatchStore", mock.Anything, blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(nil)
 		c.persistentCollections.On("BatchStoreAndIndexByTransaction",
 			mock.MatchedBy(func(lctx lockctx.Proof) bool {
 				return lctx.HoldsLock(storage.LockInsertCollection)
@@ -512,7 +512,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 		indexerData := core.workingData.indexerData
 		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil).Once()
-		c.persistentEvents.On("BatchStore", blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(expectedErr).Once()
+		c.persistentEvents.On("BatchStore", mock.Anything, blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(expectedErr).Once()
 
 		err = core.Persist()
 		c.ErrorIs(err, expectedErr)

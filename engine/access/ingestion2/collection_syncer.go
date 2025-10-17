@@ -189,12 +189,12 @@ func (s *CollectionSyncer) StartWorkerLoop(ctx irrecoverable.SignalerContext, re
 
 			// Create a lock context for indexing
 			lctx := s.lockManager.NewContext()
+			defer lctx.Release()
 			err := lctx.AcquireLock(storage.LockInsertCollection)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not acquire lock for collection indexing: %w", err))
 				return
 			}
-			defer lctx.Release()
 
 			err = indexer.IndexCollection(lctx, collection, s.collections, s.logger, s.collectionExecutedMetric)
 			if err != nil {
