@@ -653,9 +653,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution state cache", func(node *cmd.NodeConfig) error {
+			if builder.events == nil {
+				return fmt.Errorf("events store not initialized: ensure 'events storage' module runs before 'execution state cache'")
+			}
+
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
-				notNil(builder.events),
+				builder.events,
 				builder.collections,
 				builder.transactions,
 				builder.lightTransactionResults,
