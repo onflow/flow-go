@@ -158,8 +158,8 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
-	request := executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments, executionResultInfo)
-	res, metadata, err := b.executor.Execute(ctx, request)
+	request := executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments)
+	res, metadata, err := b.executor.Execute(ctx, request, executionResultInfo)
 	return res, metadata, err
 }
 
@@ -203,7 +203,8 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 
 	res, metadata, err := b.executor.Execute(
 		ctx,
-		executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments, executionResultInfo),
+		executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments),
+		executionResultInfo,
 	)
 	return res, metadata, err
 }
@@ -249,7 +250,8 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 
 	res, metadata, err := b.executor.Execute(
 		ctx,
-		executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments, executionResultInfo),
+		executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments),
+		executionResultInfo,
 	)
 	return res, metadata, err
 }
