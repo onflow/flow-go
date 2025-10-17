@@ -50,7 +50,7 @@ func NewExecutionResults(collector module.CacheMetrics, db storage.DB) *Executio
 			// this API is only used to fetch result for last executed block, so in happy case, it only need to be 1,
 			// we use 100 here to be more resilient to forks
 			withLimit[flow.Identifier, flow.Identifier](100),
-			withStoreWithLock(operation.IndexOwnOrSealedExecutionResult),
+			withStoreWithLock(operation.IndexTrustedExecutionResult),
 			withRetrieve(retrieveByBlockID),
 		),
 	}

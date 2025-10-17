@@ -77,7 +77,7 @@ func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *f
 	}
 
 	// require [storage.LockInsertMyReceipt] to be held
-	err = operation.IndexOwnExecutionReceipt(lctx, rw, blockID, receiptID)
+	err = operation.IndexMyExecutionReceipt(lctx, rw, blockID, receiptID)
 	if err != nil {
 		return err
 	}

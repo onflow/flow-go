@@ -27,11 +27,11 @@ func RetrieveExecutionReceiptStub(r storage.Reader, receiptID flow.Identifier, m
 	return RetrieveByKey(r, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// IndexOwnExecutionReceipt indexes the Execution Node's OWN execution receipt by the executed block ID.
+// IndexMyExecutionReceipt indexes the Execution Node's OWN execution receipt by the executed block ID.
 //
 // Error returns:
 //   - [storage.ErrDataMismatch] if a *different* receipt has already been indexed for the same block
-func IndexOwnExecutionReceipt(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, receiptID flow.Identifier) error {
+func IndexMyExecutionReceipt(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, receiptID flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockInsertMyReceipt) {
 		return fmt.Errorf("cannot index own execution receipt without holding lock %s", storage.LockInsertMyReceipt)
 	}

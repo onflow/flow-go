@@ -41,7 +41,7 @@ func TestReceipts_Index(t *testing.T) {
 
 		err := storage.WithLock(lockManager, storage.LockInsertMyReceipt, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexOwnExecutionReceipt(lctx, rw, blockID, expected)
+				return operation.IndexMyExecutionReceipt(lctx, rw, blockID, expected)
 			})
 		})
 		require.Nil(t, err)

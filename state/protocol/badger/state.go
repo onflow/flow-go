@@ -298,7 +298,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = operation.IndexOwnOrSealedExecutionResult(lctx, rw, result.BlockID, result.ID())
+			err = operation.IndexTrustedExecutionResult(lctx, rw, result.BlockID, result.ID())
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
@@ -457,7 +457,7 @@ func bootstrapSealingSegment(
 		// If the sealed root block is different from the finalized root block, then it means the node dynamically
 		// bootstrapped. In that case, we index the result of the latest sealed result, so that the EN is able
 		// to confirm that it is loading the correct state to execute the next block.
-		err = operation.IndexOwnOrSealedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
+		err = operation.IndexTrustedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
 		}
