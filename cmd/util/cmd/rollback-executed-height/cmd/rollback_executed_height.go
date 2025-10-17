@@ -88,7 +88,7 @@ func runE(*cobra.Command, []string) error {
 		}
 		chunkDataPacksDB := pebbleimpl.ToDB(chunkDataPacksPebbleDB)
 		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, chunkDataPacksDB, 1000)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, storedChunkDataPacks, collections, 1000)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, db, storedChunkDataPacks, collections, 1000)
 		protocolDBBatch := db.NewBatch()
 		defer protocolDBBatch.Close()
 
