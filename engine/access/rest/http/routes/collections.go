@@ -8,8 +8,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// GetCollectionByID retrieves a collection by ID and builds a response
-func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+// GetCollectionByID retrieves a light collection by ID and builds a response. The light collection
+// contains only transaction IDs, not the full transaction bodies. If the expand query parameter
+// includes "transactions", the full transaction bodies are fetched and included in the response.
+func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetCollectionRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -26,9 +28,7 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 		for _, tid := range collection.Transactions {
 			tx, err := backend.GetTransaction(r.Context(), tid)
 			if err != nil {
-				// TODO: transactions is not updated to use the new error handling convention
-				// Update this once that work is complete
-				return nil, err
+				return nil, common.ErrorToStatusError(err)
 			}
 
 			transactions = append(transactions, tx)
@@ -38,7 +38,7 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 	var response commonmodels.Collection
 	err = response.Build(collection, transactions, link, r.ExpandFields)
 	if err != nil {
-		return nil, err
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	return response, nil
