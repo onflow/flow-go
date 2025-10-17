@@ -29,9 +29,9 @@ type ExecuteScriptCommand struct {
 // Handler executes the Cadence script against the blockchain state at the
 // specified block height.
 //
-// Expected errors:
-// - storage.ErrNotFound if block or registerSnapshot value at height was not found.
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the data for the block height is not available.
 func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 

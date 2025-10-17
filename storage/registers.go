@@ -49,8 +49,8 @@ type RegisterSnapshotReader interface {
 	// The snapshot allows reading registers by ID at the specified height. Range checks are
 	// performed before constructing the snapshot.
 	//
-	// Expected errors:
-	//   - storage.ErrHeightNotIndexed: if the requested height is below the first indexed height,
-	//     above the latest indexed height, or if indexing has not yet started.
+	// Expected error returns during normal operation:
+	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+	//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 	StorageSnapshot(height uint64) (snapshot.StorageSnapshot, error)
 }

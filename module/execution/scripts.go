@@ -93,9 +93,12 @@ func NewScripts(
 // ExecuteAtBlockHeight executes provided script against the block height.
 // A result value is returned encoded as byte array. An error will be returned if script
 // doesn't successfully execute.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
@@ -123,9 +126,12 @@ func (s *Scripts) ExecuteAtBlockHeight(
 }
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error) {
 	err := s.verifyHeight(height)
 	if err != nil {
@@ -144,9 +150,12 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 }
 
 // GetAccountBalance returns a balance of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
 	err := s.verifyHeight(height)
 	if err != nil {
@@ -165,9 +174,12 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 }
 
 // GetAccountAvailableBalance returns an available balance of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
 	err := s.verifyHeight(height)
 	if err != nil {
@@ -186,9 +198,12 @@ func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.A
 }
 
 // GetAccountKeys returns a public keys of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error) {
 	err := s.verifyHeight(height)
 	if err != nil {
@@ -207,9 +222,12 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 }
 
 // GetAccountKey returns a public key of Flow account by the provided address, block height and index.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error) {
 	err := s.verifyHeight(height)
 	if err != nil {
@@ -244,8 +262,9 @@ func (s *Scripts) SetMaxCompatibleHeight(height uint64) {
 // 1. Ensures the height is within the configured minCompatibleHeight and maxCompatibleHeight.
 // 2. If version control is enabled, ensures the height is compatible with the node's version beacon.
 //
-// Expected errors:
-// - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 func (s *Scripts) verifyHeight(height uint64) error {
 	if height > s.maxCompatibleHeight.Load() || height < s.minCompatibleHeight.Load() {
 		return ErrIncompatibleNodeVersion
