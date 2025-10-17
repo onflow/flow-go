@@ -230,6 +230,8 @@ func (h *Handler) GetCollectionByID(
 	}, nil
 }
 
+// GetFullCollectionByID retrieves a full collection by ID. The full collection contains the
+// complete transaction bodies for all transactions in the collection.
 func (h *Handler) GetFullCollectionByID(
 	ctx context.Context,
 	req *accessproto.GetFullCollectionByIDRequest,
