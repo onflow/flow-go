@@ -75,10 +75,10 @@ func TestHeldOneLock(t *testing.T) {
 	t.Run("with different lock combinations", func(t *testing.T) {
 		lctx := lockManager.NewContext()
 		defer lctx.Release()
-		err := lctx.AcquireLock(LockInsertOwnReceipt)
+		err := lctx.AcquireLock(LockInsertMyReceipt)
 		require.NoError(t, err)
 
-		held, msg := HeldOneLock(lctx, LockInsertOwnReceipt, LockInsertCollection)
+		held, msg := HeldOneLock(lctx, LockInsertMyReceipt, LockInsertCollection)
 		assert.True(t, held)
 		assert.Empty(t, msg)
 	})

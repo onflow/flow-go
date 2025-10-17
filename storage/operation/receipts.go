@@ -32,8 +32,8 @@ func RetrieveExecutionReceiptStub(r storage.Reader, receiptID flow.Identifier, m
 // Error returns:
 //   - [storage.ErrDataMismatch] if a *different* receipt has already been indexed for the same block
 func IndexOwnExecutionReceipt(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, receiptID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
-		return fmt.Errorf("cannot index own execution receipt without holding lock %s", storage.LockInsertOwnReceipt)
+	if !lctx.HoldsLock(storage.LockInsertMyReceipt) {
+		return fmt.Errorf("cannot index own execution receipt without holding lock %s", storage.LockInsertMyReceipt)
 	}
 
 	key := MakePrefix(codeOwnBlockReceipt, blockID)

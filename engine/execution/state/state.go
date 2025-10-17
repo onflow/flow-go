@@ -475,7 +475,7 @@ func (s *state) saveExecutionResults(
 			}
 
 			executionResult := &result.ExecutionReceipt.ExecutionResult
-			// require [storage.LockInsertOwnReceipt] lock
+			// require [storage.LockInsertMyReceipt] lock
 			// saving my receipts will also save the execution result
 			err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
 			if err != nil {

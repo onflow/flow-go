@@ -25,9 +25,9 @@ const (
 	LockInsertEvent = "lock_insert_event"
 	// LockInsertServiceEvent protects the insertion of service events.
 	LockInsertServiceEvent = "lock_insert_service_event"
-	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
+	// LockInsertMyReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
-	LockInsertOwnReceipt       = "lock_insert_own_receipt"
+	LockInsertMyReceipt        = "lock_insert_my_receipt"
 	LockIndexExecutionResult   = "lock_index_execution_result"
 	LockIndexStateCommitment   = "lock_index_state_commitment"
 	LockInsertAndIndexTxResult = "lock_insert_and_index_tx_result"
@@ -59,7 +59,7 @@ func Locks() []string {
 		LockInsertOrFinalizeClusterBlock,
 		LockInsertEvent,
 		LockInsertServiceEvent,
-		LockInsertOwnReceipt,
+		LockInsertMyReceipt,
 		LockIndexExecutionResult,
 		LockIndexStateCommitment,
 		LockInsertAndIndexTxResult,
@@ -95,7 +95,7 @@ var LockGroupExecutionSaveExecutionResult = []string{
 	LockInsertEvent,
 	LockInsertServiceEvent,
 	LockInsertAndIndexTxResult,
-	LockInsertOwnReceipt,
+	LockInsertMyReceipt,
 	LockIndexExecutionResult,
 	LockIndexStateCommitment,
 }

@@ -62,7 +62,7 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.Executio
 //
 // If entity fails marshalling, the error is wrapped in a generic error and returned.
 // If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-// It requires [storage.LockInsertOwnReceipt] to be held.
+// It requires [storage.LockInsertMyReceipt] to be held.
 //
 // Expected error returns during *normal* operations:
 //   - `storage.ErrDataMismatch` if a *different* receipt has already been indexed for the same block
@@ -76,7 +76,7 @@ func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *f
 		return err
 	}
 
-	// require [storage.LockInsertOwnReceipt] to be held
+	// require [storage.LockInsertMyReceipt] to be held
 	err = operation.IndexOwnExecutionReceipt(lctx, rw, blockID, receiptID)
 	if err != nil {
 		return err
