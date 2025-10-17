@@ -655,7 +655,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("execution state cache", func(node *cmd.NodeConfig) error {
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
-				builder.events,
+				notNil(builder.events),
 				builder.collections,
 				builder.transactions,
 				builder.lightTransactionResults,
