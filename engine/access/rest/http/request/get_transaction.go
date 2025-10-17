@@ -86,3 +86,58 @@ func (g *GetTransactionResult) Build(r *common.Request) error {
 
 	return err
 }
+
+type GetScheduledTransaction struct {
+	ScheduledTxID uint64
+	TransactionOptionals
+	ExpandsResult bool
+}
+
+func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, error) {
+	raw := r.GetVar(idQuery)
+	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)
+	if err != nil {
+		return GetScheduledTransaction{}, fmt.Errorf("invalid scheduled transaction ID format: %w", err)
+	}
+
+	var transactionOptionals TransactionOptionals
+	err = transactionOptionals.Parse(r)
+	if err != nil {
+		return GetScheduledTransaction{}, err
+	}
+
+	return GetScheduledTransaction{
+		ScheduledTxID:        scheduledTxID,
+		TransactionOptionals: transactionOptionals,
+		ExpandsResult:        r.Expands(resultExpandable),
+	}, nil
+}
+
+type GetScheduledTransactionResult struct {
+	ScheduledTxID uint64
+	TransactionOptionals
+}
+
+func NewGetScheduledTransactionResult(r *common.Request) (GetScheduledTransactionResult, error) {
+	raw := r.GetVar(idQuery)
+	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)
+	if err != nil {
+		return GetScheduledTransactionResult{}, fmt.Errorf("invalid scheduled transaction ID format: %w", err)
+	}
+
+	var transactionOptionals TransactionOptionals
+	err = transactionOptionals.Parse(r)
+	if err != nil {
+		return GetScheduledTransactionResult{}, err
+	}
+
+	return GetScheduledTransactionResult{
+		ScheduledTxID:        scheduledTxID,
+		TransactionOptionals: transactionOptionals,
+	}, nil
+}
+
+func IsTransactionID(raw string) bool {
+	_, err := flow.HexStringToIdentifier(raw)
+	return err == nil
+}

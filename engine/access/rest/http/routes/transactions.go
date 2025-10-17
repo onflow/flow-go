@@ -10,8 +10,14 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
+const idQuery = "id"
+
 // GetTransactionByID gets a transaction by requested ID.
 func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	if !request.IsTransactionID(r.GetVar(idQuery)) {
+		return GetScheduledTransaction(r, backend, link)
+	}
+
 	req, err := request.GetTransactionRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -44,6 +50,10 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
 func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	if !request.IsTransactionID(r.GetVar(idQuery)) {
+		return GetScheduledTransactionResult(r, backend, link)
+	}
+
 	req, err := request.GetTransactionResultRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -77,7 +87,48 @@ func CreateTransaction(r *common.Request, backend access.API, link commonmodels.
 		return nil, err
 	}
 
+	response := commonmodels.NewTransaction(&req.Transaction, nil, link)
+	return response, nil
+}
+
+// GetScheduledTransaction gets a scheduled transaction by scheduled transaction ID.
+func GetScheduledTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	req, err := request.NewGetScheduledTransaction(r)
+	if err != nil {
+		return nil, common.NewBadRequestError(err)
+	}
+
+	tx, err := backend.GetScheduledTransaction(r.Context(), req.ScheduledTxID)
+	if err != nil {
+		return nil, err
+	}
+
+	var txr *accessmodel.TransactionResult
+	if req.ExpandsResult {
+		txr, err = backend.GetScheduledTransactionResult(r.Context(), req.ScheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var response commonmodels.Transaction
-	response.Build(&req.Transaction, nil, link)
+	response.Build(tx, txr, link)
+	return response, nil
+}
+
+// GetScheduledTransactionResult gets a scheduled transaction result by scheduled transaction ID.
+func GetScheduledTransactionResult(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	req, err := request.NewGetScheduledTransactionResult(r)
+	if err != nil {
+		return nil, common.NewBadRequestError(err)
+	}
+
+	txr, err := backend.GetScheduledTransactionResult(r.Context(), req.ScheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	if err != nil {
+		return nil, err
+	}
+
+	var response commonmodels.TransactionResult
+	response.Build(txr, txr.TransactionID, link)
 	return response, nil
 }

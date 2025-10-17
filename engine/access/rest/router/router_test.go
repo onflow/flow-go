@@ -25,8 +25,18 @@ func TestParseURL(t *testing.T) {
 			expected: "getTransactionByID",
 		},
 		{
+			name:     "/v1/transactions/{index}",
+			url:      "/v1/transactions/12345678",
+			expected: "getTransactionByID",
+		},
+		{
 			name:     "/v1/transaction_results/{id}",
 			url:      "/v1/transaction_results/53730d3f3d2d2f46cb910b16db817d3a62adaaa72fdb3a92ee373c37c5b55a76",
+			expected: "getTransactionResultByID",
+		},
+		{
+			name:     "/v1/transaction_results/{index}",
+			url:      "/v1/transaction_results/12345678",
 			expected: "getTransactionResultByID",
 		},
 		{

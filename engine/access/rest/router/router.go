@@ -117,65 +117,52 @@ func (b *RouterBuilder) Build() *mux.Router {
 	return b.router
 }
 
-var routeUrlMap = map[string]string{}
-var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+))?(/(\w+))?(/(\w+))?`)
+// the following logic is used to match the URL with the correct route metrics collection.
+var routePatterns []*regexp.Regexp
+var routeNameMap map[*regexp.Regexp]string
 
 func init() {
+	routePatterns = make([]*regexp.Regexp, 0, len(Routes)+len(WSLegacyRoutes))
+	routeNameMap = make(map[*regexp.Regexp]string)
+
+	// Convert REST route patterns to regex patterns for matching
 	for _, r := range Routes {
-		routeUrlMap[r.Pattern] = r.Name
+		regexPattern := patternToRegex(r.Pattern)
+		re := regexp.MustCompile("^" + regexPattern + "$")
+		routePatterns = append(routePatterns, re)
+		routeNameMap[re] = r.Name
 	}
+
+	// Convert WebSocket route patterns to regex patterns for matching
 	for _, r := range WSLegacyRoutes {
-		routeUrlMap[r.Pattern] = r.Name
+		regexPattern := patternToRegex(r.Pattern)
+		re := regexp.MustCompile("^" + regexPattern + "$")
+		routePatterns = append(routePatterns, re)
+		routeNameMap[re] = r.Name
 	}
 }
 
+// patternToRegex converts a mux pattern like "/blocks/{id}" to a regex pattern
+func patternToRegex(pattern string) string {
+	// Escape special regex characters except for {}
+	escaped := regexp.QuoteMeta(pattern)
+	// Replace placeholder patterns with regex matchers
+	// {id} -> matches 64 char hex string or integer
+	escaped = strings.ReplaceAll(escaped, `\{id\}`, `([0-9a-fA-F]{64}|\d+)`)
+	// {address} -> matches 16 char hex string
+	escaped = strings.ReplaceAll(escaped, `\{address\}`, `[0-9a-fA-F]{16}`)
+	// {index} -> matches integer
+	escaped = strings.ReplaceAll(escaped, `\{index\}`, `\d+`)
+	return escaped
+}
+
+// URLToRoute matches the URL against route patterns and returns the matching route name
 func URLToRoute(url string) (string, error) {
-	normalized, err := normalizeURL(url)
-	if err != nil {
-		return "", err
-	}
-
-	name, ok := routeUrlMap[normalized]
-	if !ok {
-		return "", fmt.Errorf("invalid url")
-	}
-	return name, nil
-}
-
-func normalizeURL(url string) (string, error) {
-	matches := routeRE.FindAllStringSubmatch(url, -1)
-	if len(matches) != 1 || len(matches[0]) != 8 {
-		return "", fmt.Errorf("invalid url")
-	}
-
-	// given a URL like
-	//      /v1/blocks/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef/payload
-	// groups  [  1  ] [                                3                             ] [  5  ]
-	// normalized form like /v1/blocks/{id}/payload
-
-	parts := []string{matches[0][1]}
-
-	switch len(matches[0][3]) {
-	case 0:
-		// top level resource. e.g. /v1/blocks
-	case 64:
-		// id based resource. e.g. /v1/blocks/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-		parts = append(parts, "{id}")
-		if matches[0][5] != "" {
-			parts = append(parts, matches[0][5])
+	path := strings.TrimPrefix(url, "/v1")
+	for _, pattern := range routePatterns {
+		if pattern.MatchString(path) {
+			return routeNameMap[pattern], nil
 		}
-	case 16:
-		// address based resource. e.g. /v1/accounts/1234567890abcdef
-		parts = append(parts, "{address}")
-		if matches[0][5] == "keys" && matches[0][7] != "" {
-			parts = append(parts, "keys", "{index}")
-		} else if matches[0][5] != "" {
-			parts = append(parts, matches[0][5])
-		}
-	default:
-		// named resource. e.g. /v1/network/parameters
-		parts = append(parts, matches[0][3])
 	}
-
-	return "/" + strings.Join(parts, "/"), nil
+	return "", fmt.Errorf("no matching route found for URL: %s", url)
 }
