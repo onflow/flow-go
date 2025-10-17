@@ -92,7 +92,8 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError if the collection is not found.
+//   - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
+//   - [access.DataNotFoundError] - if the collection is not found.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -309,7 +310,8 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flo
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
+// - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
+// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -326,7 +328,7 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "ExecuteScriptAtLatestBlock")
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -344,8 +346,9 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-// - access.DataNotFoundError - No header with the given height was found
+// - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
+// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+// - [access.DataNotFoundError] - no header with the given height was found.
 func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -369,7 +372,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "ExecuteScriptAtBlockHeight")
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -387,8 +390,9 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-// - access.InvalidRequestError - the combined size (in bytes) of the script and arguments is greater than the max size
-// - access.DataNotFoundError - No header with the given ID was found
+// - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
+// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+// - [access.DataNotFoundError] - no header with the given ID was found.
 func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -412,7 +416,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "ExecuteScriptAtBlockID")
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
