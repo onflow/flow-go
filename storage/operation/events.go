@@ -23,7 +23,7 @@ func InsertBlockEvents(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID
 	}
 
 	// Check if events for the block already exist
-	// We can exit early if we find one existing event E, assuming that the process which wrote E in the past 
+	// We can exit early if we find one existing event E, assuming that the process which wrote E in the past
 	// correctly inserted all other events for the block containing E.
 	// This function only inserts new events; it does not sanity check existing events or ever overwrite events.
 	prefix := MakePrefix(codeEvent, blockID)
@@ -67,7 +67,7 @@ func InsertBlockServiceEvents(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 	}
 
 	// Check if events for the block already exist
-	// We can exit early if we find one existing event E, assuming that the process which wrote E in the past 
+	// We can exit early if we find one existing event E, assuming that the process which wrote E in the past
 	// correctly inserted all other events for the block containing E.
 	// This function only inserts new events; it does not sanity check existing events or ever overwrite events.
 	prefix := MakePrefix(codeServiceEvent, blockID)

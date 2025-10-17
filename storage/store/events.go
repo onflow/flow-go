@@ -59,8 +59,8 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 	combinedEvents := make([]flow.Event, sliceSize)
 	eventIndex := 0
 
-for _, txEvents := range blockEvents {
-for _, event := range txEvents {
+	for _, txEvents := range blockEvents {
+		for _, event := range txEvents {
 			combinedEvents[eventIndex] = event
 			eventIndex++
 		}

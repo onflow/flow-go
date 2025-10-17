@@ -18,7 +18,7 @@ func InsertAndIndexTransactionResults(lctx lockctx.Proof, rw storage.ReaderBatch
 	}
 
 	// Check if transaction results for the block already exist
-	// We can exit early if we find one existing transaction result R, assuming that the process which wrote R in the past 
+	// We can exit early if we find one existing transaction result R, assuming that the process which wrote R in the past
 	// correctly inserted all other results for the block containing R.
 	// This function only inserts new transaction results; it does not sanity check existing results or ever overwrite results.
 
