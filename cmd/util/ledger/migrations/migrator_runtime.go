@@ -183,7 +183,6 @@ func NewInterpreterMigrationRuntime(
 		basicMigrationRuntime.Storage,
 		nil,
 		nil,
-		nil,
 	)
 
 	inter, err := interpreter.NewInterpreter(

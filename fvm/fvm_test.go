@@ -3854,7 +3854,6 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 
 		valid, err := env.ValidateAccountCapabilitiesGet(
 			nil,
-			interpreter.EmptyLocationRange,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
 			sema.NewReferenceType(
@@ -3884,7 +3883,6 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 
 		valid, err := env.ValidateAccountCapabilitiesGet(
 			nil,
-			interpreter.EmptyLocationRange,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
 			sema.NewReferenceType(

@@ -112,7 +112,6 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	dict1 := interpreter.NewDictionaryValueWithAddress(
 		inter,
-		interpreter.EmptyLocationRange,
 		dict1StaticType,
 		testAddress,
 	)
@@ -130,7 +129,6 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	dict2 := interpreter.NewDictionaryValueWithAddress(
 		inter,
-		interpreter.EmptyLocationRange,
 		dict2StaticType,
 		testAddress,
 	)
@@ -144,14 +142,13 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	array := interpreter.NewArrayValue(
 		inter,
-		interpreter.EmptyLocationRange,
 		arrayStaticType,
 		common.ZeroAddress,
 		arrayValues...,
 	)
 
 	dict2.Insert(
-		inter, interpreter.EmptyLocationRange,
+		inter,
 		interpreter.NewUnmeteredIntValueFromInt64(2),
 		array,
 	)
