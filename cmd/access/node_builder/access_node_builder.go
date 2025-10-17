@@ -665,6 +665,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return fmt.Errorf("transactions store not initialized: ensure 'transactions storage' module runs before 'execution state cache'")
 			}
 
+			if builder.lightTransactionResults == nil {
+				return fmt.Errorf("lightTransactionResults store not initialized: ensure 'lightTransactionResults storage' module runs before 'execution state cache'")
+			}
+
+			if builder.transactionResultErrorMessages == nil {
+				return fmt.Errorf("transactionResultErrorMessages store not initialized: ensure 'transactionResultErrorMessages storage' module runs before 'execution state cache'")
+			}
+
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
 				builder.events,
@@ -881,10 +889,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
 				indexedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
-				return nil
-			}).
-			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1745,6 +1749,25 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 	})
 }
 
+// buildStoragesData registers modules that initialize core read-only stores used by
+// the access node (events, lightTransactionResults, and transactionResultErrorMessages).
+func (builder *FlowAccessNodeBuilder) buildStoragesData() *FlowAccessNodeBuilder {
+	builder.Module("events storage", func(node *cmd.NodeConfig) error {
+		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+		return nil
+	})
+	builder.Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+		builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+		return nil
+	})
+	builder.Module("transaction results storage", func(node *cmd.NodeConfig) error {
+		builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+		return nil
+	})
+
+	return builder
+}
+
 // buildExecutionResultInfoProvider registers a module that wires the
 // optimistic_sync.ExecutionResultInfoProvider on the builder.
 func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAccessNodeBuilder {
@@ -1783,11 +1806,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
 	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 
-	builder.Module("events storage", func(node *cmd.NodeConfig) error {
-		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
-		return nil
-	})
 	builder.buildExecutionResultInfoProvider()
+	builder.buildStoragesData()
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -2022,13 +2042,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 			if err != nil {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
-			}
-
-			return nil
-		}).
-		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-			if builder.storeTxResultErrorMessages {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			}
 
 			return nil
