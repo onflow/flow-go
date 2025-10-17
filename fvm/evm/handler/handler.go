@@ -378,7 +378,13 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 3 - prepare block context
-	ctx, err := h.getBlockContext()
+	// ctx, err := h.getBlockContext()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// Fetch the BlockContext & BlockProposal in one go
+	ctx, bp, err := h.getBlockContextProposal()
 	if err != nil {
 		return nil, err
 	}
@@ -414,10 +420,13 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 8 - update the block proposal
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
-	}
+	// bp, err := h.blockStore.BlockProposal()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// we use the already present BlockProposal, instead of reading it
+	// again from storage.
 	bp.AppendTransaction(res)
 	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
@@ -569,6 +578,30 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
 		GasFeeCollector:           types.CoinbaseAddress,
 	}, nil
+}
+
+func (h *ContractHandler) getBlockContextProposal() (types.BlockContext, *types.BlockProposal, error) {
+	bp, err := h.blockStore.BlockProposal()
+	if err != nil {
+		return types.BlockContext{}, nil, err
+	}
+
+	return types.BlockContext{
+		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
+		BlockNumber:            bp.Height,
+		BlockTimestamp:         bp.Timestamp,
+		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
+		GetHashFunc: func(n uint64) gethCommon.Hash {
+			hash, err := h.blockStore.BlockHash(n)
+			panicOnError(err) // we have to handle it here given we can't continue with it even in try case
+			return hash
+		},
+		ExtraPrecompiledContracts: h.precompiledContracts,
+		Random:                    bp.PrevRandao,
+		TxCountSoFar:              uint(len(bp.TxHashes)),
+		TotalGasUsedSoFar:         bp.TotalGasUsed,
+		GasFeeCollector:           types.CoinbaseAddress,
+	}, bp, nil
 }
 
 func (h *ContractHandler) executeAndHandleCall(
