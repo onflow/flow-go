@@ -304,7 +304,7 @@ func AdjustEventsMetadata(events []flow.Event) []flow.Event {
 	}
 
 	lastTxID := events[0].TransactionID
-	txIndex := uint32(0)
+	txIndex := events[0].TransactionIndex
 	eventIndex := uint32(0)
 
 	output := make([]flow.Event, len(events))

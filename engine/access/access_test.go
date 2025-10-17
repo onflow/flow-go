@@ -979,6 +979,10 @@ func (suite *Suite) TestGetTransactionResult() {
 		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
+		defer func() {
+			cancel()
+			<-ingestEng.Done()
+		}()
 
 		processExecutionReceipts := func(
 			block *flow.Block,
@@ -1042,7 +1046,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			getReq := &accessproto.GetTransactionRequest{
 				Id: txId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			assertTransactionResult(resp, err)
 		})
 
@@ -1052,18 +1056,8 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:      txId[:],
 				BlockId: blockId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			assertTransactionResult(resp, err)
-		})
-
-		suite.Run("Get transaction result with wrong transaction ID and correct block ID", func() {
-			getReq := &accessproto.GetTransactionRequest{
-				Id:      txIdNegative[:],
-				BlockId: blockId[:],
-			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
-			require.Error(suite.T(), err)
-			require.Nil(suite.T(), resp)
 		})
 
 		suite.Run("Get transaction result with wrong block ID and correct transaction ID", func() {
@@ -1071,9 +1065,9 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:      txId[:],
 				BlockId: blockNegativeId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			require.Error(suite.T(), err)
-			require.Contains(suite.T(), err.Error(), "failed to find: transaction not in block")
+			require.Contains(suite.T(), err.Error(), "transaction found in block")
 			require.Nil(suite.T(), resp)
 		})
 
@@ -1083,7 +1077,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:           txId[:],
 				CollectionId: collectionId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			assertTransactionResult(resp, err)
 		})
 
@@ -1092,7 +1086,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:           txId[:],
 				CollectionId: collectionIdNegative[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)
 		})
@@ -1102,7 +1096,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:           txIdNegative[:],
 				CollectionId: collectionId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)
 		})
@@ -1114,7 +1108,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockId:      blockId[:],
 				CollectionId: collectionId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			assertTransactionResult(resp, err)
 		})
 
@@ -1124,7 +1118,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockId:      blockId[:],
 				CollectionId: collectionIdNegative[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(ctx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)
 		})

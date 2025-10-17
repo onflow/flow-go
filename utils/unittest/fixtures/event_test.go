@@ -33,7 +33,7 @@ func TestAdjustEventsMetadata(t *testing.T) {
 		require.Len(t, result, 1)
 
 		assert.Equal(t, uint32(0), result[0].EventIndex)
-		assert.Equal(t, uint32(0), result[0].TransactionIndex)
+		assert.Equal(t, uint32(999), result[0].TransactionIndex)
 
 		// unchanged
 		assert.Equal(t, txID, result[0].TransactionID)
@@ -70,7 +70,8 @@ func TestAdjustEventsMetadata(t *testing.T) {
 
 		for i, event := range result {
 			assert.Equal(t, txID, event.TransactionID)
-			assert.Equal(t, uint32(0), event.TransactionIndex)
+			// all tx have the same txID, so they should all have the same txIndex
+			assert.Equal(t, uint32(999), event.TransactionIndex)
 			assert.Equal(t, uint32(i), event.EventIndex)
 		}
 	})
@@ -132,6 +133,9 @@ func TestAdjustEventsMetadata(t *testing.T) {
 				Event.WithEventIndex(random.Uint32()),
 			)
 		}
+
+		// will adjust according to the first tx's index
+		events[0].TransactionIndex = 0
 
 		result := AdjustEventsMetadata(events)
 		require.Len(t, result, len(expected))

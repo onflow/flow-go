@@ -16,4 +16,4 @@ func (n *NoopRetrier) Retry(_ uint64) error {
 	return nil
 }
 
-func (n *NoopRetrier) RegisterTransaction(_ uint64, _ *flow.TransactionBody) {}
+func (n *NoopRetrier) RegisterTransaction(_ *flow.TransactionBody) {}
