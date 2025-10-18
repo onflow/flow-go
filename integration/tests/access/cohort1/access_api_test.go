@@ -1281,7 +1281,7 @@ func (s *AccessAPISuite) testScheduledTransactionsRest(callbackID uint64, expect
 	link.On("TransactionLink", expectedTxID).Return(fmt.Sprintf("/v1/transactions/%s", expectedTxID.String()), nil)
 	link.On("TransactionResultLink", expectedTxID).Return(fmt.Sprintf("/v1/transaction_results/%s", expectedTxID.String()), nil)
 
-	s.Run("/v1/transactions/{txID} without result", func() {
+	s.Run("REST /v1/transactions/{txID} without result", func() {
 		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, expectedTxID.String(), nil)
 		s.Require().NoError(err)
 
