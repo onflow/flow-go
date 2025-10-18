@@ -8,13 +8,14 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const idQuery = "id"
 
 // GetTransactionByID gets a transaction by requested ID.
 func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	if !request.IsTransactionID(r.GetVar(idQuery)) {
+	if !request.isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransaction(r, backend, link)
 	}
 
@@ -50,7 +51,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
 func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	if !request.IsTransactionID(r.GetVar(idQuery)) {
+	if !request.isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransactionResult(r, backend, link)
 	}
 
@@ -132,4 +133,9 @@ func GetScheduledTransactionResult(r *common.Request, backend access.API, link c
 	var response commonmodels.TransactionResult
 	response.Build(txr, txr.TransactionID, link)
 	return response, nil
+}
+
+func isTransactionID(raw string) bool {
+	_, err := flow.HexStringToIdentifier(raw)
+	return err == nil
 }
