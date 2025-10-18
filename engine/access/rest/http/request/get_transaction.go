@@ -139,8 +139,3 @@ func NewGetScheduledTransactionResult(r *common.Request) (GetScheduledTransactio
 		TransactionOptionals: transactionOptionals,
 	}, nil
 }
-
-func IsTransactionID(raw string) bool {
-	_, err := flow.HexStringToIdentifier(raw)
-	return err == nil
-}
