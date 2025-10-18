@@ -6,6 +6,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -44,15 +46,17 @@ type InMemoryIndexer struct {
 	log             zerolog.Logger
 	block           *flow.Block
 	executionResult *flow.ExecutionResult
+	fvmEnv          templates.Environment
 }
 
 // IndexerData is the collection of data ingested by the indexer.
 type IndexerData struct {
-	Events       []flow.Event
-	Collections  []*flow.Collection
-	Transactions []*flow.TransactionBody
-	Results      []flow.LightTransactionResult
-	Registers    []flow.RegisterEntry
+	Events                []flow.Event
+	Collections           []*flow.Collection
+	Transactions          []*flow.TransactionBody
+	Results               []flow.LightTransactionResult
+	Registers             []flow.RegisterEntry
+	ScheduledTransactions map[flow.Identifier]uint64
 }
 
 // NewInMemoryIndexer returns a new indexer that indexes block execution data and error messages for
@@ -68,6 +72,7 @@ func NewInMemoryIndexer(
 		return nil, fmt.Errorf("block ID and execution result block ID must match")
 	}
 
+	fvmEnv := systemcontracts.SystemContractsForChain(block.ChainID).AsTemplateEnv()
 	return &InMemoryIndexer{
 		log: log.With().
 			Str("component", "in_memory_indexer").
@@ -76,6 +81,7 @@ func NewInMemoryIndexer(
 			Logger(),
 		block:           block,
 		executionResult: executionResult,
+		fvmEnv:          fvmEnv,
 	}, nil
 }
 
@@ -152,20 +158,31 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 		})
 	}
 
+	systemChunkIndex := len(data.ChunkExecutionDatas) - 1
+	systemChunkEvents := data.ChunkExecutionDatas[systemChunkIndex].Events
+	systemChunkResults := data.ChunkExecutionDatas[systemChunkIndex].TransactionResults
+
+	scheduledTransactionData, err := collectScheduledTransactions(i.fvmEnv, i.block.ChainID, systemChunkResults, systemChunkEvents)
+	if err != nil {
+		return nil, fmt.Errorf("could not collect scheduled transaction data: %w", err)
+	}
+
 	i.log.Debug().
 		Dur("duration_ms", time.Since(start)).
 		Int("event_count", len(events)).
 		Int("register_count", len(registerEntries)).
 		Int("result_count", len(results)).
 		Int("collection_count", len(collections)).
+		Int("scheduled_tx_count", len(scheduledTransactionData)).
 		Msg("indexed block data")
 
 	return &IndexerData{
-		Events:       events,
-		Collections:  collections,
-		Transactions: transactions,
-		Results:      results,
-		Registers:    registerEntries,
+		Events:                events,
+		Collections:           collections,
+		Transactions:          transactions,
+		Results:               results,
+		Registers:             registerEntries,
+		ScheduledTransactions: scheduledTransactionData,
 	}, nil
 }
 
