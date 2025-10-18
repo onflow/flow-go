@@ -1,6 +1,9 @@
 package request
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
@@ -85,4 +88,54 @@ func (g *GetTransactionResult) Build(r *common.Request) error {
 	err = g.GetByIDRequest.Build(r)
 
 	return err
+}
+
+type GetScheduledTransaction struct {
+	ScheduledTxID uint64
+	TransactionOptionals
+	ExpandsResult bool
+}
+
+func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, error) {
+	raw := r.GetVar(idQuery)
+	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)
+	if err != nil {
+		return GetScheduledTransaction{}, fmt.Errorf("invalid ID format")
+	}
+
+	var transactionOptionals TransactionOptionals
+	err = transactionOptionals.Parse(r)
+	if err != nil {
+		return GetScheduledTransaction{}, err
+	}
+
+	return GetScheduledTransaction{
+		ScheduledTxID:        scheduledTxID,
+		TransactionOptionals: transactionOptionals,
+		ExpandsResult:        r.Expands(resultExpandable),
+	}, nil
+}
+
+type GetScheduledTransactionResult struct {
+	ScheduledTxID uint64
+	TransactionOptionals
+}
+
+func NewGetScheduledTransactionResult(r *common.Request) (GetScheduledTransactionResult, error) {
+	raw := r.GetVar(idQuery)
+	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)
+	if err != nil {
+		return GetScheduledTransactionResult{}, fmt.Errorf("invalid ID format")
+	}
+
+	var transactionOptionals TransactionOptionals
+	err = transactionOptionals.Parse(r)
+	if err != nil {
+		return GetScheduledTransactionResult{}, err
+	}
+
+	return GetScheduledTransactionResult{
+		ScheduledTxID:        scheduledTxID,
+		TransactionOptionals: transactionOptionals,
+	}, nil
 }
