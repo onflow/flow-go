@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"time"
 
@@ -654,24 +653,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("execution state cache", func(node *cmd.NodeConfig) error {
-			if builder.events == nil {
-				return fmt.Errorf("events store not initialized: ensure 'events storage' module runs before 'execution state cache'")
-			}
 
-			if builder.collections == nil {
-				return fmt.Errorf("collections store not initialized: ensure 'collections storage' module runs before 'execution state cache'")
-			}
-
-			if builder.transactions == nil {
-				return fmt.Errorf("transactions store not initialized: ensure 'transactions storage' module runs before 'execution state cache'")
-			}
-
-			if builder.lightTransactionResults == nil {
-				return fmt.Errorf("lightTransactionResults store not initialized: ensure 'lightTransactionResults storage' module runs before 'execution state cache'")
-			}
-
-			if builder.transactionResultErrorMessages == nil {
-				return fmt.Errorf("transactionResultErrorMessages store not initialized: ensure 'transactionResultErrorMessages storage' module runs before 'execution state cache'")
+			// check if all the storages are initialized before passing them to Snapshot
+			if err := builder.validateCoreStores(); err != nil {
+				return err
 			}
 
 			// TODO: use real objects instead of mocks once they're implemented
@@ -2565,28 +2550,34 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	return libp2pNode, nil
 }
 
+// validateCoreStores ensures all core stores are initialized before they’re used.
+// It returns the first missing dependency as a descriptive error.
+func (b *FlowAccessNodeBuilder) validateCoreStores() error {
+	if b.events == nil {
+		return fmt.Errorf("events store not initialized: ensure 'events storage' module runs before 'execution state cache'")
+	}
+	if b.collections == nil {
+		return fmt.Errorf("collections store not initialized: ensure 'collections storage' module runs before 'execution state cache'")
+	}
+	if b.transactions == nil {
+		return fmt.Errorf("transactions store not initialized: ensure 'transactions storage' module runs before 'execution state cache'")
+	}
+	if b.lightTransactionResults == nil {
+		return fmt.Errorf("lightTransactionResults store not initialized: ensure 'lightTransactionResults storage' module runs before 'execution state cache'")
+	}
+	if b.transactionResultErrorMessages == nil {
+		return fmt.Errorf("transactionResultErrorMessages store not initialized: ensure 'transactionResultErrorMessages storage' module runs before 'execution state cache'")
+	}
+	return nil
+}
+
 // notNil ensures that the input is not nil and returns it
 // the usage is to ensure the dependencies are initialized before initializing a module.
 // for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
 // different function, so we need to ensure that the storage.Collections were initialized before
 // creating the IngestionEngine.
-func isNil[T any](v T) bool {
-	if any(v) == nil {
-		return true
-	}
-	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Interface, reflect.Slice:
-		return rv.IsNil()
-	default:
-		return false // non-nilable kinds (struct, array, int, etc.)
-	}
-}
-
-// notNil returns dep or panics only if dep is actually nil.
-// (If you prefer, return an error instead of panicking.)
 func notNil[T any](dep T) T {
-	if isNil(dep) {
+	if any(dep) == nil {
 		panic("dependency is nil")
 	}
 	return dep
