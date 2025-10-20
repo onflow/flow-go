@@ -2,7 +2,7 @@ package executor
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec
+	//nolint:gosec
 	"fmt"
 	"time"
 
@@ -71,16 +71,11 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 	execEndTime := time.Now()
 	execDuration := execEndTime.Sub(execStartTime)
 
-	// encode to MD5 as low compute/memory lookup key
-	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
-	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
-	insecureScriptHash := md5.Sum(r.script) //nolint:gosec
-
 	log := l.log.With().
 		Str("script_executor_addr", "localhost").
 		Hex("block_id", logging.ID(r.blockID)).
 		Uint64("height", r.height).
-		Hex("script_hash", insecureScriptHash[:]).
+		Hex("script_hash", r.insecureScriptHash[:]).
 		Logger()
 
 	if err != nil {
@@ -88,7 +83,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 
 		switch status.Code(convertedErr) {
 		case codes.InvalidArgument, codes.Canceled, codes.DeadlineExceeded:
-			l.scriptCache.LogFailedScript(r.blockID, insecureScriptHash, execEndTime, "localhost", r.script)
+			l.scriptCache.LogFailedScript(r.blockID, r.insecureScriptHash, execEndTime, "localhost", r.script)
 
 		default:
 			log.Debug().Err(err).Msg("script execution failed")
@@ -98,7 +93,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 		return nil, nil, convertedErr
 	}
 
-	l.scriptCache.LogExecutedScript(r.blockID, insecureScriptHash, execEndTime, "localhost", r.script, execDuration)
+	l.scriptCache.LogExecutedScript(r.blockID, r.insecureScriptHash, execEndTime, "localhost", r.script, execDuration)
 	l.metrics.ScriptExecuted(execDuration, len(r.script))
 
 	metadata := &accessmodel.ExecutorMetadata{

@@ -2,7 +2,7 @@ package executor
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec
+	//nolint:gosec
 	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -56,11 +56,6 @@ func NewENScriptExecutor(
 
 func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
-	// encode to MD5 as low compute/memory lookup key
-	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
-	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
-	insecureScriptHash := md5.Sum(request.script) //nolint:gosec
-
 	var result []byte
 	var executionTime time.Time
 	var execDuration time.Duration
@@ -81,14 +76,14 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 				return err
 			}
 
-			e.scriptCache.LogExecutedScript(request.blockID, insecureScriptHash, executionTime, node.Address, request.script, execDuration)
+			e.scriptCache.LogExecutedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script, execDuration)
 			e.metrics.ScriptExecuted(time.Since(execStartTime), len(request.script))
 
 			return nil
 		},
 		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
-				e.scriptCache.LogFailedScript(request.blockID, insecureScriptHash, executionTime, node.Address, request.script)
+				e.scriptCache.LogFailedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script)
 				return true
 			}
 			return false
