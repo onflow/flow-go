@@ -27,7 +27,6 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -172,7 +171,6 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
 		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 		ExecutionStateCache:         suite.executionStateCache,
-		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	})
 	suite.Require().NoError(err)
 

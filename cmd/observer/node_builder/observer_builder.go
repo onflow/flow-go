@@ -2029,7 +2029,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 			ExecutionResultInfoProvider: execResultInfoProvider,
 			ExecutionStateCache:         execStateCache,
-			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		}
 
 		if builder.localServiceAPIEnabled {

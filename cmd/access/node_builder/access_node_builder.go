@@ -2203,7 +2203,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
 				ExecutionResultInfoProvider: execResultInfoProvider,
 				ExecutionStateCache:         execStateCache,
-				OperatorCriteria:            operatorCriteria,
 				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 				ScheduledCallbacksEnabled:   builder.scheduledCallbacksEnabled,
 			})
