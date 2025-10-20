@@ -2,11 +2,9 @@ package execution
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -14,14 +12,12 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
-
-// ErrIncompatibleNodeVersion indicates that node version is incompatible with the block version.
-var ErrIncompatibleNodeVersion = errors.New("node version is incompatible with data for block")
 
 // Scripts provides methods for executing Cadence scripts and querying data
 // at specific block heights. It ensures that queries are only run for blocks compatible
@@ -31,14 +27,7 @@ type Scripts struct {
 	executor *query.QueryExecutor
 	headers  storage.Headers
 
-	// versionControl provides information about the current version beacon for each block
-	versionControl *version.VersionControl
-
-	// minCompatibleHeight and maxCompatibleHeight are used to limit the block range that can be queried using local execution
-	// to ensure only blocks that are compatible with the node's current software version are allowed.
-	// Note: this is a temporary solution for cadence/fvm upgrades while version beacon support is added
-	minCompatibleHeight *atomic.Uint64
-	maxCompatibleHeight *atomic.Uint64
+	compatibleHeights *CompatibleHeights
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
@@ -81,12 +70,10 @@ func NewScripts(
 	)
 
 	return &Scripts{
-		log:                 zerolog.New(log).With().Str("component", "script_executor").Logger(),
-		executor:            queryExecutor,
-		headers:             header,
-		minCompatibleHeight: atomic.NewUint64(minHeight),
-		maxCompatibleHeight: atomic.NewUint64(maxHeight),
-		versionControl:      versionControl,
+		log:               zerolog.New(log).With().Str("component", "script_executor").Logger(),
+		executor:          queryExecutor,
+		headers:           header,
+		compatibleHeights: NewCompatibleHeights(log, versionControl, minHeight, maxHeight),
 	}
 }
 
@@ -106,17 +93,9 @@ func (s *Scripts) ExecuteAtBlockHeight(
 	height uint64,
 	registerSnapshot storage.RegisterSnapshotReader,
 ) ([]byte, error) {
-	err := s.verifyHeight(height)
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
-		return nil, fmt.Errorf("block height is not compatible with the node's version: %w", err)
-	}
-	header, err := s.headers.ByHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-	snap, err := registerSnapshot.StorageSnapshot(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
+		return nil, err
 	}
 
 	value, compUsage, err := s.executor.ExecuteScript(ctx, script, arguments, header, snap)
@@ -133,17 +112,9 @@ func (s *Scripts) ExecuteAtBlockHeight(
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error) {
-	err := s.verifyHeight(height)
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
-		return nil, fmt.Errorf("block height is not compatible with the node's version: %w", err)
-	}
-	header, err := s.headers.ByHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-	snap, err := registerSnapshot.StorageSnapshot(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
+		return nil, err
 	}
 
 	return s.executor.GetAccount(ctx, address, header, snap)
@@ -157,17 +128,9 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
-	err := s.verifyHeight(height)
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
-		return 0, fmt.Errorf("block height is not compatible with the node's version: %w", err)
-	}
-	header, err := s.headers.ByHeight(height)
-	if err != nil {
-		return 0, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-	snap, err := registerSnapshot.StorageSnapshot(height)
-	if err != nil {
-		return 0, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
+		return 0, err
 	}
 
 	return s.executor.GetAccountBalance(ctx, address, header, snap)
@@ -181,17 +144,9 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
-	err := s.verifyHeight(height)
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
-		return 0, fmt.Errorf("block height is not compatible with the node's version: %w", err)
-	}
-	header, err := s.headers.ByHeight(height)
-	if err != nil {
-		return 0, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-	snap, err := registerSnapshot.StorageSnapshot(height)
-	if err != nil {
-		return 0, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
+		return 0, err
 	}
 
 	return s.executor.GetAccountAvailableBalance(ctx, address, header, snap)
@@ -205,17 +160,9 @@ func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.A
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error) {
-	err := s.verifyHeight(height)
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
-		return nil, fmt.Errorf("block height is not compatible with the node's version: %w", err)
-	}
-	header, err := s.headers.ByHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-	snap, err := registerSnapshot.StorageSnapshot(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
+		return nil, err
 	}
 
 	return s.executor.GetAccountKeys(ctx, address, header, snap)
@@ -229,58 +176,37 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
 func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error) {
-	err := s.verifyHeight(height)
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
-		return nil, fmt.Errorf("block height is not compatible with the node's version: %w", err)
-	}
-	header, err := s.headers.ByHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-	snap, err := registerSnapshot.StorageSnapshot(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
+		return nil, err
 	}
 
 	return s.executor.GetAccountKey(ctx, address, keyIndex, header, snap)
 }
 
-// SetMinCompatibleHeight sets the lowest block height (inclusive).
-func (s *Scripts) SetMinCompatibleHeight(height uint64) {
-	s.minCompatibleHeight.Store(height)
-	s.log.Info().Uint64("height", height).Msg("minimum compatible height set")
-}
-
-// SetMaxCompatibleHeight sets the highest block height (inclusive).
-func (s *Scripts) SetMaxCompatibleHeight(height uint64) {
-	s.maxCompatibleHeight.Store(height)
-	s.log.Info().Uint64("height", height).Msg("maximum compatible height set")
-}
-
-// verifyHeight checks whether the given block height is compatible with the node's version.
-// It performs checks:
-// 1. Ensures the height is within the configured minCompatibleHeight and maxCompatibleHeight.
-// 2. If version control is enabled, ensures the height is compatible with the node's version beacon.
+// getHeaderAndSnapshot retrieves the header and storage snapshot for a given block height.
 //
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-func (s *Scripts) verifyHeight(height uint64) error {
-	if height > s.maxCompatibleHeight.Load() || height < s.minCompatibleHeight.Load() {
-		return ErrIncompatibleNodeVersion
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+func (s *Scripts) getHeaderAndSnapshot(
+	height uint64,
+	registerSnapshot storage.RegisterSnapshotReader,
+) (*flow.Header, snapshot.StorageSnapshot, error) {
+	err := s.compatibleHeights.Check(height)
+	if err != nil {
+		return nil, nil, fmt.Errorf("block height is not compatible with the node's version: %w", err)
+	}
+	header, err := s.headers.ByHeight(height)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
-	// Version control feature could be disabled. In such a case, ignore related functionality.
-	if s.versionControl != nil {
-		compatible, err := s.versionControl.CompatibleAtBlock(height)
-		if err != nil {
-			return fmt.Errorf("failed to check compatibility with block height %d: %w", height, err)
-		}
-
-		if !compatible {
-			return ErrIncompatibleNodeVersion
-		}
-	}
-
-	return nil
+	return header, snap, nil
 }

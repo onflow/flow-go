@@ -6,7 +6,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -16,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -229,86 +227,6 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 	})
 }
 
-// TestVerifyHeight tests the verifyHeight helper method.
-//
-// Test cases :
-// 1. Succeeds when height is within min and max bounds.
-// 2. Errors when height is below the minimum bound.
-// 3. Errors when height is above the maximum bound.
-// 4. Succeeds when versionControl reports a compatible version.
-// 5. Errors when versionControl reports an incompatible version.
-func (s *scriptTestSuite) TestVerifyHeight() {
-	scripts := s.defaultScripts()
-
-	s.Run("valid height within range", func() {
-		scripts.SetMinCompatibleHeight(0)
-		scripts.SetMaxCompatibleHeight(s.height + 10)
-
-		err := scripts.verifyHeight(s.height)
-		require.NoError(s.T(), err)
-	})
-
-	s.Run("error when height below minimum bound", func() {
-		scripts.SetMinCompatibleHeight(s.height + 1)
-		scripts.SetMaxCompatibleHeight(s.height + 10)
-
-		err := scripts.verifyHeight(s.height)
-		require.Error(s.T(), err)
-		require.ErrorIs(s.T(), err, ErrIncompatibleNodeVersion)
-	})
-
-	s.Run("error when height above maximum bound", func() {
-		scripts.SetMinCompatibleHeight(0)
-		scripts.SetMaxCompatibleHeight(5)
-
-		err := scripts.verifyHeight(s.height + 10)
-		require.Error(s.T(), err)
-		require.ErrorIs(s.T(), err, ErrIncompatibleNodeVersion)
-	})
-
-	versionBeacons := storagemock.NewVersionBeacons(s.T())
-
-	s.Run("versionControl compatible version", func() {
-		var err error
-		scripts.versionControl, err = version.NewVersionControl(
-			s.logger,
-			versionBeacons,
-			semver.New("0.0.1"),
-			s.height,
-			s.height+1,
-		)
-		require.NoError(s.T(), err)
-		scripts.SetMinCompatibleHeight(s.height)
-		scripts.SetMaxCompatibleHeight(s.height + 1)
-
-		err = scripts.verifyHeight(s.height)
-		require.NoError(s.T(), err)
-
-		versionBeacons.AssertExpectations(s.T())
-	})
-
-	s.Run("versionControl incompatible version", func() {
-		var err error
-		scripts.versionControl, err = version.NewVersionControl(
-			s.logger,
-			versionBeacons,
-			semver.New("0.0.1"),
-			s.height,
-			s.height+1,
-		)
-		require.NoError(s.T(), err)
-
-		scripts.SetMinCompatibleHeight(s.height)
-		scripts.SetMaxCompatibleHeight(s.height + 10)
-
-		err = scripts.verifyHeight(s.height + 2)
-		require.Error(s.T(), err)
-		require.Contains(s.T(), fmt.Sprintf("%v", err), "failed to check compatibility with block height")
-
-		versionBeacons.AssertExpectations(s.T())
-	})
-}
-
 // defaultScripts returns a pre-configured Scripts instance with default parameters for testing.
 func (s *scriptTestSuite) defaultScripts() *Scripts {
 	scripts := NewScripts(
@@ -343,31 +261,6 @@ func (s *scriptTestSuite) bootstrap() {
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), out.Err)
 	s.snapshot = s.snapshot.Append(executionSnapshot)
-}
-
-// versionBeaconEventFixture creates a SealedVersionBeacon for the given heights and versions.
-// This is used to simulate version events in the tests.
-func versionBeaconEventFixture(
-	t *testing.T,
-	sealHeight uint64,
-	heights []uint64,
-	versions []string,
-) *flow.SealedVersionBeacon {
-	require.Equal(t, len(heights), len(versions), "the heights array should be the same length as the versions array")
-	var vb []flow.VersionBoundary
-	for i := 0; i < len(heights); i++ {
-		vb = append(vb, flow.VersionBoundary{
-			BlockHeight: heights[i],
-			Version:     versions[i],
-		})
-	}
-
-	return &flow.SealedVersionBeacon{
-		VersionBeacon: unittest.VersionBeaconFixture(
-			unittest.WithBoundaries(vb...),
-		),
-		SealHeight: sealHeight,
-	}
 }
 
 func (s *scriptTestSuite) createAccount() flow.Address {
