@@ -680,7 +680,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.collections,
 				builder.transactions,
 				builder.lightTransactionResults,
-				builder.transactionResultErrorMessages, // might be nil depending on storeTxResultErrorMessages flag
+				builder.transactionResultErrorMessages,
 				nil,
 				notNil(executionDataStoreCache),
 			)
@@ -2570,25 +2570,24 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 // for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
 // different function, so we need to ensure that the storage.Collections were initialized before
 // creating the IngestionEngine.
-func notNil[T any](dep T) T {
-	v := reflect.ValueOf(dep)
-	if !v.IsValid() {
-		panic("dependency is invalid (zero)")
+func isNil[T any](v T) bool {
+	if any(v) == nil {
+		return true
 	}
-	// Unwrap interfaces until we hit the concrete value.
-	for v.Kind() == reflect.Interface {
-		if v.IsNil() {
-			panic("dependency is nil (interface)")
-		}
-		v = v.Elem()
-	}
-	switch v.Kind() {
-	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
-		if v.IsNil() {
-			panic("dependency is nil")
-		}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Interface, reflect.Slice:
+		return rv.IsNil()
 	default:
-		panic("unhandled default case")
+		return false // non-nilable kinds (struct, array, int, etc.)
+	}
+}
+
+// notNil returns dep or panics only if dep is actually nil.
+// (If you prefer, return an error instead of panicking.)
+func notNil[T any](dep T) T {
+	if isNil(dep) {
+		panic("dependency is nil")
 	}
 	return dep
 }
