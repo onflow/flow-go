@@ -145,8 +145,9 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
+	latestHeaderID := latestHeader.ID()
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(
-		latestHeader.ID(),
+		latestHeaderID,
 		userCriteria,
 	)
 	if err != nil {
@@ -158,7 +159,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
-	request := executor.NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments)
+	request := executor.NewScriptExecutionRequest(latestHeaderID, latestHeader.Height, script, arguments)
 	res, metadata, err := b.executor.Execute(ctx, request, executionResultInfo)
 	return res, metadata, err
 }
@@ -238,7 +239,8 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
-	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), userCriteria)
+	blockID := header.ID()
+	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, userCriteria)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
 		if common.IsInsufficientExecutionReceipts(err) {
@@ -250,7 +252,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 
 	res, metadata, err := b.executor.Execute(
 		ctx,
-		executor.NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments),
+		executor.NewScriptExecutionRequest(blockID, blockHeight, script, arguments),
 		executionResultInfo,
 	)
 	return res, metadata, err

@@ -46,15 +46,15 @@ func NewCompatibleHeights(
 }
 
 // SetMinCompatibleHeight sets the lowest block height (inclusive).
-func (s *CompatibleHeights) SetMinCompatibleHeight(height uint64) {
-	s.minCompatibleHeight.Store(height)
-	s.log.Info().Uint64("height", height).Msg("minimum compatible height set")
+func (c *CompatibleHeights) SetMinCompatibleHeight(height uint64) {
+	c.minCompatibleHeight.Store(height)
+	c.log.Info().Uint64("height", height).Msg("minimum compatible height set")
 }
 
 // SetMaxCompatibleHeight sets the highest block height (inclusive).
-func (s *CompatibleHeights) SetMaxCompatibleHeight(height uint64) {
-	s.maxCompatibleHeight.Store(height)
-	s.log.Info().Uint64("height", height).Msg("maximum compatible height set")
+func (c *CompatibleHeights) SetMaxCompatibleHeight(height uint64) {
+	c.maxCompatibleHeight.Store(height)
+	c.log.Info().Uint64("height", height).Msg("maximum compatible height set")
 }
 
 // Check checks whether the given block height is compatible with the node's version.
@@ -65,14 +65,14 @@ func (s *CompatibleHeights) SetMaxCompatibleHeight(height uint64) {
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-func (s *CompatibleHeights) Check(height uint64) error {
-	if height > s.maxCompatibleHeight.Load() || height < s.minCompatibleHeight.Load() {
+func (c *CompatibleHeights) Check(height uint64) error {
+	if height > c.maxCompatibleHeight.Load() || height < c.minCompatibleHeight.Load() {
 		return ErrIncompatibleNodeVersion
 	}
 
 	// Version control feature could be disabled. In such a case, ignore related functionality.
-	if s.versionControl != nil {
-		compatible, err := s.versionControl.CompatibleAtBlock(height)
+	if c.versionControl != nil {
+		compatible, err := c.versionControl.CompatibleAtBlock(height)
 		if err != nil {
 			return fmt.Errorf("failed to check compatibility with block height %d: %w", height, err)
 		}
