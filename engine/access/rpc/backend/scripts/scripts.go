@@ -64,7 +64,7 @@ func NewScriptsBackend(
 	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*Scripts, error) {
 	var exec executor.ScriptExecutor
-	cache := executor.NewLoggedScriptCache(log, loggedScripts)
+	scriptLogger := executor.NewScriptLogger(log, loggedScripts)
 
 	switch scriptExecMode {
 	case query_mode.IndexQueryModeLocalOnly:
@@ -72,7 +72,7 @@ func NewScriptsBackend(
 			log,
 			metrics,
 			scriptExecutor,
-			cache,
+			scriptLogger,
 			executionStateCache,
 		)
 
@@ -83,7 +83,7 @@ func NewScriptsBackend(
 			nodeProvider,
 			nodeCommunicator,
 			connFactory,
-			cache,
+			scriptLogger,
 		)
 
 	case query_mode.IndexQueryModeFailover:
@@ -91,7 +91,7 @@ func NewScriptsBackend(
 			log,
 			metrics,
 			scriptExecutor,
-			cache,
+			scriptLogger,
 			executionStateCache,
 		)
 		execNode := executor.NewENScriptExecutor(
@@ -100,7 +100,7 @@ func NewScriptsBackend(
 			nodeProvider,
 			nodeCommunicator,
 			connFactory,
-			cache,
+			scriptLogger,
 		)
 		exec = executor.NewFailoverScriptExecutor(local, execNode)
 

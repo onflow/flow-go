@@ -25,7 +25,7 @@ type LocalScriptExecutor struct {
 	metrics module.BackendScriptsMetrics
 
 	scriptExecutor      execution.ScriptExecutor
-	scriptCache         *LoggedScriptCache
+	scriptLogger        *ScriptLogger
 	executionStateCache optimistic_sync.ExecutionStateCache
 }
 
@@ -35,13 +35,13 @@ func NewLocalScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	scriptExecutor execution.ScriptExecutor,
-	scriptCache *LoggedScriptCache,
+	scriptLogger *ScriptLogger,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalScriptExecutor {
 	return &LocalScriptExecutor{
 		log:                 zerolog.New(log).With().Str("script_executor", "local").Logger(),
 		metrics:             metrics,
-		scriptCache:         scriptCache,
+		scriptLogger:        scriptLogger,
 		scriptExecutor:      scriptExecutor,
 		executionStateCache: executionStateCache,
 	}
@@ -83,7 +83,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 
 		switch status.Code(convertedErr) {
 		case codes.InvalidArgument, codes.Canceled, codes.DeadlineExceeded:
-			l.scriptCache.LogFailedScript(r.blockID, r.insecureScriptHash, execEndTime, "localhost", r.script)
+			l.scriptLogger.LogFailedScript(r, "localhost")
 
 		default:
 			log.Debug().Err(err).Msg("script execution failed")
@@ -93,7 +93,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 		return nil, nil, convertedErr
 	}
 
-	l.scriptCache.LogExecutedScript(r.blockID, r.insecureScriptHash, execEndTime, "localhost", r.script, execDuration)
+	l.scriptLogger.LogExecutedScript(r, "localhost", execDuration)
 	l.metrics.ScriptExecuted(execDuration, len(r.script))
 
 	metadata := &accessmodel.ExecutorMetadata{

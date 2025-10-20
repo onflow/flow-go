@@ -25,13 +25,13 @@ import (
 // TODO(Uliana): add godoc to whole file
 type ENScriptExecutor struct {
 	log     zerolog.Logger
-	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptCache struct?
+	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptLogger struct?
 
 	nodeProvider     *commonrpc.ExecutionNodeIdentitiesProvider
 	nodeCommunicator node_communicator.Communicator
 	connFactory      connection.ConnectionFactory
 
-	scriptCache *LoggedScriptCache
+	scriptLogger *ScriptLogger
 }
 
 var _ ScriptExecutor = (*ENScriptExecutor)(nil)
@@ -42,7 +42,7 @@ func NewENScriptExecutor(
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 	nodeCommunicator node_communicator.Communicator,
 	connFactory connection.ConnectionFactory,
-	scriptCache *LoggedScriptCache,
+	scriptLogger *ScriptLogger,
 ) *ENScriptExecutor {
 	return &ENScriptExecutor{
 		log:              zerolog.New(log).With().Str("script_executor", "execution_node").Logger(),
@@ -50,7 +50,7 @@ func NewENScriptExecutor(
 		nodeProvider:     nodeProvider,
 		nodeCommunicator: nodeCommunicator,
 		connFactory:      connFactory,
-		scriptCache:      scriptCache,
+		scriptLogger:     scriptLogger,
 	}
 }
 
@@ -76,14 +76,14 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 				return err
 			}
 
-			e.scriptCache.LogExecutedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script, execDuration)
+			e.scriptLogger.LogExecutedScript(request, node.Address, execDuration)
 			e.metrics.ScriptExecuted(time.Since(execStartTime), len(request.script))
 
 			return nil
 		},
 		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
-				e.scriptCache.LogFailedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script)
+				e.scriptLogger.LogFailedScript(request, node.Address)
 				return true
 			}
 			return false
