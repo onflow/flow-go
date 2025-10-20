@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
-// TODO(Uliana): add godoc to whole file
+// ENScriptExecutor is a script executor that executes scripts using execution nodes.
 type ENScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptLogger struct?
@@ -36,6 +36,7 @@ type ENScriptExecutor struct {
 
 var _ ScriptExecutor = (*ENScriptExecutor)(nil)
 
+// NewENScriptExecutor creates a new [ENScriptExecutor].
 func NewENScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
@@ -54,6 +55,13 @@ func NewENScriptExecutor(
 	}
 }
 
+// Execute executes the provided script at the requested block.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [codes.NotFound] - if the requested block has not been executed or has been pruned by the node.
+//   - [codes.Internal] - if the block state commitment could not be retrieved or for other internal execution node failures.
 func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	var result []byte
@@ -107,6 +115,12 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - if a connection to an execution node could not be established.
+//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [codes.NotFound] - if the requested block has not been executed or has been pruned by the node.
+//   - [codes.Internal] - if the block state commitment could not be retrieved or for other internal execution node failures.
 func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,
@@ -114,7 +128,7 @@ func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 ) ([]byte, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", executorAddress, err)
+		return nil, status.Errorf(codes.Unavailable, "failed to create client for execution node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
 

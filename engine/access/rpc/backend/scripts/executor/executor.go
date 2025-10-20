@@ -9,9 +9,23 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
-// TODO(Uliana): add godoc
+// ScriptExecutor is an interface for executing scripts at a specific block.
+// Implementations may run scripts using local storage, execution nodes, or a combination
+// of both (local first, then fallback to execution nodes).
 type ScriptExecutor interface {
-	// TODO(Uliana): add godoc
+	// Execute executes the provided script at the requested block.
+	//
+	// Expected error returns during normal operation:
+	//   - [version.ErrOutOfRange] - if block height is higher that last handled block height.
+	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+	//   - [storage.ErrNotFound] - if data was not found.
+	//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+	//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
+	//   - [codes.Canceled] - if the script execution was canceled.
+	//   - [codes.DeadlineExceeded] - if the script execution timed out.
+	//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+	//   - [codes.Internal] - for internal failures or index conversion errors.
+	//   - [codes.Unavailable] - if no nodes are available or a connection to an execution node could not be established.
 	Execute(ctx context.Context, scriptRequest *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo) ([]byte, *accessmodel.ExecutorMetadata, error)
 }
 

@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// TODO(Uliana): add godoc to whole file
+// LocalScriptExecutor is a script executor that runs scripts using only the local node's storage.
 type LocalScriptExecutor struct {
 	log     zerolog.Logger
 	metrics module.BackendScriptsMetrics
@@ -31,6 +31,7 @@ type LocalScriptExecutor struct {
 
 var _ ScriptExecutor = (*LocalScriptExecutor)(nil)
 
+// NewLocalScriptExecutor creates a new [LocalScriptExecutor].
 func NewLocalScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
@@ -47,9 +48,18 @@ func NewLocalScriptExecutor(
 	}
 }
 
-// Execute
-// Expected errors during normal operation:
-//   - storage.ErrNotFound - result is not available, not ready for querying, or does not descend from the latest sealed result.
+// Execute executes the provided script at the requested block.
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange] - if block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found or snapshot at executionResultID was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [codes.Canceled] - if the script execution was canceled.
+//   - [codes.DeadlineExceeded] - if the script execution timed out.
+//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [codes.Internal] - for internal failures or index conversion errors.
 func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	execStartTime := time.Now()
@@ -104,7 +114,14 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 	return result, metadata, nil
 }
 
-// convertScriptExecutionError converts the script execution error to a gRPC error
+// convertScriptExecutionError converts the script execution error to a gRPC error.
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument] - for general runtime script errors.
+//   - [codes.Canceled] - if the script execution was canceled.
+//   - [codes.DeadlineExceeded] - if the script execution timed out.
+//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [codes.Internal] - for internal failures or index conversion errors.
 func convertScriptExecutionError(err error, height uint64) error {
 	if err == nil {
 		return nil
