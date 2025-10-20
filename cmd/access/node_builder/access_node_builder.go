@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -1806,8 +1807,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
 	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 
-	builder.buildExecutionResultInfoProvider()
 	builder.buildStoragesData()
+	builder.buildExecutionResultInfoProvider()
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -2570,8 +2571,24 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 // different function, so we need to ensure that the storage.Collections were initialized before
 // creating the IngestionEngine.
 func notNil[T any](dep T) T {
-	if any(dep) == nil {
-		panic("dependency is nil")
+	v := reflect.ValueOf(dep)
+	if !v.IsValid() {
+		panic("dependency is invalid (zero)")
+	}
+	// Unwrap interfaces until we hit the concrete value.
+	for v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			panic("dependency is nil (interface)")
+		}
+		v = v.Elem()
+	}
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
+		if v.IsNil() {
+			panic("dependency is nil")
+		}
+	default:
+		panic("unhandled default case")
 	}
 	return dep
 }
