@@ -2985,7 +2985,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 				}
 			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
 
-			const maxEffortAvailable = 30_000 // FLIP 330
+			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
