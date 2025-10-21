@@ -975,7 +975,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
-					builder.Storage.RegisterIndex.FirstHeight(), //TODO(Uliana):check why we need FirstHeight() as separate param here
 					builder.Storage.RegisterIndex,
 					indexerCore,
 					executionDataStoreCache,

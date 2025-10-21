@@ -1507,7 +1507,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(
 				builder.Logger,
-				builder.Storage.RegisterIndex.FirstHeight(),
 				builder.Storage.RegisterIndex,
 				indexerCore,
 				executionDataStoreCache,
