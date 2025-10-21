@@ -20,9 +20,8 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 	executionState := req.ExecutionState
 	includeExecutorMetadata := executionState.IncludeExecutorMetadata
 
-	// TODO(mainnet #): remove this conditional: [TODO(Uliana): create an issue]
 	// "legacyParams" is only to temporarily support current behaviour.
-	// In the next spork, we should update this to always return an ExecuteScriptResponse.
+	// In the new API version (e.g. /v2), we should update this to always return an ExecuteScriptResponse.
 	legacyParams := !includeExecutorMetadata
 
 	buildResponse := func(value []byte, executorMetadata *accessmodel.ExecutorMetadata) interface{} {

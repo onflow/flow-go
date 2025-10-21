@@ -56,8 +56,9 @@ type requestScriptParams struct {
 //  6. Execute at specific block height (with metadata, expect ExecuteScriptResponse).
 //  7. Execute at latest block height (with metadata, expect ExecuteScriptResponse).
 //
-// TODO(mainnet #): delete legacy cases, update buildScriptResponse helper func and
-// update godoc once the new unified ExecuteScriptResponse behavior is enforced. [TODO(Uliana): create issue]
+// TODO: legacyParams is only to temporarily support current behaviour.
+// In the new API version (e.g. /v2), we should delete legacy cases, update buildScriptResponse helper func and
+// update godoc once the new unified ExecuteScriptResponse behavior is enforced.
 func TestScripts_HappyPath(t *testing.T) {
 	t.Run("block ID (legacyParams)", func(t *testing.T) {
 		backend := &mock.API{}

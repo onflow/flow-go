@@ -593,85 +593,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			return nil
 		}).
-		Module("registers storage", func(node *cmd.NodeConfig) error {
-			pdb, err := pstorage.OpenRegisterPebbleDB(
-				node.Logger.With().Str("pebbledb", "registers").Logger(),
-				builder.registersDBPath)
-			if err != nil {
-				return fmt.Errorf("could not open registers db: %w", err)
-			}
-			builder.ShutdownFunc(func() error {
-				return pdb.Close()
-			})
-
-			bootstrapped, err := pstorage.IsBootstrapped(pdb)
-			if err != nil {
-				return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
-			}
-
-			if !bootstrapped {
-				checkpointFile := builder.checkpointFile
-				if checkpointFile == cmd.NotSet {
-					checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
-				}
-
-				// currently, the checkpoint must be from the root block.
-				// read the root hash from the provided checkpoint and verify it matches the
-				// state commitment from the root snapshot.
-				err := wal.CheckpointHasRootHash(
-					node.Logger,
-					"", // checkpoint file already full path
-					checkpointFile,
-					ledger.RootHash(node.RootSeal.FinalState),
-				)
-				if err != nil {
-					return fmt.Errorf("could not verify checkpoint file: %w", err)
-				}
-
-				checkpointHeight := builder.SealedRootBlock.Height
-
-				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
-					return fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
-						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
-				}
-
-				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-				bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
-				if err != nil {
-					return fmt.Errorf("could not create registers bootstrap: %w", err)
-				}
-
-				// TODO: find a way to hook a context up to this to allow a graceful shutdown
-				workerCount := 10
-				err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
-				if err != nil {
-					return fmt.Errorf("could not load checkpoint file: %w", err)
-				}
-			}
-			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
-			if err != nil {
-				return fmt.Errorf("could not create registers storage: %w", err)
-			}
-
-			if builder.registerCacheSize > 0 {
-				cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
-				if err != nil {
-					return fmt.Errorf("could not parse register cache type: %w", err)
-				}
-				cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
-				registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
-				if err != nil {
-					return fmt.Errorf("could not create registers cache: %w", err)
-				}
-				builder.Storage.RegisterIndex = registersCache
-			} else {
-				builder.Storage.RegisterIndex = registers
-			}
-
-			builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
-
-			return nil
-		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			var err error
 			builder.ExecutionDatastoreManager, err = edstorage.CreateDatastoreManager(
@@ -943,6 +864,83 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
+				pdb, err := pstorage.OpenRegisterPebbleDB(
+					node.Logger.With().Str("pebbledb", "registers").Logger(),
+					builder.registersDBPath,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("could not open registers db: %w", err)
+				}
+				builder.ShutdownFunc(func() error {
+					return pdb.Close()
+				})
+
+				bootstrapped, err := pstorage.IsBootstrapped(pdb)
+				if err != nil {
+					return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+				}
+
+				if !bootstrapped {
+					checkpointFile := builder.checkpointFile
+					if checkpointFile == cmd.NotSet {
+						checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
+					}
+
+					// currently, the checkpoint must be from the root block.
+					// read the root hash from the provided checkpoint and verify it matches the
+					// state commitment from the root snapshot.
+					err := wal.CheckpointHasRootHash(
+						node.Logger,
+						"", // checkpoint file already full path
+						checkpointFile,
+						ledger.RootHash(node.RootSeal.FinalState),
+					)
+					if err != nil {
+						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
+					}
+
+					checkpointHeight := builder.SealedRootBlock.Height
+
+					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
+							builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+					}
+
+					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
+					bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+					if err != nil {
+						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
+					}
+
+					// TODO: find a way to hook a context up to this to allow a graceful shutdown
+					workerCount := 10
+					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+					if err != nil {
+						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
+					}
+				}
+				registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
+				if err != nil {
+					return nil, fmt.Errorf("could not create registers storage: %w", err)
+				}
+
+				if builder.registerCacheSize > 0 {
+					cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
+					if err != nil {
+						return nil, fmt.Errorf("could not parse register cache type: %w", err)
+					}
+					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+					registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+					if err != nil {
+						return nil, fmt.Errorf("could not create registers cache: %w", err)
+					}
+					builder.Storage.RegisterIndex = registersCache
+				} else {
+					builder.Storage.RegisterIndex = registers
+				}
+
+				builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
+
 				var indexerDerivedChainData *derived.DerivedChainData
 				if builder.programCacheSize > 0 {
 					var err error
@@ -991,6 +989,25 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
+
+				queryDerivedChainData, err := builder.buildQueryDerivedChainData()
+				if err != nil {
+					return nil, fmt.Errorf("could not create query derived chain data: %w", err)
+				}
+
+				builder.ScriptExecutor = execution.NewScripts(
+					builder.Logger,
+					metrics.NewExecutionCollector(builder.Tracer),
+					builder.RootChainID,
+					computation.NewProtocolStateWrapper(builder.State),
+					builder.Storage.Headers,
+					builder.scriptExecutorConfig,
+					queryDerivedChainData,
+					builder.programCacheSize > 0,
+					builder.scriptExecMinBlock,
+					builder.scriptExecMaxBlock,
+					builder.VersionControl,
+				)
 
 				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
 				if err != nil {
@@ -1877,27 +1894,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
-		Module("script executor", func(node *cmd.NodeConfig) error {
-			queryDerivedChainData, err := builder.buildQueryDerivedChainData()
-			if err != nil {
-				return fmt.Errorf("could not create query derived chain data: %w", err)
-			}
-
-			builder.ScriptExecutor = execution.NewScripts(
-				builder.Logger,
-				metrics.NewExecutionCollector(builder.Tracer),
-				builder.RootChainID,
-				computation.NewProtocolStateWrapper(builder.State),
-				builder.Storage.Headers,
-				builder.scriptExecutorConfig,
-				queryDerivedChainData,
-				builder.programCacheSize > 0,
-				builder.scriptExecMinBlock,
-				builder.scriptExecMaxBlock,
-				builder.VersionControl,
-			)
-			return nil
-		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
 			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 			return nil
@@ -2111,7 +2107,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.transactions,
 				builder.lightTransactionResults,
 				builder.transactionResultErrorMessages,
-				notNil(builder.registers),
+				builder.registers,
 			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
@@ -2126,7 +2122,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
-				Registers:             notNil(builder.registers),
+				Registers:             builder.registers,
 				ChainID:               node.RootChainID,
 				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
