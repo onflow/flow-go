@@ -417,14 +417,20 @@ func (a *api) ExecuteScriptAtLatestBlock(
 	_ context.Context,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, error) {
-	return runScript(
+	_ optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	value, err := runScript(
 		a.vm,
 		a.ctx,
 		a.storageSnapshot,
 		script,
 		arguments,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return value, nil, err
 }
 
 func (*api) ExecuteScriptAtBlockHeight(
@@ -432,8 +438,9 @@ func (*api) ExecuteScriptAtBlockHeight(
 	_ uint64,
 	_ []byte,
 	_ [][]byte,
-) ([]byte, error) {
-	return nil, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) ExecuteScriptAtBlockID(
@@ -441,8 +448,9 @@ func (*api) ExecuteScriptAtBlockID(
 	_ flow.Identifier,
 	_ []byte,
 	_ [][]byte,
-) ([]byte, error) {
-	return nil, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (a *api) GetEventsForHeightRange(

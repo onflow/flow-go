@@ -300,11 +300,12 @@ type ObserverServiceBuilder struct {
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
-	ScriptExecutor      *backend.ScriptExecutor
+	ScriptExecutor      *execution.Scripts
 
 	// storage
 	events                  storage.Events
 	lightTransactionResults storage.LightTransactionResults
+	registers               storage.RegisterSnapshotReader
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -1373,23 +1374,32 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			pdb, err := pstorage.OpenRegisterPebbleDB(
 				node.Logger.With().Str("pebbledb", "registers").Logger(),
-				builder.registersDBPath)
+				builder.registersDBPath,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not open registers db: %w", err)
 			}
-			builder.ShutdownFunc(func() error {
-				return pdb.Close()
-			})
+			builder.ShutdownFunc(
+				func() error {
+					return pdb.Close()
+				},
+			)
 
 			bootstrapped, err := pstorage.IsBootstrapped(pdb)
 			if err != nil {
-				return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+				return nil, fmt.Errorf(
+					"could not check if registers db is bootstrapped: %w",
+					err,
+				)
 			}
 
 			if !bootstrapped {
 				checkpointFile := builder.checkpointFile
 				if checkpointFile == cmd.NotSet {
-					checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
+					checkpointFile = path.Join(
+						builder.BootstrapDir,
+						bootstrap.PathRootCheckpoint,
+					)
 				}
 
 				// currently, the checkpoint must be from the root block.
@@ -1408,12 +1418,20 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				checkpointHeight := builder.SealedRootBlock.Height
 
 				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
-					return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
-						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+					return nil, fmt.Errorf(
+						"mismatching sealed root block and root seal: %v != %v",
+						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID,
+					)
 				}
 
 				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-				bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+				bootstrap, err := pstorage.NewRegisterBootstrap(
+					pdb,
+					checkpointFile,
+					checkpointHeight,
+					rootHash,
+					builder.Logger,
+				)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
 				}
@@ -1437,7 +1455,12 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return nil, fmt.Errorf("could not parse register cache type: %w", err)
 				}
 				cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
-				registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+				registersCache, err := pstorage.NewRegistersCache(
+					registers,
+					cacheType,
+					builder.registerCacheSize,
+					cacheMetrics,
+				)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers cache: %w", err)
 				}
@@ -1446,9 +1469,15 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.RegisterIndex = registers
 			}
 
-			indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
-			if err != nil {
-				return nil, fmt.Errorf("could not create derived chain data: %w", err)
+			builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
+
+			var indexerDerivedChainData *derived.DerivedChainData
+			if builder.programCacheSize > 0 {
+				var err error
+				indexerDerivedChainData, err = builder.buildQueryDerivedChainData()
+				if err != nil {
+					return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
+				}
 			}
 
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
@@ -1475,8 +1504,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(
 				builder.Logger,
-				registers.FirstHeight(),
-				registers,
+				builder.Storage.RegisterIndex,
 				indexerCore,
 				executionDataStoreCache,
 				builder.ExecutionDataRequester.HighestConsecutiveHeight,
@@ -1498,26 +1526,26 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
-			// create script execution module, this depends on the indexer being initialized and the
-			// having the register storage bootstrapped
-			scripts := execution.NewScripts(
+			queryDerivedChainData, err := builder.buildQueryDerivedChainData()
+			if err != nil {
+				return nil, fmt.Errorf("could not create query derived chain data: %w", err)
+			}
+
+			builder.ScriptExecutor = execution.NewScripts(
 				builder.Logger,
 				metrics.NewExecutionCollector(builder.Tracer),
 				builder.RootChainID,
 				computation.NewProtocolStateWrapper(builder.State),
 				builder.Storage.Headers,
-				builder.ExecutionIndexerCore.RegisterValue,
 				builder.scriptExecutorConfig,
 				queryDerivedChainData,
 				builder.programCacheSize > 0,
+				builder.scriptExecMinBlock,
+				builder.scriptExecMaxBlock,
+				builder.VersionControl,
 			)
 
-			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
-			if err != nil {
-				return nil, err
-			}
-
-			err = builder.RegistersAsyncStore.Initialize(registers)
+			err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
 			if err != nil {
 				return nil, err
 			}
@@ -1621,11 +1649,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	return builder
 }
 
-// buildDerivedChainData creates the derived chain data for the indexer and the query engine
-// If program caching is disabled, the function will return nil for the indexer cache, and a
-// derived chain data object for the query engine cache.
-func (builder *ObserverServiceBuilder) buildDerivedChainData() (
-	indexerCache *derived.DerivedChainData,
+// buildQueryDerivedChainData creates the derived chain data for the query engine.
+// If program caching is disabled, the function will return a derived chain data object for the query engine cache.
+func (builder *ObserverServiceBuilder) buildQueryDerivedChainData() (
 	queryCache *derived.DerivedChainData,
 	err error,
 ) {
@@ -1638,15 +1664,10 @@ func (builder *ObserverServiceBuilder) buildDerivedChainData() (
 
 	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
-	if builder.programCacheSize == 0 {
-		return nil, derivedChainData, nil
-	}
-
-	return derivedChainData, derivedChainData, nil
+	return derivedChainData, nil
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
@@ -1829,10 +1850,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 		return nil
 	})
-	builder.Module("script executor", func(node *cmd.NodeConfig) error {
-		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
-		return nil
-	})
 
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
@@ -1992,7 +2009,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			nil,
 			builder.lightTransactionResults,
 			nil,
-			nil,
+			builder.registers,
 		)
 		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 

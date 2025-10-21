@@ -78,6 +78,16 @@ func TestConvertError_Success(t *testing.T) {
 			typeName: "collection",
 			expected: access.NewServiceUnavailable(status.Error(codes.Unavailable, "connection refused")),
 		},
+		{
+			name:     "ResourceExhausted with service resource exhausted error prefix",
+			typeName: "execution result",
+			expected: access.NewServiceUnavailable(errors.New("upstream service down")),
+		},
+		{
+			name:     "ResourceExhausted without prefix (client side)",
+			typeName: "collection",
+			expected: access.NewServiceUnavailable(status.Error(codes.Unavailable, "connection refused")),
+		},
 	}
 
 	for _, tt := range tests {
@@ -108,6 +118,8 @@ func TestConvertError_Success(t *testing.T) {
 				assert.True(t, access.IsRequestTimedOutError(actual))
 			case access.ServiceUnavailable:
 				assert.True(t, access.IsServiceUnavailable(actual))
+			case access.ResourceExhausted:
+				assert.True(t, access.IsResourceExhausted(actual))
 			default:
 				t.Fatalf("unexpected error type: %T", tt.expected)
 			}

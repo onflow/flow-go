@@ -13,6 +13,14 @@ import (
 const maxFailedRequestCount = 3
 
 type Communicator interface {
+	// CallAvailableNode calls the provided function on the available nodes.
+	// It iterates through the nodes and executes the function.
+	// If an error occurs, it applies the custom error terminator (if provided) and keeps track of the errors.
+	// If the error occurs in circuit breaker, it continues to the next node.
+	// If the maximum failed request count is reached, it returns the accumulated errors.
+	//
+	// Expected error returns during normal operation:
+	//   - [codes.Unavailable] - if no nodes are available.
 	CallAvailableNode(
 		//List of node identifiers to execute callback on
 		nodes flow.IdentitySkeletonList,
@@ -44,6 +52,9 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 // If an error occurs, it applies the custom error terminator (if provided) and keeps track of the errors.
 // If the error occurs in circuit breaker, it continues to the next node.
 // If the maximum failed request count is reached, it returns the accumulated errors.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - if no nodes are available.
 func (b *NodeCommunicator) CallAvailableNode(
 	//List of node identifiers to execute callback on
 	nodes flow.IdentitySkeletonList,

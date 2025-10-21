@@ -262,3 +262,27 @@ func IsServiceUnavailable(err error) bool {
 	var errServiceUnavailable ServiceUnavailable
 	return errors.As(err, &errServiceUnavailable)
 }
+
+// ResourceExhausted indicates when computation or memory limits were exceeded
+type ResourceExhausted struct {
+	err error
+}
+
+func NewResourceExhausted(err error) ResourceExhausted {
+	return ResourceExhausted{err: err}
+}
+
+func (e ResourceExhausted) Error() string {
+	return fmt.Sprintf("resource exhausted error: %v", e.err)
+}
+
+func (e ResourceExhausted) Unwrap() error {
+	return e.err
+}
+
+func (e ResourceExhausted) accessSentinel() {}
+
+func IsResourceExhausted(err error) bool {
+	var errResourceExhausted ResourceExhausted
+	return errors.As(err, &errResourceExhausted)
+}
