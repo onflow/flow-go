@@ -49,6 +49,8 @@ func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler 
 	return h
 }
 
+// GetExecutionDataByBlockID handles request to fetch execution data for a
+// specific block.
 func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *executiondata.GetExecutionDataByBlockIDRequest) (*executiondata.GetExecutionDataByBlockIDResponse, error) {
 	blockID, err := convert.BlockID(request.GetBlockId())
 	if err != nil {

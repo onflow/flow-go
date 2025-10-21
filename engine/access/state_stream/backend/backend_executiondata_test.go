@@ -355,6 +355,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 
 	var err error
+	reader := osyncmock.NewBlockExecutionDataReader(s.T())
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
@@ -377,7 +378,6 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			Return(s.executionDataSnapshot, nil).
 			Once()
 
-		reader := osyncmock.NewBlockExecutionDataReader(s.T())
 		s.executionDataSnapshot.
 			On("BlockExecutionData").
 			Return(reader).
@@ -413,7 +413,6 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			Return(s.executionDataSnapshot, nil).
 			Once()
 
-		reader := osyncmock.NewBlockExecutionDataReader(s.T())
 		s.executionDataSnapshot.
 			On("BlockExecutionData").
 			Return(reader).
