@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 const (
@@ -16,7 +18,14 @@ const (
 // API represents an interface that defines methods for interacting with a blockchain's execution data and events.
 type API interface {
 	// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
-	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected errors:
+	// - [access.DataNotFoundError]: when data required to process the request is not available.
+	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier, criteria optimistic_sync.Criteria) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error)
 	// SubscribeExecutionData is deprecated and will be removed in future versions.
 	// Use SubscribeExecutionDataFromStartBlockID, SubscribeExecutionDataFromStartBlockHeight or SubscribeExecutionDataFromLatest.
 	//
