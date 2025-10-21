@@ -192,7 +192,10 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
-
+	span.SetAttributes(
+		attribute.Int64("chunk", int64(vc.Chunk.Index)),
+		attribute.Int64("collection_len", int64(vc.ChunkDataPack.Collection.Len())),
+	)
 	spockSecret, err := e.chVerif.Verify(vc)
 	span.End()
 

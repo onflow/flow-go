@@ -3,6 +3,7 @@ package assigner
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
 	"sync/atomic"
 
 	"github.com/rs/zerolog"
@@ -300,9 +301,18 @@ func (e *Engine) resultChunkAssignmentWithTracing(
 func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
 	var err error
 	var processed bool
-	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerProcessChunk, func() {
-		processed, err = e.processChunk(chunk, resultID, blockHeight)
-	})
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERAssignerProcessChunk)
+	defer span.End()
+	processed, err = e.processChunk(chunk, resultID, blockHeight)
+	queueSize, err := e.chunksQueue.LatestIndex()
+	if err != nil {
+		panic("failed to determine job queue size: %w" + err.Error())
+	}
+	span.SetAttributes(
+		attribute.Int64("chunk", int64(chunk.Index)),
+		attribute.Int("chunk_queue_size", int(queueSize)),
+	)
+
 	return processed, err
 }
 

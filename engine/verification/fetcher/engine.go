@@ -166,7 +166,9 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 
 	// We don't have any existing information and don't need cancellation, so use a background (empty) context
 	span, _ := e.tracer.StartBlockSpan(context.Background(), result.BlockID, trace.VERProcessAssignedChunk)
-	span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
+	span.SetAttributes(
+		attribute.Int("collection_index", int(chunk.CollectionIndex)),
+		attribute.Int64("chunk", int64(chunk.Index)))
 	defer span.End()
 
 	requested, blockHeight, err := e.processAssignedChunk(chunk, result, chunkLocatorID)
@@ -260,6 +262,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		Logger()
 
 	span, ctx := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
+	span.SetAttributes(attribute.Int64("chunk", int64(response.Index)))
 	defer span.End()
 
 	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)
