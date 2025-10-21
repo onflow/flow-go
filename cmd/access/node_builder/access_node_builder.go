@@ -943,9 +943,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				indexerDerivedChainData, err := builder.buildIndexerDerivedChainData()
-				if err != nil {
-					return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
+				var indexerDerivedChainData *derived.DerivedChainData
+				if builder.programCacheSize > 0 {
+					var err error
+					indexerDerivedChainData, err = builder.buildQueryDerivedChainData()
+					if err != nil {
+						return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
+					}
 				}
 
 				indexerCore, err := indexer.New(
@@ -2498,10 +2502,7 @@ func notNil[T any](dep T) T {
 
 // buildQueryDerivedChainData creates the derived chain data for the query engine.
 // If program caching is disabled, the function will return a derived chain data object for the query engine cache.
-func (builder *FlowAccessNodeBuilder) buildQueryDerivedChainData() (
-	queryCache *derived.DerivedChainData,
-	err error,
-) {
+func (builder *FlowAccessNodeBuilder) buildQueryDerivedChainData() (*derived.DerivedChainData, error) {
 	cacheSize := builder.programCacheSize
 
 	// the underlying cache requires size > 0. no data will be written so 1 is fine.
@@ -2512,32 +2513,6 @@ func (builder *FlowAccessNodeBuilder) buildQueryDerivedChainData() (
 	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
 	if err != nil {
 		return nil, err
-	}
-
-	return derivedChainData, nil
-}
-
-// buildIndexerDerivedChainData creates the derived chain data for the indexer engine
-// If program caching is disabled, the function will return nil for the indexer cache.
-func (builder *FlowAccessNodeBuilder) buildIndexerDerivedChainData() (
-	indexerCache *derived.DerivedChainData,
-	err error,
-) {
-	cacheSize := builder.programCacheSize
-
-	// the underlying cache requires size > 0. no data will be written so 1 is fine.
-	if cacheSize == 0 {
-		cacheSize = 1
-	}
-
-	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
-	if err != nil {
-		return nil, err
-	}
-
-	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
-	if builder.programCacheSize == 0 {
-		return nil, nil
 	}
 
 	return derivedChainData, nil

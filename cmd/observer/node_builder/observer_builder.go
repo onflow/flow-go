@@ -1474,9 +1474,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// other components from starting while bootstrapping the register db since it may
 			// take hours to complete.
 
-			indexerDerivedChainData, err := builder.buildIndexerDerivedChainData()
-			if err != nil {
-				return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
+			var indexerDerivedChainData *derived.DerivedChainData
+			if builder.programCacheSize > 0 {
+				var err error
+				indexerDerivedChainData, err = builder.buildQueryDerivedChainData()
+				if err != nil {
+					return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
+				}
 			}
 
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
@@ -1646,32 +1650,6 @@ func (builder *ObserverServiceBuilder) buildQueryDerivedChainData() (
 	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
 	if err != nil {
 		return nil, err
-	}
-
-	return derivedChainData, nil
-}
-
-// buildIndexerDerivedChainData creates the derived chain data for the indexer engine
-// If program caching is disabled, the function will return nil for the indexer cache.
-func (builder *ObserverServiceBuilder) buildIndexerDerivedChainData() (
-	indexerCache *derived.DerivedChainData,
-	err error,
-) {
-	cacheSize := builder.programCacheSize
-
-	// the underlying cache requires size > 0. no data will be written so 1 is fine.
-	if cacheSize == 0 {
-		cacheSize = 1
-	}
-
-	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
-	if err != nil {
-		return nil, err
-	}
-
-	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
-	if builder.programCacheSize == 0 {
-		return nil, nil
 	}
 
 	return derivedChainData, nil
