@@ -17,6 +17,11 @@ type ScriptExecutor interface {
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+	//   - [fvmerrors.ErrCodeScriptExecutionCancelledError] - if script execution canceled.
+	//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError] - if script execution timed out.
+	//   - [fvmerrors.ErrCodeComputationLimitExceededError] - if script execution computation limit exceeded.
+	//   - [fvmerrors.ErrCodeMemoryLimitExceededError] - if script execution memory limit exceeded.
+	//   - [indexer.ErrIndexNotInitialized] - if data for block is not available.
 	ExecuteAtBlockHeight(
 		ctx context.Context,
 		script []byte,

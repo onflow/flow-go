@@ -55,10 +55,13 @@ func NewLocalScriptExecutor(
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found or snapshot at executionResultID was not found.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
-//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
 //   - [codes.Canceled] - if the script execution was canceled.
 //   - [codes.DeadlineExceeded] - if the script execution timed out.
 //   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [codes.FailedPrecondition] - if data for block is not available.
+//   - [codes.OutOfRange] - if data for block height is not available.
+//   - [codes.NotFound] - if data not found.
 //   - [codes.Internal] - for internal failures or index conversion errors.
 func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
@@ -117,10 +120,13 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 // convertScriptExecutionError converts the script execution error to a gRPC error.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument] - for general runtime script errors.
 //   - [codes.Canceled] - if the script execution was canceled.
 //   - [codes.DeadlineExceeded] - if the script execution timed out.
 //   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [codes.FailedPrecondition] - if data for block is not available.
+//   - [codes.OutOfRange] - if data for block height is not available.
+//   - [codes.NotFound] - if data not found.
 //   - [codes.Internal] - for internal failures or index conversion errors.
 func convertScriptExecutionError(err error, height uint64) error {
 	if err == nil {

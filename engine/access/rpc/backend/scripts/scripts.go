@@ -3,11 +3,14 @@ package scripts
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"errors"
 	"fmt"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -16,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts/executor"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/version"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -125,9 +129,16 @@ func NewScriptsBackend(
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// Expected errors:
-//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size
-//   - [access.DataNotFoundError] - when data required to process the request is not available.
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
+//     if the script execution failed due to invalid arguments.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
 func (b *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
@@ -152,16 +163,23 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
-		if common.IsInsufficientExecutionReceipts(err) {
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
 		}
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
 	request := executor.NewScriptExecutionRequest(latestHeaderID, latestHeader.Height, script, arguments)
 	res, metadata, err := b.executor.Execute(ctx, request, executionResultInfo)
-	return res, metadata, err
+	if err != nil {
+		return nil, nil, handleScriptExecutionError(ctx, err)
+	}
+
+	return res, metadata, nil
 }
 
 // ExecuteScriptAtBlockID executes provided script at the provided block ID.
@@ -171,9 +189,16 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// Expected errors:
-//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
-//   - [access.DataNotFoundError] - when data required to process the request is not available.
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
+//     if the script execution failed due to invalid arguments.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
 func (b *Scripts) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -195,11 +220,14 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, userCriteria)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
-		if common.IsInsufficientExecutionReceipts(err) {
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
 		}
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
 	res, metadata, err := b.executor.Execute(
@@ -207,7 +235,11 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 		executor.NewScriptExecutionRequest(blockID, header.Height, script, arguments),
 		executionResultInfo,
 	)
-	return res, metadata, err
+	if err != nil {
+		return nil, nil, handleScriptExecutionError(ctx, err)
+	}
+
+	return res, metadata, nil
 }
 
 // ExecuteScriptAtBlockHeight executes provided script at the provided block height.
@@ -217,9 +249,16 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// Expected errors:
-//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
-//   - [access.DataNotFoundError] - when data required to process the request is not available.
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
+//     if the script execution failed due to invalid arguments.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
 func (b *Scripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -239,21 +278,78 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
-	blockID := header.ID()
-	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, userCriteria)
+	headerID := header.ID()
+	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(headerID, userCriteria)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
-		if common.IsInsufficientExecutionReceipts(err) {
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
 		}
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, nil, access.NewDataNotFoundError("execution data", err)
 	}
 
 	res, metadata, err := b.executor.Execute(
 		ctx,
-		executor.NewScriptExecutionRequest(blockID, blockHeight, script, arguments),
+		executor.NewScriptExecutionRequest(headerID, blockHeight, script, arguments),
 		executionResultInfo,
 	)
-	return res, metadata, err
+	if err != nil {
+		return nil, nil, handleScriptExecutionError(ctx, err)
+	}
+
+	return res, metadata, nil
+}
+
+// handleScriptExecutionError converts storage, execution, version or gRPC errors
+// into access-layer errors according to the Access API error handling convention.
+//
+// Expected error returns during normal operation:
+//   - [access.DataNotFoundError] - if the script data or related execution data was not found,
+//     or if the block height is out of range or incompatible with node version.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.InternalError] - for internal failures or conversion errors.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection could not be established.
+func handleScriptExecutionError(ctx context.Context, err error) error {
+	err = fmt.Errorf("failed to execute script: %w", err)
+
+	switch {
+	case errors.Is(err, version.ErrOutOfRange),
+		errors.Is(err, execution.ErrIncompatibleNodeVersion),
+		errors.Is(err, storage.ErrNotFound),
+		errors.Is(err, storage.ErrHeightNotIndexed):
+		return access.NewDataNotFoundError("script", err)
+	}
+
+	// Handle gRPC status errors according to ScriptExecutor
+	if st, ok := status.FromError(err); ok {
+		switch st.Code() {
+		case codes.InvalidArgument,
+			codes.OutOfRange,
+			codes.NotFound:
+			return access.NewDataNotFoundError("script", err)
+		case codes.FailedPrecondition:
+			return access.NewPreconditionFailedError(err)
+		case codes.Canceled:
+			return access.NewRequestCanceledError(err)
+		case codes.DeadlineExceeded:
+			return access.NewRequestTimedOutError(err)
+		case codes.ResourceExhausted:
+			return access.NewResourceExhausted(err)
+		case codes.Internal:
+			return access.NewInternalError(err)
+		case codes.Unavailable:
+			return access.NewServiceUnavailable(err)
+		default:
+			return access.RequireNoError(ctx, err)
+		}
+	}
+
+	return access.RequireNoError(ctx, err)
 }

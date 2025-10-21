@@ -24,6 +24,9 @@ type ScriptExecutor interface {
 	//   - [codes.Canceled] - if the script execution was canceled.
 	//   - [codes.DeadlineExceeded] - if the script execution timed out.
 	//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+	//   - [codes.FailedPrecondition] - if data for block is not available.
+	//   - [codes.OutOfRange] - if data for block height is not available.
+	//   - [codes.NotFound] - if data not found.
 	//   - [codes.Internal] - for internal failures or index conversion errors.
 	//   - [codes.Unavailable] - if no nodes are available or a connection to an execution node could not be established.
 	Execute(ctx context.Context, scriptRequest *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo) ([]byte, *accessmodel.ExecutorMetadata, error)

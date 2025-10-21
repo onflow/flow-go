@@ -30,8 +30,15 @@ type ExecuteScriptCommand struct {
 // specified block height.
 //
 // Expected error returns during normal operation:
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the data for the block height is not available.
+//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [storage.ErrNotFound] - if data was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [fvmerrors.ErrCodeScriptExecutionCancelledError] - if script execution canceled.
+//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError] - if script execution timed out.
+//   - [fvmerrors.ErrCodeComputationLimitExceededError] - if script execution computation limit exceeded.
+//   - [fvmerrors.ErrCodeMemoryLimitExceededError] -if script execution memory limit exceeded.
+//   - [indexer.ErrIndexNotInitialized] - if data for block is not available.
 func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
