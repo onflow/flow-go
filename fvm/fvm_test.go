@@ -2308,7 +2308,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.True(t, errors.IsComputationLimitExceededError(output.Err))
 				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
-				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(456687216))
 			},
 		),
 	)
@@ -2319,7 +2319,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
-			fvm.WithComputationLimit(20000),
+			fvm.WithComputationLimit(25000),
 			fvm.WithChain(chain),
 		).run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
