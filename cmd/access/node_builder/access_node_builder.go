@@ -1617,7 +1617,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
-					filter.HasRole[flow.Identity](flow.RoleConsensus),
+					filter.HasRole[flow.Identity](flow.RoleExecution),
 					filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 					filter.NotEjectedFilter,
 				),

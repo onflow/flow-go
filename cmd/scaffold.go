@@ -1335,7 +1335,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.HasRole[flow.Identity](flow.RoleExecution),
 				filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 				filter.NotEjectedFilter,
 			),
