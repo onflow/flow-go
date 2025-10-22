@@ -81,6 +81,11 @@ func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics, cha
 func (c *Core) HandleBlock(header *flow.Header) bool {
 	// Always accept new blocks. Since we forcibly send the block requests, the book keeping below
 	// will cause the block to ignored.
+
+	c.log.Info().
+		Str("block_id", header.ID().String()).
+		Uint64("block_height", header.Height).
+		Msg("handled block")
 	return true
 
 	// log := c.log

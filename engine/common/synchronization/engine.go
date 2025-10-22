@@ -481,7 +481,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
 		}
-		e.log.Debug().
+		e.log.Info().
 			Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
 			Uint64("range_nonce", req.Nonce).
 			Msg("batch requested")
