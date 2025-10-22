@@ -79,36 +79,40 @@ func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics, cha
 // true if the block should be processed by the compliance layer and false
 // if it should be ignored.
 func (c *Core) HandleBlock(header *flow.Header) bool {
-	log := c.log
-	if c.log.Debug().Enabled() {
-		log = c.log.With().Str("block_id", header.ID().String()).Uint64("block_height", header.Height).Logger()
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	status := c.getRequestStatus(header.Height, header.ID())
-
-	// if we never asked for this block, discard it
-	if !status.WasQueued() {
-		log.Debug().Msg("discarding not queued block")
-		return false
-	}
-	// if we have already received this block, exit
-	if status.WasReceived() {
-		log.Debug().Msg("discarding not received block")
-		return false
-	}
-
-	// this is a new block, remember that we've seen it
-	status.Header = header
-	status.Received = time.Now()
-
-	// track it by ID and by height so we don't accidentally request it again
-	c.blockIDs[header.ID()] = status
-	c.heights[header.Height] = status
-
-	log.Debug().Msg("handled block")
+	// Always accept new blocks. Since we forcibly send the block requests, the book keeping below
+	// will cause the block to ignored.
 	return true
+
+	// log := c.log
+	// if c.log.Debug().Enabled() {
+	// 	log = c.log.With().Str("block_id", header.ID().String()).Uint64("block_height", header.Height).Logger()
+	// }
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
+
+	// status := c.getRequestStatus(header.Height, header.ID())
+
+	// // if we never asked for this block, discard it
+	// if !status.WasQueued() {
+	// 	log.Debug().Msg("discarding not queued block")
+	// 	return false
+	// }
+	// // if we have already received this block, exit
+	// if status.WasReceived() {
+	// 	log.Debug().Msg("discarding not received block")
+	// 	return false
+	// }
+
+	// // this is a new block, remember that we've seen it
+	// status.Header = header
+	// status.Received = time.Now()
+
+	// // track it by ID and by height so we don't accidentally request it again
+	// c.blockIDs[header.ID()] = status
+	// c.heights[header.Height] = status
+
+	// log.Debug().Msg("handled block")
+	// return true
 }
 
 // HandleHeight handles receiving a new highest finalized height from another node.
