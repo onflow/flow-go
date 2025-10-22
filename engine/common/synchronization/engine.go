@@ -425,6 +425,43 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 	}
 
+	blockIDs := []string{
+		"26a8fbb45d9450cae9ee5609c84a8c8dac56c3438c91b218e215446f889d23d8", // 130290664
+		"95982c73effa353324e299e4cb6d374cb2c9adc8d951593b1432c643f5785c25", // 130290663
+		"177c731b4656c52188e1bedbb187eb21da921e524e4e9745a1e7ae2f6815aba5", // 130290662
+		"b6f4ddd1ea1afd02571341614f90f4765625d5383f9197ed98da3d943644af8b", // 130290661
+		"5b7679b7f86197ce4a4cfcca7fd4926d8cad4a0d0369f07613d9960c1f30a533", // 130290660
+		"40166922ae42fd8e269b0b7bdb11137f50954450ffa32ec3727128149ec74e34", // 130290659
+		"28d657bc8c6b0608e4c7caef3fb37b5b05f58c7bfedd1b8e556bd0940735e9cd", // 130290658
+		"7cc6e59b0dd3418e02cf5afbb4b2d22356e46ba1b514e31cf90b7e8cab4d0bec", // 130290657
+		"339ca0532dd44188f94d9e7e2baf4dfe81055b4036a4c5ce931e356055a8965c", // 130290656
+		"8166e6f01e71513782a2d004702759f99ce6b758402767559815f98d44a3b85a", // 130290655
+		"ecf8b6bb193ea368b606913d5dead98fe8cbebca66aa5869682f2cd13c14c5f7", // 130290654
+		"16f0c55dfb76f53ed7492798a63e2860b7438c8c330515fa084dfae5ad8d3779", // 130290653
+		"a00b9c955916ae25c8f96b259a79a4171af323dfa9abf5c32bd9788e7b1d9ce0", // 130290652
+		"86013212dace29b0c454998ec134f84131ae39ac19c3ddd0c5e5647aa169f98e", // 130290651
+		"9a53bba124f7cbeb526283fb9cedcf37ad9fd8f818d8c5e95ced799b4158a5c6", // 130290650
+		"18d48b81e195f74556eeb7f8e898f617b64279f16485e1909cb4450295ef6010", // 130290649
+		"3cce19c4271a1b95305c41d5d892557b6e6e07c936e1db723a9f032099f49944", // 130290648
+		"5a754af07cf5f43db3d34d26f83d3b32a4d7003df2d470ea062b4ad3730a592d", // 130290647
+		"f6aa413316f33f3f46079136c5a3edaf90ee66712b97e6b452c342222e83704d", // 130290646
+		"69ac0584fb6f2daa731515af2bf248d0f5789f02b1f7f398d00d710541eaa9e8", // 130290645
+		"b22bfb09edc573eb04cdd6f5df83d2c62b04b1f92a38e5e9b4ded8ed6257893c", // 130290644
+		"e3b62139cd71090949ac7dcb4c9ee9fac1e392c6dd55695a0da92cb78f7ce1ca", // 130290643
+	}
+	blocksIDs := make([]flow.Identifier, len(blockIDs))
+	for i, blockID := range blockIDs {
+		block, err := flow.HexStringToIdentifier(blockID)
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("failed to parse block ID")
+		}
+		blocksIDs[i] = block
+	}
+
+	batches = append(batches, chainsync.Batch{
+		BlockIDs: blocksIDs,
+	})
+
 	for _, batch := range batches {
 		nonce, err := rand.Uint64()
 		if err != nil {
