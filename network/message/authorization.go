@@ -123,7 +123,7 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
-				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
+				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus, flow.RoleExecution},
 				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 			channels.SyncClusterPrefix: {
@@ -171,7 +171,7 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
-				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus},
+				AuthorizedRoles:  flow.RoleList{flow.RoleConsensus, flow.RoleExecution},
 				AllowedProtocols: Protocols{ProtocolTypeUnicast},
 			},
 		},
