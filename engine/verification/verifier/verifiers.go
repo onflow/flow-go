@@ -255,7 +255,7 @@ func initStorages(
 	}
 	storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics.NewNoopCollector(), pebbleimpl.ToDB(chunkDataPackDB), 1000)
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
-		pebbleimpl.ToDB(chunkDataPackDB), storedChunkDataPacks, storages.Collections, 1000)
+		db, storedChunkDataPacks, storages.Collections, 1000)
 
 	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledCallbacksEnabled)
 	closer := func() error {

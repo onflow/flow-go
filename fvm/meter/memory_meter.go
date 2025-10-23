@@ -263,6 +263,10 @@ var (
 
 		common.MemoryKindBoundFunctionVMValue:     17,
 		common.MemoryKindImplicitReferenceVMValue: 17,
+
+		common.MemoryKindArrayIterator:         9,
+		common.MemoryKindDictionaryKeyIterator: 9,
+		common.MemoryKindStringIterator:        9,
 	}
 )
 
