@@ -1,7 +1,6 @@
 package stores
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -14,20 +13,20 @@ var _ PersisterStore = (*EventsStore)(nil)
 
 // EventsStore handles persisting events
 type EventsStore struct {
-	data            []flow.Event
-	persistedEvents storage.Events
-	blockID         flow.Identifier
+	data    []flow.Event
+	events  storage.Events
+	blockID flow.Identifier
 }
 
 func NewEventsStore(
 	data []flow.Event,
-	persistedEvents storage.Events,
+	events storage.Events,
 	blockID flow.Identifier,
 ) *EventsStore {
 	return &EventsStore{
-		data:            data,
-		persistedEvents: persistedEvents,
-		blockID:         blockID,
+		data:    data,
+		events:  events,
+		blockID: blockID,
 	}
 }
 
@@ -35,14 +34,8 @@ func NewEventsStore(
 //
 // No error returns are expected during normal operations
 func (e *EventsStore) Persist(_ lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	err := e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{e.data}, batch)
+	err := e.events.BatchStore(e.blockID, []flow.EventsList{e.data}, batch)
 	if err != nil {
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			// CAUTION: here we assume that if something is already stored for our blockID, then the data is identical.
-			// This only holds true for sealed execution results, whose consistency has previously been verified by
-			// comparing the data's hash to commitments in the execution result.
-			return nil
-		}
 		return fmt.Errorf("could not add events to batch: %w", err)
 	}
 
