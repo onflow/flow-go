@@ -615,15 +615,16 @@ type CollectionMetrics interface {
 	// a tx->col span for the transaction.
 	TransactionIngested(txID flow.Identifier)
 
-	// ClusterBlockProposed is called when a new collection is proposed by us or
-	// any other node in the cluster.
-	ClusterBlockProposed(block *cluster.Block)
-
 	// ClusterBlockFinalized is called when a collection is finalized.
 	ClusterBlockFinalized(block *cluster.Block)
 
 	// CollectionMaxSize measures the current maximum size of a collection.
 	CollectionMaxSize(size uint)
+
+	// ClusterBlockCreated informs about cluster blocks being PROPOSED by THIS NODE.
+	// CAUTION: These metrics will represent a partial picture of cluster block creation across the network,
+	// as each node will only report on cluster blocks where they are the proposer.
+	ClusterBlockCreated(block *cluster.Block, priorityTxnsCount uint)
 }
 
 type ConsensusMetrics interface {
@@ -823,6 +824,22 @@ type ExecutionStateIndexerMetrics interface {
 	// This should only be used during startup. After startup, use BlockIndexed to record newly
 	// indexed heights.
 	InitializeLatestHeight(height uint64)
+}
+
+type TransactionErrorMessagesMetrics interface {
+	// TxErrorsInitialHeight records the initial height of the transaction error messages.
+	TxErrorsInitialHeight(height uint64)
+
+	// TxErrorsFetchStarted records that a transaction error messages download has started.
+	TxErrorsFetchStarted()
+
+	// TxErrorsFetchFinished records that a transaction error messages download has finished.
+	// Pass the highest consecutive height to ensure the metrics reflect the height up to which the
+	// requester has completed downloads. This allows us to easily see when downloading gets stuck.
+	TxErrorsFetchFinished(duration time.Duration, success bool, height uint64)
+
+	// TxErrorsFetchRetried records that a transaction error messages download has been retried.
+	TxErrorsFetchRetried()
 }
 
 type RuntimeMetrics interface {

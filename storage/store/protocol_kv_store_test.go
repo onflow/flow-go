@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TesKeyValueStoreStorage tests if the KV store is stored, retrieved and indexed correctly
+// TestKeyValueStoreStorage tests if the KV store is stored, retrieved and indexed correctly
 func TestKeyValueStoreStorage(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()

@@ -233,9 +233,7 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 					return fmt.Errorf("could not process waiting persist state: %w", err)
 				}
 			case StateAbandoned:
-				if err := p.core.Abandon(); err != nil {
-					return fmt.Errorf("could not process abandonded state: %w", err)
-				}
+				p.core.Abandon()
 				return nil
 			case StateComplete:
 				return nil // terminate

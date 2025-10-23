@@ -253,8 +253,9 @@ func initStorages(
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}
+	storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics.NewNoopCollector(), pebbleimpl.ToDB(chunkDataPackDB), 1000)
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
-		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
+		db, storedChunkDataPacks, storages.Collections, 1000)
 
 	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledCallbacksEnabled)
 	closer := func() error {

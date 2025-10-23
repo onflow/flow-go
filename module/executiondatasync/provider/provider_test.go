@@ -37,7 +37,7 @@ const (
 
 var (
 	// canonicalExecutionDataID is the execution data ID of the canonical execution data.
-	canonicalExecutionDataID = flow.MustHexStringToIdentifier("637cf35656b86a647eca490d9370632a276137712ecfec65846ba8ec90bec627")
+	canonicalExecutionDataID = flow.MustHexStringToIdentifier("6796622b06907cc0894260c175fdec8960fe99c167084f901d238db22a676de3")
 )
 
 func getDatastore() datastore.Batching {
