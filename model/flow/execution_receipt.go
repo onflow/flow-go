@@ -271,6 +271,7 @@ type ExecutionReceiptList []*ExecutionReceipt
 // function used to build the groups. For example:
 //   - With GroupByExecutorID, the key is the receipt's ExecutorID (node ID).
 //   - With GroupByResultID, the key is the Execution Result ID.
+//
 // Custom groupers may choose other identifiers. Within each group, order and
 // multiplicity of receipts are preserved.
 //
@@ -278,8 +279,9 @@ type ExecutionReceiptList []*ExecutionReceipt
 // solely determined by the ExecutionReceiptGroupingFunction.
 //
 // Example:
-//   groups := list.GroupByExecutorID()
-//   receiptsFromExecutor := groups[executorID]
+//
+//	groups := list.GroupByExecutorID()
+//	receiptsFromExecutor := groups[executorID]
 //
 // Use GetGroup to safely obtain a group's receipts if the key may be absent.
 //

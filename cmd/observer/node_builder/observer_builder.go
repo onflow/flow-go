@@ -221,7 +221,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			ResponseLimit:           subscription.DefaultResponseLimit,
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
-			OperatorCriteria:        optimistic_sync.DefaultCriteria,
 		},
 		stateStreamFilterConf:                nil,
 		rpcMetricsEnabled:                    false,
