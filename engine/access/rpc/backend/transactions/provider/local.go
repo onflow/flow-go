@@ -354,10 +354,10 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 // local storage.
 //
 // Expected error returns during normal operation:
-//   - [codes.NotFound]: if the events are not found for the block ID
-//   - [codes.OutOfRange]: if the events are not available for the block height
-//   - [codes.FailedPrecondition]: if the events index is not initialized
-//   - [codes.Internal]: if the scheduled transactions cannot be constructed
+//   - [codes.NotFound]: if the events are not found for the block ID.
+//   - [codes.OutOfRange]: if the events are not available for the block height.
+//   - [codes.FailedPrecondition]: if the events index is not initialized.
+//   - [codes.Internal]: if the scheduled transactions cannot be constructed.
 func (t *LocalTransactionProvider) ScheduledTransactionsByBlockID(
 	ctx context.Context,
 	header *flow.Header,
