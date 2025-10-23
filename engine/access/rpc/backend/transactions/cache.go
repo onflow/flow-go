@@ -17,6 +17,11 @@ type NoopTxResultCache struct{}
 
 var _ TxResultCache = (*NoopTxResultCache)(nil)
 
+// NewNoopTxResultCache creates a new no-op implementation of the TxResultCache interface.
+func NewNoopTxResultCache() *NoopTxResultCache {
+	return &NoopTxResultCache{}
+}
+
 func (n *NoopTxResultCache) Get(flow.Identifier) (*accessmodel.TransactionResult, bool) {
 	return nil, false
 }

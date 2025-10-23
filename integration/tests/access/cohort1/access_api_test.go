@@ -1354,6 +1354,7 @@ func (s *AccessAPISuite) RestClient(containerName string) *restclient.APIClient 
 	return restclient.NewAPIClient(config)
 }
 
+// TestSystemTransactions tests getting a system transaction using each of the supported endpoints.
 func (s *AccessAPISuite) TestSystemTransactions() {
 	rpcClient := s.an2Client.RPCClient()
 

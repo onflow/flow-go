@@ -7,6 +7,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	// MinSystemTxCount is the minimum number of transactions in a system collection with scheduled
+	// transactions enabled. This includes the system chunk and the process callbacks transactions.
+	MinSystemTxCount = 2
+)
+
 // SystemCollection represents a system collection and exposes the transaction bodies of each transaction
 // within the collection.
 type SystemCollection struct {
@@ -57,8 +63,8 @@ func NewSystemCollection(chainID flow.ChainID, events flow.EventsList) (*SystemC
 		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
 	}
 
-	if len(systemCollection.Transactions) < 2 {
-		return nil, fmt.Errorf("expected 2 transactions in system collection, got %d", len(systemCollection.Transactions))
+	if len(systemCollection.Transactions) < MinSystemTxCount {
+		return nil, fmt.Errorf("expected %d transactions in system collection, got %d", MinSystemTxCount, len(systemCollection.Transactions))
 	}
 
 	lookup := make(map[flow.Identifier]*flow.TransactionBody, len(systemCollection.Transactions))

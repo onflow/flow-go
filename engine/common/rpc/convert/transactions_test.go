@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
+// TestConvertTransaction tests that converting a transaction to a protobuf message and back results in the
+// same transaction body.
 func TestConvertTransaction(t *testing.T) {
 	t.Parallel()
 
