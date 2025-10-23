@@ -15,14 +15,14 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
-	github.com/ethereum/go-ethereum v1.16.3
+	github.com/ethereum/go-ethereum v1.16.4
 	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.7.0
-	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad
+	github.com/google/pprof v0.0.0-20250630185457-6e76a2b096b5
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
@@ -46,14 +46,14 @@ require (
 	github.com/multiformats/go-multiaddr v0.14.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.10.1
-	github.com/onflow/cadence v1.7.1
+	github.com/onflow/atree v0.11.0
+	github.com/onflow/cadence v1.8.1
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.4.15
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.0
-	github.com/onflow/flow-go-sdk v1.8.4
-	github.com/onflow/flow/protobuf/go/flow v0.4.18-0.20250930012745-8ee6e56f77b2
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.1
+	github.com/onflow/flow-go-sdk v1.9.0
+	github.com/onflow/flow/protobuf/go/flow v0.4.18
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.7.0
@@ -77,7 +77,7 @@ require (
 	golang.org/x/crypto v0.41.0
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 	golang.org/x/sync v0.16.0
-	golang.org/x/sys v0.35.0
+	golang.org/x/sys v0.36.0
 	golang.org/x/text v0.28.0
 	golang.org/x/time v0.12.0
 	golang.org/x/tools v0.36.0
@@ -120,9 +120,10 @@ require (
 )
 
 require (
-	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.4.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.3 // indirect
+	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
 )
 
@@ -320,7 +321,7 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/supranational/blst v0.3.14 // indirect
+	github.com/supranational/blst v0.3.16-0.20250831170142-f48500c1fdbe // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
