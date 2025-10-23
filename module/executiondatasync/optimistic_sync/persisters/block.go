@@ -64,6 +64,7 @@ func (p *BlockPersister) Persist() error {
 		storage.LockInsertCollection,
 		storage.LockInsertLightTransactionResult,
 		storage.LockInsertTransactionResultErrMessage,
+		storage.LockIndexScheduledTransaction,
 	}, func(lctx lockctx.Context) error {
 		return p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			for _, persister := range p.persisterStores {
