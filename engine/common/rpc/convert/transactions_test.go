@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
+// TestConvertTransaction tests that converting a transaction to a protobuf message and back results in the
+// same transaction body.
 func TestConvertTransaction(t *testing.T) {
 	t.Parallel()
 
@@ -33,13 +35,13 @@ func TestConvertTransaction(t *testing.T) {
 	assert.Equal(t, tx.ID(), converted.ID())
 }
 
-// TestConvertSystemTransaction1 tests that converting a system transaction to a protobuf message and
+// TestConvertSystemTransaction tests that converting a system transaction to a protobuf message and
 // back results in the same transaction body.
 //
 // System and scheduled transactions have nil/empty values for some fields. This test ensures that
 // these fields are properly handled when converting to and from protobuf messages and the resulting
 // transaction body identical.
-func TestConvertSystemTransaction1(t *testing.T) {
+func TestConvertSystemTransaction(t *testing.T) {
 	t.Parallel()
 
 	g := fixtures.NewGeneratorSuite()

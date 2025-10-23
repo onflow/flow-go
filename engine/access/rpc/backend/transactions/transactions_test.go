@@ -233,10 +233,9 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	}
 }
 
-func (suite *Suite) TestGetTransaction() {
-	block := suite.g.Blocks().Fixture()
-	blockID := block.ID()
-
+// TestGetTransaction_SubmittedTx tests getting a user submitted transaction by ID returns the
+// correct transaction.
+func (suite *Suite) TestGetTransaction_SubmittedTx() {
 	params := suite.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
@@ -270,20 +269,31 @@ func (suite *Suite) TestGetTransaction() {
 		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(actual)
 	})
+}
 
-	suite.Run("system transaction", func() {
-		tx := suite.systemCollection.Transactions[0]
-		txID := tx.ID()
+// TestGetTransaction_SystemTx tests getting a system transaction by ID returns the correct transaction.
+func (suite *Suite) TestGetTransaction_SystemTx() {
+	params := suite.defaultTransactionsParams()
+	txBackend, err := NewTransactionsBackend(params)
+	suite.Require().NoError(err)
 
-		suite.transactions.
-			On("ByID", txID).
-			Return(nil, storage.ErrNotFound).
-			Once()
+	tx := suite.systemCollection.Transactions[0]
+	txID := tx.ID()
 
-		actual, err := txBackend.GetTransaction(context.Background(), txID)
-		suite.Require().NoError(err)
-		suite.Require().Equal(tx, actual)
-	})
+	suite.transactions.
+		On("ByID", txID).
+		Return(nil, storage.ErrNotFound).
+		Once()
+
+	actual, err := txBackend.GetTransaction(context.Background(), txID)
+	suite.Require().NoError(err)
+	suite.Require().Equal(tx, actual)
+}
+
+// TestGetTransaction_ScheduledTx tests getting a scheduled transaction by ID returns the correct transaction.
+func (suite *Suite) TestGetTransaction_ScheduledTx() {
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
 
 	suite.Run("scheduled tx", func() {
 		tx := suite.systemCollection.Transactions[1]
@@ -449,7 +459,11 @@ func (suite *Suite) TestGetTransaction() {
 		suite.Require().Error(err) // specific error doen't matter since it's thrown
 		suite.Require().Nil(actual)
 	})
+}
 
+// TestGetTransaction_HistoricalTx tests getting a historical transaction by ID from the historical
+// access nodes.
+func (suite *Suite) TestGetTransaction_HistoricalTx() {
 	suite.Run("historical tx", func() {
 		tx := suite.g.Transactions().Fixture()
 		txID := tx.ID()

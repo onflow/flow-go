@@ -1254,6 +1254,7 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 	})
 }
 
+// TestSystemTransactions tests getting a system transaction using each of the supported endpoints.
 func (s *AccessAPISuite) TestSystemTransactions() {
 	rpcClient := s.an2Client.RPCClient()
 

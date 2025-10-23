@@ -154,6 +154,7 @@ func (r *FungibleTokenTracker) worker(
 		storage := cadenceRuntime.NewStorage(
 			&util.AccountsAtreeLedger{Accounts: accounts},
 			nil,
+			nil,
 			cadenceRuntime.StorageConfig{},
 		)
 
@@ -164,8 +165,8 @@ func (r *FungibleTokenTracker) worker(
 
 		for _, domain := range domains {
 			storageMap := storage.GetDomainStorageMap(inter, owner, domain, true)
-			itr := storageMap.Iterator(inter)
-			key, value := itr.Next()
+			itr := storageMap.Iterator()
+			key, value := itr.Next(inter)
 			for value != nil {
 				identifier := string(key.(interpreter.StringAtreeValue))
 				r.iterateChildren(
@@ -173,7 +174,7 @@ func (r *FungibleTokenTracker) worker(
 					j.owner,
 					value,
 				)
-				key, value = itr.Next()
+				key, value = itr.Next(inter)
 			}
 		}
 
@@ -217,14 +218,14 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 		}
 
 		// iterate over fields of the composite value (skip the ones that are not resource typed)
-		compValue.ForEachField(inter,
+		compValue.ForEachField(
+			inter,
 			func(key string, value interpreter.Value) (resume bool) {
 				r.iterateChildren(append(tr, key), addr, value)
 
 				// continue iteration
 				return true
 			},
-			interpreter.EmptyLocationRange,
 		)
 	}
 }

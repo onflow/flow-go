@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
+// TestDefaultSystemCollection tests getting the default system collection returns the correct
+// collection and system transaction bodies.
 func TestDefaultSystemCollection(t *testing.T) {
 	t.Run("scheduled transactions enabled", func(t *testing.T) {
 		defaultSystemCollection, err := system.DefaultSystemCollection(flow.Mainnet, true)
@@ -55,6 +57,8 @@ func TestDefaultSystemCollection(t *testing.T) {
 	})
 }
 
+// TestNewSystemCollection tests getting the system collection with scheduled transactions returns
+// the correct collection and transaction bodies, including the scheduled transactions.
 func TestNewSystemCollection(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	events := g.PendingExecutionEvents().List(4)
