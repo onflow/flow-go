@@ -85,8 +85,8 @@ func (suite *ExecutionResultInfoProviderSuite) setupIdentitiesMock(allExecutionN
 	)
 }
 
-// TestExecutionResultQuery tests the main ExecutionResult function with various scenarios.
-func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
+// TestExecutionResultProvider tests the main ExecutionResult function with various scenarios.
+func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProvider() {
 	totalReceipts := 5
 	block := unittest.BlockFixture()
 
@@ -158,11 +158,11 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 			suite.setupIdentitiesMock(allExecutionNodes)
 
-			query, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{})
+			res, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
 
-			suite.Require().Equal(executionResult.ID(), query.ExecutionResultID)
-			suite.Assert().ElementsMatch(requiredExecutors, query.ExecutionNodes.NodeIDs())
+			suite.Require().Equal(executionResult.ID(), res.ExecutionResultID)
+			suite.Assert().ElementsMatch(requiredExecutors, res.ExecutionNodes.NodeIDs())
 		},
 	)
 
@@ -227,6 +227,70 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 			suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
 		},
 	)
+
+	suite.Run("execution result provider recognizes fork switch", func() {
+		preferredExecutors := flow.IdentifierList{}
+		operatorCriteria := optimistic_sync.Criteria{
+			AgreeingExecutorsCount: 1,
+		}
+		provider := suite.createProvider(preferredExecutors, operatorCriteria)
+
+		// set up 2 executors that produce different execution results
+		block := unittest.BlockFixture()
+		baseExecutionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+
+		// fork 1
+		executionResult1 := unittest.ExecutionResultFixture()
+		executionResult1.PreviousResultID = baseExecutionResult.ID()
+
+		// fork 2
+		executionResult2 := unittest.ExecutionResultFixture()
+		executionResult2.PreviousResultID = baseExecutionResult.ID()
+
+		executors := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+		receipts := make(flow.ExecutionReceiptList, 2)
+
+		r1 := unittest.ReceiptForBlockFixture(block)
+		r1.ExecutorID = executors[0].NodeID
+		r1.ExecutionResult = *executionResult1
+		receipts[0] = r1
+
+		r2 := unittest.ReceiptForBlockFixture(block)
+		r2.ExecutorID = executors[1].NodeID
+		r2.ExecutionResult = *executionResult2
+		receipts[1] = r2
+
+		suite.receipts.
+			On("ByBlockID", block.ID()).
+			Return(receipts, nil)
+
+		// request execution result from the first executor
+		suite.snapshot.
+			On("Identities", mock.Anything).
+			Return(flow.IdentityList{executors[0]}, nil).
+			Once()
+
+		result1, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
+			RequiredExecutors:       flow.IdentifierList{executors[0].NodeID},
+			ParentExecutionResultID: baseExecutionResult.ID(),
+		})
+		suite.Require().NoError(err)
+		suite.Require().Equal(executionResult1.ID(), result1.ExecutionResultID)
+
+		// now request the second executor's result (also a child of baseExecutionResult),
+		// but require that it descends from result1; since it's on a different fork, no match should be found.
+		suite.snapshot.
+			On("Identities", mock.Anything).
+			Return(flow.IdentityList{executors[1]}, nil).
+			Once()
+
+		result2, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
+			RequiredExecutors:       flow.IdentifierList{executors[1].NodeID},
+			ParentExecutionResultID: result1.ExecutionResultID,
+		})
+		suite.Require().ErrorContains(err, "failed to find result")
+		suite.Require().Empty(result2)
+	})
 }
 
 // TestRootBlockHandling tests the special case handling for root blocks.
@@ -318,7 +382,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 			actualExecutors := query.ExecutionNodes.NodeIDs()
 
 			suite.Assert().ElementsMatch(
-				provider.executionNodes.preferredENIdentifiers,
+				provider.executionNodeSelector.preferredENIdentifiers,
 				actualExecutors,
 			)
 		},
@@ -339,7 +403,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 			actualExecutors := query.ExecutionNodes.NodeIDs()
 
 			// Just one required executor contains the result
-			expectedExecutors := provider.executionNodes.requiredENIdentifiers[0:1]
+			expectedExecutors := provider.executionNodeSelector.requiredENIdentifiers[0:1]
 
 			suite.Assert().ElementsMatch(expectedExecutors, actualExecutors)
 		},
@@ -359,8 +423,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 			// `preferredENIdentifiers` contain 1 executor, that is not enough, so the logic will get 2 executors from `requiredENIdentifiers` to fill `defaultMaxNodesCnt` executors.
 			expectedExecutors := append(
-				provider.executionNodes.preferredENIdentifiers,
-				provider.executionNodes.requiredENIdentifiers[0:2]...,
+				provider.executionNodeSelector.preferredENIdentifiers,
+				provider.executionNodeSelector.requiredENIdentifiers[0:2]...,
 			)
 			actualExecutors := query.ExecutionNodes.NodeIDs()
 

@@ -67,7 +67,7 @@ type BackendExecutionDataSuite struct {
 	execDataCache            *cache.ExecutionDataCache
 	execDataHeroCache        *herocache.BlockExecutionData
 	executionDataTracker     *trackermock.ExecutionDataTracker
-	executionResultProvider  *osmock.ExecutionResultProvider
+	executionResultProvider  *osmock.ExecutionResultInfoProvider
 	executionStateSnapshot   *osmock.Snapshot
 	executionStateCache      *osmock.ExecutionStateCache
 	criteria                 optimistic_sync.Criteria
@@ -194,7 +194,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 		Return(s.executionStateSnapshot, nil).
 		Maybe()
 
-	s.executionResultProvider = osmock.NewExecutionResultProvider(s.T())
+	s.executionResultProvider = osmock.NewExecutionResultInfoProvider(s.T())
 	s.executionResultProvider.
 		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {

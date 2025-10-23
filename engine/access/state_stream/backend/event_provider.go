@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -34,6 +33,8 @@ type EventsProvider struct {
 	fetchFromLocalCache bool
 	execResultProvider  optimistic_sync.ExecutionResultInfoProvider
 	execStateCache      optimistic_sync.ExecutionStateCache
+
+	parentExecutionResultID flow.Identifier
 }
 
 func NewEventsProvider(
@@ -45,20 +46,21 @@ func NewEventsProvider(
 	execStateCache optimistic_sync.ExecutionStateCache,
 ) *EventsProvider {
 	return &EventsProvider{
-		log:                 log,
-		headers:             headers,
-		execDataProvider:    execDataProvider,
-		fetchFromLocalCache: fetchFromLocalCache,
-		execResultProvider:  execResultProvider,
-		execStateCache:      execStateCache,
+		log:                     log,
+		headers:                 headers,
+		execDataProvider:        execDataProvider,
+		fetchFromLocalCache:     fetchFromLocalCache,
+		execResultProvider:      execResultProvider,
+		execStateCache:          execStateCache,
+		parentExecutionResultID: flow.ZeroID,
 	}
 }
 
-// GetAllEventsResponse returns a function that retrieves the event response for a given block height.
+// Events returns a function that retrieves the event response for a given block height.
 // Expected errors:
 // - codes.NotFound: If block header for the specified block height is not found.
 // - error: An error, if any, encountered during getting events from storage or execution data.
-func (b *EventsProvider) GetAllEventsResponse(
+func (b *EventsProvider) Events(
 	ctx context.Context,
 	height uint64,
 	criteria optimistic_sync.Criteria,
@@ -98,7 +100,7 @@ func (b *EventsProvider) getEventsFromExecutionData(
 	ctx context.Context,
 	height uint64,
 ) (*EventsResponse, error) {
-	executionData, err := b.execDataProvider.ExecutionData(ctx, height)
+	executionData, err := b.execDataProvider.ExecutionDataByBlockHeight(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
@@ -128,6 +130,12 @@ func (b *EventsProvider) getEventsFromStorage(
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
 
+	// we want to fetch events from the execution node that produced the previous result
+	// so that we get data from the same execution fork, if any.
+	if b.parentExecutionResultID != flow.ZeroID {
+		criteria.ParentExecutionResultID = b.parentExecutionResultID
+	}
+
 	result, err := b.execResultProvider.ExecutionResultInfo(
 		blockID,
 		criteria,
@@ -135,6 +143,7 @@ func (b *EventsProvider) getEventsFromStorage(
 	if err != nil {
 		return &EventsResponse{}, fmt.Errorf("error fetching execution result: %w", err)
 	}
+	b.parentExecutionResultID = result.ExecutionResultID
 
 	snapshot, err := b.execStateCache.Snapshot(result.ExecutionResultID)
 	if err != nil {
@@ -150,16 +159,6 @@ func (b *EventsProvider) getEventsFromStorage(
 	if err != nil {
 		return nil, fmt.Errorf("could not get events for block %d: %w", blockID, err)
 	}
-
-	// Normalize ordering for events coming from storage.
-	// The index may return events ordered by TransactionID (implementation detail),
-	// but consumers and tests expect events ordered by transaction index and event index.
-	sort.SliceStable(events, func(i, j int) bool {
-		if events[i].TransactionIndex == events[j].TransactionIndex {
-			return events[i].EventIndex < events[j].EventIndex
-		}
-		return events[i].TransactionIndex < events[j].TransactionIndex
-	})
 
 	metadata := access.ExecutorMetadata{
 		ExecutionResultID: result.ExecutionResultID,

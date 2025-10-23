@@ -29,7 +29,7 @@ type AccountStatusesBackend struct {
 	subscriptionFactory *subscription.Factory
 
 	executionDataTracker tracker.ExecutionDataTracker
-	eventsProvider       EventsProvider
+	eventsProvider       *EventsProvider
 }
 
 var _ state_stream.AccountsAPI = (*AccountStatusesBackend)(nil)
@@ -41,7 +41,7 @@ func (b *AccountStatusesBackend) subscribe(
 	filter state_stream.AccountStatusFilter,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getAccountStatusResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.getAccountStatusResponseFactory(filter, criteria))
 }
 
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
@@ -106,7 +106,7 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	criteria optimistic_sync.Criteria,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height, criteria)
+		eventsResponse, err := b.eventsProvider.Events(ctx, height, criteria)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {

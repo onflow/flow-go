@@ -20,7 +20,7 @@ type EventsBackend struct {
 
 	subscriptionFactory  *subscription.Factory
 	executionDataTracker tracker.ExecutionDataTracker
-	eventsProvider       EventsProvider
+	eventsProvider       *EventsProvider
 }
 
 var _ state_stream.EventsAPI = (*EventsBackend)(nil)
@@ -29,7 +29,7 @@ func NewEventsBackend(
 	log zerolog.Logger,
 	subscriptionFactory subscription.Factory,
 	executionDataTracker tracker.ExecutionDataTracker,
-	eventsProvider EventsProvider,
+	eventsProvider *EventsProvider,
 ) EventsBackend {
 	return EventsBackend{
 		log:                  log,
@@ -73,7 +73,11 @@ func (b *EventsBackend) SubscribeEvents(
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(
+		ctx,
+		nextHeight,
+		b.createResponseHandler(filter, criteria),
+	)
 }
 
 // SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
@@ -102,7 +106,11 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
 
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(
+		ctx,
+		nextHeight,
+		b.createResponseHandler(filter, criteria),
+	)
 }
 
 // SubscribeEventsFromStartHeight streams events starting at the specified block height,
@@ -130,8 +138,11 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
-
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(
+		ctx,
+		nextHeight,
+		b.createResponseHandler(filter, criteria),
+	)
 }
 
 // SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
@@ -158,27 +169,28 @@ func (b *EventsBackend) SubscribeEventsFromLatest(
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponseFactory(filter, criteria))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.createResponseHandler(filter, criteria))
 }
 
-// getResponseFactory returns a function that retrieves the event response for a given height.
+// createResponseHandler returns a function that retrieves the event response for a given height.
 //
 // Parameters:
 // - filter: The event filter used to filter events.
 //
 // Expected errors during normal operation:
 // - subscription.ErrBlockNotReady: execution data for the given block height is not available.
-func (b *EventsBackend) getResponseFactory(
+func (b *EventsBackend) createResponseHandler(
 	filter state_stream.EventFilter,
 	criteria optimistic_sync.Criteria,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
-		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height, criteria)
+		eventsResponse, err := b.eventsProvider.Events(ctx, height, criteria)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
 				return nil, subscription.ErrBlockNotReady
 			}
+
 			return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 		}
 

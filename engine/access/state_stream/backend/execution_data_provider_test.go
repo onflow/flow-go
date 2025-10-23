@@ -62,7 +62,7 @@ func (s *ExecutionDataProviderSuite) TestEarlyNotReady() {
 
 	provider := NewExecutionDataProvider(s.tracker, s.edCache)
 
-	entity, err := provider.ExecutionData(ctx, 10)
+	entity, err := provider.ExecutionDataByBlockHeight(ctx, 10)
 	s.Require().Error(err)
 	s.Nil(entity)
 	// ensure the error signals not-ready
@@ -108,7 +108,7 @@ func (s *ExecutionDataProviderSuite) TestSuccess() {
 
 	provider := NewExecutionDataProvider(s.tracker, s.edCache)
 
-	entity, err := provider.ExecutionData(ctx, block.Height)
+	entity, err := provider.ExecutionDataByBlockHeight(ctx, block.Height)
 	s.Require().NoError(err)
 	s.Require().NotNil(entity)
 	s.Equal(block.ID(), entity.BlockID)
@@ -132,7 +132,7 @@ func (s *ExecutionDataProviderSuite) TestNotFoundMappedToNotReady() {
 
 	provider := NewExecutionDataProvider(s.tracker, s.edCache)
 
-	entity, err := provider.ExecutionData(ctx, height)
+	entity, err := provider.ExecutionDataByBlockHeight(ctx, height)
 	s.Require().Error(err)
 	s.Nil(entity)
 	s.ErrorIs(err, subscription.ErrBlockNotReady)
@@ -175,7 +175,7 @@ func (s *ExecutionDataProviderSuite) TestBlobNotFoundMappedToNotReady() {
 
 	provider := NewExecutionDataProvider(s.tracker, s.edCache)
 
-	entity, err := provider.ExecutionData(ctx, height)
+	entity, err := provider.ExecutionDataByBlockHeight(ctx, height)
 	s.Require().Error(err)
 	s.Nil(entity)
 	// ensure the error is recognized as not-ready and also a BlobNotFoundError

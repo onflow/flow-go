@@ -250,7 +250,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 			ResponseLimit:           subscription.DefaultResponseLimit,
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
-			OperatorCriteria:        optimistic_sync.DefaultCriteria,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",

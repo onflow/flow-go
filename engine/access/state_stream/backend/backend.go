@@ -57,8 +57,6 @@ type Config struct {
 
 	// HeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
 	HeartbeatInterval uint64
-
-	OperatorCriteria optimistic_sync.Criteria
 }
 
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
@@ -127,27 +125,27 @@ func New(
 		executionDataTracker: executionDataTracker,
 	}
 
-	eventsProvider := EventsProvider{
-		log:                 logger,
-		headers:             headers,
-		execDataProvider:    executionDataProvider,
-		fetchFromLocalCache: fetchFromLocalStorage,
-		execResultProvider:  executionResultProvider,
-		execStateCache:      executionStateCache,
-	}
+	eventProvider := NewEventsProvider(
+		log,
+		headers,
+		executionDataProvider,
+		fetchFromLocalStorage,
+		executionResultProvider,
+		executionStateCache,
+	)
 
 	b.EventsBackend = EventsBackend{
 		log:                  logger,
 		subscriptionFactory:  subscriptionFactory,
 		executionDataTracker: executionDataTracker,
-		eventsProvider:       eventsProvider,
+		eventsProvider:       eventProvider,
 	}
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,
 		subscriptionFactory:  subscriptionFactory,
 		executionDataTracker: b.ExecutionDataTracker,
-		eventsProvider:       eventsProvider,
+		eventsProvider:       eventProvider,
 	}
 
 	return b, nil

@@ -79,9 +79,8 @@ type CollectionSyncer struct {
 	pendingCollections        *engine.FifoMessageStore
 	pendingCollectionsHandler *engine.MessageHandler
 
-	blocks       storage.Blocks
-	collections  storage.Collections
-	transactions storage.Transactions
+	blocks      storage.Blocks
+	collections storage.Collections
 
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	lockManager         storage.LockManager
@@ -96,7 +95,6 @@ func NewCollectionSyncer(
 	state protocol.State,
 	blocks storage.Blocks,
 	collections storage.Collections,
-	transactions storage.Transactions,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 	lockManager storage.LockManager,
 ) (*CollectionSyncer, error) {
@@ -128,7 +126,6 @@ func NewCollectionSyncer(
 		pendingCollections:        pendingCollections,
 		blocks:                    blocks,
 		collections:               collections,
-		transactions:              transactions,
 		lastFullBlockHeight:       lastFullBlockHeight,
 		collectionExecutedMetric:  collectionExecutedMetric,
 		lockManager:               lockManager,

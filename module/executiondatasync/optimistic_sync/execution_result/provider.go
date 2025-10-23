@@ -22,12 +22,12 @@ type Provider struct {
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 
-	executionNodes *ExecutionNodeSelector
+	executionNodeSelector *ExecutionNodeSelector
 
 	rootBlockID     flow.Identifier
 	rootBlockResult *flow.ExecutionResult
 
-	baseCriteria optimistic_sync.Criteria
+	operatorCriteria optimistic_sync.Criteria
 }
 
 var _ optimistic_sync.ExecutionResultInfoProvider = (*Provider)(nil)
@@ -41,7 +41,7 @@ func NewExecutionResultInfoProvider(
 	state protocol.State,
 	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
-	executionNodes *ExecutionNodeSelector,
+	executionNodeSelector *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
 ) (*Provider, error) {
 	// Root block ID and result should not change and could be cached.
@@ -57,13 +57,13 @@ func NewExecutionResultInfoProvider(
 	}
 
 	return &Provider{
-		log:               log.With().Str("module", "execution_result_query").Logger(),
-		executionReceipts: executionReceipts,
-		state:             state,
-		executionNodes:    executionNodes,
-		rootBlockID:       rootBlockID,
-		rootBlockResult:   rootBlockResult,
-		baseCriteria:      optimistic_sync.DefaultCriteria.OverrideWith(operatorCriteria),
+		log:                   log.With().Str("module", "execution_result_info_provider").Logger(),
+		executionReceipts:     executionReceipts,
+		state:                 state,
+		executionNodeSelector: executionNodeSelector,
+		rootBlockID:           rootBlockID,
+		rootBlockResult:       rootBlockResult,
+		operatorCriteria:      optimistic_sync.DefaultCriteria.OverrideWith(operatorCriteria),
 	}, nil
 }
 
@@ -72,44 +72,44 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-func (e *Provider) ExecutionResultInfo(
+func (p *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) (*optimistic_sync.ExecutionResultInfo, error) {
-	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	allExecutors, err := p.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
 	}
 
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
-	if e.rootBlockID == blockID {
-		subsetENs, err := e.executionNodes.SelectExecutionNodes(
-			executorIdentities,
+	if p.rootBlockID == blockID {
+		chosenExecutionNodes, err := p.executionNodeSelector.SelectExecutionNodes(
+			allExecutors,
 			criteria.RequiredExecutors,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
+			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", p.rootBlockID, err)
 		}
 
 		return &optimistic_sync.ExecutionResultInfo{
-			ExecutionResultID: e.rootBlockResult.ID(),
-			ExecutionNodes:    subsetENs,
+			ExecutionResultID: p.rootBlockResult.ID(),
+			ExecutionNodes:    chosenExecutionNodes,
 		}, nil
 	}
 
-	result, executorIDs, err := e.findResultAndExecutors(blockID, criteria)
+	resultID, executorIDsForBlock, err := p.findExecutionResultAndExecutors(blockID, criteria)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
 	}
 
-	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-	subsetENs, err := e.executionNodes.SelectExecutionNodes(executors, criteria.RequiredExecutors)
+	executorsForBlock := allExecutors.Filter(filter.HasNodeID[flow.Identity](executorIDsForBlock...))
+	filteredExecutors, err := p.executionNodeSelector.SelectExecutionNodes(executorsForBlock, criteria.RequiredExecutors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
 	}
 
-	if len(subsetENs) == 0 {
+	if len(filteredExecutors) == 0 {
 		// this is unexpected, and probably indicates there is a bug.
 		// There are only three ways that SelectExecutionNodes can return an empty list:
 		//   1. there are no executors for the result
@@ -118,52 +118,57 @@ func (e *Provider) ExecutionResultInfo(
 		// None of these are possible since there must be at least one AgreeingExecutorsCount. If the
 		// criteria is met, then there must be at least one acceptable executor. If this is not true,
 		// then the criteria check must fail.
-		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
+		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w",
+			resultID, blockID, err)
 	}
 
 	return &optimistic_sync.ExecutionResultInfo{
-		ExecutionResultID: result.ID(),
-		ExecutionNodes:    subsetENs,
+		ExecutionResultID: resultID,
+		ExecutionNodes:    filteredExecutors,
 	}, nil
 }
 
-// findResultAndExecutors returns a query response for a given block ID.
+// findExecutionResultAndExecutors returns a query response for a given block ID.
 // The result must match the provided criteria and have at least one acceptable executor. If multiple
 // results are found, then the result with the most executors is returned.
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-func (e *Provider) findResultAndExecutors(
+func (p *Provider) findExecutionResultAndExecutors(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
-) (*flow.ExecutionResult, flow.IdentifierList, error) {
-	type result struct {
-		result   *flow.ExecutionResult
+) (flow.Identifier, flow.IdentifierList, error) {
+	type resultWithReceipts struct {
+		id       flow.Identifier
 		receipts flow.ExecutionReceiptList
 	}
 
-	criteria = e.baseCriteria.OverrideWith(criteria)
+	criteria = p.operatorCriteria.OverrideWith(criteria)
 
 	// Note: this will return an empty slice with no error if no receipts are found.
-	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
+	allReceiptsForBlock, err := p.executionReceipts.ByBlockID(blockID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
+		return flow.ZeroID, nil,
+			fmt.Errorf("failed to retreive execution receipts for block ID %v: %w",
+				blockID, err)
 	}
 
 	// find all results that match the criteria and have at least one acceptable executor
-	results := make([]result, 0)
-	for _, executionReceiptList := range allReceipts.GroupByResultID() {
-		executorGroup := executionReceiptList.GroupByExecutorID()
-		if isExecutorGroupMeetingCriteria(executorGroup, criteria) {
-			results = append(results, result{
-				result:   &executionReceiptList[0].ExecutionResult,
+	results := make([]resultWithReceipts, 0)
+	for executionResultID, executionReceiptList := range allReceiptsForBlock.GroupByResultID() {
+		result := &executionReceiptList[0].ExecutionResult
+		receipts := executionReceiptList.GroupByExecutorID()
+
+		if p.isExecutorGroupMeetingCriteria(result, receipts, criteria) {
+			results = append(results, resultWithReceipts{
+				id:       executionResultID,
 				receipts: executionReceiptList,
 			})
 		}
 	}
 
 	if len(results) == 0 {
-		return nil, nil, common.NewInsufficientExecutionReceipts(blockID, 0)
+		return flow.ZeroID, nil, common.NewInsufficientExecutionReceipts(blockID, 0)
 	}
 
 	// sort results by the number of execution nodes in descending order
@@ -172,33 +177,39 @@ func (e *Provider) findResultAndExecutors(
 	})
 
 	executorIDs := getExecutorIDs(results[0].receipts)
-	return results[0].result, executorIDs, nil
+	return results[0].id, executorIDs, nil
 }
 
 // isExecutorGroupMeetingCriteria checks if an executor group meets the specified criteria for execution receipts matching.
-func isExecutorGroupMeetingCriteria(
-	executorGroup flow.ExecutionReceiptGroupedList,
+func (p *Provider) isExecutorGroupMeetingCriteria(
+	executionResult *flow.ExecutionResult,
+	executorToExecutionReceipts flow.ExecutionReceiptGroupedList,
 	criteria optimistic_sync.Criteria,
 ) bool {
-	if uint(len(executorGroup)) < criteria.AgreeingExecutorsCount {
+	if uint(len(executorToExecutionReceipts)) < criteria.AgreeingExecutorsCount {
 		return false
 	}
 
+	// make sure one of the required executors is in the group
 	if len(criteria.RequiredExecutors) > 0 {
 		hasRequiredExecutor := false
 		for _, requiredExecutor := range criteria.RequiredExecutors {
-			if _, ok := executorGroup[requiredExecutor]; ok {
+			if _, ok := executorToExecutionReceipts[requiredExecutor]; ok {
 				hasRequiredExecutor = true
 				break
 			}
 		}
+
 		if !hasRequiredExecutor {
 			return false
 		}
 	}
 
-	// TODO: Implement the `ResultInFork` check here, which iteratively checks ancestors to determine if
-	//       the current result's fork includes the requested result. https://github.com/onflow/flow-go/issues/7587
+	// make sure the execution result is in the same execution fork, if any
+	if criteria.ParentExecutionResultID != flow.ZeroID &&
+		executionResult.PreviousResultID != criteria.ParentExecutionResultID {
+		return false
+	}
 
 	return true
 }

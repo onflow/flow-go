@@ -199,7 +199,7 @@ func (b *backendSubscribeBlocks) subscribeFromStartBlockID(ctx context.Context, 
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, getData)
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, getData)
 }
 
 // subscribeFromStartHeight is common method that allows clients to subscribe starting at the requested start block height.
@@ -215,7 +215,7 @@ func (b *backendSubscribeBlocks) subscribeFromStartHeight(ctx context.Context, s
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, getData)
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, getData)
 }
 
 // subscribeFromLatest is common method that allows clients to subscribe starting at the latest sealed block.
@@ -230,7 +230,7 @@ func (b *backendSubscribeBlocks) subscribeFromLatest(ctx context.Context, getDat
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from latest")
 	}
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, getData)
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, getData)
 }
 
 // getBlockResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.

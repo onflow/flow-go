@@ -168,7 +168,7 @@ func (t *TransactionStream) createSubscription(
 		t.txStatusDeriver,
 	)
 
-	return t.subscriptionFactory.CreateSubscription(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
+	return t.subscriptionFactory.CreateHeightBasedSubscription(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status

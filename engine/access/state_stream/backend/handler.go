@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type Handler struct {
@@ -29,7 +28,6 @@ type Handler struct {
 
 	eventFilterConfig        state_stream.EventFilterConfig
 	defaultHeartbeatInterval uint64
-	operatorCriteria         optimistic_sync.Criteria
 }
 
 // sendSubscribeEventsResponseFunc is a callback function used to send
@@ -48,7 +46,6 @@ func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler 
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,
 		defaultHeartbeatInterval: config.HeartbeatInterval,
-		operatorCriteria:         config.OperatorCriteria,
 		maxStreamCount:           int32(config.MaxGlobalStreams),
 	}
 	return h
@@ -265,7 +262,7 @@ func (h *Handler) SubscribeEvents(
 	}
 
 	execStateQuery := request.GetExecutionStateQuery()
-	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
+	criteria := convert.NewCriteria(execStateQuery)
 
 	sub := h.api.SubscribeEvents(
 		stream.Context(),
@@ -320,7 +317,7 @@ func (h *Handler) SubscribeEventsFromStartBlockID(
 	}
 
 	execStateQuery := request.GetExecutionStateQuery()
-	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
+	criteria := convert.NewCriteria(execStateQuery)
 
 	sub := h.api.SubscribeEventsFromStartBlockID(
 		stream.Context(),
@@ -369,7 +366,7 @@ func (h *Handler) SubscribeEventsFromStartHeight(
 	}
 
 	execStateQuery := request.GetExecutionStateQuery()
-	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
+	criteria := convert.NewCriteria(execStateQuery)
 
 	sub := h.api.SubscribeEventsFromStartHeight(
 		stream.Context(),
@@ -417,7 +414,7 @@ func (h *Handler) SubscribeEventsFromLatest(
 	}
 
 	execStateQuery := request.GetExecutionStateQuery()
-	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
+	criteria := convert.NewCriteria(execStateQuery)
 
 	sub := h.api.SubscribeEventsFromLatest(
 		stream.Context(),
@@ -714,7 +711,7 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 	}
 
 	execStateQuery := request.GetExecutionStateQuery()
-	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
+	criteria := convert.NewCriteria(execStateQuery)
 
 	sub := h.api.SubscribeAccountStatusesFromStartBlockID(
 		stream.Context(),
@@ -765,7 +762,7 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 	}
 
 	execStateQuery := request.GetExecutionStateQuery()
-	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
+	criteria := convert.NewCriteria(execStateQuery)
 
 	sub := h.api.SubscribeAccountStatusesFromStartHeight(
 		stream.Context(),
@@ -816,7 +813,7 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 	}
 
 	execStateQuery := request.GetExecutionStateQuery()
-	criteria := h.operatorCriteria.OverrideWith(convert.NewCriteria(execStateQuery))
+	criteria := convert.NewCriteria(execStateQuery)
 
 	sub := h.api.SubscribeAccountStatusesFromLatestBlock(
 		stream.Context(),

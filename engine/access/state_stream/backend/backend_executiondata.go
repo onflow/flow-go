@@ -40,7 +40,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 		return nil, fmt.Errorf("could not get block header for %s: %w", blockID, err)
 	}
 
-	executionData, err := b.execDataProvider.ExecutionData(ctx, header.Height)
+	executionData, err := b.execDataProvider.ExecutionDataByBlockHeight(ctx, header.Height)
 
 	if err != nil {
 		// need custom not found handler due to blob not found error
@@ -76,7 +76,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.getResponse)
 }
 
 // SubscribeExecutionDataFromStartBlockID streams execution data for all blocks starting at the specified block ID
@@ -94,7 +94,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx contex
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.getResponse)
 }
 
 // SubscribeExecutionDataFromStartBlockHeight streams execution data for all blocks starting at the specified block height
@@ -112,7 +112,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx co
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.getResponse)
 }
 
 // SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
@@ -129,11 +129,11 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Cont
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionFactory.CreateSubscription(ctx, nextHeight, b.getResponse)
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.getResponse)
 }
 
 func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {
-	executionData, err := b.execDataProvider.ExecutionData(ctx, height)
+	executionData, err := b.execDataProvider.ExecutionDataByBlockHeight(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}

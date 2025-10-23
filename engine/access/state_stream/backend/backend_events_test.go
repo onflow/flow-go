@@ -121,6 +121,8 @@ func (s *BackendEventsSuite) setupLocalStorage() {
 			}
 			return cmp < 0
 		})
+		// Override the in-memory blockEvents for expectation to match storage ordering
+		s.blockEvents[b.ID()] = events
 		blockEvents[b.ID()] = events
 	}
 

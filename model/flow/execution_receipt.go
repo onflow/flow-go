@@ -266,15 +266,35 @@ allows to split a list of receipts by some property
 // functionality to group receipts by various properties
 type ExecutionReceiptList []*ExecutionReceipt
 
-// ExecutionReceiptGroupedList is a partition of an ExecutionReceiptList
+// ExecutionReceiptGroupedList is a partition of an ExecutionReceiptList.
+// The map key is a generic Identifier whose meaning is defined by the grouping
+// function used to build the groups. For example:
+//   - With GroupByExecutorID, the key is the receipt's ExecutorID (node ID).
+//   - With GroupByResultID, the key is the Execution Result ID.
+// Custom groupers may choose other identifiers. Within each group, order and
+// multiplicity of receipts are preserved.
+//
+// Note: This type itself does not prescribe what the key represents; it is
+// solely determined by the ExecutionReceiptGroupingFunction.
+//
+// Example:
+//   groups := list.GroupByExecutorID()
+//   receiptsFromExecutor := groups[executorID]
+//
+// Use GetGroup to safely obtain a group's receipts if the key may be absent.
+//
+// ExecutionReceiptGroupedList maps a group Identifier to the corresponding
+// receipts for that group.
 type ExecutionReceiptGroupedList map[Identifier]ExecutionReceiptList
 
 // ExecutionReceiptGroupingFunction is a function that assigns an identifier to each receipt
 type ExecutionReceiptGroupingFunction func(*ExecutionReceipt) Identifier
 
 // GroupBy partitions the ExecutionReceiptList. All receipts that are mapped
-// by the grouping function to the same identifier are placed in the same group.
-// Within each group, the order and multiplicity of the receipts is preserved.
+// by the provided grouping function to the same Identifier (the map key) are
+// placed in the same group. The meaning of the key is entirely determined by
+// the grouper (e.g., ExecutorID or Execution Result ID). Within each group, the
+// order and multiplicity of the receipts is preserved.
 func (l ExecutionReceiptList) GroupBy(grouper ExecutionReceiptGroupingFunction) ExecutionReceiptGroupedList {
 	groups := make(map[Identifier]ExecutionReceiptList)
 	for _, rcpt := range l {

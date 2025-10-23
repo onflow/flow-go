@@ -13,7 +13,7 @@ import (
 )
 
 type ExecutionDataProvider interface {
-	ExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error)
+	ExecutionDataByBlockHeight(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error)
 }
 
 type ExecutionDataProviderImpl struct {
@@ -33,7 +33,7 @@ func NewExecutionDataProvider(
 	}
 }
 
-func (e *ExecutionDataProviderImpl) ExecutionData(
+func (e *ExecutionDataProviderImpl) ExecutionDataByBlockHeight(
 	ctx context.Context,
 	height uint64,
 ) (*execution_data.BlockExecutionDataEntity, error) {

@@ -46,19 +46,21 @@ func NewSubscriptionFactory(
 	}
 }
 
-// CreateSubscription creates and starts a new subscription.
+// CreateHeightBasedSubscription creates and starts a new subscription.
 //
 // Parameters:
 // - ctx: The context for the operation.
 // - startHeight: The height to start a subscription from.
 // - getData: The function to retrieve data by height.
-func (h *Factory) CreateSubscription(
+func (h *Factory) CreateHeightBasedSubscription(
 	ctx context.Context,
 	startHeight uint64,
 	getData GetDataByHeightFunc,
 ) Subscription {
 	sub := NewHeightBasedSubscription(h.sendBufferSize, startHeight, getData)
-	go NewStreamer(h.log, h.broadcaster, h.sendTimeout, h.responseLimit, sub).Stream(ctx)
+	streamer := NewStreamer(h.log, h.broadcaster, h.sendTimeout, h.responseLimit, sub)
+
+	go streamer.Stream(ctx)
 
 	return sub
 }
