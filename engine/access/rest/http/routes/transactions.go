@@ -15,7 +15,7 @@ const idQuery = "id"
 
 // GetTransactionByID gets a transaction by requested ID.
 func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	if !request.isTransactionID(r.GetVar(idQuery)) {
+	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransaction(r, backend, link)
 	}
 
@@ -51,7 +51,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
 func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	if !request.isTransactionID(r.GetVar(idQuery)) {
+	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransactionResult(r, backend, link)
 	}
 
