@@ -282,7 +282,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 					}
 					log(i)
 				}
-			}`)).SetComputeLimit(800000)
+			}`)).SetComputeLimit(1000000)
 
 		err = testutil.SignTransaction(spamTxBuilder, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
