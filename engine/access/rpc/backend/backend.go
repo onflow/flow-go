@@ -122,7 +122,6 @@ type Params struct {
 
 	ExecutionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
 	ExecutionStateCache         optimistic_sync.ExecutionStateCache
-	OperatorCriteria            optimistic_sync.Criteria
 	ScheduledCallbacksEnabled   bool
 }
 

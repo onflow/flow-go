@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -175,7 +174,6 @@ func (s *BackendBlocksSuite) backendParams(broadcaster *engine.Broadcaster) Para
 		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
 		ExecutionResultInfoProvider: s.executionResultInfoProvider,
 		ExecutionStateCache:         s.executionStateCache,
-		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	}
 }
 

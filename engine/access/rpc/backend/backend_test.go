@@ -41,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -2107,7 +2106,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		),
 		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 		ExecutionStateCache:         suite.executionStateCache,
-		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	}
 }
 
