@@ -1360,12 +1360,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 
-		var builderexecutionDataDBMode string
-		flags.StringVar(&builderexecutionDataDBMode,
-			"execution-data-db",
-			"pebble",
-			"[deprecated] the DB type for execution datastore")
-
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
 			"execution-data-height-range-target",
 			defaultConfig.executionDataPrunerHeightRangeTarget,
@@ -1511,6 +1505,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
 			"whether to enable the WebSockets Stream API.",
 		)
+
+		var builderexecutionDataDBMode string
+		flags.StringVar(&builderexecutionDataDBMode, "execution-data-db", "pebble", "[deprecated] the DB type for execution datastore")
+		flags.MarkDeprecated("execution-data-db", "[deprecated] this flag is ignored and will be removed in a future release.")
+
+		var unusedRetryEnabled bool
+		flags.BoolVar(&unusedRetryEnabled, "retry-enabled", false, "[deprecated] whether to enable the retry mechanism at the access node level")
+		flags.MarkDeprecated("retry-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
