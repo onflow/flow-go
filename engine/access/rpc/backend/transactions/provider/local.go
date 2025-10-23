@@ -81,21 +81,21 @@ func NewLocalTransactionProvider(
 // getter or when deriving transaction status.
 func (t *LocalTransactionProvider) TransactionResult(
 	ctx context.Context,
-	block *flow.Header,
+	header *flow.Header,
 	transactionID flow.Identifier,
 	collectionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	blockID := block.ID()
-	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
+	blockID := header.ID()
+	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, header.Height, transactionID)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
+		return nil, rpc.ConvertIndexError(err, header.Height, "failed to get transaction result")
 	}
 
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.ErrorMessageByTransactionID(ctx, blockID, block.Height, transactionID)
+		txErrorMessage, err = t.txErrorMessages.ErrorMessageByTransactionID(ctx, blockID, header.Height, transactionID)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -120,9 +120,9 @@ func (t *LocalTransactionProvider) TransactionResult(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Height, transactionID)
+	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, header.Height, transactionID)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
+		return nil, rpc.ConvertIndexError(err, header.Height, "failed to get events")
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
@@ -140,7 +140,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 		Events:        events,
 		ErrorMessage:  txErrorMessage,
 		BlockID:       blockID,
-		BlockHeight:   block.Height,
+		BlockHeight:   header.Height,
 		CollectionID:  collectionID,
 	}, nil
 }

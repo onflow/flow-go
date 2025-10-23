@@ -102,6 +102,7 @@ type TransactionStreamSuite struct {
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	systemCollection    *system.SystemCollection
+	scheduledTxEnabled  bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -233,6 +234,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		execNodeProvider,
 	)
 
+	s.scheduledTxEnabled = true
 	localTxProvider := provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
@@ -243,7 +245,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.systemCollection,
 		txStatusDeriver,
 		s.chainID,
-		true, // scheduledTransactionsEnabled
+		s.scheduledTxEnabled,
 	)
 
 	execNodeTxProvider := provider.NewENTransactionProvider(
@@ -256,7 +258,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		txStatusDeriver,
 		s.systemCollection,
 		s.chainID,
-		true, // scheduledTransactionsEnabled
+		s.scheduledTxEnabled,
 	)
 
 	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)

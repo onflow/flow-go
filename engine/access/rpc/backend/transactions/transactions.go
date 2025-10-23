@@ -174,7 +174,7 @@ func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.Transact
 	}
 
 	// try sending the transaction to one of the chosen collection nodes
-	sendError := t.nodeCommunicator.CallAvailableNode(
+	err = t.nodeCommunicator.CallAvailableNode(
 		collNodes,
 		func(node *flow.IdentitySkeleton) error {
 			return t.sendTransactionToCollector(ctx, tx, node.Address)
@@ -182,11 +182,11 @@ func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.Transact
 		nil,
 	)
 
-	if sendError != nil {
+	if err != nil {
 		t.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
 	}
 
-	return sendError
+	return err
 }
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
