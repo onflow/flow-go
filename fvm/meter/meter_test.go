@@ -1,6 +1,7 @@
 package meter_test
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
