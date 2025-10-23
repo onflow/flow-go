@@ -730,8 +730,8 @@ func (e *ENTransactionProvider) tryGetBlockEventsByBlockIDs(
 // This is found by searching guarantees and then the system collection until the transaction is found.
 //
 // Expected error returns during normal operation:
-//   - [codes.NotFound]: if the transaction is not found in the block
-//   - [codes.Internal]: if the system collection cannot be constructed
+//   - [codes.NotFound]: if the transaction is not found in the block.
+//   - [codes.Internal]: if the system collection cannot be constructed.
 func (e *ENTransactionProvider) getTransactionIDByIndex(ctx context.Context, block *flow.Block, index uint32) (flow.Identifier, error) {
 	i := uint32(0)
 
