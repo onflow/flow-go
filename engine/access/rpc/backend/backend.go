@@ -96,7 +96,6 @@ type Params struct {
 	ChainID                  flow.ChainID
 	AccessMetrics            module.AccessMetrics
 	ConnFactory              connection.ConnectionFactory
-	RetryEnabled             bool
 	MaxHeightRange           uint
 	Log                      zerolog.Logger
 	SnapshotHistoryLimit     int
@@ -251,7 +250,6 @@ func New(params Params) (*Backend, error) {
 		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
 		NodeCommunicator:            params.Communicator,
 		ConnFactory:                 params.ConnFactory,
-		EnableRetries:               params.RetryEnabled,
 		NodeProvider:                params.ExecNodeIdentitiesProvider,
 		Blocks:                      params.Blocks,
 		Collections:                 params.Collections,
