@@ -352,7 +352,6 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 }
 
-// TestGetScheduledTransactions tests the getting scheduled transactions and their results from the REST API.
 func TestGetScheduledTransactions(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 
@@ -373,7 +372,8 @@ func TestGetScheduledTransactions(t *testing.T) {
 		backend := mock.NewAPI(t)
 		backend.
 			On("GetScheduledTransaction", mocks.Anything, scheduledTxID).
-			Return(tx, nil)
+			Return(tx, nil).
+			Once()
 
 		req := getTransactionReq(fmt.Sprint(scheduledTxID), false, "", "")
 
@@ -384,10 +384,12 @@ func TestGetScheduledTransactions(t *testing.T) {
 		backend := mock.NewAPI(t)
 		backend.
 			On("GetScheduledTransaction", mocks.Anything, scheduledTxID).
-			Return(tx, nil)
+			Return(tx, nil).
+			Once()
 		backend.
 			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr, nil)
+			Return(txr, nil).
+			Once()
 
 		req := getTransactionReq(fmt.Sprint(scheduledTxID), true, "", "")
 
@@ -403,7 +405,8 @@ func TestGetScheduledTransactions(t *testing.T) {
 		backend := mock.NewAPI(t)
 		backend.
 			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr, nil)
+			Return(txr, nil).
+			Once()
 
 		req := getTransactionResultReq(fmt.Sprint(scheduledTxID), "", "")
 
@@ -417,7 +420,8 @@ func TestGetScheduledTransactions(t *testing.T) {
 		backend := mock.NewAPI(t)
 		backend.
 			On("GetTransaction", mocks.Anything, txID).
-			Return(tx, nil)
+			Return(tx, nil).
+			Once()
 
 		req := getTransactionReq(txID.String(), false, "", "")
 
@@ -428,10 +432,12 @@ func TestGetScheduledTransactions(t *testing.T) {
 		backend := mock.NewAPI(t)
 		backend.
 			On("GetTransaction", mocks.Anything, txID).
-			Return(tx, nil)
+			Return(tx, nil).
+			Once()
 		backend.
 			On("GetTransactionResult", mocks.Anything, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr, nil)
+			Return(txr, nil).
+			Once()
 
 		req := getTransactionReq(txID.String(), true, "", "")
 
@@ -535,6 +541,8 @@ func TestCreateTransaction(t *testing.T) {
 	})
 }
 
+// transactionResultFixture constructs a successful transaction result fixture for the given
+// transaction body.
 func transactionResultFixture(tx flow.TransactionBody) *accessmodel.TransactionResult {
 	txID := tx.ID()
 	cid := unittest.IdentifierFixture()
@@ -557,6 +565,8 @@ func transactionResultFixture(tx flow.TransactionBody) *accessmodel.TransactionR
 	}
 }
 
+// scheduledTransactionFixture constructs a transaction body for a scheduled transaction with the
+// given scheduled transaction ID.
 func scheduledTransactionFixture(t *testing.T, g *fixtures.GeneratorSuite, scheduledTxID uint64) *flow.TransactionBody {
 	pendingEvent := g.PendingExecutionEvents().Fixture(
 		fixtures.PendingExecutionEvent.WithID(scheduledTxID),
@@ -569,6 +579,8 @@ func scheduledTransactionFixture(t *testing.T, g *fixtures.GeneratorSuite, sched
 	return scheduledTxs[0]
 }
 
+// expectedTransactionResponse constructs the expected json transaction response for the given
+// transaction body and transaction result.
 func expectedTransactionResponse(t *testing.T, tx *flow.TransactionBody, txr *accessmodel.TransactionResult, link commonmodels.LinkGenerator) string {
 	var expectedTxWithoutResult models.Transaction
 	expectedTxWithoutResult.Build(tx, txr, link)
