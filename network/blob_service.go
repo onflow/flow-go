@@ -45,9 +45,6 @@ type BlobService interface {
 
 	// GetSession creates a new session that allows for controlled exchange of wantlists to decrease the bandwidth overhead.
 	GetSession(ctx context.Context) BlobGetter
-
-	// TriggerReprovide updates the BlobService's provider entries in the DHT
-	TriggerReprovide(ctx context.Context) error
 }
 
 type BlobServiceOption func(BlobService)
