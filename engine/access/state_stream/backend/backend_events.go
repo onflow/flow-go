@@ -11,15 +11,32 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
 )
 
 type EventsBackend struct {
 	log zerolog.Logger
 
-	subscriptionHandler  *subscription.SubscriptionHandler
+	subscriptionFactory  *subscription.Factory
 	executionDataTracker tracker.ExecutionDataTracker
-	eventsProvider       EventsProvider
+	eventsProvider       *EventsProvider
+}
+
+var _ state_stream.EventsAPI = (*EventsBackend)(nil)
+
+func NewEventsBackend(
+	log zerolog.Logger,
+	subscriptionFactory subscription.Factory,
+	executionDataTracker tracker.ExecutionDataTracker,
+	eventsProvider *EventsProvider,
+) EventsBackend {
+	return EventsBackend{
+		log:                  log,
+		subscriptionFactory:  &subscriptionFactory,
+		executionDataTracker: executionDataTracker,
+		eventsProvider:       eventsProvider,
+	}
 }
 
 // SubscribeEvents is deprecated and will be removed in a future version.
@@ -44,13 +61,23 @@ type EventsBackend struct {
 // - filter: The event filter used to filter events.
 //
 // If invalid parameters will be supplied SubscribeEvents will return a failed subscription.
-func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+func (b *EventsBackend) SubscribeEvents(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	startHeight uint64,
+	filter state_stream.EventFilter,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(
+		ctx,
+		nextHeight,
+		b.createResponseHandler(filter, criteria),
+	)
 }
 
 // SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
@@ -68,13 +95,22 @@ func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.I
 // - filter: The event filter used to filter events.
 //
 // If invalid parameters will be supplied SubscribeEventsFromStartBlockID will return a failed subscription.
-func (b *EventsBackend) SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.EventFilter) subscription.Subscription {
+func (b *EventsBackend) SubscribeEventsFromStartBlockID(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	filter state_stream.EventFilter,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(
+		ctx,
+		nextHeight,
+		b.createResponseHandler(filter, criteria),
+	)
 }
 
 // SubscribeEventsFromStartHeight streams events starting at the specified block height,
@@ -92,13 +128,21 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(ctx context.Context, sta
 // - filter: The event filter used to filter events.
 //
 // If invalid parameters will be supplied SubscribeEventsFromStartHeight will return a failed subscription.
-func (b *EventsBackend) SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+func (b *EventsBackend) SubscribeEventsFromStartHeight(
+	ctx context.Context,
+	startHeight uint64,
+	filter state_stream.EventFilter,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
-
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(
+		ctx,
+		nextHeight,
+		b.createResponseHandler(filter, criteria),
+	)
 }
 
 // SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
@@ -115,30 +159,38 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(ctx context.Context, star
 // - filter: The event filter used to filter events.
 //
 // If invalid parameters will be supplied SubscribeEventsFromLatest will return a failed subscription.
-func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter state_stream.EventFilter) subscription.Subscription {
+func (b *EventsBackend) SubscribeEventsFromLatest(
+	ctx context.Context,
+	filter state_stream.EventFilter,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.createResponseHandler(filter, criteria))
 }
 
-// getResponseFactory returns a function that retrieves the event response for a given height.
+// createResponseHandler returns a function that retrieves the event response for a given height.
 //
 // Parameters:
 // - filter: The event filter used to filter events.
 //
 // Expected errors during normal operation:
 // - subscription.ErrBlockNotReady: execution data for the given block height is not available.
-func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
+func (b *EventsBackend) createResponseHandler(
+	filter state_stream.EventFilter,
+	criteria optimistic_sync.Criteria,
+) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
-		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
+		eventsResponse, err := b.eventsProvider.Events(ctx, height, criteria)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
 				return nil, subscription.ErrBlockNotReady
 			}
+
 			return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 		}
 

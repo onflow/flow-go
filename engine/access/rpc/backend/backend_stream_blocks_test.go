@@ -162,7 +162,7 @@ func (s *BackendBlocksSuite) backendParams(broadcaster *engine.Broadcaster) Para
 		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
 		AccessMetrics:        metrics.NewNoopCollector(),
 		Log:                  s.log,
-		SubscriptionHandler: subscription.NewSubscriptionHandler(
+		SubscriptionFactory: subscription.NewSubscriptionFactory(
 			s.log,
 			broadcaster,
 			subscription.DefaultSendTimeout,

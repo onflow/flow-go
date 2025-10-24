@@ -216,7 +216,6 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.proto.state,
 		s.blocks,
 		s.collections,
-		s.transactions,
 		s.lastFullBlockHeight,
 		s.lockManager,
 	)
