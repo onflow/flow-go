@@ -12,9 +12,9 @@ import (
 )
 
 type AccountsAPI interface {
-	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+	GetAccount(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
+	GetAccountAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
+	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
 
 	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
 	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)

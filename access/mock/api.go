@@ -140,94 +140,121 @@ func (_m *API) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, ar
 	return r0, r1, r2
 }
 
-// GetAccount provides a mock function with given fields: ctx, address
-func (_m *API) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	ret := _m.Called(ctx, address)
+// GetAccount provides a mock function with given fields: ctx, address, criteria
+func (_m *API) GetAccount(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccount")
 	}
 
 	var r0 *flow.Account
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (*flow.Account, error)); ok {
-		return rf(ctx, address)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) *flow.Account); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) *flow.Account); ok {
+		r0 = rf(ctx, address, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountAtBlockHeight provides a mock function with given fields: ctx, address, height
-func (_m *API) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
-	ret := _m.Called(ctx, address, height)
+// GetAccountAtBlockHeight provides a mock function with given fields: ctx, address, height, criteria
+func (_m *API) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, height, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountAtBlockHeight")
 	}
 
 	var r0 *flow.Account
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (*flow.Account, error)); ok {
-		return rf(ctx, address, height)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, height, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) *flow.Account); ok {
-		r0 = rf(ctx, address, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) *flow.Account); ok {
+		r0 = rf(ctx, address, height, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
-		r1 = rf(ctx, address, height)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, height, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, height, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountAtLatestBlock provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	ret := _m.Called(ctx, address)
+// GetAccountAtLatestBlock provides a mock function with given fields: ctx, address, criteria
+func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountAtLatestBlock")
 	}
 
 	var r0 *flow.Account
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (*flow.Account, error)); ok {
-		return rf(ctx, address)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) *flow.Account); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) *flow.Account); ok {
+		r0 = rf(ctx, address, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetAccountBalanceAtBlockHeight provides a mock function with given fields: ctx, address, height

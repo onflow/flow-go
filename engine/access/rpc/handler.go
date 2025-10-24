@@ -527,7 +527,9 @@ func (h *Handler) GetAccount(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccount(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccount(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -535,6 +537,10 @@ func (h *Handler) GetAccount(
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.GetAccountResponse{
@@ -558,7 +564,9 @@ func (h *Handler) GetAccountAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccountAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -566,6 +574,10 @@ func (h *Handler) GetAccountAtLatestBlock(
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountResponse{
@@ -589,7 +601,9 @@ func (h *Handler) GetAccountAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -597,6 +611,10 @@ func (h *Handler) GetAccountAtBlockHeight(
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountResponse{
