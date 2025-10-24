@@ -7,33 +7,35 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go-sdk/templates"
-	"github.com/onflow/flow-go-sdk/test"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/integration/tests/mvp"
-	"github.com/onflow/flow-go/utils/dsl"
-
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/cadence"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+	"github.com/onflow/flow-go-sdk/templates"
+	"github.com/onflow/flow-go-sdk/test"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/integration/utils"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
 // This is a collection of tests that validate various Access API endpoints work as expected.
@@ -1156,4 +1158,177 @@ func (s *AccessAPISuite) TestRejectedInvalidSignatureFormat() {
 			s.Require().ErrorContains(err, "has invalid extension data")
 		})
 	}
+}
+
+// TestScheduledTransactions tests that scheduled transactions are properly indexed and can be
+// retrieved through the Access API.
+func (s *AccessAPISuite) TestScheduledTransactions() {
+	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
+
+	accessClient, err := s.net.ContainerByName("access_2").TestnetClient()
+	s.Require().NoError(err)
+	rpcClient := s.an2Client.RPCClient()
+
+	// Deploy the test contract first
+	txID, err := lib.DeployScheduledCallbackTestContract(accessClient, sc)
+	require.NoError(s.T(), err, "could not deploy test contract")
+
+	// wait for the tx to be sealed before attempting to schedule the callback. this helps make sure
+	// the proposer's sequence number is updated.
+	_, err = accessClient.WaitForSealed(s.ctx, txID)
+	s.Require().NoError(err)
+
+	// Schedule a callback for 10 seconds in the future. Use a larger wait time to ensure that there
+	// is enough time to submit the tx even on slower CI machines.
+	futureTimestamp := time.Now().Unix() + int64(10)
+
+	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, accessClient, sc)
+	require.NoError(s.T(), err, "could not schedule callback transaction")
+	s.T().Logf("scheduled callback with ID: %d", callbackID)
+
+	// construct the pending execution event using the parameters used by ScheduleCallbackAtTimestamp
+	g := fixtures.NewGeneratorSuite()
+	expectedPendingExecutionEvent := g.PendingExecutionEvents().Fixture(
+		fixtures.PendingExecutionEvent.WithID(callbackID),
+		fixtures.PendingExecutionEvent.WithPriority(0), // high priority
+		fixtures.PendingExecutionEvent.WithExecutionEffort(1000),
+	)
+
+	// construct the expected scheduled transaction body to compare to the API responses
+	scheduledTxs, err := blueprints.ExecuteCallbacksTransactions(s.net.Root().ChainID.Chain(), []flow.Event{expectedPendingExecutionEvent})
+	require.NoError(s.T(), err, "could not execute callback transaction")
+	expectedTxID := scheduledTxs[0].ID()
+
+	// Block until the API returns the scheduled transaction.
+	require.Eventually(s.T(), func() bool {
+		_, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: callbackID})
+		return err == nil
+	}, 30*time.Second, 500*time.Millisecond)
+
+	// Verify the results of the scheduled transaction and its result.
+	s.Run("GetScheduledTransaction", func() {
+		scheduledTxResponse, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: callbackID})
+		s.Require().NoError(err)
+
+		actual, err := convert.MessageToTransaction(scheduledTxResponse.GetTransaction(), s.net.Root().ChainID.Chain())
+		s.Require().NoError(err)
+		s.Require().Equal(expectedTxID, actual.ID())
+	})
+
+	var scheduledTxResult *accessmodel.TransactionResult
+	s.Run("GetScheduledTransactionResult", func() {
+		scheduledTxResultResponse, err := rpcClient.GetScheduledTransactionResult(s.ctx, &accessproto.GetScheduledTransactionResultRequest{Id: callbackID})
+		s.Require().NoError(err)
+
+		actual, err := convert.MessageToTransactionResult(scheduledTxResultResponse)
+		s.Require().NoError(err)
+
+		s.Greater(actual.BlockHeight, uint64(0))                 // make block height is set
+		s.NotEqual(flow.ZeroID, flow.Identifier(actual.BlockID)) // make sure block id is set
+		s.Equal(expectedTxID, actual.TransactionID)
+		s.Equal(flow.TransactionStatusSealed, actual.Status)
+		s.Equal(uint(0), actual.StatusCode)
+		s.Empty(actual.ErrorMessage)
+
+		scheduledTxResult = actual
+	})
+
+	s.Run("GetTransaction", func() {
+		txReponse, err := rpcClient.GetTransaction(s.ctx, &accessproto.GetTransactionRequest{Id: expectedTxID[:]})
+		s.Require().NoError(err)
+
+		actualTx, err := convert.MessageToTransaction(txReponse.GetTransaction(), s.net.Root().ChainID.Chain())
+		s.Require().NoError(err)
+		s.Equal(expectedTxID, actualTx.ID())
+	})
+
+	blockID := scheduledTxResult.BlockID
+	s.Run("GetTransactionResult", func() {
+		txResultResponse, err := rpcClient.GetTransactionResult(s.ctx, &accessproto.GetTransactionRequest{Id: expectedTxID[:], BlockId: blockID[:]})
+		s.Require().NoError(err)
+
+		actualTxResult, err := convert.MessageToTransactionResult(txResultResponse)
+		s.Require().NoError(err)
+		s.Equal(scheduledTxResult, actualTxResult)
+	})
+}
+
+// TestSystemTransactions tests getting a system transaction using each of the supported endpoints.
+func (s *AccessAPISuite) TestSystemTransactions() {
+	rpcClient := s.an2Client.RPCClient()
+
+	// block until a few blocks have executed to ensure there are blocks with system transactions
+	var blockID flow.Identifier
+	require.Eventually(s.T(), func() bool {
+		header, err := rpcClient.GetBlockHeaderByHeight(s.ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: 5})
+		if err == nil {
+			blockID = convert.MessageToIdentifier(header.GetBlock().GetId())
+			return true
+		}
+		return false
+	}, 30*time.Second, 500*time.Millisecond)
+
+	// construct the expected system collection
+	systemCollection, err := blueprints.SystemCollection(s.net.Root().ChainID.Chain(), nil)
+	s.Require().NoError(err)
+	s.Require().Len(systemCollection.Transactions, 2)
+
+	systemTxs := make([]flow.Identifier, len(systemCollection.Transactions))
+	for i, tx := range systemCollection.Transactions {
+		systemTxs[i] = tx.ID()
+	}
+
+	// query the system transactions using each of the supported endpoints and verify the results are correct
+	s.Run("GetTransaction", func() {
+		for _, txID := range systemTxs {
+			txReponse, err := rpcClient.GetTransaction(s.ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
+			s.Require().NoError(err)
+
+			actualTx, err := convert.MessageToTransaction(txReponse.GetTransaction(), s.net.Root().ChainID.Chain())
+			s.Require().NoError(err)
+			s.Equal(txID, actualTx.ID())
+		}
+	})
+
+	s.Run("GetSystemTransaction", func() {
+		for _, txID := range systemTxs {
+			systemTxResponse, err := rpcClient.GetSystemTransaction(s.ctx, &accessproto.GetSystemTransactionRequest{Id: txID[:], BlockId: blockID[:]})
+			s.Require().NoError(err)
+
+			actualSystemTx, err := convert.MessageToTransaction(systemTxResponse.GetTransaction(), s.net.Root().ChainID.Chain())
+			s.Require().NoError(err)
+			s.Equal(txID, actualSystemTx.ID())
+		}
+	})
+
+	s.Run("GetTransactionResult", func() {
+		for _, txID := range systemTxs {
+			txResultResponse, err := rpcClient.GetTransactionResult(s.ctx, &accessproto.GetTransactionRequest{Id: txID[:], BlockId: blockID[:]})
+			s.Require().NoError(err)
+
+			actualTxResult, err := convert.MessageToTransactionResult(txResultResponse)
+			s.Require().NoError(err)
+
+			s.Equal(txID, actualTxResult.TransactionID)
+			s.Equal(blockID, actualTxResult.BlockID)
+			s.Equal(uint(0), actualTxResult.StatusCode)
+			s.Empty(actualTxResult.ErrorMessage)
+		}
+	})
+
+	s.Run("GetSystemTransactionResult", func() {
+		for _, txID := range systemTxs {
+			systemTxResultResponse, err := rpcClient.GetSystemTransactionResult(s.ctx, &accessproto.GetSystemTransactionResultRequest{Id: txID[:], BlockId: blockID[:]})
+			s.Require().NoError(err)
+
+			actualSystemTxResult, err := convert.MessageToTransactionResult(systemTxResultResponse)
+			s.Require().NoError(err)
+
+			s.Equal(txID, actualSystemTxResult.TransactionID)
+			s.Equal(blockID, actualSystemTxResult.BlockID)
+			s.Equal(uint(0), actualSystemTxResult.StatusCode)
+			s.Empty(actualSystemTxResult.ErrorMessage)
+		}
+	})
 }

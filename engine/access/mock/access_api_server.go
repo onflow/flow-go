@@ -885,6 +885,66 @@ func (_m *AccessAPIServer) GetProtocolStateSnapshotByHeight(_a0 context.Context,
 	return r0, r1
 }
 
+// GetScheduledTransaction provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetScheduledTransaction(_a0 context.Context, _a1 *access.GetScheduledTransactionRequest) (*access.TransactionResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransaction")
+	}
+
+	var r0 *access.TransactionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionRequest) (*access.TransactionResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionRequest) *access.TransactionResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetScheduledTransactionRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetScheduledTransactionResult provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetScheduledTransactionResult(_a0 context.Context, _a1 *access.GetScheduledTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransactionResult")
+	}
+
+	var r0 *access.TransactionResultResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionResultRequest) (*access.TransactionResultResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionResultRequest) *access.TransactionResultResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResultResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetScheduledTransactionResultRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSystemTransaction provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) GetSystemTransaction(_a0 context.Context, _a1 *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
 	ret := _m.Called(_a0, _a1)
