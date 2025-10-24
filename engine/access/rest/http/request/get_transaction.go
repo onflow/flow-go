@@ -45,7 +45,7 @@ type GetTransaction struct {
 // GetTransactionRequest extracts necessary variables from the provided request,
 // builds a GetTransaction instance, and validates it.
 //
-// No errors are expected during normal operation.
+// All errors indicate a malformed request.
 func GetTransactionRequest(r *common.Request) (GetTransaction, error) {
 	var req GetTransaction
 	err := req.Build(r)
@@ -72,7 +72,7 @@ type GetTransactionResult struct {
 // GetTransactionResultRequest extracts necessary variables from the provided request,
 // builds a GetTransactionResult instance, and validates it.
 //
-// No errors are expected during normal operation.
+// All errors indicate a malformed request.
 func GetTransactionResultRequest(r *common.Request) (GetTransactionResult, error) {
 	var req GetTransactionResult
 	err := req.Build(r)
@@ -96,6 +96,10 @@ type GetScheduledTransaction struct {
 	ExpandsResult bool
 }
 
+// NewGetScheduledTransaction extracts the scheduled transaction ID from the request,
+// builds a GetScheduledTransaction instance, and validates it.
+//
+// All errors indicate a malformed request.
 func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, error) {
 	raw := r.GetVar(idQuery)
 	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)
@@ -121,6 +125,10 @@ type GetScheduledTransactionResult struct {
 	TransactionOptionals
 }
 
+// NewGetScheduledTransactionResult extracts the scheduled transaction ID from the request,
+// builds a GetScheduledTransactionResult instance, and validates it.
+//
+// All errors indicate a malformed request.
 func NewGetScheduledTransactionResult(r *common.Request) (GetScheduledTransactionResult, error) {
 	raw := r.GetVar(idQuery)
 	scheduledTxID, err := strconv.ParseUint(raw, 0, 64)

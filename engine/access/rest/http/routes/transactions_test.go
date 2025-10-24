@@ -352,6 +352,7 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 }
 
+// TestGetScheduledTransactions tests the getting scheduled transactions and their results from the REST API.
 func TestGetScheduledTransactions(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 

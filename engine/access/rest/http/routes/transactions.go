@@ -135,6 +135,8 @@ func GetScheduledTransactionResult(r *common.Request, backend access.API, link c
 	return response, nil
 }
 
+// isTransactionID returns true if the provided string is a valid flow.Identifier indicating it is a
+// transaction ID.
 func isTransactionID(raw string) bool {
 	_, err := flow.HexStringToIdentifier(raw)
 	return err == nil
