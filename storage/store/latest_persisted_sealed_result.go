@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -22,10 +24,6 @@ type LatestPersistedSealedResult struct {
 
 	// progress is the consumer progress instance
 	progress storage.ConsumerProgress
-
-	// batchMu is used to prevent concurrent batch updates to the persisted height.
-	// the critical section is fairly large, so use a separate mutex from the cached values.
-	batchMu sync.Mutex
 
 	// cacheMu is used to protect access to resultID and height.
 	cacheMu sync.RWMutex
@@ -71,22 +69,21 @@ func (l *LatestPersistedSealedResult) Latest() (flow.Identifier, uint64) {
 	return l.resultID, l.height
 }
 
-// BatchSet updates the latest persisted sealed result in a batch operation
+// BatchSet updates the latest persisted sealed result in a batch operation.
 // The resultID and height are added to the provided batch, and the local data is updated only after
 // the batch is successfully committed.
+// The caller must hold [storage.LockInsertCollection].
 //
-// No errors are expected during normal operation,
-func (l *LatestPersistedSealedResult) BatchSet(resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
-	// there are 2 mutexes used here:
-	// - batchMu is used to prevent concurrent batch updates to the persisted height. Since this
-	//   is a global variable, we need to ensure that only a single batch is in progress at a time.
-	// - cacheMu is used to protect access to the cached resultID and height values. This is an
-	//   optimization to avoid readers having to block during the batch operations, since they
-	//   can have arbitrarily long setup times.
-	l.batchMu.Lock()
+// No errors are expected during normal operation.
+func (l *LatestPersistedSealedResult) BatchSet(lctx lockctx.Proof, resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
+	if !lctx.HoldsLock(storage.LockInsertCollection) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertCollection)
+	}
 
+	// cacheMu is used to protect access to the cached resultID and height values. This is an
+	// optimization to avoid readers having to block during the batch operations, since they
+	// can have arbitrarily long setup times.
 	batch.AddCallback(func(err error) {
-		defer l.batchMu.Unlock()
 		if err != nil {
 			return
 		}

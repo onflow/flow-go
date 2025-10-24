@@ -3,6 +3,7 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
@@ -14,17 +15,17 @@ type LatestPersistedSealedResult struct {
 	mock.Mock
 }
 
-// BatchSet provides a mock function with given fields: resultID, height, batch
-func (_m *LatestPersistedSealedResult) BatchSet(resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(resultID, height, batch)
+// BatchSet provides a mock function with given fields: lctx, resultID, height, batch
+func (_m *LatestPersistedSealedResult) BatchSet(lctx lockctx.Proof, resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
+	ret := _m.Called(lctx, resultID, height, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchSet")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(resultID, height, batch)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, uint64, storage.ReaderBatchWriter) error); ok {
+		r0 = rf(lctx, resultID, height, batch)
 	} else {
 		r0 = ret.Error(0)
 	}

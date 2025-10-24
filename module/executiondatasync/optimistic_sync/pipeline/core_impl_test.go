@@ -76,7 +76,7 @@ func (c *CoreImplSuite) SetupTest() {
 	c.persistentTransactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Maybe()
 	c.persistentResults.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	c.persistentTxResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	c.latestPersistedSealedResult.On("BatchSet", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	c.latestPersistedSealedResult.On("BatchSet", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 }
 
 // createTestCoreImpl creates a CoreImpl instance with mocked dependencies for testing.

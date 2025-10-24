@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -111,6 +113,8 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 
 		t.Run("successful batch update", func(t *testing.T) {
+			lockManager := storage.NewTestingLockManager()
+
 			initializer := NewConsumerProgress(db, "test_consumer1")
 			progress, err := initializer.Initialize(initialHeader.Height)
 			require.NoError(t, err)
@@ -118,31 +122,37 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 			latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, mockResults)
 			require.NoError(t, err)
 
-			batch := db.NewBatch()
-			defer batch.Close()
+			err = unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+				batch := db.NewBatch()
+				defer batch.Close()
 
-			done := make(chan struct{})
-			batch.AddCallback(func(err error) {
+				done := make(chan struct{})
+				batch.AddCallback(func(err error) {
+					require.NoError(t, err)
+					close(done)
+				})
+
+				err = latest.BatchSet(lctx, newResultID, newHeight, batch)
 				require.NoError(t, err)
-				close(done)
+
+				err = batch.Commit()
+				require.NoError(t, err)
+
+				unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "callback not called")
+
+				actualResultID, actualHeight := latest.Latest()
+
+				assert.Equal(t, newResultID, actualResultID)
+				assert.Equal(t, newHeight, actualHeight)
+
+				return nil
 			})
-
-			err = latest.BatchSet(newResultID, newHeight, batch)
 			require.NoError(t, err)
-
-			err = batch.Commit()
-			require.NoError(t, err)
-
-			unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "callback not called")
-
-			actualResultID, actualHeight := latest.Latest()
-
-			assert.Equal(t, newResultID, actualResultID)
-			assert.Equal(t, newHeight, actualHeight)
 		})
 	})
 
 	t.Run("batch update error during BatchSetProcessedIndex", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 		expectedErr := fmt.Errorf("could not set processed index")
 
 		var callbackCalled sync.WaitGroup
@@ -162,7 +172,9 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		latest, err := NewLatestPersistedSealedResult(mockCP, mockHeaders, mockResults)
 		require.NoError(t, err)
 
-		err = latest.BatchSet(newResultID, newHeight, mockBatch)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+			return latest.BatchSet(lctx, newResultID, newHeight, mockBatch)
+		})
 		assert.ErrorIs(t, err, expectedErr)
 
 		callbackCalled.Wait()
@@ -213,6 +225,7 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 		})
 
 		t.Run("concurrent read/write", func(t *testing.T) {
+			lockManager := storage.NewTestingLockManager()
 			var wg sync.WaitGroup
 			numGoroutines := 1000
 
@@ -221,15 +234,20 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 				go func(i int) {
 					defer wg.Done()
 
-					batch := db.NewBatch()
-					defer batch.Close()
+					err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+						batch := db.NewBatch()
+						defer batch.Close()
 
-					newResultID := unittest.IdentifierFixture()
-					newHeight := uint64(200 + i)
-					err := latest.BatchSet(newResultID, newHeight, batch)
-					require.NoError(t, err)
+						newResultID := unittest.IdentifierFixture()
+						newHeight := uint64(200 + i)
+						err := latest.BatchSet(lctx, newResultID, newHeight, batch)
+						require.NoError(t, err)
 
-					err = batch.Commit()
+						err = batch.Commit()
+						require.NoError(t, err)
+
+						return nil
+					})
 					require.NoError(t, err)
 				}(i)
 				go func() {
