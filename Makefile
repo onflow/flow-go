@@ -227,6 +227,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'Snapshot' --dir=module/executiondatasync/optimistic_sync --case=underscore --output="module/executiondatasync/optimistic_sync/mock" --outpkg="mock"
 	mockery --name 'Requester' --dir=engine/access/ingestion/tx_error_messages --case=underscore --output="engine/access/ingestion/tx_error_messages/mock" --outpkg="mock"
 	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization/requester --case=underscore --output="module/state_synchronization/requester/mock" --outpkg="mock"
+	mockery --name '.*'	 --dir=engine/access/subscription2 --case=underscore --output="engine/access/subscription2/mock" --outpkg="mock"
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod
