@@ -17,6 +17,8 @@ import (
 )
 
 func TestTransactionVerification(t *testing.T) {
+	t.Parallel()
+
 	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 

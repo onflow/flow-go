@@ -724,16 +724,22 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 	}
 
 	oldFieldNames := make([]string, 0, v.FieldCount())
-	v.ForEachFieldName(func(fieldName string) bool {
-		oldFieldNames = append(oldFieldNames, fieldName)
-		return true
-	})
+	v.ForEachFieldName(
+		nil,
+		func(fieldName string) bool {
+			oldFieldNames = append(oldFieldNames, fieldName)
+			return true
+		},
+	)
 
 	newFieldNames := make([]string, 0, otherComposite.FieldCount())
-	otherComposite.ForEachFieldName(func(fieldName string) bool {
-		newFieldNames = append(newFieldNames, fieldName)
-		return true
-	})
+	otherComposite.ForEachFieldName(
+		nil,
+		func(fieldName string) bool {
+			newFieldNames = append(newFieldNames, fieldName)
+			return true
+		},
+	)
 
 	onlyOldFieldNames, onlyNewFieldNames, sharedFieldNames := diff(oldFieldNames, newFieldNames)
 
@@ -946,9 +952,9 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 func getStorageMapKeys(storageMap *interpreter.DomainStorageMap) []any {
 	keys := make([]any, 0, storageMap.Count())
 
-	iter := storageMap.Iterator(nil)
+	iter := storageMap.Iterator()
 	for {
-		key := iter.NextKey()
+		key := iter.NextKey(nil)
 		if key == nil {
 			break
 		}
@@ -994,7 +1000,7 @@ func diff[T comparable](old, new []T) (onlyOld, onlyNew, shared []T) {
 func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
 	ledger := &registers.ReadOnlyLedger{Registers: regs}
 	config := runtime.StorageConfig{}
-	return runtime.NewStorage(ledger, nil, config)
+	return runtime.NewStorage(ledger, nil, nil, config)
 }
 
 type readonlyStorageRuntime struct {

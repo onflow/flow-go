@@ -60,20 +60,19 @@ func (p *BlockPersister) Persist() error {
 	p.log.Debug().Msg("started to persist execution data")
 	start := time.Now()
 
-	lctx := p.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
-	}
-	defer lctx.Release()
-
-	err = p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-		for _, persister := range p.persisterStores {
-			if err := persister.Persist(lctx, batch); err != nil {
-				return err
+	err := storage.WithLocks(p.lockManager, []string{
+		storage.LockInsertCollection,
+		storage.LockInsertLightTransactionResult,
+		storage.LockInsertTransactionResultErrMessage,
+	}, func(lctx lockctx.Context) error {
+		return p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+			for _, persister := range p.persisterStores {
+				if err := persister.Persist(lctx, batch); err != nil {
+					return err
+				}
 			}
-		}
-		return nil
+			return nil
+		})
 	})
 
 	if err != nil {

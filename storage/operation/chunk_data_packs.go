@@ -10,50 +10,61 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertChunkDataPack inserts a [storage.StoredChunkDataPack] into the database, keyed by its chunk ID.
-// The function ensures data integrity by first checking if a chunk data pack already exists for the given
-// chunk ID and rejecting overwrites with different values. This function is idempotent, i.e. repeated calls
-// with the *initially* stored value are no-ops.
-//
-// CAUTION:
-//   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
-//     The caller must acquire the [storage.LockInsertChunkDataPack] and hold it until the database write has been committed.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrDataMismatch] if a *different* chunk data pack is already stored for the same chunk ID
-func InsertChunkDataPack(lctx lockctx.Proof, rw storage.ReaderBatchWriter, c *storage.StoredChunkDataPack) error {
-	if !lctx.HoldsLock(storage.LockInsertChunkDataPack) {
-		return fmt.Errorf("InsertChunkDataPack requires lock: %s", storage.LockInsertChunkDataPack)
+// IndexChunkDataPackByChunkID inserts a mapping from chunk ID to stored chunk data pack ID. It requires
+// the [storage.LockIndexChunkDataPackByChunkID] lock to be acquired by the caller and held until the write batch has been committed.
+// Returns [storage.ErrDataMismatch] if a different chunk data pack ID already exists for the given chunk ID.
+func IndexChunkDataPackByChunkID(lctx lockctx.Proof, rw storage.ReaderBatchWriter, chunkID flow.Identifier, chunkDataPackID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockIndexChunkDataPackByChunkID) {
+		return fmt.Errorf("missing required lock: %s", storage.LockIndexChunkDataPackByChunkID)
 	}
-
-	key := MakePrefix(codeChunkDataPack, c.ChunkID)
-
-	var existing storage.StoredChunkDataPack
+	key := MakePrefix(codeIndexChunkDataPackByChunkID, chunkID)
+	var existing flow.Identifier
 	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
 	if err == nil {
-		err := c.Equals(existing)
-		if err != nil {
-			return fmt.Errorf("attempting to store conflicting chunk data pack (chunk ID: %v): storing: %+v, stored: %+v, err: %s. %w",
-				c.ChunkID, c, &existing, err, storage.ErrDataMismatch)
+		if existing == chunkDataPackID {
+			// already exists, nothing to do
+			return nil
 		}
-		return nil // already stored, nothing to do
+		return fmt.Errorf("cannot insert chunk data pack ID for chunk %s, different one exist: existing: %v, new: %v: %w",
+			chunkID, existing, chunkDataPackID, storage.ErrDataMismatch)
+	} else if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("cannot check existing chunk data pack ID for chunk %s: %w", chunkID, err)
 	}
 
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("checking for existing chunk data pack (chunk ID: %v): %w", c.ChunkID, err)
-	}
-
-	return UpsertByKey(rw.Writer(), key, c)
+	return UpsertByKey(rw.Writer(), key, &chunkDataPackID)
 }
 
-// RetrieveChunkDataPack retrieves a chunk data pack by chunk ID.
-// it returns storage.ErrNotFound if the chunk data pack is not found
-func RetrieveChunkDataPack(r storage.Reader, chunkID flow.Identifier, c *storage.StoredChunkDataPack) error {
-	return RetrieveByKey(r, MakePrefix(codeChunkDataPack, chunkID), c)
+// RetrieveChunkDataPackID retrieves the stored chunk data pack ID for a given chunk ID.
+// Returns [storage.ErrNotFound] if no chunk data pack has been indexed as result for the given chunk ID.
+func RetrieveChunkDataPackID(r storage.Reader, chunkID flow.Identifier, chunkDataPackID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeIndexChunkDataPackByChunkID, chunkID), chunkDataPackID)
 }
 
-// RemoveChunkDataPack removes the chunk data pack with the given chunk ID.
-// any error are exceptions
-func RemoveChunkDataPack(w storage.Writer, chunkID flow.Identifier) error {
-	return RemoveByKey(w, MakePrefix(codeChunkDataPack, chunkID))
+// RemoveChunkDataPackID removes the mapping from chunk ID to stored chunk data pack ID.
+// Non-existing keys are no-ops. Any errors are exceptions.
+func RemoveChunkDataPackID(w storage.Writer, chunkID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeIndexChunkDataPackByChunkID, chunkID))
+}
+
+// InsertChunkDataPack inserts a [storage.StoredChunkDataPack] into the database, keyed by its own ID.
+//
+// CAUTION: The caller must ensure `storeChunkDataPackID` is the same as `c.ID()`, ie. a collision-resistant
+// hash of the chunk data pack! This method silently overrides existing data, which is safe only if for the
+// same key, we always write the same value.
+//
+// No error returns expected during normal operations.
+func InsertChunkDataPack(rw storage.ReaderBatchWriter, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
+	return UpsertByKey(rw.Writer(), MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
+}
+
+// RetrieveChunkDataPack retrieves a chunk data pack by stored chunk data pack ID.
+// It returns [storage.ErrNotFound] if no chunk data pack with the given ID is known.
+func RetrieveChunkDataPack(r storage.Reader, storeChunkDataPackID flow.Identifier, c *storage.StoredChunkDataPack) error {
+	return RetrieveByKey(r, MakePrefix(codeChunkDataPack, storeChunkDataPackID), c)
+}
+
+// RemoveChunkDataPack removes the chunk data pack with the given stored chunk data pack ID.
+// Non-existing keys are no-ops. Any errors are exceptions.
+func RemoveChunkDataPack(w storage.Writer, chunkDataPackID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeChunkDataPack, chunkDataPackID))
 }
