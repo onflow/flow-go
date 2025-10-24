@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/underlay"
@@ -361,7 +361,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	u.setupNetworks(slashingViolationsConsumer)
 	u.startNetworksAndLibp2pNodes()
 
-	msg := &libp2pmessage.TestMessage{
+	msg := &flow.TestMessage{
 		Text: string("hello"),
 	}
 
@@ -402,7 +402,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 		Identity: u.senderID,
 		OriginID: u.senderID.NodeID,
 		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
-		MsgType:  "*flow.UntrustedProposal",
+		MsgType:  "*messages.Proposal",
 		Channel:  channels.ConsensusCommittee,
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      message.ErrUnauthorizedUnicastOnChannel,
@@ -421,8 +421,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	senderCon, err := u.senderNetwork.Register(channels.ConsensusCommittee, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
 
-	// flow.UntrustedProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
-	payload := flow.UntrustedProposal(*unittest.ProposalFixture())
+	// messages.Proposal is not authorized to be sent via unicast over the ConsensusCommittee channel
+	payload := messages.Proposal(*unittest.ProposalFixture())
 	// send message via unicast
 	err = senderCon.Unicast(&payload, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
@@ -480,16 +480,19 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 		EntityIDs: unittest.IdentifierListFixture(10),
 	}
 
+	internal, err := msg.ToInternal()
+	require.NoError(u.T(), err)
+
 	// both sender and receiver must have an authorized role to send and receive messages on the ConsensusCommittee channel.
 	u.senderID.Role = flow.RoleConsensus
 	u.receiverID.Role = flow.RoleExecution
 
 	receiverEngine := &mocknetwork.MessageProcessor{}
-	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, msg).Run(
+	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, internal).Run(
 		func(args mockery.Arguments) {
 			close(u.waitCh)
 		}).Return(nil).Once()
-	_, err := u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
+	_, err = u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
 	require.NoError(u.T(), err)
 
 	senderCon, err := u.senderNetwork.Register(channels.RequestReceiptsByBlockID, &mocknetwork.MessageProcessor{})
@@ -544,6 +547,6 @@ func (u *overridableMessageEncoder) Encode(v interface{}) ([]byte, error) {
 }
 
 // Decode decodes a byte slice into a value. It uses the default decoder.
-func (u *overridableMessageEncoder) Decode(data []byte) (interface{}, error) {
+func (u *overridableMessageEncoder) Decode(data []byte) (messages.UntrustedMessage, error) {
 	return u.codec.Decode(data)
 }

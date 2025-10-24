@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -21,11 +22,10 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		store := store.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(lctx, rw, qc)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, rw, qc)
+			})
 		})
 		require.NoError(t, err)
 
@@ -46,13 +46,16 @@ func TestQuorumCertificates_LockEnforced(t *testing.T) {
 		qc := unittest.QuorumCertificateFixture()
 
 		// acquire wrong lock and attempt to store QC: should error
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock)) // INCORRECT LOCK
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return store.BatchStore(lctx, rw, qc)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error { // INCORRECT LOCK
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, rw, qc)
+			})
 		})
+		// handle the error outside of the db.WithReaderBatchWriter, otherwise batch writer would
+		// consider no error happened and would commit the batch, which would execute
+		// the callbacks to store the QC in the cache, and causing the following reads
+		// with ByBlockID to read from dirty data.
 		require.Error(t, err)
-		lctx.Release()
 
 		// qc should not be stored, so ByBlockID should return `storage.ErrNotFound`
 		_, err = store.ByBlockID(qc.BlockID)
@@ -73,17 +76,17 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 			otherQC.BlockID = qc.BlockID
 		})
 
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return s.BatchStore(lctx, rw, qc)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return s.BatchStore(lctx, rw, qc)
+			})
 		})
 		require.NoError(t, err)
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return s.BatchStore(lctx, rw, otherQC)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return s.BatchStore(lctx, rw, otherQC)
+			})
 		})
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 

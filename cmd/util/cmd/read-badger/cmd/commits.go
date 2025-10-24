@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
@@ -22,8 +23,8 @@ func init() {
 var commitsCmd = &cobra.Command{
 	Use:   "commits",
 	Short: "get commit by block ID",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := WithStorage(func(db storage.DB) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 
 			commits := store.NewCommits(metrics.NewNoopCollector(), db)
 
@@ -42,9 +43,5 @@ var commitsCmd = &cobra.Command{
 			log.Info().Msgf("commit: %v", commit)
 			return nil
 		})
-
-		if err != nil {
-			log.Error().Err(err).Msg("could not get events")
-		}
 	},
 }

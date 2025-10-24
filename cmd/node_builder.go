@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/dbops"
 )
 
 const NotSet = "not set"
@@ -154,9 +153,7 @@ type BaseConfig struct {
 	DynamicStartupEpoch         string
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
-	pebbleDir                   string
 	pebbleCheckpointsDir        string
-	DBOps                       string
 	protocolDB                  storage.DB
 	secretsdir                  string
 	secretsDBEnabled            bool
@@ -262,7 +259,6 @@ type StateExcerptAtBoot struct {
 
 func DefaultBaseConfig() *BaseConfig {
 	datadir := "/data/protocol"
-	pebbleDir := "/data/protocol-pebble"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
 	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
@@ -279,8 +275,6 @@ func DefaultBaseConfig() *BaseConfig {
 		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
-		pebbleDir:        pebbleDir,
-		DBOps:            string(dbops.PebbleBatch), // "pebble-batch" (default) or "badger-batch" (deprecated)
 		protocolDB:       nil,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,

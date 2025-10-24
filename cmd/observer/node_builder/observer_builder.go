@@ -1589,17 +1589,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				fixedENIdentifiers,
 			)
 
-			execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+			execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
 				node.Logger,
 				node.State,
-				node.Storage.Headers,
 				node.Storage.Receipts,
 				execNodeSelector,
 				optimistic_sync.DefaultCriteria,
 			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create execution result provider: %w", err)
-			}
 
 			// TODO: use real objects instead of mocks once they're implemented
 			snapshot := osyncsnapshot.NewSnapshotMock(
@@ -1965,7 +1961,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// handles block-related operations.
 		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
-			builder.FinalizedRootBlock.Height,
+			builder.SealedRootBlock.Height,
 			node.Storage.Headers,
 			broadcaster,
 		)
@@ -2018,17 +2014,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
-		execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+		execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
 			node.Logger,
 			node.State,
-			node.Storage.Headers,
 			node.Storage.Receipts,
 			execNodeSelector,
 			optimistic_sync.DefaultCriteria,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create execution result provider: %w", err)
-		}
 
 		// TODO: use real objects instead of mocks once they're implemented
 		snapshot := osyncsnapshot.NewSnapshotMock(

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -17,8 +18,10 @@ type ExecutionDataProvider interface {
 }
 
 type ExecutionDataProviderImpl struct {
-	execDataTracker tracker.ExecutionDataTracker
-	execDataCache   *cache.ExecutionDataCache
+	execDataTracker      tracker.ExecutionDataTracker
+	execDataCache        *cache.ExecutionDataCache
+	sporkRootBlockHeight uint64
+	state                protocol.State
 }
 
 var _ ExecutionDataProvider = (*ExecutionDataProviderImpl)(nil)
@@ -26,10 +29,13 @@ var _ ExecutionDataProvider = (*ExecutionDataProviderImpl)(nil)
 func NewExecutionDataProvider(
 	execDataTracker tracker.ExecutionDataTracker,
 	execDataCache *cache.ExecutionDataCache,
+	state protocol.State,
 ) *ExecutionDataProviderImpl {
 	return &ExecutionDataProviderImpl{
-		execDataTracker: execDataTracker,
-		execDataCache:   execDataCache,
+		execDataTracker:      execDataTracker,
+		execDataCache:        execDataCache,
+		state:                state,
+		sporkRootBlockHeight: state.Params().SporkRootBlockHeight(),
 	}
 }
 
@@ -43,6 +49,15 @@ func (e *ExecutionDataProviderImpl) ExecutionDataByBlockHeight(
 	// received. this ensures a consistent view is available to all streams.
 	if height > highestHeight {
 		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+	}
+
+	// the spork root block will never have execution data available. If requested, return an empty result.
+	if height == e.sporkRootBlockHeight {
+		return &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: e.state.Params().SporkRootBlock().ID(),
+			},
+		}, nil
 	}
 
 	execData, err := e.execDataCache.ByHeight(ctx, height)

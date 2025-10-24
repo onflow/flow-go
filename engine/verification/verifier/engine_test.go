@@ -21,12 +21,13 @@ import (
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	chmodel "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	realModule "github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -35,7 +36,7 @@ import (
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net           *mocknetwork.Network
+	net           *mocknetwork.EngineRegistry
 	tracer        realModule.Tracer
 	state         *protocol.State
 	ss            *protocol.Snapshot
@@ -58,7 +59,7 @@ func TestVerifierEngine(t *testing.T) {
 func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.lockManager = storage.NewTestingLockManager()
 	suite.state = new(protocol.State)
-	suite.net = mocknetwork.NewNetwork(suite.T())
+	suite.net = mocknetwork.NewEngineRegistry(suite.T())
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = new(protocol.Snapshot)
 	suite.pushCon = mocknetwork.NewConduit(suite.T())
@@ -153,7 +154,8 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	for _, test := range tests {
 		suite.Run(test.name, func() {
-			var expectedApproval atomic.Pointer[flow.ResultApproval] // potentially accessed concurrently within engine
+
+			var expectedApproval atomic.Pointer[messages.ResultApproval]
 
 			suite.approvals.
 				On("StoreMyApproval", mock.Anything).
@@ -174,7 +176,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 						// spock should be non-nil
 						suite.Assert().NotNil(ra.Body.Spock)
 
-						expectedApproval.Store(ra)
+						expectedApproval.Store((*messages.ResultApproval)(ra))
 						return nil
 					}
 				}).
@@ -185,7 +187,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 				Return(nil).
 				Run(func(args testifymock.Arguments) {
 					// check that the approval matches the input execution result
-					ra, ok := args[0].(*flow.ResultApproval)
+					ra, ok := args[0].(*messages.ResultApproval)
 					suite.Require().True(ok)
 					suite.Assert().Equal(expectedApproval.Load(), ra)
 

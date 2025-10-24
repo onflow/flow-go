@@ -24,47 +24,29 @@ type Provider struct {
 
 	executionNodeSelector *ExecutionNodeSelector
 
-	rootBlockID     flow.Identifier
-	rootBlockResult *flow.ExecutionResult
+	rootBlockID flow.Identifier
 
 	operatorCriteria optimistic_sync.Criteria
 }
 
 var _ optimistic_sync.ExecutionResultInfoProvider = (*Provider)(nil)
 
-// NewExecutionResultInfoProvider creates and returns a new instance of
-// Provider.
-//
-// No errors are expected during normal operations
+// NewExecutionResultInfoProvider creates and returns a new instance of Provider.
 func NewExecutionResultInfoProvider(
 	log zerolog.Logger,
 	state protocol.State,
-	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
 	executionNodeSelector *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
-) (*Provider, error) {
-	// Root block ID and result should not change and could be cached.
-	sporkRootBlockHeight := state.Params().SporkRootBlockHeight()
-	rootBlockID, err := headers.BlockIDByHeight(sporkRootBlockHeight)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve block ID by height: %w", err)
-	}
-
-	rootBlockResult, _, err := state.AtBlockID(rootBlockID).SealedResult()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
-	}
-
+) *Provider {
 	return &Provider{
-		log:                   log.With().Str("module", "execution_result_info_provider").Logger(),
+		log:                   log.With().Str("module", "execution_result_info").Logger(),
 		executionReceipts:     executionReceipts,
 		state:                 state,
 		executionNodeSelector: executionNodeSelector,
-		rootBlockID:           rootBlockID,
-		rootBlockResult:       rootBlockResult,
+		rootBlockID:           state.Params().SporkRootBlock().ID(),
 		operatorCriteria:      optimistic_sync.DefaultCriteria.OverrideWith(operatorCriteria),
-	}, nil
+	}
 }
 
 // ExecutionResultInfo retrieves execution results and associated execution nodes for a given block ID
@@ -72,39 +54,48 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - backend.InsufficientExecutionReceipts - found insufficient receipts for given block ID.
-func (p *Provider) ExecutionResultInfo(
+//   - storage.ErrNotFound - if the request is for the spork root block and the node was bootstrapped
+//     from a newer block.
+func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) (*optimistic_sync.ExecutionResultInfo, error) {
-	allExecutors, err := p.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	allExecutors, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve execution IDs for root block: %w", err)
+		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
 	}
 
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
-	if p.rootBlockID == blockID {
-		chosenExecutionNodes, err := p.executionNodeSelector.SelectExecutionNodes(
+	if e.rootBlockID == blockID {
+		chosenExecutionNodes, err := e.executionNodeSelector.SelectExecutionNodes(
 			allExecutors,
 			criteria.RequiredExecutors,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", p.rootBlockID, err)
+			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
+		}
+
+		rootBlockResult, _, err := e.state.AtBlockID(e.rootBlockID).SealedResult()
+		if err != nil {
+			// if the node was bootstrapped from a block after the spork root block, then the root
+			// block's result will not be present.
+			return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
 		}
 
 		return &optimistic_sync.ExecutionResultInfo{
-			ExecutionResultID: p.rootBlockResult.ID(),
+			ExecutionResultID: rootBlockResult.ID(),
 			ExecutionNodes:    chosenExecutionNodes,
 		}, nil
 	}
 
-	resultID, executorIDsForBlock, err := p.findExecutionResultAndExecutors(blockID, criteria)
+	resultID, executorIDsForBlock, err := e.findExecutionResultAndExecutors(blockID, criteria)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
 	}
 
 	executorsForBlock := allExecutors.Filter(filter.HasNodeID[flow.Identity](executorIDsForBlock...))
-	filteredExecutors, err := p.executionNodeSelector.SelectExecutionNodes(executorsForBlock, criteria.RequiredExecutors)
+	filteredExecutors, err := e.executionNodeSelector.SelectExecutionNodes(executorsForBlock, criteria.RequiredExecutors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
 	}

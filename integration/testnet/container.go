@@ -254,7 +254,7 @@ func (c *Container) ExecutionDataDB() (*pebble.DB, error) {
 }
 
 func (c *Container) DBPath() string {
-	return filepath.Join(c.datadir, DefaultFlowPebbleDBDir)
+	return filepath.Join(c.datadir, DefaultFlowDBDir)
 }
 
 func (c *Container) ExecutionDataDBPath() string {

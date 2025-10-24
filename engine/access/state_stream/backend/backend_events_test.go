@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -193,33 +194,21 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLatestFromLocalStorage() {
 func (s *BackendEventsSuite) runTestSubscribeEvents() {
 	tests := []eventsTestType{
 		{
-			name:            "happy path - all new blocks",
+			name:            "happy path - all new blocks - latest",
 			highestBackfill: -1, // no backfill
 			startBlockID:    flow.ZeroID,
 			startHeight:     0,
 		},
 		{
-			name:            "happy path - partial backfill",
+			name:            "happy path - partial backfill - by height",
 			highestBackfill: 2, // backfill the first 3 blocks
 			startBlockID:    flow.ZeroID,
 			startHeight:     s.blocks[0].Height,
 		},
 		{
-			name:            "happy path - complete backfill",
+			name:            "happy path - complete backfill - by id",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    s.blocks[0].ID(),
-			startHeight:     0,
-		},
-		{
-			name:            "happy path - start from root block by height",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    flow.ZeroID,
-			startHeight:     s.rootBlock.Height, // start from root block
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),  // start from root block
 			startHeight:     0,
 		},
 	}
@@ -237,7 +226,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startBlockID:    s.rootBlock.ID(),
+			startBlockID:    s.blocks[0].ID(),
 		},
 		{
 			name:            "happy path - partial backfill",
@@ -248,11 +237,6 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    s.blocks[0].ID(),
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),  // start from root block
 		},
 	}
 
@@ -276,7 +260,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startHeight:     s.rootBlock.Height,
+			startHeight:     s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - partial backfill",
@@ -287,11 +271,6 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startHeight:     s.blocks[0].Height,
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,  // backfill all blocks
-			startHeight:     s.rootBlock.Height, // start from root block
 		},
 	}
 
@@ -383,10 +362,10 @@ func (s *BackendEventsSuite) subscribe(
 
 			subCtx, subCancel := context.WithCancel(ctx)
 
-			// mock latest sealed if test case no start value provided
+			// mock latest sealed if test case has no start value provided
 			if test.startBlockID == flow.ZeroID && test.startHeight == 0 {
 				s.snapshot.On("Head").Unset()
-				s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
+				s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Once()
 			}
 
 			sub := subscribeFn(subCtx, test.startBlockID, test.startHeight, test.filter)
@@ -454,6 +433,163 @@ func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *Even
 	assert.Equal(s.T(), expected.Height, actual.Height)
 	assert.Equal(s.T(), expected.Events, actual.Events)
 	assert.Equal(s.T(), expected.BlockTimestamp, actual.BlockTimestamp)
+}
+
+// TestSubscribeEventsFromSporkRootBlock tests that events subscriptions starting from the spork
+// root block return an empty result for the root block.
+func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// setup the backend to have 1 available block
+	s.highestBlockHeader = s.blocks[0].ToHeader()
+
+	rootEventResponse := &EventsResponse{
+		BlockID:        s.rootBlock.ID(),
+		Height:         s.rootBlock.Height,
+		BlockTimestamp: time.UnixMilli(int64(s.rootBlock.Timestamp)).UTC(),
+	}
+
+	firstEventResponse := &EventsResponse{
+		BlockID:        s.blocks[0].ID(),
+		Height:         s.blocks[0].Height,
+		BlockTimestamp: time.UnixMilli(int64(s.blocks[0].Timestamp)).UTC(),
+		Events:         flow.EventsList(s.blockEvents[s.blocks[0].ID()]),
+	}
+
+	assertSubscriptionResponses := func(sub subscription.Subscription, cancel context.CancelFunc) {
+		// the first response should have details from the root block and no events
+		resp := <-sub.Channel()
+		s.requireEventsResponse(resp, rootEventResponse)
+
+		// the second response should have details from the first block and its events
+		resp = <-sub.Channel()
+		s.requireEventsResponse(resp, firstEventResponse)
+
+		cancel()
+		resp, ok := <-sub.Channel()
+		assert.False(s.T(), ok)
+		assert.Nil(s.T(), resp)
+		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
+	}
+
+	s.Run("by height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromHeight", s.rootBlock.Height).
+			Return(func(startHeight uint64) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+			})
+
+		sub := s.backend.SubscribeEventsFromStartHeight(
+			subCtx,
+			s.rootBlock.Height,
+			state_stream.EventFilter{},
+			optimistic_sync.DefaultCriteria,
+		)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by height - legacy", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromHeight", s.rootBlock.Height).
+			Return(func(startHeight uint64) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+			})
+
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			flow.ZeroID,
+			s.rootBlock.Height,
+			state_stream.EventFilter{},
+			optimistic_sync.DefaultCriteria,
+		)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by ID", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.ID()).
+			Return(func(startBlockID flow.Identifier) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+			})
+
+		sub := s.backend.SubscribeEventsFromStartBlockID(
+			subCtx,
+			s.rootBlock.ID(),
+			state_stream.EventFilter{},
+			optimistic_sync.DefaultCriteria,
+		)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by ID - legacy", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.ID()).
+			Return(func(startBlockID flow.Identifier) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+			})
+
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			s.rootBlock.ID(),
+			0,
+			state_stream.EventFilter{},
+			optimistic_sync.DefaultCriteria,
+		)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by latest", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		// simulate the case where the latest block is also the root block
+		s.snapshot.On("Head").Unset()
+		s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
+
+		s.executionDataTracker.On("GetStartHeightFromLatest", mock.Anything).
+			Return(func(ctx context.Context) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+			})
+
+		sub := s.backend.SubscribeEventsFromLatest(
+			subCtx,
+			state_stream.EventFilter{},
+			optimistic_sync.DefaultCriteria,
+		)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by latest - legacy", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		// simulate the case where the latest block is also the root block
+		s.snapshot.On("Head").Unset()
+		s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
+
+		s.executionDataTracker.On("GetStartHeightFromLatest", mock.Anything).
+			Return(func(ctx context.Context) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+			})
+
+		sub := s.backend.SubscribeEvents(
+			subCtx,
+			flow.ZeroID,
+			0,
+			state_stream.EventFilter{},
+			optimistic_sync.DefaultCriteria,
+		)
+		assertSubscriptionResponses(sub, subCancel)
+	})
 }
 
 // TestSubscribeEventsHandlesErrors tests error handling for SubscribeEvents subscription

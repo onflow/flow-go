@@ -3,9 +3,11 @@ package check_storage
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/interpreter"
+	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -13,10 +15,13 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
+	storageState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -32,6 +37,8 @@ var (
 	flagNWorker            int
 	flagHasAccountFormatV1 bool
 	flagHasAccountFormatV2 bool
+	flagIsAccountStatusV4  bool
+	flagCheckContract      bool
 )
 
 var (
@@ -109,8 +116,22 @@ func init() {
 	Cmd.Flags().BoolVar(
 		&flagHasAccountFormatV2,
 		"account-format-v2",
-		false,
+		true,
 		"State contains accounts in v2 format",
+	)
+
+	Cmd.Flags().BoolVar(
+		&flagIsAccountStatusV4,
+		"account-status-v4",
+		false,
+		"State is migrated to account status v4 format",
+	)
+
+	Cmd.Flags().BoolVar(
+		&flagCheckContract,
+		"check-contract",
+		false,
+		"check stored contract",
 	)
 }
 
@@ -397,7 +418,48 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 		)
 	}
 
-	// TODO: check health of non-atree registers
+	if flagIsAccountStatusV4 {
+		// Validate account public key storage
+		err = migrations.ValidateAccountPublicKeyV4(address, accountRegisters)
+		if err != nil {
+			issues = append(
+				issues,
+				accountStorageIssue{
+					Address: address.Hex(),
+					Kind:    storageErrorKindString[accountKeyErrorKind],
+					Msg:     err.Error(),
+				},
+			)
+		}
+
+		// Check account public keys
+		err = checkAccountPublicKeys(address, accountRegisters)
+		if err != nil {
+			issues = append(
+				issues,
+				accountStorageIssue{
+					Address: address.Hex(),
+					Kind:    storageErrorKindString[accountKeyErrorKind],
+					Msg:     err.Error(),
+				},
+			)
+		}
+	}
+
+	if flagCheckContract {
+		// Check contracts
+		err = checkContracts(address, accountRegisters)
+		if err != nil {
+			issues = append(
+				issues,
+				accountStorageIssue{
+					Address: address.Hex(),
+					Kind:    storageErrorKindString[contractErrorKind],
+					Msg:     err.Error(),
+				},
+			)
+		}
+	}
 
 	return issues
 }
@@ -409,12 +471,16 @@ const (
 	cadenceAtreeStorageErrorKind
 	evmAtreeStorageErrorKind
 	storageFormatErrorKind
+	accountKeyErrorKind
+	contractErrorKind
 )
 
 var storageErrorKindString = map[storageErrorKind]string{
 	otherErrorKind:               "error_check_storage_failed",
 	cadenceAtreeStorageErrorKind: "error_cadence_atree_storage",
 	evmAtreeStorageErrorKind:     "error_evm_atree_storage",
+	accountKeyErrorKind:          "error_account_public_key",
+	contractErrorKind:            "error_contract",
 }
 
 type accountStorageIssue struct {
@@ -484,3 +550,95 @@ func checkAccountFormat(
 
 	return nil
 }
+
+func checkAccountPublicKeys(
+	address common.Address,
+	accountRegisters *registers.AccountRegisters,
+) error {
+	// Skip empty address because it doesn't have any account status registers.
+	if len(address) == 0 || address == common.ZeroAddress {
+		return nil
+	}
+
+	accounts := newAccounts(accountRegisters)
+
+	keyCount, err := accounts.GetAccountPublicKeyCount(flow.BytesToAddress(address.Bytes()))
+	if err != nil {
+		return err
+	}
+
+	// Check keys
+	for keyIndex := range keyCount {
+		_, err = accounts.GetAccountPublicKey(flow.BytesToAddress(address.Bytes()), keyIndex)
+		if err != nil {
+			return err
+		}
+	}
+
+	// NOTE: don't need to check unreachable keys because it is checked in ValidateAccountPublicKeyV4().
+
+	return nil
+}
+
+func checkContracts(
+	address common.Address,
+	accountRegisters *registers.AccountRegisters,
+) error {
+	if len(address) == 0 || address == common.ZeroAddress {
+		return nil
+	}
+
+	accounts := newAccounts(accountRegisters)
+
+	contractNames, err := accounts.GetContractNames(flow.BytesToAddress(address.Bytes()))
+	if err != nil {
+		return err
+	}
+
+	// Check contract
+	contractRegisterKeys := make(map[string]bool)
+	for _, contractName := range contractNames {
+		contractRegisterKeys[flow.ContractKey(contractName)] = true
+
+		_, err = accounts.GetContract(contractName, flow.BytesToAddress(address.Bytes()))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Check unreachable contract registers
+	err = accountRegisters.ForEachKey(func(key string) error {
+		if strings.HasPrefix(key, flow.CodeKeyPrefix) && !contractRegisterKeys[key] {
+			return fmt.Errorf("found unreachable contract register %s, contract names %v", key, contractNames)
+		}
+		return nil
+	})
+
+	return err
+}
+
+func newAccounts(accountRegisters *registers.AccountRegisters) environment.Accounts {
+	// Create a new transaction state with a dummy hasher
+	// because we do not need spock proofs for migrations.
+	transactionState := storageState.NewTransactionStateFromExecutionState(
+		storageState.NewExecutionStateWithSpockStateHasher(
+			registers.StorageSnapshot{
+				Registers: accountRegisters,
+			},
+			storageState.DefaultParameters(),
+			func() hash.Hasher {
+				return dummyHasher{}
+			},
+		),
+	)
+	return environment.NewAccounts(transactionState)
+}
+
+type dummyHasher struct{}
+
+func (d dummyHasher) Algorithm() hash.HashingAlgorithm { return hash.UnknownHashingAlgorithm }
+func (d dummyHasher) Size() int                        { return 0 }
+func (d dummyHasher) ComputeHash([]byte) hash.Hash     { return nil }
+func (d dummyHasher) Write([]byte) (int, error)        { return 0, nil }
+func (d dummyHasher) SumHash() hash.Hash               { return nil }
+func (d dummyHasher) Reset()                           {}

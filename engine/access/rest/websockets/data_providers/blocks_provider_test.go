@@ -18,8 +18,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -57,8 +57,8 @@ func (s *BlocksProviderSuite) SetupTest() {
 	parent := s.rootBlock.ToHeader()
 
 	for i := 0; i < blockCount; i++ {
-		transaction := unittest.TransactionFixture()
-		col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+		transaction := unittest.TransactionBodyFixture()
+		col := unittest.CollectionFromTransactions(&transaction)
 		guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 		block := unittest.BlockWithParentAndPayload(
 			parent,
@@ -124,7 +124,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlocksFromStartBlockID",
 					mock.Anything,
@@ -140,7 +140,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlocksFromStartHeight",
 					mock.Anything,
@@ -155,7 +155,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlocksFromLatest",
 					mock.Anything,
@@ -169,7 +169,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlocksFromLatest",
 					mock.Anything,

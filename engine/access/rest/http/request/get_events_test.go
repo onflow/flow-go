@@ -9,6 +9,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestGetEvents_InvalidParse verifies that parseGetEvents returns descriptive
+// errors for a variety of invalid input combinations, including malformed
+// event types, invalid height ranges, excessive IDs, and invalid boolean or
+// numeric parameters.
 func TestGetEvents_InvalidParse(t *testing.T) {
 	tests := []struct {
 		eventType               string
@@ -166,6 +170,9 @@ func TestGetEvents_InvalidParse(t *testing.T) {
 	}
 }
 
+// TestGetEvents_ValidParse ensures parseGetEvents successfully parses valid
+// queries for both height range and block ID modes, de-duplicates block IDs,
+// and populates all fields as expected.
 func TestGetEvents_ValidParse(t *testing.T) {
 	event := "A.f8d6e0586b0a20c7.Foo.Bar"
 	getEvents, err := parseGetEvents(

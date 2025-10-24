@@ -115,6 +115,7 @@ func New(
 	executionDataProvider := NewExecutionDataProvider(
 		executionDataTracker,
 		execDataCache,
+		state,
 	)
 
 	b.ExecutionDataBackend = ExecutionDataBackend{

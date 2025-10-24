@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -12,7 +13,7 @@ type PendingMessage struct {
 	// The sender node id
 	From    flow.Identifier
 	Channel channels.Channel
-	Event   interface{}
+	Event   messages.UntrustedMessage
 	// The id of the receiver nodes
 	TargetIDs []flow.Identifier
 }

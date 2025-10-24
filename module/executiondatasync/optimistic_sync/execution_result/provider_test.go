@@ -25,9 +25,8 @@ type ExecutionResultInfoProviderSuite struct {
 	log      zerolog.Logger
 
 	receipts *storagemock.ExecutionReceipts
-	headers  *storagemock.Headers
 
-	rootBlock       *flow.Header
+	rootBlock       *flow.Block
 	rootBlockResult *flow.ExecutionResult
 }
 
@@ -43,16 +42,14 @@ func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	suite.snapshot = protocol.NewSnapshot(t)
 	suite.params = protocol.NewParams(t)
 	suite.receipts = storagemock.NewExecutionReceipts(t)
-	suite.headers = storagemock.NewHeaders(t)
 
-	suite.rootBlock = unittest.BlockHeaderFixture()
+	suite.rootBlock = unittest.BlockFixture()
 	rootBlockID := suite.rootBlock.ID()
 	suite.rootBlockResult = unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(rootBlockID))
 	// This will be used just for the root block
 	suite.snapshot.On("SealedResult").Return(suite.rootBlockResult, nil, nil).Maybe()
 	suite.state.On("SealedResult", rootBlockID).Return(flow.ExecutionReceiptList{}).Maybe()
-	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
-	suite.headers.On("BlockIDByHeight", suite.rootBlock.Height).Return(rootBlockID, nil)
+	suite.params.On("SporkRootBlock").Return(suite.rootBlock)
 	suite.state.On("Params").Return(suite.params)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
@@ -62,17 +59,13 @@ func (suite *ExecutionResultInfoProviderSuite) createProvider(
 	preferredExecutors flow.IdentifierList,
 	operatorCriteria optimistic_sync.Criteria,
 ) *Provider {
-	provider, err := NewExecutionResultInfoProvider(
+	return NewExecutionResultInfoProvider(
 		suite.log,
 		suite.state,
-		suite.headers,
 		suite.receipts,
 		NewExecutionNodeSelector(preferredExecutors, operatorCriteria.RequiredExecutors),
 		operatorCriteria,
 	)
-	suite.Require().NoError(err)
-
-	return provider
 }
 
 // setupIdentitiesMock sets up the mock for identity-related calls.

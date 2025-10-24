@@ -246,8 +246,30 @@ func ProposalFixture() *flow.Proposal {
 	return ProposalFromBlock(BlockFixture())
 }
 
+func BlockResponseFixture(count int) *flow.BlockResponse {
+	blocks := make([]flow.Proposal, count)
+	for i := 0; i < count; i++ {
+		blocks[i] = *ProposalFixture()
+	}
+	return &flow.BlockResponse{
+		Nonce:  rand.Uint64(),
+		Blocks: blocks,
+	}
+}
+
 func ClusterProposalFixture() *cluster.Proposal {
 	return ClusterProposalFromBlock(ClusterBlockFixture())
+}
+
+func ClusterBlockResponseFixture(count int) *cluster.BlockResponse {
+	blocks := make([]cluster.Proposal, count)
+	for i := 0; i < count; i++ {
+		blocks[i] = *ClusterProposalFixture()
+	}
+	return &cluster.BlockResponse{
+		Nonce:  rand.Uint64(),
+		Blocks: blocks,
+	}
 }
 
 func ProposalHeaderFromHeader(header *flow.Header) *flow.ProposalHeader {
@@ -524,7 +546,7 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 	return BlockWithParentAndPayload(parent, payload)
 }
 
-func WithHeaderHeight(height uint64) func(header *flow.Header) {
+func WithHeaderHeight(height uint64) func(*flow.Header) {
 	return func(header *flow.Header) {
 		header.Height = height
 	}
@@ -750,10 +772,9 @@ func CollectionListFixture(n int, options ...func(*flow.Collection)) []*flow.Col
 
 func CollectionFixture(n int, options ...func(*flow.Collection)) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
-
 	for i := 0; i < n; i++ {
 		tx := TransactionFixture()
-		transactions = append(transactions, &tx.TransactionBody)
+		transactions = append(transactions, &tx)
 	}
 
 	col := flow.Collection{Transactions: transactions}
@@ -1080,7 +1101,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 			Attestation:          attestation,
 			ApproverID:           IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
-			Spock:                nil,
+			Spock:                SignatureFixture(),
 		},
 		VerifierSignature: SignatureFixture(),
 	}
@@ -1569,14 +1590,11 @@ func RandomSourcesFixture(n int) [][]byte {
 	return sigs
 }
 
-func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
-	if len(n) > 0 {
-		n[0](&tx)
-	}
-	return tx
+func TransactionFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
+	return TransactionBodyFixture(opts...)
 }
 
+// DEPRECATED: please use TransactionFixture instead
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
 		Script:             []byte("access(all) fun main() {}"),
@@ -1718,7 +1736,7 @@ func ChunkDataResponseMsgFixture(
 	opts ...func(*messages.ChunkDataResponse),
 ) *messages.ChunkDataResponse {
 	cdp := &messages.ChunkDataResponse{
-		ChunkDataPack: *ChunkDataPackFixture(chunkID),
+		ChunkDataPack: flow.UntrustedChunkDataPack(*ChunkDataPackFixture(chunkID)),
 		Nonce:         rand.Uint64(),
 	}
 
@@ -1735,8 +1753,7 @@ func WithApproximateSize(bytes uint64) func(*messages.ChunkDataResponse) {
 		// 1 tx fixture is approximately 350 bytes
 		txCount := bytes / 350
 		collection := CollectionFixture(int(txCount) + 1)
-		pack := ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection))
-		request.ChunkDataPack = *pack
+		request.ChunkDataPack = flow.UntrustedChunkDataPack(*ChunkDataPackFixture(request.ChunkDataPack.ChunkID, WithChunkDataPackCollection(&collection)))
 	}
 }
 

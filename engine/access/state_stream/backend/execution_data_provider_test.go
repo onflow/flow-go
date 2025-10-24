@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -25,6 +26,7 @@ import (
 type ExecutionDataProviderSuite struct {
 	suite.Suite
 
+	state   *protocolmock.State
 	headers *storagemock.Headers
 	seals   *storagemock.Seals
 	results *storagemock.ExecutionResults
@@ -39,10 +41,16 @@ func TestExecutionDataProviderSuite(t *testing.T) {
 }
 
 func (s *ExecutionDataProviderSuite) SetupTest() {
+	s.state = protocolmock.NewState(s.T())
 	s.headers = storagemock.NewHeaders(s.T())
 	s.seals = storagemock.NewSeals(s.T())
 	s.results = storagemock.NewExecutionResults(s.T())
 	s.tracker = trackermock.NewExecutionDataTracker(s.T())
+
+	// mock protocol params to satisfy provider constructor calls
+	params := protocolmock.NewParams(s.T())
+	params.On("SporkRootBlockHeight").Return(uint64(0)).Maybe()
+	s.state.On("Params").Return(params).Maybe()
 
 	bs := blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
 	s.edStore = execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
@@ -60,7 +68,7 @@ func (s *ExecutionDataProviderSuite) TestEarlyNotReady() {
 		Return(uint64(9)).
 		Once()
 
-	provider := NewExecutionDataProvider(s.tracker, s.edCache)
+	provider := NewExecutionDataProvider(s.tracker, s.edCache, s.state)
 
 	entity, err := provider.ExecutionDataByBlockHeight(ctx, 10)
 	s.Require().Error(err)
@@ -106,7 +114,7 @@ func (s *ExecutionDataProviderSuite) TestSuccess() {
 		Return(block.Height).
 		Once()
 
-	provider := NewExecutionDataProvider(s.tracker, s.edCache)
+	provider := NewExecutionDataProvider(s.tracker, s.edCache, s.state)
 
 	entity, err := provider.ExecutionDataByBlockHeight(ctx, block.Height)
 	s.Require().NoError(err)
@@ -130,7 +138,7 @@ func (s *ExecutionDataProviderSuite) TestNotFoundMappedToNotReady() {
 		Return(flow.ZeroID, storage.ErrNotFound).
 		Once()
 
-	provider := NewExecutionDataProvider(s.tracker, s.edCache)
+	provider := NewExecutionDataProvider(s.tracker, s.edCache, s.state)
 
 	entity, err := provider.ExecutionDataByBlockHeight(ctx, height)
 	s.Require().Error(err)
@@ -173,7 +181,7 @@ func (s *ExecutionDataProviderSuite) TestBlobNotFoundMappedToNotReady() {
 		Return(result, nil).
 		Once()
 
-	provider := NewExecutionDataProvider(s.tracker, s.edCache)
+	provider := NewExecutionDataProvider(s.tracker, s.edCache, s.state)
 
 	entity, err := provider.ExecutionDataByBlockHeight(ctx, height)
 	s.Require().Error(err)

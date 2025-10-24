@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -123,7 +124,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeAccountStatusesFromStartBlockID",
 					mock.Anything,
@@ -141,7 +142,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeAccountStatusesFromStartHeight",
 					mock.Anything,
@@ -158,7 +159,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeAccountStatusesFromLatestBlock",
 					mock.Anything,
@@ -261,7 +262,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	accountStatusesChan := make(chan interface{})
 
 	// Create a mock subscription and mock the channel
-	sub := ssmock.NewSubscription(s.T())
+	sub := submock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(accountStatusesChan))
 	sub.On("Err").Return(nil).Once()
 

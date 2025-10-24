@@ -176,7 +176,6 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		params.ExecutionResultInfoProvider,
 		params.ExecutionStateCache,
-		params.OperatorCriteria,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events: %w", err)

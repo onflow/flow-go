@@ -87,7 +87,7 @@ func NewMessagingEngine(
 
 	notifier := engine.NewNotifier()
 	messageHandler := engine.NewMessageHandler(log, notifier, engine.Pattern{
-		Match: engine.MatchType[*msg.DKGMessage],
+		Match: engine.MatchType[*flow.DKGMessage],
 		Store: &engine.FifoMessageStore{FifoQueue: inbound},
 	})
 
@@ -156,11 +156,11 @@ func (e *MessagingEngine) popNextInboundMessage() (msg.PrivDKGMessageIn, bool) {
 		return msg.PrivDKGMessageIn{}, false
 	}
 	asEngineWrapper := nextMessage.(*engine.Message)
-	asDKGMsg := asEngineWrapper.Payload.(*msg.DKGMessage)
+	asDKGMsg := asEngineWrapper.Payload.(*flow.DKGMessage)
 	originID := asEngineWrapper.OriginID
 
 	message := msg.PrivDKGMessageIn{
-		DKGMessage: *asDKGMsg,
+		DKGMessage: (msg.DKGMessage)(*asDKGMsg),
 		OriginID:   originID,
 	}
 	return message, true
