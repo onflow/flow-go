@@ -343,7 +343,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 	// follow the same fork as the one we are extending here. Hence, we might apply the transaction de-duplication logic
 	// against blocks that do not belong to our fork. If we erroneously find a duplicated transaction, based on a block
 	// that is not part of our fork, we would be raising an invalid slashing challenge, which would get this node slashed.
-	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(lctx, txLookup, minRefHeight, maxRefHeight)
+	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(lctx, txLookup, minRefHeight, maxRefHeight, ctx.finalizedClusterBlock.Height)
 	if err != nil {
 		return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
 	}
@@ -356,6 +356,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 
 // checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized
 // ancestry of the given block, and returns a list of all duplicates if there are any.
+// No errors are expected during normal operation.
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 	var duplicateTxIDs []flow.Identifier
 	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
@@ -379,8 +380,13 @@ func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster
 
 // checkDupeTransactionsInFinalizedAncestry checks for duplicate transactions in the finalized
 // ancestry, and returns a list of all duplicates if there are any.
-func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(lctx lockctx.Proof, includedTransactions map[flow.Identifier]struct{}, minRefHeight, maxRefHeight uint64) ([]flow.Identifier, error) {
-	var duplicatedTxIDs []flow.Identifier
+// No errors are expected during normal operation.
+func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
+	lctx lockctx.Proof,
+	includedTransactions map[flow.Identifier]struct{},
+	minRefHeight, maxRefHeight, finalClusterHeight uint64,
+) ([]flow.Identifier, error) {
+	var dupeTxIDs []flow.Identifier
 
 	// Let E be the global transaction expiry constant, measured in blocks. For each
 	// T ∈ `includedTransactions`, we have to decide whether the transaction
@@ -419,14 +425,42 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(lctx lockctx.Pro
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve cluster payload (block_id=%x) to de-duplicate: %w", blockID, err)
 		}
+
+		// capture any transactions in the finalized block duplicating transactions in the candidate block
+		var dupeTxIDsForBlock []flow.Identifier
 		for _, tx := range payload.Collection.Transactions {
 			txID := tx.ID()
 			_, duplicated := includedTransactions[txID]
 			if duplicated {
-				duplicatedTxIDs = append(duplicatedTxIDs, txID)
+				dupeTxIDsForBlock = append(dupeTxIDsForBlock, txID)
 			}
 		}
-	}
 
-	return duplicatedTxIDs, nil
+		// if no duplicates were found, continue to the next block
+		if len(dupeTxIDsForBlock) == 0 {
+			continue
+		}
+
+		// otherwise, if any duplicates were found, confirm that the block is an ancestor of the candidate block
+		// We checked that the candidate block extends the finalized state as of the beginning of the Extend process.
+		// That state was captured as `extendCtx.finalizedClusterBlock`.
+		// Although not currently allowed, we assume that finalization may occur concurrently with extension,
+		// so a new block may have been finalized in the interim. Here we verify that, in case such a block
+		// was finalized, it is still an ancestor of the candidate block.
+		header, err := m.headers.ByBlockID(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve header by block_id=%x: %w", blockID, err)
+		}
+		// Since we already checked for duplicate transactions in the unfinalized ancestry above, we
+		// know that if we found a duplicate here ABOVE our view of the finalized height, it must be on a different fork
+		// (otherwise we would have found it before). So, we only consider blocks at or below our view of the finalized height.
+		if header.Height <= finalClusterHeight {
+			dupeTxIDs = append(dupeTxIDs, dupeTxIDsForBlock...)
+			// TODO: We could stop at this point since we know the candidate is invalid.
+			//       We likely SHOULD stop here when permissionless LNs are available, for performance reasons.
+			//       For now, we continue and obtain a complete list of duplicates for debugging purposes, since we don't expect this case to occur.
+			continue
+		}
+	}
+	return dupeTxIDs, nil
 }
