@@ -62,15 +62,11 @@ func NewFinalizedBlockProcessor(
 	state protocol.State,
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
-	finalizedProcessedHeight storage.ConsumerProgressInitializer,
+	finalizedProcessedHeight storage.ConsumerProgress,
 	syncer *CollectionSyncer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*FinalizedBlockProcessor, error) {
 	reader := jobqueue.NewFinalizedBlockReader(state, blocks)
-	finalizedBlock, err := state.Final().Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get finalized block header: %w", err)
-	}
 
 	consumerNotifier := engine.NewNotifier()
 	processor := &FinalizedBlockProcessor{
@@ -82,12 +78,12 @@ func NewFinalizedBlockProcessor(
 		collectionExecutedMetric: collectionExecutedMetric,
 	}
 
+	var err error
 	processor.consumer, err = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "ingestion_block_consumer").Logger(),
 		consumerNotifier.Channel(),
 		finalizedProcessedHeight,
 		reader,
-		finalizedBlock.Height,
 		processor.processFinalizedBlockJobCallback,
 		finalizedBlockProcessorWorkerCount,
 		searchAhead,

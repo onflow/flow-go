@@ -71,7 +71,7 @@ func New(
 	metrics module.TransactionErrorMessagesMetrics,
 	state protocol.State,
 	headers storage.Headers,
-	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
+	txErrorMessagesProcessedHeight storage.ConsumerProgress,
 	txErrorMessagesCore *TxErrorMessagesCore,
 ) (*Engine, error) {
 	e := &Engine{
@@ -102,7 +102,6 @@ func New(
 		e.txErrorMessagesNotifier.Channel(),
 		txErrorMessagesProcessedHeight,
 		sealedBlockReader,
-		e.state.Params().SealedRoot().Height,
 		e.processTxResultErrorMessagesJob,
 		processTxErrorMessagesWorkersCount,
 		0,
