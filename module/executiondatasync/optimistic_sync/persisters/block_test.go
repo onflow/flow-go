@@ -182,7 +182,7 @@ func (p *PersisterSuite) TestPersister_ErrorHandling() {
 			Times(len(p.indexerData.Collections))
 
 		events := storagemock.NewEvents(p.T())
-		events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(expectedErr).Once()
+		events.On("BatchStore", mock.Anything, p.executionResult.BlockID, mock.Anything, mock.Anything).Return(expectedErr).Once()
 
 		persister := NewBlockPersister(
 			unittest.Logger(),

@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -14,17 +16,17 @@ type ExecutionResults struct {
 	mock.Mock
 }
 
-// BatchIndex provides a mock function with given fields: blockID, resultID, batch
-func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(blockID, resultID, batch)
+// BatchIndex provides a mock function with given fields: lctx, rw, blockID, resultID
+func (_m *ExecutionResults) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
+	ret := _m.Called(lctx, rw, blockID, resultID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchIndex")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(blockID, resultID, batch)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, flow.Identifier) error); ok {
+		r0 = rf(lctx, rw, blockID, resultID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -128,58 +130,34 @@ func (_m *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResul
 	return r0, r1
 }
 
-// ForceIndex provides a mock function with given fields: blockID, resultID
-func (_m *ExecutionResults) ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error {
-	ret := _m.Called(blockID, resultID)
+// IDByBlockID provides a mock function with given fields: blockID
+func (_m *ExecutionResults) IDByBlockID(blockID flow.Identifier) (flow.Identifier, error) {
+	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ForceIndex")
+		panic("no return value specified for IDByBlockID")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
-		r0 = rf(blockID, resultID)
+	var r0 flow.Identifier
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.Identifier, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
+		r0 = rf(blockID)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
 	}
 
-	return r0
-}
-
-// Index provides a mock function with given fields: blockID, resultID
-func (_m *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	ret := _m.Called(blockID, resultID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Index")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
-		r0 = rf(blockID, resultID)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
 	} else {
-		r0 = ret.Error(0)
+		r1 = ret.Error(1)
 	}
 
-	return r0
-}
-
-// Store provides a mock function with given fields: result
-func (_m *ExecutionResults) Store(result *flow.ExecutionResult) error {
-	ret := _m.Called(result)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult) error); ok {
-		r0 = rf(result)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+	return r0, r1
 }
 
 // NewExecutionResults creates a new instance of ExecutionResults. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

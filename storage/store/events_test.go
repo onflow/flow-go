@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -16,6 +17,7 @@ import (
 )
 
 func TestEventStoreRetrieve(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		events := store.NewEvents(metrics, db)
@@ -48,10 +50,13 @@ func TestEventStoreRetrieve(t *testing.T) {
 			{evt2_1},
 		}
 
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// store event
-			return events.BatchStore(blockID, expected, rw)
-		}))
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// store event
+				return events.BatchStore(lctx, blockID, expected, rw)
+			})
+		})
+		require.NoError(t, err)
 
 		// retrieve by blockID
 		actual, err := events.ByBlockID(blockID)
@@ -136,6 +141,7 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 }
 
 func TestEventStoreAndRemove(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewEvents(metrics, db)
@@ -169,7 +175,11 @@ func TestEventStoreAndRemove(t *testing.T) {
 			{evt2_1},
 		}
 
-		err := store.Store(blockID, expected)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, blockID, expected, rw)
+			})
+		})
 		require.NoError(t, err)
 
 		// Ensure it exists
