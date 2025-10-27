@@ -655,8 +655,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("execution state cache", func(node *cmd.NodeConfig) error {
 
 			// check if all the storages are initialized before passing them to Snapshot
-			if err := builder.validateCoreStores(); err != nil {
-				return err
+			if builder.events == nil {
+				return fmt.Errorf("events store not initialized: ensure 'events storage' module runs before 'execution state cache'")
+			}
+			if builder.collections == nil {
+				return fmt.Errorf("collections store not initialized: ensure 'collections storage' module runs before 'execution state cache'")
+			}
+			if builder.transactions == nil {
+				return fmt.Errorf("transactions store not initialized: ensure 'transactions storage' module runs before 'execution state cache'")
+			}
+			if builder.lightTransactionResults == nil {
+				return fmt.Errorf("lightTransactionResults store not initialized: ensure 'lightTransactionResults storage' module runs before 'execution state cache'")
+			}
+			if builder.transactionResultErrorMessages == nil {
+				return fmt.Errorf("transactionResultErrorMessages store not initialized: ensure 'transactionResultErrorMessages storage' module runs before 'execution state cache'")
 			}
 
 			// TODO: use real objects instead of mocks once they're implemented
@@ -2548,27 +2560,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
-}
-
-// validateCoreStores ensures all core stores are initialized before they’re used.
-// It returns the first missing dependency as a descriptive error.
-func (b *FlowAccessNodeBuilder) validateCoreStores() error {
-	if b.events == nil {
-		return fmt.Errorf("events store not initialized: ensure 'events storage' module runs before 'execution state cache'")
-	}
-	if b.collections == nil {
-		return fmt.Errorf("collections store not initialized: ensure 'collections storage' module runs before 'execution state cache'")
-	}
-	if b.transactions == nil {
-		return fmt.Errorf("transactions store not initialized: ensure 'transactions storage' module runs before 'execution state cache'")
-	}
-	if b.lightTransactionResults == nil {
-		return fmt.Errorf("lightTransactionResults store not initialized: ensure 'lightTransactionResults storage' module runs before 'execution state cache'")
-	}
-	if b.transactionResultErrorMessages == nil {
-		return fmt.Errorf("transactionResultErrorMessages store not initialized: ensure 'transactionResultErrorMessages storage' module runs before 'execution state cache'")
-	}
-	return nil
 }
 
 // notNil ensures that the input is not nil and returns it

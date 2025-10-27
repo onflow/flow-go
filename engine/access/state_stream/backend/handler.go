@@ -51,6 +51,10 @@ func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler 
 
 // GetExecutionDataByBlockID handles request to fetch execution data for a
 // specific block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid block ID provided.
+// - codes.Internal - if failed to get execution data the execution node or failed to convert execution data event payloads to JSON.
 func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *executiondata.GetExecutionDataByBlockIDRequest) (*executiondata.GetExecutionDataByBlockIDResponse, error) {
 	blockID, err := convert.BlockID(request.GetBlockId())
 	if err != nil {

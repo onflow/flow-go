@@ -72,7 +72,6 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		err = fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
 		return nil, nil, access.NewDataNotFoundError("snapshot", err)
-
 	}
 
 	executionData, err := snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
