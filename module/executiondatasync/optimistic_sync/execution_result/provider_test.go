@@ -220,70 +220,70 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProvider() {
 			suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
 		},
 	)
+}
 
-	suite.Run("execution result provider recognizes fork switch", func() {
-		preferredExecutors := flow.IdentifierList{}
-		operatorCriteria := optimistic_sync.Criteria{
-			AgreeingExecutorsCount: 1,
-		}
-		provider := suite.createProvider(preferredExecutors, operatorCriteria)
+func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderRecognizesForkSwitch() {
+	preferredExecutors := flow.IdentifierList{}
+	operatorCriteria := optimistic_sync.Criteria{
+		AgreeingExecutorsCount: 1,
+	}
+	provider := suite.createProvider(preferredExecutors, operatorCriteria)
 
-		// set up 2 executors that produce different execution results
-		block := unittest.BlockFixture()
-		baseExecutionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+	// set up 2 executors that produce different execution results
+	block := unittest.BlockFixture()
+	baseExecutionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
-		// fork 1
-		executionResult1 := unittest.ExecutionResultFixture()
-		executionResult1.PreviousResultID = baseExecutionResult.ID()
+	// fork 1
+	executionResult1 := unittest.ExecutionResultFixture()
+	executionResult1.PreviousResultID = baseExecutionResult.ID()
 
-		// fork 2
-		executionResult2 := unittest.ExecutionResultFixture()
-		executionResult2.PreviousResultID = baseExecutionResult.ID()
+	// fork 2
+	executionResult2 := unittest.ExecutionResultFixture()
+	executionResult2.PreviousResultID = baseExecutionResult.ID()
 
-		executors := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		receipts := make(flow.ExecutionReceiptList, 2)
+	executors := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	receipts := make(flow.ExecutionReceiptList, 2)
 
-		r1 := unittest.ReceiptForBlockFixture(block)
-		r1.ExecutorID = executors[0].NodeID
-		r1.ExecutionResult = *executionResult1
-		receipts[0] = r1
+	r1 := unittest.ReceiptForBlockFixture(block)
+	r1.ExecutorID = executors[0].NodeID
+	r1.ExecutionResult = *executionResult1
+	receipts[0] = r1
 
-		r2 := unittest.ReceiptForBlockFixture(block)
-		r2.ExecutorID = executors[1].NodeID
-		r2.ExecutionResult = *executionResult2
-		receipts[1] = r2
+	r2 := unittest.ReceiptForBlockFixture(block)
+	r2.ExecutorID = executors[1].NodeID
+	r2.ExecutionResult = *executionResult2
+	receipts[1] = r2
 
-		suite.receipts.
-			On("ByBlockID", block.ID()).
-			Return(receipts, nil)
+	suite.receipts.
+		On("ByBlockID", block.ID()).
+		Return(receipts, nil)
 
-		// request execution result from the first executor
-		suite.snapshot.
-			On("Identities", mock.Anything).
-			Return(flow.IdentityList{executors[0]}, nil).
-			Once()
+	// request execution result from the first executor
+	suite.snapshot.
+		On("Identities", mock.Anything).
+		Return(flow.IdentityList{executors[0]}, nil).
+		Once()
 
-		result1, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
-			RequiredExecutors:       flow.IdentifierList{executors[0].NodeID},
-			ParentExecutionResultID: baseExecutionResult.ID(),
-		})
-		suite.Require().NoError(err)
-		suite.Require().Equal(executionResult1.ID(), result1.ExecutionResultID)
-
-		// now request the second executor's result (also a child of baseExecutionResult),
-		// but require that it descends from result1; since it's on a different fork, no match should be found.
-		suite.snapshot.
-			On("Identities", mock.Anything).
-			Return(flow.IdentityList{executors[1]}, nil).
-			Once()
-
-		result2, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
-			RequiredExecutors:       flow.IdentifierList{executors[1].NodeID},
-			ParentExecutionResultID: result1.ExecutionResultID,
-		})
-		suite.Require().ErrorContains(err, "failed to find result")
-		suite.Require().Empty(result2)
+	result1, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
+		RequiredExecutors:       flow.IdentifierList{executors[0].NodeID},
+		ParentExecutionResultID: baseExecutionResult.ID(),
 	})
+	suite.Require().NoError(err)
+	suite.Require().Equal(executionResult1.ID(), result1.ExecutionResultID)
+
+	// now request the second executor's result (also a child of baseExecutionResult),
+	// but require that it descends from result1; since it's on a different fork, no match should be found.
+	suite.snapshot.
+		On("Identities", mock.Anything).
+		Return(flow.IdentityList{executors[1]}, nil).
+		Once()
+
+	result2, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
+		RequiredExecutors:       flow.IdentifierList{executors[1].NodeID},
+		ParentExecutionResultID: result1.ExecutionResultID,
+	})
+	suite.Require().ErrorContains(err, "failed to find result")
+	suite.Require().Empty(result2)
 }
 
 // TestRootBlockHandling tests the special case handling for root blocks.
