@@ -14,10 +14,12 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -69,15 +71,16 @@ type StateStreamBackend struct {
 	EventsBackend
 	AccountStatusesBackend
 
-	log                  zerolog.Logger
-	state                protocol.State
-	headers              storage.Headers
-	seals                storage.Seals
-	results              storage.ExecutionResults
-	execDataStore        execution_data.ExecutionDataStore
-	execDataCache        *cache.ExecutionDataCache
-	registers            *execution.RegistersAsyncStore
-	registerRequestLimit int
+	log                     zerolog.Logger
+	state                   protocol.State
+	headers                 storage.Headers
+	seals                   storage.Seals
+	results                 storage.ExecutionResults
+	execDataStore           execution_data.ExecutionDataStore
+	execDataCache           *cache.ExecutionDataCache
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
+	executionStateCache     optimistic_sync.ExecutionStateCache
+	registerRequestLimit    int
 }
 
 func New(
@@ -94,20 +97,23 @@ func New(
 	registerIDsRequestLimit int,
 	subscriptionHandler *subscription.SubscriptionHandler,
 	executionDataTracker tracker.ExecutionDataTracker,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
 	b := &StateStreamBackend{
-		ExecutionDataTracker: executionDataTracker,
-		log:                  logger,
-		state:                state,
-		headers:              headers,
-		seals:                seals,
-		results:              results,
-		execDataStore:        execDataStore,
-		execDataCache:        execDataCache,
-		registers:            registers,
-		registerRequestLimit: registerIDsRequestLimit,
+		ExecutionDataTracker:    executionDataTracker,
+		log:                     logger,
+		state:                   state,
+		headers:                 headers,
+		seals:                   seals,
+		results:                 results,
+		execDataStore:           execDataStore,
+		execDataCache:           execDataCache,
+		executionResultProvider: executionResultProvider,
+		executionStateCache:     executionStateCache,
+		registerRequestLimit:    registerIDsRequestLimit,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -169,21 +175,46 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
-func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (b *StateStreamBackend) GetRegisterValues(
+	ids flow.RegisterIDs,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error) {
 	if len(ids) > b.registerRequestLimit {
-		return nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
+		return nil, nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
 	}
 
-	values, err := b.registers.RegisterValues(ids, height)
+	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) {
-			return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
-		}
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
-		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	return values, nil
+	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	executionResultID := execResultInfo.ExecutionResultID
+	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	values := make([]flow.RegisterValue, len(ids))
+	//values, err := b.registers.RegisterValues(ids, height)
+	for i, regID := range ids {
+		val, err := snapshot.Registers().Get(regID, height)
+		if err != nil {
+			if errors.Is(err, storage.ErrHeightNotIndexed) {
+				return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+			}
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
+			}
+			return nil, nil, err
+		}
+		values[i] = val
+	}
+
+	return values, nil, nil
 }
