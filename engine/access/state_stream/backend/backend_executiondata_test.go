@@ -305,7 +305,6 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 	s.executionDataTracker.On("GetHighestHeight").Return(func() uint64 {
 		return s.highestBlockHeader.Height
 	}).Maybe()
-
 }
 
 // generateMockEvents generates a set of mock events for a block split into multiple tx with
