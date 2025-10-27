@@ -26,8 +26,9 @@ import (
 // using the provided entropy `randomSource`. Ideally this entropy should be derived from the random beacon of the
 // previous epoch, or some other verifiable random source.
 // The function guarantees a specific constraint when partitioning the nodes into clusters:
-// Each cluster must contain strictly more than 2/3 of internal nodes. If the constraint can't be
-// satisfied, an exception is returned.
+// Strictly more than 1/3 of nodes in each cluster must be internal nodes. If the constraint can't be
+// satisfied, an exception is returned. However, note that a successful cluster assignment does not imply
+// that enough cluster votes can be obtained from internal nodes to create any cluster QCs.
 // Note that if an exception is returned with a certain number of internal/partner nodes, there is no chance
 // of succeeding the assignment by re-running the function without increasing the internal nodes ratio.
 // Args:
@@ -81,7 +82,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
-		constraint[clusterIndex] += 1
+		constraint[clusterIndex] += 2
 	}
 
 	// next, round-robin partner nodes into each cluster
@@ -91,13 +92,13 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
-		constraint[clusterIndex] -= 2
+		constraint[clusterIndex] -= 1
 	}
 
 	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
 	for i := 0; i < numCollectionClusters; i++ {
 		if constraint[i] <= 0 {
-			return nil, nil, errors.New("there isn't enough internal nodes to have at least 2/3 internal nodes in each cluster")
+			return nil, nil, errors.New("there isn't enough internal nodes to have at least 1/3 internal nodes in each cluster")
 		}
 	}
 
