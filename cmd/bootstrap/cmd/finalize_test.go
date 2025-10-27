@@ -120,8 +120,11 @@ func TestClusterAssignment(t *testing.T) {
 	tmp := flagCollectionClusters
 	flagCollectionClusters = 5
 	// Happy path (limit set-up, can't have one less internal node)
-	partnersLen := 7
-	internalLen := 22
+	partnersLen := 12
+	internalLen := 10
+	// clusters are assigned (partner:internal) as [3:2, 3:2, 2:2, 2:2, 2:2],
+	// with internal proportion being [40%, 40%, 50%, 50%, 50%]
+	// removing an internal node would lead to a 2:1 ratio (33% internal) in the last cluster
 	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
 	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
@@ -139,7 +142,7 @@ func TestClusterAssignment(t *testing.T) {
 	require.True(t, checkClusterConstraint(clusters, partners, internals))
 
 	// unhappy Path
-	internals = internals[:21] // reduce one internal node
+	internals = internals[:len(internals)-1] // reduce one internal node
 	// should error
 	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
 	require.Error(t, err)
@@ -192,6 +195,7 @@ func TestEpochTimingConfig(t *testing.T) {
 
 // Check about the number of internal/partner nodes in each cluster. The identites
 // in each cluster do not matter for this check.
+// Each cluster must have >1/3 internal nodes.
 func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.NodeInfo, internalsInfo []model.NodeInfo) bool {
 	partners := model.ToIdentityList(partnersInfo)
 	internals := model.ToIdentityList(internalsInfo)
@@ -205,7 +209,7 @@ func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.Node
 				clusterInternalCount++
 			}
 		}
-		if clusterInternalCount <= clusterPartnerCount*2 {
+		if clusterInternalCount*2 <= clusterPartnerCount {
 			return false
 		}
 	}
