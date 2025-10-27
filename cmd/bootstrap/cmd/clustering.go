@@ -145,6 +145,12 @@ func clusterAssignment(cmd *cobra.Command, args []string) {
 		model.FilterByRole(internalNodes, flow.RoleCollection),
 	)
 	log.Info().Msg("")
+
+	if checkClusterConstraint(clusters, partnerNodes, internalNodes) {
+		log.Info().Msg("Enough votes for collection clusters are present - bootstrapping can continue with root block creation")
+	} else {
+		log.Info().Msg("Not enough internal votes to generate cluster QCs, need partner votes before root block creation")
+	}
 }
 
 // constructClusterRootVotes generates and writes vote files for internal collector nodes with private keys available.
