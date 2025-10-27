@@ -55,7 +55,7 @@ type BackendExecutionDataSuite struct {
 	events         *storagemock.Events
 	seals          *storagemock.Seals
 	results        *storagemock.ExecutionResults
-	registers      *storagemock.RegisterIndex
+	registers      *storagemock.RegisterSnapshotReader
 	registersAsync *execution.RegistersAsyncStore
 	eventsIndex    *index.EventsIndex
 
@@ -182,7 +182,7 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 
 	s.eventsIndex = index.NewEventsIndex(index.NewReporter(), s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
-	s.registers = storagemock.NewRegisterIndex(s.T())
+	s.registers = storagemock.NewRegisterSnapshotReader(s.T())
 	err := s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(s.rootBlock.Height).Maybe()

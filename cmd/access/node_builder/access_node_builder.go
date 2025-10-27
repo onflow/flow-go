@@ -357,7 +357,6 @@ type FlowAccessNodeBuilder struct {
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	transactions                   storage.Transactions
 	collections                    storage.Collections
-	registers                      storage.RegisterSnapshotReader
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -848,7 +847,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
-				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor, builder.registers)
+				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor, builder.RegistersAsyncStore)
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
@@ -939,8 +938,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.RegisterIndex = registers
 				}
 
-				builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
-
 				var indexerDerivedChainData *derived.DerivedChainData
 				if builder.programCacheSize > 0 {
 					var err error
@@ -990,31 +987,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
-				queryDerivedChainData, err := builder.buildQueryDerivedChainData()
-				if err != nil {
-					return nil, fmt.Errorf("could not create query derived chain data: %w", err)
-				}
-
-				builder.ScriptExecutor = execution.NewScripts(
-					builder.Logger,
-					metrics.NewExecutionCollector(builder.Tracer),
-					builder.RootChainID,
-					computation.NewProtocolStateWrapper(builder.State),
-					builder.Storage.Headers,
-					builder.scriptExecutorConfig,
-					queryDerivedChainData,
-					builder.programCacheSize > 0,
-					builder.scriptExecMinBlock,
-					builder.scriptExecMaxBlock,
-					builder.VersionControl,
-				)
-
 				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
 				if err != nil {
 					return nil, err
 				}
 
-				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
+				registerSnapshotReader := pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
+
+				err = builder.RegistersAsyncStore.Initialize(registerSnapshotReader)
 				if err != nil {
 					return nil, err
 				}
@@ -2087,6 +2067,25 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.ExecNodeIdentitiesProvider),
 			)
 
+			queryDerivedChainData, err := builder.buildQueryDerivedChainData()
+			if err != nil {
+				return nil, fmt.Errorf("could not create query derived chain data: %w", err)
+			}
+
+			builder.ScriptExecutor = execution.NewScripts(
+				builder.Logger,
+				metrics.NewExecutionCollector(builder.Tracer),
+				builder.RootChainID,
+				computation.NewProtocolStateWrapper(builder.State),
+				builder.Storage.Headers,
+				builder.scriptExecutorConfig,
+				queryDerivedChainData,
+				builder.programCacheSize > 0,
+				builder.scriptExecMinBlock,
+				builder.scriptExecMaxBlock,
+				builder.VersionControl,
+			)
+
 			execNodeSelector := execution_result.NewExecutionNodeSelector(
 				preferredENIdentifiers,
 				fixedENIdentifiers,
@@ -2107,7 +2106,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.transactions,
 				builder.lightTransactionResults,
 				builder.transactionResultErrorMessages,
-				builder.registers,
+				builder.RegistersAsyncStore,
 			)
 			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
@@ -2122,7 +2121,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
-				Registers:             builder.registers,
+				RegistersAsyncStore:   builder.RegistersAsyncStore,
 				ChainID:               node.RootChainID,
 				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
@@ -2132,7 +2131,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
 				Communicator:          nodeCommunicator,
 				TxResultCacheSize:     builder.TxResultCacheSize,
-				ScriptExecutor:        notNil(builder.ScriptExecutor),
+				ScriptExecutor:        builder.ScriptExecutor,
 				ScriptExecutionMode:   scriptExecMode,
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,

@@ -22,5 +22,8 @@ type Snapshot interface {
 	TransactionResultErrorMessages() storage.TransactionResultErrorMessagesReader
 
 	// Registers returns a reader for querying register data.
-	Registers() storage.RegisterSnapshotReader
+	//
+	// Expected error returns during normal operation:
+	//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
+	Registers() (storage.RegisterSnapshotReader, error)
 }

@@ -3,12 +3,12 @@ package state_synchronization
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/storage"
 )
 
 var _ commands.AdminCommand = (*ReadExecutionDataCommand)(nil)
@@ -22,8 +22,8 @@ type scriptData struct {
 
 // ExecuteScriptCommand is an admin command that executes a Cadence script.
 type ExecuteScriptCommand struct {
-	scriptExecutor execution.ScriptExecutor
-	registers      storage.RegisterSnapshotReader
+	scriptExecutor      execution.ScriptExecutor
+	registersAsyncStore *execution.RegistersAsyncStore
 }
 
 // Handler executes the Cadence script against the blockchain state at the
@@ -42,7 +42,12 @@ type ExecuteScriptCommand struct {
 func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
-	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height, e.registers)
+	registerSnapshotReader, err := e.registersAsyncStore.RegisterSnapshotReader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+	}
+
+	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height, registerSnapshotReader)
 	if err != nil {
 		return nil, err
 	}
@@ -108,9 +113,9 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewExecuteScriptCommand(scripts execution.ScriptExecutor, registers storage.RegisterSnapshotReader) commands.AdminCommand {
+func NewExecuteScriptCommand(scripts execution.ScriptExecutor, registersAsyncStore *execution.RegistersAsyncStore) commands.AdminCommand {
 	return &ExecuteScriptCommand{
-		scriptExecutor: scripts,
-		registers:      registers,
+		scriptExecutor:      scripts,
+		registersAsyncStore: registersAsyncStore,
 	}
 }

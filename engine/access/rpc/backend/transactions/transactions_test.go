@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -190,13 +191,16 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.lastFullBlockHeight,
 	)
 
+	registersAsync := execution.NewRegistersAsyncStore()
+	require.NoError(suite.T(), registersAsync.Initialize(suite.registers))
+
 	txValidator, err := validator.NewTransactionValidator(
 		validatormock.NewBlocks(suite.T()),
 		suite.chainID.Chain(),
 		metrics.NewNoopCollector(),
 		validator.TransactionValidationOptions{},
 		execmock.NewScriptExecutor(suite.T()),
-		suite.registers,
+		registersAsync,
 	)
 	suite.Require().NoError(err)
 

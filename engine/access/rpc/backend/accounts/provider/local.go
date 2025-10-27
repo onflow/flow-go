@@ -3,16 +3,19 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -22,8 +25,8 @@ type LocalAccountProvider struct {
 	state          protocol.State
 	scriptExecutor execution.ScriptExecutor
 
-	// TODO(Data availability #7650): remove registers when fork-aware account endpoints will be implemented
-	registers storage.RegisterSnapshotReader
+	// TODO(Data availability #7650): remove registersAsyncStore and current usages when fork-aware account endpoints will be implemented
+	registersAsyncStore *execution.RegistersAsyncStore
 }
 
 var _ AccountProvider = (*LocalAccountProvider)(nil)
@@ -32,13 +35,13 @@ func NewLocalAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,
-	registers storage.RegisterSnapshotReader,
+	registersAsyncStore *execution.RegistersAsyncStore,
 ) *LocalAccountProvider {
 	return &LocalAccountProvider{
-		log:            log.With().Str("account_provider", "local").Logger(),
-		state:          state,
-		scriptExecutor: scriptExecutor,
-		registers:      registers,
+		log:                 log.With().Str("account_provider", "local").Logger(),
+		state:               state,
+		scriptExecutor:      scriptExecutor,
+		registersAsyncStore: registersAsyncStore,
 	}
 }
 
@@ -48,10 +51,18 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 	_ flow.Identifier,
 	height uint64,
 ) (*flow.Account, error) {
-	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, l.registers)
+	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	if err != nil {
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, access.NewDataNotFoundError("registers storage", err)
+	}
+
+	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registerSnapshotReader)
 	if err != nil {
 		return nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
 	}
+
 	return account, nil
 }
 
@@ -61,7 +72,14 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	blockID flow.Identifier,
 	height uint64,
 ) (uint64, error) {
-	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, l.registers)
+	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	if err != nil {
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return 0, access.NewDataNotFoundError("registers storage", err)
+	}
+
+	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, registerSnapshotReader)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
 		return 0, err
@@ -77,7 +95,14 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	_ flow.Identifier,
 	height uint64,
 ) (*flow.AccountPublicKey, error) {
-	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, l.registers)
+	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	if err != nil {
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, access.NewDataNotFoundError("registers storage", err)
+	}
+
+	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, registerSnapshotReader)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account key at height: %d", height)
 		return nil, err
@@ -92,7 +117,14 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	_ flow.Identifier,
 	height uint64,
 ) ([]flow.AccountPublicKey, error) {
-	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, l.registers)
+	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	if err != nil {
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, access.NewDataNotFoundError("registers storage", err)
+	}
+
+	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, registerSnapshotReader)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
 		return nil, err

@@ -305,7 +305,6 @@ type ObserverServiceBuilder struct {
 	// storage
 	events                  storage.Events
 	lightTransactionResults storage.LightTransactionResults
-	registers               storage.RegisterSnapshotReader
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -1469,8 +1468,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.RegisterIndex = registers
 			}
 
-			builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
-
 			var indexerDerivedChainData *derived.DerivedChainData
 			if builder.programCacheSize > 0 {
 				var err error
@@ -1526,26 +1523,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
-			queryDerivedChainData, err := builder.buildQueryDerivedChainData()
-			if err != nil {
-				return nil, fmt.Errorf("could not create query derived chain data: %w", err)
-			}
+			registerSnapshotReader := pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
 
-			builder.ScriptExecutor = execution.NewScripts(
-				builder.Logger,
-				metrics.NewExecutionCollector(builder.Tracer),
-				builder.RootChainID,
-				computation.NewProtocolStateWrapper(builder.State),
-				builder.Storage.Headers,
-				builder.scriptExecutorConfig,
-				queryDerivedChainData,
-				builder.programCacheSize > 0,
-				builder.scriptExecMinBlock,
-				builder.scriptExecMaxBlock,
-				builder.VersionControl,
-			)
-
-			err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
+			err = builder.RegistersAsyncStore.Initialize(registerSnapshotReader)
 			if err != nil {
 				return nil, err
 			}
@@ -1989,6 +1969,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
+		queryDerivedChainData, err := builder.buildQueryDerivedChainData()
+		if err != nil {
+			return nil, fmt.Errorf("could not create query derived chain data: %w", err)
+		}
+
+		builder.ScriptExecutor = execution.NewScripts(
+			builder.Logger,
+			metrics.NewExecutionCollector(builder.Tracer),
+			builder.RootChainID,
+			computation.NewProtocolStateWrapper(builder.State),
+			builder.Storage.Headers,
+			builder.scriptExecutorConfig,
+			queryDerivedChainData,
+			builder.programCacheSize > 0,
+			builder.scriptExecMinBlock,
+			builder.scriptExecMaxBlock,
+			builder.VersionControl,
+		)
+
 		execNodeSelector := execution_result.NewExecutionNodeSelector(
 			preferredENIdentifiers,
 			fixedENIdentifiers,
@@ -2009,7 +2008,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			nil,
 			builder.lightTransactionResults,
 			nil,
-			builder.registers,
+			builder.RegistersAsyncStore,
 		)
 		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
@@ -2021,6 +2020,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Transactions:         node.Storage.Transactions,
 			ExecutionReceipts:    node.Storage.Receipts,
 			ExecutionResults:     node.Storage.Results,
+			RegistersAsyncStore:  builder.RegistersAsyncStore,
 			ChainID:              node.RootChainID,
 			AccessMetrics:        accessMetrics,
 			ConnFactory:          connFactory,

@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -308,6 +309,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 // into access-layer errors according to the Access API error handling convention.
 //
 // Expected error returns during normal operation:
+//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
 //   - [access.DataNotFoundError] - if the script data or related execution data was not found,
 //     or if the block height is out of range or incompatible with node version.
 //   - [access.PreconditionFailedError] - if data for block is not available.
@@ -320,7 +322,8 @@ func handleScriptExecutionError(ctx context.Context, err error) error {
 	err = fmt.Errorf("failed to execute script: %w", err)
 
 	switch {
-	case errors.Is(err, version.ErrOutOfRange),
+	case errors.Is(err, indexer.ErrIndexNotInitialized),
+		errors.Is(err, version.ErrOutOfRange),
 		errors.Is(err, execution.ErrIncompatibleNodeVersion),
 		errors.Is(err, storage.ErrNotFound),
 		errors.Is(err, storage.ErrHeightNotIndexed):

@@ -387,7 +387,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 				Once()
 			s.executionDataSnapshot.
 				On("Registers").
-				Return(s.registers).
+				Return(s.registers, nil).
 				Once()
 			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
@@ -406,7 +406,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 				Once()
 			s.executionDataSnapshot.
 				On("Registers").
-				Return(s.registers).
+				Return(s.registers, nil).
 				Once()
 			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
@@ -425,7 +425,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 				Once()
 			s.executionDataSnapshot.
 				On("Registers").
-				Return(s.registers).
+				Return(s.registers, nil).
 				Once()
 			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()

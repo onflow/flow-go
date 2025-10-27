@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -284,6 +285,9 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Return(s.finalizedBlock.ToHeader(), nil).
 		Maybe() // used for some tests
 
+	registersAsync := execution.NewRegistersAsyncStore()
+	require.NoError(s.T(), registersAsync.Initialize(s.registers))
+
 	txValidator, err := validator.NewTransactionValidator(
 		validatorBlocks,
 		s.chainID.Chain(),
@@ -293,7 +297,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 			MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 		},
 		execmock.NewScriptExecutor(s.T()),
-		s.registers,
+		registersAsync,
 	)
 	s.Require().NoError(err)
 
