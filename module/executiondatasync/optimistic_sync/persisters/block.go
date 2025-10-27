@@ -13,8 +13,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// BlockPersister handles persisting of execution data for all PersisterStore-s to database.
-// Each BlockPersister instance is created for ONE specific block
+// BlockPersister stores execution data for a single execution result into the database.
+// It uses the set of [stores.PersisterStore] to persist the data with a single atomic batch operation.
+// To ensure the database only contains data certified by the protocol, the block persister must
+// only be called for sealed execution results.
 type BlockPersister struct {
 	log zerolog.Logger
 
@@ -22,7 +24,6 @@ type BlockPersister struct {
 	protocolDB      storage.DB
 	lockManager     lockctx.Manager
 	executionResult *flow.ExecutionResult
-	header          *flow.Header
 }
 
 // NewBlockPersister creates a new block persister.
@@ -31,51 +32,47 @@ func NewBlockPersister(
 	protocolDB storage.DB,
 	lockManager lockctx.Manager,
 	executionResult *flow.ExecutionResult,
-	header *flow.Header,
 	persisterStores []stores.PersisterStore,
 ) *BlockPersister {
 	log = log.With().
 		Str("component", "block_persister").
+		Hex("execution_result_id", logging.ID(executionResult.ID())).
 		Hex("block_id", logging.ID(executionResult.BlockID)).
-		Uint64("height", header.Height).
 		Logger()
 
-	persister := &BlockPersister{
+	log.Info().
+		Int("batch_persisters_count", len(persisterStores)).
+		Msg("block persisters initialized")
+
+	return &BlockPersister{
 		log:             log,
 		persisterStores: persisterStores,
 		protocolDB:      protocolDB,
 		executionResult: executionResult,
-		header:          header,
 		lockManager:     lockManager,
 	}
-
-	persister.log.Info().
-		Int("batch_persisters_count", len(persisterStores)).
-		Msg("block persisters initialized")
-
-	return persister
 }
 
-// Persist save data in provided persisted stores and commit updates to the database.
-// No errors are expected during normal operations
+// Persist atomically stores all data into the database using the configured persister stores.
+//
+// No error returns are expected during normal operations
 func (p *BlockPersister) Persist() error {
 	p.log.Debug().Msg("started to persist execution data")
 	start := time.Now()
 
-	lctx := p.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
-	}
-	defer lctx.Release()
-
-	err = p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-		for _, persister := range p.persisterStores {
-			if err := persister.Persist(lctx, batch); err != nil {
-				return err
+	err := storage.WithLocks(p.lockManager, []string{
+		storage.LockInsertCollection,
+		storage.LockInsertLightTransactionResult,
+		storage.LockInsertTransactionResultErrMessage,
+	}, func(lctx lockctx.Context) error {
+		return p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+			for _, persister := range p.persisterStores {
+				if err := persister.Persist(lctx, batch); err != nil {
+					return err
+				}
 			}
-		}
-		return nil
+			return nil
+		})
 	})
 
 	if err != nil {

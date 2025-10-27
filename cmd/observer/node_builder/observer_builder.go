@@ -299,6 +299,7 @@ type ObserverServiceBuilder struct {
 	// storage
 	events                  storage.Events
 	lightTransactionResults storage.LightTransactionResults
+	scheduledTransactions   storage.ScheduledTransactions
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -1349,6 +1350,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
 			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			return nil
+		}).Module("scheduled transactions storage", func(node *cmd.NodeConfig) error {
+			builder.scheduledTransactions = store.NewScheduledTransactions(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+			return nil
 		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Note: using a DependableComponent here to ensure that the indexer does not block
 			// other components from starting while bootstrapping the register db since it may
@@ -1435,7 +1439,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
-			indexerCore, err := indexer.New(
+			builder.ExecutionIndexerCore = indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
 				builder.ProtocolDB,
@@ -1445,22 +1449,19 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
 				builder.lightTransactionResults,
-				builder.RootChainID.Chain(),
+				builder.scheduledTransactions,
+				builder.RootChainID,
 				indexerDerivedChainData,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
 			)
-			if err != nil {
-				return nil, err
-			}
-			builder.ExecutionIndexerCore = indexerCore
 
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(
 				builder.Logger,
 				registers.FirstHeight(),
 				registers,
-				indexerCore,
+				builder.ExecutionIndexerCore,
 				executionDataStoreCache,
 				builder.ExecutionDataRequester.HighestConsecutiveHeight,
 				indexedBlockHeight,
