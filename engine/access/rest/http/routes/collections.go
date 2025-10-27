@@ -28,7 +28,9 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 		for _, tid := range collection.Transactions {
 			tx, err := backend.GetTransaction(r.Context(), tid)
 			if err != nil {
-				return nil, common.ErrorToStatusError(err)
+				// TODO: transactions is not updated to use the new error handling convention
+				// Update this once that work is complete
+				return nil, err
 			}
 
 			transactions = append(transactions, tx)
@@ -38,7 +40,10 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 	var response commonmodels.Collection
 	err = response.Build(collection, transactions, link, r.ExpandFields)
 	if err != nil {
-		return nil, common.ErrorToStatusError(err)
+		// response.Build only returns errors from the link generator (router.URLPath)
+		// which are internal configuration errors, not accessSentinel errors from the backend
+		// the ErrorHandler's catch-all will convert this to 500 Internal Server Error.
+		return nil, err
 	}
 
 	return response, nil
