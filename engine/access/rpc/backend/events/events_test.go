@@ -67,7 +67,7 @@ type EventsSuite struct {
 	blockIDs        []flow.Identifier
 	blockEvents     []flow.Event
 
-	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionResultProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache     *osyncmock.ExecutionStateCache
 	executionDataSnapshot   *osyncmock.Snapshot
 	criteria                optimistic_sync.Criteria
@@ -168,7 +168,7 @@ func (s *EventsSuite) SetupTest() {
 	}).Maybe()
 
 	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
-	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionResultProvider = osyncmock.NewExecutionResultInfoProvider(s.T())
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
 	s.criteria = optimistic_sync.Criteria{}
 

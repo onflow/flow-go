@@ -1054,7 +1054,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
-			useIndex := builder.executionDataIndexingEnabled &&
+			fetchFromLocalStorage := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
@@ -1065,8 +1065,43 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 			)
+
+			cfg := builder.rpcConf.BackendConfig
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(cfg.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(cfg.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			execNodeSelector := execution_result.NewExecutionNodeSelector(
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Receipts,
+				execNodeSelector,
+				optimistic_sync.DefaultCriteria,
+			)
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				builder.collections,
+				builder.transactions,
+				builder.lightTransactionResults,
+				builder.transactionResultErrorMessages,
+				nil,
+			)
+			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
@@ -1077,10 +1112,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.RegistersAsyncStore,
-				builder.EventsIndex,
-				useIndex,
+				fetchFromLocalStorage,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
+				subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
@@ -1088,6 +1122,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				execResultInfoProvider,
+				execStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -2186,7 +2222,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,
 				BlockTracker:          blockTracker,
-				SubscriptionHandler: subscription.NewSubscriptionHandler(
+				SubscriptionFactory: subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,

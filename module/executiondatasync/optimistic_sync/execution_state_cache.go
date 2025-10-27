@@ -1,6 +1,8 @@
 package optimistic_sync
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // ExecutionStateCache provides access to execution state snapshots for querying data at specific ExecutionResults.
 type ExecutionStateCache interface {

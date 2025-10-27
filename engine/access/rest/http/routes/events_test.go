@@ -417,7 +417,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		On(
 			"GetEventsForBlockIDs",
 			mocks.Anything,
-			mocks.Anything, ids,
+			mocks.Anything,
+			ids,
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			mocks.Anything,
 		).
@@ -425,7 +426,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		Once()
 
 	// range from first to last block
-	backend.Mock.
+	backend.
 		On(
 			"GetEventsForHeightRange",
 			mocks.Anything,
@@ -439,7 +440,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		Once()
 
 	// range from first to last block + 5
-	backend.Mock.
+	backend.
 		On(
 			"GetEventsForHeightRange",
 			mocks.Anything,
@@ -468,7 +469,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		Return(nil, nil, status.Error(codes.NotFound, "not found")).
 		Once()
 
-	backend.Mock.
+	backend.
 		On(
 			"GetEventsForHeightRange",
 			mocks.Anything,
