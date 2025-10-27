@@ -26,8 +26,7 @@ func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 	}
 }
 
-// Checks constraints about the number of partner and internal nodes.
-//   - Internal nodes must comprise >1/3 of each collector cluster: checked in ConstructClusterAssignment.
+// Checks constraints about the weights of partner and internal nodes.
 //   - for all roles R:
 //     all node with role R must have the same weight
 func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
@@ -38,9 +37,9 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	ensureUniformNodeWeightsPerRole(all)
 }
 
-// Check about the number of internal/partner nodes in each cluster. The identites
+// Check the ratio of internal/partner nodes in each cluster. The identities
 // in each cluster do not matter for this check.
-// Each cluster must have >1/3 internal nodes.
+// Internal nodes must comprise >1/3 of each collector cluster.
 func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.NodeInfo, internalsInfo []model.NodeInfo) bool {
 	partners := model.ToIdentityList(partnersInfo)
 	internals := model.ToIdentityList(internalsInfo)
