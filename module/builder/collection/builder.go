@@ -548,6 +548,11 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, u
 		totalGas += tx.GasLimit
 	}
 
+	// if collection is not full then don't create it at all.
+	if uint(len(transactions)) < buildCtx.config.MaxCollectionSize {
+		transactions = []*flow.TransactionBody{}
+	}
+
 	// build the payload from the transactions
 	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
 	if err != nil {
