@@ -195,6 +195,7 @@ func (s *EventsSuite) SetupTest() {
 // across all queryModes and encodings
 func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
+	encoding := entities.EventEncodingVersion_CCF_V0
 
 	s.executionResultProvider.
 		On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -220,7 +221,6 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 	s.Run("GetEventsForHeightRange - end height updated", func() {
 		backend := s.defaultBackend(query_mode.IndexQueryModeFailover)
 		endHeight := startHeight + 20 // should still return 5 responses
-		encoding := entities.EventEncodingVersion_CCF_V0
 
 		response, _, err := backend.GetEventsForHeightRange(
 			ctx,
@@ -233,6 +233,29 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 		s.Require().NoError(err)
 
 		s.assertResponse(response, encoding)
+	})
+
+	s.Run("deduplicates block IDs", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeLocalOnly)
+
+		duplicateBlockIDs := []flow.Identifier{
+			s.blockIDs[0],
+			s.blockIDs[1],
+			s.blockIDs[0], // duplicate
+			s.blockIDs[2],
+			s.blockIDs[1], // duplicate
+		}
+
+		response, _, err := backend.GetEventsForBlockIDs(
+			ctx,
+			targetEvent,
+			duplicateBlockIDs,
+			encoding,
+			s.criteria,
+		)
+		s.Require().NoError(err)
+
+		s.Assert().Len(response, 3)
 	})
 
 	for _, tt := range s.testCases {
