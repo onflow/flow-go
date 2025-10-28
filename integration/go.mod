@@ -20,7 +20,7 @@ require (
 	github.com/ipfs/go-datastore v0.8.2
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/libp2p/go-libp2p v0.38.2
-	github.com/onflow/cadence v1.8.2
+	github.com/onflow/cadence v1.8.3-0.20251028220914-b9fcfa8acabf
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.1
