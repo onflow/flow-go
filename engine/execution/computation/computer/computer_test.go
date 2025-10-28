@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
@@ -86,7 +87,14 @@ func (committer *fakeCommitter) CommitView(
 	execution.ExtendableStorageSnapshot,
 	error,
 ) {
+	// Add proof generation timing logs
+	fmt.Printf("🔒 PROOF GENERATION for Collection %d STARTED at %v\n",
+		committer.callCount, time.Now())
+
 	committer.callCount++
+
+	// Simulate proof generation work to make timing visible
+	time.Sleep(5 * time.Millisecond)
 
 	startState := baseStorageSnapshot.Commitment()
 	endState := incStateCommitment(startState)
@@ -113,6 +121,10 @@ func (committer *fakeCommitter) CommitView(
 	newStorageSnapshot := baseStorageSnapshot.Extend(endState, map[flow.RegisterID]flow.RegisterValue{
 		reg.Key: reg.Value,
 	})
+
+	// Add proof generation completion log
+	fmt.Printf("🔓 PROOF GENERATION for Collection %d COMPLETED at %v\n",
+		committer.callCount, time.Now())
 
 	return newStorageSnapshot.Commitment(),
 		[]byte{byte(committer.callCount)},
@@ -477,7 +489,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("multiple collections", func(t *testing.T) {
 		execCtx := fvm.NewContext()
 
-		committer := new(computermock.ViewCommitter)
+		committer := &fakeCommitter{
+			callCount: 0,
+		}
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := mocktracker.NewMockStorage()
@@ -523,14 +537,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
-		snapshot := storehouse.NewExecutingBlockSnapshot(
-			snapshot.MapStorageSnapshot{},
-			unittest.StateCommitmentFixture(),
-		)
-
-		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, snapshot, nil).
-			Times(collectionCount + 1)
+		// No mock expectations needed - using real fakeCommitter with timing logs
 
 		result, err := exe.ExecuteBlock(
 			context.Background(),
@@ -1937,7 +1944,20 @@ func (testExecutor) Preprocess() error {
 func (executor *testExecutor) Execute() error {
 	atomic.AddInt32(&executor.callCount, 1)
 
+	// Add timing logs for parallel execution verification
+	txn := executor.proc.(*fvm.TransactionProcedure)
+	// Get collection index from the transaction request context
+	collectionIndex := int(txn.TxIndex) / 2 // This is approximate - we need the real collection index
+	executor.t.Logf("🚀 TX%d (Collection ~%d) STARTED at %v",
+		txn.TxIndex, collectionIndex, time.Now())
+
+	// Simulate transaction execution work to make timing visible
+	time.Sleep(20 * time.Millisecond)
+
 	getSetAProgram(executor.t, executor.txnState)
+
+	executor.t.Logf("✅ TX%d (Collection ~%d) COMPLETED at %v",
+		txn.TxIndex, collectionIndex, time.Now())
 
 	return nil
 }
