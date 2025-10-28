@@ -1,12 +1,12 @@
 package testutils
 
 import (
-	"math"
 	"math/big"
 	"strings"
 	"testing"
 
 	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
@@ -110,7 +110,7 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 		types.NewDeployCall(
 			caller,
 			tc.ByteCode,
-			math.MaxUint64,
+			gethParams.MaxTxGas,
 			big.NewInt(0),
 			nonce+1,
 		),
