@@ -64,7 +64,7 @@ import (
 )
 
 const (
-	testMaxConcurrency = 2
+	testMaxConcurrency = 1
 )
 
 func incStateCommitment(startState flow.StateCommitment) flow.StateCommitment {
@@ -1950,9 +1950,6 @@ func (executor *testExecutor) Execute() error {
 	collectionIndex := int(txn.TxIndex) / 2 // This is approximate - we need the real collection index
 	executor.t.Logf("🚀 TX%d (Collection ~%d) STARTED at %v",
 		txn.TxIndex, collectionIndex, time.Now())
-
-	// Simulate transaction execution work to make timing visible
-	time.Sleep(20 * time.Millisecond)
 
 	getSetAProgram(executor.t, executor.txnState)
 
