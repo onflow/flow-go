@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/ratelimit"
 	cadenceutils "github.com/onflow/flow-go/access/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -22,9 +23,9 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 )
 
 // DefaultSealedIndexedHeightThreshold is the default number of blocks between sealed and indexed height
@@ -166,7 +167,7 @@ type TransactionValidator struct {
 	scriptExecutor               execution.ScriptExecutor
 	verifyPayerBalanceScript     []byte
 	transactionValidationMetrics module.TransactionValidationMetrics
-	registers                    storage.RegisterSnapshotReader
+	registersAsyncStore          *execution.RegistersAsyncStore
 
 	validationSteps []ValidationStep
 }
@@ -180,7 +181,7 @@ func NewTransactionValidator(
 	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
-	registers storage.RegisterSnapshotReader,
+	registersAsyncStore *execution.RegistersAsyncStore,
 ) (*TransactionValidator, error) {
 	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
@@ -197,7 +198,7 @@ func NewTransactionValidator(
 		scriptExecutor:               executor,
 		verifyPayerBalanceScript:     templates.GenerateVerifyPayerBalanceForTxExecution(env),
 		transactionValidationMetrics: transactionValidationMetrics,
-		registers:                    registers,
+		registersAsyncStore:          registersAsyncStore,
 	}
 
 	txValidator.initValidationSteps()
@@ -484,6 +485,8 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 	return nil
 }
 
+// Expected error returns during normal operation:
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
 func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
 	if v.options.CheckPayerBalanceMode == Disabled {
 		return nil
@@ -516,7 +519,14 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
 	}
 
-	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight, v.registers)
+	registerSnapshotReader, err := v.registersAsyncStore.RegisterSnapshotReader()
+	if err != nil {
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return access.NewDataNotFoundError("registersAsyncStore storage", err)
+	}
+
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight, registerSnapshotReader)
 	if err != nil {
 		return fmt.Errorf("script finished with error: %w", err)
 	}

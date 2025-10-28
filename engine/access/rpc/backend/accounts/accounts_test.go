@@ -19,6 +19,7 @@ import (
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -604,6 +605,9 @@ func findAccountKeyByIndex(keys []flow.AccountPublicKey, keyIndex uint32) *flow.
 }
 
 func (s *AccountsSuite) defaultAccountsBackend(mode query_mode.IndexQueryMode, executor *execmock.ScriptExecutor) *Accounts {
+	registersAsync := execution.NewRegistersAsyncStore()
+	require.NoError(s.T(), registersAsync.Initialize(s.registers))
+
 	accounts, err := NewAccountsBackend(
 		s.log,
 		s.state,
@@ -619,7 +623,7 @@ func (s *AccountsSuite) defaultAccountsBackend(mode query_mode.IndexQueryMode, e
 			flow.IdentifierList{},
 			flow.IdentifierList{},
 		),
-		s.registers,
+		registersAsync,
 	)
 	require.NoError(s.T(), err)
 

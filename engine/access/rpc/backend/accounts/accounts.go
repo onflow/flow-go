@@ -38,19 +38,19 @@ func NewAccountsBackend(
 	scriptExecMode query_mode.IndexQueryMode,
 	scriptExecutor execution.ScriptExecutor,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
-	registers storage.RegisterSnapshotReader,
+	registersAsyncStore *execution.RegistersAsyncStore,
 ) (*Accounts, error) {
 	var accountProvider provider.AccountProvider
 
 	switch scriptExecMode {
 	case query_mode.IndexQueryModeLocalOnly:
-		accountProvider = provider.NewLocalAccountProvider(log, state, scriptExecutor, registers)
+		accountProvider = provider.NewLocalAccountProvider(log, state, scriptExecutor, registersAsyncStore)
 
 	case query_mode.IndexQueryModeExecutionNodesOnly:
 		accountProvider = provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 
 	case query_mode.IndexQueryModeFailover:
-		local := provider.NewLocalAccountProvider(log, state, scriptExecutor, registers)
+		local := provider.NewLocalAccountProvider(log, state, scriptExecutor, registersAsyncStore)
 		execNode := provider.NewENAccountProvider(log, state, connFactory, nodeCommunicator, execNodeIdentitiesProvider)
 		accountProvider = provider.NewFailoverAccountProvider(log, state, local, execNode)
 
