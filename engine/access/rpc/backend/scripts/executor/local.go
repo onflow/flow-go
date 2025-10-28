@@ -78,6 +78,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
 	}
+
 	result, err := l.scriptExecutor.ExecuteAtBlockHeight(
 		ctx,
 		r.script,

@@ -55,7 +55,13 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
-	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, snapshot.Registers())
+
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+	}
+
+	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registers)
 	if err != nil {
 		return nil, nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
 	}
@@ -80,7 +86,13 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
-	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, snapshot.Registers())
+
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+	}
+
+	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
 		return 0, nil, err
@@ -107,7 +119,13 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
-	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, snapshot.Registers())
+
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+	}
+
+	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account key at height: %d", height)
 		return nil, nil, err
@@ -133,7 +151,13 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
-	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, snapshot.Registers())
+
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+	}
+
+	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
 		return nil, nil, err
