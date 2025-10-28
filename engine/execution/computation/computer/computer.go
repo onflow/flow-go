@@ -426,7 +426,7 @@ func (e *blockComputer) executeBlock(
 		block,
 		blockSpan,
 		database,
-		rawCollections,
+		len(rawCollections),
 		userTxCount,
 	)
 	if err != nil {
@@ -487,10 +487,9 @@ func (e *blockComputer) executeSystemTransactions(
 	block *entity.ExecutableBlock,
 	blockSpan otelTrace.Span,
 	database *transactionCoordinator,
-	rawCollections []*entity.CompleteCollection,
+	userCollectionCount,
 	userTxCount int,
 ) error {
-	userCollectionCount := len(rawCollections)
 	txIndex := uint32(userTxCount)
 
 	callbackCtx := fvm.NewContextFromParent(
