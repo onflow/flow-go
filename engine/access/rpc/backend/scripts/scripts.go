@@ -43,9 +43,7 @@ type Scripts struct {
 	state                    protocol.State
 	executor                 executor.ScriptExecutor
 	maxScriptAndArgumentSize uint
-
-	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
-	executionStateCache     optimistic_sync.ExecutionStateCache
+	executionResultProvider  optimistic_sync.ExecutionResultInfoProvider
 }
 
 var _ access.ScriptsAPI = (*Scripts)(nil)
@@ -118,7 +116,6 @@ func NewScriptsBackend(
 		state:                    state,
 		executor:                 exec,
 		maxScriptAndArgumentSize: maxScriptAndArgumentSize,
-		executionStateCache:      executionStateCache,
 		executionResultProvider:  executionResultProvider,
 	}, nil
 }
