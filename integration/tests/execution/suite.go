@@ -114,7 +114,10 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = nil
 	s.accessClient = nil
 
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(
+		flow.RoleAccess,
+		testnet.WithAdditionalFlag("--execution-result-agreeing-executors-count=1"),
+	))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
@@ -126,16 +129,12 @@ func (s *Suite) SetupTest() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// at least 2 execution nodes are required to execute a script with the default AgreeingExecutorsCount, which is 2
+	// need one execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
-	exe2ID := unittest.IdentifierFixture()
-	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(exe2ID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// need two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
