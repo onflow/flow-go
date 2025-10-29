@@ -38,7 +38,7 @@ func NewRegisterSnapshotReader(registers storage.RegisterIndexReader) *RegisterS
 //
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (r *RegisterSnapshotReader) StorageSnapshot(height uint64) (snapshot.StorageSnapshot, error) {
 	if height < r.RegisterIndexReader.FirstHeight() {
 		return nil, storage.ErrHeightNotIndexed
@@ -51,14 +51,11 @@ func (r *RegisterSnapshotReader) StorageSnapshot(height uint64) (snapshot.Storag
 	return snapshot.NewReadFuncStorageSnapshot(func(registerID flow.RegisterID) (flow.RegisterValue, error) {
 		value, err := r.RegisterIndexReader.Get(registerID, height)
 		if err != nil {
-			// only return an error if the error doesn't match the not found error, since we have
-			// to gracefully handle not found values and instead assign nil, that is because the script executor
-			// expects that behaviour
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, err
+			// FVM expects the storage snapshot to return nil for non-existent registers
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, nil
 			}
-
-			return nil, nil
+			return nil, err
 		}
 
 		return value, nil
