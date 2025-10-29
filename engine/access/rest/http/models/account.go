@@ -2,7 +2,7 @@ package models
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
-	//commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -11,7 +11,6 @@ import (
 const expandableKeys = "keys"
 const expandableContracts = "contracts"
 
-// TODO(Uliana)
 func NewAccount(
 	flowAccount *flow.Account,
 	link models.LinkGenerator,
@@ -19,16 +18,16 @@ func NewAccount(
 	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) (*Account, error) {
-	//var meta *commonmodels.Metadata
-	//if shouldIncludeMetadata {
-	//	meta = commonmodels.NewMetadata(metadata)
-	//}
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
+	}
 
 	account := &Account{
 		Address:    flowAccount.Address.String(),
 		Balance:    util.FromUint(flowAccount.Balance),
 		Expandable: &AccountExpandable{},
-		//Metadata:       meta,
+		Metadata:   meta,
 	}
 
 	if expand[expandableKeys] {
@@ -66,10 +65,10 @@ func NewAccountPublicKey(
 	sigAlgo := SigningAlgorithm(k.SignAlgo.String())
 	hashAlgo := HashingAlgorithm(k.HashAlgo.String())
 
-	//var meta *commonmodels.Metadata
-	//if shouldIncludeMetadata {
-	//	meta = commonmodels.NewMetadata(metadata)
-	//}
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
+	}
 
 	return AccountPublicKey{
 		Index:            util.FromUint(k.Index),
@@ -79,7 +78,7 @@ func NewAccountPublicKey(
 		SequenceNumber:   util.FromUint(k.SeqNumber),
 		Weight:           util.FromUint(uint64(k.Weight)),
 		Revoked:          k.Revoked,
-		//Metadata:       meta,
+		Metadata:         meta,
 	}
 }
 
@@ -120,13 +119,13 @@ func NewAccountBalance(
 	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) AccountBalance {
-	//var meta *commonmodels.Metadata
-	//if shouldIncludeMetadata {
-	//	meta = commonmodels.NewMetadata(metadata)
-	//}
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
+	}
 
 	return AccountBalance{
-		Balance: util.FromUint(balance),
-		//Metadata:       meta,
+		Balance:  util.FromUint(balance),
+		Metadata: meta,
 	}
 }
