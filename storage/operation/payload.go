@@ -179,8 +179,8 @@ func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 
 func IndexLatestSealAtBlockFunctor(blockID flow.Identifier, sealID flow.Identifier) Functor {
 	return BindFunctors(
-		HoldingLock(storage.LockInsertBlock),
-		UpsertingFunctor(MakePrefix(codeBlockIDToLatestSealID, blockID), sealID),
+		CheckHoldsLockFunctor(storage.LockInsertBlock),
+		UpsertFunctor(MakePrefix(codeBlockIDToLatestSealID, blockID), sealID),
 	)
 }
 

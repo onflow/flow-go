@@ -37,10 +37,10 @@ func BindFunctors(functors ...Functor) Functor {
 	}
 }
 
-// HoldingLock creates a functor that validates the lock context holds the specified lock.
+// CheckHoldsLockFunctor creates a functor that validates the lock context holds the specified lock.
 // This is used as a guard to ensure operations are only performed when the required lock is held.
 // Returns an exception if the lock is not held, otherwise returns nil.
-func HoldingLock(lockID string) Functor {
+func CheckHoldsLockFunctor(lockID string) Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		if !lctx.HoldsLock(lockID) {
 			return fmt.Errorf("missing required lock: %s", lockID)
@@ -62,13 +62,13 @@ func WrapError(wrapMsg string, fn Functor) Functor {
 	}
 }
 
-// UpsertingFunctor returns a functor that overwrites a key-value pair in the storage.
+// UpsertFunctor returns a functor that overwrites a key-value pair in the storage.
 // The value is serialized using msgpack encoding. If the key already exists,
 // the value will be overwritten without any checks.
 //
 // This is typically used for operations where we want to update existing data
 // or where we don't care about potential conflicts.
-func UpsertingFunctor(key []byte, val interface{}) Functor {
+func UpsertFunctor(key []byte, val interface{}) Functor {
 	value, err := msgpack.Marshal(val)
 	if err != nil {
 		return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
@@ -90,7 +90,7 @@ func UpsertingFunctor(key []byte, val interface{}) Functor {
 // The values are serialized using msgpack encoding. If any of the keys already exist,
 // the values will be overwritten without any checks.
 //
-// This is the batch version of UpsertingFunctor, useful for operations where we want to
+// This is the batch version of UpsertFunctor, useful for operations where we want to
 // update multiple entries atomically or where we don't care about potential conflicts.
 // The keys and vals slices must have the same length.
 func UpsertMulFunctor(keys [][]byte, vals []any) Functor {

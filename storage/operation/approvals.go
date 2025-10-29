@@ -41,8 +41,8 @@ func InsertAndIndexResultApproval(approval *flow.ResultApproval) Functor {
 	errmsg := fmt.Sprintf("InsertAndIndexResultApproval failed with approvalID %v, chunkIndex %v, resultID %v",
 		approvalID, chunkIndex, resultID)
 	return WrapError(errmsg, BindFunctors(
-		HoldingLock(storage.LockIndexResultApproval),
-		UpsertingFunctor(MakePrefix(codeResultApproval, approvalID), approval),
+		CheckHoldsLockFunctor(storage.LockIndexResultApproval),
+		UpsertFunctor(MakePrefix(codeResultApproval, approvalID), approval),
 		InsertingWithMismatchCheck(MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID),
 	))
 }
