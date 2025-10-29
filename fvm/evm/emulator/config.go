@@ -24,7 +24,7 @@ var (
 
 	PreviewnetOsakaActivation = uint64(0)          // already on Osaka for PreviewNet
 	TestnetOsakaActivation    = uint64(1761670800) // Wednesday, December 3, 2025 5:00:00 PM GMT+0000
-	MainnetOsakaActivation    = uint64(1764781200) // Wednesday, December 3, 2025 11:59:59 PM GMT+0000
+	MainnetOsakaActivation    = uint64(1796317200) // Wednesday, December 3, 2026 5 PM GMT+0000
 )
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
