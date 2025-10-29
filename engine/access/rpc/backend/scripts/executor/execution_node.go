@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	//nolint:gosec
 	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"

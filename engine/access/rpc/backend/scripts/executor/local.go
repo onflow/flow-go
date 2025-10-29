@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	//nolint:gosec
 	"fmt"
 	"time"
 
