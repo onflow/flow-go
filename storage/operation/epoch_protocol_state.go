@@ -28,12 +28,9 @@ func RetrieveEpochProtocolState(r storage.Reader, entryID flow.Identifier, entry
 // CAUTION:
 //   - The caller must acquire the lock [storage.LockInsertBlock] and hold it until the database write has been committed.
 //   - OVERWRITES existing data (potential for data corruption):
-//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
-//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
-//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
-//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The lock proof
-//     serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
-//     ATOMICALLY with this write operation.
+//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY within this write operation. Currently it's done by operation.InsertHeader where it performs a check
+//     to ensure the blockID is new, therefore any data indexed by this blockID is new as well.
 //
 // No error returns are expected during normal operation.
 func IndexEpochProtocolState(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {

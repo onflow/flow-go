@@ -343,9 +343,9 @@ func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Addre
 		return
 	}
 
-	iterator := capabilityControllerStorage.Iterator(nil)
+	iterator := capabilityControllerStorage.Iterator()
 	for {
-		k, v := iterator.Next()
+		k, v := iterator.Next(nil)
 
 		if k == nil || v == nil {
 			break

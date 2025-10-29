@@ -54,8 +54,9 @@ type Config struct {
 func (c *Config) ChainRules() gethParams.Rules {
 	return c.ChainConfig.Rules(
 		c.BlockContext.BlockNumber,
-		c.BlockContext.Random != nil,
-		c.BlockContext.Time)
+		true, // we are already on Merge
+		c.BlockContext.Time,
+	)
 }
 
 // PreviewNetChainConfig is the chain config used by the previewnet

@@ -1,0 +1,75 @@
+# Dependency Review Action
+
+# PRs introducing NEW known-vulnerable packages will be blocked from merging.
+# This will output a GHAS comment in the PR with the details of the vulnerabilities.
+# and will also provide a comment on what to do next.
+
+# Public documentation: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review#dependency-review-enforcement
+name: "Dependency review"
+on:
+  pull_request:
+    branches: ["master"]
+
+permissions:
+  contents: read
+  pull-requests: write # Required for PR comments
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    outputs:
+      vulnerable-changes: ${{ steps.review.outputs.vulnerable-changes }}
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Dependency Review"
+        id: review
+        uses: actions/dependency-review-action@v4
+        with:
+          comment-summary-in-pr: always
+          fail-on-severity: moderate
+          #allow-ghsas: GHSA-q34m-jh98-gwm2,GHSA-f9vj-2wh5-fj8j  EXAMPLE of how to whitelist!
+
+  dependency-review-failure-info:
+    needs: dependency-review
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add PR Comment
+        uses: actions/github-script@v7
+        env:
+          VULN_OUTPUT: ${{ needs.dependency-review.outputs.vulnerable-changes }}
+        with:
+          script: |
+            try {
+              const vulnData = JSON.parse(process.env.VULN_OUTPUT || '[]');
+              let details = '';
+              
+              for (const pkg of vulnData) {
+                details += `\n📦 **${pkg.name}@${pkg.version}**\n`;
+              }
+
+              const comment = `⚠️ **Security Dependency Review Failed** ⚠️
+
+              This pull request introduces dependencies with security vulnerabilities of moderate severity or higher.
+
+              ### Vulnerable Dependencies:${details}
+
+              ### What to do next?
+              1. Review the vulnerability details in the Dependency Review Comment above, specifically the "Vulnerabilities" section
+              2. Click on the links in the "Vulnerability" section to see the details of the vulnerability
+              3. If multiple versions of the same package are vulnerable, please update to the common latest non-vulnerable version
+              4. If you are unsure about the vulnerability, please contact the security engineer
+              5. If the vulnerability cannot be avoided (can't upgrade, or need to keep), contact #security on slack to **get it added to the allowlist**
+              \nSecurity Engineering contact: #security on slack`;
+
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.error('Error processing vulnerability data:', error);
+              throw error;
+            }

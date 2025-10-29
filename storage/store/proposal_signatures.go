@@ -48,9 +48,9 @@ func newProposalSignatures(collector module.CacheMetrics, db storage.DB) *propos
 //   - The caller must acquire either the lock [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock]
 //     but not both and hold the lock until the database write has been committed.
 //   - OVERWRITES existing data (potential for data corruption):
-//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK
-//     is done elsewhere ATOMICALLY with this write operation. It is intended that this function is called only for new
-//     blocks, i.e. no signature was previously persisted for it.
+//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY within this write operation. Currently it's done by operation.InsertHeader where it performs a check
+//     to ensure the blockID is new, therefore any data indexed by this blockID is new as well.
 //
 // No error returns expected during normal operations.
 func (h *proposalSignatures) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, sig []byte) error {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -44,7 +45,8 @@ func TestReExecuteBlock(t *testing.T) {
 		txResults, err := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
 		require.NoError(t, err)
 		commits := store.NewCommits(metrics, db)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.DefaultCacheSize)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
 		results := all.Results
 		receipts := all.Receipts
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
@@ -101,13 +103,10 @@ func TestReExecuteBlock(t *testing.T) {
 		batch := db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch := pebbleimpl.ToDB(pdb).NewBatch()
-		defer chunkBatch.Close()
-
 		// remove execution results
-		err = removeForBlockID(
+		var cdpIDs []flow.Identifier
+		cdpIDs, err = removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -121,9 +120,8 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		// remove again, to make sure missing entires are handled properly
-		err = removeForBlockID(
+		additionalCdpIDs, err := removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -135,21 +133,26 @@ func TestReExecuteBlock(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NoError(t, chunkBatch.Commit())
+		// combine chunk data pack IDs from both calls
+		cdpIDs = append(cdpIDs, additionalCdpIDs...)
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 		err2 := batch.Commit()
 
 		require.NoError(t, err2)
 
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
+
 		batch = db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch = pebbleimpl.ToDB(pdb).NewBatch()
-		defer chunkBatch.Close()
-
 		// remove again after flushing
-		err = removeForBlockID(
+		cdpIDs, err = removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -160,11 +163,17 @@ func TestReExecuteBlock(t *testing.T) {
 			header.ID(),
 		)
 		require.NoError(t, err)
-
-		require.NoError(t, chunkBatch.Commit())
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 		err2 = batch.Commit()
 
 		require.NoError(t, err2)
+
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 
 		// re execute result
 		err = es.SaveExecutionResults(context.Background(), computationResult)
@@ -201,7 +210,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		serviceEvents := store.NewServiceEvents(metrics, db)
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), bstorage.DefaultCacheSize)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, collections, bstorage.DefaultCacheSize)
 		txResults, err := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 		require.NoError(t, err)
 
@@ -262,13 +272,9 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		batch := db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch := db.NewBatch()
-		defer chunkBatch.Close()
-
 		// remove execution results
-		err = removeForBlockID(
+		cdpIDs, err := removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -280,20 +286,23 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NoError(t, chunkBatch.Commit())
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 		err2 := batch.Commit()
 		require.NoError(t, err2)
+
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 
 		batch = db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch = db.NewBatch()
-		defer chunkBatch.Close()
-
 		// remove again to test for duplicates handling
-		err = removeForBlockID(
+		additionalCdpIDs, err := removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -305,10 +314,19 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NoError(t, chunkBatch.Commit())
+		// combine chunk data pack IDs from both calls
+		cdpIDs = append(cdpIDs, additionalCdpIDs...)
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 
 		err2 = batch.Commit()
 		require.NoError(t, err2)
+
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 
 		computationResult2 := testutil.ComputationResultFixture(t)
 		computationResult2.ExecutableBlock = executableBlock

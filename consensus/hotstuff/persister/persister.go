@@ -3,6 +3,8 @@ package persister
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -15,8 +17,9 @@ import (
 // SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be complete
 // before constructing a Persister instance with New (otherwise it will return an error).
 type Persister struct {
-	db      storage.DB
-	chainID flow.ChainID
+	db          storage.DB
+	chainID     flow.ChainID
+	lockManager lockctx.Manager
 }
 
 var _ hotstuff.Persister = (*Persister)(nil)
@@ -26,15 +29,16 @@ var _ hotstuff.PersisterReader = (*Persister)(nil)
 // Persister depends on protocol.State and cluster.State bootstrapping to set initial values for
 // SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be completed
 // before first using a Persister instance.
-func New(db storage.DB, chainID flow.ChainID) (*Persister, error) {
+func New(db storage.DB, chainID flow.ChainID, lockManager lockctx.Manager) (*Persister, error) {
 	err := ensureSafetyDataAndLivenessDataAreBootstrapped(db, chainID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check persister was properly bootstrapped: %w", err)
 	}
 
 	p := &Persister{
-		db:      db,
-		chainID: chainID,
+		db:          db,
+		chainID:     chainID,
+		lockManager: lockManager,
 	}
 	return p, nil
 }
@@ -62,8 +66,8 @@ func ensureSafetyDataAndLivenessDataAreBootstrapped(db storage.DB, chainID flow.
 }
 
 // NewReader returns a new Persister as a PersisterReader type (only read methods accessible).
-func NewReader(db storage.DB, chainID flow.ChainID) (hotstuff.PersisterReader, error) {
-	return New(db, chainID)
+func NewReader(db storage.DB, chainID flow.ChainID, lockManager lockctx.Manager) (hotstuff.PersisterReader, error) {
+	return New(db, chainID, lockManager)
 }
 
 // GetSafetyData will retrieve last persisted safety data.
@@ -85,15 +89,19 @@ func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
 // PutSafetyData persists the last safety data.
 // During normal operations, no errors are expected.
 func (p *Persister) PutSafetyData(safetyData *hotstuff.SafetyData) error {
-	return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertSafetyData(rw.Writer(), p.chainID, safetyData)
+	return storage.WithLock(p.lockManager, storage.LockInsertSafetyData, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.UpsertSafetyData(lctx, rw, p.chainID, safetyData)
+		})
 	})
 }
 
 // PutLivenessData persists the last liveness data.
 // During normal operations, no errors are expected.
 func (p *Persister) PutLivenessData(livenessData *hotstuff.LivenessData) error {
-	return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertLivenessData(rw.Writer(), p.chainID, livenessData)
+	return storage.WithLock(p.lockManager, storage.LockInsertLivenessData, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.UpsertLivenessData(lctx, rw, p.chainID, livenessData)
+		})
 	})
 }

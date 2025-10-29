@@ -489,6 +489,8 @@ func TestWithServiceAccount(t *testing.T) {
 }
 
 func TestEventLimits(t *testing.T) {
+	t.Parallel()
+
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
@@ -594,6 +596,7 @@ func TestEventLimits(t *testing.T) {
 // TestHappyPathSigning checks that a signing a transaction with `Sign` doesn't produce an error.
 // Transaction verification tests are in `TestVerifySignatureFromTransaction`.
 func TestHappyPathTransactionSigning(t *testing.T) {
+	t.Parallel()
 
 	newVMTest().run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
@@ -635,6 +638,8 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
+	t.Parallel()
+
 	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, address flow.Address) uint64 {
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		code := []byte(fmt.Sprintf(
@@ -1142,6 +1147,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 }
 
 func TestSettingExecutionWeights(t *testing.T) {
+	t.Parallel()
 
 	// change the chain so that the metering settings are read from the service account
 	chain := flow.Emulator.Chain()
@@ -1907,6 +1913,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 }
 
 func TestStorageCapacity(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Storage capacity updates on FLOW transfer", newVMTest().
 		withContextOptions(
 			fvm.WithAuthorizationChecksEnabled(false),
@@ -2373,7 +2381,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				if *testWithVMScriptExecution {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(540000979))
 				} else {
-					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(456687216))
 				}
 			},
 		),
@@ -2385,7 +2393,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
-			fvm.WithComputationLimit(20000),
+			fvm.WithComputationLimit(25000),
 			fvm.WithChain(chain),
 		).run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
@@ -2406,6 +2414,9 @@ func TestScriptExecutionLimit(t *testing.T) {
 }
 
 func TestInteractionLimit(t *testing.T) {
+
+	t.Parallel()
+
 	type testCase struct {
 		name             string
 		interactionLimit uint64
@@ -2575,6 +2586,7 @@ func TestInteractionLimit(t *testing.T) {
 }
 
 func TestAttachments(t *testing.T) {
+	t.Parallel()
 
 	newVMTest().
 		withBootstrapProcedureOptions().
@@ -2614,6 +2626,8 @@ func TestAttachments(t *testing.T) {
 }
 
 func TestCapabilityControllers(t *testing.T) {
+	t.Parallel()
+
 	test := func(t *testing.T) {
 		newVMTest().
 			withBootstrapProcedureOptions().
@@ -2883,6 +2897,8 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 }
 
 func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
+	t.Parallel()
+
 	source := testutil.EntropyProviderFixture(nil)
 
 	test := func(t *testing.T, allowed bool) {
@@ -2943,6 +2959,8 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 }
 
 func TestEntropyCallExpectsNoParameters(t *testing.T) {
+	t.Parallel()
+
 	source := testutil.EntropyProviderFixture(nil)
 	newVMTest().
 		withBootstrapProcedureOptions().
@@ -2986,6 +3004,7 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 }
 
 func TestTransientNetworkCoreContractAddresses(t *testing.T) {
+	t.Parallel()
 
 	// This test ensures that the transient networks have the correct core contract addresses.
 	newVMTest().
@@ -3011,6 +3030,8 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 }
 
 func TestFlowCallbackScheduler(t *testing.T) {
+	t.Parallel()
+
 	ctxOpts := []fvm.Option{
 		fvm.WithScheduleCallbacksEnabled(true),
 	}
@@ -3048,7 +3069,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 				}
 			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
 
-			const maxEffortAvailable = 30_000 // FLIP 330
+			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
@@ -3059,6 +3080,8 @@ func TestFlowCallbackScheduler(t *testing.T) {
 }
 
 func TestEVM(t *testing.T) {
+	t.Parallel()
+
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
@@ -3328,6 +3351,8 @@ func TestEVM(t *testing.T) {
 }
 
 func TestVMBridge(t *testing.T) {
+	t.Parallel()
+
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
@@ -3896,6 +3921,7 @@ func TestVMBridge(t *testing.T) {
 }
 
 func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
+	t.Parallel()
 
 	// Note: This cannot be tested anymore using a transaction,
 	// because publish method also aborts when trying to publish an entitled capability.
@@ -3912,7 +3938,6 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 
 		valid, err := env.ValidateAccountCapabilitiesGet(
 			nil,
-			interpreter.EmptyLocationRange,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
 			sema.NewReferenceType(
@@ -3942,7 +3967,6 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 
 		valid, err := env.ValidateAccountCapabilitiesGet(
 			nil,
-			interpreter.EmptyLocationRange,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
 			sema.NewReferenceType(
@@ -3958,6 +3982,7 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 }
 
 func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
+	t.Parallel()
 
 	t.Run("entitled capability", newVMTest().
 		run(func(
@@ -4215,6 +4240,7 @@ func TestCrypto(t *testing.T) {
 }
 
 func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
+	t.Parallel()
 
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())

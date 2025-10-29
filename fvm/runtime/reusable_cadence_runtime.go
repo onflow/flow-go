@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/bbq"
 	"github.com/onflow/cadence/bbq/vm"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
@@ -71,13 +70,24 @@ func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 	// It also doesn't need user documentation, since it is not (and should not)
 	// be called by the user. If it is called by the user it will panic.
 
+	randomSourceHistoryFunction := interpreter.NativeFunction(
+		func(
+			context interpreter.NativeFunctionContext,
+			_ interpreter.TypeArgumentsIterator,
+			_ interpreter.Value,
+			_ []interpreter.Value,
+		) interpreter.Value {
+			return reusable.randomSourceHistory(context)
+		},
+	)
+
 	reusable.TxRuntimeEnv.DeclareValue(
 		newRandomSourceHistoryFunctionValue(
 			interpreter.NewUnmeteredStaticHostFunctionValue(
 				randomSourceHistoryFunctionType,
-				func(invocation interpreter.Invocation) interpreter.Value {
-					return reusable.randomSourceHistory(invocation.InvocationContext)
-				},
+				interpreter.AdaptNativeFunctionForInterpreter(
+					randomSourceHistoryFunction,
+				),
 			),
 		),
 		nil,
@@ -88,9 +98,7 @@ func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 			vm.NewNativeFunctionValue(
 				randomSourceHistoryFunctionName,
 				randomSourceHistoryFunctionType,
-				func(context *vm.Context, _ []bbq.StaticType, _ vm.Value, _ ...vm.Value) vm.Value {
-					return reusable.randomSourceHistory(context)
-				},
+				randomSourceHistoryFunction,
 			),
 		),
 		nil,

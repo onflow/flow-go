@@ -128,6 +128,7 @@ const (
 	ResourceBlockVoteQueue                        = "vote_aggregator_queue"                     // consensus/collection node, vote aggregator
 	ResourceTimeoutObjectQueue                    = "timeout_aggregator_queue"                  // consensus/collection node, timeout aggregator
 	ResourceCollectionGuaranteesQueue             = "ingestion_col_guarantee_queue"             // consensus node, ingestion engine
+	ResourceChunkIDToChunkDataPackIndex           = "chunk_data_pack_index"                     // execution node
 	ResourceChunkDataPack                         = "chunk_data_pack"                           // execution node
 	ResourceChunkDataPackRequests                 = "chunk_data_pack_request"                   // execution node
 	ResourceEvents                                = "events"                                    // execution node
@@ -138,6 +139,7 @@ const (
 	ResourceTransactionResultErrorMessagesIndices = "transaction_result_error_messages_indices" // execution node
 	ResourceTransactionResultByBlock              = "transaction_result_by_block"               // execution node
 	ResourceExecutionDataCache                    = "execution_data_cache"                      // access node
+	ResourceScheduledTransactionsIndices          = "scheduled_transactions_indices"            // access node
 )
 
 const (

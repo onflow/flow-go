@@ -396,3 +396,13 @@ func (g *GeneratorSuite) RegisterEntries() *RegisterEntryGenerator {
 func (g *GeneratorSuite) TransactionErrorMessages() *TransactionErrorMessageGenerator {
 	return NewTransactionErrorMessageGenerator(g.Random(), g.Identifiers())
 }
+
+// PendingExecutionEvents returns a generator for [flow.PendingExecutionEvent].
+func (g *GeneratorSuite) PendingExecutionEvents() *PendingExecutionEventGenerator {
+	return NewPendingExecutionEventGenerator(
+		g.Random(),
+		g.Addresses(),
+		g.Events(),
+		g.chainID,
+	)
+}

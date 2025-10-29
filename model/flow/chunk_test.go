@@ -173,7 +173,7 @@ func TestChunkDataPackMalleability(t *testing.T) {
 //
 // 9. Empty ExecutionDataRoot.ChunkExecutionDataIDs:
 //   - Ensures an error is returned when ChunkExecutionDataIDs is empty.
-func TestNewChunkDataPack(t *testing.T) {
+func TestFromUntrustedChunkDataPack(t *testing.T) {
 	chunkID := unittest.IdentifierFixture()
 	startState := unittest.StateCommitmentFixture()
 	proof := []byte{0x1, 0x2}

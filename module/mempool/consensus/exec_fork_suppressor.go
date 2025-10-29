@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
@@ -46,6 +47,7 @@ type ExecForkSuppressor struct {
 	execForkDetected      atomic.Bool
 	onExecFork            ExecForkActor
 	execForkEvidenceStore storage.ExecutionForkEvidence
+	lockManager           storage.LockManager
 	log                   zerolog.Logger
 }
 
@@ -61,6 +63,7 @@ func NewExecStateForkSuppressor(
 	seals mempool.IncorporatedResultSeals,
 	onExecFork ExecForkActor,
 	db storage.DB,
+	lockManager storage.LockManager,
 	log zerolog.Logger,
 ) (*ExecForkSuppressor, error) {
 	executionForkEvidenceStore := store.NewExecutionForkEvidence(db)
@@ -83,6 +86,7 @@ func NewExecStateForkSuppressor(
 		execForkDetected:      *atomic.NewBool(execForkDetectedFlag),
 		onExecFork:            onExecFork,
 		execForkEvidenceStore: executionForkEvidenceStore,
+		lockManager:           lockManager,
 		log:                   log.With().Str("mempool", "ExecForkSuppressor").Logger(),
 	}
 
@@ -365,9 +369,13 @@ func (s *ExecForkSuppressor) filterConflictingSeals(sealsByBlockID map[flow.Iden
 				s.execForkDetected.Store(true)
 				s.Clear()
 				conflictingSeals = append(sealsList{candidateSeal}, conflictingSeals...)
-				err := s.execForkEvidenceStore.StoreIfNotExists(conflictingSeals)
+
+				// Acquire lock and store execution fork evidence
+				err := storage.WithLock(s.lockManager, storage.LockInsertExecutionForkEvidence, func(lctx lockctx.Context) error {
+					return s.execForkEvidenceStore.StoreIfNotExists(lctx, conflictingSeals)
+				})
 				if err != nil {
-					panic("failed to store execution fork evidence")
+					s.log.Fatal().Msg("failed to store execution fork evidence")
 				}
 				s.onExecFork(conflictingSeals)
 				return nil

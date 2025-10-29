@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -42,17 +44,17 @@ func (_m *ExecutionForkEvidence) Retrieve() ([]*flow.IncorporatedResultSeal, err
 	return r0, r1
 }
 
-// StoreIfNotExists provides a mock function with given fields: conflictingSeals
-func (_m *ExecutionForkEvidence) StoreIfNotExists(conflictingSeals []*flow.IncorporatedResultSeal) error {
-	ret := _m.Called(conflictingSeals)
+// StoreIfNotExists provides a mock function with given fields: lctx, conflictingSeals
+func (_m *ExecutionForkEvidence) StoreIfNotExists(lctx lockctx.Proof, conflictingSeals []*flow.IncorporatedResultSeal) error {
+	ret := _m.Called(lctx, conflictingSeals)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StoreIfNotExists")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]*flow.IncorporatedResultSeal) error); ok {
-		r0 = rf(conflictingSeals)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, []*flow.IncorporatedResultSeal) error); ok {
+		r0 = rf(lctx, conflictingSeals)
 	} else {
 		r0 = ret.Error(0)
 	}

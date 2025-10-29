@@ -26,13 +26,20 @@ func TestChunkDataPackPruner(t *testing.T) {
 		transactions := store.NewTransactions(m, db)
 		collections := store.NewCollections(db, transactions)
 		byChunkIDCacheSize := uint(10)
-		chunks := store.NewChunkDataPacks(m, db, collections, byChunkIDCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(m, db, byChunkIDCacheSize)
+		chunks := store.NewChunkDataPacks(m, db, storedChunkDataPacks, collections, byChunkIDCacheSize)
 
 		// store the chunks
 		cdp1, result1 := unittest.ChunkDataPacksFixtureAndResult()
 		require.NoError(t, results.Store(result1))
-		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
-			return chunks.StoreByChunkID(lctx, cdp1)
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
+			storeFunc, err := chunks.Store(cdp1)
+			if err != nil {
+				return err
+			}
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return storeFunc(lctx, rw)
+			})
 		}))
 
 		pruner := NewChunkDataPackPruner(chunks, results)

@@ -93,11 +93,20 @@ const (
 	codeJobQueuePointer      = 72
 
 	// codes for indexing multiple identifiers by identifier -- continued from 40-49
-	codeBlockIDToProposalSignature = 80 // index of proposer signatures by block ID
-	codeGuaranteeByCollectionID    = 81 // index of collection guarantee by collection ID
+	codeBlockIDToProposalSignature            = 80 // index of proposer signatures by block ID
+	codeGuaranteeByCollectionID               = 81 // index of collection guarantee by collection ID
+	codeTransactionIDByScheduledTransactionID = 82 // index of transaction ID by scheduled transaction ID
+	codeBlockIDByScheduledTransactionID       = 83 // index of block ID by scheduled transaction ID
+
+	// The storage prefixes `codeChunkDataPack` and `codeIndexChunkDataPackByChunkID` are used primarily by execution nodes
+	// to persist their own results for chunks they executed.
+	//  - `codeIndexChunkDataPackByChunkID` stores the chunkID → chunkDataPackID index, and
+	//  - `codeChunkDataPack` stores the chunk data pack by its own ID.
+	// This breakup allows us to store chunk data packs in a different database in a concurrent safe way.
+	codeIndexChunkDataPackByChunkID = 99
+	codeChunkDataPack               = 100
 
 	// legacy codes (should be cleaned up)
-	codeChunkDataPack                      = 100
 	codeCommit                             = 101
 	codeEvent                              = 102
 	codeExecutionStateInteractions         = 103
