@@ -138,7 +138,7 @@ func IsInternalError(err error) bool {
 	return errors.As(err, &errInternalError)
 }
 
-// OutOfRangeError indicates that the request was for data that is outside of the available range.
+// OutOfRangeError indicates that the request was for data that is outside the available range.
 // This is a more specific version of DataNotFoundError, where the data is known to eventually exist, but
 // currently is not known.
 // For example, querying data for a height above the current finalized height.
