@@ -22,8 +22,9 @@ import (
 type Functor func(lockctx.Proof, storage.ReaderBatchWriter) error
 
 // BindFunctors composes multiple functors into a single functor that executes
-// them sequentially. If any functor fails, the execution stops and returns the error.
-// This enables functional composition of database operations.
+// them sequentially. This enables functional composition of database operations.
+// If any bound functor returns an error, that error is passed through unchanged.
+// This utility is error-agnostic: callers are responsible for checking and documenting expected errors at the higher level.
 func BindFunctors(functors ...Functor) Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		for _, fn := range functors {
@@ -38,7 +39,7 @@ func BindFunctors(functors ...Functor) Functor {
 
 // HoldingLock creates a functor that validates the lock context holds the specified lock.
 // This is used as a guard to ensure operations are only performed when the required lock is held.
-// Returns an error if the lock is not held, otherwise returns nil.
+// Returns an exception if the lock is not held, otherwise returns nil.
 func HoldingLock(lockID string) Functor {
 	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 		if !lctx.HoldsLock(lockID) {
