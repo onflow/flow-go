@@ -255,11 +255,12 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 
 		// This function stores conflicting seals to the underlying database.
 		func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
 
 			// initialize ExecForkSuppressor
 			wrappedMempool := &poolmock.IncorporatedResultSeals{}
 			execForkActor := &actormock.ExecForkActor{}
-			wrapper, _ := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, zerolog.New(os.Stderr))
+			wrapper, _ := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, lockManager, zerolog.New(os.Stderr))
 
 			// add seal
 			wrappedMempool.On("Add", sealA).Return(true, nil).Once()
@@ -285,6 +286,8 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 
 		// This function retrieves conflicting seals from the same underlying database with a new instance of storage.DB.
 		func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
+
 			wrappedMempool2 := &poolmock.IncorporatedResultSeals{}
 			execForkActor2 := &actormock.ExecForkActor{}
 			execForkActor2.On("OnExecFork", mock.Anything).
@@ -292,7 +295,7 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 					conflictingSeals := args.Get(0).([]*flow.IncorporatedResultSeal)
 					require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, conflictingSeals)
 				}).Return().Once()
-			wrapper2, _ := NewExecStateForkSuppressor(wrappedMempool2, execForkActor2.OnExecFork, db, zerolog.New(os.Stderr))
+			wrapper2, _ := NewExecStateForkSuppressor(wrappedMempool2, execForkActor2.OnExecFork, db, lockManager, zerolog.New(os.Stderr))
 
 			// add another (non-conflicting) seal to ExecForkSuppressor
 			// fail test if seal is added to wrapped mempool
@@ -318,8 +321,10 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 		require.Fail(t, "no call to onExecFork expected ")
 	}
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+
 		wrappedMempool := stdmap.NewIncorporatedResultSeals(100)
-		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, onExecFork, db, zerolog.New(os.Stderr))
+		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, onExecFork, db, lockManager, zerolog.New(os.Stderr))
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
 
@@ -355,6 +360,8 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 // Test adding conflicting seals with different number of matching receipts.
 func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+
 		executingForkDetected := atomic.NewBool(false)
 		onExecFork := func([]*flow.IncorporatedResultSeal) {
 			executingForkDetected.Store(true)
@@ -363,7 +370,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 		rawMempool := stdmap.NewIncorporatedResultSeals(100)
 		receiptsDB := mockstorage.NewExecutionReceipts(t)
 		wrappedMempool := NewIncorporatedResultSeals(rawMempool, receiptsDB)
-		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, onExecFork, db, zerolog.New(os.Stderr))
+		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, onExecFork, db, lockManager, zerolog.New(os.Stderr))
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
 
@@ -426,9 +433,11 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 //  4. executes the `testLogic`
 func WithExecStateForkSuppressor(t *testing.T, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActor)) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
 		execForkActor := &actormock.ExecForkActor{}
-		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, zerolog.New(os.Stderr))
+		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, lockManager, zerolog.New(os.Stderr))
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
 		testLogic(wrapper, wrappedMempool, execForkActor)

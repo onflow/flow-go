@@ -377,6 +377,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Log,
 		node.Me,
 		db,
+		node.LockManager,
 		node.State,
 		node.Metrics,
 		node.Metrics,
@@ -550,7 +551,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	txResultStorage, err := store.NewTransactionResults(node.Metrics, db, storagebadger.DefaultCacheSize)
 	require.NoError(t, err)
 	commitsStorage := store.NewCommits(node.Metrics, db)
-	chunkDataPackStorage := store.NewChunkDataPacks(node.Metrics, db, collectionsStorage, 100)
+	storedChunkDataPacks := store.NewStoredChunkDataPacks(node.Metrics, db, 100)
+	chunkDataPackStorage := store.NewChunkDataPacks(node.Metrics, db, storedChunkDataPacks, collectionsStorage, 100)
 	results := store.NewExecutionResults(node.Metrics, db)
 	receipts := store.NewExecutionReceipts(node.Metrics, db, results, storagebadger.DefaultCacheSize)
 	myReceipts := store.NewMyExecutionReceipts(node.Metrics, db, receipts)

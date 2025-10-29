@@ -111,7 +111,7 @@ func (p *PersisterSuite) testWithDatabase() {
 				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
 				stores.NewResultsStore(p.indexerData.Results, results, p.executionResult.BlockID),
 				stores.NewCollectionsStore(p.indexerData.Collections, collections),
-				stores.NewTxResultErrMsgStore(p.txErrMsgs, txResultErrMsg, p.executionResult.BlockID),
+				stores.NewTxResultErrMsgStore(p.txErrMsgs, txResultErrMsg, p.executionResult.BlockID, lockManager),
 				stores.NewLatestSealedResultStore(latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
 			},
 		)
