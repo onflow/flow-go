@@ -130,13 +130,13 @@ func NewScriptsBackend(
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if data required to process the request is not available.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.InternalError] - for internal failures or index conversion errors.
 //   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (b *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
@@ -190,13 +190,13 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if data required to process the request is not available.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.InternalError] - for internal failures or index conversion errors.
 //   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (b *Scripts) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -250,13 +250,13 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if data required to process the request is not available.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.InternalError] - for internal failures or index conversion errors.
 //   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (b *Scripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -306,15 +306,14 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 // into access-layer errors according to the Access API error handling convention.
 //
 // Expected error returns during normal operation:
-//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if the script data or related execution data was not found,
 //     or if the block height is out of range or incompatible with node version.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.InternalError] - for internal failures or conversion errors.
 //   - [access.ServiceUnavailable] - if no nodes are available or a connection could not be established.
+//   - [access.InternalError] - for internal failures or conversion errors.
 func handleScriptExecutionError(ctx context.Context, err error) error {
 	err = fmt.Errorf("failed to execute script: %w", err)
 
