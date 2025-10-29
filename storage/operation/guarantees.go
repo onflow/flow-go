@@ -20,7 +20,7 @@ func InsertAndIndexGuarantee(guaranteeID flow.Identifier, guarantee *flow.Collec
 		guaranteeID, guarantee.CollectionID)
 	return WrapError(errmsg, BindFunctors(
 		HoldingLock(storage.LockInsertBlock),
-		Overwriting(MakePrefix(codeGuarantee, guaranteeID), guarantee),
+		UpsertingFunctor(MakePrefix(codeGuarantee, guaranteeID), guarantee),
 		InsertingWithMismatchCheck(MakePrefix(codeGuaranteeByCollectionID, guarantee.CollectionID), guaranteeID),
 	))
 }
@@ -44,7 +44,7 @@ func InsertAndIndexGuarantees(guaranteesWithID []*CollectionGuaranteeWithID) Fun
 
 	return WrapError("InsertAndIndexGuarantees failed", BindFunctors(
 		HoldingLock(storage.LockInsertBlock),
-		WrapError("insert guarantee failed", OverwritingMul(guaranteeIDKeys, guarantees)),
+		WrapError("insert guarantee failed", UpsertMulFunctor(guaranteeIDKeys, guarantees)),
 		WrapError("index guarantee failed", InsertingMulWithMismatchCheck(collectionIDKeys, guaranteeIDs)),
 	))
 }

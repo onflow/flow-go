@@ -42,7 +42,7 @@ func InsertAndIndexResultApproval(approval *flow.ResultApproval) Functor {
 		approvalID, chunkIndex, resultID)
 	return WrapError(errmsg, BindFunctors(
 		HoldingLock(storage.LockIndexResultApproval),
-		Overwriting(MakePrefix(codeResultApproval, approvalID), approval),
+		UpsertingFunctor(MakePrefix(codeResultApproval, approvalID), approval),
 		InsertingWithMismatchCheck(MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID),
 	))
 }

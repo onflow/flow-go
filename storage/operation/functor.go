@@ -62,13 +62,13 @@ func WrapError(wrapMsg string, fn Functor) Functor {
 	}
 }
 
-// Overwriting returns a functor that overwrites a key-value pair in the storage.
+// UpsertingFunctor returns a functor that overwrites a key-value pair in the storage.
 // The value is serialized using msgpack encoding. If the key already exists,
 // the value will be overwritten without any checks.
 //
 // This is typically used for operations where we want to update existing data
 // or where we don't care about potential conflicts.
-func Overwriting(key []byte, val interface{}) Functor {
+func UpsertingFunctor(key []byte, val interface{}) Functor {
 	value, err := msgpack.Marshal(val)
 	if err != nil {
 		return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
@@ -86,14 +86,14 @@ func Overwriting(key []byte, val interface{}) Functor {
 	}
 }
 
-// OverwritingMul returns a functor that overwrites multiple key-value pairs in the storage.
+// UpsertMulFunctor returns a functor that overwrites multiple key-value pairs in the storage.
 // The values are serialized using msgpack encoding. If any of the keys already exist,
 // the values will be overwritten without any checks.
 //
-// This is the batch version of Overwriting, useful for operations where we want to
+// This is the batch version of UpsertingFunctor, useful for operations where we want to
 // update multiple entries atomically or where we don't care about potential conflicts.
 // The keys and vals slices must have the same length.
-func OverwritingMul(keys [][]byte, vals []any) Functor {
+func UpsertMulFunctor(keys [][]byte, vals []any) Functor {
 	if len(keys) != len(vals) {
 		return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 			return irrecoverable.NewExceptionf("keys and vals length mismatch: %d vs %d", len(keys), len(vals))

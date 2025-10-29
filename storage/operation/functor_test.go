@@ -26,8 +26,8 @@ func TestFunctorBindFunctors(t *testing.T) {
 			value2 := "value2"
 
 			composed := operation.BindFunctors(
-				operation.Overwriting(key1, value1),
-				operation.Overwriting(key2, value2),
+				operation.UpsertingFunctor(key1, value1),
+				operation.UpsertingFunctor(key2, value2),
 			)
 
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
@@ -66,7 +66,7 @@ func TestFunctorBindFunctors(t *testing.T) {
 			// Test that the first operation alone works
 			err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.Overwriting(key1, value1)(lctx, rw)
+					return operation.UpsertingFunctor(key1, value1)(lctx, rw)
 				})
 			})
 			require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestFunctorBindFunctors(t *testing.T) {
 
 			// Now test the composition where the second operation fails
 			composed := operation.BindFunctors(
-				operation.Overwriting(key1, "new_value1"),
+				operation.UpsertingFunctor(key1, "new_value1"),
 				operation.InsertingWithExistenceCheck(key2, "different_value"),
 			)
 
@@ -141,7 +141,7 @@ func TestFunctorWrapError(t *testing.T) {
 			key := []byte("test_key")
 			value := "test_value"
 
-			wrapped := operation.WrapError("test operation", operation.Overwriting(key, value))
+			wrapped := operation.WrapError("test operation", operation.UpsertingFunctor(key, value))
 
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -184,8 +184,8 @@ func TestFunctorWrapError(t *testing.T) {
 	})
 }
 
-// TestFunctorOverwriting tests the overwriting functor
-func TestFunctorOverwriting(t *testing.T) {
+// TestFunctorUpsertingFunctor tests the upserting functor
+func TestFunctorUpsertingFunctor(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 
@@ -193,7 +193,7 @@ func TestFunctorOverwriting(t *testing.T) {
 			key := []byte("new_key")
 			value := "new_value"
 
-			overwrite := operation.Overwriting(key, value)
+			overwrite := operation.UpsertingFunctor(key, value)
 
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -217,13 +217,13 @@ func TestFunctorOverwriting(t *testing.T) {
 			// First insert the original value
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.Overwriting(key, originalValue)(lctx, rw)
+					return operation.UpsertingFunctor(key, originalValue)(lctx, rw)
 				})
 			})
 			require.NoError(t, err)
 
 			// Now overwrite with new value
-			overwrite := operation.Overwriting(key, newValue)
+			overwrite := operation.UpsertingFunctor(key, newValue)
 
 			err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -247,7 +247,7 @@ func TestFunctorOverwriting(t *testing.T) {
 			}
 			unserializable := &Unserializable{Channel: make(chan int)}
 
-			overwrite := operation.Overwriting(key, unserializable)
+			overwrite := operation.UpsertingFunctor(key, unserializable)
 
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -427,7 +427,7 @@ func TestFunctorComplexComposition(t *testing.T) {
 			complexOp := operation.BindFunctors(
 				operation.HoldingLock(storage.LockInsertBlock),
 				operation.InsertingWithExistenceCheck(key1, value1),
-				operation.Overwriting(key2, value2),
+				operation.UpsertingFunctor(key2, value2),
 				operation.InsertingWithMismatchCheck(key3, value3),
 			)
 
@@ -499,7 +499,7 @@ func TestFunctorErrorHandling(t *testing.T) {
 			}
 			unserializable := &Unserializable{Channel: make(chan int)}
 
-			overwrite := operation.Overwriting(key, unserializable)
+			overwrite := operation.UpsertingFunctor(key, unserializable)
 
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -516,7 +516,7 @@ func TestFunctorErrorHandling(t *testing.T) {
 			key := []byte("test_key")
 			value := "test_value"
 
-			overwrite := operation.Overwriting(key, value)
+			overwrite := operation.UpsertingFunctor(key, value)
 
 			// The operation should succeed in normal conditions
 			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
