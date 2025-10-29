@@ -9,13 +9,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -53,9 +51,7 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 ) (*flow.Account, error) {
 	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
-		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
-		return nil, access.NewDataNotFoundError("registers storage", err)
+		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registerSnapshotReader)
@@ -74,9 +70,7 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 ) (uint64, error) {
 	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
-		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
-		return 0, access.NewDataNotFoundError("registers storage", err)
+		return 0, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, registerSnapshotReader)
@@ -97,9 +91,7 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 ) (*flow.AccountPublicKey, error) {
 	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
-		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
-		return nil, access.NewDataNotFoundError("registers storage", err)
+		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, registerSnapshotReader)
@@ -119,9 +111,7 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 ) ([]flow.AccountPublicKey, error) {
 	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
-		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
-		return nil, access.NewDataNotFoundError("registers storage", err)
+		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, registerSnapshotReader)

@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/ratelimit"
 	cadenceutils "github.com/onflow/flow-go/access/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -23,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -485,8 +483,6 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 	return nil
 }
 
-// Expected error returns during normal operation:
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
 func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
 	if v.options.CheckPayerBalanceMode == Disabled {
 		return nil
@@ -521,9 +517,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 
 	registerSnapshotReader, err := v.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
-		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
-		return access.NewDataNotFoundError("registersAsyncStore storage", err)
+		return fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight, registerSnapshotReader)
