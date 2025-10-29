@@ -61,7 +61,7 @@ type requestScriptParams struct {
 // update godoc once the new unified ExecuteScriptResponse behavior is enforced.
 func TestScripts_HappyPath(t *testing.T) {
 	t.Run("block ID (legacyParams)", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		blockID := unittest.IdentifierFixture()
 		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
@@ -78,11 +78,10 @@ func TestScripts_HappyPath(t *testing.T) {
 			nil,
 		)
 		router.AssertOKResponse(t, req, expectedResp, backend)
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("block height (legacyParams)", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		height := uint64(1337)
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
@@ -99,11 +98,10 @@ func TestScripts_HappyPath(t *testing.T) {
 			nil,
 		)
 		router.AssertOKResponse(t, req, expectedResp, backend)
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("latest height (legacyParams)", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
 			Once()
@@ -119,11 +117,10 @@ func TestScripts_HappyPath(t *testing.T) {
 			nil,
 		)
 		router.AssertOKResponse(t, req, expectedResp, backend)
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("final height (legacyParams)", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		finalBlock := unittest.BlockHeaderFixture()
 		backend.On("GetLatestBlockHeader", mocks.Anything, false).
 			Return(finalBlock, flow.BlockStatusFinalized, nil).
@@ -143,7 +140,6 @@ func TestScripts_HappyPath(t *testing.T) {
 			nil,
 		)
 		router.AssertOKResponse(t, req, expectedResp, backend)
-		backend.AssertExpectations(t)
 	})
 
 	metadata := &access.ExecutorMetadata{
@@ -152,7 +148,7 @@ func TestScripts_HappyPath(t *testing.T) {
 	}
 
 	t.Run("latest height (with metadata)", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
 			Return([]byte("hello world"), metadata, nil).
@@ -171,11 +167,10 @@ func TestScripts_HappyPath(t *testing.T) {
 			metadata,
 		)
 		router.AssertOKResponse(t, req, expectedResp, backend)
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("block height (with metadata)", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		height := uint64(1337)
 
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, mocks.Anything).
@@ -195,11 +190,10 @@ func TestScripts_HappyPath(t *testing.T) {
 			metadata,
 		)
 		router.AssertOKResponse(t, req, expectedResp, backend)
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("block ID (with metadata)", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		blockID := unittest.IdentifierFixture()
 		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
@@ -219,7 +213,6 @@ func TestScripts_HappyPath(t *testing.T) {
 			metadata,
 		)
 		router.AssertOKResponse(t, req, expectedResp, backend)
-		backend.AssertExpectations(t)
 	})
 }
 
@@ -233,7 +226,7 @@ func TestScripts_HappyPath(t *testing.T) {
 //  4. Backend error when executing at the latest block, expect 400 Bad Request.
 func TestScripts_Errors(t *testing.T) {
 	t.Run("invalid arguments", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := buildScriptRequest(
 			requestScriptParams{
@@ -244,12 +237,10 @@ func TestScripts_Errors(t *testing.T) {
 
 		expectedResp := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expectedResp, backend)
-
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("backend error at block ID", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		blockID := unittest.IdentifierFixture()
 
 		req := buildScriptRequest(
@@ -265,12 +256,10 @@ func TestScripts_Errors(t *testing.T) {
 
 		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
 		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
-
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("backend error at block height", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := buildScriptRequest(
 			requestScriptParams{
@@ -285,12 +274,10 @@ func TestScripts_Errors(t *testing.T) {
 
 		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
 		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
-
-		backend.AssertExpectations(t)
 	})
 
 	t.Run("backend error at latest block", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := buildScriptRequest(
 			requestScriptParams{
@@ -304,8 +291,6 @@ func TestScripts_Errors(t *testing.T) {
 
 		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
 		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
-
-		backend.AssertExpectations(t)
 	})
 }
 

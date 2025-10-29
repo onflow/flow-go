@@ -1354,8 +1354,6 @@ func (suite *Suite) TestExecuteScript() {
 			}
 			actualResp, err := handler.ExecuteScriptAtLatestBlock(ctx, &req)
 			assertResult(err, expectedResp, actualResp)
-
-			suite.executionResultInfoProvider.AssertExpectations(suite.T())
 		})
 
 		suite.Run("execute script at block id", func() {
@@ -1373,8 +1371,6 @@ func (suite *Suite) TestExecuteScript() {
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockID(ctx, &req)
 			assertResult(err, expectedResp, actualResp)
-
-			suite.executionResultInfoProvider.AssertExpectations(suite.T())
 		})
 
 		suite.Run("execute script at block height", func() {
@@ -1393,8 +1389,6 @@ func (suite *Suite) TestExecuteScript() {
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockHeight(ctx, &req)
 			assertResult(err, expectedResp, actualResp)
-
-			suite.executionResultInfoProvider.AssertExpectations(suite.T())
 		})
 	})
 }

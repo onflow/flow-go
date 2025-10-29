@@ -113,8 +113,6 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		require.NoError(s.T(), err)
 		// make sure that the returned block height matches the current one set
 		require.Equal(s.T(), s.height, uint64(val.(cadence.UInt64)))
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 
 	s.Run("error when height is not indexed  ", func() {
@@ -124,8 +122,6 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		require.Error(s.T(), err)
 		require.Nil(s.T(), result)
 		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 }
 
@@ -144,8 +140,6 @@ func (s *scriptTestSuite) TestGetAccount() {
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), address, account.Address)
 		require.Zero(s.T(), account.Balance)
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 
 	s.Run("error when height is not indexed  ", func() {
@@ -155,8 +149,6 @@ func (s *scriptTestSuite) TestGetAccount() {
 		require.Error(s.T(), err)
 		require.Nil(s.T(), account)
 		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 }
 
@@ -176,8 +168,6 @@ func (s *scriptTestSuite) TestGetAccountBalance() {
 		balance, err := scripts.GetAccountBalance(context.Background(), address, s.height, s.registerSnapshot)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), transferAmount, balance)
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 
 	s.Run("error when height is not indexed  ", func() {
@@ -187,8 +177,6 @@ func (s *scriptTestSuite) TestGetAccountBalance() {
 		require.Error(s.T(), err)
 		require.Equal(s.T(), uint64(0), balance)
 		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 }
 
@@ -211,8 +199,6 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 		require.Equal(s.T(), publicKey.SignAlgo, accountKeys[0].SignAlgo)
 		require.Equal(s.T(), publicKey.HashAlgo, accountKeys[0].HashAlgo)
 		require.Equal(s.T(), publicKey.Weight, accountKeys[0].Weight)
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 
 	s.Run("error when height is not indexed  ", func() {
@@ -222,8 +208,6 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 		require.Error(s.T(), err)
 		require.Nil(s.T(), accountKeys)
 		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
-
-		s.registerSnapshot.AssertExpectations(s.T())
 	})
 }
 

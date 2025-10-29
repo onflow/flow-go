@@ -55,7 +55,6 @@ func TestVerifyHeight(t *testing.T) {
 		ch := NewCompatibleHeights(logger, vc, 10, 20)
 		err = ch.Check(15)
 		require.NoError(t, err)
-		beacons.AssertExpectations(t)
 	})
 
 	t.Run("versionControl reports incompatible", func(t *testing.T) {

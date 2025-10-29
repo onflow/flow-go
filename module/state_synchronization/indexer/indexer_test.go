@@ -88,8 +88,6 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	)
 	require.NoError(t, err)
 
-	registers.AssertExpectations(t)
-
 	return test
 }
 
