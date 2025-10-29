@@ -20,7 +20,7 @@ type ScriptExecutor interface {
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 	//   - [storage.ErrNotFound] - if data was not found.
 	//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
-	//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
 	//   - [codes.Canceled] - if the script execution was canceled.
 	//   - [codes.DeadlineExceeded] - if the script execution timed out.

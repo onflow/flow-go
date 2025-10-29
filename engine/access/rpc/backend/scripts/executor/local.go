@@ -55,7 +55,7 @@ func NewLocalScriptExecutor(
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 //   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found or snapshot at executionResultID was not found.
 //   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 //   - [codes.Canceled] - if the script execution was canceled.
 //   - [codes.DeadlineExceeded] - if the script execution timed out.
 //   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
