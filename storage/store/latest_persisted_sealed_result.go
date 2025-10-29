@@ -72,12 +72,12 @@ func (l *LatestPersistedSealedResult) Latest() (flow.Identifier, uint64) {
 // BatchSet updates the latest persisted sealed result in a batch operation.
 // The resultID and height are added to the provided batch, and the local data is updated only after
 // the batch is successfully committed.
-// The caller must hold [storage.LockInsertCollection].
+// The caller must hold [storage.LockUpdateLatestPersistedSealedResult].
 //
 // No errors are expected during normal operation.
 func (l *LatestPersistedSealedResult) BatchSet(lctx lockctx.Proof, resultID flow.Identifier, height uint64, batch storage.ReaderBatchWriter) error {
-	if !lctx.HoldsLock(storage.LockInsertCollection) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertCollection)
+	if !lctx.HoldsLock(storage.LockUpdateLatestPersistedSealedResult) {
+		return fmt.Errorf("missing required lock: %s", storage.LockUpdateLatestPersistedSealedResult)
 	}
 
 	// cacheMu is used to protect access to the cached resultID and height values. This is an
