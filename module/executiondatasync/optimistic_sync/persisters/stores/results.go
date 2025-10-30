@@ -33,6 +33,7 @@ func NewResultsStore(
 // Persist saves and indexes all transaction results (light representation) for the block as part of the
 // provided database batch. The caller must acquire [storage.LockInsertLightTransactionResult] and hold
 // it until the write batch has been committed.
+// Will return an error if the transaction results for the block already exist.
 //
 // No error returns are expected during normal operations
 func (r *ResultsStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
