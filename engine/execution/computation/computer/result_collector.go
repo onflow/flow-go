@@ -361,8 +361,8 @@ func (collector *resultCollector) AddTransactionResult(
 
 	log.Info().Str("mode", "para-proof").Msgf("finished executing tx %v for block %v, collection index %v",
 		request.ID,
-		request.collectionIndex,
 		request.blockId,
+		request.collectionIndex,
 	)
 
 	select {
