@@ -255,7 +255,17 @@ func (s *EventsSuite) TestGetEvents_HappyPaths() {
 		)
 		s.Require().NoError(err)
 
-		s.Assert().Len(response, 3)
+		s.Require().Len(response, 3)
+
+		// verify responses are returned in order of first occurrence
+		s.Assert().Equal(s.blocks[0].ID(), response[0].BlockID)
+		s.Assert().Equal(s.blocks[0].Height, response[0].BlockHeight)
+
+		s.Assert().Equal(s.blocks[1].ID(), response[1].BlockID)
+		s.Assert().Equal(s.blocks[1].Height, response[1].BlockHeight)
+
+		s.Assert().Equal(s.blocks[2].ID(), response[2].BlockID)
+		s.Assert().Equal(s.blocks[2].Height, response[2].BlockHeight)
 	})
 
 	for _, tt := range s.testCases {
