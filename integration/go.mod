@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	cloud.google.com/go/bigquery v1.69.0
 	github.com/VividCortex/ewma v1.2.0
+	github.com/antihax/optional v1.0.0
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/cockroachdb/pebble/v2 v2.0.6
 	github.com/coreos/go-semver v0.3.0
@@ -22,6 +23,7 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.8.3
 	github.com/onflow/crypto v0.25.3
+	github.com/onflow/flow v0.4.15
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.1
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
