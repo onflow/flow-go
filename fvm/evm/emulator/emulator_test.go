@@ -3,7 +3,6 @@ package emulator_test
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -211,7 +210,7 @@ func TestContractInteraction(t *testing.T) {
 						call := types.NewDeployCall(
 							testAccount,
 							testContract.ByteCode,
-							math.MaxUint64,
+							gethParams.MaxTxGas,
 							amountToBeTransfered,
 							testAccountNonce)
 						res, err := blk.DirectCall(call)
@@ -599,7 +598,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								testAccount,
 								target,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								amountToBeTransfered,
 								0,
 							),
@@ -629,7 +628,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								testAccount,
 								target,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								amountToBeTransfered,
 								0),
 						)
@@ -687,7 +686,7 @@ func TestSelfdestruct(t *testing.T) {
 							types.NewDeployCall(
 								testAddress,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								deployBalance,
 								0),
 						)
@@ -768,7 +767,7 @@ func TestFactoryPatterns(t *testing.T) {
 							types.NewDeployCall(
 								factoryDeployer,
 								factoryContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								factoryBalance,
 								0),
 						)
