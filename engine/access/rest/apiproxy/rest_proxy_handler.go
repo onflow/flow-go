@@ -553,7 +553,7 @@ func convertError(ctx context.Context, err error, typeName string) error {
 		// it's possible that this came from the client side, so wrap the original error directly.
 		return access.NewServiceUnavailable(err)
 	case codes.ResourceExhausted:
-		if sourceErrStr, ok := splitOnPrefix(err.Error(), "computation or memory limits were exceeded: "); ok {
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "resource exhausted error: "); ok {
 			return access.NewResourceExhausted(errors.New(sourceErrStr))
 		}
 		// it's possible that this came from the client side, so wrap the original error directly.

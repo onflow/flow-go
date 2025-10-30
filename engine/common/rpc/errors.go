@@ -46,6 +46,8 @@ func ErrorToStatus(err error) error {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	case access.IsServiceUnavailable(err):
 		return status.Error(codes.Unavailable, err.Error())
+	case access.IsResourceExhausted(err):
+		return status.Error(codes.ResourceExhausted, err.Error())
 	default:
 		// all errors should have explicit sentinels. reporting them as `Unknown` will make them easier to find and fix.
 		return status.Error(codes.Unknown, err.Error())

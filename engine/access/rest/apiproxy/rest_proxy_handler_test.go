@@ -80,13 +80,13 @@ func TestConvertError_Success(t *testing.T) {
 		},
 		{
 			name:     "ResourceExhausted with service resource exhausted error prefix",
-			typeName: "execution result",
-			expected: access.NewServiceUnavailable(errors.New("upstream service down")),
+			typeName: "",
+			expected: access.NewResourceExhausted(errors.New("execution computation limit reached")),
 		},
 		{
 			name:     "ResourceExhausted without prefix (client side)",
-			typeName: "collection",
-			expected: access.NewServiceUnavailable(status.Error(codes.Unavailable, "connection refused")),
+			typeName: "",
+			expected: access.NewResourceExhausted(status.Error(codes.ResourceExhausted, "execution computation limit reached")),
 		},
 	}
 
