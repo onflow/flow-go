@@ -124,6 +124,14 @@ func Bootstrap(
 	if err != nil {
 		return nil, err
 	}
+	err = lctx.AcquireLock(storage.LockInsertSafetyData)
+	if err != nil {
+		return nil, err
+	}
+	err = lctx.AcquireLock(storage.LockInsertLivenessData)
+	if err != nil {
+		return nil, err
+	}
 
 	config := defaultBootstrapConfig()
 	for _, opt := range options {
@@ -232,7 +240,7 @@ func bootstrapProtocolState(
 	// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
 	for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
 		// Store the protocol KV Store entry
-		err := protocolKVStoreSnapshots.BatchStore(lctx, rw, protocolStateID, &stateEntry.KVStore)
+		err := protocolKVStoreSnapshots.BatchStore(rw, protocolStateID, &stateEntry.KVStore)
 		if err != nil {
 			return fmt.Errorf("could not store protocol state kvstore: %w", err)
 		}
@@ -256,7 +264,7 @@ func bootstrapProtocolState(
 	for _, proposal := range segment.AllBlocks() {
 		blockID := proposal.Block.ID()
 		protocolStateEntryWrapper := segment.ProtocolStateEntries[proposal.Block.Payload.ProtocolStateID]
-		err := epochProtocolStateSnapshots.BatchIndex(rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
+		err := epochProtocolStateSnapshots.BatchIndex(lctx, rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
 		if err != nil {
 			return fmt.Errorf("could not index root protocol state: %w", err)
 		}
@@ -431,15 +439,14 @@ func bootstrapSealingSegment(
 
 			// For all but the first block in the segment, index the parent->child relationship:
 			if i > 0 {
-				err = operation.UpsertBlockChildren(lctx, w, proposal.Block.ParentID, []flow.Identifier{blockID})
+				// Reason for skipping block at index i == 0:
+				//  * `segment.Blocks[0]` is the node's root block, history prior to that root block is not guaranteed to be known to the node.
+				//  * For consistency, we don't want to index children for an unknown or non-existent parent.
+				//    So by convention, we start populating the parent-child relationship only for the root block's children and its descendants.
+				//    This convention also covers the genesis block, where no parent exists.
+				err = operation.IndexNewBlock(lctx, rw, blockID, proposal.Block.ParentID)
 				if err != nil {
-					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
-				}
-			}
-			if i == len(segment.Blocks)-1 { // in addition, for the highest block in the sealing segment, the set of known children is empty:
-				err = operation.UpsertBlockChildren(lctx, rw.Writer(), head.ID(), nil)
-				if err != nil {
-					return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
+					return fmt.Errorf("could not index block (id=%x): %w", blockID, err)
 				}
 			}
 
@@ -586,13 +593,12 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		NewestQC:    qcForLatestFinalizedBlock,
 	}
 
-	w := rw.Writer()
 	// persist safety and liveness data plus the QuorumCertificate for the latest finalized block for HotStuff/Jolteon consensus
-	err = operation.UpsertSafetyData(w, lastFinalized.ChainID, safetyData)
+	err = operation.UpsertSafetyData(lctx, rw, lastFinalized.ChainID, safetyData)
 	if err != nil {
 		return fmt.Errorf("could not insert safety data: %w", err)
 	}
-	err = operation.UpsertLivenessData(w, lastFinalized.ChainID, livenessData)
+	err = operation.UpsertLivenessData(lctx, rw, lastFinalized.ChainID, livenessData)
 	if err != nil {
 		return fmt.Errorf("could not insert liveness data: %w", err)
 	}
@@ -601,6 +607,7 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		return fmt.Errorf("could not insert quorum certificate for the latest finalized block: %w", err)
 	}
 
+	w := rw.Writer()
 	// insert height pointers
 	err = operation.UpsertFinalizedHeight(lctx, w, lastFinalized.Height)
 	if err != nil {

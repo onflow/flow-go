@@ -1,6 +1,8 @@
 package store
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -21,8 +23,8 @@ type proposalSignatures struct {
 // newProposalSignatures creates a proposalSignatures instance which is a database of block proposal signatures
 // which supports storing, caching and retrieving by block ID.
 func newProposalSignatures(collector module.CacheMetrics, db storage.DB) *proposalSignatures {
-	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, sig []byte) error {
-		return operation.InsertProposalSignature(rw.Writer(), blockID, &sig)
+	store := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, sig []byte) error {
+		return operation.InsertProposalSignature(lctx, rw.Writer(), blockID, &sig)
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) ([]byte, error) {
@@ -35,13 +37,24 @@ func newProposalSignatures(collector module.CacheMetrics, db storage.DB) *propos
 		db: db,
 		cache: newCache(collector, metrics.ResourceProposalSignature,
 			withLimit[flow.Identifier, []byte](4*flow.DefaultTransactionExpiry),
-			withStore(store),
+			withStoreWithLock(store),
 			withRetrieve(retrieve)),
 	}
 }
 
-func (h *proposalSignatures) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, sig []byte) error {
-	return h.cache.PutTx(rw, blockID, sig)
+// storeTx persists the given `sig` as the proposer's signature for the specified block.
+//
+// CAUTION:
+//   - The caller must acquire either the lock [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock]
+//     but not both and hold the lock until the database write has been committed.
+//   - OVERWRITES existing data (potential for data corruption):
+//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY within this write operation. Currently it's done by operation.InsertHeader where it performs a check
+//     to ensure the blockID is new, therefore any data indexed by this blockID is new as well.
+//
+// No error returns expected during normal operations.
+func (h *proposalSignatures) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, sig []byte) error {
+	return h.cache.PutWithLockTx(lctx, rw, blockID, sig)
 }
 
 func (h *proposalSignatures) retrieveTx(blockID flow.Identifier) ([]byte, error) {

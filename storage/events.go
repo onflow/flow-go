@@ -23,9 +23,11 @@ type Events interface {
 	EventsReader
 
 	// Store will store events for the given block ID
+	// TODO: error documentation
 	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
 
 	// BatchStore will store events for the given block ID in a given batch
+	// TODO: error documentation
 	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error
 
 	// BatchRemoveByBlockID removes events keyed by a blockID in provided batch

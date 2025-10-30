@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/jordanschalm/lockctx"
@@ -26,6 +27,18 @@ const (
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
+	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs
+	LockIndexChunkDataPackByChunkID = "lock_index_chunk_data_pack_by_chunk_id"
+	// LockInsertTransactionResultErrMessage protects the insertion of transaction result error messages
+	LockInsertTransactionResultErrMessage = "lock_insert_transaction_result_message"
+	// LockInsertLightTransactionResult protects the insertion of light transaction results
+	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
+	// LockInsertExecutionForkEvidence protects the insertion of execution fork evidence
+	LockInsertExecutionForkEvidence = "lock_insert_execution_fork_evidence"
+	LockInsertSafetyData            = "lock_insert_safety_data"
+	LockInsertLivenessData          = "lock_insert_liveness_data"
+	// LockIndexScheduledTransaction protects the indexing of scheduled transactions.
+	LockIndexScheduledTransaction = "lock_index_scheduled_transaction"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -38,6 +51,13 @@ func Locks() []string {
 		LockInsertOwnReceipt,
 		LockInsertCollection,
 		LockBootstrapping,
+		LockIndexChunkDataPackByChunkID,
+		LockInsertTransactionResultErrMessage,
+		LockInsertLightTransactionResult,
+		LockInsertExecutionForkEvidence,
+		LockInsertSafetyData,
+		LockInsertLivenessData,
+		LockIndexScheduledTransaction,
 	}
 }
 
@@ -61,6 +81,15 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockBootstrapping, LockInsertSafetyData).
+		Add(LockInsertSafetyData, LockInsertLivenessData).
+		Add(LockInsertOrFinalizeClusterBlock, LockInsertSafetyData).
+		Add(LockIndexChunkDataPackByChunkID, LockInsertOwnReceipt).
+
+		// module/executiondatasync/optimistic_sync/persisters/block.go#Persist
+		Add(LockInsertCollection, LockInsertLightTransactionResult).
+		Add(LockInsertLightTransactionResult, LockInsertTransactionResultErrMessage).
+		Add(LockInsertLightTransactionResult, LockIndexScheduledTransaction).
 		Build()
 }
 
@@ -109,4 +138,44 @@ func MakeSingletonLockManager() lockctx.Manager {
 // Unlike MakeSingletonLockManager, this function may be called multiple times.
 func NewTestingLockManager() lockctx.Manager {
 	return lockctx.NewManager(Locks(), makeLockPolicy())
+}
+
+// HeldOneLock checks that exactly one of the two specified locks is held in the provided lock context.
+func HeldOneLock(lctx lockctx.Proof, lockA string, lockB string) (bool, string) {
+	heldLockA := lctx.HoldsLock(lockA)
+	heldLockB := lctx.HoldsLock(lockB)
+	if heldLockA {
+		if heldLockB {
+			return false, fmt.Sprintf("epxect to hold only one lock, but actually held both locks: %s and %s", lockA, lockB)
+		} else {
+			return true, ""
+		}
+	} else {
+		if heldLockB {
+			return true, ""
+		} else {
+			return false, fmt.Sprintf("expect to hold one of the locks: %s or %s, but actually held none", lockA, lockB)
+		}
+	}
+}
+
+// WithLock is a helper function that creates a new lock context, acquires the specified lock,
+// and executes the provided function within that context.
+// This function passes through any errors returned by fn.
+func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) error {
+	return WithLocks(manager, []string{lockID}, fn)
+}
+
+// WithLocks is a helper function that creates a new lock context, acquires the specified locks,
+// and executes the provided function within that context.
+// This function passes through any errors returned by fn.
+func WithLocks(manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) error {
+	lctx := manager.NewContext()
+	defer lctx.Release()
+	for _, lockID := range lockIDs {
+		if err := lctx.AcquireLock(lockID); err != nil {
+			return err
+		}
+	}
+	return fn(lctx)
 }

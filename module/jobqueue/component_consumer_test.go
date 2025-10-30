@@ -3,12 +3,10 @@ package jobqueue
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -93,7 +91,7 @@ func (suite *ComponentConsumerSuite) prepareTest(
 	progressInitializer.On("Initialize", mock.AnythingOfType("uint64")).Return(progress, nil)
 
 	consumer, err := NewComponentConsumer(
-		zerolog.New(os.Stdout).With().Timestamp().Logger(),
+		unittest.Logger(),
 		workSignal,
 		progressInitializer,
 		jobs,

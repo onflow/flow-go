@@ -49,6 +49,7 @@ type Engine struct {
 	*component.ComponentManager
 
 	log     zerolog.Logger
+	metrics module.TransactionErrorMessagesMetrics
 	state   protocol.State
 	headers storage.Headers
 
@@ -67,6 +68,7 @@ type Engine struct {
 // No errors are expected during normal operation.
 func New(
 	log zerolog.Logger,
+	metrics module.TransactionErrorMessagesMetrics,
 	state protocol.State,
 	headers storage.Headers,
 	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
@@ -74,6 +76,7 @@ func New(
 ) (*Engine, error) {
 	e := &Engine{
 		log:                     log.With().Str("engine", "tx_error_messages_engine").Logger(),
+		metrics:                 metrics,
 		state:                   state,
 		headers:                 headers,
 		txErrorMessagesCore:     txErrorMessagesCore,
@@ -108,6 +111,8 @@ func New(
 		return nil, fmt.Errorf("error creating transaction result error messages jobqueue: %w", err)
 	}
 
+	e.metrics.TxErrorsInitialHeight(e.txErrorMessagesConsumer.LastProcessedIndex())
+
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.runTxResultErrorMessagesConsumer).
@@ -125,7 +130,15 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
+	start := time.Now()
+	e.metrics.TxErrorsFetchStarted()
+
 	err = e.processErrorMessagesForBlock(ctx, header.ID())
+
+	// use the last processed index to ensure the metrics reflect the highest _consecutive_ height.
+	// this makes it easier to see when downloading gets stuck at a height.
+	e.metrics.TxErrorsFetchFinished(time.Since(start), err == nil, e.txErrorMessagesConsumer.LastProcessedIndex())
+
 	if err == nil {
 		done()
 		return
@@ -144,6 +157,11 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 	err := util.WaitClosed(ctx, e.txErrorMessagesConsumer.Ready())
 	if err == nil {
 		ready()
+
+		// In the case where this component is started for the first time after a spork, we need to
+		// manually trigger the first check since OnFinalizedBlock will never be called.
+		// If this is started on a live network, an early check will be a no-op.
+		e.txErrorMessagesNotifier.Notify()
 	}
 
 	<-e.txErrorMessagesConsumer.Done()
@@ -167,14 +185,18 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
+			e.metrics.TxErrorsFetchRetried()
+		}
+
+		err := e.txErrorMessagesCore.FetchErrorMessages(ctx, blockID)
+		if err != nil {
 			e.log.Debug().
+				Err(err).
 				Str("block_id", blockID.String()).
 				Uint64("attempt", uint64(attempt)).
-				Msgf("retrying process transaction result error messages")
-
+				Msgf("failed to fetch transaction result error messages. will retry")
 		}
 		attempt++
-		err := e.txErrorMessagesCore.FetchErrorMessages(ctx, blockID)
 
 		return retry.RetryableError(err)
 	})

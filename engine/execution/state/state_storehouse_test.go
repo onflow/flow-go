@@ -61,7 +61,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			txResults := storagemock.NewTransactionResults(t)
 			txResults.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			chunkDataPacks := storagemock.NewChunkDataPacks(t)
-			chunkDataPacks.On("Store", mock.Anything).Return(nil)
+			chunkDataPacks.On("Store", mock.Anything).Return(func(lockctx.Proof, storage.ReaderBatchWriter) error { return nil }, nil)
 			results := storagemock.NewExecutionResults(t)
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storagemock.NewMyExecutionReceipts(t)
