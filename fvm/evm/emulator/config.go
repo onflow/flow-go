@@ -23,8 +23,8 @@ var (
 	MainnetPragueActivation    = uint64(1747328400) // Thu May 15 2025 17:00:00 GMT+0000 (10am PDT)
 
 	PreviewnetOsakaActivation = uint64(0)          // already on Osaka for PreviewNet
-	TestnetOsakaActivation    = uint64(1761670800) // Wednesday, December 3, 2025 5:00:00 PM GMT+0000
-	MainnetOsakaActivation    = uint64(1796317200) // Wednesday, December 3, 2026 5 PM GMT+0000
+	TestnetOsakaActivation    = uint64(1762970400) // Wednesday, November 12, 2025 6:00:00 PM GMT+0000
+	MainnetOsakaActivation    = uint64(1796317200) // Thursday, December 3, 2026 5:00:00 PM GMT+0000
 )
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
@@ -117,8 +117,7 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		chainConfig.OsakaTime = &TestnetOsakaActivation
 	} else if chainID.Cmp(types.FlowEVMMainNetChainID) == 0 {
 		chainConfig.PragueTime = &MainnetPragueActivation
-		// Do not set this yet, until we know exact date for Mainnet
-		// chainConfig.OsakaTime = &MainnetOsakaActivation
+		chainConfig.OsakaTime = &MainnetOsakaActivation
 	}
 
 	return chainConfig
