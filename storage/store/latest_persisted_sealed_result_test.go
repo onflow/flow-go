@@ -123,19 +123,15 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 			require.NoError(t, err)
 
 			err = unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
-				batch := db.NewBatch()
-				defer batch.Close()
-
 				done := make(chan struct{})
-				batch.AddCallback(func(err error) {
-					require.NoError(t, err)
-					close(done)
+				err := db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
+					rbw.AddCallback(func(err error) {
+						require.NoError(t, err)
+						close(done)
+					})
+
+					return latest.BatchSet(lctx, newResultID, newHeight, rbw)
 				})
-
-				err = latest.BatchSet(lctx, newResultID, newHeight, batch)
-				require.NoError(t, err)
-
-				err = batch.Commit()
 				require.NoError(t, err)
 
 				unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "callback not called")
@@ -235,18 +231,11 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 					defer wg.Done()
 
 					err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
-						batch := db.NewBatch()
-						defer batch.Close()
-
-						newResultID := unittest.IdentifierFixture()
-						newHeight := uint64(200 + i)
-						err := latest.BatchSet(lctx, newResultID, newHeight, batch)
-						require.NoError(t, err)
-
-						err = batch.Commit()
-						require.NoError(t, err)
-
-						return nil
+						return db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
+							newResultID := unittest.IdentifierFixture()
+							newHeight := uint64(200 + i)
+							return latest.BatchSet(lctx, newResultID, newHeight, rbw)
+						})
 					})
 					require.NoError(t, err)
 				}(i)
