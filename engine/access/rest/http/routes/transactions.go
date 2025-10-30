@@ -15,8 +15,8 @@ const idQuery = "id"
 
 // GetTransactionByID gets a transaction by requested ID.
 // The ID may be either:
-//   1. the hex-encoded 32-byte hash of a user-submitted transaction, or 
-//   2. the integral system-assigned identifier of a scheduled transaction
+//  1. the hex-encoded 32-byte hash of a user-submitted transaction, or
+//  2. the integral system-assigned identifier of a scheduled transaction
 func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransaction(r, backend, link)
@@ -54,8 +54,8 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
 // The ID may be either:
-//   1. the hex-encoded 32-byte hash of a user-submitted transaction, or 
-//   2. the integral system-assigned identifier of a scheduled transaction
+//  1. the hex-encoded 32-byte hash of a user-submitted transaction, or
+//  2. the integral system-assigned identifier of a scheduled transaction
 func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransactionResult(r, backend, link)
