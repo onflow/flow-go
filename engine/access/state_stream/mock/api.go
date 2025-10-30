@@ -25,34 +25,43 @@ type API struct {
 	mock.Mock
 }
 
-// GetExecutionDataByBlockID provides a mock function with given fields: ctx, blockID
-func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
-	ret := _m.Called(ctx, blockID)
+// GetExecutionDataByBlockID provides a mock function with given fields: ctx, blockID, criteria
+func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier, criteria optimistic_sync.Criteria) (*execution_data.BlockExecutionData, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, blockID, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetExecutionDataByBlockID")
 	}
 
 	var r0 *execution_data.BlockExecutionData
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*execution_data.BlockExecutionData, error)); ok {
-		return rf(ctx, blockID)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) (*execution_data.BlockExecutionData, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, blockID, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *execution_data.BlockExecutionData); ok {
-		r0 = rf(ctx, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) *execution_data.BlockExecutionData); ok {
+		r0 = rf(ctx, blockID, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution_data.BlockExecutionData)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, blockID, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, blockID, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetRegisterValues provides a mock function with given fields: registerIDs, height, criteria

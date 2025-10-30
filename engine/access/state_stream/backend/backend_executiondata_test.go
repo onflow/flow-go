@@ -16,17 +16,22 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -67,6 +72,11 @@ type BackendExecutionDataSuite struct {
 	executionDataTracker     *trackermock.ExecutionDataTracker
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
+
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	executionDataSnapshot   *osyncmock.Snapshot
+	criteria                optimistic_sync.Criteria
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -169,6 +179,11 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
+	s.criteria = optimistic_sync.Criteria{}
+
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	s.blockMap[s.rootBlock.Height] = s.rootBlock
@@ -261,6 +276,8 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 			subscription.DefaultSendBufferSize,
 		),
 		s.executionDataTracker,
+		s.executionResultProvider,
+		s.executionStateCache,
 	)
 	require.NoError(s.T(), err)
 
@@ -335,24 +352,189 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	// notify backend block is available
 	s.highestBlockHeader = block.ToHeader()
 
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+
 	var err error
+	reader := osyncmock.NewBlockExecutionDataReader(s.T())
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
-		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		metadata := &accessmodel.ExecutorMetadata{
+			ExecutionResultID: result.ID(),
+			ExecutorIDs:       executionNodes.NodeIDs(),
+		}
+
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(execData, nil).
+			Once()
+
+		res, resMetadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.NotNil(s.T(), resMetadata)
+		assert.Equal(s.T(), metadata, resMetadata)
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
 
 	s.execDataHeroCache.Clear()
 
+	s.Run("execution result info returns data not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("execution result info returns unexpected error", func() {
+		expectedErr := fmt.Errorf("failed to get execution result info for block: %w", storage.ErrDataMismatch)
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, storage.ErrDataMismatch).
+			Once()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedErr)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+
+	s.Run("snapshot returns data not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("snapshot returns unexpected error", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		expectedError := fmt.Errorf("unexpected error")
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(nil, expectedError).
+			Once()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedError)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
-		execDataRes, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
 		assert.Nil(s.T(), execDataRes)
-		assert.Equal(s.T(), codes.NotFound, status.Code(err))
+		assert.Nil(s.T(), metadata)
+		s.Require().True(access.IsDataNotFoundError(err))
+	})
+
+	s.Run("unexpected error from ByBlockID", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(nil, storage.ErrDataMismatch).
+			Once()
+
+		expectedError := fmt.Errorf("unexpected error getting execution data: %w", storage.ErrDataMismatch)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedError)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
 	})
 }
 

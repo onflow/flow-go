@@ -121,11 +121,13 @@ func New(
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
-		log:                  logger,
-		headers:              headers,
-		subscriptionHandler:  subscriptionHandler,
-		getExecutionData:     b.getExecutionData,
-		executionDataTracker: executionDataTracker,
+		log:                     logger,
+		headers:                 headers,
+		subscriptionHandler:     subscriptionHandler,
+		getExecutionData:        b.getExecutionData,
+		executionDataTracker:    executionDataTracker,
+		executionResultProvider: executionResultProvider,
+		executionStateCache:     executionStateCache,
 	}
 
 	eventsProvider := EventsProvider{
