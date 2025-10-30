@@ -41,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -898,11 +897,10 @@ func (suite *Suite) TestGetTransaction() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	transaction := unittest.TransactionFixture()
-	expected := transaction.TransactionBody
 
 	suite.transactions.
 		On("ByID", transaction.ID()).
-		Return(&expected, nil).
+		Return(&transaction, nil).
 		Once()
 
 	params := suite.defaultBackendParams()
@@ -916,7 +914,7 @@ func (suite *Suite) TestGetTransaction() {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(actual)
 
-	suite.Require().Equal(expected, *actual)
+	suite.Require().Equal(transaction, *actual)
 
 	suite.assertAllExpectations()
 }
@@ -2108,7 +2106,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		),
 		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 		ExecutionStateCache:         suite.executionStateCache,
-		OperatorCriteria:            optimistic_sync.DefaultCriteria,
 	}
 }
 

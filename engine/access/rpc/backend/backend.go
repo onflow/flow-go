@@ -94,7 +94,7 @@ type Params struct {
 	ExecutionReceipts        storage.ExecutionReceipts
 	ExecutionResults         storage.ExecutionResults
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
-	Registers                storage.RegisterSnapshotReader
+	RegistersAsyncStore      *execution.RegistersAsyncStore
 	ChainID                  flow.ChainID
 	AccessMetrics            module.AccessMetrics
 	ConnFactory              connection.ConnectionFactory
@@ -123,7 +123,6 @@ type Params struct {
 
 	ExecutionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
 	ExecutionStateCache         optimistic_sync.ExecutionStateCache
-	OperatorCriteria            optimistic_sync.Criteria
 	ScheduledCallbacksEnabled   bool
 }
 
@@ -160,7 +159,7 @@ func New(params Params) (*Backend, error) {
 		params.ScriptExecutionMode,
 		params.ScriptExecutor,
 		params.ExecNodeIdentitiesProvider,
-		params.Registers,
+		params.RegistersAsyncStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounts: %w", err)
@@ -178,7 +177,6 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		params.ExecutionResultInfoProvider,
 		params.ExecutionStateCache,
-		params.OperatorCriteria,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events: %w", err)
@@ -219,7 +217,7 @@ func New(params Params) (*Backend, error) {
 			CheckPayerBalanceMode:        params.CheckPayerBalanceMode,
 		},
 		params.ScriptExecutor,
-		params.Registers,
+		params.RegistersAsyncStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)

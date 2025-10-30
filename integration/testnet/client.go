@@ -197,7 +197,7 @@ func (c *Client) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, 
 		return nil, nil, err
 	}
 	authNChallenge := hasher.ComputeHash(transactionMessage)
-	authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
+	authNChallengeBase64Url := base64.RawURLEncoding.EncodeToString(authNChallenge)
 	validUserFlag := byte(0x01)
 	validClientDataOrigin := "https://testing.com"
 	rpIDHash := unittest.RandomBytes(32)
@@ -262,7 +262,7 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Va
 	return res, nil
 }
 
-func (c *Client) ExecuteScriptAtBlock(ctx context.Context, script dsl.Main, blockID sdk.Identifier) (cadence.Value, error) {
+func (c *Client) ExecuteScriptAtBlockID(ctx context.Context, script dsl.Main, blockID sdk.Identifier) (cadence.Value, error) {
 	res, err := c.client.ExecuteScriptAtBlockID(ctx, blockID, []byte(script.ToCadence()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not execute script: %w", err)

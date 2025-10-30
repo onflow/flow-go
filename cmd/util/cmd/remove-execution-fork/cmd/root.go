@@ -6,13 +6,15 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 )
 
 var (
 	flagDatadir string
 )
 
-// run with `./remove-execution-fork --datadir /var/flow/data/protocol`
+// run with `./remove-execution-fork `
 var RootCmd = &cobra.Command{
 	Use:   "remove-execution-fork",
 	Short: "remove execution fork",
@@ -27,8 +29,7 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
-	_ = RootCmd.MarkPersistentFlagRequired("datadir")
+	common.InitDataDirFlag(RootCmd, &flagDatadir)
 
 	cobra.OnInitialize(initConfig)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
@@ -192,7 +193,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 			// collections should only be pushed to consensus nodes, once they are successfully persisted as finalized:
 			storage.OnCommitSucceed(rw, func() {
-				f.pusher.SubmitCollectionGuarantee(guarantee)
+				f.pusher.SubmitCollectionGuarantee((*messages.CollectionGuarantee)(guarantee))
 			})
 
 			return nil

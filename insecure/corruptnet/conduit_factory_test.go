@@ -10,7 +10,7 @@ import (
 
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -20,7 +20,7 @@ func TestNewConduit_HappyPath(t *testing.T) {
 	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	channel := channels.TestNetworkChannel
 	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
-	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
+	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.ConduitAdapter{}))
 
 	c, err := ccf.NewConduit(context.Background(), channel)
 	require.NoError(t, err)
@@ -30,7 +30,7 @@ func TestNewConduit_HappyPath(t *testing.T) {
 // TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
-	adapter := mocknetwork.NewAdapter(t)
+	adapter := mocknetwork.NewConduitAdapter(t)
 
 	// registering adapter should be successful
 	require.NoError(t, ccf.RegisterAdapter(adapter))
@@ -69,7 +69,7 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 func TestNewConduit_MissingEgressController(t *testing.T) {
 	ccf := NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	channel := channels.TestNetworkChannel
-	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
+	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.ConduitAdapter{}))
 
 	c, err := ccf.NewConduit(context.Background(), channel)
 	require.ErrorContains(t, err, "missing a registered egress controller")

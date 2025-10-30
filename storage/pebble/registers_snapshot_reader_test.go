@@ -27,7 +27,6 @@ func TestRegisterSnapshotReader_StorageSnapshot(t *testing.T) {
 		// fail with storage.ErrHeightNotIndexed.
 		t.Run("error when height below first indexed", func(t *testing.T) {
 			_, err := reader.StorageSnapshot(r.FirstHeight() - 1)
-			require.Error(t, err)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 
@@ -35,7 +34,6 @@ func TestRegisterSnapshotReader_StorageSnapshot(t *testing.T) {
 		// fail with storage.ErrHeightNotIndexed.
 		t.Run("error when height above latest indexed", func(t *testing.T) {
 			_, err := reader.StorageSnapshot(r.LatestHeight() + 1)
-			require.Error(t, err)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 

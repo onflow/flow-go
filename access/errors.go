@@ -138,7 +138,7 @@ func IsInternalError(err error) bool {
 	return errors.As(err, &errInternalError)
 }
 
-// OutOfRangeError indicates that the request was for data that is outside of the available range.
+// OutOfRangeError indicates that the request was for data that is outside the available range.
 // This is a more specific version of DataNotFoundError, where the data is known to eventually exist, but
 // currently is not known.
 // For example, querying data for a height above the current finalized height.
@@ -261,4 +261,28 @@ func (e ServiceUnavailable) accessSentinel() {}
 func IsServiceUnavailable(err error) bool {
 	var errServiceUnavailable ServiceUnavailable
 	return errors.As(err, &errServiceUnavailable)
+}
+
+// ResourceExhausted indicates when computation or memory limits were exceeded
+type ResourceExhausted struct {
+	err error
+}
+
+func NewResourceExhausted(err error) ResourceExhausted {
+	return ResourceExhausted{err: err}
+}
+
+func (e ResourceExhausted) Error() string {
+	return fmt.Sprintf("resource exhausted error: %v", e.err)
+}
+
+func (e ResourceExhausted) Unwrap() error {
+	return e.err
+}
+
+func (e ResourceExhausted) accessSentinel() {}
+
+func IsResourceExhausted(err error) bool {
+	var errResourceExhausted ResourceExhausted
+	return errors.As(err, &errResourceExhausted)
 }

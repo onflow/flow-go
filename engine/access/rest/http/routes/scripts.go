@@ -20,12 +20,9 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 	executionState := req.ExecutionState
 	includeExecutorMetadata := executionState.IncludeExecutorMetadata
 
-	// TODO(mainnet #): remove this conditional: [TODO(Uliana): create an issue]
 	// "legacyParams" is only to temporarily support current behaviour.
-	// In the next spork, we should update this to always return an ExecuteScriptResponse.
-	legacyParams := executionState.AgreeingExecutorsCount == 0 &&
-		len(executionState.RequiredExecutorIDs) == 0 &&
-		!includeExecutorMetadata
+	// In the new API version (e.g. /v2), we should update this to always return an ExecuteScriptResponse.
+	legacyParams := !includeExecutorMetadata
 
 	buildResponse := func(value []byte, executorMetadata *accessmodel.ExecutorMetadata) interface{} {
 		if legacyParams {
@@ -40,10 +37,10 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			req.BlockID,
 			req.Script.Source,
 			req.Script.Args,
-			models.NewCriteria(req.ExecutionState),
+			models.NewCriteria(executionState),
 		)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToStatusError(err)
 		}
 
 		return buildResponse(value, executorMetadata), nil
@@ -55,10 +52,10 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 			r.Context(),
 			req.Script.Source,
 			req.Script.Args,
-			models.NewCriteria(req.ExecutionState),
+			models.NewCriteria(executionState),
 		)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToStatusError(err)
 		}
 
 		return buildResponse(value, executorMetadata), nil
@@ -67,7 +64,7 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 	if req.BlockHeight == request.FinalHeight {
 		finalBlock, _, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.BlockHeight = finalBlock.Height
 	}
@@ -77,10 +74,10 @@ func ExecuteScript(r *common.Request, backend access.API, _ commonmodels.LinkGen
 		req.BlockHeight,
 		req.Script.Source,
 		req.Script.Args,
-		models.NewCriteria(req.ExecutionState),
+		models.NewCriteria(executionState),
 	)
 	if err != nil {
-		return nil, err
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	return buildResponse(value, executorMetadata), nil

@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	consensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	realModule "github.com/onflow/flow-go/module"
 	real "github.com/onflow/flow-go/module/buffer"
@@ -22,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/state"
 	protint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -64,8 +63,7 @@ type CommonSuite struct {
 	state                     *protocol.ParticipantState
 	snapshot                  *protocol.Snapshot
 	con                       *mocknetwork.Conduit
-	net                       *mocknetwork.Network
-	prov                      *consensus.ProposalProvider
+	net                       *mocknetwork.EngineRegistry
 	pending                   *module.PendingBlockBuffer
 	hotstuff                  *module.HotStuff
 	sync                      *module.BlockRequester
@@ -192,17 +190,13 @@ func (cs *CommonSuite) SetupTest() {
 	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
-	cs.net = &mocknetwork.Network{}
+	cs.net = &mocknetwork.EngineRegistry{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,
 	)
-
-	// set up the provider engine
-	cs.prov = &consensus.ProposalProvider{}
-	cs.prov.On("ProvideProposal", mock.Anything).Return()
 
 	// set up pending module mock
 	cs.pending = &module.PendingBlockBuffer{}

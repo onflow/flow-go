@@ -12,7 +12,7 @@ import (
 
 const blockIDQuery = "block_id"
 
-// TODO(Uliana): add godoc
+// GetScript represents a parsed http request for executing a Cadence script.
 type GetScript struct {
 	BlockID        flow.Identifier
 	BlockHeight    uint64
@@ -35,7 +35,12 @@ func NewGetScript(r *common.Request) (GetScript, error) {
 	)
 }
 
-// TODO(Uliana): add godoc
+// parseGetScripts parses raw query and body parameters from an incoming request
+// and constructs a validated GetScript instance.
+//
+// It ensures that only one of block height or block ID is provided, defaults
+// to the latest sealed block when neither is specified, and validates all
+// script and execution state parameters.
 func parseGetScripts(
 	rawHeight string,
 	rawID string,

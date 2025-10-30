@@ -138,42 +138,44 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
-	observerNetworkingKeyPath            string
-	bootstrapIdentities                  flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
-	apiRatelimits                        map[string]int
-	apiBurstlimits                       map[string]int
-	rpcConf                              rpc.Config
-	rpcMetricsEnabled                    bool
-	registersDBPath                      string
-	checkpointFile                       string
-	stateStreamConf                      statestreambackend.Config
-	stateStreamFilterConf                map[string]int
-	upstreamNodeAddresses                []string
-	upstreamNodePublicKeys               []string
-	upstreamIdentities                   flow.IdentitySkeletonList // the identity list of upstream peers the node uses to forward API requests to
-	scriptExecutorConfig                 query.QueryConfig
-	logTxTimeToFinalized                 bool
-	logTxTimeToExecuted                  bool
-	logTxTimeToFinalizedExecuted         bool
-	logTxTimeToSealed                    bool
-	executionDataSyncEnabled             bool
-	executionDataIndexingEnabled         bool
-	executionDataDBMode                  string
-	executionDataPrunerHeightRangeTarget uint64
-	executionDataPrunerThreshold         uint64
-	executionDataPruningInterval         time.Duration
-	localServiceAPIEnabled               bool
-	versionControlEnabled                bool
-	stopControlEnabled                   bool
-	executionDataDir                     string
-	executionDataStartHeight             uint64
-	executionDataConfig                  edrequester.ExecutionDataConfig
-	scriptExecMinBlock                   uint64
-	scriptExecMaxBlock                   uint64
-	registerCacheType                    string
-	registerCacheSize                    uint
-	programCacheSize                     uint
-	registerDBPruneThreshold             uint64
+	observerNetworkingKeyPath             string
+	bootstrapIdentities                   flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
+	apiRatelimits                         map[string]int
+	apiBurstlimits                        map[string]int
+	rpcConf                               rpc.Config
+	rpcMetricsEnabled                     bool
+	registersDBPath                       string
+	checkpointFile                        string
+	stateStreamConf                       statestreambackend.Config
+	stateStreamFilterConf                 map[string]int
+	upstreamNodeAddresses                 []string
+	upstreamNodePublicKeys                []string
+	upstreamIdentities                    flow.IdentitySkeletonList // the identity list of upstream peers the node uses to forward API requests to
+	scriptExecutorConfig                  query.QueryConfig
+	logTxTimeToFinalized                  bool
+	logTxTimeToExecuted                   bool
+	logTxTimeToFinalizedExecuted          bool
+	logTxTimeToSealed                     bool
+	executionDataSyncEnabled              bool
+	executionDataIndexingEnabled          bool
+	executionDataDBMode                   string
+	executionDataPrunerHeightRangeTarget  uint64
+	executionDataPrunerThreshold          uint64
+	executionDataPruningInterval          time.Duration
+	localServiceAPIEnabled                bool
+	versionControlEnabled                 bool
+	stopControlEnabled                    bool
+	executionDataDir                      string
+	executionDataStartHeight              uint64
+	executionDataConfig                   edrequester.ExecutionDataConfig
+	scriptExecMinBlock                    uint64
+	scriptExecMaxBlock                    uint64
+	registerCacheType                     string
+	registerCacheSize                     uint
+	programCacheSize                      uint
+	registerDBPruneThreshold              uint64
+	executionResultAgreeingExecutorsCount uint
+	executionResultRequiredExecutors      []string
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -255,12 +257,14 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		scriptExecMinBlock:       0,
-		scriptExecMaxBlock:       math.MaxUint64,
-		registerCacheType:        pstorage.CacheTypeTwoQueue.String(),
-		registerCacheSize:        0,
-		programCacheSize:         0,
-		registerDBPruneThreshold: pruner.DefaultThreshold,
+		scriptExecMinBlock:                    0,
+		scriptExecMaxBlock:                    math.MaxUint64,
+		registerCacheType:                     pstorage.CacheTypeTwoQueue.String(),
+		registerCacheSize:                     0,
+		programCacheSize:                      0,
+		registerDBPruneThreshold:              pruner.DefaultThreshold,
+		executionResultAgreeingExecutorsCount: optimistic_sync.DefaultCriteria.AgreeingExecutorsCount,
+		executionResultRequiredExecutors:      optimistic_sync.DefaultCriteria.RequiredExecutors.Strings(),
 	}
 }
 
@@ -305,7 +309,6 @@ type ObserverServiceBuilder struct {
 	// storage
 	events                  storage.Events
 	lightTransactionResults storage.LightTransactionResults
-	registers               storage.RegisterSnapshotReader
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -867,6 +870,14 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
 			"whether to enable the WebSockets Stream API.",
 		)
+		flags.UintVar(&builder.executionResultAgreeingExecutorsCount,
+			"execution-result-agreeing-executors-count",
+			defaultConfig.executionResultAgreeingExecutorsCount,
+			"minimum number of execution receipts with the same result required for execution result queries")
+		flags.StringSliceVar(&builder.executionResultRequiredExecutors,
+			"execution-result-required-executors",
+			defaultConfig.executionResultRequiredExecutors,
+			"comma separated list of execution node IDs, one of which must have produced the execution result")
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -915,6 +926,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 
 		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
 			return errors.New("rest-max-request-size must be greater than 0")
+		}
+
+		if builder.executionResultAgreeingExecutorsCount <= 0 {
+			return errors.New("execution-result-agreeing-executors-count must be greater than 0")
 		}
 
 		return nil
@@ -1207,108 +1222,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			return nil
 		}).
-		Module("registers storage", func(node *cmd.NodeConfig) error {
-			pdb, err := pstorage.OpenRegisterPebbleDB(
-				node.Logger.With().Str("pebbledb", "registers").Logger(),
-				builder.registersDBPath,
-			)
-			if err != nil {
-				return fmt.Errorf("could not open registers db: %w", err)
-			}
-			builder.ShutdownFunc(
-				func() error {
-					return pdb.Close()
-				},
-			)
-
-			bootstrapped, err := pstorage.IsBootstrapped(pdb)
-			if err != nil {
-				return fmt.Errorf(
-					"could not check if registers db is bootstrapped: %w",
-					err,
-				)
-			}
-
-			if !bootstrapped {
-				checkpointFile := builder.checkpointFile
-				if checkpointFile == cmd.NotSet {
-					checkpointFile = path.Join(
-						builder.BootstrapDir,
-						bootstrap.PathRootCheckpoint,
-					)
-				}
-
-				// currently, the checkpoint must be from the root block.
-				// read the root hash from the provided checkpoint and verify it matches the
-				// state commitment from the root snapshot.
-				err := wal.CheckpointHasRootHash(
-					node.Logger,
-					"", // checkpoint file already full path
-					checkpointFile,
-					ledger.RootHash(node.RootSeal.FinalState),
-				)
-				if err != nil {
-					return fmt.Errorf("could not verify checkpoint file: %w", err)
-				}
-
-				checkpointHeight := builder.SealedRootBlock.Height
-
-				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
-					return fmt.Errorf(
-						"mismatching sealed root block and root seal: %v != %v",
-						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID,
-					)
-				}
-
-				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-				bootstrap, err := pstorage.NewRegisterBootstrap(
-					pdb,
-					checkpointFile,
-					checkpointHeight,
-					rootHash,
-					builder.Logger,
-				)
-				if err != nil {
-					return fmt.Errorf("could not create registers bootstrap: %w", err)
-				}
-
-				// TODO: find a way to hook a context up to this to allow a graceful shutdown
-				workerCount := 10
-				err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
-				if err != nil {
-					return fmt.Errorf("could not load checkpoint file: %w", err)
-				}
-			}
-
-			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
-			if err != nil {
-				return fmt.Errorf("could not create registers storage: %w", err)
-			}
-
-			if builder.registerCacheSize > 0 {
-				cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
-				if err != nil {
-					return fmt.Errorf("could not parse register cache type: %w", err)
-				}
-				cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
-				registersCache, err := pstorage.NewRegistersCache(
-					registers,
-					cacheType,
-					builder.registerCacheSize,
-					cacheMetrics,
-				)
-				if err != nil {
-					return fmt.Errorf("could not create registers cache: %w", err)
-				}
-				builder.Storage.RegisterIndex = registersCache
-			} else {
-				builder.Storage.RegisterIndex = registers
-			}
-
-			builder.registers = pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
-
-			return nil
-		}).
 		Component("public execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
@@ -1474,9 +1387,95 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// other components from starting while bootstrapping the register db since it may
 			// take hours to complete.
 
-			indexerDerivedChainData, err := builder.buildIndexerDerivedChainData()
+			pdb, err := pstorage.OpenRegisterPebbleDB(
+				node.Logger.With().Str("pebbledb", "registers").Logger(),
+				builder.registersDBPath,
+			)
 			if err != nil {
-				return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
+				return nil, fmt.Errorf("could not open registers db: %w", err)
+			}
+			builder.ShutdownFunc(func() error {
+				return pdb.Close()
+			})
+
+			bootstrapped, err := pstorage.IsBootstrapped(pdb)
+			if err != nil {
+				return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+			}
+
+			if !bootstrapped {
+				checkpointFile := builder.checkpointFile
+				if checkpointFile == cmd.NotSet {
+					checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
+				}
+
+				// currently, the checkpoint must be from the root block.
+				// read the root hash from the provided checkpoint and verify it matches the
+				// state commitment from the root snapshot.
+				err := wal.CheckpointHasRootHash(
+					node.Logger,
+					"", // checkpoint file already full path
+					checkpointFile,
+					ledger.RootHash(node.RootSeal.FinalState),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
+				}
+
+				checkpointHeight := builder.SealedRootBlock.Height
+
+				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+					return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
+						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+				}
+
+				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
+				bootstrap, err := pstorage.NewRegisterBootstrap(
+					pdb,
+					checkpointFile,
+					checkpointHeight,
+					rootHash,
+					builder.Logger,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
+				}
+
+				// TODO: find a way to hook a context up to this to allow a graceful shutdown
+				workerCount := 10
+				err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+				if err != nil {
+					return nil, fmt.Errorf("could not load checkpoint file: %w", err)
+				}
+			}
+
+			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
+			if err != nil {
+				return nil, fmt.Errorf("could not create registers storage: %w", err)
+			}
+
+			if builder.registerCacheSize > 0 {
+				cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
+				if err != nil {
+					return nil, fmt.Errorf("could not parse register cache type: %w", err)
+				}
+				cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+				registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+				if err != nil {
+					return nil, fmt.Errorf("could not create registers cache: %w", err)
+				}
+				builder.Storage.RegisterIndex = registersCache
+			} else {
+				builder.Storage.RegisterIndex = registers
+			}
+
+			var indexerDerivedChainData *derived.DerivedChainData
+			if builder.programCacheSize > 0 {
+				var err error
+				indexerDerivedChainData, err = builder.buildQueryDerivedChainData()
+				if err != nil {
+					return nil, fmt.Errorf("could not create indexer derived chain data: %w", err)
+				}
 			}
 
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
@@ -1503,7 +1502,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(
 				builder.Logger,
-				builder.Storage.RegisterIndex.FirstHeight(),
 				builder.Storage.RegisterIndex,
 				indexerCore,
 				executionDataStoreCache,
@@ -1526,7 +1524,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
-			err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
+			registerSnapshotReader := pstorage.NewRegisterSnapshotReader(builder.Storage.RegisterIndex)
+
+			err = builder.RegistersAsyncStore.Initialize(registerSnapshotReader)
 			if err != nil {
 				return nil, err
 			}
@@ -1646,32 +1646,6 @@ func (builder *ObserverServiceBuilder) buildQueryDerivedChainData() (
 	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
 	if err != nil {
 		return nil, err
-	}
-
-	return derivedChainData, nil
-}
-
-// buildIndexerDerivedChainData creates the derived chain data for the indexer engine
-// If program caching is disabled, the function will return nil for the indexer cache.
-func (builder *ObserverServiceBuilder) buildIndexerDerivedChainData() (
-	indexerCache *derived.DerivedChainData,
-	err error,
-) {
-	cacheSize := builder.programCacheSize
-
-	// the underlying cache requires size > 0. no data will be written so 1 is fine.
-	if cacheSize == 0 {
-		cacheSize = 1
-	}
-
-	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
-	if err != nil {
-		return nil, err
-	}
-
-	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
-	if builder.programCacheSize == 0 {
-		return nil, nil
 	}
 
 	return derivedChainData, nil
@@ -1857,27 +1831,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 		return nil
 	})
-	builder.Module("script executor", func(node *cmd.NodeConfig) error {
-		queryDerivedChainData, err := builder.buildQueryDerivedChainData()
-		if err != nil {
-			return fmt.Errorf("could not create query derived chain data: %w", err)
-		}
-
-		builder.ScriptExecutor = execution.NewScripts(
-			builder.Logger,
-			metrics.NewExecutionCollector(builder.Tracer),
-			builder.RootChainID,
-			computation.NewProtocolStateWrapper(builder.State),
-			builder.Storage.Headers,
-			builder.scriptExecutorConfig,
-			queryDerivedChainData,
-			builder.programCacheSize > 0,
-			builder.scriptExecMinBlock,
-			builder.scriptExecMaxBlock,
-			builder.VersionControl,
-		)
-		return nil
-	})
 
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
@@ -1970,7 +1923,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// handles block-related operations.
 		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
-			builder.FinalizedRootBlock.Height,
+			builder.SealedRootBlock.Height,
 			node.Storage.Headers,
 			broadcaster,
 		)
@@ -2017,22 +1970,46 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
+		queryDerivedChainData, err := builder.buildQueryDerivedChainData()
+		if err != nil {
+			return nil, fmt.Errorf("could not create query derived chain data: %w", err)
+		}
+
+		builder.ScriptExecutor = execution.NewScripts(
+			builder.Logger,
+			metrics.NewExecutionCollector(builder.Tracer),
+			builder.RootChainID,
+			computation.NewProtocolStateWrapper(builder.State),
+			builder.Storage.Headers,
+			builder.scriptExecutorConfig,
+			queryDerivedChainData,
+			builder.programCacheSize > 0,
+			builder.scriptExecMinBlock,
+			builder.scriptExecMaxBlock,
+			builder.VersionControl,
+		)
+
+		requiredENIdentifiers, err := flow.IdentifierListFromHex(builder.executionResultRequiredExecutors)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for required EN list: %w", err)
+		}
+		operatorCriteria := optimistic_sync.Criteria{
+			AgreeingExecutorsCount: builder.executionResultAgreeingExecutorsCount,
+			RequiredExecutors:      requiredENIdentifiers,
+		}
+
 		execNodeSelector := execution_result.NewExecutionNodeSelector(
 			preferredENIdentifiers,
 			fixedENIdentifiers,
 		)
 
-		execResultInfoProvider, err := execution_result.NewExecutionResultInfoProvider(
+		execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
 			node.Logger,
 			node.State,
-			node.Storage.Headers,
 			node.Storage.Receipts,
 			execNodeSelector,
-			optimistic_sync.DefaultCriteria,
+			operatorCriteria,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create execution result provider: %w", err)
-		}
 
 		// TODO: use real objects instead of mocks once they're implemented
 		snapshot := osyncsnapshot.NewSnapshotMock(
@@ -2041,7 +2018,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			nil,
 			builder.lightTransactionResults,
 			nil,
-			builder.registers,
+			builder.RegistersAsyncStore,
 		)
 		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
@@ -2053,6 +2030,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Transactions:         node.Storage.Transactions,
 			ExecutionReceipts:    node.Storage.Receipts,
 			ExecutionResults:     node.Storage.Results,
+			RegistersAsyncStore:  builder.RegistersAsyncStore,
 			ChainID:              node.RootChainID,
 			AccessMetrics:        accessMetrics,
 			ConnFactory:          connFactory,
@@ -2078,7 +2056,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 			ExecutionResultInfoProvider: execResultInfoProvider,
 			ExecutionStateCache:         execStateCache,
-			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 		}
 
 		if builder.localServiceAPIEnabled {

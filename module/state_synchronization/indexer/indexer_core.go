@@ -83,7 +83,6 @@ func New(
 	}, nil
 }
 
-// TODO(Uliana): remove this callback and update tests
 // RegisterValue retrieves register values by the register IDs at the provided block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // If a register is not found it will return a nil value and not an error.

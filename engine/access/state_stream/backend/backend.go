@@ -80,7 +80,9 @@ type StateStreamBackend struct {
 	execDataCache           *cache.ExecutionDataCache
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	executionStateCache     optimistic_sync.ExecutionStateCache
+	registers               *execution.RegistersAsyncStore
 	registerRequestLimit    int
+	sporkRootBlockHeight    uint64
 }
 
 func New(
@@ -113,7 +115,9 @@ func New(
 		execDataCache:           execDataCache,
 		executionResultProvider: executionResultProvider,
 		executionStateCache:     executionStateCache,
+		registers:               registers,
 		registerRequestLimit:    registerIDsRequestLimit,
+		sporkRootBlockHeight:    state.Params().SporkRootBlockHeight(),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -161,6 +165,15 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
+	// the spork root block will never have execution data available. If requested, return an empty result.
+	if height == b.sporkRootBlockHeight {
+		return &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: b.state.Params().SporkRootBlock().ID(),
+			},
+		}, nil
+	}
+
 	execData, err := b.execDataCache.ByHeight(ctx, height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) ||
@@ -201,9 +214,20 @@ func (b *StateStreamBackend) GetRegisterValues(
 	}
 
 	values := make([]flow.RegisterValue, len(ids))
+
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return nil, nil, err
+	}
+	registersStorageSnapshot, err := registers.StorageSnapshot(height)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	//values, err := b.registers.RegisterValues(ids, height)
 	for i, regID := range ids {
-		val, err := snapshot.Registers().Get(regID, height)
+		//val, err := registers.Get(regID, height)
+		val, err := registersStorageSnapshot.Get(regID)
 		if err != nil {
 			if errors.Is(err, storage.ErrHeightNotIndexed) {
 				return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)

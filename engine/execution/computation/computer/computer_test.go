@@ -1529,6 +1529,16 @@ func testScheduledCallbackWithError(t *testing.T, chain flow.Chain, callbackEven
 		Return(nil).
 		Times(1)
 
+	// expect callback execution metrics if there are callbacks
+	if len(callbackEvents) > 0 {
+		exemetrics.On("ExecutionCallbacksExecuted",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(1)
+	}
+
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
 

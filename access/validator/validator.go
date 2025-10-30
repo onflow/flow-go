@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 )
 
 // DefaultSealedIndexedHeightThreshold is the default number of blocks between sealed and indexed height
@@ -153,9 +152,10 @@ type ValidationStep struct {
 	failReason string
 }
 
-// TransactionValidator performs validation of transactions before they are processed.
-// It enforces correctness, safety, and economic checks by running a series of validation steps
-// to ensure that transactions are well-formed, valid, and executable.
+// TransactionValidator implements transaction validation logic for Access and Collection Nodes.
+// NOTE: This validation logic is a simplified interim approach: Collection/Access Nodes cannot reliably validate transaction signatures or payer balance.
+// The long-term design for extending validation to cover these cases is described in the Sweet Onion Plan
+// (https://flowfoundation.notion.site/Sweet-Onion-Plan-eae4db664feb459598879b49ccf2aa85).
 type TransactionValidator struct {
 	blocks                       Blocks     // for looking up blocks to check transaction expiry
 	chain                        flow.Chain // for checking validity of addresses
@@ -165,7 +165,7 @@ type TransactionValidator struct {
 	scriptExecutor               execution.ScriptExecutor
 	verifyPayerBalanceScript     []byte
 	transactionValidationMetrics module.TransactionValidationMetrics
-	registers                    storage.RegisterSnapshotReader
+	registersAsyncStore          *execution.RegistersAsyncStore
 
 	validationSteps []ValidationStep
 }
@@ -179,7 +179,7 @@ func NewTransactionValidator(
 	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
-	registers storage.RegisterSnapshotReader,
+	registersAsyncStore *execution.RegistersAsyncStore,
 ) (*TransactionValidator, error) {
 	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
@@ -196,7 +196,7 @@ func NewTransactionValidator(
 		scriptExecutor:               executor,
 		verifyPayerBalanceScript:     templates.GenerateVerifyPayerBalanceForTxExecution(env),
 		transactionValidationMetrics: transactionValidationMetrics,
-		registers:                    registers,
+		registersAsyncStore:          registersAsyncStore,
 	}
 
 	txValidator.initValidationSteps()
@@ -515,7 +515,12 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
 	}
 
-	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight, v.registers)
+	registerSnapshotReader, err := v.registersAsyncStore.RegisterSnapshotReader()
+	if err != nil {
+		return fmt.Errorf("failed to get register snapshot reader: %w", err)
+	}
+
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight, registerSnapshotReader)
 	if err != nil {
 		return fmt.Errorf("script finished with error: %w", err)
 	}

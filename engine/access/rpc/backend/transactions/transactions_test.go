@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -190,13 +191,16 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.lastFullBlockHeight,
 	)
 
+	registersAsync := execution.NewRegistersAsyncStore()
+	require.NoError(suite.T(), registersAsync.Initialize(suite.registers))
+
 	txValidator, err := validator.NewTransactionValidator(
 		validatormock.NewBlocks(suite.T()),
 		suite.chainID.Chain(),
 		metrics.NewNoopCollector(),
 		validator.TransactionValidationOptions{},
 		execmock.NewScriptExecutor(suite.T()),
-		suite.registers,
+		registersAsync,
 	)
 	suite.Require().NoError(err)
 
@@ -245,10 +249,8 @@ func (suite *Suite) defaultTransactionsParams() Params {
 // TestGetTransactionResult_UnknownTx returns unknown result when tx not found
 func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 	block := unittest.BlockFixture()
-	tbody := unittest.TransactionBodyFixture()
-	tx := unittest.TransactionFixture()
-	tx.TransactionBody = tbody
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	tx := unittest.TransactionBodyFixture()
+	coll := unittest.CollectionFromTransactions(&tx)
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -276,10 +278,8 @@ func (suite *Suite) TestGetTransactionResult_UnknownTx() {
 // TestGetTransactionResult_TxLookupFailure returns error from transaction storage
 func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 	block := unittest.BlockFixture()
-	tbody := unittest.TransactionBodyFixture()
-	tx := unittest.TransactionFixture()
-	tx.TransactionBody = tbody
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	tx := unittest.TransactionBodyFixture()
+	coll := unittest.CollectionFromTransactions(&tx)
 
 	expectedErr := fmt.Errorf("some other error")
 	suite.transactions.
@@ -303,10 +303,8 @@ func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
 // TestGetTransactionResult_HistoricNodes_Success tests lookup in historic nodes
 func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 	block := unittest.BlockFixture()
-	tbody := unittest.TransactionBodyFixture()
-	tx := unittest.TransactionFixture()
-	tx.TransactionBody = tbody
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	tx := unittest.TransactionBodyFixture()
+	coll := unittest.CollectionFromTransactions(&tx)
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -345,9 +343,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
 // TestGetTransactionResult_HistoricNodes_FromCache get historic transaction result from cache
 func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	block := unittest.BlockFixture()
-	tbody := unittest.TransactionBodyFixture()
-	tx := unittest.TransactionFixture()
-	tx.TransactionBody = tbody
+	tx := unittest.TransactionBodyFixture()
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -371,7 +367,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions(&tx)
 	resp, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
@@ -398,9 +394,7 @@ func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
 // TestGetTransactionResultUnknownFromCache retrieve unknown result from cache.
 func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	block := unittest.BlockFixture()
-	tbody := unittest.TransactionBodyFixture()
-	tx := unittest.TransactionFixture()
-	tx.TransactionBody = tbody
+	tx := unittest.TransactionBodyFixture()
 
 	suite.transactions.
 		On("ByID", tx.ID()).
@@ -419,7 +413,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	txBackend, err := NewTransactionsBackend(params)
 	require.NoError(suite.T(), err)
 
-	coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
+	coll := unittest.CollectionFromTransactions(&tx)
 	resp, err := txBackend.GetTransactionResult(
 		context.Background(),
 		tx.ID(),
@@ -997,8 +991,8 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 // instead of requesting it from the Execution Node.
 func (suite *Suite) TestGetTransactionResult_FromStorage() {
 	// Create fixtures for block, transaction, and collection
-	transaction := unittest.TransactionFixture()
-	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	transaction := unittest.TransactionBodyFixture()
+	col := unittest.CollectionFromTransactions(&transaction)
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
@@ -1019,7 +1013,7 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 
 	suite.transactions.
 		On("ByID", txId).
-		Return(&transaction.TransactionBody, nil)
+		Return(&transaction, nil)
 
 	// Set up the light collection and mock the behavior of the collections object
 	lightCol := col.Light()
@@ -1106,8 +1100,8 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 // and returns it from storage instead of requesting from the Execution Node.
 func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Create fixtures for block, transaction, and collection
-	transaction := unittest.TransactionFixture()
-	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	transaction := unittest.TransactionBodyFixture()
+	col := unittest.CollectionFromTransactions(&transaction)
 	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	block := unittest.BlockFixture(
 		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
