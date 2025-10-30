@@ -14,6 +14,9 @@ import (
 const idQuery = "id"
 
 // GetTransactionByID gets a transaction by requested ID.
+// The ID may be either:
+//   1. the hex-encoded 32-byte hash of a user-submitted transaction, or 
+//   2. the integral system-assigned identifier of a scheduled transaction
 func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransaction(r, backend, link)
@@ -50,6 +53,9 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 }
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
+// The ID may be either:
+//   1. the hex-encoded 32-byte hash of a user-submitted transaction, or 
+//   2. the integral system-assigned identifier of a scheduled transaction
 func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransactionResult(r, backend, link)
@@ -135,8 +141,8 @@ func GetScheduledTransactionResult(r *common.Request, backend access.API, link c
 	return response, nil
 }
 
-// isTransactionID returns true if the provided string is a valid flow.Identifier indicating it is a
-// transaction ID.
+// isTransactionID returns true if the provided string is a valid hex-encoded 32-byte flow.Identifier indicating it is a transaction ID.
+// In particular, this method returns false if the input is a *scheduled transaction* ID.
 func isTransactionID(raw string) bool {
 	_, err := flow.HexStringToIdentifier(raw)
 	return err == nil
