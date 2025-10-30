@@ -21,7 +21,6 @@ type ScriptExecutor interface {
 	//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError] - if script execution timed out.
 	//   - [fvmerrors.ErrCodeComputationLimitExceededError] - if script execution computation limit exceeded.
 	//   - [fvmerrors.ErrCodeMemoryLimitExceededError] - if script execution memory limit exceeded.
-	//   - [indexer.ErrIndexNotInitialized] - if data for block is not available.
 	ExecuteAtBlockHeight(
 		ctx context.Context,
 		script []byte,
