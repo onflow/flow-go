@@ -2228,7 +2228,7 @@ func (suite *Suite) TestSendTransaction() {
 		suite.Require().NoError(err)
 	})
 
-	// test that the correct node is used when a static collection node is provided and the\
+	// test that the correct node is used when a static collection node is provided and the
 	// clustering lookup is never performed
 	suite.Run("static collection node", func() {
 		client := accessmock.NewAccessAPIClient(suite.T())
