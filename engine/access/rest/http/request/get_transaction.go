@@ -90,6 +90,8 @@ func (g *GetTransactionResult) Build(r *common.Request) error {
 	return err
 }
 
+// GetScheduledTransaction represents a request to get a scheduled transaction by its scheduled
+// transaction ID, and contains the parsed and validated input parameters.
 type GetScheduledTransaction struct {
 	ScheduledTxID uint64
 	TransactionOptionals
@@ -120,6 +122,8 @@ func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, err
 	}, nil
 }
 
+// GetScheduledTransactionResult represents a request to get a scheduled transaction result by its
+// scheduled transaction ID, and contains the parsed and validated input parameters.
 type GetScheduledTransactionResult struct {
 	ScheduledTxID uint64
 	TransactionOptionals
