@@ -1,68 +1,55 @@
 package transactions
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"math/rand"
-	"os"
 	"testing"
 
-	"github.com/cockroachdb/pebble/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/onflow/cadence"
-	cadenceCommon "github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/encoding/ccf"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/access/validator"
-	validatormock "github.com/onflow/flow-go/access/validator/mock"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
+	providermock "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider/mock"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
-	"github.com/onflow/flow-go/state/protocol"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-const expectedErrorMsg = "expected test error"
+func TestTransactionsBackend(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 type Suite struct {
 	suite.Suite
 
+	g        *fixtures.GeneratorSuite
 	log      zerolog.Logger
 	state    *protocolmock.State
 	snapshot *protocolmock.Snapshot
@@ -77,11 +64,9 @@ type Suite struct {
 	lightTxResults        *storagemock.LightTransactionResults
 	events                *storagemock.Events
 	txResultErrorMessages *storagemock.TransactionResultErrorMessages
+	scheduledTransactions *storagemock.ScheduledTransactions
 	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
-
-	db                  *pebble.DB
-	dbDir               string
-	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lastFullBlockHeight   *counters.PersistentStrictMonotonicCounter
 
 	executionAPIClient        *accessmock.ExecutionAPIClient
 	historicalAccessAPIClient *accessmock.AccessAPIClient
@@ -95,26 +80,24 @@ type Suite struct {
 
 	errorMessageProvider error_messages.Provider
 
-	chainID                           flow.ChainID
-	systemTx                          *flow.TransactionBody
-	systemCollection                  *flow.Collection
-	pendingExecutionEvents            []flow.Event
-	processScheduledCallbackEventType flow.EventType
-	scheduledCallbacksEnabled         bool
+	chainID                              flow.ChainID
+	defaultSystemCollection              *system.SystemCollection
+	systemCollection                     *flow.Collection
+	pendingExecutionEvents               []flow.Event
+	processScheduledTransactionEventType flow.EventType
+	scheduledTransactionsEnabled         bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
 }
 
-func TestTransactionsBackend(t *testing.T) {
-	suite.Run(t, new(Suite))
-}
-
 func (suite *Suite) SetupTest() {
 	suite.log = unittest.Logger()
-	suite.snapshot = protocolmock.NewSnapshot(suite.T())
+	suite.chainID = flow.Testnet
+	suite.g = fixtures.NewGeneratorSuite(fixtures.WithChainID(suite.chainID))
 
 	header := unittest.BlockHeaderFixture()
+	suite.snapshot = protocolmock.NewSnapshot(suite.T())
 	suite.params = protocolmock.NewParams(suite.T())
 	suite.params.On("FinalizedRoot").Return(header, nil).Maybe()
 	suite.params.On("SporkID").Return(unittest.IdentifierFixture(), nil).Maybe()
@@ -134,7 +117,7 @@ func (suite *Suite) SetupTest() {
 	suite.executionAPIClient = accessmock.NewExecutionAPIClient(suite.T())
 	suite.lightTxResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
-	suite.chainID = flow.Testnet
+	suite.scheduledTransactions = storagemock.NewScheduledTransactions(suite.T())
 	suite.historicalAccessAPIClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
@@ -149,19 +132,18 @@ func (suite *Suite) SetupTest() {
 	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
 
-	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
+	// this is the system collection with no scheduled transactions used within the backend
+	suite.defaultSystemCollection, err = system.DefaultSystemCollection(suite.chainID, true)
 	suite.Require().NoError(err)
-	suite.scheduledCallbacksEnabled = true
+	suite.scheduledTransactionsEnabled = true
 
-	suite.pendingExecutionEvents = suite.createPendingExecutionEvents(2) // 2 callbacks
+	// this is the system collection with scheduled transactions used as block data
+	suite.pendingExecutionEvents = suite.g.PendingExecutionEvents().List(2)
 	suite.systemCollection, err = blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
 	suite.Require().NoError(err)
-	suite.processScheduledCallbackEventType = suite.pendingExecutionEvents[0].Type
+	suite.processScheduledTransactionEventType = suite.pendingExecutionEvents[0].Type
 
-	suite.db, suite.dbDir = unittest.TempPebbleDB(suite.T())
-	progress, err := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressLastFullBlockHeight).Initialize(0)
-	require.NoError(suite.T(), err)
-	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
+	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(newMockConsumerProgress())
 	suite.Require().NoError(err)
 
 	suite.fixedExecutionNodeIDs = nil
@@ -169,9 +151,29 @@ func (suite *Suite) SetupTest() {
 	suite.errorMessageProvider = nil
 }
 
-func (suite *Suite) TearDownTest() {
-	err := os.RemoveAll(suite.dbDir)
-	suite.Require().NoError(err)
+var _ storage.ConsumerProgress = (*mockConsumerProgress)(nil)
+
+type mockConsumerProgress struct {
+	counter counters.StrictMonotonicCounter
+}
+
+func newMockConsumerProgress() *mockConsumerProgress {
+	return &mockConsumerProgress{counter: counters.NewMonotonicCounter(0)}
+}
+
+func (m *mockConsumerProgress) ProcessedIndex() (uint64, error) {
+	return m.counter.Value(), nil
+}
+
+func (m *mockConsumerProgress) SetProcessedIndex(processed uint64) error {
+	if !m.counter.Set(processed) {
+		return fmt.Errorf("value must not decrease: %d", processed)
+	}
+	return nil
+}
+
+func (m *mockConsumerProgress) BatchSetProcessedIndex(processed uint64, batch storage.ReaderBatchWriter) error {
+	return m.SetProcessedIndex(processed)
 }
 
 func (suite *Suite) defaultTransactionsParams() Params {
@@ -188,1721 +190,2116 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		suite.lastFullBlockHeight,
 	)
 
+	validatorBlocks := validator.NewProtocolStateBlocks(suite.state, suite.indexReporter)
 	txValidator, err := validator.NewTransactionValidator(
-		validatormock.NewBlocks(suite.T()),
+		validatorBlocks,
 		suite.chainID.Chain(),
 		metrics.NewNoopCollector(),
-		validator.TransactionValidationOptions{},
+		validator.TransactionValidationOptions{
+			Expiry:                       flow.DefaultTransactionExpiry,
+			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
+			AllowEmptyReferenceBlockID:   false,
+			AllowUnknownReferenceBlockID: false,
+			CheckScriptsParse:            false,
+			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
+			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
+			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
+			CheckPayerBalanceMode:        validator.Disabled,
+		},
 		execmock.NewScriptExecutor(suite.T()),
 	)
 	suite.Require().NoError(err)
 
-	nodeCommunicator := node_communicator.NewNodeCommunicator(false)
-
-	txProvider := provider.NewENTransactionProvider(
-		suite.log,
-		suite.state,
-		suite.collections,
-		suite.connectionFactory,
-		nodeCommunicator,
-		nodeProvider,
-		txStatusDeriver,
-		suite.systemTx.ID(),
-		suite.chainID,
-		suite.scheduledCallbacksEnabled,
-	)
-
 	return Params{
-		Log:                         suite.log,
-		Metrics:                     metrics.NewNoopCollector(),
-		State:                       suite.state,
-		ChainID:                     flow.Testnet,
-		SystemTxID:                  suite.systemTx.ID(),
-		StaticCollectionRPCClient:   suite.historicalAccessAPIClient,
-		HistoricalAccessNodeClients: nil,
-		NodeCommunicator:            nodeCommunicator,
-		ConnFactory:                 suite.connectionFactory,
-		EnableRetries:               true,
-		NodeProvider:                nodeProvider,
-		Blocks:                      suite.blocks,
-		Collections:                 suite.collections,
-		Transactions:                suite.transactions,
-		Events:                      suite.events,
-		TxErrorMessageProvider:      suite.errorMessageProvider,
-		TxResultCache:               suite.txResultCache,
-		TxProvider:                  txProvider,
-		TxValidator:                 txValidator,
-		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 suite.eventsIndex,
-		TxResultsIndex:              suite.txResultsIndex,
-		ScheduledCallbacksEnabled:   suite.scheduledCallbacksEnabled,
+		Log:                          suite.log,
+		Metrics:                      metrics.NewNoopCollector(),
+		State:                        suite.state,
+		ChainID:                      flow.Testnet,
+		SystemCollection:             suite.defaultSystemCollection,
+		NodeCommunicator:             node_communicator.NewNodeCommunicator(false),
+		ConnFactory:                  suite.connectionFactory,
+		NodeProvider:                 nodeProvider,
+		Blocks:                       suite.blocks,
+		Collections:                  suite.collections,
+		Transactions:                 suite.transactions,
+		TxErrorMessageProvider:       suite.errorMessageProvider,
+		ScheduledTransactions:        suite.scheduledTransactions,
+		TxResultCache:                suite.txResultCache,
+		TxValidator:                  txValidator,
+		TxStatusDeriver:              txStatusDeriver,
+		EventsIndex:                  suite.eventsIndex,
+		TxResultsIndex:               suite.txResultsIndex,
+		ScheduledTransactionsEnabled: suite.scheduledTransactionsEnabled,
 	}
 }
 
-// TestGetTransactionResult_UnknownTx returns unknown result when tx not found
-func (suite *Suite) TestGetTransactionResult_UnknownTx() {
-	block := unittest.BlockFixture()
-	tx := unittest.TransactionBodyFixture()
-	coll := unittest.CollectionFromTransactions(&tx)
-
-	suite.transactions.
-		On("ByID", tx.ID()).
-		Return(nil, storage.ErrNotFound)
-
+// TestGetTransaction_SubmittedTx tests getting a user submitted transaction by ID returns the
+// correct transaction.
+func (suite *Suite) TestGetTransaction_SubmittedTx() {
 	params := suite.defaultTransactionsParams()
 	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(suite.T(), err)
-	res, err := txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
 	suite.Require().NoError(err)
-	suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
-	suite.Require().Empty(res.BlockID)
-	suite.Require().Empty(res.BlockHeight)
-	suite.Require().Empty(res.TransactionID)
-	suite.Require().Empty(res.CollectionID)
-	suite.Require().Empty(res.ErrorMessage)
-}
 
-// TestGetTransactionResult_TxLookupFailure returns error from transaction storage
-func (suite *Suite) TestGetTransactionResult_TxLookupFailure() {
-	block := unittest.BlockFixture()
-	tx := unittest.TransactionBodyFixture()
-	coll := unittest.CollectionFromTransactions(&tx)
+	suite.Run("submitted transaction found", func() {
+		tx := suite.g.Transactions().Fixture()
+		txID := tx.ID()
 
-	expectedErr := fmt.Errorf("some other error")
-	suite.transactions.
-		On("ByID", tx.ID()).
-		Return(nil, expectedErr)
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
 
-	params := suite.defaultTransactionsParams()
-	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(suite.T(), err)
-
-	_, err = txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", expectedErr))
-}
-
-// TestGetTransactionResult_HistoricNodes_Success tests lookup in historic nodes
-func (suite *Suite) TestGetTransactionResult_HistoricNodes_Success() {
-	block := unittest.BlockFixture()
-	tx := unittest.TransactionBodyFixture()
-	coll := unittest.CollectionFromTransactions(&tx)
-
-	suite.transactions.
-		On("ByID", tx.ID()).
-		Return(nil, storage.ErrNotFound)
-
-	transactionResultResponse := access.TransactionResultResponse{
-		Status:     entities.TransactionStatus_EXECUTED,
-		StatusCode: uint32(entities.TransactionStatus_EXECUTED),
-	}
-
-	suite.historicalAccessAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
-			txID := tx.ID()
-			return bytes.Equal(txID[:], req.Id)
-		})).
-		Return(&transactionResultResponse, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
-	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(suite.T(), err)
-
-	resp, err := txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
-	suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
-}
-
-// TestGetTransactionResult_HistoricNodes_FromCache get historic transaction result from cache
-func (suite *Suite) TestGetTransactionResult_HistoricNodes_FromCache() {
-	block := unittest.BlockFixture()
-	tx := unittest.TransactionBodyFixture()
-
-	suite.transactions.
-		On("ByID", tx.ID()).
-		Return(nil, storage.ErrNotFound)
-
-	transactionResultResponse := access.TransactionResultResponse{
-		Status:     entities.TransactionStatus_EXECUTED,
-		StatusCode: uint32(entities.TransactionStatus_EXECUTED),
-	}
-
-	suite.historicalAccessAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
-			txID := tx.ID()
-			return bytes.Equal(txID[:], req.Id)
-		})).
-		Return(&transactionResultResponse, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
-	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(suite.T(), err)
-
-	coll := unittest.CollectionFromTransactions(&tx)
-	resp, err := txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
-	suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
-
-	resp2, err := txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().Equal(flow.TransactionStatusExecuted, resp2.Status)
-	suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp2.StatusCode)
-}
-
-// TestGetTransactionResultUnknownFromCache retrieve unknown result from cache.
-func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
-	block := unittest.BlockFixture()
-	tx := unittest.TransactionBodyFixture()
-
-	suite.transactions.
-		On("ByID", tx.ID()).
-		Return(nil, storage.ErrNotFound)
-
-	suite.historicalAccessAPIClient.
-		On("GetTransactionResult", mock.Anything, mock.MatchedBy(func(req *access.GetTransactionRequest) bool {
-			txID := tx.ID()
-			return bytes.Equal(txID[:], req.Id)
-		})).
-		Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
-	txBackend, err := NewTransactionsBackend(params)
-	require.NoError(suite.T(), err)
-
-	coll := unittest.CollectionFromTransactions(&tx)
-	resp, err := txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
-	suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
-
-	// ensure the unknown transaction is cached when not found anywhere
-	txStatus := flow.TransactionStatusUnknown
-	res, ok := txBackend.txResultCache.Get(tx.ID())
-	suite.Require().True(ok)
-	suite.Require().Equal(res, &accessmodel.TransactionResult{
-		Status:     txStatus,
-		StatusCode: uint(txStatus),
+		actual, err := txBackend.GetTransaction(context.Background(), txID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(tx, actual)
 	})
 
-	// ensure underlying GetTransactionResult() won't be called the second time
-	resp2, err := txBackend.GetTransactionResult(
-		context.Background(),
-		tx.ID(),
-		block.ID(),
-		coll.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)
-	suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp2.StatusCode)
-}
+	suite.Run("submitted transaction - unexpected error", func() {
+		tx := suite.g.Transactions().Fixture()
+		txID := tx.ID()
 
-// TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
-func (suite *Suite) TestGetSystemTransaction_ExecutionNode_HappyPath() {
-	block := unittest.BlockFixture()
-	blockID := block.ID()
+		expectedErr := fmt.Errorf("some other error")
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, expectedErr).
+			Once()
 
-	params := suite.defaultTransactionsParams()
-	enabledProvider := provider.NewENTransactionProvider(
-		suite.log,
-		suite.state,
-		suite.collections,
-		suite.connectionFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-		params.TxStatusDeriver,
-		suite.systemTx.ID(),
-		suite.chainID,
-		true,
-	)
-	disabledProvider := provider.NewENTransactionProvider(
-		suite.log,
-		suite.state,
-		suite.collections,
-		suite.connectionFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-		params.TxStatusDeriver,
-		suite.systemTx.ID(),
-		suite.chainID,
-		false,
-	)
-
-	suite.params.On("FinalizedRoot").Unset()
-
-	suite.Run("scheduled callbacks DISABLED - ZeroID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = disabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks DISABLED - system txID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = disabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks DISABLED - non-system txID fails", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = disabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
+		actual, err := txBackend.GetTransaction(context.Background(), txID)
 		suite.Require().Error(err)
-		suite.Require().Nil(res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - ZeroID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = enabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - system txID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = enabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - system collection TX", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		// get execution node identities
-		suite.params.On("FinalizedRoot").Return(block.ToHeader(), nil)
-		suite.state.On("Final").Return(suite.snapshot, nil).Twice()
-		suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Twice()
-
-		suite.setupExecutionGetEventsRequest(blockID, block.Height, suite.pendingExecutionEvents)
-
-		params.TxProvider = enabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		systemTx := suite.systemCollection.Transactions[2]
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - non-system txID fails", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = enabledProvider
-
-		suite.params.On("FinalizedRoot").Return(block.ToHeader(), nil)
-		suite.state.On("Final").Return(suite.snapshot, nil).Twice()
-		suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Twice()
-
-		suite.setupExecutionGetEventsRequest(blockID, block.Height, suite.pendingExecutionEvents)
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
-		suite.Require().Error(err)
-		suite.Require().Nil(res)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actual)
 	})
 }
 
-// TestGetSystemTransaction_HappyPath tests that GetSystemTransaction call returns system chunk transaction.
-func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
-	block := unittest.BlockFixture()
-	blockID := block.ID()
-
+// TestGetTransaction_SystemTx tests getting a system transaction by ID returns the correct transaction.
+func (suite *Suite) TestGetTransaction_SystemTx() {
 	params := suite.defaultTransactionsParams()
-	enabledProvider := provider.NewLocalTransactionProvider(
-		suite.state,
-		suite.collections,
-		suite.blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
-		suite.systemTx.ID(),
-		params.TxStatusDeriver,
-		suite.chainID,
-		true,
-	)
-	disabledProvider := provider.NewLocalTransactionProvider(
-		suite.state,
-		suite.collections,
-		suite.blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
-		suite.systemTx.ID(),
-		params.TxStatusDeriver,
-		suite.chainID,
-		false,
-	)
-
-	suite.params.On("FinalizedRoot").Unset()
-
-	suite.Run("scheduled callbacks DISABLED - ZeroID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = disabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks DISABLED - system txID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = disabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks DISABLED - non-system txID fails", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = disabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
-		suite.Require().Error(err)
-		suite.Require().Nil(res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - ZeroID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = enabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - system txID", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = enabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), suite.systemTx.ID(), blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(suite.systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - system collection TX", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil).Once()
-		suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil).Once()
-		suite.events.On("ByBlockID", blockID).Return(suite.pendingExecutionEvents, nil).Once()
-
-		params.TxProvider = enabledProvider
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		systemTx := suite.systemCollection.Transactions[2]
-		res, err := txBackend.GetSystemTransaction(context.Background(), systemTx.ID(), blockID)
-		suite.Require().NoError(err)
-
-		suite.Require().Equal(systemTx, res)
-	})
-
-	suite.Run("scheduled callbacks ENABLED - non-system txID fails", func() {
-		suite.blocks.On("ByID", blockID).Return(block, nil).Once()
-
-		params.TxProvider = enabledProvider
-
-		suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil).Once()
-		suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil).Once()
-		suite.events.On("ByBlockID", blockID).Return(suite.pendingExecutionEvents, nil).Once()
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetSystemTransaction(context.Background(), unittest.IdentifierFixture(), blockID)
-		suite.Require().Error(err)
-		suite.Require().Nil(res)
-	})
-}
-
-func (suite *Suite) TestGetSystemTransactionResult_ExecutionNode_HappyPath() {
-	test := func(snapshot protocol.Snapshot) {
-		suite.state.
-			On("Sealed").
-			Return(snapshot, nil).
-			Once()
-
-		lastBlock, err := snapshot.Head()
-		suite.Require().NoError(err)
-
-		identities, err := snapshot.Identities(filter.Any)
-		suite.Require().NoError(err)
-
-		block := unittest.BlockWithParentFixture(lastBlock)
-		blockID := block.ID()
-		suite.state.
-			On("AtBlockID", blockID).
-			Return(unittest.StateSnapshotForKnownBlock(block.ToHeader(), identities.Lookup()), nil).
-			Once()
-
-		// block storage returns the corresponding block
-		suite.blocks.
-			On("ByID", blockID).
-			Return(block, nil).
-			Once()
-
-		receipt1 := unittest.ReceiptForBlockFixture(block)
-		suite.receipts.
-			On("ByBlockID", block.ID()).
-			Return(flow.ExecutionReceiptList{receipt1}, nil)
-
-		// Generating events with event generator
-		exeNodeEventEncodingVersion := entities.EventEncodingVersion_CCF_V0
-		events := unittest.EventGenerator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-		eventMessages := convert.EventsToMessages(events)
-
-		systemTxID := suite.systemTx.ID()
-		expectedRequest := &execproto.GetTransactionResultRequest{
-			BlockId:       blockID[:],
-			TransactionId: systemTxID[:],
-		}
-		exeEventResp := &execproto.GetTransactionResultResponse{
-			Events:               eventMessages,
-			EventEncodingVersion: exeNodeEventEncodingVersion,
-		}
-
-		suite.executionAPIClient.
-			On("GetTransactionResult", mock.Anything, expectedRequest).
-			Return(exeEventResp, nil).
-			Once()
-
-		suite.connectionFactory.
-			On("GetExecutionAPIClient", mock.Anything).
-			Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-			Once()
-
-		// the connection factory should be used to get the execution node client
-		params := suite.defaultTransactionsParams()
-		backend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := backend.GetSystemTransactionResult(
-			context.Background(),
-			flow.ZeroID,
-			block.ID(),
-			entities.EventEncodingVersion_JSON_CDC_V0,
-		)
-		suite.Require().NoError(err)
-
-		// Expected system chunk transaction
-		suite.Require().Equal(flow.TransactionStatusExecuted, res.Status)
-		suite.Require().Equal(suite.systemTx.ID(), res.TransactionID)
-
-		// Check for successful decoding of event
-		_, err = jsoncdc.Decode(nil, res.Events[0].Payload)
-		suite.Require().NoError(err)
-
-		events, err = convert.MessagesToEventsWithEncodingConversion(
-			eventMessages,
-			exeNodeEventEncodingVersion,
-			entities.EventEncodingVersion_JSON_CDC_V0,
-		)
-		suite.Require().NoError(err)
-		suite.Require().Equal(events, res.Events)
-	}
-
-	identities := unittest.CompleteIdentitySet()
-	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolStateAndMutator(
-		suite.T(),
-		rootSnapshot,
-		func(db storage.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
-			epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
-
-			epochBuilder.
-				BuildEpoch().
-				CompleteEpoch()
-
-			// get heights of each phase in built epochs
-			epoch1, ok := epochBuilder.EpochHeights(1)
-			require.True(suite.T(), ok)
-
-			snapshot := state.AtHeight(epoch1.FinalHeight())
-			suite.state.On("Final").Return(snapshot)
-			test(snapshot)
-		},
-	)
-}
-
-func (suite *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
-	block := unittest.BlockFixture()
-	sysTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
-	suite.Require().NoError(err)
-	suite.Require().NotNil(sysTx)
-	txId := suite.systemTx.ID()
-	blockId := block.ID()
-
-	suite.blocks.
-		On("ByID", blockId).
-		Return(block, nil).
-		Once()
-
-	lightTxShouldFail := false
-	suite.lightTxResults.
-		On("ByBlockIDTransactionID", blockId, txId).
-		Return(&flow.LightTransactionResult{
-			TransactionID:   txId,
-			Failed:          lightTxShouldFail,
-			ComputationUsed: 0,
-		}, nil).
-		Once()
-
-	// Set up the events storage mock
-	var eventsForTx []flow.Event
-	// expect a call to lookup events by block ID and transaction ID
-	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
-
-	// Set up the state and snapshot mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
-
-	// create a mock index reporter
-	reporter := syncmock.NewIndexReporter(suite.T())
-	reporter.On("LowestIndexedHeight").Return(block.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
-
-	indexReporter := index.NewReporter()
-	err = indexReporter.Initialize(reporter)
-	suite.Require().NoError(err)
-
-	// Set up the backend parameters and the backend instance
-	params := suite.defaultTransactionsParams()
-	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
-	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.lightTxResults)
-	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
-		params.Collections,
-		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
-		params.SystemTxID,
-		params.TxStatusDeriver,
-		params.ChainID,
-		params.ScheduledCallbacksEnabled,
-	)
-
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
-	response, err := txBackend.GetSystemTransactionResult(context.Background(), flow.ZeroID, blockId, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.assertTransactionResultResponse(err, response, *block, txId, lightTxShouldFail, eventsForTx)
-}
 
-// TestGetSystemTransactionResult_BlockNotFound tests GetSystemTransactionResult function when block was not found.
-func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
-	block := unittest.BlockFixture()
-	suite.blocks.
-		On("ByID", block.ID()).
+	tx := suite.systemCollection.Transactions[0]
+	txID := tx.ID()
+
+	suite.transactions.
+		On("ByID", txID).
 		Return(nil, storage.ErrNotFound).
 		Once()
 
-	params := suite.defaultTransactionsParams()
-	txBackend, err := NewTransactionsBackend(params)
+	actual, err := txBackend.GetTransaction(context.Background(), txID)
 	suite.Require().NoError(err)
-	res, err := txBackend.GetSystemTransactionResult(
-		context.Background(),
-		flow.ZeroID,
-		block.ID(),
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-
-	suite.Require().Nil(res)
-	suite.Require().Error(err)
-	suite.Require().Equal(err, status.Errorf(codes.NotFound, "not found: %v", fmt.Errorf("key not found")))
+	suite.Require().Equal(tx, actual)
 }
 
-// TestGetSystemTransactionResult_FailedEncodingConversion tests the GetSystemTransactionResult function with different
-// event encoding versions.
-func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
-	block := unittest.BlockFixture()
+// TestGetTransaction_ScheduledTx tests getting a scheduled transaction by ID returns the correct transaction.
+func (suite *Suite) TestGetTransaction_ScheduledTx() {
+	block := suite.g.Blocks().Fixture()
 	blockID := block.ID()
 
-	_, fixedENIDs := suite.setupReceipts(block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+	suite.Run("happy path", func() {
+		tx := suite.systemCollection.Transactions[1]
+		txID := tx.ID()
 
-	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.state.On("Final").Return(suite.snapshot, nil)
-
-	// block storage returns the corresponding block
-	suite.blocks.
-		On("ByID", blockID).
-		Return(block, nil).
-		Once()
-
-	// create empty events
-	eventsPerBlock := 10
-	eventMessages := make([]*entities.Event, eventsPerBlock)
-
-	systemTxID := suite.systemTx.ID()
-	expectedRequest := &execproto.GetTransactionResultRequest{
-		BlockId:       blockID[:],
-		TransactionId: systemTxID[:],
-	}
-	exeEventResp := &execproto.GetTransactionResultResponse{
-		Events:               eventMessages,
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-	}
-
-	suite.executionAPIClient.
-		On("GetTransactionResult", mock.Anything, expectedRequest).
-		Return(exeEventResp, nil).
-		Once()
-
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	res, err := txBackend.GetSystemTransactionResult(
-		context.Background(),
-		flow.ZeroID,
-		block.ID(),
-		entities.EventEncodingVersion_CCF_V0,
-	)
-
-	suite.Require().Nil(res)
-	suite.Require().Error(err)
-	suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to convert events to message: %v",
-		fmt.Errorf("conversion from format JSON_CDC_V0 to CCF_V0 is not supported")))
-}
-
-// TestGetTransactionResult_FromStorage tests the retrieval of a transaction result (flow.TransactionResult) from storage
-// instead of requesting it from the Execution Node.
-func (suite *Suite) TestGetTransactionResult_FromStorage() {
-	// Create fixtures for block, transaction, and collection
-	transaction := unittest.TransactionBodyFixture()
-	col := unittest.CollectionFromTransactions(&transaction)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block := unittest.BlockFixture(
-		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
-	)
-	txId := transaction.ID()
-	blockId := block.ID()
-
-	suite.blocks.
-		On("ByID", blockId).
-		Return(block, nil)
-
-	suite.lightTxResults.On("ByBlockIDTransactionID", blockId, txId).
-		Return(&flow.LightTransactionResult{
-			TransactionID:   txId,
-			Failed:          true,
-			ComputationUsed: 0,
-		}, nil)
-
-	suite.transactions.
-		On("ByID", txId).
-		Return(&transaction, nil)
-
-	// Set up the light collection and mock the behavior of the collections object
-	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
-
-	// Set up the events storage mock
-	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents)
-	eventMessages := make([]*entities.Event, totalEvents)
-	for j, event := range eventsForTx {
-		eventMessages[j] = convert.EventToMessage(event)
-	}
-	// expect a call to lookup events by block ID and transaction ID
-	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
-
-	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-
-	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
-
-	suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil)
-	suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
-
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
-
-	// Set up the expected error message for the execution node response
-	exeEventReq := &execproto.GetTransactionErrorMessageRequest{
-		BlockId:       blockId[:],
-		TransactionId: txId[:],
-	}
-	exeEventResp := &execproto.GetTransactionErrorMessageResponse{
-		TransactionId: txId[:],
-		ErrorMessage:  expectedErrorMsg,
-	}
-	suite.executionAPIClient.
-		On("GetTransactionErrorMessage", mock.Anything, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-		params.Log,
-		nil,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-	)
-	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
-		params.Collections,
-		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
-		params.SystemTxID,
-		params.TxStatusDeriver,
-		params.ChainID,
-		params.ScheduledCallbacksEnabled,
-	)
-
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	response, err := txBackend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.assertTransactionResultResponse(err, response, *block, txId, true, eventsForTx)
-
-	suite.reporter.AssertExpectations(suite.T())
-	suite.connectionFactory.AssertExpectations(suite.T())
-	suite.executionAPIClient.AssertExpectations(suite.T())
-	suite.blocks.AssertExpectations(suite.T())
-	suite.events.AssertExpectations(suite.T())
-	suite.state.AssertExpectations(suite.T())
-}
-
-// TestTransactionByIndexFromStorage tests the retrieval of a transaction result (flow.TransactionResult) by index
-// and returns it from storage instead of requesting from the Execution Node.
-func (suite *Suite) TestTransactionByIndexFromStorage() {
-	// Create fixtures for block, transaction, and collection
-	transaction := unittest.TransactionBodyFixture()
-	col := unittest.CollectionFromTransactions(&transaction)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block := unittest.BlockFixture(
-		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
-	)
-	blockId := block.ID()
-	txId := transaction.ID()
-	txIndex := rand.Uint32()
-
-	// Set up the light collection and mock the behavior of the collections object
-	lightCol := col.Light()
-	suite.collections.On("LightByID", col.ID()).Return(lightCol, nil)
-
-	// Mock the behavior of the blocks and lightTxResults objects
-	suite.blocks.
-		On("ByID", blockId).
-		Return(block, nil)
-
-	suite.lightTxResults.On("ByBlockIDTransactionIndex", blockId, txIndex).
-		Return(&flow.LightTransactionResult{
-			TransactionID:   txId,
-			Failed:          true,
-			ComputationUsed: 0,
-		}, nil)
-
-	// Set up the events storage mock
-	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents)
-	eventMessages := make([]*entities.Event, totalEvents)
-	for j, event := range eventsForTx {
-		eventMessages[j] = convert.EventToMessage(event)
-	}
-
-	// expect a call to lookup events by block ID and transaction ID
-	suite.events.On("ByBlockIDTransactionIndex", blockId, txIndex).Return(eventsForTx, nil)
-
-	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
-
-	suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil)
-	suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
-
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-		params.Log,
-		nil,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-	)
-	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
-		params.Collections,
-		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
-		params.SystemTxID,
-		params.TxStatusDeriver,
-		params.ChainID,
-		params.ScheduledCallbacksEnabled,
-	)
-
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	// Set up the expected error message for the execution node response
-	exeEventReq := &execproto.GetTransactionErrorMessageByIndexRequest{
-		BlockId: blockId[:],
-		Index:   txIndex,
-	}
-
-	exeEventResp := &execproto.GetTransactionErrorMessageResponse{
-		TransactionId: txId[:],
-		ErrorMessage:  expectedErrorMsg,
-	}
-
-	suite.executionAPIClient.
-		On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
-
-	response, err := txBackend.GetTransactionResultByIndex(context.Background(), blockId, txIndex, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.assertTransactionResultResponse(err, response, *block, txId, true, eventsForTx)
-}
-
-// TestTransactionResultsByBlockIDFromStorage tests the retrieval of transaction results ([]flow.TransactionResult)
-// by block ID from storage instead of requesting from the Execution Node.
-func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
-	// Create fixtures for the block and collection
-	col := unittest.CollectionFixture(2)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block := unittest.BlockFixture(
-		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
-	)
-	blockId := block.ID()
-
-	// Mock the behavior of the blocks, collections and light transaction results objects
-	suite.blocks.
-		On("ByID", blockId).
-		Return(block, nil)
-	lightCol := col.Light()
-	suite.collections.
-		On("LightByID", mock.Anything).
-		Return(lightCol, nil).
-		Once()
-
-	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
-	for i, txID := range lightCol.Transactions {
-		lightTxResults[i] = flow.LightTransactionResult{
-			TransactionID:   txID,
-			Failed:          false,
-			ComputationUsed: 0,
+		scheduledTxs := []*flow.TransactionBody{
+			suite.g.Transactions().Fixture(),
+			tx,
+			suite.g.Transactions().Fixture(),
 		}
-	}
-	// simulate the system tx
-	lightTxResults = append(lightTxResults, flow.LightTransactionResult{
-		TransactionID:   suite.systemTx.ID(),
-		Failed:          false,
-		ComputationUsed: 10,
-	})
 
-	// Mark the first transaction as failed
-	lightTxResults[0].Failed = true
-	suite.lightTxResults.
-		On("ByBlockID", blockId).
-		Return(lightTxResults, nil).
-		Once()
-
-	// Set up the events storage mock
-	totalEvents := 5
-	eventsForTx := unittest.EventsFixture(totalEvents)
-	eventMessages := make([]*entities.Event, totalEvents)
-	for j, event := range eventsForTx {
-		eventMessages[j] = convert.EventToMessage(event)
-	}
-
-	// expect a call to lookup events by block ID and transaction ID
-	suite.events.
-		On("ByBlockIDTransactionID", blockId, mock.Anything).
-		Return(eventsForTx, nil)
-
-	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
-
-	suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil)
-	suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
-
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
-
-	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-		params.Log,
-		nil,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-	)
-	params.TxProvider = provider.NewLocalTransactionProvider(
-		params.State,
-		params.Collections,
-		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
-		params.SystemTxID,
-		params.TxStatusDeriver,
-		params.ChainID,
-		params.ScheduledCallbacksEnabled,
-	)
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
-
-	// Set up the expected error message for the execution node response
-	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-		BlockId: blockId[:],
-	}
-	res := &execproto.GetTransactionErrorMessagesResponse_Result{
-		TransactionId: lightTxResults[0].TransactionID[:],
-		ErrorMessage:  expectedErrorMsg,
-		Index:         1,
-	}
-	exeEventResp := &execproto.GetTransactionErrorMessagesResponse{
-		Results: []*execproto.GetTransactionErrorMessagesResponse_Result{
-			res,
-		},
-	}
-	suite.executionAPIClient.
-		On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
-
-	response, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockId, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.Require().NoError(err)
-	suite.Assert().Equal(len(lightTxResults), len(response))
-
-	// Assertions for each transaction result in the response
-	for i, responseResult := range response {
-		lightTx := lightTxResults[i]
-		suite.assertTransactionResultResponse(err, responseResult, *block, lightTx.TransactionID, lightTx.Failed, eventsForTx)
-	}
-}
-
-func (suite *Suite) TestGetTransactionsByBlockID() {
-	// Create fixtures
-	col := unittest.CollectionFixture(3)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block := unittest.BlockFixture(
-		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
-	)
-	blockID := block.ID()
-
-	// Create PendingExecution events for scheduled callbacks
-	pendingExecutionEvents := suite.createPendingExecutionEvents(2) // 2 callbacks
-
-	// Reconstruct expected system collection to get the actual transaction IDs
-	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
-	suite.Require().NoError(err)
-
-	// Expected transaction counts
-	expectedUserTxCount := len(col.Transactions)
-	expectedSystemTxCount := len(expectedSystemCollection.Transactions)
-	expectedTotalCount := expectedUserTxCount + expectedSystemTxCount
-
-	// Test with Local Provider
-	suite.Run("LocalProvider", func() {
-		// Mock the blocks storage
-		suite.blocks.
-			On("ByID", blockID).
-			Return(block, nil).
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
 			Once()
 
-		// Mock the collections storage
-		suite.collections.
-			On("ByID", col.ID()).
-			Return(&col, nil).
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
 			Once()
 
-		// Mock the events storage to return PendingExecution events
-		suite.events.
-			On("ByBlockID", blockID).
-			Return(pendingExecutionEvents, nil).
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
 			Once()
 
-		suite.reporter.On("LowestIndexedHeight").Return(block.Height, nil)
-		suite.reporter.On("HighestIndexedHeight").Return(block.Height+10, nil)
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("ScheduledTransactionsByBlockID", mock.Anything, block.ToHeader()).
+			Return(scheduledTxs, nil)
 
-		// Set up the backend parameters with local transaction provider
 		params := suite.defaultTransactionsParams()
-
-		params.TxProvider = provider.NewLocalTransactionProvider(
-			params.State,
-			params.Collections,
-			params.Blocks,
-			params.EventsIndex,
-			params.TxResultsIndex,
-			params.TxErrorMessageProvider,
-			params.SystemTxID,
-			params.TxStatusDeriver,
-			params.ChainID,
-			params.ScheduledCallbacksEnabled,
-		)
+		params.TxProvider = provider
 
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		// Call GetTransactionsByBlockID
-		transactions, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
+		actual, err := txBackend.GetTransaction(context.Background(), txID)
 		suite.Require().NoError(err)
-
-		// Verify transaction count
-		suite.Require().Equal(expectedTotalCount, len(transactions), "expected %d transactions but got %d", expectedTotalCount, len(transactions))
-
-		// Verify user transactions
-		for i, tx := range col.Transactions {
-			suite.Assert().Equal(tx.ID(), transactions[i].ID(), "user transaction %d mismatch", i)
-		}
-
-		// Verify system transactions
-		for i, expectedTx := range expectedSystemCollection.Transactions {
-			actualTx := transactions[expectedUserTxCount+i]
-			suite.Assert().Equal(expectedTx.ID(), actualTx.ID(), "system transaction %d mismatch", i)
-		}
+		suite.Require().Equal(tx, actual)
 	})
 
-	// Test with Execution Node Provider
-	suite.Run("ExecutionNodeProvider", func() {
-		// Set up the state and snapshot mocks first
-		_, fixedENIDs := suite.setupReceipts(block)
-		suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-		suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-		suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-		suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil).Maybe()
-		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Maybe()
+	// Tests the case where the scheduled transaction exists in the indices, but not in the generated
+	// system collection (produced from events). This indicates inconsistent state, however it is handled
+	// by returning an internal error instead of an irrecoverable since the events may be queried from
+	// an Execution node, which could have returned incorrect data.
+	suite.Run("not in generated collection", func() {
+		tx := suite.systemCollection.Transactions[1]
+		txID := tx.ID()
 
-		// Mock the blocks storage
-		suite.blocks.
-			On("ByID", blockID).
-			Return(block, nil).
+		scheduledTxs := []*flow.TransactionBody{
+			suite.g.Transactions().Fixture(),
+			suite.g.Transactions().Fixture(),
+		}
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
 			Once()
 
-		// Mock the collections storage
-		suite.collections.
-			On("ByID", col.ID()).
-			Return(&col, nil).
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
 			Once()
 
-		suite.setupExecutionGetEventsRequest(blockID, block.Height, pendingExecutionEvents)
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
 
-		// Set up the backend parameters with EN transaction provider
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("ScheduledTransactionsByBlockID", mock.Anything, block.ToHeader()).
+			Return(scheduledTxs, nil)
+
 		params := suite.defaultTransactionsParams()
-		params.TxProvider = provider.NewENTransactionProvider(
-			params.Log,
-			params.State,
-			params.Collections,
-			params.ConnFactory,
-			params.NodeCommunicator,
-			params.NodeProvider,
-			params.TxStatusDeriver,
-			params.SystemTxID,
-			params.ChainID,
-			params.ScheduledCallbacksEnabled,
-		)
+		params.TxProvider = provider
 
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		// Call GetTransactionsByBlockID
-		transactions, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
+		actual, err := txBackend.GetTransaction(context.Background(), txID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actual)
+	})
+
+	suite.Run("provider error", func() {
+		tx := suite.systemCollection.Transactions[1]
+		txID := tx.ID()
+
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("ScheduledTransactionsByBlockID", mock.Anything, block.ToHeader()).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		// For empty events, we expect: user transactions + process tx + system chunk tx (no execute callback txs)
-		expectedSystemCollectionEmpty, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
+		actual, err := txBackend.GetTransaction(context.Background(), txID)
+		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Nil(actual)
+	})
+
+	suite.Run("block not found exception", func() {
+		tx := suite.systemCollection.Transactions[1]
+		txID := tx.ID()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
-		expectedTotalCountEmpty := len(col.Transactions) + len(expectedSystemCollectionEmpty.Transactions)
 
-		// Verify transaction count
-		suite.Assert().Equal(expectedTotalCountEmpty, len(transactions))
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(),
+			fmt.Errorf("failed to get block header: %w", storage.ErrNotFound))
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
 
-		// Verify user transactions
-		for i, tx := range col.Transactions {
-			suite.Assert().Equal(tx.ID(), transactions[i].ID())
-		}
-
-		// Verify system transactions (process + system chunk only, no execute callbacks)
-		for i, expectedTx := range expectedSystemCollectionEmpty.Transactions {
-			actualTx := transactions[len(col.Transactions)+i]
-			suite.Assert().Equal(expectedTx.ID(), actualTx.ID())
-		}
+		actual, err := txBackend.GetTransaction(signalerCtx, txID)
+		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		suite.Require().Nil(actual)
 	})
 }
 
-func (suite *Suite) TestTransactionResultsByBlockIDFromExecutionNode() {
-	// Create fixtures for the block and collection
-	col := unittest.CollectionFixture(2)
-	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
-	block := unittest.BlockFixture(
-		unittest.Block.WithPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee))),
-	)
-	blockId := block.ID()
+// TestGetTransaction_HistoricalTx tests getting a historical transaction by ID from the historical
+// access nodes.
+func (suite *Suite) TestGetTransaction_HistoricalTx() {
+	suite.Run("historical tx", func() {
+		tx := suite.g.Transactions().Fixture()
+		txID := tx.ID()
 
-	// Mock the behavior of the blocks, collections and light transaction results objects
-	suite.blocks.
-		On("ByID", blockId).
-		Return(block, nil)
-	lightCol := col.Light()
-	suite.collections.
-		On("LightByID", mock.Anything).
-		Return(lightCol, nil).
-		Once()
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
 
-	// Execute callback transactions will be reconstructed from PendingExecution events
-	// We don't create them manually - they'll be generated by blueprints.SystemCollection
-	// System collection will be reconstructed from events, so we don't need to pre-populate lightTxResults
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(flow.ZeroID, storage.ErrNotFound).
+			Once()
 
-	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
-	for i, txID := range lightCol.Transactions {
-		lightTxResults[i] = flow.LightTransactionResult{
-			TransactionID:   txID,
-			Failed:          false,
-			ComputationUsed: 0,
+		expectedRequest := &access.GetTransactionRequest{
+			Id: txID[:],
 		}
-	}
-
-	// Create PendingExecution events that would be emitted by the process callback transaction
-	pendingExecutionEvents := suite.createPendingExecutionEvents(2) // 2 callbacks
-
-	// Convert PendingExecution events to protobuf messages for execution node response
-	pendingEventMessages := make([]*entities.Event, len(pendingExecutionEvents))
-	for i, event := range pendingExecutionEvents {
-		pendingEventMessages[i] = convert.EventToMessage(event)
-	}
-
-	// Reconstruct the expected system collection to get the actual transaction IDs
-	expectedSystemCollection, err := blueprints.SystemCollection(suite.chainID.Chain(), pendingExecutionEvents)
-	suite.Require().NoError(err)
-
-	// Extract the expected transaction IDs in order: process, execute callbacks, system chunk
-	expectedSystemTxIDs := make([]flow.Identifier, len(expectedSystemCollection.Transactions))
-	for i, tx := range expectedSystemCollection.Transactions {
-		expectedSystemTxIDs[i] = tx.ID()
-	}
-
-	suite.Require().Equal(4, len(expectedSystemTxIDs), "should have 4 system transactions: process + 2 execute callbacks + system chunk")
-
-	// Build the execution response with all transaction results including proper events
-	userTxResults := make([]*execproto.GetTransactionResultResponse, len(lightCol.Transactions))
-	for i := 0; i < len(lightCol.Transactions); i++ {
-		userTxResults[i] = &execproto.GetTransactionResultResponse{
-			Events: []*entities.Event{},
+		response := &access.TransactionResponse{
+			Transaction: convert.TransactionToMessage(*tx),
 		}
-	}
 
-	// System transaction results: process (with events), execute callback txs, system chunk
-	systemTxResults := []*execproto.GetTransactionResultResponse{
-		// Process callback transaction with PendingExecution events
-		{Events: pendingEventMessages},
-		// Execute callback transaction 1
-		{Events: []*entities.Event{}},
-		// Execute callback transaction 2
-		{Events: []*entities.Event{}},
-		// System chunk transaction
-		{Events: []*entities.Event{}},
-	}
+		suite.historicalAccessAPIClient.
+			On("GetTransaction", mock.Anything, expectedRequest).
+			Return(response, nil)
 
-	allTxResults := append(userTxResults, systemTxResults...)
+		params := suite.defaultTransactionsParams()
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
 
-	// Set up execution node response with system transactions
-	// The execution node response should include: user txs + process tx (with PendingExecution events) + execute txs + system chunk tx
-	exeGetTxReq := &execproto.GetTransactionsByBlockIDRequest{
-		BlockId: blockId[:],
-	}
-	exeGetTxResp := &execproto.GetTransactionResultsResponse{
-		TransactionResults:   allTxResults,
-		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-	}
-	suite.executionAPIClient.
-		On("GetTransactionResultsByBlockID", mock.Anything, exeGetTxReq).
-		Return(exeGetTxResp, nil).
-		Once()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
 
-	// Set up the state and snapshot mocks
-	_, fixedENIDs := suite.setupReceipts(block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	suite.snapshot.On("Head").Return(block.ToHeader(), nil)
+		actual, err := txBackend.GetTransaction(context.Background(), txID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(tx, actual)
+	})
 
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Once()
+	suite.Run("historical tx returns unexpected error", func() {
+		tx := suite.g.Transactions().Fixture()
+		txID := tx.ID()
 
-	params := suite.defaultTransactionsParams()
-	params.TxErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-		params.Log,
-		nil,
-		params.TxResultsIndex,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-	)
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
 
-	params.TxProvider = provider.NewENTransactionProvider(
-		params.Log,
-		params.State,
-		params.Collections,
-		params.ConnFactory,
-		params.NodeCommunicator,
-		params.NodeProvider,
-		params.TxStatusDeriver,
-		params.SystemTxID,
-		params.ChainID,
-		params.ScheduledCallbacksEnabled,
-	)
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(flow.ZeroID, storage.ErrNotFound).
+			Once()
 
-	response, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockId, entities.EventEncodingVersion_CCF_V0)
-	suite.Require().NoError(err)
+		expectedRequest := &access.GetTransactionRequest{
+			Id: txID[:],
+		}
 
-	// Expected total: user transactions + system transactions (process + 2 execute callbacks + system chunk)
-	expectedTotal := len(lightTxResults) + len(expectedSystemTxIDs)
-	suite.Assert().Equal(expectedTotal, len(response), "should have user txs + system txs")
+		suite.historicalAccessAPIClient.
+			On("GetTransaction", mock.Anything, expectedRequest).
+			Return(nil, status.Errorf(codes.Internal, "some other error"))
 
-	// Verify user transactions
-	userTxCount := len(lightCol.Transactions)
-	for i := 0; i < userTxCount; i++ {
-		suite.Assert().Equal(lightTxResults[i].TransactionID, response[i].TransactionID)
-		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response[i].CollectionID)
-		suite.Assert().Equal(block.ID(), response[i].BlockID)
-		suite.Assert().Equal(block.Height, response[i].BlockHeight)
-		suite.Assert().Equal(flow.TransactionStatusSealed, response[i].Status)
-	}
+		params := suite.defaultTransactionsParams()
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
 
-	// Verify system collection transactions (all should have ZeroID as collectionID)
-	systemTxCount := len(response) - userTxCount
-	suite.Assert().Equal(len(expectedSystemTxIDs), systemTxCount, "should have 4 system transactions: process + 2 execute callbacks + system chunk")
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
 
-	for i := 0; i < systemTxCount; i++ {
-		systemTxIndex := userTxCount + i
-		suite.Assert().Equal(flow.ZeroID, response[systemTxIndex].CollectionID)
-		suite.Assert().Equal(block.ID(), response[systemTxIndex].BlockID)
-		suite.Assert().Equal(block.Height, response[systemTxIndex].BlockHeight)
-		suite.Assert().Equal(flow.TransactionStatusSealed, response[systemTxIndex].Status)
-		suite.Assert().Equal(expectedSystemTxIDs[i], response[userTxCount+i].TransactionID, "system transaction %d should match reconstructed ID", i)
-	}
+		actual, err := txBackend.GetTransaction(context.Background(), txID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(actual)
+	})
 }
 
-// TestTransactionRetry tests that the retry mechanism will send retries at specific times
-func (suite *Suite) TestTransactionRetry() {
-	block := unittest.BlockFixture(
-		// Height needs to be at least DefaultTransactionExpiry before we start doing retries
-		unittest.Block.WithHeight(flow.DefaultTransactionExpiry + 1),
-	)
-	transactionBody := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(block.ID()))
-	headBlock := unittest.BlockFixture()
-	headBlock.Height = block.Height - 1 // head is behind the current block
-	suite.state.On("Final").Return(suite.snapshot, nil)
+func (suite *Suite) TestGetTransactionResult_SystemTx() {
+	tx := suite.systemCollection.Transactions[0]
+	txID := tx.ID()
 
-	suite.snapshot.On("Head").Return(headBlock.ToHeader(), nil)
-	snapshotAtBlock := protocolmock.NewSnapshot(suite.T())
-	snapshotAtBlock.On("Head").Return(block.ToHeader(), nil)
-	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
 
-	// collection storage returns a not found error
+	expectedResult := &accessmodel.TransactionResult{
+		BlockID:       blockID,
+		TransactionID: txID,
+		CollectionID:  flow.ZeroID,
+		BlockHeight:   block.Height,
+		Status:        flow.TransactionStatusExecuted,
+	}
+
+	encodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+
+	suite.Run("happy path", func() {
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(expectedResult, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("provider error", func() {
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Nil(res)
+		suite.Require().Equal(expectedErr, err)
+	})
+
+	suite.Run("block not found exception", func() {
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("block not provided", func() {
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.InvalidArgument, status.Code(err))
+		suite.Require().Nil(res)
+	})
+}
+
+func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
+	tx := suite.systemCollection.Transactions[1]
+	txID := tx.ID()
+
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
+
+	encodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+
+	expectedResult := &accessmodel.TransactionResult{
+		BlockID:       blockID,
+		TransactionID: txID,
+		CollectionID:  flow.ZeroID,
+		BlockHeight:   block.Height,
+		Status:        flow.TransactionStatusExecuted,
+	}
+
+	suite.Run("happy path", func() {
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(expectedResult, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("scheduled tx lookup failure", func() {
+		expectedErr := fmt.Errorf("some other error")
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(flow.ZeroID, expectedErr).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("scheduled tx block mismatch", func() {
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		incorrectBlockID := suite.g.Identifiers().Fixture()
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, incorrectBlockID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("scheduled tx block not found exception", func() {
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(),
+			fmt.Errorf("failed to get scheduled transaction's block from storage: %w", storage.ErrNotFound))
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		res, err := txBackend.GetTransactionResult(signalerCtx, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("provider error", func() {
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Nil(res)
+	})
+}
+
+func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
+
+	collection := suite.g.Collections().Fixture()
+	collectionID := collection.ID()
+	lightCollection := collection.Light()
+
+	tx := collection.Transactions[0]
+	txID := tx.ID()
+
+	encodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+
+	expectedResult := &accessmodel.TransactionResult{
+		BlockID:       blockID,
+		BlockHeight:   block.Height,
+		TransactionID: txID,
+		CollectionID:  collectionID,
+		Status:        flow.TransactionStatusExecuted,
+	}
+
+	ctx := irrecoverable.NewMockSignalerContext(suite.T(), context.Background())
+	ctxNoErr := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+	suite.scheduledTransactions.
+		On("BlockIDByTransactionID", txID).
+		Return(flow.ZeroID, storage.ErrNotFound)
+
+	suite.Run("happy path - only txID provided", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			Return(expectedResult, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("happy path - all args provided", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			Return(expectedResult, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("happy path - not executed", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			Return(nil, storage.ErrNotFound)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		expected := *expectedResult
+		expected.Status = flow.TransactionStatusFinalized
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expected, *res)
+	})
+
+	suite.Run("collection ID mismatch", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		incorrectCollectionID := suite.g.Identifiers().Fixture()
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, incorrectCollectionID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("block ID mismatch", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		incorrectBlockID := suite.g.Identifiers().Fixture()
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, incorrectBlockID, collectionID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("collection lookup error", func() {
+		expectedErr := fmt.Errorf("some other error")
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(nil, expectedErr).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("block lookup failure throws exception", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		expectedErr := fmt.Errorf("failed to find block for collection %v: %w", collectionID, storage.ErrNotFound)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedErr)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		res, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion)
+		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("tx body lookup failure throws exception", func() {
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		expectedErr := fmt.Errorf("failed to get transaction from storage: %w", storage.ErrNotFound)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedErr)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		res, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("provider error", func() {
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		suite.collections.
+			On("LightByTransactionID", txID).
+			Return(lightCollection, nil).
+			Once()
+
+		suite.blocks.
+			On("ByCollectionID", collectionID).
+			Return(block, nil).
+			Once()
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Nil(res)
+	})
+}
+
+func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
+	blocks := suite.g.Blocks().List(3)
+
+	finalizedBlock := blocks[0]
+
+	refBlock := blocks[1]
+	refBlockID := refBlock.ID()
+
+	block := blocks[2]
+	blockID := block.ID()
+
+	tx := suite.g.Transactions().Fixture()
+	tx.ReferenceBlockID = refBlockID
+	txID := tx.ID()
+
+	collection := suite.g.Collections().Fixture()
+	lightCollection := collection.Light()
+	collectionID := collection.ID()
+
+	encodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+
+	ctx := irrecoverable.NewMockSignalerContext(suite.T(), context.Background())
+	ctxNoErr := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+	suite.scheduledTransactions.
+		On("BlockIDByTransactionID", txID).
+		Return(flow.ZeroID, storage.ErrNotFound)
+
 	suite.collections.
-		On("LightByTransactionID", transactionBody.ID()).
+		On("LightByTransactionID", txID).
 		Return(nil, storage.ErrNotFound)
 
-	client := accessmock.NewAccessAPIClient(suite.T())
-	params := suite.defaultTransactionsParams()
-	params.StaticCollectionRPCClient = client
-	txBackend, err := NewTransactionsBackend(params)
-	suite.Require().NoError(err)
+	suite.Run("pending tx", func() {
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
 
-	retry := retrier.NewRetrier(
-		suite.log,
-		suite.blocks,
-		suite.collections,
-		txBackend,
-		txBackend.txStatusDeriver,
-	)
-	retry.RegisterTransaction(block.Height, &transactionBody)
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(refBlock.ToHeader(), nil)
+		suite.state.On("AtBlockID", refBlockID).Return(snapshot, nil).Once()
 
-	client.On("SendTransaction", mock.Anything, mock.Anything).Return(&access.SendTransactionResponse{}, nil)
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(finalizedBlock.ToHeader(), nil)
+		suite.state.On("Final").Return(finalSnapshot, nil).Once()
 
-	// Don't retry on every height
-	err = retry.Retry(block.Height + 1)
-	suite.Require().NoError(err)
+		expectedResult := &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        flow.TransactionStatusPending,
+		}
 
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 
-	// Retry every `retryFrequency`
-	err = retry.Retry(block.Height + retrier.RetryFrequency)
-	suite.Require().NoError(err)
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
 
-	client.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
 
-	// do not retry if expired
-	err = retry.Retry(block.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
-	suite.Require().NoError(err)
+	suite.Run("transaction lookup error", func() {
+		expectedErr := fmt.Errorf("some other error")
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, expectedErr).
+			Once()
 
-	// Should've still only been called once
-	client.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("pending block with derive status exception", func() {
+		suite.transactions.
+			On("ByID", txID).
+			Return(tx, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(refBlock.ToHeader(), nil)
+		suite.state.On("AtBlockID", refBlockID).Return(snapshot, nil).Once()
+
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(nil, storage.ErrNotFound)
+		suite.state.On("Final").Return(finalSnapshot, nil).Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(),
+			fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup final header: %w", storage.ErrNotFound)))
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		res, err := txBackend.GetTransactionResult(signalerCtx, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("unknown tx in known block", func() {
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		suite.blocks.
+			On("ByID", blockID).
+			Return(block, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		expectedResult := &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        flow.TransactionStatusUnknown,
+		}
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("block lookup error", func() {
+		expectedErr := fmt.Errorf("some other error")
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		suite.blocks.
+			On("ByID", blockID).
+			Return(nil, expectedErr).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("unknown tx in known collection", func() {
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		suite.collections.
+			On("LightByID", collectionID).
+			Return(lightCollection, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, collectionID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("collection lookup error", func() {
+		expectedErr := fmt.Errorf("some other error")
+
+		suite.transactions.
+			On("ByID", txID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		suite.collections.
+			On("LightByID", collectionID).
+			Return(nil, expectedErr).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, collectionID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(res)
+	})
 }
 
-// TestSuccessfulTransactionsDontRetry tests that the retry mechanism will send retries at specific times
-func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
-	collection := unittest.CollectionFixture(1)
-	light := collection.Light()
-	transactionBody := collection.Transactions[0]
-	txID := transactionBody.ID()
+func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
+	tx := suite.g.Transactions().Fixture()
+	txID := tx.ID()
 
-	block := unittest.BlockFixture()
+	block := suite.g.Blocks().Fixture()
 	blockID := block.ID()
 
-	// setup chain state
-	_, fixedENIDs := suite.setupReceipts(block)
-	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
-
-	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(light, nil)
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(block, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-
-	exeEventReq := execproto.GetTransactionResultRequest{
-		BlockId:       blockID[:],
-		TransactionId: txID[:],
+	expectedFoundResponse := &accessmodel.TransactionResult{
+		TransactionID: txID,
+		BlockID:       blockID,
+		BlockHeight:   block.Height,
+		Status:        flow.TransactionStatusSealed,
+		Events:        []flow.Event{}, // needed because converter uses an empty slice for nil events
 	}
-	exeEventResp := execproto.GetTransactionResultResponse{
-		Events: nil,
-	}
-	suite.executionAPIClient.
-		On("GetTransactionResult", context.Background(), &exeEventReq).
-		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
-		Times(len(fixedENIDs)) // should call each EN once
 
-	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
-		Times(len(fixedENIDs))
+	expectedNotFoundResponse := &accessmodel.TransactionResult{
+		TransactionID: txID,
+		Status:        flow.TransactionStatusUnknown,
+	}
+
+	expectedRequest := &access.GetTransactionRequest{
+		Id: txID[:],
+	}
+
+	foundResponse := convert.TransactionResultToMessage(expectedFoundResponse)
+
+	encodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+
+	ctx := irrecoverable.NewMockSignalerContext(suite.T(), context.Background())
+	ctxNoErr := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+	suite.scheduledTransactions.
+		On("BlockIDByTransactionID", txID).
+		Return(flow.ZeroID, storage.ErrNotFound)
+
+	suite.collections.
+		On("LightByTransactionID", txID).
+		Return(nil, storage.ErrNotFound)
+
+	suite.transactions.
+		On("ByID", txID).
+		Return(nil, storage.ErrNotFound)
+
+	suite.Run("result found", func() {
+		suite.historicalAccessAPIClient.
+			On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(foundResponse, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxResultCache = new(NoopTxResultCache)
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedFoundResponse, resp)
+	})
+
+	suite.Run("result not found", func() {
+		suite.historicalAccessAPIClient.
+			On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(nil, status.Error(codes.Internal, "some other error")).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxResultCache = new(NoopTxResultCache)
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedNotFoundResponse, resp)
+	})
+
+	suite.Run("success result is cached", func() {
+		// make sure the cache is starting empty
+		suite.txResultCache.Purge()
+
+		// this should only be called once
+		// unset to make sure we're definitely testing what we expect
+		suite.historicalAccessAPIClient.
+			On("GetTransactionResult", mock.Anything, expectedRequest).
+			Unset()
+		suite.historicalAccessAPIClient.
+			On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(foundResponse, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		// use real cache (used by default)
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		// first call should populate the cache
+		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedFoundResponse, resp)
+
+		// second call should return the cached result
+		resp, err = txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedFoundResponse, resp)
+	})
+
+	suite.Run("not found result is cached", func() {
+		// make sure the cache is starting empty
+		suite.txResultCache.Purge()
+
+		// this should only be called once
+		// unset to make sure we're definitely testing what we expect
+		suite.historicalAccessAPIClient.
+			On("GetTransactionResult", mock.Anything, expectedRequest).
+			Unset()
+		suite.historicalAccessAPIClient.
+			On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(nil, status.Error(codes.Internal, "some other error")).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		// use real cache (used by default)
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		// first call should populate the cache
+		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedNotFoundResponse, resp)
+
+		// second call should return the cached result
+		resp, err = txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedNotFoundResponse, resp)
+	})
+}
+
+func (suite *Suite) TestGetHistoricalTransactionResult() {
+	tx := suite.g.Transactions().Fixture()
+	txID := tx.ID()
+
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
+
+	expectedFoundResponse := &accessmodel.TransactionResult{
+		TransactionID: txID,
+		BlockID:       blockID,
+		BlockHeight:   block.Height,
+		Status:        flow.TransactionStatusSealed,
+		Events:        []flow.Event{}, // needed because converter uses an empty slice for nil events
+	}
+	response := convert.TransactionResultToMessage(expectedFoundResponse)
+
+	expectedRequest := &access.GetTransactionRequest{
+		Id: txID[:],
+	}
+
+	an1 := accessmock.NewAccessAPIClient(suite.T())
+	an2 := accessmock.NewAccessAPIClient(suite.T())
+	an3 := accessmock.NewAccessAPIClient(suite.T())
+
+	suite.Run("iterates through multiple nodes", func() {
+		an1.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(nil, status.Error(codes.NotFound, "not found")).
+			Once()
+
+		an2.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(nil, status.Error(codes.Unavailable, "unavailable")).
+			Once()
+
+		an3.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(response, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{an1, an2, an3}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		resp, err := txBackend.getHistoricalTransactionResult(context.Background(), txID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedFoundResponse, resp)
+	})
+
+	suite.Run("returns not found when all nodes return not found", func() {
+		an1.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(nil, status.Error(codes.OutOfRange, "out of range")).
+			Once()
+
+		an2.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(nil, status.Error(codes.Unavailable, "unavailable")).
+			Once()
+
+		an3.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(nil, status.Error(codes.Internal, "internal error")).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{an1, an2, an3}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		resp, err := txBackend.getHistoricalTransactionResult(context.Background(), txID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(resp)
+	})
+
+	suite.Run("returns unknown when result status is unknown", func() {
+		expectedResponse := &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        flow.TransactionStatusUnknown,
+		}
+		response := convert.TransactionResultToMessage(expectedResponse)
+
+		an1.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(response, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{an1}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		resp, err := txBackend.getHistoricalTransactionResult(context.Background(), txID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(resp)
+	})
+
+	suite.Run("returns expired when result status is pending", func() {
+		nodeResponse := &accessmodel.TransactionResult{
+			TransactionID: txID,
+			BlockID:       blockID,
+			BlockHeight:   block.Height,
+			Status:        flow.TransactionStatusPending,
+		}
+		response := convert.TransactionResultToMessage(nodeResponse)
+
+		// result status should be updated to expired
+		expectedResponse := &accessmodel.TransactionResult{
+			TransactionID: txID,
+			BlockID:       blockID,
+			BlockHeight:   block.Height,
+			Status:        flow.TransactionStatusExpired,
+			Events:        []flow.Event{}, // needed because converter uses an empty slice for nil events
+		}
+
+		an1.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(response, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{an1}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		resp, err := txBackend.getHistoricalTransactionResult(context.Background(), txID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResponse, resp)
+	})
+
+	suite.Run("returns error when convert fails", func() {
+		nodeResponse := &accessmodel.TransactionResult{
+			TransactionID: txID,
+			BlockID:       blockID,
+			BlockHeight:   block.Height,
+			Status:        flow.TransactionStatusSealed,
+			Events: []flow.Event{
+				suite.g.Events().Fixture(
+					// this is invalid and will cause the converter to fail
+					suite.g.Events().WithTransactionID(flow.ZeroID),
+				),
+			},
+		}
+		response := convert.TransactionResultToMessage(nodeResponse)
+
+		an1.On("GetTransactionResult", mock.Anything, expectedRequest).
+			Return(response, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.HistoricalAccessNodeClients = []access.AccessAPIClient{an1}
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		resp, err := txBackend.getHistoricalTransactionResult(context.Background(), txID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(resp)
+	})
+}
+
+func (suite *Suite) TestGetSystemTransaction() {
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
 
 	params := suite.defaultTransactionsParams()
-	client := accessmock.NewAccessAPIClient(suite.T())
-	params.StaticCollectionRPCClient = client
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
 
-	retry := retrier.NewRetrier(
-		suite.log,
-		suite.blocks,
-		suite.collections,
-		txBackend,
-		txBackend.txStatusDeriver,
-	)
-	retry.RegisterTransaction(block.Height, transactionBody)
+	suite.Run("returns process transactions transaction", func() {
+		tx := suite.systemCollection.Transactions[0]
+		txID := tx.ID()
 
-	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := txBackend.GetTransactionResult(
-		context.Background(),
-		txID,
-		flow.ZeroID,
-		flow.ZeroID,
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	)
-	suite.Require().NoError(err)
-	suite.Require().NotNil(result)
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
 
-	// status should be finalized since the sealed Blocks is smaller in height
-	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
+		res, err := txBackend.GetSystemTransaction(context.Background(), txID, blockID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(tx, res)
+	})
 
-	// Don't retry when block is finalized
-	err = retry.Retry(block.Height + 1)
-	suite.Require().NoError(err)
+	suite.Run("returns system chunk transaction", func() {
+		tx := suite.systemCollection.Transactions[len(suite.systemCollection.Transactions)-1]
+		txID := tx.ID()
 
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
 
-	// Don't retry when block is finalized
-	err = retry.Retry(block.Height + retrier.RetryFrequency)
-	suite.Require().NoError(err)
+		res, err := txBackend.GetSystemTransaction(context.Background(), txID, blockID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(tx, res)
+	})
 
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
+	suite.Run("returns system chunk transaction when tx is not provided", func() {
+		tx := suite.systemCollection.Transactions[len(suite.systemCollection.Transactions)-1]
 
-	// Don't retry when block is finalized
-	err = retry.Retry(block.Height + retrier.RetryFrequency + flow.DefaultTransactionExpiry)
-	suite.Require().NoError(err)
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
 
-	// Should've still should not be called
-	client.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
+		res, err := txBackend.GetSystemTransaction(context.Background(), flow.ZeroID, blockID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(tx, res)
+	})
+
+	suite.Run("returns error when block not found", func() {
+		tx := suite.systemCollection.Transactions[0]
+		txID := tx.ID()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		res, err := txBackend.GetSystemTransaction(context.Background(), txID, blockID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("returns not found for non-system transaction", func() {
+		tx := suite.g.Transactions().Fixture()
+		txID := tx.ID()
+
+		res, err := txBackend.GetSystemTransaction(context.Background(), txID, blockID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
 }
 
-func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
-	ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	receipt1 := unittest.ReceiptForBlockFixture(block)
-	receipt1.ExecutorID = ids[0].NodeID
-	receipt2 := unittest.ReceiptForBlockFixture(block)
-	receipt2.ExecutorID = ids[1].NodeID
-	receipt1.ExecutionResult = receipt2.ExecutionResult
+func (suite *Suite) TestGetSystemTransactionResult() {
+	tx := suite.systemCollection.Transactions[0]
+	txID := tx.ID()
 
-	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
-	suite.receipts.
-		On("ByBlockID", block.ID()).
-		Return(receipts, nil)
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
 
-	return receipts, ids
-}
-
-func (suite *Suite) assertTransactionResultResponse(
-	err error,
-	response *accessmodel.TransactionResult,
-	block flow.Block,
-	txId flow.Identifier,
-	txFailed bool,
-	eventsForTx []flow.Event,
-) {
-	suite.Require().NoError(err)
-	suite.Assert().Equal(block.ID(), response.BlockID)
-	suite.Assert().Equal(block.Height, response.BlockHeight)
-	suite.Assert().Equal(txId, response.TransactionID)
-	if txId == suite.systemTx.ID() {
-		suite.Assert().Equal(flow.ZeroID, response.CollectionID)
-	} else {
-		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response.CollectionID)
+	expectedResult := &accessmodel.TransactionResult{
+		BlockID:       blockID,
+		TransactionID: txID,
+		CollectionID:  flow.ZeroID,
+		BlockHeight:   block.Height,
+		Status:        flow.TransactionStatusExecuted,
 	}
-	suite.Assert().Equal(len(eventsForTx), len(response.Events))
-	// When there are error messages occurred in the transaction, the status should be 1
-	if txFailed {
-		suite.Assert().Equal(uint(1), response.StatusCode)
-		suite.Assert().Equal(expectedErrorMsg, response.ErrorMessage)
-	} else {
-		suite.Assert().Equal(uint(0), response.StatusCode)
-		suite.Assert().Equal("", response.ErrorMessage)
-	}
-	suite.Assert().Equal(flow.TransactionStatusSealed, response.Status)
+
+	encodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+
+	suite.Run("happy path", func() {
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(expectedResult, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetSystemTransactionResult(context.Background(), txID, blockID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("uses system chunk tx when txID is not provided", func() {
+		systemTx := suite.systemCollection.Transactions[len(suite.systemCollection.Transactions)-1]
+		systemTxID := systemTx.ID()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), systemTxID, flow.ZeroID, encodingVersion).
+			Return(expectedResult, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetSystemTransactionResult(context.Background(), flow.ZeroID, blockID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("returns not found when tx is not a system tx", func() {
+		tx := suite.g.Transactions().Fixture()
+		txID := tx.ID()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetSystemTransactionResult(context.Background(), txID, blockID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("provider error", func() {
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetSystemTransactionResult(context.Background(), txID, blockID, encodingVersion)
+		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Nil(res)
+		suite.Require().Equal(expectedErr, err)
+	})
+
+	suite.Run("block not found exception", func() {
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetSystemTransactionResult(context.Background(), txID, blockID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("block not provided", func() {
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetSystemTransactionResult(context.Background(), txID, flow.ZeroID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.InvalidArgument, status.Code(err))
+		suite.Require().Nil(res)
+	})
 }
 
-// createPendingExecutionEvents creates properly formatted PendingExecution events
-// that blueprints.SystemCollection expects for reconstructing the system collection.
-func (suite *Suite) createPendingExecutionEvents(numCallbacks int) []flow.Event {
-	events := make([]flow.Event, numCallbacks)
+func (suite *Suite) TestGetScheduledTransaction() {
+	scheduledTxID := suite.g.Random().Uint64()
+	tx := suite.systemCollection.Transactions[1]
+	txID := tx.ID()
 
-	// Get system contracts for the test chain
-	env := systemcontracts.SystemContractsForChain(suite.chainID).AsTemplateEnv()
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
 
-	for i := 0; i < numCallbacks; i++ {
-		// Create the PendingExecution event as it would be emitted by the process callback transaction
-		const processedEventTypeTemplate = "A.%v.FlowTransactionScheduler.PendingExecution"
-		eventTypeString := fmt.Sprintf(processedEventTypeTemplate, env.FlowTransactionSchedulerAddress)
-
-		// Create Cadence event type
-		loc, err := cadenceCommon.HexToAddress(env.FlowTransactionSchedulerAddress)
-		suite.Require().NoError(err)
-		location := cadenceCommon.NewAddressLocation(nil, loc, "PendingExecution")
-
-		eventType := cadence.NewEventType(
-			location,
-			"PendingExecution",
-			[]cadence.Field{
-				{Identifier: "id", Type: cadence.UInt64Type},
-				{Identifier: "priority", Type: cadence.UInt8Type},
-				{Identifier: "executionEffort", Type: cadence.UInt64Type},
-				{Identifier: "fees", Type: cadence.UFix64Type},
-				{Identifier: "callbackOwner", Type: cadence.AddressType},
-			},
-			nil,
-		)
-
-		fees, err := cadence.NewUFix64("0.0")
-		suite.Require().NoError(err)
-
-		// Create the Cadence event with proper values
-		event := cadence.NewEvent(
-			[]cadence.Value{
-				cadence.NewUInt64(uint64(i + 1)),           // id: unique callback ID
-				cadence.NewUInt8(1),                        // priority
-				cadence.NewUInt64(uint64((i+1)*100 + 100)), // executionEffort (200, 300, etc.)
-				fees,                          // fees: 0.0
-				cadence.NewAddress([8]byte{}), // callbackOwner
-			},
-		).WithType(eventType)
-
-		// Encode the event using CCF
-		payload, err := ccf.Encode(event)
-		suite.Require().NoError(err)
-
-		// Create the Flow event
-		events[i] = flow.Event{
-			Type:             flow.EventType(eventTypeString),
-			TransactionID:    unittest.IdentifierFixture(), // Process callback transaction ID
-			TransactionIndex: 0,
-			EventIndex:       uint32(i),
-			Payload:          payload,
+	suite.Run("happy path", func() {
+		scheduledTxs := []*flow.TransactionBody{
+			suite.g.Transactions().Fixture(),
+			tx,
+			suite.g.Transactions().Fixture(),
 		}
-	}
 
-	return events
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("ScheduledTransactionsByBlockID", mock.Anything, block.ToHeader()).
+			Return(scheduledTxs, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		actual, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+		suite.Require().NoError(err)
+		suite.Require().Equal(tx, actual)
+	})
+
+	suite.Run("not a scheduled tx", func() {
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		actual, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(actual)
+	})
+
+	// Tests the case where the scheduled transaction exists in the indices, but not in the generated
+	// system collection (produced from events). This indicates inconsistent state, however it is handled
+	// by returning an internal error instead of an irrecoverable since the events may be queried from
+	// an Execution node, which could have returned incorrect data.
+	suite.Run("not in generated collection", func() {
+		scheduledTxs := []*flow.TransactionBody{
+			suite.g.Transactions().Fixture(),
+			suite.g.Transactions().Fixture(),
+		}
+
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("ScheduledTransactionsByBlockID", mock.Anything, block.ToHeader()).
+			Return(scheduledTxs, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		actual, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actual)
+	})
+
+	suite.Run("provider error", func() {
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("ScheduledTransactionsByBlockID", mock.Anything, block.ToHeader()).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		actual, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Nil(actual)
+	})
+
+	suite.Run("block not found exception", func() {
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(),
+			fmt.Errorf("failed to get block header: %w", storage.ErrNotFound))
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		actual, err := txBackend.GetScheduledTransaction(signalerCtx, scheduledTxID)
+		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		suite.Require().Nil(actual)
+	})
+
+	suite.Run("returns unimplemented error when scheduled transactions are not enabled", func() {
+		params := suite.defaultTransactionsParams()
+		params.ScheduledTransactions = nil
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransaction(context.Background(), 0)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Unimplemented, status.Code(err))
+		suite.Require().Nil(res)
+	})
 }
 
-func (suite *Suite) setupExecutionGetEventsRequest(blockID flow.Identifier, blockHeight uint64, events []flow.Event) {
-	eventMessages := make([]*entities.Event, len(events))
-	for i, event := range events {
-		eventMessages[i] = convert.EventToMessage(event)
+func (suite *Suite) TestGetScheduledTransactionResult() {
+	scheduledTxID := suite.g.Random().Uint64()
+	tx := suite.systemCollection.Transactions[1]
+	txID := tx.ID()
+
+	block := suite.g.Blocks().Fixture()
+	blockID := block.ID()
+
+	encodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+
+	expectedResult := &accessmodel.TransactionResult{
+		BlockID:       blockID,
+		TransactionID: txID,
+		CollectionID:  flow.ZeroID,
+		BlockHeight:   block.Height,
+		Status:        flow.TransactionStatusExecuted,
 	}
 
-	request := &execproto.GetEventsForBlockIDsRequest{
-		Type:     string(suite.processScheduledCallbackEventType),
-		BlockIds: [][]byte{blockID[:]},
-	}
-	expectedResponse := &execproto.GetEventsForBlockIDsResponse{
-		Results: []*execproto.GetEventsForBlockIDsResponse_Result{
-			{
-				BlockId:     blockID[:],
-				BlockHeight: blockHeight,
-				Events:      eventMessages,
-			},
-		},
-		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	suite.Run("happy path", func() {
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(expectedResult, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+	})
+
+	suite.Run("not a scheduled tx", func() {
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("scheduled tx by block ID lookup failure", func() {
+		expectedErr := fmt.Errorf("some other error")
+
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(flow.ZeroID, expectedErr).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("block not found exception", func() {
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(),
+			fmt.Errorf("failed to get scheduled transaction's block from storage: %w", storage.ErrNotFound))
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		res, err := txBackend.GetScheduledTransactionResult(signalerCtx, scheduledTxID, encodingVersion)
+		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("provider error", func() {
+		expectedErr := status.Errorf(codes.Internal, "some other error")
+
+		suite.scheduledTransactions.
+			On("TransactionIDByID", scheduledTxID).
+			Return(txID, nil).
+			Once()
+
+		suite.scheduledTransactions.
+			On("BlockIDByTransactionID", txID).
+			Return(blockID, nil).
+			Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			Return(nil, expectedErr)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
+		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Nil(res)
+	})
+
+	suite.Run("returns unimplemented error when scheduled transactions are not enabled", func() {
+		params := suite.defaultTransactionsParams()
+		params.ScheduledTransactions = nil
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Unimplemented, status.Code(err))
+		suite.Require().Nil(res)
+	})
+}
+
+func (suite *Suite) TestSendTransaction() {
+	refBlock := suite.g.Headers().Fixture()
+	refBlockID := refBlock.ID()
+	finalBlock := suite.g.Headers().Fixture(fixtures.Header.WithParentHeader(refBlock))
+	tx := suite.g.Transactions().Fixture(fixtures.Transaction.WithReferenceBlockID(refBlockID))
+
+	expectedRequest := &access.SendTransactionRequest{
+		Transaction: convert.TransactionToMessage(*tx),
 	}
 
-	suite.executionAPIClient.
-		On("GetEventsForBlockIDs", mock.Anything, request).
-		Return(expectedResponse, nil).
-		Once()
+	response := &access.SendTransactionResponse{
+		Id: convert.IdentifierToMessage(tx.ID()),
+	}
 
+	nodes := suite.g.Identities().List(2, fixtures.Identity.WithRole(flow.RoleCollection))
+
+	suite.Run("happy path", func() {
+		client := suite.addCollectionClient(nodes[0].Address)
+		client.On("SendTransaction", mock.Anything, expectedRequest).Return(response, nil)
+
+		suite.transactions.On("Store", tx).Return(nil).Once()
+
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(finalBlock, nil).Once()
+		suite.state.On("Final").Return(finalSnapshot, nil).Twice() // once to get clustering, once to validate the tx
+
+		refBlockSnapshot := protocolmock.NewSnapshot(suite.T())
+		refBlockSnapshot.On("Head").Return(refBlock, nil).Once()
+		suite.state.On("AtBlockID", refBlockID).Return(refBlockSnapshot, nil).Once()
+
+		configureClustering(suite.T(), flow.IdentityList{nodes[0]}, finalSnapshot)
+
+		params := suite.defaultTransactionsParams()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		err = txBackend.SendTransaction(context.Background(), tx)
+		suite.Require().NoError(err)
+	})
+
+	// test that the correct node is used when a static collection node is provided and the
+	// clustering lookup is never performed
+	suite.Run("static collection node", func() {
+		client := accessmock.NewAccessAPIClient(suite.T())
+		client.On("SendTransaction", mock.Anything, expectedRequest).Return(response, nil)
+
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(finalBlock, nil).Once()
+		suite.state.On("Final").Return(finalSnapshot, nil).Once()
+
+		refBlockSnapshot := protocolmock.NewSnapshot(suite.T())
+		refBlockSnapshot.On("Head").Return(refBlock, nil).Once()
+		suite.state.On("AtBlockID", refBlockID).Return(refBlockSnapshot, nil).Once()
+
+		suite.transactions.On("Store", tx).Return(nil).Once()
+
+		params := suite.defaultTransactionsParams()
+		params.StaticCollectionRPCClient = client
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		err = txBackend.SendTransaction(context.Background(), tx)
+		suite.Require().NoError(err)
+	})
+
+	// test that each collection node is tried when requests fail
+	suite.Run("multiple collection nodes tried when first fails", func() {
+		expectedErr := status.Errorf(codes.Internal, "test failed to send transaction")
+
+		for _, node := range nodes {
+			client := suite.addCollectionClient(node.Address)
+			client.On("SendTransaction", mock.Anything, expectedRequest).Return(nil, expectedErr)
+		}
+
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(finalBlock, nil).Once()
+		suite.state.On("Final").Return(finalSnapshot, nil).Twice() // once to get clustering, once to validate the tx
+
+		refBlockSnapshot := protocolmock.NewSnapshot(suite.T())
+		refBlockSnapshot.On("Head").Return(refBlock, nil).Once()
+		suite.state.On("AtBlockID", refBlockID).Return(refBlockSnapshot, nil).Once()
+
+		configureClustering(suite.T(), nodes, finalSnapshot)
+
+		params := suite.defaultTransactionsParams()
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		err = txBackend.SendTransaction(context.Background(), tx)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Contains(err.Error(), expectedErr.Error())
+	})
+}
+
+func configureClustering(t *testing.T, identities flow.IdentityList, finalSnapshot *protocolmock.Snapshot) {
+	epoch := protocolmock.NewCommittedEpoch(t)
+	epoch.On("Clustering").Return(flow.ClusterList{identities.ToSkeleton()}, nil).Once()
+
+	epochQuery := protocolmock.NewEpochQuery(t)
+	epochQuery.On("Current").Return(epoch, nil).Once()
+
+	finalSnapshot.On("Epochs").Return(epochQuery, nil).Once()
+}
+
+func (suite *Suite) addCollectionClient(address string) *accessmock.AccessAPIClient {
+	client := accessmock.NewAccessAPIClient(suite.T())
 	suite.connectionFactory.
-		On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.executionAPIClient, &mocks.MockCloser{}, nil).
+		On("GetCollectionAPIClient", address, mock.Anything).
+		Return(client, &mocks.MockCloser{}, nil).
 		Once()
+
+	return client
 }
