@@ -308,12 +308,12 @@ func (t *Transactions) lookupScheduledTransaction(ctx context.Context, txID flow
 		// the node is in an inconsistent state
 		err = fmt.Errorf("failed to get block header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, true, err
+		return nil, false, err
 	}
 
 	scheduledTxs, err := t.txProvider.ScheduledTransactionsByBlockID(ctx, header)
 	if err != nil {
-		return nil, true, rpc.ConvertError(err, "failed to get scheduled transactions", codes.Internal)
+		return nil, false, rpc.ConvertError(err, "failed to get scheduled transactions", codes.Internal)
 	}
 
 	for _, tx := range scheduledTxs {
@@ -392,6 +392,7 @@ func (t *Transactions) GetTransactionResult(
 }
 
 // lookupSubmittedTransactionResult looks up the transaction result for a user transaction.
+// This function assumes that the queried transaction is not a system transaction or scheduled transaction.
 //
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if the transaction is not found or not in the provided block or collection
@@ -417,7 +418,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		}
 		// we have already checked if this is a system or scheduled tx. at this point, the tx is either
 		// pending, unknown, or from a past spork.
-		result, err := t.getUnknownTransactionResult(ctx, txID, blockID, collectionID)
+		result, err := t.getUnknownUserTransactionResult(ctx, txID, blockID, collectionID)
 		return result, nil, err
 	}
 	actualCollectionID := lightCollection.ID()
@@ -468,7 +469,6 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		// The transaction is not executed yet
 		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, false)
 		if err != nil {
-			// this is an executed transaction. If we can't derive transaction status something is very wrong.
 			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 			return nil, nil, err
 		}
@@ -505,12 +505,12 @@ func (t *Transactions) lookupSystemTransactionResult(
 
 	// block must be provided to get the correct system tx result
 	if blockID == flow.ZeroID {
-		return nil, true, status.Errorf(codes.InvalidArgument, "block ID is required for system transactions")
+		return nil, false, status.Errorf(codes.InvalidArgument, "block ID is required for system transactions")
 	}
 
 	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
-		return nil, true, status.Errorf(codes.NotFound, "could not find block: %v", err)
+		return nil, false, status.Errorf(codes.NotFound, "could not find block: %v", err)
 	}
 
 	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
@@ -538,7 +538,7 @@ func (t *Transactions) lookupScheduledTransactionResult(
 	}
 
 	if blockID != flow.ZeroID && scheduledTxBlockID != blockID {
-		return nil, true, status.Errorf(codes.NotFound, "scheduled transaction found in block %s, but %s was provided", scheduledTxBlockID, blockID)
+		return nil, false, status.Errorf(codes.NotFound, "scheduled transaction found in block %s, but %s was provided", scheduledTxBlockID, blockID)
 	}
 
 	header, err := t.state.AtBlockID(scheduledTxBlockID).Head()
@@ -547,20 +547,20 @@ func (t *Transactions) lookupScheduledTransactionResult(
 		// otherwise the node is in an inconsistent state
 		err = fmt.Errorf("failed to get scheduled transaction's block from storage: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, true, err
+		return nil, false, err
 	}
 
 	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
 	return result, true, err
 }
 
-// getUnknownTransactionResult returns the transaction result for a transaction that is not yet
+// getUnknownUserTransactionResult returns the transaction result for a transaction that is not yet
 // indexed in a finalized block.
 //
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if the transaction is not found or is in the provided block or collection
 //   - [codes.Internal]: if there was an error looking up the transaction, block, or collection.
-func (t *Transactions) getUnknownTransactionResult(
+func (t *Transactions) getUnknownUserTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
@@ -590,8 +590,8 @@ func (t *Transactions) getUnknownTransactionResult(
 		return nil, status.Errorf(codes.Internal, "failed to lookup unknown transaction: %v", err)
 	}
 
-	// the transaction does not exist locally, so check if the block or collection help identify its
-	// status.
+	// The transaction does not exist locally, so check if the block or collection help identify its status.
+	// If we know the queried block or collection exist locally, then we can avoid querying historical Access Node.
 	if blockID != flow.ZeroID {
 		_, err := t.blocks.ByID(blockID)
 		if err == nil {
@@ -664,8 +664,9 @@ func (t *Transactions) GetTransactionResultByIndex(
 }
 
 // GetSystemTransaction returns a system transaction by ID.
-// Note: this function only returns privilaged system transactions. It does NOT return user scheduled
-// transactions contained within the system collection.
+// If no transaction ID is provided, the last system transaction is queried.
+// Note: this function only returns privileged system transactions. It does NOT return user scheduled
+// transactions, which are also contained within the system collection.
 func (t *Transactions) GetSystemTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -691,8 +692,9 @@ func (t *Transactions) GetSystemTransaction(
 }
 
 // GetSystemTransactionResult returns a system transaction result by ID.
-// Note: this function only returns privilaged system transactions. It does NOT return user scheduled
-// transactions contained within the system collection.
+// If no transaction ID is provided, the last system transaction is queried.
+// Note: this function only returns privileged system transactions. It does NOT return user scheduled
+// transactions, which are also contained within the system collection.
 func (t *Transactions) GetSystemTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -718,6 +720,8 @@ func (t *Transactions) GetSystemTransactionResult(
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if the scheduled transaction is not found
 func (t *Transactions) GetScheduledTransaction(ctx context.Context, scheduledTxID uint64) (*flow.TransactionBody, error) {
+	// The scheduled transactions index is only written if execution state indexing is enabled.
+	// Note: it's possible indexing is enabled and requests are still served from execution nodes.
 	if t.scheduledTransactions == nil {
 		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
 	}
@@ -747,6 +751,8 @@ func (t *Transactions) GetScheduledTransaction(ctx context.Context, scheduledTxI
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if the scheduled transaction is not found
 func (t *Transactions) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+	// The scheduled transactions index is only written if execution state indexing is enabled.
+	// Note: it's possible indexing is enabled and requests are still served from execution nodes.
 	if t.scheduledTransactions == nil {
 		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
 	}

@@ -295,7 +295,7 @@ func (suite *Suite) TestGetTransaction_ScheduledTx() {
 	block := suite.g.Blocks().Fixture()
 	blockID := block.ID()
 
-	suite.Run("scheduled tx", func() {
+	suite.Run("happy path", func() {
 		tx := suite.systemCollection.Transactions[1]
 		txID := tx.ID()
 
@@ -339,7 +339,11 @@ func (suite *Suite) TestGetTransaction_ScheduledTx() {
 		suite.Require().Equal(tx, actual)
 	})
 
-	suite.Run("scheduled tx - not in generated collection", func() {
+	// Tests the case where the scheduled transaction exists in the indices, but not in the generated
+	// system collection (produced from events). This indicates inconsistent state, however it is handled
+	// by returning an internal error instead of an irrecoverable since the events may be queried from
+	// an Execution node, which could have returned incorrect data.
+	suite.Run("not in generated collection", func() {
 		tx := suite.systemCollection.Transactions[1]
 		txID := tx.ID()
 
@@ -383,7 +387,7 @@ func (suite *Suite) TestGetTransaction_ScheduledTx() {
 		suite.Require().Nil(actual)
 	})
 
-	suite.Run("scheduled tx - provider error", func() {
+	suite.Run("provider error", func() {
 		tx := suite.systemCollection.Transactions[1]
 		txID := tx.ID()
 
@@ -423,7 +427,7 @@ func (suite *Suite) TestGetTransaction_ScheduledTx() {
 		suite.Require().Nil(actual)
 	})
 
-	suite.Run("scheduled tx - block not found exception", func() {
+	suite.Run("block not found exception", func() {
 		tx := suite.systemCollection.Transactions[1]
 		txID := tx.ID()
 
@@ -1873,6 +1877,10 @@ func (suite *Suite) TestGetScheduledTransaction() {
 		suite.Require().Nil(actual)
 	})
 
+	// Tests the case where the scheduled transaction exists in the indices, but not in the generated
+	// system collection (produced from events). This indicates inconsistent state, however it is handled
+	// by returning an internal error instead of an irrecoverable since the events may be queried from
+	// an Execution node, which could have returned incorrect data.
 	suite.Run("not in generated collection", func() {
 		scheduledTxs := []*flow.TransactionBody{
 			suite.g.Transactions().Fixture(),
