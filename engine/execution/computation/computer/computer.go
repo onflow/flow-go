@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
@@ -790,6 +791,12 @@ func (e *blockComputer) executeTransactionInternal(
 		return nil, err
 	}
 	defer txn.Cleanup()
+
+	log.Info().Str("mode", "para-proof").Msgf("start executing transaction %v, for block %v, collection index: %v",
+		request.txnIdStr,
+		request.blockIdStr,
+		request.collectionIndex,
+	)
 
 	err = txn.Preprocess()
 	if err != nil {

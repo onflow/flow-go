@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/rs/zerolog/log"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -287,10 +288,22 @@ func (collector *resultCollector) processTransactionResult(
 		return nil
 	}
 
-	return collector.commitCollection(
+	log.Info().Str("mode", "para-proof").Msgf("Committing collection index %v for block %v",
+		txn.collectionInfo.collectionIndex,
+		txn.collectionInfo.blockId,
+	)
+
+	err = collector.commitCollection(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
 		collector.currentCollectionState.Finalize())
+
+	log.Info().Str("mode", "para-proof").Msgf("Committed collection index %v for block %v",
+		txn.collectionInfo.collectionIndex,
+		txn.collectionInfo.blockId,
+	)
+
+	return err
 }
 
 func (collector *resultCollector) handleTransactionExecutionMetrics(
@@ -345,6 +358,12 @@ func (collector *resultCollector) AddTransactionResult(
 		timeSpent:          timeSpent,
 		numConflictRetries: numConflictRetries,
 	}
+
+	log.Info().Str("mode", "para-proof").Msgf("finished executing tx %v for block %v, collection index %v",
+		request.ID,
+		request.collectionIndex,
+		request.blockId,
+	)
 
 	select {
 	case collector.processorInputChan <- result:
