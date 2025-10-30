@@ -331,7 +331,9 @@ type ObserverServiceBuilder struct {
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	stateStreamBackend *statestreambackend.StateStreamBackend
+	stateStreamBackend          *statestreambackend.StateStreamBackend
+	executionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	executionStateCache         optimistic_sync.ExecutionStateCache
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -1108,10 +1110,53 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 	}
 }
 
+// buildExecutionResultInfoProvider registers a module that wires the
+// optimistic_sync.ExecutionResultInfoProvider on the builder.
+func (builder *ObserverServiceBuilder) buildExecutionResultInfoProvider() *ObserverServiceBuilder {
+	builder.Module("execution result info provider", func(node *cmd.NodeConfig) error {
+		backendConfig := builder.rpcConf.BackendConfig
+
+		preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		requiredENIdentifiers, err := flow.IdentifierListFromHex(builder.executionResultRequiredExecutors)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for required EN list: %w", err)
+		}
+		operatorCriteria := optimistic_sync.Criteria{
+			AgreeingExecutorsCount: builder.executionResultAgreeingExecutorsCount,
+			RequiredExecutors:      requiredENIdentifiers,
+		}
+		execNodeSelector := execution_result.NewExecutionNodeSelector(
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		builder.executionResultInfoProvider = execution_result.NewExecutionResultInfoProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Receipts,
+			execNodeSelector,
+			operatorCriteria,
+		)
+
+		return nil
+	})
+	return builder
+}
+
 // Build enqueues the sync engine and the follower engine for the observer.
 // Currently, the observer only runs the follower engine.
 func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
+	builder.buildExecutionResultInfoProvider()
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1219,6 +1264,25 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Results,
 				execDataCacheBackend,
 			)
+
+			return nil
+		}).
+		Module("events storage", func(node *cmd.NodeConfig) error {
+			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+			return nil
+		}).
+		Module("execution state cache", func(node *cmd.NodeConfig) error {
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				builder.Storage.Collections,
+				builder.Storage.Transactions,
+				builder.lightTransactionResults,
+				nil,
+				nil,
+				executionDataStoreCache,
+			)
+			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
 
 			return nil
 		}).
@@ -1609,6 +1673,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
+				builder.executionResultInfoProvider,
+				builder.executionStateCache,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1829,10 +1895,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 		return nil
 	})
-	builder.Module("events storage", func(node *cmd.NodeConfig) error {
-		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
-		return nil
-	})
 	builder.Module("reporter", func(node *cmd.NodeConfig) error {
 		builder.Reporter = index.NewReporter()
 		return nil
@@ -1988,39 +2050,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			fixedENIdentifiers,
 		)
 
-		requiredENIdentifiers, err := flow.IdentifierListFromHex(builder.executionResultRequiredExecutors)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for required EN list: %w", err)
-		}
-		operatorCriteria := optimistic_sync.Criteria{
-			AgreeingExecutorsCount: builder.executionResultAgreeingExecutorsCount,
-			RequiredExecutors:      requiredENIdentifiers,
-		}
-
-		execNodeSelector := execution_result.NewExecutionNodeSelector(
-			preferredENIdentifiers,
-			fixedENIdentifiers,
-		)
-
-		execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
-			node.Logger,
-			node.State,
-			node.Storage.Receipts,
-			execNodeSelector,
-			operatorCriteria,
-		)
-
-		// TODO: use real objects instead of mocks once they're implemented
-		snapshot := osyncsnapshot.NewSnapshotMock(
-			builder.events,
-			nil,
-			nil,
-			builder.lightTransactionResults,
-			nil,
-			nil,
-		)
-		execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
-
 		backendParams := backend.Params{
 			State:                node.State,
 			Blocks:               node.Storage.Blocks,
@@ -2052,8 +2081,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			VersionControl:              builder.VersionControl,
 			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
 			MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
-			ExecutionResultInfoProvider: execResultInfoProvider,
-			ExecutionStateCache:         execStateCache,
+			ExecutionResultInfoProvider: builder.executionResultInfoProvider,
+			ExecutionStateCache:         builder.executionStateCache,
 		}
 
 		if builder.localServiceAPIEnabled {
