@@ -1508,11 +1508,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		var builderexecutionDataDBMode string
 		flags.StringVar(&builderexecutionDataDBMode, "execution-data-db", "pebble", "[deprecated] the DB type for execution datastore")
-		flags.MarkDeprecated("execution-data-db", "[deprecated] this flag is ignored and will be removed in a future release.")
+		_ = flags.MarkDeprecated("execution-data-db", "[deprecated] this flag is ignored and will be removed in a future release.")
 
 		var unusedRetryEnabled bool
 		flags.BoolVar(&unusedRetryEnabled, "retry-enabled", false, "[deprecated] whether to enable the retry mechanism at the access node level")
-		flags.MarkDeprecated("retry-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
+		_ = flags.MarkDeprecated("retry-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
