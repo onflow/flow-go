@@ -214,14 +214,14 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.11.0 // indirect
-	github.com/onflow/cadence v1.8.2 // indirect
+	github.com/onflow/cadence v1.8.3 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
-	github.com/onflow/flow-go-sdk v1.9.1 // indirect
+	github.com/onflow/flow-go-sdk v1.9.2 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.3.0 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.3.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.18 // indirect

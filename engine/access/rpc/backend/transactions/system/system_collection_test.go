@@ -73,7 +73,7 @@ func TestNewSystemCollection(t *testing.T) {
 	expectedSystemTx, err := blueprints.SystemChunkTransaction(chainID.Chain())
 	require.NoError(t, err)
 
-	// 4 transactions: process + 2 execute callbacks + system chunk
+	// scheduled tx + process tx + system chunk tx
 	assert.Len(t, systemCollection.Transactions(), 2+len(events))
 
 	systemTxID := systemCollection.SystemTxID()
