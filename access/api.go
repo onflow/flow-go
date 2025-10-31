@@ -55,6 +55,7 @@ type ScriptsAPI interface {
 	//   - [access.InvalidRequestError] - if the request had invalid arguments.
 	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 	//   - [access.DataNotFoundError] - if data required to process the request is not available.
+	//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 	//   - [access.PreconditionFailedError] - if data for block is not available.
 	//   - [access.RequestCanceledError] - if the script execution was canceled.
 	//   - [access.RequestTimedOutError] - if the script execution timed out.
@@ -73,6 +74,7 @@ type ScriptsAPI interface {
 	//   - [access.InvalidRequestError] - if the request had invalid arguments.
 	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 	//   - [access.DataNotFoundError] - if data required to process the request is not available.
+	//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 	//   - [access.PreconditionFailedError] - if data for block is not available.
 	//   - [access.RequestCanceledError] - if the script execution was canceled.
 	//   - [access.RequestTimedOutError] - if the script execution timed out.
@@ -91,6 +93,7 @@ type ScriptsAPI interface {
 	//   - [access.InvalidRequestError] - if the request had invalid arguments.
 	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 	//   - [access.DataNotFoundError] - if data required to process the request is not available.
+	//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 	//   - [access.PreconditionFailedError] - if data for block is not available.
 	//   - [access.RequestCanceledError] - if the script execution was canceled.
 	//   - [access.RequestTimedOutError] - if the script execution timed out.

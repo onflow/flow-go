@@ -9,8 +9,6 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -19,14 +17,12 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts/executor"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/version"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -132,6 +128,7 @@ func NewScriptsBackend(
 //     if the script execution failed due to invalid arguments.
 //   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
@@ -192,6 +189,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 //     if the script execution failed due to invalid arguments.
 //   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
@@ -252,6 +250,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 //     if the script execution failed due to invalid arguments.
 //   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
@@ -306,49 +305,39 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 // into access-layer errors according to the Access API error handling convention.
 //
 // Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
 //   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 //   - [access.DataNotFoundError] - if the script data or related execution data was not found,
 //     or if the block height is out of range or incompatible with node version.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 //   - [access.PreconditionFailedError] - if data for block is not available.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
 //   - [access.ServiceUnavailable] - if no nodes are available or a connection could not be established.
 //   - [access.InternalError] - for internal failures or conversion errors.
 func handleScriptExecutionError(ctx context.Context, err error) error {
-	err = fmt.Errorf("failed to execute script: %w", err)
-
 	switch {
-	case errors.Is(err, indexer.ErrIndexNotInitialized),
-		errors.Is(err, version.ErrOutOfRange),
-		errors.Is(err, execution.ErrIncompatibleNodeVersion),
-		errors.Is(err, storage.ErrNotFound),
-		errors.Is(err, storage.ErrHeightNotIndexed):
+	case executor.IsInvalidArgumentError(err):
+		return access.NewInvalidRequestError(err)
+	case executor.IsResourceExhausted(err):
+		return access.NewResourceExhausted(err)
+	case executor.IsDataNotFoundError(err):
 		return access.NewDataNotFoundError("script", err)
+	case executor.IsOutOfRangeError(err):
+		return access.NewOutOfRangeError(err)
+	case executor.IsPreconditionFailedError(err):
+		return access.NewPreconditionFailedError(err)
+	case executor.IsScriptExecutionCanceledError(err):
+		return access.NewRequestCanceledError(err)
+	case executor.IsScriptExecutionTimedOutError(err):
+		return access.NewRequestTimedOutError(err)
+	case common.IsFailedToQueryExternalNodeError(err):
+		return access.NewInternalError(err)
+	case executor.IsServiceUnavailable(err):
+		return access.NewServiceUnavailable(err)
+	case executor.IsInternalError(err):
+		return access.NewInternalError(err)
+	default:
+		return access.RequireNoError(ctx, err)
 	}
-
-	// Handle gRPC status errors according to ScriptExecutor
-	if st, ok := status.FromError(err); ok {
-		switch st.Code() {
-		case codes.InvalidArgument,
-			codes.OutOfRange,
-			codes.NotFound:
-			return access.NewDataNotFoundError("script", err)
-		case codes.FailedPrecondition:
-			return access.NewPreconditionFailedError(err)
-		case codes.Canceled:
-			return access.NewRequestCanceledError(err)
-		case codes.DeadlineExceeded:
-			return access.NewRequestTimedOutError(err)
-		case codes.ResourceExhausted:
-			return access.NewResourceExhausted(err)
-		case codes.Internal:
-			return access.NewInternalError(err)
-		case codes.Unavailable:
-			return access.NewServiceUnavailable(err)
-		default:
-			return access.RequireNoError(ctx, err)
-		}
-	}
-
-	return access.RequireNoError(ctx, err)
 }

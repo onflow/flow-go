@@ -46,7 +46,8 @@ func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRe
 	registerSnapshotReader, err := e.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
 		err = admin.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
-		return nil, admin.NewDataNotFoundError("registers storage", fmt.Errorf("failed to get register snapshot reader: %w", err))
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, admin.NewPreconditionFailedError(err)
 	}
 
 	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height, registerSnapshotReader)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,13 +16,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-
 	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts/executor"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
@@ -48,6 +48,8 @@ var (
 	timeoutErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionTimedOutError, "timeout error")
 	compLimitErr  = fvmerrors.NewCodedError(fvmerrors.ErrCodeComputationLimitExceededError, "computation limit exceeded error")
 	memLimitErr   = fvmerrors.NewCodedError(fvmerrors.ErrCodeMemoryLimitExceededError, "memory limit exceeded error")
+
+	systemErr = fmt.Errorf("system error")
 )
 
 // BackendScriptsSuite defines a test suite for verifying the Scripts backend behavior.
@@ -196,7 +198,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtLatestBlock(ctx, scripts, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
@@ -206,7 +208,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testExecuteScriptAtBlockID(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockID(ctx, scripts, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
@@ -216,12 +218,8 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockHeight(ctx, scripts, nil)
 	})
-
-	s.executionResultProvider.AssertExpectations(s.T())
-	s.connectionFactory.AssertExpectations(s.T())
-	s.execClient.AssertExpectations(s.T())
 }
 
 // TestExecuteScriptOnExecutionNode_Fails tests that the backend returns an error when the execution
@@ -229,9 +227,9 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	ctx := context.Background()
 
-	// use a status code that's not used in the API to make sure it's passed through
-	statusCode := codes.FailedPrecondition
+	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
+	expectedErr := executor.NewInvalidArgumentError(errToReturn)
 
 	scripts := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 
@@ -242,7 +240,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, statusCode)
+		s.testExecuteScriptAtLatestBlock(ctx, scripts, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
@@ -252,7 +250,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockID(ctx, scripts, statusCode)
+		s.testExecuteScriptAtBlockID(ctx, scripts, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
@@ -262,12 +260,8 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, statusCode)
+		s.testExecuteScriptAtBlockHeight(ctx, scripts, expectedErr)
 	})
-
-	s.executionResultProvider.AssertExpectations(s.T())
-	s.connectionFactory.AssertExpectations(s.T())
-	s.execClient.AssertExpectations(s.T())
 }
 
 // TestExecuteScriptFromStorage_HappyPath tests that the backend successfully executes scripts using
@@ -293,7 +287,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 			Return(expectedResponse, nil).
 			Once()
 
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtLatestBlock(ctx, scripts, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockID - happy path", func() {
@@ -313,7 +307,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 			Return(expectedResponse, nil).
 			Once()
 
-		s.testExecuteScriptAtBlockID(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockID(ctx, scripts, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight - happy path", func() {
@@ -333,45 +327,40 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 			Return(expectedResponse, nil).
 			Once()
 
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, codes.OK)
+		s.testExecuteScriptAtBlockHeight(ctx, scripts, nil)
 	})
-
-	s.executionResultProvider.AssertExpectations(s.T())
-	s.executionStateCache.AssertExpectations(s.T())
-	s.executionDataSnapshot.AssertExpectations(s.T())
-	s.scriptExecutor.AssertExpectations(s.T())
 }
 
 // TestExecuteScriptFromStorage_Fails tests that errors received from local storage are handled
-// and converted to the appropriate status code..
+// and converted to the appropriate status code.
 func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	ctx := context.Background()
 
 	backend := s.defaultBackend(query_mode.IndexQueryModeLocalOnly)
 
 	testCases := []struct {
-		err        error
-		statusCode codes.Code
+		err           error
+		expectedError error
 	}{
 		{
-			err:        storage.ErrHeightNotIndexed,
-			statusCode: codes.OutOfRange,
+			err:           storage.ErrHeightNotIndexed,
+			expectedError: executor.NewOutOfRangeError(storage.ErrHeightNotIndexed),
 		},
 		{
-			err:        storage.ErrNotFound,
-			statusCode: codes.NotFound,
+			err:           storage.ErrNotFound,
+			expectedError: executor.NewDataNotFoundError("script", storage.ErrNotFound),
 		},
 		{
-			err:        fmt.Errorf("system error"),
-			statusCode: codes.Internal,
+			err:           systemErr,
+			expectedError: executor.NewInternalError(systemErr),
 		},
 		{
-			err:        cadenceErr,
-			statusCode: codes.InvalidArgument,
+			err:           cadenceErr,
+			expectedError: executor.NewInvalidArgumentError(cadenceErr),
 		},
 		{
-			err:        fvmFailureErr,
-			statusCode: codes.Internal,
+			err:           fvmFailureErr,
+			expectedError: executor.NewInternalError(fvmFailureErr),
 		},
 	}
 
@@ -392,7 +381,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
 
-			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - fails with %v", tt.err), func() {
@@ -411,7 +400,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
 
-			s.testExecuteScriptAtBlockID(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtBlockID(ctx, backend, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - fails with %v", tt.err), func() {
@@ -430,14 +419,9 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
 
-			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.expectedError)
 		})
 	}
-
-	s.executionResultProvider.AssertExpectations(s.T())
-	s.executionStateCache.AssertExpectations(s.T())
-	s.executionDataSnapshot.AssertExpectations(s.T())
-	s.scriptExecutor.AssertExpectations(s.T())
 }
 
 // TestExecuteScriptWithFailover_HappyPath tests that when an error is returned executing a script
@@ -448,7 +432,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	errors := []error{
 		storage.ErrHeightNotIndexed,
 		storage.ErrNotFound,
-		fmt.Errorf("system error"),
+		systemErr,
 		fvmFailureErr,
 		compLimitErr,
 		memLimitErr,
@@ -475,7 +459,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 				Return(nil, errToReturn).Once()
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, nil)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - recovers %v", errToReturn), func() {
@@ -496,7 +480,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 				Return(nil, errToReturn).Once()
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testExecuteScriptAtBlockID(ctx, backend, codes.OK)
+			s.testExecuteScriptAtBlockID(ctx, backend, nil)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - recovers %v", errToReturn), func() {
@@ -517,16 +501,9 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 				Return(nil, errToReturn).Once()
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testExecuteScriptAtBlockHeight(ctx, backend, codes.OK)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, nil)
 		})
 	}
-
-	s.executionResultProvider.AssertExpectations(s.T())
-	s.executionStateCache.AssertExpectations(s.T())
-	s.executionDataSnapshot.AssertExpectations(s.T())
-	s.scriptExecutor.AssertExpectations(s.T())
-	s.connectionFactory.AssertExpectations(s.T())
-	s.execClient.AssertExpectations(s.T())
 }
 
 // TestExecuteScriptWithFailover_SkippedForCorrectCodes tests that failover is skipped for
@@ -536,21 +513,21 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 	backend := s.defaultBackend(query_mode.IndexQueryModeFailover)
 
 	testCases := []struct {
-		err        error
-		statusCode codes.Code
+		err           error
+		expectedError error
 	}{
 		{
-			err:        cadenceErr,
-			statusCode: codes.InvalidArgument,
+			err:           cadenceErr,
+			expectedError: executor.NewInvalidArgumentError(cadenceErr),
 		},
 		{
-			err:        ctxCancelErr,
-			statusCode: codes.Canceled,
+			err:           ctxCancelErr,
+			expectedError: executor.NewScriptExecutionCanceledError(ctxCancelErr),
 		},
 	}
 
 	for _, tt := range testCases {
-		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - %s", tt.statusCode), func() {
+		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - %s", tt.expectedError), func() {
 			s.executionResultProvider.
 				On("ExecutionResultInfo", s.block.ID(), s.criteria).
 				Return(s.executionResultInfo, nil).
@@ -568,10 +545,10 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 				Return(nil, tt.err).
 				Once()
 
-			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.expectedError)
 		})
 
-		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - %s", tt.statusCode), func() {
+		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - %s", tt.expectedError), func() {
 			s.executionResultProvider.
 				On("ExecutionResultInfo", s.block.ID(), s.criteria).
 				Return(s.executionResultInfo, nil).
@@ -589,10 +566,10 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 				Return(nil, tt.err).
 				Once()
 
-			s.testExecuteScriptAtBlockID(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtBlockID(ctx, backend, tt.expectedError)
 		})
 
-		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - %s", tt.statusCode), func() {
+		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - %s", tt.expectedError), func() {
 			s.executionResultProvider.
 				On("ExecutionResultInfo", s.block.ID(), s.criteria).
 				Return(s.executionResultInfo, nil).
@@ -610,14 +587,9 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 				Return(nil, tt.err).
 				Once()
 
-			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.expectedError)
 		})
 	}
-
-	s.executionResultProvider.AssertExpectations(s.T())
-	s.executionStateCache.AssertExpectations(s.T())
-	s.executionDataSnapshot.AssertExpectations(s.T())
-	s.scriptExecutor.AssertExpectations(s.T())
 }
 
 // TestExecuteScriptWithFailover_ReturnsENErrors tests that when an error is returned from the execution
@@ -625,9 +597,9 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	ctx := context.Background()
 
-	// use a status code that's not used in the API to make sure it's passed through
-	statusCode := codes.FailedPrecondition
+	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
+	expectedErr := executor.NewInvalidArgumentError(errToReturn)
 
 	backend := s.defaultBackend(query_mode.IndexQueryModeFailover)
 
@@ -650,7 +622,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 			Return(nil, storage.ErrHeightNotIndexed).Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtLatestBlock(ctx, backend, statusCode)
+		s.testExecuteScriptAtLatestBlock(ctx, backend, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
@@ -673,7 +645,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockID(ctx, backend, statusCode)
+		s.testExecuteScriptAtBlockID(ctx, backend, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
@@ -696,15 +668,8 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
+		s.testExecuteScriptAtBlockHeight(ctx, backend, expectedErr)
 	})
-
-	s.executionResultProvider.AssertExpectations(s.T())
-	s.executionStateCache.AssertExpectations(s.T())
-	s.executionDataSnapshot.AssertExpectations(s.T())
-	s.scriptExecutor.AssertExpectations(s.T())
-	s.connectionFactory.AssertExpectations(s.T())
-	s.execClient.AssertExpectations(s.T())
 }
 
 // TestExecuteScriptAtLatestBlockFromStorage_InconsistentState tests that signaler context received error when node state is
@@ -725,9 +690,6 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 	s.Require().Error(err)
 	s.Require().Nil(actual)
 	s.Require().Nil(metadata)
-
-	s.state.AssertExpectations(s.T())
-	s.snapshot.AssertExpectations(s.T())
 }
 
 // TestExecuteScript_ExceedsMaxSize tests that when a script exceeds the max size, it returns an error.
@@ -765,20 +727,20 @@ func (s *BackendScriptsSuite) TestExecuteScript_ExceedsMaxSize() {
 //
 // It verifies that the method correctly executes a script against the latest sealed block
 // and returns the expected response or error. The test behavior depends on the provided
-// expected gRPC status code:
-//   - If expectedStatusCode == codes.OK, it asserts that the script executes successfully
+// expected script executor error:
+//   - If expectedError == nil, it asserts that the script executes successfully
 //     and returns the expected response.
-//   - Otherwise, it asserts that an error occurs with the expected status code,
+//   - Otherwise, it asserts that an error occurs with the expected error,
 //     and both the actual result and metadata are nil.
 func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	scripts *Scripts,
-	expectedStatusCode codes.Code,
+	expectedError error,
 ) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
-	if expectedStatusCode == codes.OK {
+	if expectedError == nil {
 		actual, metadata, err := scripts.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
@@ -786,33 +748,30 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(
 	} else {
 		actual, metadata, err := scripts.ExecuteScriptAtLatestBlock(ctx, s.failingScript, s.arguments, s.criteria)
 		s.Require().Error(err)
-		s.Require().Equal(expectedStatusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", expectedStatusCode, status.Code(err), err)
+		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
 		s.Require().Nil(metadata)
 	}
-
-	s.state.AssertExpectations(s.T())
-	s.snapshot.AssertExpectations(s.T())
 }
 
 // testExecuteScriptAtBlockID tests the Scripts.ExecuteScriptAtBlockID method.
 //
 // It verifies that the method correctly executes a script at a specific block ID
 // and produces the expected result or error. The test behavior depends on the
-// expected gRPC status code:
-//   - If expectedStatusCode == codes.OK, the script should execute successfully
+// expected script executor error:
+//   - If expectedError == nil, the script should execute successfully
 //     and return the expected response.
-//   - Otherwise, it asserts that an error occurs with the expected status code,
+//   - Otherwise, it asserts that an error occurs with the expected error,
 //     and both the actual result and metadata are nil.
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(
 	ctx context.Context,
 	scripts *Scripts,
-	expectedStatusCode codes.Code,
+	expectedError error,
 ) {
 	blockID := s.block.ID()
 	s.headers.On("ByBlockID", blockID).Return(s.block.ToHeader(), nil).Once()
 
-	if expectedStatusCode == codes.OK {
+	if expectedError == nil {
 		actual, metadata, err := scripts.ExecuteScriptAtBlockID(ctx, blockID, s.script, s.arguments, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
@@ -820,32 +779,31 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(
 	} else {
 		actual, metadata, err := scripts.ExecuteScriptAtBlockID(ctx, blockID, s.failingScript, s.arguments, s.criteria)
 		s.Require().Error(err)
-		s.Require().Equal(expectedStatusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", expectedStatusCode, status.Code(err), err)
+		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
 		s.Require().Nil(metadata)
 	}
-
-	s.headers.AssertExpectations(s.T())
 }
 
 // testExecuteScriptAtBlockHeight tests the Scripts.ExecuteScriptAtBlockHeight method.
 //
 // It verifies that the method correctly executes a script against a specific block height
 // and returns the expected output or error. The test behavior is determined by the
-// expected gRPC status code:
-//   - If expectedStatusCode == codes.OK, the execution is expected to succeed
+// expected script executor error:
+//   - If expectedError == nil, the execution is expected to succeed
 //     and produce the expected response.
-//   - Otherwise, it verifies that an error occurs with the expected status code,
+//   - Otherwise, it verifies that an error occurs with the expected error,
 //     and both the actual result and metadata are nil.
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	scripts *Scripts,
-	expectedStatusCode codes.Code,
+	expectedError error,
 ) {
 	height := s.block.Height
 	s.headers.On("ByHeight", height).Return(s.block.ToHeader(), nil).Once()
 
-	if expectedStatusCode == codes.OK {
+	if expectedError == nil {
+		s.script = []byte("access(all) fun main() { return 1 }")
 		actual, metadata, err := scripts.ExecuteScriptAtBlockHeight(ctx, height, s.script, s.arguments, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
@@ -853,10 +811,8 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(
 	} else {
 		actual, metadata, err := scripts.ExecuteScriptAtBlockHeight(ctx, height, s.failingScript, s.arguments, s.criteria)
 		s.Require().Error(err)
-		s.Require().Equalf(expectedStatusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", expectedStatusCode, status.Code(err), err)
+		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
 		s.Require().Nil(metadata)
 	}
-
-	s.headers.AssertExpectations(s.T())
 }

@@ -15,7 +15,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	//   - [fvmerrors.ErrCodeScriptExecutionCancelledError] - if script execution canceled.
 	//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError] - if script execution timed out.
@@ -34,7 +34,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error)
 
@@ -43,7 +43,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error)
 
@@ -52,7 +52,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error)
 
@@ -61,7 +61,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error)
 
@@ -70,7 +70,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error)
 }

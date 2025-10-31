@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// TODO: move RequireNoError and RequireErrorIs to common package and use one.
+// TODO: move RequireNoError and RequireErrorIs to common package (irrecoverable) and update usages.
 // RequireNoError returns nil if error is nil, otherwise throws an irrecoverable exception
 func RequireNoError(ctx context.Context, err error) error {
 	if err == nil {
@@ -109,6 +109,25 @@ func (e OutOfRangeError) Error() string {
 }
 
 func (e OutOfRangeError) Unwrap() error {
+	return e.err
+}
+
+// PreconditionFailedError indicates that a precondition for the operation was not met
+// This is a more specific version of InvalidRequestError, where the request is valid, but the system
+// is not currently in a state to fulfill the request (but may be in the future).
+type PreconditionFailedError struct {
+	err error
+}
+
+func NewPreconditionFailedError(err error) PreconditionFailedError {
+	return PreconditionFailedError{err: err}
+}
+
+func (e PreconditionFailedError) Error() string {
+	return fmt.Sprintf("precondition failed: %v", e.err)
+}
+
+func (e PreconditionFailedError) Unwrap() error {
 	return e.err
 }
 
