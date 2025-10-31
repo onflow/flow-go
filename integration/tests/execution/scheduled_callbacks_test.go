@@ -198,7 +198,7 @@ func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, boo
 	latest, err := s.AccessClient().GetLatestFinalizedBlockHeader(context.Background())
 	require.NoError(s.T(), err, "could not get latest finalized block header")
 
-	result, err := s.AccessClient().ExecuteScriptAtBlock(context.Background(), getStatusScript, latest.ID)
+	result, err := s.AccessClient().ExecuteScriptAtBlockID(context.Background(), getStatusScript, latest.ID)
 	require.NoError(s.T(), err, "could not execute getStatus script")
 
 	optionalResult, ok := result.(cadence.Optional)
@@ -231,7 +231,7 @@ func (s *ScheduledCallbacksSuite) getExecutedCallbacks() []uint64 {
 	latest, err := s.AccessClient().GetLatestFinalizedBlockHeader(context.Background())
 	require.NoError(s.T(), err, "could not get latest finalized block header")
 
-	result, err := s.AccessClient().ExecuteScriptAtBlock(context.Background(), getExecutedScript, latest.ID)
+	result, err := s.AccessClient().ExecuteScriptAtBlockID(context.Background(), getExecutedScript, latest.ID)
 	require.NoError(s.T(), err, "could not execute getStatus script")
 
 	// Convert cadence array to Go slice

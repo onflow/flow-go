@@ -3,31 +3,75 @@ package state_synchronization
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/engine/common/version"
+	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ commands.AdminCommand = (*ReadExecutionDataCommand)(nil)
 
+// scriptData holds the parsed input data for ExecuteScriptCommand.
 type scriptData struct {
 	height    uint64
 	script    []byte
 	arguments [][]byte
 }
 
+// ExecuteScriptCommand is an admin command that executes a Cadence script.
 type ExecuteScriptCommand struct {
-	scriptExecutor execution.ScriptExecutor
+	scriptExecutor      execution.ScriptExecutor
+	registersAsyncStore *execution.RegistersAsyncStore
 }
 
+// Handler executes the Cadence script against the blockchain state at the
+// specified block height.
+//
+// Expected error returns during normal operation:
+//   - [admin.DataNotFoundError] - if data required to process the request is not available.
+//   - [admin.OutOfRangeError] - if data required to process the request is outside the available range.
+//   - [admin.RequestCanceledError] - if script execution canceled.
+//   - [admin.RequestTimedOutError] - if script execution timed out.
+//   - [admin.ResourceExhausted] - if script execution computation limit exceeded or memory limit exceeded.
 func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
-	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height)
+	registerSnapshotReader, err := e.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
-		return nil, err
+		err = admin.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, admin.NewPreconditionFailedError(err)
+	}
+
+	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height, registerSnapshotReader)
+	if err != nil {
+		err = fmt.Errorf("failed to execute script: %w", err)
+
+		switch {
+		case errors.Is(err, version.ErrOutOfRange),
+			errors.Is(err, storage.ErrHeightNotIndexed),
+			errors.Is(err, execution.ErrIncompatibleNodeVersion):
+			return nil, admin.NewOutOfRangeError(err)
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, admin.NewDataNotFoundError("script", err)
+		case fvmerrors.IsScriptExecutionCancelledError(err):
+			return nil, admin.NewRequestCanceledError(err)
+		case fvmerrors.IsScriptExecutionTimedOutError(err):
+			return nil, admin.NewRequestTimedOutError(err)
+		case fvmerrors.IsComputationLimitExceededError(err):
+			return nil, admin.NewResourceExhausted(err)
+		case fvmerrors.IsMemoryLimitExceededError(err):
+			return nil, admin.NewResourceExhausted(err)
+		default:
+			return nil, admin.RequireNoError(ctx, err)
+		}
 	}
 
 	return string(result), nil
@@ -91,8 +135,9 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewExecuteScriptCommand(scripts execution.ScriptExecutor) commands.AdminCommand {
+func NewExecuteScriptCommand(scripts execution.ScriptExecutor, registersAsyncStore *execution.RegistersAsyncStore) commands.AdminCommand {
 	return &ExecuteScriptCommand{
-		scripts,
+		scriptExecutor:      scripts,
+		registersAsyncStore: registersAsyncStore,
 	}
 }

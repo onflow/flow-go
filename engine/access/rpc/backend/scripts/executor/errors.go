@@ -1,4 +1,4 @@
-package access
+package executor
 
 import (
 	"context"
@@ -8,7 +8,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// RequireNoError returns nil if error is nil, otherwise throws an irrecoverable exception
+// TODO: move RequireNoError and RequireErrorIs to common package (irrecoverable) and update usages.
+// RequireNoError returns nil if error is nil, otherwise throws an irrecoverable exception.
 func RequireNoError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
@@ -18,8 +19,8 @@ func RequireNoError(ctx context.Context, err error) error {
 	return irrecoverable.NewException(err)
 }
 
-// RequireErrorIs returns the error if it unwraps to any of the provided target error types
-// Otherwise, it throws an irrecoverable exception
+// RequireErrorIs returns the error if it unwraps to any of the provided target error types.
+// Otherwise, it throws an irrecoverable exception.
 func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 	if err == nil {
 		return nil
@@ -35,19 +36,19 @@ func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 	return irrecoverable.NewException(err)
 }
 
-// RequireAccessError returns the error if it is an Access sentinel error, otherwise, it throws an
+// RequireExecutorError returns the error if it is an Executor sentinel error, otherwise, it throws an
 // irrecoverable exception.
 //
 // This can be used for more complex endpoints that call into other methods to ensure all unexpected
 // errors are handled.
 // Note: this method will not unwrap the error. the passed error must be an instance of a sentinel
 // error.
-func RequireAccessError(ctx context.Context, err error) error {
+func RequireExecutorError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
 
-	if _, ok := err.(accessSentinel); ok {
+	if _, ok := err.(executorSentinel); ok {
 		return err
 	}
 
@@ -55,36 +56,36 @@ func RequireAccessError(ctx context.Context, err error) error {
 	return irrecoverable.NewException(err)
 }
 
-// accessSentinel is a marker interface for errors returned by the Access API.
-// This is used to differentiate unexpected errors returned by endpoints
-// Implement this for all new Access sentinel errors. Any that do not will be considered unexpected
+// executorSentinel is a marker interface for errors returned by the ScriptExecutor.
+// This is used to differentiate unexpected errors returned by Execute.
+// Implement this for all new ScriptExecutor sentinel errors. Any that do not will be considered unexpected
 // exceptions.
-type accessSentinel interface {
-	accessSentinel()
+type executorSentinel interface {
+	executorSentinel()
 }
 
-// InvalidRequestError indicates that the client's request was malformed or invalid
-type InvalidRequestError struct {
+// InvalidArgumentError indicates that the script was malformed or invalid.
+type InvalidArgumentError struct {
 	err error
 }
 
-func NewInvalidRequestError(err error) InvalidRequestError {
-	return InvalidRequestError{err: err}
+func NewInvalidArgumentError(err error) InvalidArgumentError {
+	return InvalidArgumentError{err: err}
 }
 
-func (e InvalidRequestError) Error() string {
-	return fmt.Sprintf("invalid argument: %v", e.err)
+func (e InvalidArgumentError) Error() string {
+	return fmt.Sprintf("script execution invalid argument: %v", e.err)
 }
 
-func (e InvalidRequestError) Unwrap() error {
+func (e InvalidArgumentError) Unwrap() error {
 	return e.err
 }
 
-func (e InvalidRequestError) accessSentinel() {}
+func (e InvalidArgumentError) executorSentinel() {}
 
-func IsInvalidRequestError(err error) bool {
-	var errInvalidRequest InvalidRequestError
-	return errors.As(err, &errInvalidRequest)
+func IsInvalidArgumentError(err error) bool {
+	var errInvalidArgument InvalidArgumentError
+	return errors.As(err, &errInvalidArgument)
 }
 
 // DataNotFoundError indicates that the requested data was not found on the system.
@@ -98,14 +99,14 @@ func NewDataNotFoundError(dataType string, err error) DataNotFoundError {
 }
 
 func (e DataNotFoundError) Error() string {
-	return fmt.Sprintf("data not found for %s: %v", e.dataType, e.err)
+	return fmt.Sprintf("script execution data not found for %s: %v", e.dataType, e.err)
 }
 
 func (e DataNotFoundError) Unwrap() error {
 	return e.err
 }
 
-func (e DataNotFoundError) accessSentinel() {}
+func (e DataNotFoundError) executorSentinel() {}
 
 func IsDataNotFoundError(err error) bool {
 	var errDataNotFound DataNotFoundError
@@ -124,14 +125,14 @@ func NewInternalError(err error) InternalError {
 }
 
 func (e InternalError) Error() string {
-	return fmt.Sprintf("internal error: %v", e.err)
+	return fmt.Sprintf("script execution internal error: %v", e.err)
 }
 
 func (e InternalError) Unwrap() error {
 	return e.err
 }
 
-func (e InternalError) accessSentinel() {}
+func (e InternalError) executorSentinel() {}
 
 func IsInternalError(err error) bool {
 	var errInternalError InternalError
@@ -141,7 +142,6 @@ func IsInternalError(err error) bool {
 // OutOfRangeError indicates that the request was for data that is outside the available range.
 // This is a more specific version of DataNotFoundError, where the data is known to eventually exist, but
 // currently is not known.
-// For example, querying data for a height above the current finalized height.
 type OutOfRangeError struct {
 	err error
 }
@@ -151,14 +151,14 @@ func NewOutOfRangeError(err error) OutOfRangeError {
 }
 
 func (e OutOfRangeError) Error() string {
-	return fmt.Sprintf("out of range: %v", e.err)
+	return fmt.Sprintf("script execution out of range: %v", e.err)
 }
 
 func (e OutOfRangeError) Unwrap() error {
 	return e.err
 }
 
-func (e OutOfRangeError) accessSentinel() {}
+func (e OutOfRangeError) executorSentinel() {}
 
 func IsOutOfRangeError(err error) bool {
 	var errOutOfRangeError OutOfRangeError
@@ -177,66 +177,66 @@ func NewPreconditionFailedError(err error) PreconditionFailedError {
 }
 
 func (e PreconditionFailedError) Error() string {
-	return fmt.Sprintf("precondition failed: %v", e.err)
+	return fmt.Sprintf("script execution precondition failed: %v", e.err)
 }
 
 func (e PreconditionFailedError) Unwrap() error {
 	return e.err
 }
 
-func (e PreconditionFailedError) accessSentinel() {}
+func (e PreconditionFailedError) executorSentinel() {}
 
 func IsPreconditionFailedError(err error) bool {
 	var errPreconditionFailed PreconditionFailedError
 	return errors.As(err, &errPreconditionFailed)
 }
 
-// RequestCanceledError indicates that the request was canceled before the server finished processing it.
-type RequestCanceledError struct {
+// ScriptExecutionCanceledError indicates that the request was canceled before the server finished processing it.
+type ScriptExecutionCanceledError struct {
 	err error
 }
 
-func NewRequestCanceledError(err error) RequestCanceledError {
-	return RequestCanceledError{err: err}
+func NewScriptExecutionCanceledError(err error) ScriptExecutionCanceledError {
+	return ScriptExecutionCanceledError{err: err}
 }
 
-func (e RequestCanceledError) Error() string {
-	return fmt.Sprintf("request canceled: %v", e.err)
+func (e ScriptExecutionCanceledError) Error() string {
+	return fmt.Sprintf("script execution canceled: %v", e.err)
 }
 
-func (e RequestCanceledError) Unwrap() error {
+func (e ScriptExecutionCanceledError) Unwrap() error {
 	return e.err
 }
 
-func (e RequestCanceledError) accessSentinel() {}
+func (e ScriptExecutionCanceledError) executorSentinel() {}
 
-func IsRequestCanceledError(err error) bool {
-	var requestCanceledError RequestCanceledError
-	return errors.As(err, &requestCanceledError)
+func IsScriptExecutionCanceledError(err error) bool {
+	var scriptExecutionCanceledError ScriptExecutionCanceledError
+	return errors.As(err, &scriptExecutionCanceledError)
 }
 
-// RequestTimedOutError indicates that the request timed out before the server finished processing it.
-type RequestTimedOutError struct {
+// ScriptExecutionTimedOutError indicates that the request timed out before the server finished processing it.
+type ScriptExecutionTimedOutError struct {
 	err error
 }
 
-func NewRequestTimedOutError(err error) RequestTimedOutError {
-	return RequestTimedOutError{err: err}
+func NewScriptExecutionTimedOutError(err error) ScriptExecutionTimedOutError {
+	return ScriptExecutionTimedOutError{err: err}
 }
 
-func (e RequestTimedOutError) Error() string {
-	return fmt.Sprintf("request timed out: %v", e.err)
+func (e ScriptExecutionTimedOutError) Error() string {
+	return fmt.Sprintf("script execution timed out: %v", e.err)
 }
 
-func (e RequestTimedOutError) Unwrap() error {
+func (e ScriptExecutionTimedOutError) Unwrap() error {
 	return e.err
 }
 
-func (e RequestTimedOutError) accessSentinel() {}
+func (e ScriptExecutionTimedOutError) executorSentinel() {}
 
-func IsRequestTimedOutError(err error) bool {
-	var requestTimedOutError RequestTimedOutError
-	return errors.As(err, &requestTimedOutError)
+func IsScriptExecutionTimedOutError(err error) bool {
+	var scriptExecutionTimedOutError ScriptExecutionTimedOutError
+	return errors.As(err, &scriptExecutionTimedOutError)
 }
 
 // ServiceUnavailable indicates that a requested service is unavailable.
@@ -249,14 +249,14 @@ func NewServiceUnavailable(err error) ServiceUnavailable {
 }
 
 func (e ServiceUnavailable) Error() string {
-	return fmt.Sprintf("service unavailable error: %v", e.err)
+	return fmt.Sprintf("script execution service unavailable error: %v", e.err)
 }
 
 func (e ServiceUnavailable) Unwrap() error {
 	return e.err
 }
 
-func (e ServiceUnavailable) accessSentinel() {}
+func (e ServiceUnavailable) executorSentinel() {}
 
 func IsServiceUnavailable(err error) bool {
 	var errServiceUnavailable ServiceUnavailable
@@ -273,14 +273,14 @@ func NewResourceExhausted(err error) ResourceExhausted {
 }
 
 func (e ResourceExhausted) Error() string {
-	return fmt.Sprintf("resource exhausted error: %v", e.err)
+	return fmt.Sprintf("script execution resource exhausted error: %v", e.err)
 }
 
 func (e ResourceExhausted) Unwrap() error {
 	return e.err
 }
 
-func (e ResourceExhausted) accessSentinel() {}
+func (e ResourceExhausted) executorSentinel() {}
 
 func IsResourceExhausted(err error) bool {
 	var errResourceExhausted ResourceExhausted

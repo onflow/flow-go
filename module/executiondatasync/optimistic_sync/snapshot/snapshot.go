@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
 )
@@ -11,7 +12,7 @@ type Mock struct {
 	transactions                   storage.TransactionsReader
 	lightTransactionResults        storage.LightTransactionResultsReader
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader
-	registers                      storage.RegisterIndexReader
+	registersAsyncStore            *execution.RegistersAsyncStore
 	executionData                  optimistic_sync.BlockExecutionDataReader
 }
 
@@ -23,7 +24,7 @@ func NewSnapshotMock(
 	transactions storage.TransactionsReader,
 	lightTransactionResults storage.LightTransactionResultsReader,
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader,
-	registers storage.RegisterIndexReader,
+	registersAsyncStore *execution.RegistersAsyncStore,
 	executionData optimistic_sync.BlockExecutionDataReader,
 ) *Mock {
 	return &Mock{
@@ -32,7 +33,7 @@ func NewSnapshotMock(
 		transactions:                   transactions,
 		lightTransactionResults:        lightTransactionResults,
 		transactionResultErrorMessages: transactionResultErrorMessages,
-		registers:                      registers,
+		registersAsyncStore:            registersAsyncStore,
 		executionData:                  executionData,
 	}
 }
@@ -57,8 +58,12 @@ func (s *Mock) TransactionResultErrorMessages() storage.TransactionResultErrorMe
 	return s.transactionResultErrorMessages
 }
 
-func (s *Mock) Registers() storage.RegisterIndexReader {
-	return s.registers
+// Registers returns a reader for querying register data.
+//
+// Expected error returns during normal operation:
+//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
+func (s *Mock) Registers() (storage.RegisterSnapshotReader, error) {
+	return s.registersAsyncStore.RegisterSnapshotReader()
 }
 
 func (s *Mock) BlockExecutionData() optimistic_sync.BlockExecutionDataReader { return s.executionData }
