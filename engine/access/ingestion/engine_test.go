@@ -596,7 +596,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		p = 1
 
 		// timeout after 3 db polls
-		ctx, cancel := context.WithTimeout(context.Background(), 5*collectionCatchupDBPollInterval)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*collectionCatchupDBPollInterval)
 		defer cancel()
 
 		err := syncer.requestMissingCollectionsBlocking(ctx)
