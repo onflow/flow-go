@@ -347,7 +347,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 	}
 
 	// With the call of `checkDupeTransactionsInUnfinalizedAncestry` above, we have now scanned the candidate's ancestry
-	// up the height `ctx.finalizedClusterBlock + 1`. At the beginning of the `Extend` process, we verified (function
+	// down to the height `ctx.finalizedClusterBlock + 1`. At the beginning of the `Extend` process, we verified (function
 	// `checkConnectsToFinalizedState`) that the candidate block descends from the finalized block at height
 	// `ctx.finalizedClusterBlock`.
 	// The function `checkDupeTransactionsInFinalizedAncestry` below determines whether the finalized fork up to
