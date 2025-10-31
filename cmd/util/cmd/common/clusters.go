@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/onflow/crypto/random"
@@ -40,8 +39,9 @@ import (
 // Returns:
 // - flow.AssignmentList: the generated assignment list.
 // - flow.ClusterList: the generate collection cluster list.
+// - bool: whether all cluster QCs can be created with only votes from internal nodes.
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
-func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int, randomSource random.Rand) (flow.AssignmentList, flow.ClusterList, error) {
+func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int, randomSource random.Rand) (flow.AssignmentList, flow.ClusterList, bool, error) {
 
 	partnerCollectors := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	internalCollectors := internalNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
@@ -78,7 +78,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	// first, round-robin internal nodes into each cluster
 	for i, node := range internalCollectors {
 		if node.InitialWeight != refWeight {
-			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
+			return nil, nil, false, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
 		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
@@ -88,7 +88,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	// next, round-robin partner nodes into each cluster
 	for i, node := range partnerCollectors {
 		if node.InitialWeight != refWeight {
-			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
+			return nil, nil, false, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
 		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
@@ -96,9 +96,10 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 
 	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
+	canConstructAllClusterQCs := true
 	for i := 0; i < numCollectionClusters; i++ {
 		if constraint[i] <= 0 {
-			return nil, nil, errors.New("there isn't enough internal nodes to have at least 1/3 internal nodes in each cluster")
+			canConstructAllClusterQCs = false
 		}
 	}
 
@@ -110,7 +111,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 		log.Fatal().Err(err).Msg("could not create cluster list")
 	}
 
-	return assignments, clusters, nil
+	return assignments, clusters, canConstructAllClusterQCs, nil
 }
 
 // ConvertClusterAssignmentsCdc converts golang cluster assignments type to Cadence type `[[String]]`.

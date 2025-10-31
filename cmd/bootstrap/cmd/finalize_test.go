@@ -137,15 +137,16 @@ func TestClusterAssignment(t *testing.T) {
 
 	log := zerolog.Nop()
 	// should not error
-	_, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
+	_, _, canConstructQCs, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
 	require.NoError(t, err)
-	require.True(t, checkClusterConstraint(clusters, partners, internals))
+	require.True(t, canConstructQCs)
 
 	// unhappy Path
 	internals = internals[:len(internals)-1] // reduce one internal node
-	// should error
-	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
-	require.Error(t, err)
+	// should no longer be able to construct QCs using only votes from internal nodes
+	_, _, canConstructQCs, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
+	require.NoError(t, err)
+	require.False(t, canConstructQCs)
 	// revert the flag value
 	flagCollectionClusters = tmp
 }

@@ -36,26 +36,3 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 
 	ensureUniformNodeWeightsPerRole(all)
 }
-
-// Check the ratio of internal/partner nodes in each cluster. The identities
-// in each cluster do not matter for this check.
-// Internal nodes must comprise >1/3 of each collector cluster.
-func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.NodeInfo, internalsInfo []model.NodeInfo) bool {
-	partners := model.ToIdentityList(partnersInfo)
-	internals := model.ToIdentityList(internalsInfo)
-	for _, cluster := range clusters {
-		var clusterPartnerCount, clusterInternalCount int
-		for _, node := range cluster {
-			if _, exists := partners.ByNodeID(node.NodeID); exists {
-				clusterPartnerCount++
-			}
-			if _, exists := internals.ByNodeID(node.NodeID); exists {
-				clusterInternalCount++
-			}
-		}
-		if clusterInternalCount*2 <= clusterPartnerCount {
-			return false
-		}
-	}
-	return true
-}

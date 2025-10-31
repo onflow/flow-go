@@ -120,7 +120,7 @@ func clusterAssignment(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerList, internalList, int(flagCollectionClusters), clusteringPrg)
+	assignments, clusters, canConstructQCs, err := common.ConstructClusterAssignment(log, partnerList, internalList, int(flagCollectionClusters), clusteringPrg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
@@ -146,10 +146,10 @@ func clusterAssignment(cmd *cobra.Command, args []string) {
 	)
 	log.Info().Msg("")
 
-	if checkClusterConstraint(clusters, partnerNodes, internalNodes) {
-		log.Info().Msg("Enough votes for collection clusters are present - bootstrapping can continue with root block creation")
+	if canConstructQCs {
+		log.Info().Msg("enough votes for collection clusters are present - bootstrapping can continue with root block creation")
 	} else {
-		log.Info().Msg("Not enough internal votes to generate cluster QCs, need partner votes before root block creation")
+		log.Info().Msg("not enough internal votes to generate cluster QCs, need partner votes before root block creation")
 	}
 }
 
