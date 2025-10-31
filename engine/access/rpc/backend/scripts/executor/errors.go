@@ -36,6 +36,26 @@ func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 	return irrecoverable.NewException(err)
 }
 
+// RequireExecutorError returns the error if it is an Executor sentinel error, otherwise, it throws an
+// irrecoverable exception
+//
+// This can be used for more complex endpoints that call into other methods to ensure all unexpected
+// errors are handled.
+// Note: this method will not unwrap the error. the passed error must be an instance of a sentinel
+// error.
+func RequireExecutorError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if _, ok := err.(executorSentinel); ok {
+		return err
+	}
+
+	irrecoverable.Throw(ctx, err)
+	return irrecoverable.NewException(err)
+}
+
 // executorSentinel is a marker interface for errors returned by the ScriptExecutor.
 // This is used to differentiate unexpected errors returned by Execute.
 // Implement this for all new ScriptExecutor sentinel errors. Any that do not will be considered unexpected
