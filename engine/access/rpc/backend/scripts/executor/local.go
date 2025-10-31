@@ -140,7 +140,7 @@ func convertScriptExecutionError(err error) error {
 		errors.Is(err, execution.ErrIncompatibleNodeVersion):
 		return NewOutOfRangeError(err)
 	case errors.Is(err, storage.ErrNotFound):
-		return NewDataNotFoundError("script", err)
+		return NewDataNotFoundError("scriptExecutor", err)
 	}
 
 	var failure fvmerrors.CodedFailure
