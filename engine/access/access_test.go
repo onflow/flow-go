@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/google/go-cmp/cmp"
@@ -74,7 +75,7 @@ type Suite struct {
 	me                   *mockmodule.Local
 	rootBlock            *flow.Header
 	sealedBlock          *flow.Header
-	finalizedBlock       *flow.Header
+	finalizedBlock       *flow.Block
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	finalizedHeaderCache module.FinalizedHeaderCache
@@ -102,7 +103,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
-	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.sealedBlock)
+	suite.finalizedBlock = unittest.BlockWithParentFixture(suite.sealedBlock)
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.sealedSnapshot, nil).Maybe()
@@ -116,7 +117,7 @@ func (suite *Suite) SetupTest() {
 	).Maybe()
 	suite.finalSnapshot.On("Head").Return(
 		func() *flow.Header {
-			return suite.finalizedBlock
+			return suite.finalizedBlock.ToHeader()
 		},
 		nil,
 	).Maybe()
@@ -253,7 +254,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 
 		// create latest block that is past the expiry window
-		latestBlock := unittest.BlockHeaderFixture()
+		latestBlock := unittest.BlockFixture()
 		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
 
 		refSnapshot := new(protocol.Snapshot)
@@ -264,7 +265,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 
 		refSnapshot.
 			On("Head").
-			Return(referenceBlock, nil).
+			Return(referenceBlock.ToHeader(), nil).
 			Twice()
 
 		// Advancing final state to expire ref block
@@ -637,8 +638,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// setup mocks
 		conduit := new(mocknetwork.Conduit)
-		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
-			Once()
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
@@ -751,16 +751,26 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLocks(suite.T(), suite.lockManager, []string{
+			storage.LockInsertBlock,
+			storage.LockFinalizeBlock,
+		}, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return all.Blocks.BatchStore(lctx, rw, proposal)
-			})
-		})
-		require.NoError(suite.T(), err)
+				if err := all.Blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(suite.finalizedBlock)); err != nil {
+					return err
+				}
+				if err := all.Blocks.BatchStore(lctx, rw, proposal); err != nil {
+					return err
+				}
 
-		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Height, block.ID())
+				if err := operation.IndexFinalizedBlockByHeight(lctx, rw, suite.finalizedBlock.Height, suite.finalizedBlock.ID()); err != nil {
+					return err
+				}
+				if err := operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID()); err != nil {
+					return err
+				}
+
+				return nil
 			})
 		})
 		require.NoError(suite.T(), err)
@@ -772,10 +782,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
-		<-ingestEng.Ready()
+		unittest.RequireCloseBefore(suite.T(), ingestEng.Ready(), 5*time.Second, "ingest engine timed out waiting for ready")
 		defer func() {
 			cancel()
-			<-ingestEng.Done()
+			unittest.RequireCloseBefore(suite.T(), ingestEng.Done(), 5*time.Second, "ingest engine timed out waiting for done")
 		}()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
@@ -831,7 +841,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		blockNegativeId := blockNegative.ID()
 
 		finalSnapshot := new(protocol.Snapshot)
-		finalSnapshot.On("Head").Return(suite.finalizedBlock, nil)
+		finalSnapshot.On("Head").Return(suite.finalizedBlock.ToHeader(), nil)
 
 		suite.state.On("Params").Return(suite.params)
 		suite.state.On("Final").Return(finalSnapshot)
@@ -840,16 +850,24 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-		err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLocks(suite.T(), suite.lockManager, []string{
+			storage.LockInsertBlock,
+			storage.LockFinalizeBlock,
+		}, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return all.Blocks.BatchStore(lctx, rw, proposal)
-			})
-		})
-		require.NoError(suite.T(), err)
-
-		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx2 lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return all.Blocks.BatchStore(lctx2, rw, proposalNegative)
+				if err := all.Blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(suite.finalizedBlock)); err != nil {
+					return err
+				}
+				if err := all.Blocks.BatchStore(lctx, rw, proposal); err != nil {
+					return err
+				}
+				if err := all.Blocks.BatchStore(lctx, rw, proposalNegative); err != nil {
+					return err
+				}
+				if err := operation.IndexFinalizedBlockByHeight(lctx, rw, suite.finalizedBlock.Height, suite.finalizedBlock.ID()); err != nil {
+					return err
+				}
+				return nil
 			})
 		})
 		require.NoError(suite.T(), err)
@@ -978,10 +996,10 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
-		<-ingestEng.Ready()
+		unittest.RequireCloseBefore(suite.T(), ingestEng.Ready(), 5*time.Second, "ingest engine timed out waiting for ready")
 		defer func() {
 			cancel()
-			<-ingestEng.Done()
+			unittest.RequireCloseBefore(suite.T(), ingestEng.Done(), 5*time.Second, "ingest engine timed out waiting for done")
 		}()
 
 		processExecutionReceipts := func(
@@ -1234,7 +1252,7 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
-		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock)
+		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock.ToHeader())
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.ToHeader())
@@ -1388,14 +1406,26 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 // updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	suite.RunTest(func(handler *rpc.Handler, db storage.DB, all *store.All) {
-		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
+		block := unittest.BlockWithParentFixture(suite.finalizedBlock.ToHeader())
 		proposal := unittest.ProposalFromBlock(block)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.ToHeader())
 
-		err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLocks(suite.T(), suite.lockManager, []string{
+			storage.LockInsertBlock,
+			storage.LockFinalizeBlock,
+		}, func(lctx lockctx.Context) error {
 			// store new block
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return all.Blocks.BatchStore(lctx, rw, proposal)
+				if err := all.Blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(suite.finalizedBlock)); err != nil {
+					return err
+				}
+				if err := all.Blocks.BatchStore(lctx, rw, proposal); err != nil {
+					return err
+				}
+				if err := operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID()); err != nil {
+					return err
+				}
+				return nil
 			})
 		})
 		require.NoError(suite.T(), err)
@@ -1422,7 +1452,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		resp, err := handler.GetBlockHeaderByID(context.Background(), req)
 		assertFinalizedBlockHeader(resp, err)
 
-		suite.finalizedBlock = newFinalizedBlock.ToHeader()
+		suite.finalizedBlock = newFinalizedBlock
 
 		resp, err = handler.GetBlockHeaderByID(context.Background(), req)
 		assertFinalizedBlockHeader(resp, err)
@@ -1445,7 +1475,7 @@ func (suite *Suite) createChain() (*flow.Proposal, *flow.Collection) {
 		SignerIndices:    indices,
 	}
 	block := unittest.BlockWithParentAndPayload(
-		suite.finalizedBlock,
+		suite.finalizedBlock.ToHeader(),
 		unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
 	)
 	proposal := unittest.ProposalFromBlock(block)
