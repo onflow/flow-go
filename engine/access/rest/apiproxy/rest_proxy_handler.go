@@ -305,10 +305,6 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flo
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
 //
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
-//
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError] - if the request had invalid arguments.
 //   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
@@ -348,10 +344,6 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 }
 
 // ExecuteScriptAtBlockHeight executes script at the given block height.
-//
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError] - if the request had invalid arguments.
@@ -399,10 +391,6 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 }
 
 // ExecuteScriptAtBlockID executes script at the given block id.
-//
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError] - if the request had invalid arguments.
