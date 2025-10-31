@@ -59,6 +59,9 @@ type TransactionsAPI interface {
 
 	GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error)
 	GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
+
+	GetScheduledTransaction(ctx context.Context, scheduledTxID uint64) (*flow.TransactionBody, error)
+	GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error)
 }
 
 type TransactionStreamAPI interface {

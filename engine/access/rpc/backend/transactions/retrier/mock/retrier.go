@@ -12,9 +12,9 @@ type Retrier struct {
 	mock.Mock
 }
 
-// RegisterTransaction provides a mock function with given fields: height, tx
-func (_m *Retrier) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
-	_m.Called(height, tx)
+// RegisterTransaction provides a mock function with given fields: tx
+func (_m *Retrier) RegisterTransaction(tx *flow.TransactionBody) {
+	_m.Called(tx)
 }
 
 // Retry provides a mock function with given fields: height
