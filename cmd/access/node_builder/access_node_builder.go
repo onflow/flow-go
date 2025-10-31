@@ -332,6 +332,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
+	CollectionSyncer             *ingestion.CollectionSyncer
 	ScriptExecutor               *backend.ScriptExecutor
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
@@ -2224,6 +2225,21 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 			builder.RequestEng = requestEng
 
+			collectionSyncer := ingestion.NewCollectionSyncer(
+				node.Logger,
+				notNil(builder.collectionExecutedMetric),
+				builder.RequestEng,
+				node.State,
+				node.Storage.Blocks,
+				notNil(builder.collections),
+				notNil(builder.transactions),
+				lastFullBlockHeight,
+				node.StorageLockMgr,
+			)
+			builder.CollectionSyncer = collectionSyncer
+
+			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
+
 			return builder.RequestEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -2239,19 +2255,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				)
 			}
 
-			collectionSyncer := ingestion.NewCollectionSyncer(
-				node.Logger,
-				notNil(builder.collectionExecutedMetric),
-				builder.RequestEng,
-				node.State,
-				node.Storage.Blocks,
-				notNil(builder.collections),
-				notNil(builder.transactions),
-				lastFullBlockHeight,
-				node.StorageLockMgr,
-			)
-			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
-
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -2261,7 +2264,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				processedFinalizedBlockHeight,
-				notNil(collectionSyncer),
+				notNil(builder.CollectionSyncer),
 				notNil(builder.collectionExecutedMetric),
 				notNil(builder.TxResultErrorMessagesCore),
 			)
