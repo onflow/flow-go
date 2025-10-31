@@ -225,7 +225,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	require.NoError(s.T(), err)
 
 	eng.ComponentManager.Start(ctx)
-	<-eng.Ready()
+	unittest.RequireCloseBefore(s.T(), eng.Ready(), time.Second, "expect to start ingestion engine before timeout")
 
 	return eng, syncer
 }
@@ -596,7 +596,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		p = 1
 
 		// timeout after 3 db polls
-		ctx, cancel := context.WithTimeout(context.Background(), 100*collectionCatchupDBPollInterval)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*collectionCatchupDBPollInterval)
 		defer cancel()
 
 		err := syncer.requestMissingCollectionsBlocking(ctx)
@@ -816,8 +816,8 @@ func (s *Suite) TestComponentShutdown() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng, _ := s.initEngineAndSyncer(irrecoverableCtx)
 
-	// start then shut down the engine
-	unittest.AssertClosesBefore(s.T(), eng.Ready(), 10*time.Millisecond)
+	// ingestion engine is ready before initEngineAndSyncer returns. shut down the engine and wait
+	// for it to be done.
 	s.cancel()
 	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
 

@@ -190,6 +190,11 @@ func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context
 		}
 	}
 
+	if len(collectionsToBeDownloaded) == 0 {
+		s.logger.Info().Msg("no missing collections to download")
+		return nil
+	}
+
 	s.requester.Force()
 
 	collectionStoragePollTicker := time.NewTicker(collectionCatchupDBPollInterval)
