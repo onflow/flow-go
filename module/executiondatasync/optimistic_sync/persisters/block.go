@@ -67,6 +67,10 @@ func (p *BlockPersister) Persist() error {
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
 	}
+	err = lctx.AcquireLock(storage.LockUpdateLatestPersistedSealedResult)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for updating latest persisted sealed result: %w", err)
+	}
 	defer lctx.Release()
 
 	err = p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
