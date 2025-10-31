@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -95,7 +96,19 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 	// on start-up, AN wants to download all missing collections to serve it to end users
 	err := s.requestMissingCollectionsBlocking(requestCtx)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("error downloading missing collections")
+		if ctx.Err() != nil {
+			s.logger.Error().Err(err).Msg("engine shutdown while downloading missing collections")
+			return
+		}
+
+		if !errors.Is(err, context.DeadlineExceeded) {
+			ctx.Throw(fmt.Errorf("error downloading missing collections: %w", err))
+			return
+		}
+
+		// timed out during catchup. continue with normal startup.
+		// missing collections will be requested periodically.
+		s.logger.Error().Err(err).Msg("timed out syncing collections during startup")
 	}
 	ready()
 
@@ -175,8 +188,14 @@ func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context
 		return fmt.Errorf("failed to get finalized block: %w", err)
 	}
 
+	progress := util.LogProgress(s.logger, util.DefaultLogProgressConfig("requesting missing collections", lastFinalizedBlock.Height-lastFullBlockHeight-1))
+
 	collectionsToBeDownloaded := make(map[flow.Identifier]struct{})
 	for currBlockHeight := lastFullBlockHeight + 1; currBlockHeight <= lastFinalizedBlock.Height; currBlockHeight++ {
+		if ctx.Err() != nil {
+			return fmt.Errorf("missing collection catchup interrupted: %w", ctx.Err())
+		}
+
 		collections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
 		if err != nil {
 			return fmt.Errorf("failed to find missing collections at height %d: %w", currBlockHeight, err)
@@ -188,6 +207,8 @@ func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context
 				collectionsToBeDownloaded[collection.CollectionID] = struct{}{}
 			}
 		}
+
+		progress(1)
 	}
 
 	if len(collectionsToBeDownloaded) == 0 {
