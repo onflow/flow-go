@@ -1974,7 +1974,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			ChainID:               node.RootChainID,
 			AccessMetrics:         accessMetrics,
 			ConnFactory:           connFactory,
-			RetryEnabled:          false,
 			MaxHeightRange:        backendConfig.MaxHeightRange,
 			Log:                   node.Logger,
 			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
