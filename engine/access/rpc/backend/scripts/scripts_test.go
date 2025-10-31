@@ -348,7 +348,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 		},
 		{
 			err:           storage.ErrNotFound,
-			expectedError: executor.NewDataNotFoundError("script", storage.ErrNotFound),
+			expectedError: executor.NewDataNotFoundError("scriptExecutor", storage.ErrNotFound),
 		},
 		{
 			err:           systemErr,
