@@ -122,7 +122,7 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 			latest, err := NewLatestPersistedSealedResult(progress, mockHeaders, mockResults)
 			require.NoError(t, err)
 
-			err = unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+			err = unittest.WithLock(t, lockManager, storage.LockUpdateLatestPersistedSealedResult, func(lctx lockctx.Context) error {
 				done := make(chan struct{})
 				err := db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
 					rbw.AddCallback(func(err error) {
@@ -168,7 +168,7 @@ func TestLatestPersistedSealedResult_BatchSet(t *testing.T) {
 		latest, err := NewLatestPersistedSealedResult(mockCP, mockHeaders, mockResults)
 		require.NoError(t, err)
 
-		err = unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockUpdateLatestPersistedSealedResult, func(lctx lockctx.Context) error {
 			return latest.BatchSet(lctx, newResultID, newHeight, mockBatch)
 		})
 		assert.ErrorIs(t, err, expectedErr)
@@ -230,7 +230,7 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 				go func(i int) {
 					defer wg.Done()
 
-					err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+					err := unittest.WithLock(t, lockManager, storage.LockUpdateLatestPersistedSealedResult, func(lctx lockctx.Context) error {
 						return db.WithReaderBatchWriter(func(rbw storage.ReaderBatchWriter) error {
 							newResultID := unittest.IdentifierFixture()
 							newHeight := uint64(200 + i)
