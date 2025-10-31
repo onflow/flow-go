@@ -36,6 +36,7 @@ type ScriptExecutor interface {
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error)
 
 	// GetAccountBalance returns a Flow account balance by the provided address and block height.
@@ -45,6 +46,7 @@ type ScriptExecutor interface {
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error)
 
 	// GetAccountAvailableBalance returns a Flow account available balance by the provided address and block height.
@@ -54,6 +56,7 @@ type ScriptExecutor interface {
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error)
 
 	// GetAccountKeys returns a Flow account public keys by the provided address and block height.
@@ -63,6 +66,7 @@ type ScriptExecutor interface {
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error)
 
 	// GetAccountKey returns a Flow account public key by the provided address, block height and index.
@@ -72,5 +76,6 @@ type ScriptExecutor interface {
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error)
 }

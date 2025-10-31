@@ -9,7 +9,7 @@ import (
 )
 
 // TODO: move RequireNoError and RequireErrorIs to common package (irrecoverable) and update usages.
-// RequireNoError returns nil if error is nil, otherwise throws an irrecoverable exception
+// RequireNoError returns nil if error is nil, otherwise throws an irrecoverable exception.
 func RequireNoError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
@@ -20,7 +20,7 @@ func RequireNoError(ctx context.Context, err error) error {
 }
 
 // RequireErrorIs returns the error if it unwraps to any of the provided target error types
-// Otherwise, it throws an irrecoverable exception
+// Otherwise, it throws an irrecoverable exception.
 func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 	if err == nil {
 		return nil
@@ -37,7 +37,7 @@ func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 }
 
 // RequireExecutorError returns the error if it is an Executor sentinel error, otherwise, it throws an
-// irrecoverable exception
+// irrecoverable exception.
 //
 // This can be used for more complex endpoints that call into other methods to ensure all unexpected
 // errors are handled.
