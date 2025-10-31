@@ -2194,10 +2194,22 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return builder.RpcEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
+		Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return builder.secureGrpcServer, nil
+		}).
+		Component("state stream unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return builder.stateStreamGrpcServer, nil
+		})
 
-			builder.RequestEng, err = requester.New(
+	if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
+		builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return builder.unsecureGrpcServer, nil
+		})
+	}
+
+	builder.
+		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			requestEng, err := requester.New(
 				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
@@ -2210,6 +2222,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
+			builder.RequestEng = requestEng
+
+			return builder.RequestEng, nil
+		}).
+		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
 
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
@@ -2254,23 +2272,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
-		}).
-		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
-			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
-			// be handled by the scaffold.
-			return builder.RequestEng, nil
-		}).
-		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
-			return storageCommands.NewBackfillTxErrorMessagesCommand(
-				builder.Logger,
-				builder.State,
-				builder.TxResultErrorMessagesCore,
-			)
 		})
 
 	if builder.storeTxResultErrorMessages {
 		builder.
+			AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
+				return storageCommands.NewBackfillTxErrorMessagesCommand(
+					builder.Logger,
+					builder.State,
+					builder.TxResultErrorMessagesCore,
+				)
+			}).
 			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(
 					node.Metrics.Cache,
@@ -2321,20 +2333,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddFinalizationConsumer(syncRequestHandler)
 
 			return syncRequestHandler, nil
-		})
-	}
-
-	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return builder.secureGrpcServer, nil
-	})
-
-	builder.Component("state stream unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return builder.stateStreamGrpcServer, nil
-	})
-
-	if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
-		builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			return builder.unsecureGrpcServer, nil
 		})
 	}
 

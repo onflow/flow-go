@@ -158,7 +158,7 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 			Int("missing_collection_count", len(collections)).
 			Msg("re-requesting missing collections")
 
-		s.requestCollections(collections)
+		s.requestCollections(collections, true)
 	}
 
 	return nil
@@ -169,21 +169,28 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 //
 // No errors are expected during normal operations.
 func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context) error {
-	missingCollections, _, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
+	lastFullBlockHeight := s.lastFullBlockHeight.Value()
+	lastFinalizedBlock, err := s.state.Final().Head()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get finalized block: %w", err)
 	}
-	if len(missingCollections) == 0 {
-		s.logger.Info().Msg("skipping requesting missing collections. no missing collections found")
-		return nil
-	}
-
-	s.requestCollections(missingCollections)
 
 	collectionsToBeDownloaded := make(map[flow.Identifier]struct{})
-	for _, collection := range missingCollections {
-		collectionsToBeDownloaded[collection.CollectionID] = struct{}{}
+	for currBlockHeight := lastFullBlockHeight + 1; currBlockHeight <= lastFinalizedBlock.Height; currBlockHeight++ {
+		collections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
+		if err != nil {
+			return fmt.Errorf("failed to find missing collections at height %d: %w", currBlockHeight, err)
+		}
+
+		if len(collections) > 0 {
+			s.requestCollections(collections, false)
+			for _, collection := range collections {
+				collectionsToBeDownloaded[collection.CollectionID] = struct{}{}
+			}
+		}
 	}
+
+	s.requester.Force()
 
 	collectionStoragePollTicker := time.NewTicker(collectionCatchupDBPollInterval)
 	defer collectionStoragePollTicker.Stop()
@@ -304,12 +311,12 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 		return
 	}
 
-	s.requestCollections(missingCollections)
+	s.requestCollections(missingCollections, true)
 }
 
 // requestCollections registers collection download requests in the requester engine and
 // causes the requester to immediately dispatch requests.
-func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee) {
+func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee, force bool) {
 	for _, guarantee := range collections {
 		guarantors, err := protocol.FindGuarantors(s.state, guarantee)
 		if err != nil {
@@ -319,7 +326,7 @@ func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuar
 		s.requester.EntityByID(guarantee.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 
-	if len(collections) > 0 {
+	if force && len(collections) > 0 {
 		s.requester.Force()
 	}
 }
