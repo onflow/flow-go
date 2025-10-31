@@ -1090,6 +1090,80 @@ func (_m *AccessAPIClient) GetProtocolStateSnapshotByHeight(ctx context.Context,
 	return r0, r1
 }
 
+// GetScheduledTransaction provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetScheduledTransaction(ctx context.Context, in *access.GetScheduledTransactionRequest, opts ...grpc.CallOption) (*access.TransactionResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransaction")
+	}
+
+	var r0 *access.TransactionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionRequest, ...grpc.CallOption) (*access.TransactionResponse, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionRequest, ...grpc.CallOption) *access.TransactionResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetScheduledTransactionRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetScheduledTransactionResult provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetScheduledTransactionResult(ctx context.Context, in *access.GetScheduledTransactionResultRequest, opts ...grpc.CallOption) (*access.TransactionResultResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransactionResult")
+	}
+
+	var r0 *access.TransactionResultResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionResultRequest, ...grpc.CallOption) (*access.TransactionResultResponse, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetScheduledTransactionResultRequest, ...grpc.CallOption) *access.TransactionResultResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResultResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetScheduledTransactionResultRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSystemTransaction provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) GetSystemTransaction(ctx context.Context, in *access.GetSystemTransactionRequest, opts ...grpc.CallOption) (*access.TransactionResponse, error) {
 	_va := make([]interface{}, len(opts))

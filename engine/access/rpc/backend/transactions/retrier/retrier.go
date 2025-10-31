@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -26,7 +27,7 @@ type TransactionSender interface {
 
 type Retrier interface {
 	Retry(height uint64) error
-	RegisterTransaction(height uint64, tx *flow.TransactionBody)
+	RegisterTransaction(tx *flow.TransactionBody)
 }
 
 // RetrierImpl implements a simple retry mechanism for transaction submission.
@@ -36,6 +37,7 @@ type RetrierImpl struct {
 	mu                  sync.RWMutex
 	pendingTransactions BlockHeightToTransactions
 
+	state       protocol.State
 	blocks      storage.Blocks
 	collections storage.Collections
 
@@ -45,6 +47,7 @@ type RetrierImpl struct {
 
 func NewRetrier(
 	log zerolog.Logger,
+	state protocol.State,
 	blocks storage.Blocks,
 	collections storage.Collections,
 	txSender TransactionSender,
@@ -53,6 +56,7 @@ func NewRetrier(
 	return &RetrierImpl{
 		log:                 log,
 		pendingTransactions: BlockHeightToTransactions{},
+		state:               state,
 		blocks:              blocks,
 		collections:         collections,
 		txSender:            txSender,
@@ -90,7 +94,13 @@ func (r *RetrierImpl) Retry(height uint64) error {
 }
 
 // RegisterTransaction adds a transaction that could possibly be retried
-func (r *RetrierImpl) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
+func (r *RetrierImpl) RegisterTransaction(tx *flow.TransactionBody) {
+	referenceBlock, err := r.state.AtBlockID(tx.ReferenceBlockID).Head()
+	if err != nil {
+		return
+	}
+	height := referenceBlock.Height
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.pendingTransactions[height] == nil {

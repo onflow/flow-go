@@ -10,20 +10,26 @@ import (
 	"testing"
 
 	mocks "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
 func getTransactionReq(id string, expandResult bool, blockIdQuery string, collectionIdQuery string) *http.Request {
@@ -74,7 +80,7 @@ func createTransactionReq(body interface{}) *http.Request {
 
 func TestGetTransactions(t *testing.T) {
 	t.Run("get by ID without results", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
 
@@ -119,7 +125,7 @@ func TestGetTransactions(t *testing.T) {
 	})
 
 	t.Run("Get by ID with results", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		tx := unittest.TransactionBodyFixture()
 		txr := transactionResultFixture(tx)
@@ -189,7 +195,7 @@ func TestGetTransactions(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := getTransactionReq("invalid", false, "", "")
 		expected := `{"code":400, "message":"invalid ID format"}`
@@ -197,7 +203,7 @@ func TestGetTransactions(t *testing.T) {
 	})
 
 	t.Run("get by ID non-existing", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
@@ -254,7 +260,7 @@ func TestGetTransactionResult(t *testing.T) {
 		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 
 	t.Run("get by transaction ID", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		req := getTransactionResultReq(id.String(), "", "")
 
 		backend.Mock.
@@ -265,7 +271,7 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 
 	t.Run("get by block ID", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := getTransactionResultReq(id.String(), bid.String(), "")
 
@@ -277,7 +283,7 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 
 	t.Run("get by collection ID", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 		req := getTransactionResultReq(id.String(), "", cid.String())
 
 		backend.Mock.
@@ -288,7 +294,7 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 
 	t.Run("get execution statuses", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		testVectors := map[*accessmodel.TransactionResult]string{{
 			Status:       flow.TransactionStatusExpired,
@@ -337,7 +343,7 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		backend := &mock.API{}
+		backend := mock.NewAPI(t)
 
 		req := getTransactionResultReq("invalid", "", "")
 
@@ -346,8 +352,113 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 }
 
+func TestGetScheduledTransactions(t *testing.T) {
+	g := fixtures.NewGeneratorSuite()
+
+	scheduledTxID := uint64(42)
+	tx := scheduledTransactionFixture(t, g, scheduledTxID)
+	txID := tx.ID()
+
+	txr := transactionResultFixture(*tx)
+
+	link := mockcommonmodels.NewLinkGenerator(t)
+	link.On("TransactionLink", txID).Return(fmt.Sprintf("/v1/transactions/%s", txID), nil)
+	link.On("TransactionResultLink", txID).Return(fmt.Sprintf("/v1/transaction_results/%s", txID), nil)
+
+	expectedWithoutResult := expectedTransactionResponse(t, tx, nil, link)
+	expectedWithResult := expectedTransactionResponse(t, tx, txr, link)
+
+	t.Run("get by scheduled transaction ID without results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		backend.
+			On("GetScheduledTransaction", mocks.Anything, scheduledTxID).
+			Return(tx, nil).
+			Once()
+
+		req := getTransactionReq(fmt.Sprint(scheduledTxID), false, "", "")
+
+		router.AssertOKResponse(t, req, string(expectedWithoutResult), backend)
+	})
+
+	t.Run("get by scheduled transaction ID with results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		backend.
+			On("GetScheduledTransaction", mocks.Anything, scheduledTxID).
+			Return(tx, nil).
+			Once()
+		backend.
+			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
+			Return(txr, nil).
+			Once()
+
+		req := getTransactionReq(fmt.Sprint(scheduledTxID), true, "", "")
+
+		router.AssertOKResponse(t, req, string(expectedWithResult), backend)
+	})
+
+	t.Run("get result by scheduled transaction ID", func(t *testing.T) {
+		var expectedTxResult models.TransactionResult
+		expectedTxResult.Build(txr, txID, link)
+		expectedResult, err := json.Marshal(expectedTxResult)
+		require.NoError(t, err)
+
+		backend := mock.NewAPI(t)
+		backend.
+			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
+			Return(txr, nil).
+			Once()
+
+		req := getTransactionResultReq(fmt.Sprint(scheduledTxID), "", "")
+
+		router.AssertOKResponse(t, req, string(expectedResult), backend)
+	})
+
+	// these are identical to the regular get transaction tests, except the tx body is a scheduled
+	// transaction. Scheduled tx bodies contain a subset of the information in regular submitted tx,
+	// so this ensures the endpoints return the expected responses.
+	t.Run("get by transaction ID without results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		backend.
+			On("GetTransaction", mocks.Anything, txID).
+			Return(tx, nil).
+			Once()
+
+		req := getTransactionReq(txID.String(), false, "", "")
+
+		router.AssertOKResponse(t, req, string(expectedWithoutResult), backend)
+	})
+
+	t.Run("get by transaction ID with results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		backend.
+			On("GetTransaction", mocks.Anything, txID).
+			Return(tx, nil).
+			Once()
+		backend.
+			On("GetTransactionResult", mocks.Anything, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
+			Return(txr, nil).
+			Once()
+
+		req := getTransactionReq(txID.String(), true, "", "")
+
+		router.AssertOKResponse(t, req, string(expectedWithResult), backend)
+	})
+
+	t.Run("get by ID non-existing", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		backend.
+			On("GetScheduledTransaction", mocks.Anything, scheduledTxID).
+			Return(nil, status.Error(codes.NotFound, "transaction not found"))
+
+		req := getTransactionReq(fmt.Sprint(scheduledTxID), false, "", "")
+
+		expected := `{"code":404, "message":"Flow resource not found: transaction not found"}`
+		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
+	})
+}
+
 func TestCreateTransaction(t *testing.T) {
-	backend := &mock.API{}
+	backend := mock.NewAPI(t)
 
 	t.Run("create", func(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
@@ -430,7 +541,10 @@ func TestCreateTransaction(t *testing.T) {
 	})
 }
 
+// transactionResultFixture constructs a successful transaction result fixture for the given
+// transaction body.
 func transactionResultFixture(tx flow.TransactionBody) *accessmodel.TransactionResult {
+	txID := tx.ID()
 	cid := unittest.IdentifierFixture()
 	return &accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
@@ -440,12 +554,39 @@ func transactionResultFixture(tx flow.TransactionBody) *accessmodel.TransactionR
 				unittest.Event.WithEventType(flow.EventAccountCreated),
 				unittest.Event.WithTransactionIndex(0),
 				unittest.Event.WithEventIndex(0),
-				unittest.Event.WithTransactionID(tx.ID()),
+				unittest.Event.WithTransactionID(txID),
 				unittest.Event.WithPayload([]byte{}),
 			),
 		},
-		ErrorMessage: "",
-		BlockID:      tx.ReferenceBlockID,
-		CollectionID: cid,
+		ErrorMessage:  "",
+		BlockID:       tx.ReferenceBlockID,
+		CollectionID:  cid,
+		TransactionID: txID,
 	}
+}
+
+// scheduledTransactionFixture constructs a transaction body for a scheduled transaction with the
+// given scheduled transaction ID.
+func scheduledTransactionFixture(t *testing.T, g *fixtures.GeneratorSuite, scheduledTxID uint64) *flow.TransactionBody {
+	pendingEvent := g.PendingExecutionEvents().Fixture(
+		fixtures.PendingExecutionEvent.WithID(scheduledTxID),
+		fixtures.PendingExecutionEvent.WithPriority(1),
+		fixtures.PendingExecutionEvent.WithExecutionEffort(5555),
+	)
+
+	scheduledTxs, err := blueprints.ExecuteCallbacksTransactions(g.ChainID().Chain(), []flow.Event{pendingEvent})
+	require.NoError(t, err)
+	return scheduledTxs[0]
+}
+
+// expectedTransactionResponse constructs the expected json transaction response for the given
+// transaction body and transaction result.
+func expectedTransactionResponse(t *testing.T, tx *flow.TransactionBody, txr *accessmodel.TransactionResult, link commonmodels.LinkGenerator) string {
+	var expectedTxWithoutResult models.Transaction
+	expectedTxWithoutResult.Build(tx, txr, link)
+
+	expected, err := json.Marshal(expectedTxWithoutResult)
+	require.NoError(t, err)
+
+	return string(expected)
 }

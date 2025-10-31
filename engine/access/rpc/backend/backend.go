@@ -25,12 +25,12 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -93,6 +93,7 @@ type Params struct {
 	ExecutionReceipts        storage.ExecutionReceipts
 	ExecutionResults         storage.ExecutionResults
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
+	ScheduledTransactions    storage.ScheduledTransactionsReader
 	ChainID                  flow.ChainID
 	AccessMetrics            module.AccessMetrics
 	ConnFactory              connection.ConnectionFactory
@@ -130,7 +131,7 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
-	var txResCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
+	var txResCache transactions.TxResultCache = transactions.NewNoopTxResultCache()
 	if params.TxResultCacheSize > 0 {
 		txResCache, err = lru.New[flow.Identifier, *accessmodel.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
@@ -138,12 +139,10 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	// the system tx is hardcoded and never changes during runtime
-	systemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
+	systemCollection, err := system.DefaultSystemCollection(params.ChainID, params.ScheduledCallbacksEnabled)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
+		return nil, fmt.Errorf("failed to construct system collection: %w", err)
 	}
-	systemTxID := systemTx.ID()
 
 	accountsBackend, err := accounts.NewAccountsBackend(
 		params.Log,
@@ -222,7 +221,7 @@ func New(params Params) (*Backend, error) {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		systemTxID,
+		systemCollection,
 		txStatusDeriver,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
@@ -235,34 +234,35 @@ func New(params Params) (*Backend, error) {
 		params.Communicator,
 		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
-		systemTxID,
+		systemCollection,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
 	txParams := transactions.Params{
-		Log:                         params.Log,
-		Metrics:                     params.AccessMetrics,
-		State:                       params.State,
-		ChainID:                     params.ChainID,
-		SystemTxID:                  systemTxID,
-		StaticCollectionRPCClient:   params.CollectionRPC,
-		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
-		NodeCommunicator:            params.Communicator,
-		ConnFactory:                 params.ConnFactory,
-		EnableRetries:               params.RetryEnabled,
-		NodeProvider:                params.ExecNodeIdentitiesProvider,
-		Blocks:                      params.Blocks,
-		Collections:                 params.Collections,
-		Transactions:                params.Transactions,
-		TxErrorMessageProvider:      params.TxErrorMessageProvider,
-		TxResultCache:               txResCache,
-		TxValidator:                 txValidator,
-		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 params.EventsIndex,
-		TxResultsIndex:              params.TxResultsIndex,
-		ScheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
+		Log:                          params.Log,
+		Metrics:                      params.AccessMetrics,
+		State:                        params.State,
+		ChainID:                      params.ChainID,
+		SystemCollection:             systemCollection,
+		StaticCollectionRPCClient:    params.CollectionRPC,
+		HistoricalAccessNodeClients:  params.HistoricalAccessNodes,
+		NodeCommunicator:             params.Communicator,
+		ConnFactory:                  params.ConnFactory,
+		EnableRetries:                params.RetryEnabled,
+		NodeProvider:                 params.ExecNodeIdentitiesProvider,
+		Blocks:                       params.Blocks,
+		Collections:                  params.Collections,
+		Transactions:                 params.Transactions,
+		TxErrorMessageProvider:       params.TxErrorMessageProvider,
+		ScheduledTransactions:        params.ScheduledTransactions,
+		TxResultCache:                txResCache,
+		TxValidator:                  txValidator,
+		TxStatusDeriver:              txStatusDeriver,
+		EventsIndex:                  params.EventsIndex,
+		TxResultsIndex:               params.TxResultsIndex,
+		ScheduledTransactionsEnabled: params.ScheduledCallbacksEnabled,
 	}
 
 	switch params.TxResultQueryMode {

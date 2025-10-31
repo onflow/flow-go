@@ -51,7 +51,7 @@ func (f payloadFactory) WithReceiptStubs(receipts ...*flow.ExecutionReceiptStub)
 }
 
 // WithResults is an option that sets the `Results` of the payload.
-func (f payloadFactory) WithResults(results flow.ExecutionResultList) PayloadOption {
+func (f payloadFactory) WithResults(results ...*flow.ExecutionResult) PayloadOption {
 	return func(g *PayloadGenerator, payload *flow.Payload) {
 		payload.Results = results
 	}
