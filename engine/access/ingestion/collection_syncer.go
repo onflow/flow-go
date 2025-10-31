@@ -188,7 +188,7 @@ func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context
 		return fmt.Errorf("failed to get finalized block: %w", err)
 	}
 
-	progress := util.LogProgress(s.logger, util.DefaultLogProgressConfig("requesting missing collections", lastFinalizedBlock.Height-lastFullBlockHeight-1))
+	progress := util.LogProgress(s.logger, util.DefaultLogProgressConfig("requesting missing collections", lastFinalizedBlock.Height-lastFullBlockHeight))
 
 	collectionsToBeDownloaded := make(map[flow.Identifier]struct{})
 	for currBlockHeight := lastFullBlockHeight + 1; currBlockHeight <= lastFinalizedBlock.Height; currBlockHeight++ {
