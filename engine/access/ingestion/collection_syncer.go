@@ -74,7 +74,7 @@ func NewCollectionSyncer(
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
 	return &CollectionSyncer{
-		logger:                   logger,
+		logger:                   logger.With().Str("component", "collection_syncer").Logger(),
 		state:                    state,
 		requester:                requester,
 		blocks:                   blocks,
