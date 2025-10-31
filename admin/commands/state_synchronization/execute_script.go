@@ -55,11 +55,11 @@ func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRe
 		err = fmt.Errorf("failed to execute script: %w", err)
 
 		switch {
-		case errors.Is(err, version.ErrOutOfRange):
+		case errors.Is(err, version.ErrOutOfRange),
+			errors.Is(err, storage.ErrHeightNotIndexed),
+			errors.Is(err, execution.ErrIncompatibleNodeVersion):
 			return nil, admin.NewOutOfRangeError(err)
-		case errors.Is(err, execution.ErrIncompatibleNodeVersion),
-			errors.Is(err, storage.ErrNotFound),
-			errors.Is(err, storage.ErrHeightNotIndexed):
+		case errors.Is(err, storage.ErrNotFound):
 			return nil, admin.NewDataNotFoundError("script", err)
 		case fvmerrors.IsScriptExecutionCancelledError(err):
 			return nil, admin.NewRequestCanceledError(err)

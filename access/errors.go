@@ -36,7 +36,7 @@ func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 }
 
 // RequireAccessError returns the error if it is an Access sentinel error, otherwise, it throws an
-// irrecoverable exception
+// irrecoverable exception.
 //
 // This can be used for more complex endpoints that call into other methods to ensure all unexpected
 // errors are handled.
@@ -55,7 +55,7 @@ func RequireAccessError(ctx context.Context, err error) error {
 	return irrecoverable.NewException(err)
 }
 
-// accessSentinel is a marker interface for errors returned by the Access API
+// accessSentinel is a marker interface for errors returned by the Access API.
 // This is used to differentiate unexpected errors returned by endpoints
 // Implement this for all new Access sentinel errors. Any that do not will be considered unexpected
 // exceptions.
@@ -87,7 +87,7 @@ func IsInvalidRequestError(err error) bool {
 	return errors.As(err, &errInvalidRequest)
 }
 
-// DataNotFoundError indicates that the requested data was not found on the system
+// DataNotFoundError indicates that the requested data was not found on the system.
 type DataNotFoundError struct {
 	dataType string
 	err      error
@@ -112,7 +112,7 @@ func IsDataNotFoundError(err error) bool {
 	return errors.As(err, &errDataNotFound)
 }
 
-// InternalError indicates that a non-fatal internal error occurred
+// InternalError indicates that a non-fatal internal error occurred.
 // IMPORTANT: this should only be used for benign internal errors. Fatal or irrecoverable system
 // errors must be handled explicitly.
 type InternalError struct {
@@ -165,7 +165,7 @@ func IsOutOfRangeError(err error) bool {
 	return errors.As(err, &errOutOfRangeError)
 }
 
-// PreconditionFailedError indicates that a precondition for the operation was not met
+// PreconditionFailedError indicates that a precondition for the operation was not met.
 // This is a more specific version of InvalidRequestError, where the request is valid, but the system
 // is not currently in a state to fulfill the request (but may be in the future).
 type PreconditionFailedError struct {
@@ -191,7 +191,7 @@ func IsPreconditionFailedError(err error) bool {
 	return errors.As(err, &errPreconditionFailed)
 }
 
-// RequestCanceledError indicates that the request was canceled before the server finished processing it
+// RequestCanceledError indicates that the request was canceled before the server finished processing it.
 type RequestCanceledError struct {
 	err error
 }
@@ -215,7 +215,7 @@ func IsRequestCanceledError(err error) bool {
 	return errors.As(err, &requestCanceledError)
 }
 
-// RequestTimedOutError indicates that the request timed out before the server finished processing it
+// RequestTimedOutError indicates that the request timed out before the server finished processing it.
 type RequestTimedOutError struct {
 	err error
 }
@@ -239,7 +239,7 @@ func IsRequestTimedOutError(err error) bool {
 	return errors.As(err, &requestTimedOutError)
 }
 
-// ServiceUnavailable indicates that a requested service is unavailable
+// ServiceUnavailable indicates that a requested service is unavailable.
 type ServiceUnavailable struct {
 	err error
 }
@@ -263,7 +263,7 @@ func IsServiceUnavailable(err error) bool {
 	return errors.As(err, &errServiceUnavailable)
 }
 
-// ResourceExhausted indicates when computation or memory limits were exceeded
+// ResourceExhausted indicates when computation or memory limits were exceeded.
 type ResourceExhausted struct {
 	err error
 }

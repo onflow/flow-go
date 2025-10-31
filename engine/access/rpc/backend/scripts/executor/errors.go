@@ -19,7 +19,7 @@ func RequireNoError(ctx context.Context, err error) error {
 	return irrecoverable.NewException(err)
 }
 
-// RequireErrorIs returns the error if it unwraps to any of the provided target error types
+// RequireErrorIs returns the error if it unwraps to any of the provided target error types.
 // Otherwise, it throws an irrecoverable exception.
 func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 	if err == nil {
@@ -165,7 +165,7 @@ func IsOutOfRangeError(err error) bool {
 	return errors.As(err, &errOutOfRangeError)
 }
 
-// PreconditionFailedError indicates that a precondition for the operation was not met
+// PreconditionFailedError indicates that a precondition for the operation was not met.
 // This is a more specific version of InvalidRequestError, where the request is valid, but the system
 // is not currently in a state to fulfill the request (but may be in the future).
 type PreconditionFailedError struct {
@@ -191,7 +191,7 @@ func IsPreconditionFailedError(err error) bool {
 	return errors.As(err, &errPreconditionFailed)
 }
 
-// ScriptExecutionCanceledError indicates that the request was canceled before the server finished processing it
+// ScriptExecutionCanceledError indicates that the request was canceled before the server finished processing it.
 type ScriptExecutionCanceledError struct {
 	err error
 }
@@ -215,7 +215,7 @@ func IsScriptExecutionCanceledError(err error) bool {
 	return errors.As(err, &scriptExecutionCanceledError)
 }
 
-// ScriptExecutionTimedOutError indicates that the request timed out before the server finished processing it
+// ScriptExecutionTimedOutError indicates that the request timed out before the server finished processing it.
 type ScriptExecutionTimedOutError struct {
 	err error
 }
@@ -239,7 +239,7 @@ func IsScriptExecutionTimedOutError(err error) bool {
 	return errors.As(err, &scriptExecutionTimedOutError)
 }
 
-// ServiceUnavailable indicates that a requested service is unavailable
+// ServiceUnavailable indicates that a requested service is unavailable.
 type ServiceUnavailable struct {
 	err error
 }
@@ -263,7 +263,7 @@ func IsServiceUnavailable(err error) bool {
 	return errors.As(err, &errServiceUnavailable)
 }
 
-// ResourceExhausted indicates when computation or memory limits were exceeded
+// ResourceExhausted indicates when computation or memory limits were exceeded.
 type ResourceExhausted struct {
 	err error
 }
