@@ -410,7 +410,7 @@ func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.Sig
 		parentCtx.Throw(err)
 	}
 
-	logger.Info().
+	logger.Debug().
 		Hex("execution_data_id", logging.ID(execData.ExecutionDataID)).
 		Msg("execution data fetched")
 
