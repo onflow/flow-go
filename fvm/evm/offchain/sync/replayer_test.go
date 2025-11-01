@@ -1,11 +1,11 @@
 package sync_test
 
 import (
-	"math"
 	"math/big"
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -139,7 +139,7 @@ func TestChainReplay(t *testing.T) {
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						totalTxCount += 1
 
-						rs = coa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
+						rs = coa.Deploy(testContract.ByteCode, types.GasLimit(gethParams.MaxTxGas), types.EmptyBalance)
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						totalTxCount += 1
 

@@ -147,15 +147,20 @@ func (v *View) DryCall(
 		return nil, err
 	}
 
-	res, err := bv.DirectCall(
-		&types.DirectCall{
-			From:     types.NewAddress(from),
-			To:       types.NewAddress(to),
-			Data:     data,
-			Value:    value,
-			GasLimit: gasLimit,
-		},
-	)
+	call := &types.DirectCall{
+		From:     types.NewAddress(from),
+		To:       types.NewAddress(to),
+		Data:     data,
+		Value:    value,
+		GasLimit: gasLimit,
+	}
+	// We deliberately skip the EIP-7825 tx gas limit cap, because
+	// `DryCall` is used only for `eth_estimateGas` & `eth_call`
+	// JSON-RPC endpoints, for which the tx gas limit cap does
+	// not apply. These endpoints don't mutate the state, they
+	// simply read the state.
+	call.SkipTxGasLimitCheck()
+	res, err := bv.DirectCall(call)
 	if err != nil {
 		return nil, err
 	}
