@@ -189,6 +189,8 @@ func (s *Suite) SetupTest() {
 // It waits until the ingestion engine starts.
 func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine, *CollectionSyncer) {
 	processedHeightInitializer := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
+	processedHeight, err := processedHeightInitializer.Initialize(s.finalizedBlock.Height)
+	require.NoError(s.T(), err)
 
 	lastFullBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
 	require.NoError(s.T(), err)
@@ -216,7 +218,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 		s.blocks,
 		s.results,
 		s.receipts,
-		processedHeightInitializer,
+		processedHeight,
 		syncer,
 		s.collectionExecutedMetric,
 		nil,
