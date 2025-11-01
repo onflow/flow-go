@@ -82,7 +82,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
-		constraint[clusterIndex] += 2
+		constraint[clusterIndex] += 1
 	}
 
 	// next, round-robin partner nodes into each cluster
@@ -92,7 +92,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
-		constraint[clusterIndex] -= 1
+		constraint[clusterIndex] -= 2
 	}
 
 	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
