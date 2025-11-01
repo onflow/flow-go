@@ -356,11 +356,11 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
 	defer span.End()
 
-	result, err := s.results.ByBlockID(blockID)
+	resultID, err := s.results.IDByBlockID(blockID)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return result.ID(), nil
+	return resultID, nil
 }
 
 // SaveExecutionResults saves all data related to the execution of a block.
@@ -424,10 +424,7 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not store chunk data packs for block ID: %v: %w", blockID, err)
 	}
 
-	return storage.WithLocks(s.lockManager, []string{
-		storage.LockIndexChunkDataPackByChunkID,
-		storage.LockInsertOwnReceipt,
-	}, func(lctx lockctx.Context) error {
+	return storage.WithLocks(s.lockManager, storage.LockGroupExecutionSaveExecutionResult, func(lctx lockctx.Context) error {
 		// The batch update writes all execution result data (except chunk data pack!) atomically.
 		// Since the chunk data pack itself was already stored in a separate database (s.chunkDataPacks)
 		// during the previous step, this step stores only the mapping between chunk ID
@@ -446,7 +443,7 @@ func (s *state) saveExecutionResults(
 		// attempt to store another execution result that references a different
 		// chunk data pack with the same chunk ID, the conflict is detected, preventing
 		// overwriting of the previously stored mapping.
-		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+		err := s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 			// store the ChunkID -> StoredChunkDataPack.ID() mapping
 			// in s.db (protocol database along with other execution data in a single batch)
 			err := storeChunkDataPacksFunc(lctx, batch)
@@ -454,32 +451,39 @@ func (s *state) saveExecutionResults(
 				return fmt.Errorf("cannot store chunk data packs: %w", err)
 			}
 
-			err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+			// require LockInsertEvent
+			err = s.events.BatchStore(lctx, blockID, []flow.EventsList{result.AllEvents()}, batch)
 			if err != nil {
 				return fmt.Errorf("cannot store events: %w", err)
 			}
 
-			err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
+			// require LockInsertServiceEvent
+			err = s.serviceEvents.BatchStore(lctx, blockID, result.AllServiceEvents(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store service events: %w", err)
 			}
 
+			// require LockInsertAndIndexTxResult
 			err = s.transactionResults.BatchStore(
+				lctx,
+				batch,
 				blockID,
 				result.AllTransactionResults(),
-				batch)
+			)
 			if err != nil {
 				return fmt.Errorf("cannot store transaction result: %w", err)
 			}
 
 			executionResult := &result.ExecutionReceipt.ExecutionResult
+			// require [storage.LockInsertMyReceipt] lock
 			// saving my receipts will also save the execution result
 			err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
 			if err != nil {
 				return fmt.Errorf("could not persist execution result: %w", err)
 			}
 
-			err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+			// require [storage.LockIndexExecutionResult] lock
+			err = s.results.BatchIndex(lctx, batch, blockID, executionResult.ID())
 			if err != nil {
 				return fmt.Errorf("cannot index execution result: %w", err)
 			}
@@ -487,6 +491,7 @@ func (s *state) saveExecutionResults(
 			// the state commitment is the last data item to be stored, so that
 			// IsBlockExecuted can be implemented by checking whether state commitment exists
 			// in the database
+			// require [storage.LockIndexStateCommitment] lock
 			err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store state commitment: %w", err)
@@ -494,6 +499,11 @@ func (s *state) saveExecutionResults(
 
 			return nil
 		})
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
+		}
+
+		return err
 	})
 }
 

@@ -46,10 +46,7 @@ func TestSealStoreRetrieve(t *testing.T) {
 }
 
 // TestSealIndexAndRetrieve verifies that:
-//   - for a block, we can s (aka index) the latest sealed block along this fork.
-//
-// Note: indexing the seal for a block is currently implemented only through a direct
-// Badger operation. The Seals mempool only supports retrieving the latest sealed block.
+//   - for a block, we can seal (aka index) the latest sealed block along this fork.
 func TestSealIndexAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()

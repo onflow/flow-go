@@ -136,8 +136,8 @@ func (i *indexCoreTest) setStoreRegisters(f func(t *testing.T, entries flow.Regi
 
 func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flow.EventsList) error) *indexCoreTest {
 	i.events.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
-		Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+		On("BatchStore", mock.AnythingOfType("*lockctx.context"), mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
+		Return(func(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, events)
 		})
@@ -166,7 +166,7 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 
 func (i *indexCoreTest) useDefaultEvents() *indexCoreTest {
 	i.events.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
+		On("BatchStore", mock.AnythingOfType("*lockctx.context"), mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
 		Return(nil)
 	return i
 }
@@ -257,10 +257,10 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index AllTheThings", func(t *testing.T) {
 		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
 
-		test.events.On("BatchStore", mock.Anything, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
-			Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+		test.events.On("BatchStore", mock.Anything, blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(func(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+				require.True(t, lctx.HoldsLock(storage.LockInsertEvent))
 				require.NotNil(t, batch)
-				// Events BatchStore doesn't require specific locks, but we validate the batch is provided
 				return nil
 			})
 		test.results.On("BatchStore", mock.Anything, mock.Anything, blockID, tf.ExpectedResults).
