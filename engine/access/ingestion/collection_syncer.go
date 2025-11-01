@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -74,7 +75,7 @@ func NewCollectionSyncer(
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
 	return &CollectionSyncer{
-		logger:                   logger,
+		logger:                   logger.With().Str("component", "collection_syncer").Logger(),
 		state:                    state,
 		requester:                requester,
 		blocks:                   blocks,
@@ -95,7 +96,19 @@ func (s *CollectionSyncer) RequestCollections(ctx irrecoverable.SignalerContext,
 	// on start-up, AN wants to download all missing collections to serve it to end users
 	err := s.requestMissingCollectionsBlocking(requestCtx)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("error downloading missing collections")
+		if ctx.Err() != nil {
+			s.logger.Error().Err(err).Msg("engine shutdown while downloading missing collections")
+			return
+		}
+
+		if !errors.Is(err, context.DeadlineExceeded) {
+			ctx.Throw(fmt.Errorf("error downloading missing collections: %w", err))
+			return
+		}
+
+		// timed out during catchup. continue with normal startup.
+		// missing collections will be requested periodically.
+		s.logger.Error().Err(err).Msg("timed out syncing collections during startup")
 	}
 	ready()
 
@@ -158,7 +171,7 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 			Int("missing_collection_count", len(collections)).
 			Msg("re-requesting missing collections")
 
-		s.requestCollections(collections)
+		s.requestCollections(collections, true)
 	}
 
 	return nil
@@ -169,21 +182,41 @@ func (s *CollectionSyncer) requestMissingCollections() error {
 //
 // No errors are expected during normal operations.
 func (s *CollectionSyncer) requestMissingCollectionsBlocking(ctx context.Context) error {
-	missingCollections, _, err := s.findMissingCollections(s.lastFullBlockHeight.Value())
+	lastFullBlockHeight := s.lastFullBlockHeight.Value()
+	lastFinalizedBlock, err := s.state.Final().Head()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get finalized block: %w", err)
 	}
-	if len(missingCollections) == 0 {
-		s.logger.Info().Msg("skipping requesting missing collections. no missing collections found")
+
+	progress := util.LogProgress(s.logger, util.DefaultLogProgressConfig("requesting missing collections", lastFinalizedBlock.Height-lastFullBlockHeight))
+
+	collectionsToBeDownloaded := make(map[flow.Identifier]struct{})
+	for currBlockHeight := lastFullBlockHeight + 1; currBlockHeight <= lastFinalizedBlock.Height; currBlockHeight++ {
+		if ctx.Err() != nil {
+			return fmt.Errorf("missing collection catchup interrupted: %w", ctx.Err())
+		}
+
+		collections, err := s.findMissingCollectionsAtHeight(currBlockHeight)
+		if err != nil {
+			return fmt.Errorf("failed to find missing collections at height %d: %w", currBlockHeight, err)
+		}
+
+		if len(collections) > 0 {
+			s.requestCollections(collections, false)
+			for _, collection := range collections {
+				collectionsToBeDownloaded[collection.CollectionID] = struct{}{}
+			}
+		}
+
+		progress(1)
+	}
+
+	if len(collectionsToBeDownloaded) == 0 {
+		s.logger.Info().Msg("no missing collections to download")
 		return nil
 	}
 
-	s.requestCollections(missingCollections)
-
-	collectionsToBeDownloaded := make(map[flow.Identifier]struct{})
-	for _, collection := range missingCollections {
-		collectionsToBeDownloaded[collection.CollectionID] = struct{}{}
-	}
+	s.requester.Force()
 
 	collectionStoragePollTicker := time.NewTicker(collectionCatchupDBPollInterval)
 	defer collectionStoragePollTicker.Stop()
@@ -304,12 +337,12 @@ func (s *CollectionSyncer) RequestCollectionsForBlock(height uint64, missingColl
 		return
 	}
 
-	s.requestCollections(missingCollections)
+	s.requestCollections(missingCollections, true)
 }
 
 // requestCollections registers collection download requests in the requester engine and
 // causes the requester to immediately dispatch requests.
-func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee) {
+func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuarantee, force bool) {
 	for _, guarantee := range collections {
 		guarantors, err := protocol.FindGuarantors(s.state, guarantee)
 		if err != nil {
@@ -319,7 +352,7 @@ func (s *CollectionSyncer) requestCollections(collections []*flow.CollectionGuar
 		s.requester.EntityByID(guarantee.CollectionID, filter.HasNodeID[flow.Identity](guarantors...))
 	}
 
-	if len(collections) > 0 {
+	if force && len(collections) > 0 {
 		s.requester.Force()
 	}
 }
