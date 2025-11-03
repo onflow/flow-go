@@ -20,6 +20,8 @@ type ExecutionDataCache struct {
 	cache   mempool.ExecutionData
 }
 
+var _ execution_data.ExecutionDataCache = (*ExecutionDataCache)(nil)
+
 // NewExecutionDataCache returns a new ExecutionDataCache.
 func NewExecutionDataCache(
 	backend execution_data.ExecutionDataGetter,
