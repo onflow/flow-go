@@ -818,7 +818,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.Eventually(suite.T(), func() bool {
 			isStored, err := collectionIndexer.IsCollectionInStorage(collection.ID())
 			return isStored && err == nil
-		}, 1*time.Second, 100*time.Millisecond, "collection not indexed")
+		}, 1*time.Second, 10*time.Millisecond, "collection not indexed")
 
 		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
@@ -1074,7 +1074,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				return false
 			}
 			return true
-		}, 1*time.Second, 100*time.Millisecond, "transactions never indexed")
+		}, 1*time.Second, 10*time.Millisecond, "transactions never indexed")
 
 		assertTransactionResult := func(
 			resp *accessproto.TransactionResultResponse,

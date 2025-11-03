@@ -161,15 +161,15 @@ func (s *IndexerSuite) TestMissingCollectionsAtHeight_ErrorCases() {
 	})
 
 	s.Run("collection error", func() {
-		expectedErr := errors.New("expected error")
+		exception := errors.New("exception")
 
 		s.blocks.On("ByHeight", block.Height).Return(block, nil).Once()
-		s.collections.On("LightByID", block.Payload.Guarantees[0].CollectionID).Return(nil, expectedErr).Once()
+		s.collections.On("LightByID", block.Payload.Guarantees[0].CollectionID).Return(nil, exception).Once()
 
 		indexer := s.createIndexer(s.T())
 
 		missingCollections, err := indexer.MissingCollectionsAtHeight(block.Height)
-		s.Require().ErrorIs(err, expectedErr)
+		s.Require().ErrorIs(err, exception)
 		s.Require().Empty(missingCollections)
 	})
 }
@@ -199,13 +199,13 @@ func (s *IndexerSuite) TestIsCollectionInStorage() {
 	})
 
 	s.Run("unexpected error", func() {
-		expectedErr := errors.New("unexpected error")
-		s.collections.On("LightByID", collection.ID()).Return(nil, expectedErr).Once()
+		exception := errors.New("unexpected error")
+		s.collections.On("LightByID", collection.ID()).Return(nil, exception).Once()
 
 		indexer := s.createIndexer(s.T())
 
 		inStorage, err := indexer.IsCollectionInStorage(collection.ID())
-		s.Require().ErrorIs(err, expectedErr)
+		s.Require().ErrorIs(err, exception)
 		s.Require().False(inStorage)
 	})
 }
@@ -363,7 +363,7 @@ func (s *IndexerSuite) TestWorkerProcessing_ProcessesCollections() {
 		// wait until the last full block height is updated
 		require.Eventually(s.T(), func() bool {
 			return lastFullBlockHeight.Value() == prevHeader.Height
-		}, time.Second, 100*time.Millisecond)
+		}, time.Second, 10*time.Millisecond)
 	})
 }
 
