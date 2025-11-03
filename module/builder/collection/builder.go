@@ -191,7 +191,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 	// STEP 2: build a payload of valid transactions, while at the same
 	// time figuring out the correct reference block ID for the collection.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreatePayload)
-	payload, err := b.buildPayload(buildCtx)
+	payload, priorityTransactionsCount, err := b.buildPayload(buildCtx)
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not build payload: %w", err)
@@ -215,6 +215,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 	if err != nil {
 		return nil, fmt.Errorf("could not build cluster block: %w", err)
 	}
+
+	b.metrics.ClusterBlockCreated(block, priorityTransactionsCount)
 
 	blockProposal, err := cluster.NewProposal(
 		cluster.UntrustedProposal{
@@ -403,8 +405,13 @@ func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *block
 
 // buildPayload constructs a valid payload based on transactions available in the mempool.
 // If the mempool is empty, an empty payload will be returned.
+// Return values:
+//   - *cluster.Payload: the payload that has been built.
+//   - uint: number of prioritized transactions included in the payload.
+//   - error: exception if failed to build the payload.
+//
 // No errors are expected during normal operation.
-func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, error) {
+func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, uint, error) {
 	lookup := buildCtx.lookup
 	limiter := buildCtx.limiter
 	config := buildCtx.config
@@ -469,7 +476,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 			continue // in case we are configured with liberal transaction ingest rules
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve reference header: %w", err)
+			return nil, 0, fmt.Errorf("could not retrieve reference header: %w", err)
 		}
 
 		// disallow un-finalized reference blocks, and reference blocks beyond the cluster's operating epoch
@@ -480,7 +487,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		// make sure the reference block is finalized and not orphaned
 		blockIDFinalizedAtRefHeight, err := b.mainHeaders.BlockIDByHeight(refHeader.Height)
 		if err != nil {
-			return nil, fmt.Errorf("could not check that reference block (id=%x) for transaction (id=%x) is finalized: %w", tx.ReferenceBlockID, txID, err)
+			return nil, 0, fmt.Errorf("could not check that reference block (id=%x) for transaction (id=%x) is finalized: %w", tx.ReferenceBlockID, txID, err)
 		}
 		if blockIDFinalizedAtRefHeight != tx.ReferenceBlockID {
 			// the transaction references an orphaned block - it will never be valid
@@ -544,7 +551,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	// build the payload from the transactions
 	collection, err := flow.NewCollection(flow.UntrustedCollection{Transactions: transactions})
 	if err != nil {
-		return nil, fmt.Errorf("could not build the collection from the transactions: %w", err)
+		return nil, 0, fmt.Errorf("could not build the collection from the transactions: %w", err)
 	}
 
 	payload, err := cluster.NewPayload(
@@ -554,9 +561,9 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not build a payload: %w", err)
+		return nil, 0, fmt.Errorf("could not build a payload: %w", err)
 	}
-	return payload, nil
+	return payload, uint(len(priorityTransactions)), nil
 }
 
 // buildHeader constructs the header for the cluster block being built.

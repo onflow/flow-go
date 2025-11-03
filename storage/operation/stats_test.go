@@ -3,7 +3,6 @@ package operation_test
 import (
 	"testing"
 
-	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
@@ -14,8 +13,6 @@ import (
 
 func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		lockManager := storage.NewTestingLockManager()
-
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			// insert random events
 			b := unittest.IdentifierFixture()
@@ -36,9 +33,10 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 					Proof:        []byte{'p'},
 					CollectionID: collectionID,
 				}
-				require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
-					return operation.InsertChunkDataPack(lctx, rw, cdp)
-				}))
+				err := operation.InsertChunkDataPack(rw, cdp.ID(), cdp)
+				if err != nil {
+					return err
+				}
 			}
 
 			// insert 20 results
@@ -63,11 +61,11 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 
 		for i := 0; i < 256; i++ {
 			count := 0
-			if i == 102 { // events
+			if i == 102 { // events (codeEvent)
 				count = 30
-			} else if i == 100 { // CDP
+			} else if i == 100 { // CDP (codeChunkDataPack)
 				count = 100
-			} else if i == 36 { // results
+			} else if i == 36 { // results (codeExecutionResult)
 				count = 20
 			}
 			require.Equal(t, count, stats[byte(i)].Count, "byte %d", i)

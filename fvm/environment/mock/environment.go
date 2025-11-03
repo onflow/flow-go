@@ -1704,9 +1704,9 @@ func (_m *Environment) UpdateAccountContractCode(location common.AddressLocation
 	return r0
 }
 
-// ValidateAccountCapabilitiesGet provides a mock function with given fields: context, locationRange, address, path, wantedBorrowType, capabilityBorrowType
-func (_m *Environment) ValidateAccountCapabilitiesGet(context interpreter.AccountCapabilityGetValidationContext, locationRange interpreter.LocationRange, address interpreter.AddressValue, path interpreter.PathValue, wantedBorrowType *sema.ReferenceType, capabilityBorrowType *sema.ReferenceType) (bool, error) {
-	ret := _m.Called(context, locationRange, address, path, wantedBorrowType, capabilityBorrowType)
+// ValidateAccountCapabilitiesGet provides a mock function with given fields: context, address, path, wantedBorrowType, capabilityBorrowType
+func (_m *Environment) ValidateAccountCapabilitiesGet(context interpreter.AccountCapabilityGetValidationContext, address interpreter.AddressValue, path interpreter.PathValue, wantedBorrowType *sema.ReferenceType, capabilityBorrowType *sema.ReferenceType) (bool, error) {
+	ret := _m.Called(context, address, path, wantedBorrowType, capabilityBorrowType)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidateAccountCapabilitiesGet")
@@ -1714,17 +1714,17 @@ func (_m *Environment) ValidateAccountCapabilitiesGet(context interpreter.Accoun
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) (bool, error)); ok {
-		return rf(context, locationRange, address, path, wantedBorrowType, capabilityBorrowType)
+	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) (bool, error)); ok {
+		return rf(context, address, path, wantedBorrowType, capabilityBorrowType)
 	}
-	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) bool); ok {
-		r0 = rf(context, locationRange, address, path, wantedBorrowType, capabilityBorrowType)
+	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) bool); ok {
+		r0 = rf(context, address, path, wantedBorrowType, capabilityBorrowType)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) error); ok {
-		r1 = rf(context, locationRange, address, path, wantedBorrowType, capabilityBorrowType)
+	if rf, ok := ret.Get(1).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) error); ok {
+		r1 = rf(context, address, path, wantedBorrowType, capabilityBorrowType)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1732,9 +1732,9 @@ func (_m *Environment) ValidateAccountCapabilitiesGet(context interpreter.Accoun
 	return r0, r1
 }
 
-// ValidateAccountCapabilitiesPublish provides a mock function with given fields: context, locationRange, address, path, capabilityBorrowType
-func (_m *Environment) ValidateAccountCapabilitiesPublish(context interpreter.AccountCapabilityPublishValidationContext, locationRange interpreter.LocationRange, address interpreter.AddressValue, path interpreter.PathValue, capabilityBorrowType *interpreter.ReferenceStaticType) (bool, error) {
-	ret := _m.Called(context, locationRange, address, path, capabilityBorrowType)
+// ValidateAccountCapabilitiesPublish provides a mock function with given fields: context, address, path, capabilityBorrowType
+func (_m *Environment) ValidateAccountCapabilitiesPublish(context interpreter.AccountCapabilityPublishValidationContext, address interpreter.AddressValue, path interpreter.PathValue, capabilityBorrowType *interpreter.ReferenceStaticType) (bool, error) {
+	ret := _m.Called(context, address, path, capabilityBorrowType)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidateAccountCapabilitiesPublish")
@@ -1742,17 +1742,17 @@ func (_m *Environment) ValidateAccountCapabilitiesPublish(context interpreter.Ac
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityPublishValidationContext, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) (bool, error)); ok {
-		return rf(context, locationRange, address, path, capabilityBorrowType)
+	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityPublishValidationContext, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) (bool, error)); ok {
+		return rf(context, address, path, capabilityBorrowType)
 	}
-	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityPublishValidationContext, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) bool); ok {
-		r0 = rf(context, locationRange, address, path, capabilityBorrowType)
+	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityPublishValidationContext, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) bool); ok {
+		r0 = rf(context, address, path, capabilityBorrowType)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(interpreter.AccountCapabilityPublishValidationContext, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) error); ok {
-		r1 = rf(context, locationRange, address, path, capabilityBorrowType)
+	if rf, ok := ret.Get(1).(func(interpreter.AccountCapabilityPublishValidationContext, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) error); ok {
+		r1 = rf(context, address, path, capabilityBorrowType)
 	} else {
 		r1 = ret.Error(1)
 	}
