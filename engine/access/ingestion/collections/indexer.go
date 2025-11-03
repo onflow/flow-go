@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog"
 )
 
 const (

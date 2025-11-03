@@ -223,7 +223,8 @@ func (s *IndexerSuite) TestUpdateLastFullBlockHeight() {
 		finalSnapshot.On("Head").Return(finalizedBlock.ToHeader(), nil).Once()
 		s.state.On("Final").Return(finalSnapshot).Once()
 
-		indexer.updateLastFullBlockHeight()
+		err := indexer.updateLastFullBlockHeight()
+		s.Require().NoError(err)
 
 		updated := indexer.lastFullBlockHeight.Value()
 		s.Equal(original, updated)
@@ -252,7 +253,8 @@ func (s *IndexerSuite) TestUpdateLastFullBlockHeight() {
 		}
 		s.lastFullBlockCP.On("SetProcessedIndex", finalizedBlock.Height).Return(nil).Once()
 
-		indexer.updateLastFullBlockHeight()
+		err := indexer.updateLastFullBlockHeight()
+		s.Require().NoError(err)
 
 		updated := indexer.lastFullBlockHeight.Value()
 		s.Equal(finalizedBlock.Height, updated)
