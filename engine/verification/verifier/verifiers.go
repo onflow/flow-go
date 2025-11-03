@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/initialize"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification/convert"
 	"github.com/onflow/flow-go/module"
@@ -37,12 +38,22 @@ func VerifyLastKHeight(
 	chainID flow.ChainID,
 	protocolDataDir string,
 	chunkDataPackDir string,
+	newExecutionState func() *state.ExecutionState,
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
+		lockManager,
+		chainID,
+		protocolDataDir,
+		chunkDataPackDir,
+		newExecutionState,
+		transactionFeesDisabled,
+		scheduledCallbacksEnabled,
+	)
+
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -92,13 +103,24 @@ func VerifyRange(
 	lockManager lockctx.Manager,
 	from, to uint64,
 	chainID flow.ChainID,
-	protocolDataDir string, chunkDataPackDir string,
+	protocolDataDir string,
+	chunkDataPackDir string,
+	newExecutionState func() *state.ExecutionState,
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
+		lockManager,
+		chainID,
+		protocolDataDir,
+		chunkDataPackDir,
+		newExecutionState,
+		transactionFeesDisabled,
+		scheduledCallbacksEnabled,
+	)
+
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -226,6 +248,7 @@ func initStorages(
 	chainID flow.ChainID,
 	dataDir string,
 	chunkDataPackDir string,
+	newExecutionState func() *state.ExecutionState,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
 ) (
@@ -257,7 +280,15 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		db, storedChunkDataPacks, storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledCallbacksEnabled)
+	verifier := makeVerifier(
+		log.Logger,
+		chainID,
+		storages.Headers,
+		newExecutionState,
+		transactionFeesDisabled,
+		scheduledCallbacksEnabled,
+	)
+
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -329,6 +360,7 @@ func makeVerifier(
 	logger zerolog.Logger,
 	chainID flow.ChainID,
 	headers storage.Headers,
+	newExecutionState func() *state.ExecutionState,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
 ) module.ChunkVerifier {
@@ -355,6 +387,10 @@ func makeVerifier(
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)
 
-	chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, logger)
-	return chunkVerifier
+	return chunks.NewChunkVerifier(
+		vm,
+		vmCtx,
+		newExecutionState,
+		logger,
+	)
 }

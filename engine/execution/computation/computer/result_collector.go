@@ -122,7 +122,7 @@ func newResultCollector(
 		blockStartTime:               now,
 		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
 		currentCollectionStartTime:   now,
-		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
+		currentCollectionState:       state.NewSpockExecutionState(nil, state.DefaultParameters()),
 		currentCollectionStats:       module.CollectionExecutionResultStats{},
 		currentCollectionStorageSnapshot: storehouse.NewExecutingBlockSnapshot(
 			previousBlockSnapshot,
@@ -206,7 +206,7 @@ func (collector *resultCollector) commitCollection(
 	collector.blockMeter.MergeMeter(collectionExecutionSnapshot.Meter)
 
 	collector.currentCollectionStartTime = time.Now()
-	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
+	collector.currentCollectionState = state.NewSpockExecutionState(nil, state.DefaultParameters())
 	collector.currentCollectionStats = module.CollectionExecutionResultStats{}
 
 	for _, consumer := range collector.consumers {

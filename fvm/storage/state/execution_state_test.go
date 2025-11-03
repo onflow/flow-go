@@ -20,7 +20,7 @@ func createByteArray(size int) []byte {
 }
 
 func TestExecutionState_Finalize(t *testing.T) {
-	parent := state.NewExecutionState(nil, state.DefaultParameters())
+	parent := state.NewSpockExecutionState(nil, state.DefaultParameters())
 
 	child := parent.NewChild()
 
@@ -64,7 +64,7 @@ func TestExecutionState_Finalize(t *testing.T) {
 }
 
 func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
-	st := state.NewExecutionState(nil, state.DefaultParameters())
+	st := state.NewSpockExecutionState(nil, state.DefaultParameters())
 
 	owner := unittest.RandomAddressFixture()
 
@@ -137,7 +137,7 @@ func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestExecutionState_MaxValueSize(t *testing.T) {
-	st := state.NewExecutionState(
+	st := state.NewSpockExecutionState(
 		nil,
 		state.DefaultParameters().WithMaxValueSizeAllowed(6))
 
@@ -155,7 +155,7 @@ func TestExecutionState_MaxValueSize(t *testing.T) {
 }
 
 func TestExecutionState_MaxKeySize(t *testing.T) {
-	st := state.NewExecutionState(
+	st := state.NewSpockExecutionState(
 		nil,
 		// Note: owners are always 8 bytes
 		state.DefaultParameters().WithMaxKeySizeAllowed(8+2))
@@ -197,7 +197,7 @@ func TestExecutionState_MaxInteraction(t *testing.T) {
 	key4 := flow.NewRegisterID(unittest.RandomAddressFixture(), "4567")
 	key4Size := uint64(8 + 4)
 
-	st := state.NewExecutionState(
+	st := state.NewSpockExecutionState(
 		nil,
 		state.DefaultParameters().
 			WithMeterParameters(
@@ -219,7 +219,7 @@ func TestExecutionState_MaxInteraction(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, st.InteractionUsed(), key1Size+key2Size+key3Size)
 
-	st = state.NewExecutionState(
+	st = state.NewSpockExecutionState(
 		nil,
 		state.DefaultParameters().
 			WithMeterParameters(

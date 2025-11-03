@@ -172,6 +172,10 @@ type nestedTransactionStackFrame struct {
 	parseRestriction *common.AddressLocation
 }
 
+func (frame nestedTransactionStackFrame) NewChild() *ExecutionState {
+	return frame.ExecutionState.NewChild().(*ExecutionState)
+}
+
 type transactionState struct {
 	// NOTE: The first frame is always the main transaction, and is not
 	// poppable during the course of the transaction.
@@ -184,7 +188,7 @@ func NewTransactionState(
 	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 ) NestedTransactionPreparer {
-	startState := NewExecutionState(snapshot, params)
+	startState := NewSpockExecutionState(snapshot, params)
 	return NewTransactionStateFromExecutionState(startState)
 }
 

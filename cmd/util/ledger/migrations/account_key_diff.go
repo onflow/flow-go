@@ -227,7 +227,7 @@ func newStatefulAccounts(
 	// Create a new transaction state with a dummy hasher
 	// because we do not need spock proofs for migrations.
 	transactionState := state.NewTransactionStateFromExecutionState(
-		state.NewExecutionStateWithSpockStateHasher(
+		state.NewSpockExecutionStateWithSpockStateHasher(
 			registers.StorageSnapshot{
 				Registers: regs,
 			},

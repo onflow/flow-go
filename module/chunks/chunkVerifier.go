@@ -27,21 +27,28 @@ import (
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm             fvm.VM
-	vmCtx          fvm.Context
-	systemChunkCtx fvm.Context
-	callbackCtx    fvm.Context
-	logger         zerolog.Logger
+	vm                fvm.VM
+	vmCtx             fvm.Context
+	systemChunkCtx    fvm.Context
+	callbackCtx       fvm.Context
+	logger            zerolog.Logger
+	newExecutionState func() *fvmState.ExecutionState
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
+func NewChunkVerifier(
+	vm fvm.VM,
+	vmCtx fvm.Context,
+	newExecutionState func() *fvmState.ExecutionState,
+	logger zerolog.Logger,
+) *ChunkVerifier {
 	return &ChunkVerifier{
-		vm:             vm,
-		vmCtx:          vmCtx,
-		systemChunkCtx: computer.SystemChunkContext(vmCtx, metrics.NewNoopCollector()),
-		callbackCtx:    computer.CallbackContext(vmCtx, metrics.NewNoopCollector()),
-		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
+		vm:                vm,
+		vmCtx:             vmCtx,
+		newExecutionState: newExecutionState,
+		systemChunkCtx:    computer.SystemChunkContext(vmCtx, metrics.NewNoopCollector()),
+		callbackCtx:       computer.CallbackContext(vmCtx, metrics.NewNoopCollector()),
+		logger:            logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
 
@@ -202,7 +209,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				chunkDataPack.StartState),
 			unknownRegTouch: unknownRegTouch,
 		})
-	chunkState := fvmState.NewExecutionState(nil, fvmState.DefaultParameters())
+	chunkState := fcv.newExecutionState()
 
 	var problematicTx flow.Identifier
 	// collect execution data formatted transaction results

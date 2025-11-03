@@ -200,7 +200,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 
 	val := createByteArray(2)
 
-	cachedState := state.NewExecutionState(
+	cachedState := state.NewSpockExecutionState(
 		nil,
 		state.DefaultParameters(),
 	)

@@ -75,7 +75,7 @@ func newPendingBlock(
 		transactions:       make(map[flowgo.Identifier]*flowgo.TransactionBody),
 		transactionIDs:     make([]flowgo.Identifier, 0),
 		transactionResults: make(map[flowgo.Identifier]IndexedTransactionResult),
-		ledgerState: state.NewExecutionState(
+		ledgerState: state.NewSpockExecutionState(
 			ledgerSnapshot,
 			state.DefaultParameters()),
 		events: make([]flowgo.Event, 0),

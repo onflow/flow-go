@@ -17,6 +17,17 @@ const (
 	DefaultMaxValueSize = 256_000_000 // ~256MB
 )
 
+type state interface {
+	NewChild() state
+	Finalize() *snapshot.ExecutionSnapshot
+	Merge(snapshot *snapshot.ExecutionSnapshot) error
+	Set(id flow.RegisterID, value flow.RegisterValue) error
+	Get(id flow.RegisterID) (flow.RegisterValue, error)
+	DropChanges() error
+	readSetSize() int
+	interimReadSet(accumulator map[flow.RegisterID]struct{})
+}
+
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
@@ -26,12 +37,14 @@ type ExecutionState struct {
 	// bookkeeping purpose).
 	finalized bool
 
-	*spockState
+	state
 	meter *meter.Meter
 
 	// NOTE: parent and child state shares the same limits controller
 	*limitsController
 }
+
+var _ state = &ExecutionState{}
 
 type StateParameters struct {
 	meter.MeterParameters
@@ -103,29 +116,56 @@ func (controller *limitsController) RunWithMeteringDisabled(f func()) {
 	controller.meteringEnabled = current
 }
 
-// NewExecutionState constructs a new state
-func NewExecutionState(
+// NewSpockExecutionState constructs a new execution state,
+// backed by a Spock state and using the default Spock hasher.
+func NewSpockExecutionState(
 	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 ) *ExecutionState {
-	return NewExecutionStateWithSpockStateHasher(
+	return NewSpockExecutionStateWithSpockStateHasher(
 		snapshot,
 		params,
 		DefaultSpockSecretHasher,
 	)
 }
 
-// NewExecutionStateWithSpockStateHasher constructs a new state with a custom hasher
-func NewExecutionStateWithSpockStateHasher(
+// NewDefaultSpockExecutionState constructs a new execution state,
+// backed by a Spock state with default parameters and using the default Spock hasher.
+func NewDefaultSpockExecutionState() *ExecutionState {
+	return NewSpockExecutionState(nil, DefaultParameters())
+}
+
+// NewSpockExecutionStateWithSpockStateHasher constructs a new execution state,
+// backed by a Spock state and using a custom Spock hasher.
+func NewSpockExecutionStateWithSpockStateHasher(
 	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 	getHasher func() hash.Hasher,
 ) *ExecutionState {
-	m := meter.NewMeter(params.MeterParameters)
+	return NewExecutionState(
+		newSpockState(snapshot, getHasher),
+		params,
+	)
+}
+
+// Deprecated: NewDefaultWritesOnlySpockExecutionState constructs a new execution state,
+// backed by a "writes-only Spock" which only considers writes but not reads,
+// with default parameters and using the default Spock hasher.
+//
+// It should not be used in production code, only for testing and debugging purposes.
+func NewDefaultWritesOnlySpockExecutionState() *ExecutionState {
+	return NewExecutionState(
+		newWritesOnlySpockState(nil, DefaultSpockSecretHasher),
+		DefaultParameters(),
+	)
+}
+
+// NewExecutionState constructs a new execution state backed by the provided state.
+func NewExecutionState(state state, params StateParameters) *ExecutionState {
 	return &ExecutionState{
 		finalized:        false,
-		spockState:       newSpockState(snapshot, getHasher),
-		meter:            m,
+		state:            state,
+		meter:            meter.NewMeter(params.MeterParameters),
 		limitsController: newLimitsController(params),
 	}
 }
@@ -137,14 +177,14 @@ func (state *ExecutionState) NewChildWithMeterParams(
 ) *ExecutionState {
 	return &ExecutionState{
 		finalized:        false,
-		spockState:       state.spockState.NewChild(),
+		state:            state.state.NewChild(),
 		meter:            meter.NewMeter(params.MeterParameters),
 		limitsController: state.limitsController,
 	}
 }
 
 // NewChild generates a new child state using the parent's meter parameters.
-func (state *ExecutionState) NewChild() *ExecutionState {
+func (state *ExecutionState) NewChild() state {
 	return state.NewChildWithMeterParams(state.ExecutionParameters())
 }
 
@@ -163,7 +203,7 @@ func (state *ExecutionState) DropChanges() error {
 		return fmt.Errorf("cannot DropChanges on a finalized state")
 	}
 
-	return state.spockState.DropChanges()
+	return state.state.DropChanges()
 }
 
 // Get returns a register value given owner and key
@@ -181,7 +221,7 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 		}
 	}
 
-	if value, err = state.spockState.Get(id); err != nil {
+	if value, err = state.state.Get(id); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -204,7 +244,7 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 		}
 	}
 
-	if err := state.spockState.Set(id, value); err != nil {
+	if err := state.state.Set(id, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -300,9 +340,9 @@ func (state *ExecutionState) TotalEmittedEventBytes() uint64 {
 
 func (state *ExecutionState) Finalize() *snapshot.ExecutionSnapshot {
 	state.finalized = true
-	snapshot := state.spockState.Finalize()
-	snapshot.Meter = state.meter
-	return snapshot
+	snap := state.state.Finalize()
+	snap.Meter = state.meter
+	return snap
 }
 
 // MergeState the changes from a the given execution snapshot to this state.
@@ -311,7 +351,7 @@ func (state *ExecutionState) Merge(other *snapshot.ExecutionSnapshot) error {
 		return fmt.Errorf("cannot Merge on a finalized state")
 	}
 
-	err := state.spockState.Merge(other)
+	err := state.state.Merge(other)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
 	}
@@ -348,11 +388,11 @@ func (state *ExecutionState) ExecutionParameters() ExecutionParameters {
 }
 
 func (state *ExecutionState) readSetSize() int {
-	return state.spockState.readSetSize()
+	return state.state.readSetSize()
 }
 
 func (state *ExecutionState) interimReadSet(
 	accumulator map[flow.RegisterID]struct{},
 ) {
-	state.spockState.interimReadSet(accumulator)
+	state.state.interimReadSet(accumulator)
 }

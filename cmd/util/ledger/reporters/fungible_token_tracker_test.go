@@ -45,7 +45,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	// bootstrap ledger
 	payloads := []ledger.Payload{}
 	chain := flow.Testnet.Chain()
-	view := state.NewExecutionState(
+	view := state.NewSpockExecutionState(
 		reporters.NewStorageSnapshotFromPayload(payloads),
 		state.DefaultParameters())
 

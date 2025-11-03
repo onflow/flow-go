@@ -621,7 +621,7 @@ func newAccounts(accountRegisters *registers.AccountRegisters) environment.Accou
 	// Create a new transaction state with a dummy hasher
 	// because we do not need spock proofs for migrations.
 	transactionState := storageState.NewTransactionStateFromExecutionState(
-		storageState.NewExecutionStateWithSpockStateHasher(
+		storageState.NewSpockExecutionStateWithSpockStateHasher(
 			registers.StorageSnapshot{
 				Registers: accountRegisters,
 			},

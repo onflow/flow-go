@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -23,8 +24,9 @@ var (
 	flagFromTo                    string
 	flagWorkerCount               uint // number of workers to verify the blocks concurrently
 	flagStopOnMismatch            bool
-	flagtransactionFeesDisabled   bool
+	flagTransactionFeesDisabled   bool
 	flagScheduledCallbacksEnabled bool
+	flagWritesOnlyExecutionState  bool
 )
 
 // # verify the last 100 sealed blocks
@@ -58,9 +60,16 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagStopOnMismatch, "stop_on_mismatch", false, "stop verification on first mismatch")
 
-	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
+	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
 	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledCallbacksEnabled, "enable scheduled callbacks")
+
+	Cmd.Flags().BoolVar(
+		&flagWritesOnlyExecutionState,
+		"writes_only_execution_state",
+		false,
+		"use writes-only execution states instead of Spock execution states",
+	)
 }
 
 func run(*cobra.Command, []string) {
@@ -88,6 +97,11 @@ func run(*cobra.Command, []string) {
 		lg.Info().Msgf("look for 'could not verify' in the log for any mismatch, or try again with --stop_on_mismatch true to stop on first mismatch")
 	}
 
+	newExecutionState := fvmState.NewDefaultSpockExecutionState
+	if flagWritesOnlyExecutionState {
+		newExecutionState = fvmState.NewDefaultWritesOnlySpockExecutionState
+	}
+
 	if flagFromTo != "" {
 		from, to, err := parseFromTo(flagFromTo)
 		if err != nil {
@@ -95,14 +109,37 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(lockManager, from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledCallbacksEnabled)
+		err = verifier.VerifyRange(
+			lockManager,
+			from,
+			to,
+			chainID,
+			flagDatadir,
+			flagChunkDataPackDir,
+			newExecutionState,
+			flagWorkerCount,
+			flagStopOnMismatch,
+			flagTransactionFeesDisabled,
+			flagScheduledCallbacksEnabled,
+		)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
 		lg.Info().Msgf("finished verified range from %d to %d", from, to)
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(lockManager, flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledCallbacksEnabled)
+		err := verifier.VerifyLastKHeight(
+			lockManager,
+			flagLastK,
+			chainID,
+			flagDatadir,
+			flagChunkDataPackDir,
+			newExecutionState,
+			flagWorkerCount,
+			flagStopOnMismatch,
+			flagTransactionFeesDisabled,
+			flagScheduledCallbacksEnabled,
+		)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}

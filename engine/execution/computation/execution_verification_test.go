@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -866,7 +867,12 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	er := &computationResult.ExecutionReceipt.ExecutionResult
 
-	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
+	verifier := chunks.NewChunkVerifier(
+		vm,
+		fvmContext,
+		fvmState.NewDefaultSpockExecutionState,
+		logger,
+	)
 
 	vcds := make([]*verification.VerifiableChunkData, er.Chunks.Len())
 

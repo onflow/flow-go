@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
@@ -216,7 +217,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)
 
-			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
+			chunkVerifier := chunks.NewChunkVerifier(
+				vm,
+				vmCtx,
+				fvmState.NewDefaultSpockExecutionState,
+				node.Logger,
+			)
 
 			approvalStorage := store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB, node.StorageLockMgr)
 

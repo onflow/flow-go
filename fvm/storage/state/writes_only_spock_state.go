@@ -10,55 +10,41 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var (
-	// Note: encoding the operation type as part of the spock hash
-	// prevents operation injection/substitution attacks.
-	getMarker         = []byte("1")
-	setMarker         = []byte("2")
-	dropChangesMarker = []byte("3")
-	mergeMarker       = []byte("4")
-)
-
-type spockState struct {
+type writesOnlySpockState struct {
 	*storageState
 
 	spockSecretHasher hash.Hasher
 
 	getHasher func() hash.Hasher
 
-	// NOTE: spockState is no longer accessible once Finalize is called.  We
+	// NOTE: writesOnlySpockState is no longer accessible once Finalize is called.  We
 	// can't support access after Finalize since spockSecretHasher.SumHash is
 	// not idempotent.  Repeated calls to SumHash (without modifying the input)
 	// may return different hashes.
 	finalizedSpockSecret []byte
 }
 
-var _ state = &spockState{}
+var _ state = &writesOnlySpockState{}
 
-// DefaultSpockSecretHasher returns a new SHA3_256 hasher
-var DefaultSpockSecretHasher = func() hash.Hasher {
-	return hash.NewSHA3_256()
-}
-
-// newSpockState creates a new spock state.
+// newWritesOnlySpockState creates a new spock state.
 // getHasher will be called to create a new hasher for the spock state and each child state
-func newSpockState(base snapshot.StorageSnapshot, getHasher func() hash.Hasher) *spockState {
-	return &spockState{
+func newWritesOnlySpockState(base snapshot.StorageSnapshot, getHasher func() hash.Hasher) *writesOnlySpockState {
+	return &writesOnlySpockState{
 		storageState:      newStorageState(base),
 		spockSecretHasher: getHasher(),
 		getHasher:         getHasher,
 	}
 }
 
-func (state *spockState) NewChild() state {
-	return &spockState{
+func (state *writesOnlySpockState) NewChild() state {
+	return &writesOnlySpockState{
 		storageState:      state.storageState.NewChild(),
 		spockSecretHasher: state.getHasher(),
 		getHasher:         state.getHasher,
 	}
 }
 
-func (state *spockState) Finalize() *snapshot.ExecutionSnapshot {
+func (state *writesOnlySpockState) Finalize() *snapshot.ExecutionSnapshot {
 	if state.finalizedSpockSecret == nil {
 		state.finalizedSpockSecret = state.spockSecretHasher.SumHash()
 	}
@@ -68,7 +54,7 @@ func (state *spockState) Finalize() *snapshot.ExecutionSnapshot {
 	return snapshot
 }
 
-func (state *spockState) Merge(snapshot *snapshot.ExecutionSnapshot) error {
+func (state *writesOnlySpockState) Merge(snapshot *snapshot.ExecutionSnapshot) error {
 	if state.finalizedSpockSecret != nil {
 		return fmt.Errorf("cannot Merge on a finalized state")
 	}
@@ -86,7 +72,7 @@ func (state *spockState) Merge(snapshot *snapshot.ExecutionSnapshot) error {
 	return state.storageState.Merge(snapshot)
 }
 
-func (state *spockState) Set(
+func (state *writesOnlySpockState) Set(
 	id flow.RegisterID,
 	value flow.RegisterValue,
 ) error {
@@ -132,7 +118,7 @@ func (state *spockState) Set(
 	return state.storageState.Set(id, value)
 }
 
-func (state *spockState) Get(
+func (state *writesOnlySpockState) Get(
 	id flow.RegisterID,
 ) (
 	flow.RegisterValue,
@@ -142,32 +128,12 @@ func (state *spockState) Get(
 		return nil, fmt.Errorf("cannot Get on a finalized state")
 	}
 
-	_, err := state.spockSecretHasher.Write(getMarker)
-	if err != nil {
-		return nil, fmt.Errorf("get SPoCK failed: %w", err)
-	}
-
-	idBytes := id.Bytes()
-
-	// Note: encoding the register id length as part of spock hash to prevent
-	// string injection attacks.
-	err = binary.Write(
-		state.spockSecretHasher,
-		binary.LittleEndian,
-		int32(len(idBytes)))
-	if err != nil {
-		return nil, fmt.Errorf("get SPoCK failed: %w", err)
-	}
-
-	_, err = state.spockSecretHasher.Write(idBytes)
-	if err != nil {
-		return nil, fmt.Errorf("get SPoCK failed: %w", err)
-	}
+	// NOTE: Reads do not affect the SPoCK hash
 
 	return state.storageState.Get(id)
 }
 
-func (state *spockState) DropChanges() error {
+func (state *writesOnlySpockState) DropChanges() error {
 	if state.finalizedSpockSecret != nil {
 		return fmt.Errorf("cannot DropChanges on a finalized state")
 	}
@@ -180,11 +146,11 @@ func (state *spockState) DropChanges() error {
 	return state.storageState.DropChanges()
 }
 
-func (state *spockState) readSetSize() int {
+func (state *writesOnlySpockState) readSetSize() int {
 	return state.storageState.readSetSize()
 }
 
-func (state *spockState) interimReadSet(
+func (state *writesOnlySpockState) interimReadSet(
 	accumulator map[flow.RegisterID]struct{},
 ) {
 	state.storageState.interimReadSet(accumulator)

@@ -20,6 +20,7 @@ import (
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
@@ -133,7 +134,12 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 		).
 		Maybe() // don't require for all tests since some never call FVM
 
-	s.verifier = chunks.NewChunkVerifier(vmMock, vmCtx, zerolog.Nop())
+	s.verifier = chunks.NewChunkVerifier(
+		vmMock,
+		vmCtx,
+		fvmState.NewDefaultSpockExecutionState,
+		zerolog.Nop(),
+	)
 
 	txBody, err := blueprints.SystemChunkTransaction(testChain.Chain())
 	require.NoError(s.T(), err)
