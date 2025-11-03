@@ -71,18 +71,16 @@ type StateStreamBackend struct {
 	EventsBackend
 	AccountStatusesBackend
 
-	log                     zerolog.Logger
-	state                   protocol.State
-	headers                 storage.Headers
-	seals                   storage.Seals
-	results                 storage.ExecutionResults
-	execDataStore           execution_data.ExecutionDataStore
-	execDataCache           *cache.ExecutionDataCache
-	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
-	executionStateCache     optimistic_sync.ExecutionStateCache
-	registers               *execution.RegistersAsyncStore
-	registerRequestLimit    int
-	sporkRootBlockHeight    uint64
+	log                  zerolog.Logger
+	state                protocol.State
+	headers              storage.Headers
+	seals                storage.Seals
+	results              storage.ExecutionResults
+	execDataStore        execution_data.ExecutionDataStore
+	execDataCache        *cache.ExecutionDataCache
+	registers            *execution.RegistersAsyncStore
+	registerRequestLimit int
+	sporkRootBlockHeight uint64
 }
 
 func New(
@@ -105,19 +103,17 @@ func New(
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
 	b := &StateStreamBackend{
-		ExecutionDataTracker:    executionDataTracker,
-		log:                     logger,
-		state:                   state,
-		headers:                 headers,
-		seals:                   seals,
-		results:                 results,
-		execDataStore:           execDataStore,
-		execDataCache:           execDataCache,
-		executionResultProvider: executionResultProvider,
-		executionStateCache:     executionStateCache,
-		registers:               registers,
-		registerRequestLimit:    registerIDsRequestLimit,
-		sporkRootBlockHeight:    state.Params().SporkRootBlockHeight(),
+		ExecutionDataTracker: executionDataTracker,
+		log:                  logger,
+		state:                state,
+		headers:              headers,
+		seals:                seals,
+		results:              results,
+		execDataStore:        execDataStore,
+		execDataCache:        execDataCache,
+		registers:            registers,
+		registerRequestLimit: registerIDsRequestLimit,
+		sporkRootBlockHeight: state.Params().SporkRootBlockHeight(),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -242,5 +238,10 @@ func (b *StateStreamBackend) GetRegisterValues(
 		values[i] = val
 	}
 
-	return values, nil, nil
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return values, metadata, nil
 }

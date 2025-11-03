@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"testing"
 	"time"
 
@@ -900,28 +901,63 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 }
 
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
+
+	block := s.blocks[0]
+	seal := s.sealMap[block.ID()]
+	result := s.resultMap[seal.ResultID]
+	//execData := s.execDataMap[block.ID()]
+
+	// notify backend block is available
+	s.highestBlockHeader = block.ToHeader()
+
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+
 	s.Run("normal case", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height)
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil)
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		storageSnapshot := snapshot.MapStorageSnapshot{}
+		storageSnapshot[s.registerID] = flow.RegisterValue([]byte("value"))
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+		s.registers.On("StorageSnapshot", block.Height).Return(storageSnapshot, nil).Once()
+		
+		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		//res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height, s.criteria)
+
 		require.NoError(s.T(), err)
 		require.NotEmpty(s.T(), res)
+		require.NotEmpty(s.T(), metadata)
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height+1)
+		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height+1, s.criteria)
 		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		res, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Height)
+		res, metadata, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Height, s.criteria)
 		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Height)
+		res, metadata, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Height, s.criteria)
 		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }
