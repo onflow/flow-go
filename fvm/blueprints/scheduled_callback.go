@@ -98,9 +98,9 @@ func executeCallbackTransaction(
 	id []byte,
 	effort uint64,
 ) (*flow.TransactionBody, error) {
-	script := templates.GenerateExecuteTransactionScript(env)
 	// todo use templates after updated
-	script = []byte(fmt.Sprintf(`
+	//script := templates.GenerateExecuteTransactionScript(env)
+	script := []byte(fmt.Sprintf(`
 		import FlowTransactionScheduler from %s
 
 		transaction(id: UInt64) {
