@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestGetScript_InvalidParse verifies that parseGetScripts correctly returns errors
+// for invalid input combinations and malformed request parameters.
 func TestGetScript_InvalidParse(t *testing.T) {
 	validScript := fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(`access(all) fun main() {}`)))
 	tests := []struct {
@@ -118,6 +120,8 @@ func TestGetScript_InvalidParse(t *testing.T) {
 	}
 }
 
+// TestGetScript_ValidParse verifies that parseGetScripts successfully parses
+// valid GetScript requests and populates the request fields as expected.
 func TestGetScript_ValidParse(t *testing.T) {
 	source := "access(all) fun main() {}"
 	validScript := strings.NewReader(fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(source))))

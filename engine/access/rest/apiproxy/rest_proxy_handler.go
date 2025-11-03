@@ -338,13 +338,17 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
 //
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
-//
 // Expected sentinel errors providing details to clients about failed requests:
-// - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
-// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
+//   - [access.InvalidRequestError] - if the request had invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -374,14 +378,17 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 
 // ExecuteScriptAtBlockHeight executes script at the given block height.
 //
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
-//
 // Expected sentinel errors providing details to clients about failed requests:
-// - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
-// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
-// - [access.DataNotFoundError] - no header with the given height was found.
+//   - [access.InvalidRequestError] - if the request had invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -418,14 +425,17 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 
 // ExecuteScriptAtBlockID executes script at the given block id.
 //
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
-//
 // Expected sentinel errors providing details to clients about failed requests:
-// - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
-// - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size.
-// - [access.DataNotFoundError] - no header with the given ID was found.
+//   - [access.InvalidRequestError] - if the request had invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -586,7 +596,7 @@ func convertError(ctx context.Context, err error, typeName string) error {
 		// it's possible that this came from the client side, so wrap the original error directly.
 		return access.NewServiceUnavailable(err)
 	case codes.ResourceExhausted:
-		if sourceErrStr, ok := splitOnPrefix(err.Error(), "computation or memory limits were exceeded: "); ok {
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "resource exhausted error: "); ok {
 			return access.NewResourceExhausted(errors.New(sourceErrStr))
 		}
 		// it's possible that this came from the client side, so wrap the original error directly.

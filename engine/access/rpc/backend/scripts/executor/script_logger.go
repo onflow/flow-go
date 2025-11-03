@@ -59,9 +59,8 @@ func (s *ScriptLogger) LogFailedScript(request *Request, executor string) {
 
 // shouldLogScript determines whether a script should be logged based on its hash
 // and the time since it was last logged.
-// It returns false if:
-//   - The logger’s level is above Debug (i.e., debug logs are disabled), or
-//   - The same script hash was logged less than [uniqueScriptLoggingTimeWindow] ago.
+// It returns true if logging is configured at debug level and the script has not been logged
+// within the `uniqueScriptLoggingTimeWindow` interval.
 func (s *ScriptLogger) shouldLogScript(execTime time.Time, scriptHash [md5.Size]byte) bool {
 	if s.log.GetLevel() > zerolog.DebugLevel {
 		return false

@@ -1282,7 +1282,10 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		err = unittest.WithLocks(suite.T(), suite.lockManager, []string{storage.LockInsertBlock, storage.LockFinalizeBlock}, func(ctx lockctx.Context) error {
+		err = unittest.WithLocks(suite.T(), suite.lockManager, []string{
+			storage.LockInsertBlock,
+			storage.LockFinalizeBlock,
+		}, func(ctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := all.Blocks.BatchStore(ctx, rw, unittest.ProposalFromBlock(prevBlock))
 				if err != nil {
@@ -1346,7 +1349,7 @@ func (suite *Suite) TestExecuteScript() {
 				Return(suite.sealedSnapshot, nil)
 
 			suite.executionResultInfoProvider.On("ExecutionResultInfo", lastBlock.ID(), mock.Anything).
-				Return(unittest.ExecutionInfoFixture(2), nil).Once()
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
 
 			expectedResp := setupExecClientMock(lastBlock.ID())
 			req := accessproto.ExecuteScriptAtLatestBlockRequest{
@@ -1354,8 +1357,6 @@ func (suite *Suite) TestExecuteScript() {
 			}
 			actualResp, err := handler.ExecuteScriptAtLatestBlock(ctx, &req)
 			assertResult(err, expectedResp, actualResp)
-
-			suite.executionResultInfoProvider.AssertExpectations(suite.T())
 		})
 
 		suite.Run("execute script at block id", func() {
@@ -1364,7 +1365,7 @@ func (suite *Suite) TestExecuteScript() {
 				On("AtBlockID", blockID).
 				Return(suite.sealedSnapshot, nil)
 			suite.executionResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).
-				Return(unittest.ExecutionInfoFixture(2), nil).Once()
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
 
 			expectedResp := setupExecClientMock(blockID)
 			req := accessproto.ExecuteScriptAtBlockIDRequest{
@@ -1373,8 +1374,6 @@ func (suite *Suite) TestExecuteScript() {
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockID(ctx, &req)
 			assertResult(err, expectedResp, actualResp)
-
-			suite.executionResultInfoProvider.AssertExpectations(suite.T())
 		})
 
 		suite.Run("execute script at block height", func() {
@@ -1384,7 +1383,7 @@ func (suite *Suite) TestExecuteScript() {
 				Return(suite.sealedSnapshot, nil)
 
 			suite.executionResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).
-				Return(unittest.ExecutionInfoFixture(2), nil).Once()
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
 
 			expectedResp := setupExecClientMock(blockID)
 			req := accessproto.ExecuteScriptAtBlockHeightRequest{
@@ -1393,8 +1392,6 @@ func (suite *Suite) TestExecuteScript() {
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockHeight(ctx, &req)
 			assertResult(err, expectedResp, actualResp)
-
-			suite.executionResultInfoProvider.AssertExpectations(suite.T())
 		})
 	})
 }

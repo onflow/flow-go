@@ -58,7 +58,7 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registers)
@@ -89,7 +89,7 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return 0, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, registers)
@@ -122,7 +122,7 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, registers)
@@ -154,7 +154,7 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
 	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, registers)

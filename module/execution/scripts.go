@@ -84,13 +84,12 @@ func NewScripts(
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 //   - [fvmerrors.ErrCodeScriptExecutionCancelledError] - if script execution canceled.
 //   - [fvmerrors.ErrCodeScriptExecutionTimedOutError] - if script execution timed out.
 //   - [fvmerrors.ErrCodeComputationLimitExceededError] - if script execution computation limit exceeded.
 //   - [fvmerrors.ErrCodeMemoryLimitExceededError] - if script execution memory limit exceeded.
-//   - [indexer.ErrIndexNotInitialized] - if data for block is not available.
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
@@ -114,8 +113,8 @@ func (s *Scripts) ExecuteAtBlockHeight(
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
@@ -130,8 +129,8 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
@@ -146,8 +145,8 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
@@ -162,8 +161,8 @@ func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.A
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
@@ -178,8 +177,8 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
@@ -194,8 +193,8 @@ func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIn
 // Expected error returns during normal operation:
 //   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (s *Scripts) getHeaderAndSnapshot(
 	height uint64,
 	registerSnapshot storage.RegisterSnapshotReader,

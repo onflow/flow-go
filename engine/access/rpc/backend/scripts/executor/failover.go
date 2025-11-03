@@ -3,9 +3,6 @@ package executor
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
@@ -31,18 +28,16 @@ func NewFailoverScriptExecutor(localExecutor ScriptExecutor, execNodeExecutor Sc
 // Execute executes the provided script at the requested block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [codes.Canceled] - if the script execution was canceled.
-//   - [codes.Unavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [codes.NotFound] - if the requested block has not been executed or has been pruned by the node.
-//   - [codes.Internal] - if the block state commitment could not be retrieved or for other internal execution node failures.
+//   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [ScriptExecutionCanceledError] - if the script execution was canceled.
+//   - [DataNotFoundError] - if data not found.
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed.
+//   - [ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [InternalError] - for internal failures or index conversion errors.
 func (f *FailoverScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	localResult, localMetadata, localErr := f.localExecutor.Execute(ctx, request, executionResultInfo)
-
-	isInvalidArgument := status.Code(localErr) == codes.InvalidArgument
-	isCanceled := status.Code(localErr) == codes.Canceled
-	if localErr == nil || isInvalidArgument || isCanceled {
+	if localErr == nil || IsInvalidArgumentError(localErr) || IsScriptExecutionCanceledError(localErr) {
 		return localResult, localMetadata, localErr
 	}
 

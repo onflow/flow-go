@@ -68,7 +68,6 @@ func (s *TransactionValidatorSuite) SetupTest() {
 		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 	}
-
 }
 
 var verifyPayerBalanceResultType = cadence.NewStructType(

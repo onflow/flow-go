@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	//nolint:gosec
 	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -14,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -58,16 +56,17 @@ func NewENScriptExecutor(
 // Execute executes the provided script at the requested block.
 //
 // Expected error returns during normal operation:
-//   - [codes.Unavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [codes.NotFound] - if the requested block has not been executed or has been pruned by the node.
-//   - [codes.Internal] - if the block state commitment could not be retrieved or for other internal execution node failures.
+//   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [DataNotFoundError] - if the requested block has not been executed or has been pruned by the node.
+//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed.
+//   - [ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [InternalError] - if the block state commitment could not be retrieved or for other internal execution node failures.
 func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	var result []byte
 	var executionTime time.Time
 	var execDuration time.Duration
-	var nodeID flow.Identifier
+	var exeNode *flow.IdentitySkeleton
 	var err error
 	errToReturn := e.nodeCommunicator.CallAvailableNode(
 		executionResultInfo.ExecutionNodes,
@@ -78,7 +77,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 
 			executionTime = time.Now()
 			execDuration = executionTime.Sub(execStartTime)
-			nodeID = node.NodeID
+			exeNode = node
 
 			if err != nil {
 				return err
@@ -103,12 +102,24 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 			e.metrics.ScriptExecutionErrorOnExecutionNode()
 			e.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
-		return nil, nil, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
+
+		switch status.Code(errToReturn) {
+		case codes.InvalidArgument:
+			return nil, nil, NewInvalidArgumentError(errToReturn)
+		case codes.NotFound:
+			return nil, nil, NewDataNotFoundError("block", err)
+		case codes.Internal:
+			return nil, nil, NewInternalError(errToReturn)
+		case codes.Unavailable:
+			return nil, nil, NewServiceUnavailable(errToReturn)
+		default:
+			return nil, nil, common.NewFailedToQueryExternalNodeError(errToReturn)
+		}
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: executionResultInfo.ExecutionResultID,
-		ExecutorIDs:       common.OrderedExecutors(nodeID, executionResultInfo.ExecutionNodes.NodeIDs()),
+		ExecutorIDs:       common.OrderedExecutors(exeNode.NodeID, executionResultInfo.ExecutionNodes.NodeIDs()),
 	}
 
 	return result, metadata, nil
@@ -140,7 +151,7 @@ func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 		},
 	)
 	if err != nil {
-		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
+		return nil, err
 	}
 
 	return execResp.GetValue(), nil

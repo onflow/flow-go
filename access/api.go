@@ -52,15 +52,15 @@ type ScriptsAPI interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	//   - [access.ServiceUnavailable] - if the configured upstream access client failed to respond,
-	//  if no execution nodes are available, a connection to an execution node could not be established,
-	//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
-	//     if the script execution failed due to invalid arguments.
+	//   - [access.InvalidRequestError] - if the request had invalid arguments.
+	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 	//   - [access.DataNotFoundError] - if data required to process the request is not available.
+	//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 	//   - [access.PreconditionFailedError] - if data for block is not available.
 	//   - [access.RequestCanceledError] - if the script execution was canceled.
 	//   - [access.RequestTimedOutError] - if the script execution timed out.
-	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+	//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+	//     no upstream server is available.
 	//   - [access.InternalError] - for internal failures or index conversion errors.
 	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 
@@ -71,15 +71,15 @@ type ScriptsAPI interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	//   - [access.ServiceUnavailable] - if the configured upstream access client failed to respond,
-	//  if no execution nodes are available, a connection to an execution node could not be established,
-	//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
-	//     if the script execution failed due to invalid arguments.
+	//   - [access.InvalidRequestError] - if the request had invalid arguments.
+	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 	//   - [access.DataNotFoundError] - if data required to process the request is not available.
+	//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 	//   - [access.PreconditionFailedError] - if data for block is not available.
 	//   - [access.RequestCanceledError] - if the script execution was canceled.
 	//   - [access.RequestTimedOutError] - if the script execution timed out.
-	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+	//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+	//     no upstream server is available.
 	//   - [access.InternalError] - for internal failures or index conversion errors.
 	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 
@@ -90,15 +90,15 @@ type ScriptsAPI interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	//   - [access.ServiceUnavailable] - if the configured upstream access client failed to respond,
-	//  if no execution nodes are available, a connection to an execution node could not be established,
-	//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
-	//     if the script execution failed due to invalid arguments.
+	//   - [access.InvalidRequestError] - if the request had invalid arguments.
+	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
 	//   - [access.DataNotFoundError] - if data required to process the request is not available.
+	//   - [access.OutOfRangeError] - if the requested data is outside the available range.
 	//   - [access.PreconditionFailedError] - if data for block is not available.
 	//   - [access.RequestCanceledError] - if the script execution was canceled.
 	//   - [access.RequestTimedOutError] - if the script execution timed out.
-	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+	//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+	//     no upstream server is available.
 	//   - [access.InternalError] - for internal failures or index conversion errors.
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error)
 }

@@ -13,6 +13,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
@@ -1408,8 +1409,8 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
-// ExecutionInfoFixture returns an ExecutionResultInfo object.
-func ExecutionInfoFixture(executionNodeCount int) *optimistic_sync.ExecutionResultInfo {
+// ExecutionResultInfo returns an ExecutionResultInfo object.
+func ExecutionResultInfo(executionNodeCount int) *optimistic_sync.ExecutionResultInfo {
 	executionNodes := IdentityListFixture(executionNodeCount, WithRole(flow.RoleExecution))
 	return &optimistic_sync.ExecutionResultInfo{
 		ExecutionResultID: IdentifierFixture(),
