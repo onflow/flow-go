@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -69,6 +70,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -1438,7 +1440,32 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, fmt.Errorf("could not create derived chain data: %w", err)
 			}
 
+			rootBlockHeight := node.State.Params().FinalizedRoot().Height
+			progress, err := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not create last full block height consumer progress: %w", err)
+			}
+
+			lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
+			if err != nil {
+				return nil, fmt.Errorf("could not create last full block height counter: %w", err)
+			}
+
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
+			collectionIndexer, err := collections.NewIndexer(
+				builder.Logger,
+				collectionExecutedMetric,
+				builder.State,
+				builder.Storage.Blocks,
+				builder.Storage.Collections,
+				builder.Storage.Transactions,
+				lastFullBlockHeight,
+				builder.StorageLockMgr,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create collection indexer: %w", err)
+			}
+
 			builder.ExecutionIndexerCore = indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
@@ -1452,6 +1479,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.scheduledTransactions,
 				builder.RootChainID,
 				indexerDerivedChainData,
+				collectionIndexer,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
 			)
