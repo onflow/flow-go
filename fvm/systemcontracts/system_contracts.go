@@ -50,6 +50,8 @@ const (
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
+	// AccountNameScheduledTransactionExecutor is not a contract, but a special account that is used to execute scheduled transactions
+	AccountNameScheduledTransactionExecutor = "ScheduledTransactionExecutorAccount"
 	// AccountNameExecutionParametersAccount is not a contract, but a special account that is used to store execution parameters
 	// It is a separate account on all networks in order to separate it away
 	// from the frequently changing data on the service account.
@@ -77,14 +79,15 @@ const (
 	// On long-running networks some of these contracts might have been deployed after bootstrapping,
 	// and therefore might not be at these indexes.
 
-	FungibleTokenAccountIndex = 2
-	FlowTokenAccountIndex     = 3
-	FlowFeesAccountIndex      = 4
-	EVMStorageAccountIndex    = 5
+	FungibleTokenAccountIndex                = 2
+	FlowTokenAccountIndex                    = 3
+	FlowFeesAccountIndex                     = 4
+	EVMStorageAccountIndex                   = 5
+	ScheduledTransactionExecutorAccountIndex = 6
 
 	// LastSystemAccountIndex is the last index of a system accounts.
 	// Other addresses will be created  after this one.
-	LastSystemAccountIndex = EVMStorageAccountIndex
+	LastSystemAccountIndex = ScheduledTransactionExecutorAccountIndex
 )
 
 // Well-known addresses for system contracts on long-running networks.
@@ -107,6 +110,11 @@ var (
 	evmStorageAddressTestnet = flow.HexToAddress("1a54ed2be7552821")
 	// evmStorageAddressMainnet is the address of the EVM state storage contract on Mainnet
 	evmStorageAddressMainnet = flow.HexToAddress("d421a63faae318f9")
+
+	// scheduledTransactionExecutorAddressTestnet is the address of the Scheduled Transaction Executor contract on Testnet
+	scheduledTransactionExecutorAddressTestnet = flow.HexToAddress("") // todo define the address
+	// scheduledTransactionExecutorAddressMainnet is the address of the Scheduled Transaction Executor contract on Mainnet
+	scheduledTransactionExecutorAddressMainnet = flow.HexToAddress("") // todo define the address
 
 	// executionParametersAddressTestnet is the address of the Execution Parameters contract on Testnet
 	executionParametersAddressTestnet = flow.HexToAddress("6997a2f2cf57b73a")
@@ -254,7 +262,7 @@ func (c SystemContracts) All() []SystemContract {
 		c.CrossVMMetadataViews,
 
 		c.EVMContract,
-		// EVMStorage is not included here, since it is not a contract
+		// EVMStorage and ScheduledTransactionExecutor are not included here, since they are not contracts
 
 		c.Burner,
 		c.Crypto,
@@ -363,6 +371,17 @@ func init() {
 		}
 	}
 
+	scheduledTransactionExecutorAddressFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet:
+			return scheduledTransactionExecutorAddressMainnet
+		case flow.Testnet:
+			return scheduledTransactionExecutorAddressTestnet
+		default:
+			return nthAddressFunc(ScheduledTransactionExecutorAccountIndex)(chain)
+		}
+	}
+
 	burnerAddressFunc := func(chain flow.ChainID) flow.Address {
 		switch chain {
 		case flow.Mainnet, flow.Testnet:
@@ -393,7 +412,6 @@ func init() {
 		ContractNameRandomBeaconHistory:       serviceAddressFunc,
 		ContractNameServiceAccount:            serviceAddressFunc,
 		ContractNameStorageFees:               serviceAddressFunc,
-		ContractNameFlowCallbackScheduler:     serviceAddressFunc,
 		AccountNameExecutionParametersAccount: executionParametersAccountFunc,
 
 		ContractNameFlowFees:                   nthAddressFunc(FlowFeesAccountIndex),
@@ -406,6 +424,9 @@ func init() {
 		ContractNameMetadataViews:        nftTokenAddressFunc,
 		ContractNameViewResolver:         nftTokenAddressFunc,
 		ContractNameCrossVMMetadataViews: nftTokenAddressFunc,
+
+		ContractNameFlowCallbackScheduler:       serviceAddressFunc,
+		AccountNameScheduledTransactionExecutor: scheduledTransactionExecutorAddressFunc,
 
 		ContractNameEVM:       serviceAddressFunc,
 		AccountNameEVMStorage: evmStorageEVMFunc,
@@ -451,7 +472,6 @@ func init() {
 			DKG:            addressOfContract(ContractNameDKG),
 
 			FlowServiceAccount:         addressOfContract(ContractNameServiceAccount),
-			FlowTransactionScheduler:   addressOfContract(ContractNameFlowCallbackScheduler),
 			NodeVersionBeacon:          addressOfContract(ContractNameNodeVersionBeacon),
 			RandomBeaconHistory:        addressOfContract(ContractNameRandomBeaconHistory),
 			FlowStorageFees:            addressOfContract(ContractNameStorageFees),
@@ -467,6 +487,9 @@ func init() {
 			MetadataViews:        addressOfContract(ContractNameMetadataViews),
 			ViewResolver:         addressOfContract(ContractNameViewResolver),
 			CrossVMMetadataViews: addressOfContract(ContractNameCrossVMMetadataViews),
+
+			FlowTransactionScheduler:     addressOfContract(ContractNameFlowCallbackScheduler),
+			ScheduledTransactionExecutor: addressOfAccount(AccountNameScheduledTransactionExecutor),
 
 			EVMContract: addressOfContract(ContractNameEVM),
 			EVMStorage:  addressOfAccount(AccountNameEVMStorage),
