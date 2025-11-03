@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -26,6 +25,7 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 
 	tests := []struct {
+		name                    string
 		address                 string
 		height                  string
 		agreeingExecutorsCount  string
@@ -34,14 +34,16 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 		err                     string
 	}{
 		{
+			"parse with invalid address",
 			"",
 			"",
 			"2",
 			validAgreeingExecutorsIds,
 			"false",
-			"invalid validAddress",
+			"invalid address",
 		},
 		{
+			"parse with invalid height format",
 			validAddress,
 			"-1",
 			"2",
@@ -50,6 +52,7 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 			"invalid height format",
 		},
 		{
+			"parse with invalid agreeingExecutorCount value",
 			validAddress,
 			"",
 			"abc",
@@ -58,14 +61,16 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 			"invalid agreeingExecutorCount",
 		},
 		{
+			"parse with invalid agreeingExecutorCount number",
 			validAddress,
 			"",
 			"-5",
-			unittest.IdentifierListFixture(2).Strings(),
+			validAgreeingExecutorsIds,
 			"false",
 			"invalid agreeingExecutorCount",
 		},
 		{
+			"parse with invalid agreeingExecutorsIds",
 			validAddress,
 			"",
 			"2",
@@ -74,6 +79,7 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 			"invalid ID format",
 		},
 		{
+			"parse with invalid includeExecutorMetadata",
 			validAddress,
 			"",
 			"2",
@@ -85,17 +91,19 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 
 	chain := flow.Localnet.Chain()
 	for i, test := range tests {
-		_, err := parseGetAccountBalanceRequest(
-			test.address,
-			test.height,
-			test.agreeingExecutorsCount,
-			test.agreeingExecutorsIds,
-			test.includeExecutorMetadata,
-			chain,
-		)
-		//TODO(Uliana):
-		//require.Nil(t, request)
-		require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
+		t.Run(test.name, func(t *testing.T) {
+			_, err := parseGetAccountBalanceRequest(
+				test.address,
+				test.height,
+				test.agreeingExecutorsCount,
+				test.agreeingExecutorsIds,
+				test.includeExecutorMetadata,
+				chain,
+			)
+			//TODO(Uliana):
+			//require.Nil(t, request)
+			require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
+		})
 	}
 }
 
@@ -113,19 +121,19 @@ func TestGetAccountBalance_ValidParse(t *testing.T) {
 	chain := flow.Localnet.Chain()
 
 	request, err := parseGetAccountBalanceRequest(validAddress, "", "2", validAgreeingExecutorsIds, "false", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, request.Address.String(), validAddress)
-	assert.Equal(t, request.Height, SealedHeight)
+	require.NoError(t, err)
+	require.Equal(t, request.Address.String(), validAddress)
+	require.Equal(t, request.Height, SealedHeight)
 
 	request, err = parseGetAccountBalanceRequest(validAddress, "100", "2", validAgreeingExecutorsIds, "false", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, request.Height, uint64(100))
+	require.NoError(t, err)
+	require.Equal(t, request.Height, uint64(100))
 
 	request, err = parseGetAccountBalanceRequest(validAddress, sealed, "2", validAgreeingExecutorsIds, "false", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, request.Height, SealedHeight)
+	require.NoError(t, err)
+	require.Equal(t, request.Height, SealedHeight)
 
 	request, err = parseGetAccountBalanceRequest(validAddress, final, "2", validAgreeingExecutorsIds, "false", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, request.Height, FinalHeight)
+	require.NoError(t, err)
+	require.Equal(t, request.Height, FinalHeight)
 }
