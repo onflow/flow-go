@@ -101,7 +101,7 @@ func executeCallbackTransaction(
 	script := templates.GenerateExecuteTransactionScript(env)
 
 	return flow.NewTransactionBodyBuilder().
-		AddAuthorizer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
 		SetScript(script).
 		AddArgument(id).
 		SetComputeLimit(effort).
