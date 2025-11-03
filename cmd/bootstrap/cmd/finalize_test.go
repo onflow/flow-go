@@ -120,11 +120,9 @@ func TestClusterAssignment(t *testing.T) {
 	tmp := flagCollectionClusters
 	flagCollectionClusters = 5
 	// Happy path (limit set-up, can't have one less internal node)
-	partnersLen := 12
-	internalLen := 10
-	// clusters are assigned (partner:internal) as [3:2, 3:2, 2:2, 2:2, 2:2],
-	// with internal proportion being [40%, 40%, 50%, 50%, 50%]
-	// removing an internal node would lead to a 2:1 ratio (33% internal) in the last cluster
+	partnersLen := 7
+	internalLen := 22
+	// clusters are assigned with ratios (partner:internal) [2:5, 2:5, 1:4, 1:4, 1:4]
 	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
 	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
