@@ -129,16 +129,3 @@ func synctestWaitForStateUpdates(t *testing.T, updateChan <-chan State, expected
 		assert.Equalf(t, expected, update, "expected pipeline to transition to %s, but got %s", expected, update)
 	}
 }
-
-// synctestWaitForError waits for an error from the errChan using synctest.Wait and asserts it matches the expected error.
-// TODO: refactor all tests to use the synctest approach.
-func synctestWaitForError(t *testing.T, errChan <-chan error, expectedErr error) {
-	synctest.Wait()
-	err := <-errChan
-	if expectedErr == nil {
-		assert.NoError(t, err, "Pipeline should complete without errors")
-	} else {
-		assert.ErrorIs(t, err, expectedErr)
-	}
-
-}
