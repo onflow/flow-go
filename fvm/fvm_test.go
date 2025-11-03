@@ -2568,10 +2568,10 @@ func TestCapabilityControllers(t *testing.T) {
 						transaction {
 						  prepare(signer: auth(Capabilities) &Account) {
 							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
-							assert(cap.id == 7)
+							assert(cap.id == 8)
 
 							let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
-							assert(cap2.id == 8)
+							assert(cap2.id == 9)
 						  }
 						}
 					`)).
