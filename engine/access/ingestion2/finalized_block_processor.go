@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -49,7 +50,7 @@ type FinalizedBlockProcessor struct {
 
 	executionResults storage.ExecutionResults
 
-	collectionSyncer         *CollectionSyncer
+	collectionSyncer         *collections.Syncer
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
@@ -63,7 +64,7 @@ func NewFinalizedBlockProcessor(
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer,
-	syncer *CollectionSyncer,
+	syncer *collections.Syncer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*FinalizedBlockProcessor, error) {
 	reader := jobqueue.NewFinalizedBlockReader(state, blocks)
