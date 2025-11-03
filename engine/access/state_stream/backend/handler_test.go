@@ -554,7 +554,13 @@ func TestGetRegisterValues(t *testing.T) {
 
 	t.Run("valid registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
-		api.On("GetRegisterValues", testIds, testHeight).Return(testValues, nil)
+
+		metadata := &accessmodel.ExecutorMetadata{
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutorIDs:       unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution)).NodeIDs(),
+		}
+
+		api.On("GetRegisterValues", testIds, testHeight, mock.Anything).Return(testValues, metadata, nil)
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
@@ -565,17 +571,22 @@ func TestGetRegisterValues(t *testing.T) {
 		req := &executiondata.GetRegisterValuesRequest{
 			RegisterIds: validRegisters,
 			BlockHeight: testHeight,
+			ExecutionStateQuery: &entities.ExecutionStateQuery{
+				IncludeExecutorMetadata: true,
+			},
 		}
 
 		resp, err := h.GetRegisterValues(ctx, req)
 		require.NoError(t, err)
+		require.NotNil(t, resp.ExecutorMetadata)
+		require.Equal(t, convert.ExecutorMetadataToMessage(metadata), resp.ExecutorMetadata)
 		require.Equal(t, testValues, resp.GetValues())
 	})
 
 	t.Run("unavailable registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.NotFound, "could not get register values: %v", storage.ErrNotFound)
-		api.On("GetRegisterValues", invalidIDs, testHeight).Return(nil, expectedErr)
+		api.On("GetRegisterValues", invalidIDs, testHeight, mock.Anything).Return(nil, nil, expectedErr)
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		unavailableRegisters := make([]*entities.RegisterID, len(invalidIDs))
@@ -595,7 +606,7 @@ func TestGetRegisterValues(t *testing.T) {
 	t.Run("wrong height", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.OutOfRange, "could not get register values: %v", storage.ErrHeightNotIndexed)
-		api.On("GetRegisterValues", testIds, testHeight+1).Return(nil, expectedErr)
+		api.On("GetRegisterValues", testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr)
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
