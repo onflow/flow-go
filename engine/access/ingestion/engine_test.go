@@ -264,7 +264,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	snap := new(protocolmock.Snapshot)
 
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Maybe()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Twice()
 	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
@@ -334,7 +334,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	snap := new(protocolmock.Snapshot)
 
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Maybe()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Twice()
 	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
@@ -419,8 +419,8 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
 func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Maybe()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
+	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
 
 	eng, _, _ := s.initEngineAndSyncer()
 
