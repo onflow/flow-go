@@ -145,7 +145,8 @@ func TestExecuteCallbacksTransactions(t *testing.T) {
 				} else {
 					assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 				}
-				assert.Equal(t, tx.Authorizers, []flow.Address{chain.ServiceAddress()})
+				executor := systemcontracts.SystemContractsForChain(chain.ChainID()).ScheduledTransactionExecutor.Address
+				assert.Equal(t, tx.Authorizers, []flow.Address{executor})
 				assert.Len(t, tx.Arguments, 1)
 				assert.NotEmpty(t, tx.Arguments[0])
 
@@ -340,6 +341,7 @@ func TestSystemCollection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			collection, err := blueprints.SystemCollection(chain, tt.events)
+			executor := systemcontracts.SystemContractsForChain(chain.ChainID()).ScheduledTransactionExecutor.Address
 
 			if tt.errorMessage != "" {
 				assert.Error(t, err)
@@ -376,7 +378,7 @@ func TestSystemCollection(t *testing.T) {
 						executeTx := transactions[i]
 						assert.NotNil(t, executeTx)
 						assert.NotEmpty(t, executeTx.Script)
-						assert.Equal(t, []flow.Address{chain.ServiceAddress()}, executeTx.Authorizers)
+						assert.Equal(t, []flow.Address{executor}, executeTx.Authorizers)
 						assert.Len(t, executeTx.Arguments, 1)
 						assert.NotEmpty(t, executeTx.Arguments[0])
 					}
