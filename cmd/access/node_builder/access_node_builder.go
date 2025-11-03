@@ -157,7 +157,6 @@ type AccessNodeConfig struct {
 	logTxTimeToExecuted                  bool
 	logTxTimeToFinalizedExecuted         bool
 	logTxTimeToSealed                    bool
-	retryEnabled                         bool
 	rpcMetricsEnabled                    bool
 	executionDataSyncEnabled             bool
 	publicNetworkExecutionDataEnabled    bool
@@ -253,7 +252,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		logTxTimeToFinalizedExecuted: false,
 		logTxTimeToSealed:            false,
 		pingEnabled:                  false,
-		retryEnabled:                 false,
 		rpcMetricsEnabled:            false,
 		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
@@ -1288,7 +1286,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"ping-enabled",
 			defaultConfig.pingEnabled,
 			"whether to enable the ping process that pings all other peers and report the connectivity to metrics")
-		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
 		flags.StringVarP(&builder.nodeInfoFile,
@@ -1362,12 +1359,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-
-		var builderexecutionDataDBMode string
-		flags.StringVar(&builderexecutionDataDBMode,
-			"execution-data-db",
-			"pebble",
-			"[deprecated] the DB type for execution datastore")
 
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
 			"execution-data-height-range-target",
@@ -1514,6 +1505,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
 			"whether to enable the WebSockets Stream API.",
 		)
+
+		var builderexecutionDataDBMode string
+		flags.StringVar(&builderexecutionDataDBMode, "execution-data-db", "pebble", "[deprecated] the DB type for execution datastore")
+		_ = flags.MarkDeprecated("execution-data-db", "[deprecated] this flag is ignored and will be removed in a future release.")
+
+		var unusedRetryEnabled bool
+		flags.BoolVar(&unusedRetryEnabled, "retry-enabled", false, "[deprecated] whether to enable the retry mechanism at the access node level")
+		_ = flags.MarkDeprecated("retry-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -2131,7 +2131,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ChainID:               node.RootChainID,
 				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
-				RetryEnabled:          builder.retryEnabled,
 				MaxHeightRange:        backendConfig.MaxHeightRange,
 				Log:                   node.Logger,
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
