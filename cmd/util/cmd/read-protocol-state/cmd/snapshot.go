@@ -96,7 +96,7 @@ func runSnapshotE(*cobra.Command, []string) error {
 					return fmt.Errorf("could not get block header by height: %v: %w", h, err)
 				}
 
-				// check if block is executed by checking if commit exists
+				// block is executed if a commitment to the block's output state has been persisted
 				_, err = storages.Commits.ByBlockID(blockHeader.ID())
 				if err == nil {
 					executedBlockID = blockHeader.ID()
@@ -104,14 +104,15 @@ func runSnapshotE(*cobra.Command, []string) error {
 					break
 				}
 
-				// statecommitment not exists means the block hasn't been executed yet
+				// state commitment not existing means the block hasn't been executed yet,
+				// hence `storage.ErrNotFound` is the only error return we expect here
 				if !errors.Is(err, storage.ErrNotFound) {
 					return fmt.Errorf("could not check block executed or not: %v: %w", h, err)
 				}
 			}
 
 			if !found {
-				return fmt.Errorf("could not find executed block")
+				return fmt.Errorf("State corrupted: traversed sealed fork backwards down to root height %d, could not find executed block. This should never happen, since the state should be known at least for the root block!", root.Height)
 			}
 
 			snapshot = state.AtBlockID(executedBlockID)
