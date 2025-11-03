@@ -162,7 +162,6 @@ type SystemContracts struct {
 
 	// service account related contracts
 	FlowServiceAccount         SystemContract
-	FlowCallbackScheduler      SystemContract
 	NodeVersionBeacon          SystemContract
 	RandomBeaconHistory        SystemContract
 	FlowStorageFees            SystemContract
@@ -180,6 +179,10 @@ type SystemContracts struct {
 	MetadataViews        SystemContract
 	ViewResolver         SystemContract
 	CrossVMMetadataViews SystemContract
+
+	// transaction scheduler related contracts
+	FlowTransactionScheduler     SystemContract
+	ScheduledTransactionExecutor SystemAccount
 
 	// EVM related contracts
 	EVMContract SystemContract
@@ -210,7 +213,7 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
-		FlowTransactionSchedulerAddress:   c.FlowCallbackScheduler.Address.Hex(),
+		FlowTransactionSchedulerAddress:   c.FlowTransactionScheduler.Address.Hex(),
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
 		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
@@ -234,7 +237,7 @@ func (c SystemContracts) All() []SystemContract {
 		c.DKG,
 
 		c.FlowServiceAccount,
-		c.FlowCallbackScheduler,
+		c.FlowTransactionScheduler,
 		c.NodeVersionBeacon,
 		c.RandomBeaconHistory,
 		c.FlowStorageFees,
@@ -448,7 +451,7 @@ func init() {
 			DKG:            addressOfContract(ContractNameDKG),
 
 			FlowServiceAccount:         addressOfContract(ContractNameServiceAccount),
-			FlowCallbackScheduler:      addressOfContract(ContractNameFlowCallbackScheduler),
+			FlowTransactionScheduler:   addressOfContract(ContractNameFlowCallbackScheduler),
 			NodeVersionBeacon:          addressOfContract(ContractNameNodeVersionBeacon),
 			RandomBeaconHistory:        addressOfContract(ContractNameRandomBeaconHistory),
 			FlowStorageFees:            addressOfContract(ContractNameStorageFees),

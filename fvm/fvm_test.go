@@ -2962,15 +2962,15 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-			require.NotNil(t, sc.FlowCallbackScheduler.Address)
-			require.NotNil(t, sc.FlowCallbackScheduler.Name)
+			require.NotNil(t, sc.FlowTransactionScheduler.Address)
+			require.NotNil(t, sc.FlowTransactionScheduler.Name)
 
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): FlowTransactionScheduler.Status? {
 					return FlowTransactionScheduler.getStatus(id: 1)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
@@ -2983,7 +2983,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 				access(all) fun main(): UInt64 {
 					return FlowTransactionScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowTransactionScheduler.Priority.High)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)
