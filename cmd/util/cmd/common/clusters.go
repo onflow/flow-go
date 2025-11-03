@@ -24,10 +24,6 @@ import (
 // The identity of internal and partner nodes in each cluster is deterministically randomized
 // using the provided entropy `randomSource`. Ideally this entropy should be derived from the random beacon of the
 // previous epoch, or some other verifiable random source.
-// The function guarantees a specific constraint when partitioning the nodes into clusters:
-// Strictly more than 1/3 of nodes in each cluster must be internal nodes. If the constraint can't be
-// satisfied, an exception is returned. However, note that a successful cluster assignment does not imply
-// that enough cluster votes can be obtained from internal nodes to create any cluster QCs.
 // Note that if an exception is returned with a certain number of internal/partner nodes, there is no chance
 // of succeeding the assignment by re-running the function without increasing the internal nodes ratio.
 // Args:
@@ -96,6 +92,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 
 	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
+	// for a QC to be created without external votes
 	canConstructAllClusterQCs := true
 	for i := 0; i < numCollectionClusters; i++ {
 		if constraint[i] <= 0 {
