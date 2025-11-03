@@ -189,3 +189,31 @@ func PendingExecutionEventType(env templates.Environment) flow.EventType {
 	scheduledContractAddress := env.FlowTransactionSchedulerAddress
 	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
 }
+
+// CreateScheduledTransactionExecutorTransaction creates a transaction to create an account that will be used for
+// authorizing the execution of scheduled transactions.
+func CreateScheduledTransactionExecutorTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	// todo templates.GenerateScheduledTransactionExecutorScript(sc.AsTemplateEnv())
+	script := []byte(fmt.Sprintf(`
+		import FlowTransactionScheduler from %s
+
+		transaction {
+			prepare(serviceAccount: auth(Capabilities, Storage) &Account) {
+				let newAccount = Account(payer: serviceAccount)
+				
+				let capability = serviceAccount.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &FlowTransactionScheduler.SharedScheduler>(/storage/sharedScheduler)
+				newAccount.storage.save(capability, to: /storage/executeScheduledTransactionsCapability)
+				
+				let accountCapability = newAccount.capabilities.account.issue<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()
+				serviceAccount.storage.save(accountCapability, to: /storage/executeScheduledTransactionsAccount)
+			}
+		}
+	`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+
+	return flow.NewTransactionBodyBuilder().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		SetScript(script).
+		SetComputeLimit(callbackTransactionGasLimit).Build()
+}
