@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -39,6 +40,9 @@ func init() {
 	SnapshotCmd.Flags().BoolVar(&flagSealed, "sealed", false,
 		"get sealed block")
 
+	SnapshotCmd.Flags().BoolVar(&flagExecuted, "executed", false,
+		"get last executed and sealed block (execution node only)")
+
 	SnapshotCmd.Flags().StringVar(&flagCheckpointDir, "checkpoint-dir", "",
 		"(execution node only) get snapshot from the latest checkpoint file in the given checkpoint directory")
 
@@ -73,6 +77,44 @@ func runSnapshotE(*cobra.Command, []string) error {
 		} else if flagSealed {
 			log.Info().Msgf("get last sealed snapshot")
 			snapshot = state.Sealed()
+		} else if flagExecuted {
+			log.Info().Msgf("get last executed and sealed snapshot")
+			sealedSnapshot := state.Sealed()
+			sealedHead, err := sealedSnapshot.Head()
+			if err != nil {
+				return fmt.Errorf("could not get sealed block: %w", err)
+			}
+
+			root := state.Params().SealedRoot()
+
+			// find the last executed and sealed block
+			var executedBlockID flow.Identifier
+			found := false
+			for h := sealedHead.Height; h >= root.Height; h-- {
+				blockHeader, err := state.AtHeight(h).Head()
+				if err != nil {
+					return fmt.Errorf("could not get block header by height: %v: %w", h, err)
+				}
+
+				// check if block is executed by checking if commit exists
+				_, err = storages.Commits.ByBlockID(blockHeader.ID())
+				if err == nil {
+					executedBlockID = blockHeader.ID()
+					found = true
+					break
+				}
+
+				// statecommitment not exists means the block hasn't been executed yet
+				if !errors.Is(err, storage.ErrNotFound) {
+					return fmt.Errorf("could not check block executed or not: %v: %w", h, err)
+				}
+			}
+
+			if !found {
+				return fmt.Errorf("could not find executed block")
+			}
+
+			snapshot = state.AtBlockID(executedBlockID)
 		} else if flagCheckpointDir != "" {
 			log.Info().Msgf("get snapshot for latest checkpoint in directory %v (step: %v, endHeight: %v)",
 				flagCheckpointDir, flagCheckpointScanStep, flagCheckpointScanEndHeight)
