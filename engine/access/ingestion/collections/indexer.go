@@ -38,7 +38,7 @@ type CollectionIndexer interface {
 	// finalized block height.
 	//
 	// Expected error returns during normal operation:
-	//   - [storage.ErrNotFound]: if provided block height is not finalized
+	//   - [storage.ErrNotFound]: if provided block height is not finalized or below this node's root block
 	MissingCollectionsAtHeight(height uint64) ([]*flow.CollectionGuarantee, error)
 
 	// IsCollectionInStorage checks whether the given collection is present in local storage.
@@ -169,8 +169,7 @@ func (ci *Indexer) indexCollection(collection *flow.Collection) error {
 	// first notification should be processed.
 	//
 	// It's OK that this check is not done atomically with the index operation since the collections
-	// module will perform a similar check. Also, this module should be the only system performing
-	// collection writes.
+	// storage module is solely responsible for enforcing consistency (even if this is a stale read).
 	exists, err := ci.IsCollectionInStorage(collection.ID())
 	if err != nil {
 		return fmt.Errorf("failed to check if collection is in storage: %w", err)
@@ -197,8 +196,9 @@ func (ci *Indexer) indexCollection(collection *flow.Collection) error {
 	return nil
 }
 
-// updateLastFullBlockHeight updates the next highest block height where all previous collections
-// are indexed if it has changed.
+// updateLastFullBlockHeight updates the LastFullBlockHeight index (if it has changed).
+// The LastFullBlockHeight index tracks the height of the highest block B, such that all collections
+// in B and in all B's ancestors have been indexed by this node.
 //
 // No error returns are expected during normal operation.
 func (ci *Indexer) updateLastFullBlockHeight() error {

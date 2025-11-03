@@ -52,7 +52,7 @@ const (
 //     from the network.
 //  3. Submit collections received to the Indexer for storage and indexing.
 //
-// The Syncer guarantees that all collection for finalized blocks will eventually be received as long
+// The Syncer guarantees that all collections for finalized blocks will eventually be received as long
 // as there are honest Collection nodes in each cluster, and the node is able to successfully communicate
 // with them over the networking layer.
 //
@@ -71,7 +71,7 @@ type Syncer struct {
 	state               protocol.State
 	collections         storage.Collections
 	lastFullBlockHeight counters.Reader
-	execDataSyncer      *ExecutionDataSyncer
+	execDataSyncer      *ExecutionDataSyncer // may be nil
 
 	// these are held as members to allow configuring their values during testing.
 	collectionCatchupTimeout        time.Duration

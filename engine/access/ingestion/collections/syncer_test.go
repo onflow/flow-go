@@ -134,7 +134,7 @@ func (s *SyncerSuite) TestRequestCollectionsForBlock() {
 	syncer := s.createSyncer()
 
 	s.Run("request for block <= last full block height", func() {
-		// EntityByID should not be called
+		s.requester.AssertNotCalled(s.T(), "EntityByID")
 		err := syncer.RequestCollectionsForBlock(s.lastFullBlockHeight.Value(), guarantees)
 		s.Require().NoError(err)
 	})
@@ -153,11 +153,11 @@ func (s *SyncerSuite) TestRequestCollectionsForBlock() {
 	})
 
 	s.Run("finding guarantors fails", func() {
-		expectedError := errors.New("state lookup failed")
-		s.mockGuarantorsForCollectionReturnsError(guarantees[0], expectedError)
+		exception := errors.New("state lookup failed")
+		s.mockGuarantorsForCollectionReturnsError(guarantees[0], exception)
 
 		err := syncer.RequestCollectionsForBlock(s.lastFullBlockHeight.Value()+1, guarantees)
-		s.Require().ErrorIs(err, expectedError)
+		s.Require().ErrorIs(err, exception)
 	})
 }
 
