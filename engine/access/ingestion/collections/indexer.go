@@ -19,6 +19,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	// lastFullBlockRefreshInterval is the interval at which the last full block height is updated.
+	lastFullBlockRefreshInterval = 1 * time.Second
+
+	// defaultQueueCapacity is the default capacity of the pending collections queue.
+	defaultQueueCapacity = 10_000
+)
+
 type CollectionIndexer interface {
 	// OnCollectionReceived notifies the collection indexer that a new collection is available to be indexed.
 	// Calling this method multiple times with the same collection is a no-op.
@@ -26,7 +34,7 @@ type CollectionIndexer interface {
 	OnCollectionReceived(collection *flow.Collection)
 
 	// MissingCollectionsAtHeight returns all collections that are not present in storage for a specific
-	// block height.
+	// finalized block height.
 	//
 	// Expected error returns during normal operation:
 	//   - [storage.ErrNotFound]: if provided block height is not finalized
@@ -38,16 +46,8 @@ type CollectionIndexer interface {
 	IsCollectionInStorage(collectionID flow.Identifier) (bool, error)
 }
 
-const (
-	// lastFullBlockRefreshInterval is the interval at which the last full block height is updated.
-	lastFullBlockRefreshInterval = 1 * time.Second
-
-	// defaultQueueCapacity is the default capacity of the pending collections queue.
-	defaultQueueCapacity = 10_000
-)
-
 // Indexer stores and indexes collections received from the network. It is designed to be the central
-// point for accumulating collection from various subsystems that my receive them from the network.
+// point for accumulating collections from various subsystems that my receive them from the network.
 // For example, collections may be received from execution data sync, the collection syncer, or the
 // execution state indexer. Depending on the node's configuration, one or more of these subsystems
 // will feed the indexer with collections.
@@ -55,14 +55,13 @@ const (
 // The indexer also maintains the last full block height state, which is the highest block height
 // for which all collections are stored and indexed.
 type Indexer struct {
-	log     zerolog.Logger
-	metrics module.CollectionExecutedMetric
+	log         zerolog.Logger
+	metrics     module.CollectionExecutedMetric
+	lockManager lockctx.Manager
 
 	state               protocol.State
 	blocks              storage.Blocks
 	collections         storage.Collections
-	transactions        storage.Transactions
-	lockManager         lockctx.Manager
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	pendingCollectionsNotifier engine.Notifier
@@ -78,7 +77,6 @@ func NewIndexer(
 	state protocol.State,
 	blocks storage.Blocks,
 	collections storage.Collections,
-	transactions storage.Transactions,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 	lockManager lockctx.Manager,
 ) (*Indexer, error) {
@@ -92,14 +90,13 @@ func NewIndexer(
 	return &Indexer{
 		log:                        log.With().Str("component", "collection-indexer").Logger(),
 		metrics:                    metrics,
+		lockManager:                lockManager,
 		state:                      state,
 		blocks:                     blocks,
 		collections:                collections,
-		transactions:               transactions,
-		lockManager:                lockManager,
+		lastFullBlockHeight:        lastFullBlockHeight,
 		pendingCollectionsNotifier: engine.NewNotifier(),
 		pendingCollectionsQueue:    collectionsQueue,
-		lastFullBlockHeight:        lastFullBlockHeight,
 	}, nil
 }
 
@@ -121,7 +118,7 @@ func (ci *Indexer) WorkerLoop(ctx irrecoverable.SignalerContext, ready component
 		case <-updateLastFullBlockHeightTicker.C:
 			err := ci.updateLastFullBlockHeight()
 			if err != nil {
-				ctx.Throw(err)
+				ctx.Throw(fmt.Errorf("failed to update last full block height: %w", err))
 				return
 			}
 
@@ -134,7 +131,7 @@ func (ci *Indexer) WorkerLoop(ctx irrecoverable.SignalerContext, ready component
 
 				collection, ok := v.(*flow.Collection)
 				if !ok {
-					ctx.Throw(fmt.Errorf("received invalid object. expected *flow.Collection, got: %T", collection))
+					ctx.Throw(fmt.Errorf("collection indexer received invalid object. expected *flow.Collection, got: %T", collection))
 					return
 				}
 
@@ -244,7 +241,7 @@ func (ci *Indexer) updateLastFullBlockHeight() error {
 }
 
 // MissingCollectionsAtHeight returns all collections that are not present in storage for a specific
-// block height.
+// finalized block height.
 //
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound]: if provided block height is not finalized

@@ -7,23 +7,21 @@ import (
 
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
+// ExecutionDataSyncer submits collections from execution data to the collections indexer. It is
+// designed to be used within the collection syncer to optimize indexing when collection data is
+// already available on the node.
 type ExecutionDataSyncer struct {
-	log zerolog.Logger
-
 	executionDataCache execution_data.ExecutionDataCache
 	indexer            CollectionIndexer
 }
 
 func NewExecutionDataSyncer(
-	log zerolog.Logger,
 	executionDataCache execution_data.ExecutionDataCache,
 	indexer CollectionIndexer,
 ) *ExecutionDataSyncer {
 	return &ExecutionDataSyncer{
-		log:                log.With().Str("component", "execution-data-syncer").Logger(),
 		executionDataCache: executionDataCache,
 		indexer:            indexer,
 	}

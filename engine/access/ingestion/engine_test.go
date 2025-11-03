@@ -187,7 +187,6 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 		s.proto.state,
 		s.blocks,
 		s.collections,
-		s.transactions,
 		s.lastFullBlockHeight,
 		s.lockManager,
 	)

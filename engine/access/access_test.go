@@ -730,7 +730,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 			suite.state,
 			all.Blocks,
 			collections,
-			transactions,
 			lastFullBlockHeight,
 			suite.lockManager,
 		)
@@ -989,7 +988,6 @@ func (suite *Suite) TestGetTransactionResult() {
 			suite.state,
 			all.Blocks,
 			collections,
-			transactions,
 			lastFullBlockHeight,
 			suite.lockManager,
 		)
@@ -1265,7 +1263,6 @@ func (suite *Suite) TestExecuteScript() {
 			suite.state,
 			all.Blocks,
 			all.Collections,
-			all.Transactions,
 			lastFullBlockHeight,
 			suite.lockManager,
 		)

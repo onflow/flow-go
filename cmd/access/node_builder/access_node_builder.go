@@ -637,14 +637,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
 			// This ensures that it simply returns a not found error if the blob doesn't exist
 			// instead of attempting to download it from the network.
-			executionDataStoreCache := execdatacache.NewExecutionDataCache(
+			builder.ExecutionDataCache = execdatacache.NewExecutionDataCache(
 				builder.ExecutionDataStore,
 				builder.Storage.Headers,
 				builder.Storage.Seals,
 				builder.Storage.Results,
 				execDataCacheBackend,
 			)
-			builder.ExecutionDataCache = executionDataStoreCache
 
 			return nil
 		}).
@@ -2220,7 +2219,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				node.Storage.Blocks,
 				notNil(builder.collections),
-				notNil(builder.transactions),
 				lastFullBlockHeight,
 				node.StorageLockMgr,
 			)
@@ -2235,8 +2233,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			var executionDataSyncer *collections.ExecutionDataSyncer
 			if builder.executionDataSyncEnabled && !builder.executionDataIndexingEnabled {
 				executionDataSyncer = collections.NewExecutionDataSyncer(
-					node.Logger,
-					builder.ExecutionDataCache,
+					notNil(builder.ExecutionDataCache),
 					collectionIndexer,
 				)
 			}

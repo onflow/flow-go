@@ -71,7 +71,6 @@ func (s *IndexerSuite) createIndexer(t *testing.T) *Indexer {
 		s.state,
 		s.blocks,
 		s.collections,
-		s.transactions,
 		s.lastFullBlockHeight,
 		s.lockManager,
 	)
@@ -315,7 +314,6 @@ func (s *IndexerSuite) TestWorkerProcessing_ProcessesCollections() {
 			bc.state,
 			bc.all.Blocks,
 			bc.collections,
-			bc.transactions,
 			lastFullBlockHeight,
 			bc.lockManager,
 		)
