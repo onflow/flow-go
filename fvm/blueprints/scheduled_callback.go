@@ -99,6 +99,22 @@ func executeCallbackTransaction(
 	effort uint64,
 ) (*flow.TransactionBody, error) {
 	script := templates.GenerateExecuteTransactionScript(env)
+	// todo use templates after updated
+	script = []byte(fmt.Sprintf(`
+		import FlowTransactionScheduler from %s
+
+		transaction(id: UInt64) {
+			prepare(signer: auth(CopyValue) &Account) {
+				let scheduler = signer.storage.copy<Capability<auth(FlowTransactionScheduler.Execute) &FlowTransactionScheduler.SharedScheduler>>(from: /storage/executeScheduledTransactionsCapability)
+					?? panic("Could not find Execute Scheduled Transactions Capability in storage")
+
+				let schedulerRef = scheduler.borrow()
+					?? panic("Could not borrow FlowTransactionScheduler SharedScheduler reference")
+
+				schedulerRef.executeTransaction(id: id)
+			}
+		}
+	`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
