@@ -356,7 +356,7 @@ func ScheduleCallbackAtTimestamp(
 		return 0, fmt.Errorf("could not get latest block ID: %w", err)
 	}
 
-	flowCallbackScheduler := sdk.Address(sc.FlowCallbackScheduler.Address)
+	flowTransactionScheduler := sdk.Address(sc.FlowTransactionScheduler.Address)
 	flowToken := sdk.Address(sc.FlowToken.Address)
 	fungibleToken := sdk.Address(sc.FungibleToken.Address)
 
@@ -403,7 +403,7 @@ func ScheduleCallbackAtTimestamp(
 				TestFlowCallbackHandler.addScheduledCallback(callback: <-scheduledCallback)
 			}
 		} 
-	`, serviceAccountAddress.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
+	`, serviceAccountAddress.Hex(), flowTransactionScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
 
 	timeArg, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
 	if err != nil {
@@ -436,7 +436,7 @@ func CancelCallbackByID(
 		return 0, fmt.Errorf("could not get latest block ID: %w", err)
 	}
 
-	flowCallbackScheduler := sdk.Address(sc.FlowCallbackScheduler.Address)
+	flowTransactionScheduler := sdk.Address(sc.FlowTransactionScheduler.Address)
 	flowToken := sdk.Address(sc.FlowToken.Address)
 	fungibleToken := sdk.Address(sc.FungibleToken.Address)
 
@@ -457,7 +457,7 @@ func CancelCallbackByID(
 				vault.deposit(from: <-TestFlowCallbackHandler.cancelCallback(id: id))
 			}
 		} 
-	`, serviceAccountAddress.Hex(), flowCallbackScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
+	`, serviceAccountAddress.Hex(), flowTransactionScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
 
 	tx := sdk.NewTransaction().
 		SetScript([]byte(cancelTx)).
@@ -501,11 +501,11 @@ func DeployScheduledCallbackTestContract(
 		return sdk.Identifier{}, fmt.Errorf("could not get latest block ID: %w", err)
 	}
 
-	flowCallbackScheduler := sdk.Address(sc.FlowCallbackScheduler.Address)
+	flowTransactionScheduler := sdk.Address(sc.FlowTransactionScheduler.Address)
 	flowToken := sdk.Address(sc.FlowToken.Address)
 	fungibleToken := sdk.Address(sc.FungibleToken.Address)
 
-	testContract := TestFlowCallbackHandlerContract(flowCallbackScheduler, flowToken, fungibleToken)
+	testContract := TestFlowCallbackHandlerContract(flowTransactionScheduler, flowToken, fungibleToken)
 	tx, err := client.DeployContract(context.Background(), referenceBlock.ID, testContract)
 	if err != nil {
 		return sdk.Identifier{}, fmt.Errorf("could not deploy test contract: %w", err)
