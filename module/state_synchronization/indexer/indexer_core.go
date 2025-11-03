@@ -222,12 +222,14 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	g.Go(func() error {
 		start := time.Now()
 
-		// index all collections except the system chunk
 		// Note: the access ingestion engine also indexes collections, starting when the block is
 		// finalized. This process can fall behind due to the node being offline, resource issues
 		// or network congestion. This indexer ensures that collections are never farther behind
 		// than the latest indexed block. Calling the collection handler with a collection that
 		// has already been indexed is a noop.
+
+		// index all collections except the system chunk. if there is only a single chunk, it is the
+		// system chunk and can be skipped.
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 1 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
