@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-# Bootstrap a network while having <2/3rds of private keys available for Collector nodes
+# This file implements a test for bootstrapping a network while having <2/3rds of private keys available for Collector nodes.
+# In particular, it tests decentralized voting by Collection nodes on root cluster blocks as part of the bootstrapping process.
+# The test can be run using either local or GCP bucket vote transport. To test GCP bucket transport, set the `bucket` and `token` variables below.
+# To run this test, you must have `jq` and `gsutil` installed.
 
 # exit early if anything fails
 set -e
