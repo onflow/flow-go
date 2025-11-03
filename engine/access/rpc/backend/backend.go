@@ -15,8 +15,12 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/block"
+	blockstream "github.com/onflow/flow-go/engine/access/rpc/backend/block/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/execution_results"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/network"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
@@ -53,12 +57,14 @@ const DefaultConnectionPoolSize = 250
 //
 // It is composed of several sub-backends that implement part of the Access API.
 //
-// Script related calls are handled by backendScripts.
-// Transaction related calls are handled by backendTransactions.
-// Block Header related calls are handled by backendBlockHeaders.
-// Block details related calls are handled by backendBlockDetails.
-// Event related calls are handled by backendEvents.
-// Account related calls are handled by backendAccounts.
+// Script related calls are handled by Scripts.
+// Transaction related calls are handled by Transactions.
+// Block related calls are handled by BlockBase.
+// Block subscription calls are handled by SubscribeBlocks.
+// Event related calls are handled by Events.
+// Account related calls are handled by Accounts.
+// Execution result calls are handled by ExecutionResults.
+// Network and protocol snapshot calls are handled by Network.
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
@@ -67,11 +73,10 @@ type Backend struct {
 	scripts.Scripts
 	transactions.Transactions
 	txstream.TransactionStream
-	backendBlockHeaders
-	backendBlockDetails
-	backendExecutionResults
-	backendNetwork
-	backendSubscribeBlocks
+	block.BlockBase
+	blockstream.SubscribeBlocks
+	execution_results.ExecutionResults
+	network.Network
 
 	state               protocol.State
 	collections         storage.Collections
@@ -299,43 +304,34 @@ func New(params Params) (*Backend, error) {
 		txStatusDeriver,
 	)
 
+	subscribeBlocksBackend := blockstream.NewSubscribeBlocks(
+		params.Log,
+		params.State,
+		params.Headers,
+		params.Blocks,
+		params.SubscriptionHandler,
+		params.BlockTracker,
+	)
+
+	executionResultsBackend := execution_results.NewExecutionResults(params.ExecutionResults)
+
+	networkBackend := network.NewNetwork(
+		params.State,
+		params.ChainID,
+		params.Headers,
+		params.SnapshotHistoryLimit,
+	)
+
 	b := &Backend{
 		Accounts:          *accountsBackend,
 		Events:            *eventsBackend,
 		Scripts:           *scriptsBackend,
 		Transactions:      *txBackend,
 		TransactionStream: *txStreamBackend,
-		backendBlockHeaders: backendBlockHeaders{
-			backendBlockBase: backendBlockBase{
-				blocks:  params.Blocks,
-				headers: params.Headers,
-				state:   params.State,
-			},
-		},
-		backendBlockDetails: backendBlockDetails{
-			backendBlockBase: backendBlockBase{
-				blocks:  params.Blocks,
-				headers: params.Headers,
-				state:   params.State,
-			},
-		},
-		backendExecutionResults: backendExecutionResults{
-			executionResults: params.ExecutionResults,
-		},
-		backendNetwork: backendNetwork{
-			state:                params.State,
-			chainID:              params.ChainID,
-			headers:              params.Headers,
-			snapshotHistoryLimit: params.SnapshotHistoryLimit,
-		},
-		backendSubscribeBlocks: backendSubscribeBlocks{
-			log:                 params.Log,
-			state:               params.State,
-			headers:             params.Headers,
-			blocks:              params.Blocks,
-			subscriptionHandler: params.SubscriptionHandler,
-			blockTracker:        params.BlockTracker,
-		},
+		BlockBase:         block.NewBlockBase(params.Blocks, params.Headers, params.State),
+		SubscribeBlocks:   *subscribeBlocksBackend,
+		ExecutionResults:  *executionResultsBackend,
+		Network:           *networkBackend,
 
 		state:               params.State,
 		collections:         params.Collections,

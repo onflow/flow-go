@@ -1,4 +1,4 @@
-package backend
+package stream_test
 
 import (
 	"context"
@@ -14,14 +14,12 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/block/stream"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
-	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -46,7 +44,6 @@ type BackendBlocksSuite struct {
 
 	chainID flow.ChainID
 
-	broadcaster *engine.Broadcaster
 	blocksArray []*flow.Block
 	blockMap    map[uint64]*flow.Block
 	rootBlock   *flow.Block
@@ -55,7 +52,7 @@ type BackendBlocksSuite struct {
 	executionStateCache         *osyncmock.ExecutionStateCache
 	executionDataSnapshot       *osyncmock.Snapshot
 
-	backend *Backend
+	backend *stream.SubscribeBlocks
 }
 
 // testType represents a test scenario for subscribing
@@ -140,7 +137,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 }
 
 // backendParams returns the Params configuration for the backend.
-func (s *BackendBlocksSuite) backendParams(broadcaster *engine.Broadcaster) Params {
+func (s *BackendBlocksSuite) createSubscribeBlocks(broadcaster *engine.Broadcaster) *stream.SubscribeBlocks {
 	var err error
 	// Head() is called twice by NewBlockTracker
 	s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Twice()
@@ -152,29 +149,22 @@ func (s *BackendBlocksSuite) backendParams(broadcaster *engine.Broadcaster) Para
 	)
 	s.Require().NoError(err)
 
-	return Params{
-		State:                s.state,
-		Blocks:               s.blocks,
-		Headers:              s.headers,
-		ChainID:              s.chainID,
-		MaxHeightRange:       events.DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		Log:                  s.log,
-		SubscriptionHandler: subscription.NewSubscriptionHandler(
-			s.log,
-			broadcaster,
-			subscription.DefaultSendTimeout,
-			subscription.DefaultResponseLimit,
-			subscription.DefaultSendBufferSize,
-		),
-		BlockTracker:                s.blockTracker,
-		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
-		ExecutionResultInfoProvider: s.executionResultInfoProvider,
-		ExecutionStateCache:         s.executionStateCache,
-	}
+	subscriptionHandler := subscription.NewSubscriptionHandler(
+		s.log,
+		broadcaster,
+		subscription.DefaultSendTimeout,
+		subscription.DefaultResponseLimit,
+		subscription.DefaultSendBufferSize,
+	)
+
+	return stream.NewSubscribeBlocks(
+		s.log,
+		s.state,
+		s.headers,
+		s.blocks,
+		subscriptionHandler,
+		s.blockTracker,
+	)
 }
 
 // subscribeFromStartBlockIdTestCases generates variations of testType scenarios for subscriptions
@@ -380,10 +370,8 @@ func (s *BackendBlocksSuite) subscribe(
 			synctest.Test(s.T(), func(t *testing.T) {
 				// the broadcaster must be setup inside of the synctest bubble otherwise the test
 				// will panic.
-				var err error
 				broadcaster := engine.NewBroadcaster()
-				s.backend, err = New(s.backendParams(broadcaster))
-				s.Require().NoError(err)
+				s.backend = s.createSubscribeBlocks(broadcaster)
 
 				// add "backfill" block - blocks that are already in the database before the test starts
 				// this simulates a subscription on a past block
@@ -476,8 +464,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	backend, err := New(s.backendParams(engine.NewBroadcaster()))
-	s.Require().NoError(err)
+	backend := s.createSubscribeBlocks(engine.NewBroadcaster())
 
 	s.Run("returns error if unknown start block id is provided", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
