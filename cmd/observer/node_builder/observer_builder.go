@@ -1458,7 +1458,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.State,
 				builder.Storage.Blocks,
 				builder.Storage.Collections,
-				builder.Storage.Transactions,
 				lastFullBlockHeight,
 				builder.StorageLockMgr,
 			)

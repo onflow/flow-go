@@ -60,7 +60,6 @@ func (s *SyncerSuite) SetupTest() {
 
 func (s *SyncerSuite) createSyncer() *Syncer {
 	execDataSyncer := NewExecutionDataSyncer(
-		unittest.Logger(),
 		s.executionDataCache,
 		s.indexer,
 	)
@@ -535,7 +534,6 @@ func (s *SyncerSuite) TestWorkerLoop_RequestsMissingCollections() {
 
 	s.Run("missing collections - processed from execution data", func() {
 		execDataSyncer := NewExecutionDataSyncer(
-			unittest.Logger(),
 			s.executionDataCache,
 			s.indexer,
 		)
