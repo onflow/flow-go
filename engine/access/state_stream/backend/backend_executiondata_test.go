@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"testing"
 	"time"
 
@@ -24,6 +23,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	storagesnapshotmock "github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -905,7 +906,6 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	block := s.blocks[0]
 	seal := s.sealMap[block.ID()]
 	result := s.resultMap[seal.ResultID]
-	//execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
 	s.highestBlockHeader = block.ToHeader()
@@ -918,7 +918,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Return(&optimistic_sync.ExecutionResultInfo{
 				ExecutionResultID: result.ID(),
 				ExecutionNodes:    executionNodes.ToSkeleton(),
-			}, nil)
+			}, nil).Once()
 
 		s.executionStateCache.
 			On("Snapshot", result.ID()).
@@ -930,9 +930,8 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
 		s.registers.On("StorageSnapshot", block.Height).Return(storageSnapshot, nil).Once()
-		
+
 		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
-		//res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height, s.criteria)
 
 		require.NoError(s.T(), err)
 		require.NotEmpty(s.T(), res)
@@ -940,22 +939,61 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height+1, s.criteria)
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		storageSnapshot := snapshot.MapStorageSnapshot{}
+		storageSnapshot[s.registerID] = flow.RegisterValue([]byte("value"))
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+		s.registers.On("StorageSnapshot", block.Height).Return(nil, storage.ErrHeightNotIndexed).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
 		require.Nil(s.T(), res)
 		require.Nil(s.T(), metadata)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
+
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		res, metadata, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Height, s.criteria)
+		storageSnapshotMock := storagesnapshotmock.NewStorageSnapshot(s.T())
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+		s.registers.On("StorageSnapshot", block.Height).Return(storageSnapshotMock, nil).Once()
+		storageSnapshotMock.On("Get", falseID[0]).Return(nil, storage.ErrNotFound).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(falseID, block.Height, s.criteria)
+
 		require.Nil(s.T(), res)
 		require.Nil(s.T(), metadata)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		res, metadata, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Height, s.criteria)
+		res, metadata, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), block.Height, s.criteria)
+
 		require.Nil(s.T(), res)
 		require.Nil(s.T(), metadata)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))

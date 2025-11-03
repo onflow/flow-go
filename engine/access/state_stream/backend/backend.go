@@ -219,12 +219,13 @@ func (b *StateStreamBackend) GetRegisterValues(
 	}
 	registersStorageSnapshot, err := registers.StorageSnapshot(height)
 	if err != nil {
+		if errors.Is(err, storage.ErrHeightNotIndexed) {
+			return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+		}
 		return nil, nil, err
 	}
 
-	//values, err := b.registers.RegisterValues(ids, height)
 	for i, regID := range ids {
-		//val, err := registers.Get(regID, height)
 		val, err := registersStorageSnapshot.Get(regID)
 		if err != nil {
 			if errors.Is(err, storage.ErrHeightNotIndexed) {
