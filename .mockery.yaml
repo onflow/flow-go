@@ -32,7 +32,6 @@ packages:
   github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator:
   github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages:
   github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider:
-  github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier:
   github.com/onflow/flow-go/engine/access/rpc/connection:
   github.com/onflow/flow-go/engine/access/state_stream:
   github.com/onflow/flow-go/engine/access/subscription:

@@ -313,7 +313,6 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,
 		ConnFactory:                 s.connectionFactory,
-		EnableRetries:               false,
 		NodeProvider:                execNodeProvider,
 		Blocks:                      s.blocks,
 		Collections:                 s.collections,
