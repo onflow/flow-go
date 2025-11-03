@@ -462,9 +462,6 @@ func (b *bootstrapExecutor) Execute() error {
 	// deploy staking collection contract to the service account
 	b.deployStakingCollection(service, &env)
 
-	// deploy flow transaction scheduler contract to the service account
-	b.deployFlowTransactionScheduler(service, &env)
-
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
 	b.setupVMBridge(service, &env)
@@ -472,6 +469,14 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployCrossVMMetadataViews(nonFungibleToken, &env)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
+	if err != nil {
+		return err
+	}
+
+	// deploy flow transaction scheduler contract to the service account
+	b.deployFlowTransactionScheduler(service, &env)
+
+	err = expectAccounts(systemcontracts.ScheduledTransactionExecutorAccountIndex)
 	if err != nil {
 		return err
 	}
@@ -827,6 +832,16 @@ func (b *bootstrapExecutor) deployFlowTransactionScheduler(deployTo flow.Address
 
 	env.FlowTransactionSchedulerUtilsAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowTransactionSchedulerUtils contract: %s", txError, err)
+
+	txBody, err = blueprints.CreateScheduledTransactionExecutorTransaction(b.ctx.Chain)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create scheduled transaction executor transaction: %s", err))
+	}
+	txError, err = b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(txBody, 0),
+	)
+	panicOnMetaInvokeErrf("failed to create scheduled transaction executor: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(
