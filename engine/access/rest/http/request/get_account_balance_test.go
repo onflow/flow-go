@@ -19,7 +19,7 @@ import (
 //  3. A request with a non-numeric agreeingExecutorsCount value.
 //  4. A request with a negative agreeingExecutorsCount value.
 //  5. A request containing invalid executor IDs.
-//  6. A request with a non-boolean includeExecutorMetadata flag.
+//  6. A request with a non-boolean includeExecutorMetadata query.
 func TestGetAccountBalance_InvalidParse(t *testing.T) {
 	validAddress := flow.Localnet.Chain().ServiceAddress().String()
 	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()

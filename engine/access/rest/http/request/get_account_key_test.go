@@ -10,7 +10,18 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func Test_GetAccountKey_InvalidParse(t *testing.T) {
+// TestGetAccountKey_InvalidParse verifies that parseGetAccountKeyRequest correctly
+// returns errors for invalid input parameters and malformed request values.
+//
+// Test cases:
+//  1. A request with an invalid account address.
+//  2. A request with an invalid key index.
+//  3. A request with an invalid (negative) block height.
+//  4. A request with a non-numeric agreeingExecutorsCount value.
+//  5. A request with a negative agreeingExecutorsCount value.
+//  6. A request containing invalid executor IDs.
+//  7. A request with a non-boolean includeExecutorMetadata query.
+func TestGetAccountKey_InvalidParse(t *testing.T) {
 	validAddress := flow.Localnet.Chain().ServiceAddress().String()
 	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 
@@ -113,7 +124,15 @@ func Test_GetAccountKey_InvalidParse(t *testing.T) {
 	}
 }
 
-func Test_GetAccountKey_ValidParse(t *testing.T) {
+// TestGetAccountKey_ValidParse verifies that parseGetAccountKeyRequest correctly
+// parses valid GetAccountKey requests and populates the request fields.
+//
+// Test cases:
+//  1. A request with a valid account address and block height.
+//  2. A request with a valid account and no specified block height (defaults to sealed height).
+//  3. A request using "sealed" as the block height.
+//  4. A request using "final" as the block height.
+func TestGetAccountKey_ValidParse(t *testing.T) {
 	validAddress := flow.Localnet.Chain().ServiceAddress().String()
 	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 	keyIndex := "5"
