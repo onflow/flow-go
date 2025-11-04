@@ -33,10 +33,15 @@ func (r *ResultApprovalState) Add(sender flow.Identifier, approval *flow.ResultA
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.resultApprovals[sender]; !ok {
-		r.resultApprovals[sender] = make([]*flow.ResultApproval, 0)
-	}
 	r.resultApprovals[sender] = append(r.resultApprovals[sender], approval)
+}
+
+func (r *ResultApprovalState) Get(verifierID flow.Identifier) ([]*flow.ResultApproval, bool) {
+	r.RLock()
+	defer r.RUnlock()
+
+	approvals, ok := r.resultApprovals[verifierID]
+	return approvals, ok
 }
 
 // WaitForResultApproval waits until a result approval for execution result id from the verification node for
@@ -57,17 +62,15 @@ func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 	verificationIds flow.IdentifierList,
 	resultID flow.Identifier,
 	chunkIndex uint64,
-	count int) []*flow.ResultApproval {
+	count int,
+) []*flow.ResultApproval {
 
-	receivedApprovalIds := flow.IdentifierList{}
-	receivedApprovals := make([]*flow.ResultApproval, 0)
+	receivedApprovalIds := make(map[flow.Identifier]bool)
+	receivedApprovals := make([]*flow.ResultApproval, 0, count)
 
 	require.Eventually(t, func() bool {
-		r.RLock()
-		defer r.RUnlock()
-
 		for _, verificationId := range verificationIds {
-			approvals, ok := r.resultApprovals[verificationId]
+			approvals, ok := r.Get(verificationId)
 			if !ok {
 				continue
 			}
@@ -80,8 +83,8 @@ func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 					continue // chunk indices do not match
 				}
 				approvalId := approval.ID()
-				if !receivedApprovalIds.Contains(approvalId) {
-					receivedApprovalIds = append(receivedApprovalIds, approvalId)
+				if !receivedApprovalIds[approvalId] {
+					receivedApprovalIds[approvalId] = true
 					receivedApprovals = append(receivedApprovals, approval)
 				}
 
@@ -93,9 +96,7 @@ func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 
 		return false
 	}, resultApprovalTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive enough approval for chunk %d of result ID %x",
-			chunkIndex,
-			resultID))
+		fmt.Sprintf("did not receive enough approval for chunk %d of result ID %x", chunkIndex, resultID))
 
 	return receivedApprovals
 }

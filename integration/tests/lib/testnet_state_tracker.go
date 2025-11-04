@@ -85,7 +85,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 				require.NoError(t, err)
 
 				block := m.Block
-				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
+				t.Logf("%v block proposal received from %s at height %v, view %v: %s\n",
 					time.Now().UTC(),
 					sender,
 					block.Height,
@@ -93,7 +93,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					block.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
-				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",
+				t.Logf("%v result approval received from %s for execution result ID %s and chunk index %v\n",
 					time.Now().UTC(),
 					sender,
 					m.Body.ExecutionResultID,
@@ -103,7 +103,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 				finalState, err := m.ExecutionResult.FinalStateCommitment()
 				require.NoError(t, err)
 				tst.ReceiptState.Add(m)
-				t.Logf("%v execution receipts received from %s for block ID %x by executor ID %x with final state %x result ID %x chunks %d\n",
+				t.Logf("%v execution receipts received from %s for block ID %s by executor ID %s with final state %s result ID %s chunks %d\n",
 					time.Now().UTC(),
 					sender,
 					m.ExecutionResult.BlockID,
@@ -113,7 +113,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					len(m.ExecutionResult.Chunks))
 			case *flow.ChunkDataResponse:
 				// consuming this explicitly to avoid logging full msg which is usually very large because of proof
-				t.Logf("%x chunk data pack received from %x\n",
+				t.Logf("%s chunk data pack received from %s\n",
 					m.ChunkDataPack.ChunkID,
 					sender)
 
