@@ -3,12 +3,17 @@ package state_synchronization
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/engine/common/version"
+	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ commands.AdminCommand = (*ReadExecutionDataCommand)(nil)
@@ -30,26 +35,43 @@ type ExecuteScriptCommand struct {
 // specified block height.
 //
 // Expected error returns during normal operation:
-//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
-//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-//   - [storage.ErrNotFound] - if data was not found.
-//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
-//   - [fvmerrors.ErrCodeScriptExecutionCancelledError] - if script execution canceled.
-//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError] - if script execution timed out.
-//   - [fvmerrors.ErrCodeComputationLimitExceededError] - if script execution computation limit exceeded.
-//   - [fvmerrors.ErrCodeMemoryLimitExceededError] - if script execution memory limit exceeded.
-//   - [indexer.ErrIndexNotInitialized] - if data for block is not available.
-func (e *ExecuteScriptCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
+//   - [admin.DataNotFoundError] - if data required to process the request is not available.
+//   - [admin.OutOfRangeError] - if data required to process the request is outside the available range.
+//   - [admin.RequestCanceledError] - if script execution canceled.
+//   - [admin.RequestTimedOutError] - if script execution timed out.
+//   - [admin.ResourceExhausted] - if script execution computation limit exceeded or memory limit exceeded.
+func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
 	registerSnapshotReader, err := e.registersAsyncStore.RegisterSnapshotReader()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		err = admin.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, admin.NewPreconditionFailedError(err)
 	}
 
 	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height, registerSnapshotReader)
 	if err != nil {
-		return nil, err
+		err = fmt.Errorf("failed to execute script: %w", err)
+
+		switch {
+		case errors.Is(err, version.ErrOutOfRange),
+			errors.Is(err, storage.ErrHeightNotIndexed),
+			errors.Is(err, execution.ErrIncompatibleNodeVersion):
+			return nil, admin.NewOutOfRangeError(err)
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, admin.NewDataNotFoundError("script", err)
+		case fvmerrors.IsScriptExecutionCancelledError(err):
+			return nil, admin.NewRequestCanceledError(err)
+		case fvmerrors.IsScriptExecutionTimedOutError(err):
+			return nil, admin.NewRequestTimedOutError(err)
+		case fvmerrors.IsComputationLimitExceededError(err):
+			return nil, admin.NewResourceExhausted(err)
+		case fvmerrors.IsMemoryLimitExceededError(err):
+			return nil, admin.NewResourceExhausted(err)
+		default:
+			return nil, admin.RequireNoError(ctx, err)
+		}
 	}
 
 	return string(result), nil

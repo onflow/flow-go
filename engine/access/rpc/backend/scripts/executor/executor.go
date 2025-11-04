@@ -16,20 +16,16 @@ type ScriptExecutor interface {
 	// Execute executes the provided script at the requested block.
 	//
 	// Expected error returns during normal operation:
-	//   - [version.ErrOutOfRange] - if block height is higher that last handled block height.
-	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if data was not found.
-	//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
-	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
-	//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
-	//   - [codes.Canceled] - if the script execution was canceled.
-	//   - [codes.DeadlineExceeded] - if the script execution timed out.
-	//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-	//   - [codes.FailedPrecondition] - if data for block is not available.
-	//   - [codes.OutOfRange] - if data for block height is not available.
-	//   - [codes.NotFound] - if data not found.
-	//   - [codes.Internal] - for internal failures or index conversion errors.
-	//   - [codes.Unavailable] - if no nodes are available or a connection to an execution node could not be established.
+	//   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
+	//   - [ResourceExhausted] - if computation or memory limits were exceeded.
+	//   - [DataNotFoundError] - if data not found.
+	//   - [OutOfRangeError] - if the requested data is outside the available range.
+	//   - [PreconditionFailedError] - if the registers storage is still bootstrapping.
+	//   - [ScriptExecutionCanceledError] - if the script execution was canceled.
+	//   - [ScriptExecutionTimedOutError] - if the script execution timed out.
+	//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed.
+	//   - [ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+	//   - [InternalError] - for internal failures or index conversion errors.
 	Execute(ctx context.Context, scriptRequest *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo) ([]byte, *accessmodel.ExecutorMetadata, error)
 }
 

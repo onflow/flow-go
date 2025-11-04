@@ -272,6 +272,11 @@ func NewScriptExecutionCancelledError(err error) CodedError {
 		"script execution is cancelled")
 }
 
+// IsScriptExecutionCancelledError returns true if error has this code.
+func IsScriptExecutionCancelledError(err error) bool {
+	return HasErrorCode(err, ErrCodeScriptExecutionCancelledError)
+}
+
 // NewScriptExecutionTimedOutError construct a new CodedError which indicates
 // that Cadence Script execution has been taking more time than what is allowed.
 //
@@ -282,6 +287,11 @@ func NewScriptExecutionTimedOutError() CodedError {
 		ErrCodeScriptExecutionTimedOutError,
 		"script execution is timed out and did not finish executing within "+
 			"the maximum execution time allowed")
+}
+
+// IsScriptExecutionTimedOutError returns true if error has this code.
+func IsScriptExecutionTimedOutError(err error) bool {
+	return HasErrorCode(err, ErrCodeScriptExecutionTimedOutError)
 }
 
 // NewCouldNotGetExecutionParameterFromStateError constructs a new CodedError
