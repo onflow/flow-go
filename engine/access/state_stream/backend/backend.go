@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -197,17 +199,26 @@ func (b *StateStreamBackend) GetRegisterValues(
 
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, status.Errorf(codes.NotFound, "no finalized block is known at the given height %d", height)
+		}
 		return nil, nil, err
 	}
 
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) || common.IsInsufficientExecutionReceipts(err) {
+			return nil, nil, status.Errorf(codes.NotFound, "failed to get execution result info for block")
+		}
 		return nil, nil, err
 	}
 
 	executionResultID := execResultInfo.ExecutionResultID
 	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
+		}
 		return nil, nil, err
 	}
 
@@ -215,12 +226,20 @@ func (b *StateStreamBackend) GetRegisterValues(
 
 	registers, err := snapshot.Registers()
 	if err != nil {
+		if errors.Is(err, indexer.ErrIndexNotInitialized) {
+			return nil, nil, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
+		}
+
 		return nil, nil, err
 	}
+
 	registersStorageSnapshot, err := registers.StorageSnapshot(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrHeightNotIndexed) {
 			return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
 		}
 		return nil, nil, err
 	}
