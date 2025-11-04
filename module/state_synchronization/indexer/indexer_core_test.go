@@ -250,9 +250,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				assert.ElementsMatch(t, tf.ExpectedRegisterEntries, entries)
 			}).
 			Return(nil)
-		for _, collection := range tf.ExpectedCollections {
-			test.collectionIndexer.On("OnCollectionReceived", collection).Once()
-		}
+		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
 		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
 			test.scheduledTransactions.On("BatchIndex", mock.Anything, blockID, txID, scheduledTxID, mock.Anything).
 				Return(func(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
