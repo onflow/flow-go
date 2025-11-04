@@ -4,41 +4,115 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func Test_GetAccount_InvalidParse(t *testing.T) {
-	var getAccount GetAccount
+// TestGetAccount_InvalidParse verifies that parseGetAccountRequest correctly
+// returns errors for invalid input parameters and malformed request values.
+//
+// Test cases:
+//  1. A request with an empty account address.
+//  2. A request with an invalid (negative) block height.
+//  3. A request with a non-numeric agreeingExecutorsCount value.
+//  4. A request with a negative agreeingExecutorsCount value.
+//  5. A request containing invalid executor IDs.
+//  6. A request with a non-boolean includeExecutorMetadata value.
+func TestGetAccount_InvalidParse(t *testing.T) {
+	validAddress := flow.Localnet.Chain().ServiceAddress().String()
+	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 
 	tests := []struct {
-		address string
-		height  string
-		err     string
+		address                 string
+		height                  string
+		agreeingExecutorsCount  string
+		agreeingExecutorsIds    []string
+		includeExecutorMetadata string
+		err                     string
 	}{
-		{"", "", "invalid address"},
-		{"f8d6e0586b0a20c7", "-1", "invalid height format"},
+		{
+			"",
+			"",
+			"2",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid address",
+		},
+		{
+			validAddress,
+			"-1",
+			"2",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid height format",
+		},
+		{
+			validAddress,
+			"1",
+			"abc",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid agreeingExecutorCount",
+		},
+		{
+			validAddress,
+			"1",
+			"-5",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid agreeingExecutorCount",
+		},
+		{
+			validAddress,
+			"1",
+			"2",
+			[]string{"not-a-valid-id"},
+			"false",
+			"invalid ID format",
+		},
+		{
+			validAddress,
+			"1",
+			"2",
+			validAgreeingExecutorsIds,
+			"not-bool",
+			"invalid includeExecutorMetadata",
+		},
 	}
 
 	chain := flow.Localnet.Chain()
 	for i, test := range tests {
-		err := getAccount.Parse(test.address, test.height, chain)
-		assert.EqualError(t, err, test.err, fmt.Sprintf("test #%d failed", i))
+		_, err := parseGetAccountRequest(
+			test.address,
+			test.height,
+			test.agreeingExecutorsCount,
+			test.agreeingExecutorsIds,
+			test.includeExecutorMetadata,
+			chain,
+		)
+		require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
 	}
 }
 
-func Test_GetAccount_ValidParse(t *testing.T) {
-	var getAccount GetAccount
-
-	addr := "f8d6e0586b0a20c7"
+// TestGetAccount_ValidParse verifies that parseGetAccountRequest successfully
+// parses valid GetAccount requests and populates the request fields as expected.
+//
+// Test cases:
+//  1. A request with a valid account address and no specified height (defaults to sealed height).
+//  2. A request with a valid block height.
+func TestGetAccount_ValidParse(t *testing.T) {
+	validAddress := flow.Localnet.Chain().ServiceAddress().String()
+	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 	chain := flow.Localnet.Chain()
-	err := getAccount.Parse(addr, "", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, getAccount.Address.String(), addr)
-	assert.Equal(t, getAccount.Height, SealedHeight)
 
-	err = getAccount.Parse(addr, "100", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, getAccount.Height, uint64(100))
+	request, err := parseGetAccountRequest(validAddress, "", "2", validAgreeingExecutorsIds, "false", chain)
+	require.NoError(t, err)
+	require.Equal(t, request.Address.String(), validAddress)
+	require.Equal(t, request.Height, SealedHeight)
+
+	request, err = parseGetAccountRequest(validAddress, "100", "2", validAgreeingExecutorsIds, "false", chain)
+	require.NoError(t, err)
+	require.Equal(t, request.Height, uint64(100))
 }
