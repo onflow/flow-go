@@ -25,7 +25,8 @@ set -e
 # avoid overwriting existing files or using data from a previous run
 if [ "$(ls | wc -l)" -gt 1 ]
 then
-  echo "Found files in $(pwd), please clean up after previous runs"
+  echo "Found files in $(pwd), please clean up after previous runs:"
+  echo "rm -rf permissionless public-root-information private-root-information execution-state $keygen_dir $partner_dir node-config.json partner-weights.json"
   exit 1
 fi
 
@@ -181,6 +182,6 @@ $bootstrapcmd finalize \
     --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \
     -o ./
 
-#TODO: clean up files
-#rm -rf ./permissionless ./public-root-information ./private-root-information ./execution-state "$keygen_dir" "$partner_dir"
-#rm -f node-config.json partner-weights.json
+# allow output to be inspected if necessary
+echo "To clean up results, run:"
+echo "rm -rf permissionless public-root-information private-root-information execution-state $keygen_dir $partner_dir node-config.json partner-weights.json"
