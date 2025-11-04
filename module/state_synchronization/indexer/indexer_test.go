@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
@@ -202,7 +201,7 @@ func TestIndexer_Success(t *testing.T) {
 			})
 
 		test.executionData.On("Get", blockID).Return(ed, true).Once()
-		test.indexTest.collections.On("StoreAndIndexByTransaction", mocks.Anything, collection).Return(collection.Light(), nil).Once()
+		test.indexTest.collectionIndexer.On("OnCollectionReceived", collection).Return(nil).Once()
 		test.indexTest.registers.On("Store", flow.RegisterEntries{}, block.Height).Return(nil).Once()
 	}
 
@@ -244,7 +243,7 @@ func TestIndexer_Failure(t *testing.T) {
 			})
 
 		test.executionData.On("Get", blockID).Return(ed, true).Once()
-		test.indexTest.collections.On("StoreAndIndexByTransaction", mocks.Anything, collection).Return(collection.Light(), nil).Once()
+		test.indexTest.collectionIndexer.On("OnCollectionReceived", collection).Return(nil).Once()
 
 		// return an error on the last block to trigger the error path
 		if block.Height == lastHeight {
