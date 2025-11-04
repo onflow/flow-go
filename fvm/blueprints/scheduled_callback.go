@@ -98,23 +98,7 @@ func executeCallbackTransaction(
 	id []byte,
 	effort uint64,
 ) (*flow.TransactionBody, error) {
-	// todo use templates after updated
-	//script := templates.GenerateExecuteTransactionScript(env)
-	script := []byte(fmt.Sprintf(`
-		import FlowTransactionScheduler from %s
-
-		transaction(id: UInt64) {
-			prepare(signer: auth(CopyValue) &Account) {
-				let scheduler = signer.storage.copy<Capability<auth(FlowTransactionScheduler.Execute) &FlowTransactionScheduler.SharedScheduler>>(from: /storage/executeScheduledTransactionsCapability)
-					?? panic("Could not find Execute Scheduled Transactions Capability in storage")
-
-				let schedulerRef = scheduler.borrow()
-					?? panic("Could not borrow FlowTransactionScheduler SharedScheduler reference")
-
-				schedulerRef.executeTransaction(id: id)
-			}
-		}
-	`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+	script := templates.GenerateSchedulerExecutorTransactionScript(env)
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
@@ -210,23 +194,7 @@ func PendingExecutionEventType(env templates.Environment) flow.EventType {
 // authorizing the execution of scheduled transactions.
 func CreateScheduledTransactionExecutorTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-
-	// todo templates.GenerateScheduledTransactionExecutorScript(sc.AsTemplateEnv())
-	script := []byte(fmt.Sprintf(`
-		import FlowTransactionScheduler from %s
-
-		transaction {
-			prepare(serviceAccount: auth(Capabilities, Storage) &Account) {
-				let newAccount = Account(payer: serviceAccount)
-				
-				let capability = serviceAccount.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &FlowTransactionScheduler.SharedScheduler>(/storage/sharedScheduler)
-				newAccount.storage.save(capability, to: /storage/executeScheduledTransactionsCapability)
-				
-				let accountCapability = newAccount.capabilities.account.issue<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()
-				serviceAccount.storage.save(accountCapability, to: /storage/executeScheduledTransactionsAccount)
-			}
-		}
-	`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+	script := templates.GenerateCreateExecutionAccountScript(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
