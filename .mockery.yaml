@@ -22,6 +22,7 @@ packages:
     config:
       dir: "consensus/hotstuff/mocks"
       outpkg: "mocks"
+  github.com/onflow/flow-go/engine/access/ingestion/collections:
   github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages:
   github.com/onflow/flow-go/engine/access/rest/common/models:
   github.com/onflow/flow-go/engine/access/rest/websockets:
@@ -31,7 +32,6 @@ packages:
   github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator:
   github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages:
   github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider:
-  github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier:
   github.com/onflow/flow-go/engine/access/rpc/connection:
   github.com/onflow/flow-go/engine/access/state_stream:
   github.com/onflow/flow-go/engine/access/subscription:
