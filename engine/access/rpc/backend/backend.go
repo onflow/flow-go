@@ -110,15 +110,15 @@ type Params struct {
 	SubscriptionHandler      *subscription.SubscriptionHandler
 	MaxScriptAndArgumentSize uint
 
-	EventsIndex                *index.EventsIndex
-	TxResultQueryMode          query_mode.IndexQueryMode
-	TxResultsIndex             *index.TransactionResultsIndex
-	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
-	IndexReporter              state_synchronization.IndexReporter
-	VersionControl             *version.VersionControl
-	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
-	TxErrorMessageProvider     error_messages.Provider
-	ScheduledCallbacksEnabled  bool
+	EventsIndex                  *index.EventsIndex
+	TxResultQueryMode            query_mode.IndexQueryMode
+	TxResultsIndex               *index.TransactionResultsIndex
+	LastFullBlockHeight          *counters.PersistentStrictMonotonicCounter
+	IndexReporter                state_synchronization.IndexReporter
+	VersionControl               *version.VersionControl
+	ExecNodeIdentitiesProvider   *rpc.ExecutionNodeIdentitiesProvider
+	TxErrorMessageProvider       error_messages.Provider
+	ScheduledTransactionsEnabled bool
 }
 
 var _ access.API = (*Backend)(nil)
@@ -138,7 +138,7 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	systemCollection, err := system.DefaultSystemCollection(params.ChainID, params.ScheduledCallbacksEnabled)
+	systemCollection, err := system.DefaultSystemCollection(params.ChainID, params.ScheduledTransactionsEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct system collection: %w", err)
 	}
@@ -223,7 +223,7 @@ func New(params Params) (*Backend, error) {
 		systemCollection,
 		txStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -235,7 +235,7 @@ func New(params Params) (*Backend, error) {
 		txStatusDeriver,
 		systemCollection,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
+		params.ScheduledTransactionsEnabled,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
@@ -260,7 +260,7 @@ func New(params Params) (*Backend, error) {
 		TxStatusDeriver:              txStatusDeriver,
 		EventsIndex:                  params.EventsIndex,
 		TxResultsIndex:               params.TxResultsIndex,
-		ScheduledTransactionsEnabled: params.ScheduledCallbacksEnabled,
+		ScheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
 	}
 
 	switch params.TxResultQueryMode {

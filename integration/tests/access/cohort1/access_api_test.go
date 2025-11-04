@@ -1175,7 +1175,7 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 	rpcClient := s.an2Client.RPCClient()
 
 	// Deploy the test contract first
-	deployTxID, err := lib.DeployScheduledCallbackTestContract(accessClient, sc)
+	deployTxID, err := lib.DeployScheduledTransactionsTestContract(accessClient, sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
 	// wait for the tx to be sealed before attempting to schedule the callback. this helps make sure

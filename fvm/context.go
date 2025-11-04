@@ -23,9 +23,9 @@ const (
 	DefaultMemoryLimit        = math.MaxUint64
 	DefaultMaxInteractionSize = 20_000_000 // ~20MB
 
-	// DefaultScheduledCallbacksEnabled is the default value for the scheduled callbacks enabled flag
+	// DefaultScheduledTransactionsEnabled is the default value for the scheduled callbacks enabled flag
 	// used by Execution, Verification, and Access nodes.
-	DefaultScheduledCallbacksEnabled = true
+	DefaultScheduledTransactionsEnabled = true
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.

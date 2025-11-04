@@ -16,15 +16,15 @@ import (
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
-func TestScheduledCallbacks(t *testing.T) {
-	suite.Run(t, new(ScheduledCallbacksSuite))
+func TestScheduledTransactions(t *testing.T) {
+	suite.Run(t, new(ScheduledTransactionsSuite))
 }
 
-type ScheduledCallbacksSuite struct {
+type ScheduledTransactionsSuite struct {
 	Suite
 }
 
-func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
+func (s *ScheduledTransactionsSuite) TestScheduleCallback_DeployAndGetStatus() {
 	// wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
@@ -41,7 +41,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	s.T().Logf("got block result ID %v", erBlock.ExecutionResult.BlockID)
 }
 
-func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
+func (s *ScheduledTransactionsSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
 
 	// Wait for next height finalized (potentially first height)
@@ -50,7 +50,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
+	_, err := lib.DeployScheduledTransactionsTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
 	// Wait for next height finalized before scheduling callback
@@ -99,7 +99,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	require.Contains(s.T(), executedCallbacksAfter, callbackID, "callback should have been executed")
 }
 
-func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
+func (s *ScheduledTransactionsSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
 	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
 
 	// Wait for next height finalized (potentially first height)
@@ -108,7 +108,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
+	_, err := lib.DeployScheduledTransactionsTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
 	// Wait for next height finalized before scheduling callback
@@ -154,7 +154,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	require.Equal(s.T(), canceledStatus, status, "status should be equal to canceled")
 }
 
-func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, bool) {
+func (s *ScheduledTransactionsSuite) getCallbackStatus(callbackID uint64) (int, bool) {
 	getStatusScript := dsl.Main{
 		Import: dsl.Import{
 			Address: s.AccessClient().SDKServiceAddress(),
@@ -187,7 +187,7 @@ func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, boo
 	return int(val), true
 }
 
-func (s *ScheduledCallbacksSuite) getExecutedCallbacks() []uint64 {
+func (s *ScheduledTransactionsSuite) getExecutedCallbacks() []uint64 {
 	getExecutedScript := dsl.Main{
 		Import: dsl.Import{
 			Address: s.AccessClient().SDKServiceAddress(),

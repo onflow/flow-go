@@ -14,15 +14,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestVerifyScheduledCallback(t *testing.T) {
-	suite.Run(t, new(VerifyScheduledCallbackSuite))
+func TestVerifyScheduledTransactions(t *testing.T) {
+	suite.Run(t, new(VerifyScheduledTransactionsSuite))
 }
 
-type VerifyScheduledCallbackSuite struct {
+type VerifyScheduledTransactionsSuite struct {
 	Suite
 }
 
-func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
+func (s *VerifyScheduledTransactionsSuite) TestVerifyScheduledTransactions() {
 	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
 
 	// Wait for next height finalized (potentially first height)
@@ -31,7 +31,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
+	_, err := lib.DeployScheduledTransactionsTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
 	// Wait for next height finalized before scheduling callback
