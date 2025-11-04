@@ -29,7 +29,9 @@ func TestGetAccountBalance(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
 	t.Run("get balance by address at latest sealed block", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
@@ -48,7 +50,9 @@ func TestGetAccountBalance(t *testing.T) {
 	})
 
 	t.Run("get balance by address at latest finalized block", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
@@ -67,7 +71,9 @@ func TestGetAccountBalance(t *testing.T) {
 	})
 
 	t.Run("get balance by address at height", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+
 		var height uint64 = 100
 		req := getAccountBalanceRequest(t, account, fmt.Sprintf("%d", height), "1", []string{}, "false")
 
@@ -80,7 +86,9 @@ func TestGetAccountBalance(t *testing.T) {
 	})
 
 	t.Run("get balance by address at latest sealed block with metadata", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 

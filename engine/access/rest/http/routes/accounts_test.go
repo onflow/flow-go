@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	mocktestify "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/access/mock"
+	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
+	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -21,121 +22,167 @@ import (
 const expandableFieldKeys = "keys"
 const expandableFieldContracts = "contracts"
 
-func accountURL(t *testing.T, address string, height string) string {
-	u, err := url.ParseRequestURI(fmt.Sprintf("/v1/accounts/%s", address))
-	require.NoError(t, err)
-	q := u.Query()
-
-	if height != "" {
-		q.Add("block_height", height)
-	}
-
-	u.RawQuery = q.Encode()
-	return u.String()
-}
-
 // TestAccessGetAccount tests local getAccount request.
 //
-//	Runs the following tests:
-//	1. Get account by address at latest sealed block.
-//	2. Get account by address at latest finalized block.
-//	3. Get account by address at height.
-//	4. Get account by address at height condensed.
-//	5. Get invalid account.
+// Test cases:
+// 1. Get account by address at latest sealed block.
+// 2. Get account by address at latest finalized block.
+// 3. Get account by address at height.
+// 4. Get account by address at height condensed.
+// 5. Get account by address with executor metadata included.
 func TestAccessGetAccount(t *testing.T) {
-	backend := &mock.API{}
+	backend := accessmock.NewAPI(t)
 
 	t.Run("get by address at latest sealed block", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountRequest(t, account, router.SealedHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
+		req := getAccountRequest(t, account, router.SealedHeightQueryParam, "2", []string{}, "false", expandableFieldKeys, expandableFieldContracts)
 
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, true).
-			Return(block, flow.BlockStatusSealed, nil)
+		backend.On("GetLatestBlockHeader", mock.Anything, true).
+			Return(block, flow.BlockStatusSealed, nil).
+			Once()
 
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
+		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account, &access.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedExpandedResponse(account)
-
+		expected := expectedExpandedResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by address at latest finalized block", func(t *testing.T) {
-
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
 
-		req := getAccountRequest(t, account, router.FinalHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(block, flow.BlockStatusFinalized, nil)
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
+		req := getAccountRequest(t, account, router.FinalHeightQueryParam, "2", []string{}, "false", expandableFieldKeys, expandableFieldContracts)
+		backend.On("GetLatestBlockHeader", mock.Anything, false).
+			Return(block, flow.BlockStatusFinalized, nil).
+			Once()
+		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account, &access.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedExpandedResponse(account)
-
+		expected := expectedExpandedResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by address at height", func(t *testing.T) {
 		var height uint64 = 1337
-		account := accountFixture(t)
-		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), expandableFieldKeys, expandableFieldContracts)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "false", expandableFieldKeys, expandableFieldContracts)
 
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
+		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account, &access.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedExpandedResponse(account)
-
+		expected := expectedExpandedResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by address at height condensed", func(t *testing.T) {
-		var height uint64 = 1337
-		account := accountFixture(t)
-		req := getAccountRequest(t, account, fmt.Sprintf("%d", height))
+		var height uint64 = 100
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "false")
 
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
+		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account, &access.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedCondensedResponse(account)
-
+		expected := expectedCondensedResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
-	t.Run("get invalid", func(t *testing.T) {
-		tests := []struct {
-			url string
-			out string
-		}{
-			{accountURL(t, "123", ""), `{"code":400, "message":"invalid address"}`},
-			{accountURL(t, unittest.AddressFixture().String(), "foo"), `{"code":400, "message":"invalid height format"}`},
+	t.Run("get by address with executor metadata included", func(t *testing.T) {
+		var height uint64 = 100
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+
+		metadata := &access.ExecutorMetadata{
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutorIDs:       unittest.IdentifierListFixture(2),
 		}
 
-		for i, test := range tests {
-			req, _ := http.NewRequest("GET", test.url, nil)
-			rr := router.ExecuteRequest(req, backend)
+		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "true")
+		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account, metadata, nil).
+			Once()
 
-			assert.Equal(t, http.StatusBadRequest, rr.Code)
-			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
-		}
+		expected := expectedCondensedResponse(account, metadata)
+		router.AssertOKResponse(t, req, expected, backend)
 	})
 }
 
-func expectedExpandedResponse(account *flow.Account) string {
+// TestGetAccountErrors verifies that the GetAccount endpoint
+// correctly returns appropriate HTTP error codes and messages
+// in various failure scenarios.
+//
+// Test cases:
+//  1. A request with an invalid account address returns http.StatusBadRequest.
+//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusNotFound.
+//  3. A request where GetAccountAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+func TestGetAccountErrors(t *testing.T) {
+	backend := accessmock.NewAPI(t)
+
+	tests := []struct {
+		name   string
+		url    string
+		setup  func()
+		status int
+		out    string
+	}{
+		{
+			name:   "invalid account address",
+			url:    accountURL(t, "123", "100", "2", []string{}, "false"),
+			setup:  func() {},
+			status: http.StatusBadRequest,
+			out:    `{"code":400, "message":"invalid address"}`,
+		},
+		{
+			name: "GetLatestBlockHeader fails for sealed height",
+			url:  accountURL(t, unittest.AddressFixture().String(), router.SealedHeightQueryParam, "2", []string{}, "false"),
+			setup: func() {
+				backend.On("GetLatestBlockHeader", mock.Anything, true).
+					Return(nil, flow.BlockStatusUnknown, fmt.Errorf("latest block header error")).
+					Once()
+			},
+			status: http.StatusNotFound,
+			out:    fmt.Sprintf(`{"code":404, "message":"block with height: %d does not exist"}`, request.SealedHeight),
+		},
+		{
+			name: "GetAccountAtBlockHeight fails for valid height",
+			url:  accountURL(t, unittest.AddressFixture().String(), "100", "2", []string{}, "false"),
+			setup: func() {
+				backend.On("GetAccountAtBlockHeight", mock.Anything, mock.Anything, uint64(100), mock.Anything).
+					Return(nil, nil, fmt.Errorf("database error")).
+					Once()
+			},
+			status: http.StatusNotFound,
+			out:    `{"code":404, "message":"failed to get account, reason: database error"}`,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.setup()
+			req, _ := http.NewRequest("GET", test.url, nil)
+			rr := router.ExecuteRequest(req, backend)
+
+			require.Equal(t, test.status, rr.Code, fmt.Sprintf("test #%d failed: %v", i, test))
+			require.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
+		})
+	}
+}
+
+func expectedExpandedResponse(account *flow.Account, metadata *access.ExecutorMetadata) string {
+	metadataSection := expectedMetadata(metadata)
+
 	return fmt.Sprintf(`{
 			  "address":"%s",
 			  "balance":"100",
@@ -150,23 +197,32 @@ func expectedExpandedResponse(account *flow.Account) string {
 					 "revoked":false
 				  }
 			  ],
-             "_links":{"_self":"/v1/accounts/%s" },
-             "_expandable": {},
-             "contracts": {"contract1":"Y29udHJhY3Qx", "contract2":"Y29udHJhY3Qy"}
-			}`, account.Address, account.Keys[0].PublicKey.String(), account.Address)
+            "_links":{"_self":"/v1/accounts/%s" },
+            "_expandable": {},
+            "contracts": {"contract1":"Y29udHJhY3Qx", "contract2":"Y29udHJhY3Qy"}%s
+			}`, account.Address, account.Keys[0].PublicKey.String(), account.Address, metadataSection)
 }
 
-func expectedCondensedResponse(account *flow.Account) string {
+func expectedCondensedResponse(account *flow.Account, metadata *access.ExecutorMetadata) string {
+	metadataSection := expectedMetadata(metadata)
+
 	return fmt.Sprintf(`{
 			  "address":"%s",
 			  "balance":"100",
-             "_links":{"_self":"/v1/accounts/%s" },
-             "_expandable":{"contracts":"contracts", "keys":"keys"}
-			}`, account.Address, account.Address)
+            "_links":{"_self":"/v1/accounts/%s" },
+            "_expandable":{"contracts":"contracts", "keys":"keys"}%s
+			}`, account.Address, account.Address, metadataSection)
 }
 
-func getAccountRequest(t *testing.T, account *flow.Account, height string, expandFields ...string) *http.Request {
-	req, err := http.NewRequest("GET", accountURL(t, account.Address.String(), height), nil)
+func getAccountRequest(
+	t *testing.T,
+	account *flow.Account,
+	height string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
+	expandFields ...string) *http.Request {
+	req, err := http.NewRequest("GET", accountURL(t, account.Address.String(), height, agreeingExecutorsCount, requiredExecutors, includeExecutorMetadata), nil)
 	if len(expandFields) > 0 {
 		fieldParam := strings.Join(expandFields, ",")
 		q := req.URL.Query()
@@ -178,8 +234,30 @@ func getAccountRequest(t *testing.T, account *flow.Account, height string, expan
 	return req
 }
 
-func accountFixture(t *testing.T) *flow.Account {
-	account, err := unittest.AccountFixture()
+func accountURL(
+	t *testing.T,
+	address string,
+	height string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string) string {
+	u, err := url.ParseRequestURI(fmt.Sprintf("/v1/accounts/%s", address))
 	require.NoError(t, err)
-	return account
+	q := u.Query()
+
+	if height != "" {
+		q.Add("block_height", height)
+	}
+	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+
+	if len(requiredExecutors) > 0 {
+		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	}
+
+	if len(includeExecutorMetadata) > 0 {
+		q.Add(router.IncludeExecutorMetadataQueryParam, includeExecutorMetadata)
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String()
 }

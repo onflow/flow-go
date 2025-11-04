@@ -32,7 +32,9 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
 	t.Run("get key by address and index at latest sealed block", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 		var keyIndex uint32 = 0
@@ -53,7 +55,8 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 	})
 
 	t.Run("get key by address and index at latest finalized block", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 		var keyIndex uint32 = 0
@@ -75,7 +78,8 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 
 	t.Run("get key by address and index at height", func(t *testing.T) {
 		var height uint64 = 100
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
 		req := getAccountKeyByIndexRequest(t, account, "0", fmt.Sprintf("%d", height), "2", []string{}, "false")
 
 		var keyIndex uint32 = 0
@@ -90,7 +94,8 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 	})
 
 	t.Run("get key by address and index with executor metadata included", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
 		var height uint64 = 100
 		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
