@@ -115,6 +115,8 @@ var (
 	scheduledTransactionExecutorAddressTestnet = flow.HexToAddress("") // todo define the address
 	// scheduledTransactionExecutorAddressMainnet is the address of the Scheduled Transaction Executor contract on Mainnet
 	scheduledTransactionExecutorAddressMainnet = flow.HexToAddress("") // todo define the address
+	// scheduledTransactionExecutorAddressEmulator is the address of the Scheduled Transaction Executor contract on Emulator
+	scheduledTransactionExecutorAddressEmulator = flow.HexToAddress("f8d6e0586b0a20c7")
 
 	// executionParametersAddressTestnet is the address of the Execution Parameters contract on Testnet
 	executionParametersAddressTestnet = flow.HexToAddress("6997a2f2cf57b73a")
@@ -377,6 +379,8 @@ func init() {
 			return scheduledTransactionExecutorAddressMainnet
 		case flow.Testnet:
 			return scheduledTransactionExecutorAddressTestnet
+		case flow.Emulator:
+			return scheduledTransactionExecutorAddressEmulator
 		default:
 			return nthAddressFunc(ScheduledTransactionExecutorAccountIndex)(chain)
 		}
