@@ -212,10 +212,14 @@ func (s *Syncer) requestMissingCollections(ctx context.Context, forceSendRequest
 		return fmt.Errorf("failed to get finalized block: %w", err)
 	}
 
+	if lastFullBlockHeight >= lastFinalizedBlock.Height {
+		return nil
+	}
+
 	// only send requests if we are sufficiently behind the latest finalized block to avoid spamming
 	// collection nodes with requests.
 	shouldSendRequestsToNetwork := forceSendRequests
-	if lastFullBlockHeight < lastFinalizedBlock.Height && (lastFinalizedBlock.Height-lastFullBlockHeight >= s.missingCollectionRequestThreshold) {
+	if lastFinalizedBlock.Height-lastFullBlockHeight >= s.missingCollectionRequestThreshold {
 		shouldSendRequestsToNetwork = true
 	}
 
