@@ -547,7 +547,7 @@ func (s *Suite) TestCollectionSyncing() {
 	// wait until the finalized block jobqueue completes processing the block
 	require.Eventually(s.T(), func() bool {
 		return eng.finalizedBlockConsumer.LastProcessedIndex() == block.Height
-	}, 2*time.Second, 100*time.Millisecond, "finalized block processor never processed block")
+	}, 2*time.Second, 10*time.Millisecond, "finalized block processor never processed block")
 
 	// all requests should be sent after the finalized block processor completes processing the block.
 	// The requester engine calls the syncer's OnCollectionDownloaded callback for each response.
