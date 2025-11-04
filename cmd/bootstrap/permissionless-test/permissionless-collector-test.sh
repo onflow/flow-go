@@ -5,14 +5,8 @@
 # The test can be run using either local or GCP bucket vote transport. To test GCP bucket transport, set the `bucket` and `token` variables below.
 # To run this test, you must have `jq` and `gsutil` installed.
 
-# exit early if anything fails
-set -e
-# avoid overwriting existing files or using data from a previous run
-if [ "$(ls | wc -l)" -gt 1 ]
-then
-  echo "Found files in $(pwd), please clean up after previous runs"
-  exit 1
-fi
+bucket=
+token=
 
 bootstrapcmd="go run .."
 transitcmd="go run ../transit"
@@ -24,10 +18,16 @@ partner_dir="./public-root-information"
 # keygen dir must not exist yet, or be empty
 keygen_dir="./keygen"
 
-bucket=
-token=
-
 clusterCount=2
+
+# exit early if anything fails
+set -e
+# avoid overwriting existing files or using data from a previous run
+if [ "$(ls | wc -l)" -gt 1 ]
+then
+  echo "Found files in $(pwd), please clean up after previous runs"
+  exit 1
+fi
 
 $bootstrapcmd genconfig --address-format "%s%d.example.com:3569" \
     --access 2 --collection 7 --consensus 3 --execution 2 --verification 1 --weight 100 \
