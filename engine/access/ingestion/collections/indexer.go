@@ -34,17 +34,18 @@ type CollectionIndexer interface {
 	// This method is non-blocking.
 	OnCollectionReceived(collection *flow.Collection)
 
+	// IndexCollections indexes a set of collections, skipping any collections which already exist in storage.
+	// Calling this method multiple times with the same collections is a no-op.
+	//
+	// No error returns are expected during normal operation.
+	IndexCollections(collections []*flow.Collection) error
+
 	// MissingCollectionsAtHeight returns all collections that are not present in storage for a specific
 	// finalized block height.
 	//
 	// Expected error returns during normal operation:
 	//   - [storage.ErrNotFound]: if provided block height is not finalized or below this node's root block
 	MissingCollectionsAtHeight(height uint64) ([]*flow.CollectionGuarantee, error)
-
-	// IsCollectionInStorage checks whether the given collection is present in local storage.
-	//
-	// No error returns are expected during normal operation.
-	IsCollectionInStorage(collectionID flow.Identifier) (bool, error)
 }
 
 // Indexer stores and indexes collections received from the network. It is designed to be the central
@@ -56,10 +57,11 @@ type CollectionIndexer interface {
 // The indexer also maintains the last full block height state, which is the highest block height
 // for which all collections are stored and indexed.
 type Indexer struct {
-	log         zerolog.Logger
-	metrics     module.CollectionExecutedMetric
-	lockManager lockctx.Manager
+	log     zerolog.Logger
+	metrics module.CollectionExecutedMetric
 
+	db                  storage.DB
+	lockManager         lockctx.Manager
 	state               protocol.State
 	blocks              storage.Blocks
 	collections         storage.Collections
@@ -74,6 +76,7 @@ type Indexer struct {
 // No error returns are expected during normal operation.
 func NewIndexer(
 	log zerolog.Logger,
+	db storage.DB,
 	metrics module.CollectionExecutedMetric,
 	state protocol.State,
 	blocks storage.Blocks,
@@ -91,6 +94,7 @@ func NewIndexer(
 	return &Indexer{
 		log:                        log.With().Str("component", "collection-indexer").Logger(),
 		metrics:                    metrics,
+		db:                         db,
 		lockManager:                lockManager,
 		state:                      state,
 		blocks:                     blocks,
@@ -136,7 +140,7 @@ func (ci *Indexer) WorkerLoop(ctx irrecoverable.SignalerContext, ready component
 					return
 				}
 
-				if err := ci.indexCollection(collection); err != nil {
+				if err := ci.IndexCollections([]*flow.Collection{collection}); err != nil {
 					ctx.Throw(fmt.Errorf("error indexing collection: %w", err))
 					return
 				}
@@ -158,11 +162,11 @@ func (ci *Indexer) OnCollectionReceived(collection *flow.Collection) {
 	ci.pendingCollectionsNotifier.Notify()
 }
 
-// indexCollection indexes a collection and its transactions.
-// Skips indexing and returns without an error if the collection is already indexed.
+// IndexCollections indexes a set of collections, skipping any collections which already exist in storage.
+// Calling this method multiple times with the same collections is a no-op.
 //
 // No error returns are expected during normal operation.
-func (ci *Indexer) indexCollection(collection *flow.Collection) error {
+func (ci *Indexer) IndexCollections(collections []*flow.Collection) error {
 	// skip indexing if collection is already indexed. on the common path, collections may be received
 	// via multiple subsystems (e.g. execution data sync, collection sync, execution state indexer).
 	// In this case, the indexer will be notified multiple times for the same collection. Only the
@@ -170,30 +174,36 @@ func (ci *Indexer) indexCollection(collection *flow.Collection) error {
 	//
 	// It's OK that this check is not done atomically with the index operation since the collections
 	// storage module is solely responsible for enforcing consistency (even if this is a stale read).
-	exists, err := ci.IsCollectionInStorage(collection.ID())
-	if err != nil {
-		return fmt.Errorf("failed to check if collection is in storage: %w", err)
+	newCollections := make([]*flow.Collection, 0)
+	for _, collection := range collections {
+		exists, err := ci.isCollectionInStorage(collection.ID())
+		if err != nil {
+			return fmt.Errorf("failed to check if collection is in storage: %w", err)
+		}
+		if !exists {
+			newCollections = append(newCollections, collection)
+		}
 	}
-	if exists {
+
+	if len(newCollections) == 0 {
 		return nil
 	}
 
-	lctx := ci.lockManager.NewContext()
-	defer lctx.Release()
-	err = lctx.AcquireLock(storage.LockInsertCollection)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for indexing collections: %w", err)
-	}
+	return storage.WithLock(ci.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+		return ci.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			for _, collection := range newCollections {
+				// store the collection, including constituent transactions, and index transactionID -> collectionID
+				light, err := ci.collections.BatchStoreAndIndexByTransaction(lctx, collection, rw)
+				if err != nil {
+					return fmt.Errorf("failed to store collection: %w", err)
+				}
 
-	// store the collection, including constituent transactions, and index transactionID -> collectionID
-	light, err := ci.collections.StoreAndIndexByTransaction(lctx, collection)
-	if err != nil {
-		return fmt.Errorf("failed to store collection: %w", err)
-	}
-
-	ci.metrics.CollectionFinalized(light)
-	ci.metrics.CollectionExecuted(light)
-	return nil
+				ci.metrics.CollectionFinalized(light)
+				ci.metrics.CollectionExecuted(light)
+			}
+			return nil
+		})
+	})
 }
 
 // updateLastFullBlockHeight updates the LastFullBlockHeight index (if it has changed).
@@ -254,7 +264,7 @@ func (ci *Indexer) MissingCollectionsAtHeight(height uint64) ([]*flow.Collection
 
 	var missingCollections []*flow.CollectionGuarantee
 	for _, guarantee := range block.Payload.Guarantees {
-		inStorage, err := ci.IsCollectionInStorage(guarantee.CollectionID)
+		inStorage, err := ci.isCollectionInStorage(guarantee.CollectionID)
 		if err != nil {
 			return nil, err
 		}
@@ -267,10 +277,10 @@ func (ci *Indexer) MissingCollectionsAtHeight(height uint64) ([]*flow.Collection
 	return missingCollections, nil
 }
 
-// IsCollectionInStorage checks whether the given collection is present in local storage.
+// isCollectionInStorage checks whether the given collection is present in local storage.
 //
 // No error returns are expected during normal operation.
-func (ci *Indexer) IsCollectionInStorage(collectionID flow.Identifier) (bool, error) {
+func (ci *Indexer) isCollectionInStorage(collectionID flow.Identifier) (bool, error) {
 	_, err := ci.collections.LightByID(collectionID)
 	if err == nil {
 		return true, nil
