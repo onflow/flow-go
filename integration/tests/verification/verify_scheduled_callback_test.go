@@ -44,7 +44,7 @@ func (s *VerifyScheduledTransactionsSuite) TestVerifyScheduledTransactions() {
 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
 	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not schedule callback transaction")
-	s.T().Logf("scheduled callback with ID: %d", callbackID)
+	s.T().Logf("scheduled transaction with ID: %d", callbackID)
 
 	// wait for block that executed the scheduled callbacks to be sealed (plus some buffer)
 	var sealedBlock *flow.Block

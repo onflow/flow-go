@@ -1322,9 +1322,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
 		flags.BoolVar(&builder.scheduledTransactionsEnabled,
-			"scheduled-callbacks-enabled",
+			"scheduled-transactions-enabled",
 			defaultConfig.scheduledTransactionsEnabled,
-			"whether to include scheduled callback transactions in system collections.")
+			"whether to include scheduled transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",

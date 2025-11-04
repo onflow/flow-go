@@ -344,8 +344,8 @@ func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Log
 	}
 }
 
-// ScheduleCallbackAtTimestamp sends a test transaction to schedule a callback on FlowTransactionScheduler
-// at a given timestamp and returns the scheduled callback ID.
+// ScheduleCallbackAtTimestamp sends a test transaction to schedule a transaction on FlowTransactionScheduler
+// at a given timestamp and returns the scheduled transaction ID.
 func ScheduleCallbackAtTimestamp(
 	timestamp int64,
 	client *testnet.Client,
@@ -491,7 +491,7 @@ func ExtractCallbackIDFromEvents(result *sdk.TransactionResult) uint64 {
 	return 0
 }
 
-// DeployScheduledTransactionsTestContract deploys the test contract for scheduled callbacks.
+// DeployScheduledTransactionsTestContract deploys the test contract for scheduled transactions.
 func DeployScheduledTransactionsTestContract(
 	client *testnet.Client,
 	sc *systemcontracts.SystemContracts,

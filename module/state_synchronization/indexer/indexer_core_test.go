@@ -584,7 +584,7 @@ func TestCollectScheduledTransactions(t *testing.T) {
 	t.Run("incorrect number of results", func(t *testing.T) {
 		invalidSystemResults := append(systemResults, g.LightTransactionResults().Fixture())
 		actual, err := collectScheduledTransactions(fvmEnv, chainID, invalidSystemResults, pendingExecutionEvents)
-		require.ErrorContains(t, err, "system chunk contained 8 results, but found 5 scheduled callbacks")
+		require.ErrorContains(t, err, "system chunk contained 8 results, but found 5 scheduled transactions")
 		require.Nil(t, actual)
 	})
 

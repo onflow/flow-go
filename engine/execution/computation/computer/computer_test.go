@@ -1451,7 +1451,7 @@ func testScheduledTransactionsWithError(
 	testLogger := NewTestLogger()
 
 	execCtx := fvm.NewContext(
-		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
+		fvm.WithScheduledTransactionsEnabled(true), // Enable scheduled transactions
 		fvm.WithChain(chain),
 		fvm.WithLogger(testLogger.Logger),
 	)
@@ -1562,9 +1562,9 @@ func testScheduledTransactionsWithError(
 		Return(nil).
 		Times(1)
 
-	// expect callback execution metrics if there are callbacks
+	// expect scheduled transaction execution metrics if there are scheduled transactions
 	if len(callbackEvents) > 0 {
-		exemetrics.On("ExecutionCallbacksExecuted",
+		exemetrics.On("ExecutionScheduledTransactionsExecuted",
 			mock.Anything,
 			mock.Anything,
 			mock.Anything).

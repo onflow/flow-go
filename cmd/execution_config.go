@@ -145,7 +145,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
-	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "enable execution of scheduled callbacks")
+	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-transactions-enabled", fvm.DefaultScheduledTransactionsEnabled, "enable execution of scheduled transactions")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
 	var deprecatedEnableNewIngestionEngine bool
 	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")

@@ -1187,10 +1187,10 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 	// is enough time to submit the tx even on slower CI machines.
 	futureTimestamp := time.Now().Unix() + int64(10)
 
-	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	s.T().Logf("scheduling transaction at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
 	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, accessClient, sc)
-	require.NoError(s.T(), err, "could not schedule callback transaction")
-	s.T().Logf("scheduled callback with ID: %d", callbackID)
+	require.NoError(s.T(), err, "could not schedule transaction")
+	s.T().Logf("scheduled transaction with ID: %d", callbackID)
 
 	// construct the pending execution event using the parameters used by ScheduleCallbackAtTimestamp
 	g := fixtures.NewGeneratorSuite()
