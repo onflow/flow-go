@@ -89,7 +89,7 @@ func NewAccountKeys(
 	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) AccountKeys {
-	keys := make([]AccountPublicKey, 0, len(accountKeys))
+	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
 		keys[i] = NewAccountPublicKey(k, metadata, shouldIncludeMetadata)
 	}
@@ -104,7 +104,7 @@ func NewAccountPublicKeys(
 	metadata *access.ExecutorMetadata,
 	shouldIncludeMetadata bool,
 ) AccountPublicKeys {
-	keys := make([]AccountPublicKey, 0, len(accountKeys))
+	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
 		keys[i] = NewAccountPublicKey(k, metadata, shouldIncludeMetadata)
 	}

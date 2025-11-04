@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestGetAccountBalance tests local getAccountBalance request.
+// TestGetAccountBalance tests local GetAccountBalance request.
 //
 // Test cases:
 // 1. Get account balance by address at latest sealed block.
@@ -68,7 +68,7 @@ func TestGetAccountBalance(t *testing.T) {
 
 	t.Run("get balance by address at height", func(t *testing.T) {
 		account := accountFixture(t)
-		var height uint64 = 1337
+		var height uint64 = 100
 		req := getAccountBalanceRequest(t, account, fmt.Sprintf("%d", height), "1", []string{}, "false")
 
 		backend.On("GetAccountBalanceAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
@@ -104,7 +104,7 @@ func TestGetAccountBalance(t *testing.T) {
 	})
 }
 
-// TestGetAccountBalanceErrors verifies that the getAccountBalance endpoint
+// TestGetAccountBalanceErrors verifies that the GetAccountBalance endpoint
 // correctly returns appropriate HTTP error codes and messages in various failure scenarios.
 //
 // Test cases:
@@ -123,7 +123,7 @@ func TestGetAccountBalanceErrors(t *testing.T) {
 	}{
 		{
 			name:   "invalid account address",
-			url:    accountBalanceURL(t, "123", "", "2", []string{}, "true"),
+			url:    accountBalanceURL(t, "123", "", "2", []string{}, "false"),
 			setup:  func() {},
 			status: http.StatusBadRequest,
 			out:    `{"code":400, "message":"invalid address"}`,
@@ -215,32 +215,37 @@ func getAccountBalanceRequest(
 // If metadata is provided, it includes the executor metadata fields nested
 // under "metadata.executor_metadata", matching the actual API structure.
 func expectedAccountBalanceResponse(account *flow.Account, metadata *access.ExecutorMetadata) string {
-	if metadata != nil {
-		executorIDs := make([]string, len(metadata.ExecutorIDs))
-		for i, id := range metadata.ExecutorIDs {
-			executorIDs[i] = fmt.Sprintf(`"%s"`, id)
-		}
-
-		return fmt.Sprintf(`
-      {
-        "balance":"%d",
-        "metadata": {
-          "executor_metadata": {
-            "execution_result_id": "%s",
-            "executor_ids": [%s]
-          }
-        }
-      }`,
-			account.Balance,
-			metadata.ExecutionResultID,
-			strings.Join(executorIDs, ", "),
-		)
-	}
+	metadataSection := expectedMetadata(metadata)
 
 	return fmt.Sprintf(`
       {
-        "balance":"%d"
+        "balance": "%d"%s
       }`,
 		account.Balance,
+		metadataSection,
+	)
+}
+
+// expectedMetadata returns a formatted JSON string for executor metadata,
+// or an empty string if metadata is nil.
+func expectedMetadata(metadata *access.ExecutorMetadata) string {
+	if metadata == nil {
+		return ""
+	}
+
+	executors := make([]string, len(metadata.ExecutorIDs))
+	for i, id := range metadata.ExecutorIDs {
+		executors[i] = fmt.Sprintf(`"%s"`, id)
+	}
+
+	return fmt.Sprintf(`,
+		"metadata": {
+			"executor_metadata": {
+				"execution_result_id": "%s",
+				"executor_ids": [%s]
+			}
+		}`,
+		metadata.ExecutionResultID,
+		strings.Join(executors, ","),
 	)
 }
