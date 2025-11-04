@@ -1454,6 +1454,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
 			collectionIndexer, err := collections.NewIndexer(
 				builder.Logger,
+				builder.ProtocolDB,
 				collectionExecutedMetric,
 				builder.State,
 				builder.Storage.Blocks,
