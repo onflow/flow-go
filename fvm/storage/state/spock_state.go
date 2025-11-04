@@ -140,27 +140,31 @@ func (state *spockState) Get(
 		return nil, fmt.Errorf("cannot Get on a finalized state")
 	}
 
-	_, err := state.spockSecretHasher.Write(getMarker)
-	if err != nil {
-		return nil, fmt.Errorf("get SPoCK failed: %w", err)
-	}
+	// NOTE: commented out for the sole purpose of allowing us to compare the execution results
+	// of the VM and interpreter. The VM produces the same writes, but in some cases fewer reads.
+	// This should NEVER be used in production!
 
-	idBytes := id.Bytes()
-
-	// Note: encoding the register id length as part of spock hash to prevent
-	// string injection attacks.
-	err = binary.Write(
-		state.spockSecretHasher,
-		binary.LittleEndian,
-		int32(len(idBytes)))
-	if err != nil {
-		return nil, fmt.Errorf("get SPoCK failed: %w", err)
-	}
-
-	_, err = state.spockSecretHasher.Write(idBytes)
-	if err != nil {
-		return nil, fmt.Errorf("get SPoCK failed: %w", err)
-	}
+	//_, err := state.spockSecretHasher.Write(getMarker)
+	//if err != nil {
+	//	return nil, fmt.Errorf("get SPoCK failed: %w", err)
+	//}
+	//
+	//idBytes := id.Bytes()
+	//
+	//// Note: encoding the register id length as part of spock hash to prevent
+	//// string injection attacks.
+	//err = binary.Write(
+	//	state.spockSecretHasher,
+	//	binary.LittleEndian,
+	//	int32(len(idBytes)))
+	//if err != nil {
+	//	return nil, fmt.Errorf("get SPoCK failed: %w", err)
+	//}
+	//
+	//_, err = state.spockSecretHasher.Write(idBytes)
+	//if err != nil {
+	//	return nil, fmt.Errorf("get SPoCK failed: %w", err)
+	//}
 
 	return state.storageState.Get(id)
 }
