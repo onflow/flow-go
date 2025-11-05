@@ -10,6 +10,8 @@ type StrictMonotonicCounter struct {
 	atomicCounter uint64
 }
 
+var _ Reader = (*StrictMonotonicCounter)(nil)
+
 // NewMonotonicCounter creates new counter with initial value
 func NewMonotonicCounter(initialValue uint64) StrictMonotonicCounter {
 	return StrictMonotonicCounter{

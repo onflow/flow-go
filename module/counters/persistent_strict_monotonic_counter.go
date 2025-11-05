@@ -20,6 +20,8 @@ type PersistentStrictMonotonicCounter struct {
 	counter StrictMonotonicCounter
 }
 
+var _ Reader = (*PersistentStrictMonotonicCounter)(nil)
+
 // NewPersistentStrictMonotonicCounter creates a new PersistentStrictMonotonicCounter.
 // The consumer progress and associated db entry must not be accessed outside of calls to the returned object,
 // otherwise the state may become inconsistent.

@@ -192,6 +192,7 @@ func (s *scriptTestSuite) SetupTest() {
 		flow.Testnet,
 		derivedChainData,
 		nil,
+		nil,
 		lockManager,
 	)
 

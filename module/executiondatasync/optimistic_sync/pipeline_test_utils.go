@@ -2,6 +2,7 @@ package optimistic_sync
 
 import (
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -115,4 +116,16 @@ func createPipeline(t *testing.T) (*PipelineImpl, *osmock.Core, <-chan State, *m
 	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver)
 
 	return pipeline, mockCore, stateReceiver.updateChan, parent
+}
+
+// synctestWaitForStateUpdates waits for a sequence of state updates to occur using synctest.Wait.
+// updates must be received in the correct order or the test will fail.
+// TODO: refactor all tests to use the synctest approach.
+func synctestWaitForStateUpdates(t *testing.T, updateChan <-chan State, expectedStates ...State) {
+	for _, expected := range expectedStates {
+		synctest.Wait()
+		update, ok := <-updateChan
+		require.True(t, ok, "update channel closed unexpectedly")
+		assert.Equalf(t, expected, update, "expected pipeline to transition to %s, but got %s", expected, update)
+	}
 }

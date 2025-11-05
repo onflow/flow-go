@@ -68,6 +68,31 @@ type BlockExecutionData struct {
 	ChunkExecutionDatas []*ChunkExecutionData
 }
 
+// StandardChunks returns all standard (non-system) chunks for the block.
+func (bd *BlockExecutionData) StandardChunks() []*ChunkExecutionData {
+	return bd.ChunkExecutionDatas[:len(bd.ChunkExecutionDatas)-1]
+}
+
+// StandardCollections returns all standard (non-system) collections for the block.
+func (bd *BlockExecutionData) StandardCollections() []*flow.Collection {
+	standardChunks := bd.StandardChunks()
+	collections := make([]*flow.Collection, len(standardChunks))
+	for i, chunk := range standardChunks {
+		collections[i] = chunk.Collection
+	}
+	return collections
+}
+
+// SystemChunk returns the system chunk for the block.
+func (bd *BlockExecutionData) SystemChunk() *ChunkExecutionData {
+	return bd.ChunkExecutionDatas[len(bd.ChunkExecutionDatas)-1]
+}
+
+// SystemCollection returns the system collection for the block.
+func (bd *BlockExecutionData) SystemCollection() *flow.Collection {
+	return bd.SystemChunk().Collection
+}
+
 // ConvertTransactionResults converts a list of flow.TransactionResults into a list of
 // flow.LightTransactionResults to be included in a ChunkExecutionData.
 func ConvertTransactionResults(results flow.TransactionResults) []flow.LightTransactionResult {
