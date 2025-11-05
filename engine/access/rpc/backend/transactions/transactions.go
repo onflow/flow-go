@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -48,7 +47,6 @@ type Transactions struct {
 	historicalAccessNodeClients []accessproto.AccessAPIClient
 	nodeCommunicator            node_communicator.Communicator
 	connectionFactory           connection.ConnectionFactory
-	retrier                     retrier.Retrier
 
 	// Storages
 	blocks                storage.Blocks
@@ -115,19 +113,6 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		scheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
 	}
 
-	if params.EnableRetries {
-		txs.retrier = retrier.NewRetrier(
-			params.Log,
-			params.State,
-			params.Blocks,
-			params.Collections,
-			txs,
-			params.TxStatusDeriver,
-		)
-	} else {
-		txs.retrier = retrier.NewNoopRetrier()
-	}
-
 	return txs, nil
 }
 
@@ -154,8 +139,6 @@ func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.Transaction
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
-
-	go t.registerTransactionForRetry(tx)
 
 	return nil
 }
@@ -901,17 +884,4 @@ func (t *Transactions) lookupCollectionIDByBlockAndTxIndex(block *flow.Block, in
 
 	// otherwise, assume it's a system transaction and return the ZeroID
 	return flow.ZeroID, nil
-}
-
-func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
-	t.retrier.RegisterTransaction(tx)
-}
-
-// ATTENTION: might be a source of problems in future. We run this code on finalization gorotuine,
-// potentially lagging finalization events if operations take long time.
-// We might need to move this logic on dedicated goroutine and provide a way to skip finalization events if they are delivered
-// too often for this engine. An example of similar approach - https://github.com/onflow/flow-go/blob/10b0fcbf7e2031674c00f3cdd280f27bd1b16c47/engine/common/follower/compliance_engine.go#L201..
-// No errors expected during normal operations.
-func (t *Transactions) ProcessFinalizedBlockHeight(height uint64) error {
-	return t.retrier.Retry(height)
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -30,6 +31,7 @@ type IndexerCore struct {
 	fvmEnv                   templates.Environment
 	metrics                  module.ExecutionStateIndexerMetrics
 	collectionExecutedMetric module.CollectionExecutedMetric
+	collectionIndexer        collections.CollectionIndexer
 
 	registers             storage.RegisterIndex
 	headers               storage.Headers
@@ -61,6 +63,7 @@ func New(
 	scheduledTransactions storage.ScheduledTransactions,
 	chainID flow.ChainID,
 	derivedChainData *derived.DerivedChainData,
+	collectionIndexer collections.CollectionIndexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
 ) *IndexerCore {
@@ -90,6 +93,7 @@ func New(
 		serviceAddress:        chainID.Chain().ServiceAddress(),
 		derivedChainData:      derivedChainData,
 
+		collectionIndexer:        collectionIndexer,
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
 	}
@@ -218,19 +222,18 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	g.Go(func() error {
 		start := time.Now()
 
-		// index all collections except the system chunk
 		// Note: the access ingestion engine also indexes collections, starting when the block is
 		// finalized. This process can fall behind due to the node being offline, resource issues
 		// or network congestion. This indexer ensures that collections are never farther behind
 		// than the latest indexed block. Calling the collection handler with a collection that
 		// has already been indexed is a noop.
+
+		// index all collections except the system chunk. if there is only a single chunk, it is the
+		// system chunk and can be skipped.
 		indexedCount := 0
-		if len(data.ChunkExecutionDatas) > 0 {
+		if len(data.ChunkExecutionDatas) > 1 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				err := c.indexCollection(chunk.Collection)
-				if err != nil {
-					return err
-				}
+				c.collectionIndexer.OnCollectionReceived(chunk.Collection)
 				indexedCount++
 			}
 		}
@@ -449,44 +452,4 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	}
 
 	return c.registers.Store(regEntries, height)
-}
-
-func (c *IndexerCore) indexCollection(collection *flow.Collection) error {
-	lctx := c.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for indexing collections: %w", err)
-	}
-
-	err = IndexCollection(lctx, collection, c.collections, c.log, c.collectionExecutedMetric)
-	if err != nil {
-		return fmt.Errorf("could not handle collection")
-	}
-	return nil
-}
-
-// IndexCollection handles the response of the collection request made earlier when a block was received.
-//
-// No error returns are expected during normal operations.
-func IndexCollection(
-	lctx lockctx.Proof,
-	collection *flow.Collection,
-	collections storage.Collections,
-	logger zerolog.Logger,
-	collectionExecutedMetric module.CollectionExecutedMetric,
-) error {
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// store the collection, including constituent transactions, and index transactionID -> collectionID
-	light, err := collections.StoreAndIndexByTransaction(lctx, collection)
-	if err != nil {
-		return err
-	}
-
-	collectionExecutedMetric.CollectionFinalized(light)
-	collectionExecutedMetric.CollectionExecuted(light)
-	return nil
 }

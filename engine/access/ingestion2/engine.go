@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -35,7 +36,7 @@ type Engine struct {
 	log zerolog.Logger
 
 	finalizedBlockProcessor *FinalizedBlockProcessor
-	collectionSyncer        *CollectionSyncer
+	collectionSyncer        *collections.Syncer
 
 	messageHandler           *engine.MessageHandler
 	executionReceiptsQueue   *engine.FifoMessageStore
@@ -49,7 +50,7 @@ func New(
 	log zerolog.Logger,
 	net network.EngineRegistry,
 	finalizedBlockProcessor *FinalizedBlockProcessor,
-	collectionSyncer *CollectionSyncer,
+	collectionSyncer *collections.Syncer,
 	receipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
@@ -85,7 +86,7 @@ func New(
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.messageHandlerLoop).
 		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
-		AddWorker(e.collectionSyncer.StartWorkerLoop)
+		AddWorker(e.collectionSyncer.WorkerLoop)
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel
