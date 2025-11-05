@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -38,9 +39,6 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 // It returns [storage.ErrDataMismatch] if there is already an indexed result for the given blockID,
 // but it is different from the given resultID.
 func IndexTrustedExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error {
-	// during bootstrapping, we index the sealed root block or the spork root block, which is not
-	// produced by the node itself, but we still need to index its execution result to be able to
-	// execute next block
 	if !lctx.HoldsLock(storage.LockIndexExecutionResult) {
 		return fmt.Errorf("missing require locks: %s", storage.LockIndexExecutionResult)
 	}
@@ -55,7 +53,7 @@ func IndexTrustedExecutionResult(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 		}
 		// if the result is the same, we don't need to index it again
 		return nil
-	} else if err != storage.ErrNotFound {
+	} else if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not check if execution result exists: %w", err)
 	}
 

@@ -29,21 +29,19 @@ var _ cluster.State = (*State)(nil)
 // The genesis block must have height 0, a parent hash of 32 zero bytes,
 // and an empty collection as payload.
 func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot) (*State, error) {
-	var state *State
+	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
+	}
+	if isBootstrapped {
+		return nil, fmt.Errorf("expected empty cluster state for cluster ID %s", stateRoot.ClusterID())
+	}
+	state := newState(db, stateRoot.ClusterID(), stateRoot.EpochCounter())
 
-	err := storage.WithLocks(lockManager, storage.LockGroupCollectionBootstrapClusterState, func(lctx lockctx.Context) error {
-		isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
-		if err != nil {
-			return fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
-		}
-		if isBootstrapped {
-			return fmt.Errorf("expected empty cluster state for cluster ID %s", stateRoot.ClusterID())
-		}
-		state = newState(db, stateRoot.ClusterID(), stateRoot.EpochCounter())
+	genesis := stateRoot.Block()
+	rootQC := stateRoot.QC()
 
-		genesis := stateRoot.Block()
-		rootQC := stateRoot.QC()
-
+	err = storage.WithLocks(lockManager, storage.LockGroupCollectionBootstrapClusterState, func(lctx lockctx.Context) error {
 		// bootstrap cluster state
 		return state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			chainID := genesis.ChainID

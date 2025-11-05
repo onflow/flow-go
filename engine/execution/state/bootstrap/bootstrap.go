@@ -106,6 +106,9 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 				return fmt.Errorf("could not index initial genesis execution block: %w", err)
 			}
 
+			// during bootstrapping, we index the sealed root block or the spork root block, which is not
+			// produced by the node itself, but we still need to index its execution result to be able to
+			// execute next block
 			err = operation.IndexTrustedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
 			if err != nil {
 				return fmt.Errorf("could not index result for root result: %w", err)

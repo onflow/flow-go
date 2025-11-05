@@ -139,9 +139,6 @@ func Bootstrap(
 	// TAIL <- ... <- HEAD
 	// Per definition, the highest block in the sealing segment is the last finalized block.
 	// (The lowest block in sealing segment is the last sealed block, but we don't use that here.)
-	lastFinalized := segment.Finalized() // highest block in sealing segment; finalized by protocol convention
-
-	var state *State
 
 	// Overview of ACQUIRED LOCKS:
 	//  * In a nutshell, the instance parameters describe how far back the node's local history reaches in comparison
@@ -157,28 +154,21 @@ func Bootstrap(
 		// bootstrap the sealing segment
 		// creating sealed root block with the rootResult
 		// creating finalized root block with lastFinalized
-		err = bootstrapSealingSegment(lctx, db, blocks, qcs, segment, lastFinalized, rootSeal)
+		err = bootstrapSealingSegment(lctx, db, blocks, qcs, segment, rootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// bootstrap dynamic protocol state
-			err = bootstrapProtocolState(lctx, rw, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
-			if err != nil {
-				return fmt.Errorf("could not bootstrap protocol state: %w", err)
-			}
-
-			// initialize version beacon
-			err = boostrapVersionBeacon(rw, root)
-			if err != nil {
-				return fmt.Errorf("could not bootstrap version beacon: %w", err)
-			}
-
-			return nil
-		})
+		// bootstrap dynamic protocol state
+		err = bootstrapProtocolState(lctx, db, segment, root.Params(), epochProtocolStateSnapshots, protocolKVStoreSnapshots, setups, commits, !config.SkipNetworkAddressValidation)
 		if err != nil {
-			return fmt.Errorf("bootstrapping failed: %w", err)
+			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+		}
+
+		// initialize version beacon
+		err = boostrapVersionBeacon(db, root)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
 		// CAUTION: INSERT FINALIZED HEIGHT must be LAST, because we use its existence in the database
@@ -192,22 +182,21 @@ func Bootstrap(
 		if isBootstrapped { // we haven't written the latest finalized height yet, so this value must be false
 			return fmt.Errorf("sanity check failed: while bootstrapping has not yet completed, the implementation already considers the protocol state as successfully bootstrapped")
 		}
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// initialize the current protocol state height/view pointers
-			return bootstrapStatePointers(lctx, rw, root)
-		})
+		// initialize the current protocol state height/view pointers
+		err = bootstrapStatePointers(lctx, db, root)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
 
-		state, err = OpenState(metrics, db, lockManager, headers, seals, results, blocks, qcs, setups, commits, epochProtocolStateSnapshots, protocolKVStoreSnapshots, versionBeacons)
-		if err != nil {
-			return fmt.Errorf("bootstrapping failed, because the resulting database state is rejected: %w", err)
-		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	state, err := OpenState(metrics, db, lockManager, headers, seals, results, blocks, qcs, setups, commits, epochProtocolStateSnapshots, protocolKVStoreSnapshots, versionBeacons)
+	if err != nil {
+		return nil, fmt.Errorf("bootstrapping failed, because the resulting database state is rejected: %w", err)
 	}
 	return state, nil
 }
@@ -223,7 +212,7 @@ func Bootstrap(
 // No error returns expected during normal operation.
 func bootstrapProtocolState(
 	lctx lockctx.Proof,
-	rw storage.ReaderBatchWriter,
+	db storage.DB,
 	segment *flow.SealingSegment,
 	params protocol.GlobalParams,
 	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
@@ -232,44 +221,46 @@ func bootstrapProtocolState(
 	epochCommits storage.EpochCommits,
 	verifyNetworkAddress bool,
 ) error {
-	// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
-	for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
-		// Store the protocol KV Store entry
-		err := protocolKVStoreSnapshots.BatchStore(rw, protocolStateID, &stateEntry.KVStore)
-		if err != nil {
-			return fmt.Errorf("could not store protocol state kvstore: %w", err)
+	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
+		for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
+			// Store the protocol KV Store entry
+			err := protocolKVStoreSnapshots.BatchStore(rw, protocolStateID, &stateEntry.KVStore)
+			if err != nil {
+				return fmt.Errorf("could not store protocol state kvstore: %w", err)
+			}
+
+			// Store the epoch portion of the protocol state, including underlying EpochSetup/EpochCommit service events
+			dynamicEpochProtocolState, err := inmem.NewEpochProtocolStateAdapter(
+				inmem.UntrustedEpochProtocolStateAdapter{
+					RichEpochStateEntry: stateEntry.EpochEntry,
+					Params:              params,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not construct epoch protocol state adapter: %w", err)
+			}
+			err = bootstrapEpochForProtocolStateEntry(rw, epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)
+			if err != nil {
+				return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)
+			}
 		}
 
-		// Store the epoch portion of the protocol state, including underlying EpochSetup/EpochCommit service events
-		dynamicEpochProtocolState, err := inmem.NewEpochProtocolStateAdapter(
-			inmem.UntrustedEpochProtocolStateAdapter{
-				RichEpochStateEntry: stateEntry.EpochEntry,
-				Params:              params,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("could not construct epoch protocol state adapter: %w", err)
+		for _, proposal := range segment.AllBlocks() {
+			blockID := proposal.Block.ID()
+			protocolStateEntryWrapper := segment.ProtocolStateEntries[proposal.Block.Payload.ProtocolStateID]
+			err := epochProtocolStateSnapshots.BatchIndex(lctx, rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
+			if err != nil {
+				return fmt.Errorf("could not index root protocol state: %w", err)
+			}
+			err = protocolKVStoreSnapshots.BatchIndex(lctx, rw, blockID, proposal.Block.Payload.ProtocolStateID)
+			if err != nil {
+				return fmt.Errorf("could not index root kv store: %w", err)
+			}
 		}
-		err = bootstrapEpochForProtocolStateEntry(rw, epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)
-		if err != nil {
-			return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)
-		}
-	}
 
-	for _, proposal := range segment.AllBlocks() {
-		blockID := proposal.Block.ID()
-		protocolStateEntryWrapper := segment.ProtocolStateEntries[proposal.Block.Payload.ProtocolStateID]
-		err := epochProtocolStateSnapshots.BatchIndex(lctx, rw, blockID, protocolStateEntryWrapper.EpochEntry.ID())
-		if err != nil {
-			return fmt.Errorf("could not index root protocol state: %w", err)
-		}
-		err = protocolKVStoreSnapshots.BatchIndex(lctx, rw, blockID, proposal.Block.Payload.ProtocolStateID)
-		if err != nil {
-			return fmt.Errorf("could not index root kv store: %w", err)
-		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the protocol state root
@@ -296,7 +287,6 @@ func bootstrapSealingSegment(
 	blocks storage.Blocks,
 	qcs storage.QuorumCertificates,
 	segment *flow.SealingSegment,
-	head *flow.Block,
 	rootSeal *flow.Seal,
 ) error {
 	// STEP 1: persist AUXILIARY EXECUTION RESULTS (should include the result sealed by segment.FirstSeal if that is not nil)
@@ -526,7 +516,7 @@ func bootstrapSealingSegment(
 // [storage.LockInsertBlock] and [storage.LockFinalizeBlock]
 //
 // No error returns expected during normal operation.
-func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
+func bootstrapStatePointers(lctx lockctx.Proof, db storage.DB, root protocol.Snapshot) error {
 	// sealing segment lists blocks in order of ascending height, so the tail
 	// is the oldest ancestor and head is the newest child in the segment
 	// TAIL <- ... <- HEAD
@@ -547,91 +537,93 @@ func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, ro
 		return fmt.Errorf("could not create versioned instance params: %w", err)
 	}
 
-	err = operation.InsertInstanceParams(lctx, rw, *enc)
-	if err != nil {
-		return fmt.Errorf("could not store instance params: %w", err)
-	}
+	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = operation.InsertInstanceParams(lctx, rw, *enc)
+		if err != nil {
+			return fmt.Errorf("could not store instance params: %w", err)
+		}
 
-	// find the finalized seal that seals the lastSealed block, meaning seal.BlockID == lastSealed.ID()
-	seal, err := segment.FinalizedSeal()
-	if err != nil {
-		return fmt.Errorf("could not get finalized seal from sealing segment: %w", err)
-	}
+		// find the finalized seal that seals the lastSealed block, meaning seal.BlockID == lastSealed.ID()
+		seal, err := segment.FinalizedSeal()
+		if err != nil {
+			return fmt.Errorf("could not get finalized seal from sealing segment: %w", err)
+		}
 
-	// Per convention, all blocks in the sealing segment must be finalized. Therefore, a QC must
-	// exist for the `lastFinalized` block in the sealing segment. The QC for `lastFinalized` should be
-	// contained in the `root` Snapshot and returned by `root.QuorumCertificate()`. Otherwise,
-	// the Snapshot is incomplete, because consensus nodes require this QC. To reduce the chance of
-	// accidental misconfiguration undermining consensus liveness, we do the following sanity checks:
-	//  * `qcForLatestFinalizedBlock` should not be nil
-	//  * `qcForLatestFinalizedBlock` should be for `lastFinalized` block, i.e. its view and blockID should match
-	qcForLatestFinalizedBlock, err := root.QuorumCertificate()
-	if err != nil {
-		return fmt.Errorf("failed to obtain QC for latest finalized block from root sanpshot: %w", err)
-	}
-	if qcForLatestFinalizedBlock == nil {
-		return fmt.Errorf("QC for latest finalized block in sealing segment cannot be nil")
-	}
-	if qcForLatestFinalizedBlock.BlockID != lastFinalized.ID() || qcForLatestFinalizedBlock.View != lastFinalized.View {
-		return fmt.Errorf("latest finalized block from sealing segment (id %v, view=%d) does not match the root snapshot's tailing QC (certifying block %v with view %d)",
-			lastFinalized.ID(), lastFinalized.View, qcForLatestFinalizedBlock.BlockID, qcForLatestFinalizedBlock.View)
-	}
+		// Per convention, all blocks in the sealing segment must be finalized. Therefore, a QC must
+		// exist for the `lastFinalized` block in the sealing segment. The QC for `lastFinalized` should be
+		// contained in the `root` Snapshot and returned by `root.QuorumCertificate()`. Otherwise,
+		// the Snapshot is incomplete, because consensus nodes require this QC. To reduce the chance of
+		// accidental misconfiguration undermining consensus liveness, we do the following sanity checks:
+		//  * `qcForLatestFinalizedBlock` should not be nil
+		//  * `qcForLatestFinalizedBlock` should be for `lastFinalized` block, i.e. its view and blockID should match
+		qcForLatestFinalizedBlock, err := root.QuorumCertificate()
+		if err != nil {
+			return fmt.Errorf("failed to obtain QC for latest finalized block from root sanpshot: %w", err)
+		}
+		if qcForLatestFinalizedBlock == nil {
+			return fmt.Errorf("QC for latest finalized block in sealing segment cannot be nil")
+		}
+		if qcForLatestFinalizedBlock.BlockID != lastFinalized.ID() || qcForLatestFinalizedBlock.View != lastFinalized.View {
+			return fmt.Errorf("latest finalized block from sealing segment (id %v, view=%d) does not match the root snapshot's tailing QC (certifying block %v with view %d)",
+				lastFinalized.ID(), lastFinalized.View, qcForLatestFinalizedBlock.BlockID, qcForLatestFinalizedBlock.View)
+		}
 
-	// By definition, the root block / genesis block is the block with the lowest height and view. In other words, the latest
-	// finalized block's view must be equal or greater than the view of the spork root block. We sanity check this relationship here:
-	sporkRootBlockView := root.Params().SporkRootBlockView()
-	if !(sporkRootBlockView <= lastFinalized.View) {
-		return fmt.Errorf("sealing segment is invalid, because the latest finalized block's view %d is lower than the spork root block's view %d", lastFinalized.View, sporkRootBlockView)
-	}
-	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      lastFinalized.View,
-		HighestAcknowledgedView: lastFinalized.View,
-	}
+		// By definition, the root block / genesis block is the block with the lowest height and view. In other words, the latest
+		// finalized block's view must be equal or greater than the view of the spork root block. We sanity check this relationship here:
+		sporkRootBlockView := root.Params().SporkRootBlockView()
+		if !(sporkRootBlockView <= lastFinalized.View) {
+			return fmt.Errorf("sealing segment is invalid, because the latest finalized block's view %d is lower than the spork root block's view %d", lastFinalized.View, sporkRootBlockView)
+		}
+		safetyData := &hotstuff.SafetyData{
+			LockedOneChainView:      lastFinalized.View,
+			HighestAcknowledgedView: lastFinalized.View,
+		}
 
-	// We are given a QC for the latest finalized block, which proves that the view of the latest finalized block has been completed.
-	// Hence, a freshly-bootstrapped consensus participant continues from the next view. Note that this guarantees that we are starting
-	// in a view strictly greater than the spork root block's view, which is important for safety and liveness.
-	livenessData := &hotstuff.LivenessData{
-		CurrentView: lastFinalized.View + 1,
-		NewestQC:    qcForLatestFinalizedBlock,
-	}
+		// We are given a QC for the latest finalized block, which proves that the view of the latest finalized block has been completed.
+		// Hence, a freshly-bootstrapped consensus participant continues from the next view. Note that this guarantees that we are starting
+		// in a view strictly greater than the spork root block's view, which is important for safety and liveness.
+		livenessData := &hotstuff.LivenessData{
+			CurrentView: lastFinalized.View + 1,
+			NewestQC:    qcForLatestFinalizedBlock,
+		}
 
-	// persist safety and liveness data plus the QuorumCertificate for the latest finalized block for HotStuff/Jolteon consensus
-	err = operation.UpsertSafetyData(lctx, rw, lastFinalized.ChainID, safetyData)
-	if err != nil {
-		return fmt.Errorf("could not insert safety data: %w", err)
-	}
-	err = operation.UpsertLivenessData(lctx, rw, lastFinalized.ChainID, livenessData)
-	if err != nil {
-		return fmt.Errorf("could not insert liveness data: %w", err)
-	}
-	err = operation.InsertQuorumCertificate(lctx, rw, qcForLatestFinalizedBlock)
-	if err != nil {
-		return fmt.Errorf("could not insert quorum certificate for the latest finalized block: %w", err)
-	}
+		// persist safety and liveness data plus the QuorumCertificate for the latest finalized block for HotStuff/Jolteon consensus
+		err = operation.UpsertSafetyData(lctx, rw, lastFinalized.ChainID, safetyData)
+		if err != nil {
+			return fmt.Errorf("could not insert safety data: %w", err)
+		}
+		err = operation.UpsertLivenessData(lctx, rw, lastFinalized.ChainID, livenessData)
+		if err != nil {
+			return fmt.Errorf("could not insert liveness data: %w", err)
+		}
+		err = operation.InsertQuorumCertificate(lctx, rw, qcForLatestFinalizedBlock)
+		if err != nil {
+			return fmt.Errorf("could not insert quorum certificate for the latest finalized block: %w", err)
+		}
 
-	w := rw.Writer()
-	// insert height pointers
-	err = operation.UpsertFinalizedHeight(lctx, w, lastFinalized.Height)
-	if err != nil {
-		return fmt.Errorf("could not insert finalized height: %w", err)
-	}
-	err = operation.UpsertSealedHeight(lctx, w, lastSealed.Height)
-	if err != nil {
-		return fmt.Errorf("could not insert sealed height: %w", err)
-	}
-	err = operation.IndexFinalizedSealByBlockID(w, seal.BlockID, seal.ID())
-	if err != nil {
-		return fmt.Errorf("could not index sealed block: %w", err)
-	}
+		w := rw.Writer()
+		// insert height pointers
+		err = operation.UpsertFinalizedHeight(lctx, w, lastFinalized.Height)
+		if err != nil {
+			return fmt.Errorf("could not insert finalized height: %w", err)
+		}
+		err = operation.UpsertSealedHeight(lctx, w, lastSealed.Height)
+		if err != nil {
+			return fmt.Errorf("could not insert sealed height: %w", err)
+		}
+		err = operation.IndexFinalizedSealByBlockID(w, seal.BlockID, seal.ID())
+		if err != nil {
+			return fmt.Errorf("could not index sealed block: %w", err)
+		}
 
-	// insert first-height indices for epochs which begin within the sealing segment
-	err = indexEpochHeights(lctx, rw, segment)
-	if err != nil {
-		return fmt.Errorf("could not index epoch heights: %w", err)
-	}
+		// insert first-height indices for epochs which begin within the sealing segment
+		err = indexEpochHeights(lctx, rw, segment)
+		if err != nil {
+			return fmt.Errorf("could not index epoch heights: %w", err)
+		}
 
-	return nil
+		return nil
+	})
 }
 
 // bootstrapEpochForProtocolStateEntry bootstraps the protocol state database with epoch
@@ -1023,7 +1015,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 
 // boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
 // to an index, if present.
-func boostrapVersionBeacon(rw storage.ReaderBatchWriter, snapshot protocol.Snapshot) error {
+func boostrapVersionBeacon(db storage.DB, snapshot protocol.Snapshot) error {
 	versionBeacon, err := snapshot.VersionBeacon()
 	if err != nil {
 		return err
@@ -1031,7 +1023,9 @@ func boostrapVersionBeacon(rw storage.ReaderBatchWriter, snapshot protocol.Snaps
 	if versionBeacon == nil {
 		return nil
 	}
-	return operation.IndexVersionBeaconByHeight(rw.Writer(), versionBeacon)
+	return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.IndexVersionBeaconByHeight(rw.Writer(), versionBeacon)
+	})
 }
 
 // populateCache is used after opening or bootstrapping the state to populate the cache.
