@@ -2215,6 +2215,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			collectionIndexer, err := collections.NewIndexer(
 				node.Logger,
+				builder.ProtocolDB,
 				notNil(builder.collectionExecutedMetric),
 				node.State,
 				node.Storage.Blocks,
@@ -2233,6 +2234,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			var executionDataSyncer *collections.ExecutionDataSyncer
 			if builder.executionDataSyncEnabled && !builder.executionDataIndexingEnabled {
 				executionDataSyncer = collections.NewExecutionDataSyncer(
+					node.Logger,
 					notNil(builder.ExecutionDataCache),
 					collectionIndexer,
 				)

@@ -211,6 +211,7 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 
 	indexer, err := collections.NewIndexer(
 		s.log,
+		s.db,
 		s.collectionExecutedMetric,
 		s.proto.state,
 		s.blocks,

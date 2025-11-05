@@ -228,18 +228,17 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		// than the latest indexed block. Calling the collection handler with a collection that
 		// has already been indexed is a noop.
 
-		// index all collections except the system chunk. if there is only a single chunk, it is the
-		// system chunk and can be skipped.
-		indexedCount := 0
-		if len(data.ChunkExecutionDatas) > 1 {
-			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				c.collectionIndexer.OnCollectionReceived(chunk.Collection)
-				indexedCount++
+		// index all standard (non-system) collections
+		standardCollections := data.StandardCollections()
+		if len(standardCollections) > 0 {
+			err := c.collectionIndexer.IndexCollections(standardCollections)
+			if err != nil {
+				return fmt.Errorf("could not index collections: %w", err)
 			}
 		}
 
 		lg.Debug().
-			Int("collection_count", indexedCount).
+			Int("collection_count", len(standardCollections)).
 			Dur("duration_ms", time.Since(start)).
 			Msg("indexed collections")
 
