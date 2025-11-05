@@ -18,9 +18,9 @@ import (
 // structure.
 // Test cases:
 //  1. InstanceParams can be inserted and retrieved successfully.
-//  2. Overwrite attempts return storage.ErrAlreadyExists and do not change the
+//  2. Overwrite attempts return [storage.ErrAlreadyExists] and do not change the
 //     persisted value.
-//  3. Writes without holding LockInsertInstanceParams are denied.
+//  3. Writes without holding [storage.LockInsertInstanceParams] are denied.
 func TestInstanceParams_InsertRetrieve(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	enc, err := datastore.NewVersionedInstanceParams(

@@ -15,10 +15,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBatchStoringTransactionResults(t *testing.T) {
@@ -153,7 +152,7 @@ func TestBatchStoreAndBatchRemoveTransactionResults(t *testing.T) {
 	})
 }
 
-func TestReadingNotstTransaction(t *testing.T) {
+func TestReadingUnknownTransaction(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		st, err := store.NewTransactionResults(metrics, db, 1000)
@@ -189,6 +188,10 @@ func TestIndexKeyConversion(t *testing.T) {
 	require.Equal(t, txIndex, tID)
 }
 
+// TestBatchStoreTransactionResultsErrAlreadyExists verifies the following behaviour when attempting
+// to store transaction results for a block that already has transaction results:
+// * a [storage.ErrAlreadyExists] error is returned
+// * and the existing values are not changed.
 func TestBatchStoreTransactionResultsErrAlreadyExists(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -250,6 +253,8 @@ func TestBatchStoreTransactionResultsErrAlreadyExists(t *testing.T) {
 	})
 }
 
+// TestBatchStoreTransactionResultsMissingLock verifies that attempting to store transaction results
+// without the holding the required lock results in an error.
 func TestBatchStoreTransactionResultsMissingLock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -281,6 +286,8 @@ func TestBatchStoreTransactionResultsMissingLock(t *testing.T) {
 	})
 }
 
+// TestBatchStoreTransactionResultsWrongLock verifies that attempting to store transaction results
+// while holding the wrong lock results in an error.
 func TestBatchStoreTransactionResultsWrongLock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()

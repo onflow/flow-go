@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestResultStoreAndRetrieve tests storing and retrieving an execution result on the happy path.
 func TestResultStoreAndRetrieve(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -42,6 +43,8 @@ func TestResultStoreAndRetrieve(t *testing.T) {
 	})
 }
 
+// TestResultStoreTwice verifies that [ExecutionResults.BatchStore] and [ExecutionResults.BatchIndex]
+// are idempotent when called repeatedly with the same data.
 func TestResultStoreTwice(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -77,6 +80,8 @@ func TestResultStoreTwice(t *testing.T) {
 	})
 }
 
+// TestResultStoreTwice verifies that [ExecutionResults.BatchStore] and [ExecutionResults.BatchIndex]
+// are idempotent when called repeatedly with the same data.
 func TestResultBatchStoreTwice(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
@@ -113,6 +118,8 @@ func TestResultBatchStoreTwice(t *testing.T) {
 	})
 }
 
+// TestResultStoreTwoDifferentResultsShouldFail verifies that attempting to index two different
+// execution results for the same block ID fails with [storage.ErrDataMismatch].
 func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {

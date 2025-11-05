@@ -11,27 +11,28 @@ import (
 
 // InsertExecutionResult inserts a [flow.ExecutionResult] into the storage, keyed by its ID.
 //
-// If the result already exists, it will be overwritten. Note that here, the key (result ID) is derived
-// from the value (result) via a collision-resistant hash function. Hence, unchecked overwrites pose no risk
-// of data corruption, because for the same key, we expect the same value.
+// CAUTION: The caller must ensure `resultID` is a collision-resistant hash of the provided `result`!
+// This method silently overrides existing data, which is safe only if for the same key, we always
+// write the same value.
 //
-// No errors are expected during normal operation.
+// No error returns are expected during normal operations.
 func InsertExecutionResult(w storage.Writer, resultID flow.Identifier, result *flow.ExecutionResult) error {
 	return UpsertByKey(w, MakePrefix(codeExecutionResult, resultID), result)
 }
 
 // RetrieveExecutionResult retrieves an Execution Result by its ID.
-// Expected errors during normal operations:
+// Expected error returns during normal operation:
 //   - [storage.ErrNotFound] if no result with the specified `resultID` is known.
 func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result *flow.ExecutionResult) error {
 	return RetrieveByKey(r, MakePrefix(codeExecutionResult, resultID), result)
 }
 
-// IndexTrustedExecutionResult indexes the result of the given block.
+// IndexTrustedExecutionResult indexes the result for the given block.
 // It is used by the following scenarios:
 // 1. Execution Node indexes its own executed block's result when finish executing a block
 // 2. Execution Node indexes the sealed root block's result during bootstrapping
 // 3. Access Node indexes the sealed result during syncing from EN.
+//
 // The caller must acquire [storage.LockIndexExecutionResult]
 //
 // It returns [storage.ErrDataMismatch] if there is already an indexed result for the given blockID,

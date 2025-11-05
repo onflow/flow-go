@@ -151,7 +151,7 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) (
 		// Create index mappings for each chunk data pack
 		for i, c := range cs {
 			chunkDataPackID := chunkDataPackIDs[i]
-			// Index the stored chunk data pack ID by chunk ID for fast retrieval
+			// Index the stored chunk data pack ID by chunk ID for fast retrieval; requires [storage.LockIndexChunkDataPackByChunkID]
 			err := ch.chunkIDToChunkDataPackIDCache.PutWithLockTx(
 				lctx, protocolDBBatch, c.ChunkID, chunkDataPackID)
 			if err != nil {

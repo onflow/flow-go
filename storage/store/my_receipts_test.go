@@ -76,7 +76,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 					return myReceipts.BatchStoreMyReceipt(lctx, receipt1, rw)
 				})
 			})
-			require.NoError(t, err)
+			require.NoError(t, err, "`BatchStoreMyReceipt` should be idempotent for the same receipt")
 		})
 	})
 

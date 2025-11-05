@@ -10,7 +10,8 @@ import (
 )
 
 // InsertAndIndexTransactionResults inserts and indexes multiple transaction results in a single batch write.
-// The caller must hold the [storage.LockInsertAndIndexTxResult] lock.
+// Conceptually, for a block this data should be written once and never changed. This is enforced by the
+// function, for which reason the caller must hold the [storage.LockInsertAndIndexTxResult] lock.
 // It returns [storage.ErrAlreadyExists] if transaction results for the block already exist.
 func InsertAndIndexTransactionResults(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
 	if !lctx.HoldsLock(storage.LockInsertAndIndexTxResult) {

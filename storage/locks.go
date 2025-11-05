@@ -33,7 +33,9 @@ const (
 	LockInsertAndIndexTxResult = "lock_insert_and_index_tx_result"
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
-	// LockInsertInstanceParams protects data that is *exclusively* written during bootstrapping.
+	// LockInsertInstanceParams protects data describing from which block on this node locally stores blockchain history.
+	// These values are *exclusively* written during bootstrapping and (currently) immutable throughout the lifetime of
+	// the node. Hence, this lock should only ever be used during bootstrapping.
 	LockInsertInstanceParams          = "lock_insert_instance_params"
 	LockIndexBlockByPayloadGuarantees = "lock_index_block_by_payload_guarantees"
 	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs

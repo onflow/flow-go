@@ -13,8 +13,8 @@ import (
 )
 
 // MyExecutionReceipts holds and indexes Execution Receipts.
-// MyExecutionReceipts is implemented as a wrapper around badger.ExecutionReceipts
-// The wrapper adds the ability to "MY execution receipt", from the viewpoint
+// MyExecutionReceipts is implemented as a wrapper around [storage.ExecutionReceipts]
+// The wrapper adds the ability to index "MY execution receipt", from the viewpoint
 // of an individual Execution Node.
 type MyExecutionReceipts struct {
 	genericReceipts storage.ExecutionReceipts
@@ -22,8 +22,10 @@ type MyExecutionReceipts struct {
 	cache           *Cache[flow.Identifier, *flow.ExecutionReceipt]
 }
 
-// NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around badger.ExecutionReceipts
-// It's useful for execution nodes to keep track of produced execution receipts.
+var _ storage.MyExecutionReceipts = (*MyExecutionReceipts)(nil)
+
+// NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper around [storage.ExecutionReceipts].
+// It's useful for execution nodes to keep track of their own execution receipts.
 func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receipts storage.ExecutionReceipts) *MyExecutionReceipts {
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
 		var receiptID flow.Identifier
@@ -58,14 +60,17 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.Executio
 	return m.cache.Get(m.db.Reader(), blockID) // assemble DB operations to retrieve receipt (no execution)
 }
 
-// BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
+// BatchStoreMyReceipt stores the receipt by its ID and populates the index blockID → receiptID in the provided batch.
 //
-// If entity fails marshalling, the error is wrapped in a generic error and returned.
-// If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-// It requires [storage.LockInsertMyReceipt] to be held.
+// CAUTION: By persisting the receipt, the Execution Node is effectively committing to this being the correct result.
+// Changing data could cause the node to publish inconsistent commitments and to be slashed, or the protocol to be
+// compromised as a whole. Therefore, the function checks upfront that we are not changing a previously stored
+// commitment. This function is idempotent, i.e. repeated calls with the *initially* indexed result are no-ops.
+// To guarantee atomicity of existence-check plus database write, we require the caller to acquire
+// the [storage.LockInsertMyReceipt] lock and hold it until the database write has been committed.
 //
 // Expected error returns during *normal* operations:
-//   - `storage.ErrDataMismatch` if a *different* receipt has already been indexed for the same block
+//   - [storage.ErrDataMismatch] if a *different* receipt has already been indexed for the same block
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *flow.ExecutionReceipt, rw storage.ReaderBatchWriter) error {
 	receiptID := receipt.ID()
 	blockID := receipt.ExecutionResult.BlockID
@@ -90,7 +95,7 @@ func (m *MyExecutionReceipts) BatchStoreMyReceipt(lctx lockctx.Proof, receipt *f
 }
 
 // MyReceipt retrieves my receipt for the given block.
-// Returns storage.ErrNotFound if no receipt was persisted for the block.
+// Returns [storage.ErrNotFound] if no receipt was persisted for the block.
 func (m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
 	return m.myReceipt(blockID)
 }

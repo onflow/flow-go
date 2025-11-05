@@ -16,10 +16,15 @@ import (
 // a certified block (including a QC for the block).
 type Blocks interface {
 
-	// BatchStore stores a valid block in a batch.
-	// Error returns:
-	//   - storage.ErrAlreadyExists if the blockID already exists in the database.
-	//   - generic error in case of unexpected failure from the database layer or encoding failure.
+	// BatchStore adds the provided block to the database write batch and populates all secondary storage indices
+	// (maps from the block ID to some block-related information).
+	//
+	// CAUTION: Under the hood, `BatchStore` performs some prior database reads, which must happen atomically with
+	// the subsequent database write in order to prevent accidental state corruption. Therefore, the caller must
+	// acquire [storage.LockInsertBlock] and hold it until the database write has been committed.
+	//
+	// Expected error returns during normal operations:
+	// - [storage.ErrAlreadyExists] if some block with the same ID has already been stored
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, proposal *flow.Proposal) error
 
 	// ByID returns the block with the given hash. It is available for all incorporated blocks (validated blocks
@@ -88,7 +93,7 @@ type Blocks interface {
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
 	// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
-	// The caller must acquire a storage.LockIndexBlockByPayloadGuarantees lock.
+	// The caller must acquire [storage.LockIndexBlockByPayloadGuarantees] and hold it until the database write has been committed.
 	//
 	// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 	// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -96,8 +101,7 @@ type Blocks interface {
 	// Hence, this function should be treated as a temporary solution, which requires generalization
 	// (one-to-many mapping) for soft finality and the mature protocol.
 	//
-	// Error returns:
-	//   - storage.ErrAlreadyExists if any collection guarantee is already indexed
-	//   - generic error in case of unexpected failure from the database layer or encoding failure.
+	// Expected error returns during normal operations:
+	//   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
 	BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error
 }

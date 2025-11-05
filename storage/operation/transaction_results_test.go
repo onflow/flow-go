@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestInsertAndIndexTransactionResults verifies the insertion and indexing of transaction results
+// on the happy path.
 func TestInsertAndIndexTransactionResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -57,6 +59,8 @@ func TestInsertAndIndexTransactionResults(t *testing.T) {
 	})
 }
 
+// TestInsertAndIndexTransactionResults_AlreadyExists verifies that attempting to insert
+// transaction results for a block that already has results returns `storage.ErrAlreadyExists`.
 func TestInsertAndIndexTransactionResults_AlreadyExists(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -86,6 +90,8 @@ func TestInsertAndIndexTransactionResults_AlreadyExists(t *testing.T) {
 	})
 }
 
+// TestInsertAndIndexTransactionResults_NoLock verifies that attempting to insert
+// transaction results while holding no lock returns an error.
 func TestInsertAndIndexTransactionResults_NoLock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		blockID := unittest.IdentifierFixture()
@@ -105,6 +111,8 @@ func TestInsertAndIndexTransactionResults_NoLock(t *testing.T) {
 	})
 }
 
+// TestInsertAndIndexTransactionResults_EmptyResults verifies that inserting
+// an empty slice of transaction is effectively a no-op.
 func TestInsertAndIndexTransactionResults_EmptyResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -128,6 +136,8 @@ func TestInsertAndIndexTransactionResults_EmptyResults(t *testing.T) {
 	})
 }
 
+// TestInsertAndIndexTransactionResults_SingleResult verifies that inserting
+// a batch containing only a single transaction works.
 func TestInsertAndIndexTransactionResults_SingleResult(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -152,6 +162,10 @@ func TestInsertAndIndexTransactionResults_SingleResult(t *testing.T) {
 	})
 }
 
+// TestInsertAndIndexTransactionResults_MultipleResultsWithSameTransactionID verifies that inserting
+// a block with more than one result for the same transaction IDs is handled. This is an important BFT
+// edge case, which can occur if we have a cluster collector with byzantine supermajority (quite
+// small but non-vanishing probability, which we still have to account for).
 func TestInsertAndIndexTransactionResults_MultipleResultsWithSameTransactionID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()

@@ -49,8 +49,7 @@ type FinalizedBlockProcessor struct {
 	lockManager      storage.LockManager
 	db               storage.DB
 
-	blocks storage.Blocks
-
+	blocks           storage.Blocks
 	executionResults storage.ExecutionResults
 
 	collectionSyncer         *CollectionSyncer

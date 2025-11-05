@@ -97,7 +97,6 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 	db storage.DB,
 	rootSeal *flow.Seal,
 ) error {
-
 	commit := rootSeal.FinalState
 	return storage.WithLocks(manager, storage.LockGroupExecutionBootstrap, func(lctx lockctx.Context) error {
 		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

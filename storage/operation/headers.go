@@ -21,7 +21,7 @@ import (
 // It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
 // This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
 // of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
-// No other errors are expected during normal operation.
+// No other error returns are expected during normal operation.
 func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
 	held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
 	if !held {
@@ -125,7 +125,7 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 }
 
 // BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
-// The caller must acquire a storage.LockIndexBlockByPayloadGuarantees lock.
+// The caller must acquire [storage.LockIndexBlockByPayloadGuarantees] and hold it until the database write has been committed.
 //
 // CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
@@ -133,7 +133,7 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 // Hence, this function should be treated as a temporary solution, which requires generalization
 // (one-to-many mapping) for soft finality and the mature protocol.
 //
-// Expected errors during normal operations:
+// Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
 func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
 	if !lctx.HoldsLock(storage.LockIndexBlockByPayloadGuarantees) {

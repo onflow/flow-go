@@ -22,7 +22,7 @@ var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
 // which supports storing, caching and retrieving by block ID.
 func NewQuorumCertificates(collector module.CacheMetrics, db storage.DB, cacheSize uint) *QuorumCertificates {
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, _ flow.Identifier, qc *flow.QuorumCertificate) error {
-		return operation.InsertQuorumCertificate(lctx, rw, qc)
+		return operation.InsertQuorumCertificate(lctx, rw, qc) // requires [storage.LockInsertBlock]
 	}
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.QuorumCertificate, error) {
@@ -47,13 +47,16 @@ func NewQuorumCertificates(collector module.CacheMetrics, db storage.DB, cacheSi
 // is only important that a block has been certified, but irrelevant who specifically contributed to the QC. Therefore, we
 // only store the first QC.
 //
-// If *any* quorum certificate for QC.BlockID has already been stored, a `storage.ErrAlreadyExists` is returned (typically benign).
+// CAUTION: Persisting the QC only if none is already stored for the block, requires an atomic database read and write.
+// Therefore, the caller must acquire [storage.LockInsertBlock] and hold it until the database write has been committed.
+//
+// If *any* quorum certificate for QC.BlockID has already been stored, a [storage.ErrAlreadyExists] is returned (typically benign).
 func (q *QuorumCertificates) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
 	return q.cache.PutWithLockTx(lctx, rw, qc.BlockID, qc)
 }
 
 // ByBlockID returns QC that certifies the block referred by blockID.
-// * storage.ErrNotFound if no QC for blockID doesn't exist.
+// * [storage.ErrNotFound] if no QC for blockID is known.
 func (q *QuorumCertificates) ByBlockID(blockID flow.Identifier) (*flow.QuorumCertificate, error) {
 	val, err := q.cache.Get(q.db.Reader(), blockID)
 	if err != nil {

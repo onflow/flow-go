@@ -88,7 +88,7 @@ func SkipNetworkAddressValidation(conf *BootstrapConfig) {
 	conf.SkipNetworkAddressValidation = true
 }
 
-// Bootstrap initializes a the protocol state from the provided root snapshot and persists it to the database.
+// Bootstrap initializes the protocol state from the provided root snapshot and persists it to the database.
 // No errors expected during normal operation.
 func Bootstrap(
 	metrics module.ComplianceMetrics,
@@ -143,11 +143,17 @@ func Bootstrap(
 
 	var state *State
 
-	// we acquire both [storage.LockInsertBlock] and [storage.LockFinalizeBlock] because
-	// the bootstrapping process inserts and finalizes blocks (all blocks within the
-	// trusted root snapshot are presumed to be finalized)
+	// Overview of ACQUIRED LOCKS:
+	//  * In a nutshell, the instance parameters describe how far back the node's local history reaches in comparison
+	//    to the genesis / spork root block. These values are immutable throughout the lifetime of a node. Hence, the
+	//    lock [storage.LockInsertInstanceParams] should only ever be used here during bootstrapping.
+	//  * We acquire both [storage.LockInsertBlock] and [storage.LockFinalizeBlock] because the bootstrapping process
+	//    inserts and finalizes blocks (all blocks within the trusted root snapshot are presumed to be finalized).
+	//  * Liveness and safety data for Jolteon consensus need to be initialized, requiring [storage.LockInsertSafetyData]
+	//    and [storage.LockInsertLivenessData].
+	//  * The lock [storage.LockIndexExecutionResult] is required for bootstrapping execution. When bootstrapping other
+	//    node roles, the lock is acquired (for algorithmic uniformity) but not used.
 	err = storage.WithLocks(lockManager, storage.LockGroupProtocolStateBootstrap, func(lctx lockctx.Context) error {
-
 		// bootstrap the sealing segment
 		// creating sealed root block with the rootResult
 		// creating finalized root block with lastFinalized
@@ -209,9 +215,12 @@ func Bootstrap(
 // bootstrapProtocolStates bootstraps data structures needed for Dynamic Protocol State.
 // The sealing segment may contain blocks committing to different Protocol State entries,
 // in which case each of these protocol state entries are stored in the database during
-// bootstrapping.
-// For each distinct protocol state entry, we also store the associated EpochSetup and
-// EpochCommit service events.
+// bootstrapping. For each distinct protocol state entry, we also store the associated
+// EpochSetup and EpochCommit service events.
+//
+// Caller must hold [storage.LockInsertBlock] lock.
+//
+// No error returns expected during normal operation.
 func bootstrapProtocolState(
 	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
@@ -280,7 +289,7 @@ func bootstrapProtocolState(
 //     history is covered. The spork root block is persisted as a root proposal without proposer
 //     signature (by convention).
 //
-// It requires [storage.LockIndexExecutionResult] lock
+// Required locks: [storage.LockIndexExecutionResult] and [storage.LockInsertBlock] and [storage.LockFinalizeBlock]
 func bootstrapSealingSegment(
 	lctx lockctx.Proof,
 	db storage.DB,
@@ -298,7 +307,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = operation.IndexTrustedExecutionResult(lctx, rw, result.BlockID, result.ID())
+			err = operation.IndexTrustedExecutionResult(lctx, rw, result.BlockID, result.ID()) // requires [storage.LockIndexExecutionResult]
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
@@ -504,13 +513,19 @@ func bootstrapSealingSegment(
 // bootstrapStatePointers instantiates central pointers used to by the protocol
 // state for keeping track of lifecycle variables:
 //   - Consensus Safety and Liveness Data (only used by consensus participants)
-//   - Root Block's Height (heighest block in sealing segment)
+//   - Root Block's Height (highest block in sealing segment)
 //   - Sealed Root Block Height (block height sealed as of the Root Block)
 //   - Latest Finalized Height (initialized to height of Root Block)
 //   - Latest Sealed Block Height (initialized to block height sealed as of the Root Block)
 //   - Spork root block ID (spork root block in sealing segment)
 //   - initial entry in map:
 //     Finalized Block ID -> ID of latest seal in fork with this block as head
+//
+// Caller must hold locks:
+// [storage.LockInsertSafetyData] and [storage.LockInsertLivenessData] and
+// [storage.LockInsertBlock] and [storage.LockFinalizeBlock]
+//
+// No error returns expected during normal operation.
 func bootstrapStatePointers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, root protocol.Snapshot) error {
 	// sealing segment lists blocks in order of ascending height, so the tail
 	// is the oldest ancestor and head is the newest child in the segment
@@ -716,6 +731,9 @@ func bootstrapEpochForProtocolStateEntry(
 // indexEpochHeights populates the epoch height index from the root snapshot.
 // We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
 // or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
+//
+// Caller must hold [storage.LockFinalizeBlock] lock.
+//
 // No errors are expected during normal operation.
 func indexEpochHeights(lctx lockctx.Proof, rw storage.ReaderBatchWriter, segment *flow.SealingSegment) error {
 	// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.

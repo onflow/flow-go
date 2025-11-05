@@ -171,7 +171,12 @@ func NewServiceEvents(collector module.CacheMetrics, db storage.DB) *ServiceEven
 		)}
 }
 
-// BatchStore stores service events keyed by a blockID in provided batch
+// BatchStore stores service events keyed by the given blockID in as part of the write batch.
+//
+// Conceptually, this data should be written once for a block and never changed thereafter.
+// This is enforced by the implementation, for which reason the caller must acquire
+// [storage.LockInsertServiceEvent] and hold it until the batch is committed.
+//
 // Expected error returns:
 //   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (e *ServiceEvents) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.Event, rw storage.ReaderBatchWriter) error {

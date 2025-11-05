@@ -560,8 +560,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 				if err != nil {
 					return err
 				}
-				// requires LockIndexExecutionResult
-				return all.Results.BatchIndex(lctx, rw, blockID, er.ID())
+				return all.Results.BatchIndex(lctx, rw, blockID, er.ID()) // requires storage.LockIndexExecutionResult
 			})
 		}))
 

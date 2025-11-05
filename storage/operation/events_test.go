@@ -132,7 +132,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 }
 
 // Event retrieval does not guarantee any order,
-// Hence, we a sort the events for comparing the expected and actual events.
+// Hence, we sort the events for comparing the expected and actual events.
 func sortEvent(events []flow.Event) {
 	slices.SortFunc(events, func(i, j flow.Event) int {
 		tComp := bytes.Compare(i.TransactionID[:], j.TransactionID[:])

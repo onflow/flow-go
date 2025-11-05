@@ -129,9 +129,10 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 	}, nil
 }
 
-// BatchStore will store the transaction results for the given block ID in a batch
-// It returns [ErrAlreadyExists] if transaction results for the block already exist.
-// It requires the caller to hold [storage.LockInsertAndIndexTxResult]
+// BatchStore will store the transaction results for the given block ID in a batch.
+// Conceptually, for a block this data should be written once and never changed. This is enforced by the
+// implementation, for which reason the caller must hold the [storage.LockInsertAndIndexTxResult] lock.
+// It returns [storage.ErrAlreadyExists] if transaction results for the block already exist.
 func (tr *TransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
 	err := operation.InsertAndIndexTransactionResults(lctx, rw, blockID, transactionResults)
 	if err != nil {

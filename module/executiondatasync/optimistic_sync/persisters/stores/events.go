@@ -32,6 +32,7 @@ func NewEventsStore(
 }
 
 // Persist adds events to the batch.
+// The caller must acquire [storage.LockInsertEvent] and hold it until the write batch is  committed.
 //
 // No error returns are expected during normal operations
 func (e *EventsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {

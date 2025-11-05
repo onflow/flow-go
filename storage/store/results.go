@@ -47,8 +47,8 @@ func NewExecutionResults(collector module.CacheMetrics, db storage.DB) *Executio
 			withRetrieve(retrieve)),
 
 		indexCache: newCache(collector, metrics.ResourceResult,
-			// this API is only used to fetch result for last executed block, so in happy case, it only need to be 1,
-			// we use 100 here to be more resilient to forks
+			// This API is only used to fetch result for last executed block, so in happy case, it only needs to cache 1.
+			// We use 100 here to be more resilient to forks.
 			withLimit[flow.Identifier, flow.Identifier](100),
 			withStoreWithLock(operation.IndexTrustedExecutionResult),
 			withRetrieve(retrieveByBlockID),
@@ -86,7 +86,9 @@ func (r *ExecutionResults) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatch
 	return r.indexCache.PutWithLockTx(lctx, rw, blockID, resultID)
 }
 
-// BatchStore stores an execution result in a given batch
+// BatchStore stores an execution result in a given batch.
+// The key (result ID) is derived from the value (result) via a collision-resistant hash function. Hence,
+// unchecked overwrites pose no risk of data corruption, because for the same key, we expect the same value.
 // No error is expected during normal operation.
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.ReaderBatchWriter) error {
 	return r.store(batch, result)

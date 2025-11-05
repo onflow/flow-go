@@ -61,32 +61,30 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 			if err != nil {
 				return fmt.Errorf("could not insert genesis block: %w", err)
 			}
-			// insert block height -> ID mapping
+			// insert block height -> ID mapping for genesis block (finalized by protocol convention)
 			err = operation.IndexClusterBlockHeight(lctx, rw, chainID, genesis.Height, genesis.ID())
 			if err != nil {
 				return fmt.Errorf("failed to map genesis block height to block: %w", err)
 			}
-			// insert boundary
+			// insert latest finalized height
 			err = operation.BootstrapClusterFinalizedHeight(lctx, rw, chainID, genesis.Height)
 			if err != nil {
 				return fmt.Errorf("could not insert genesis boundary: %w", err)
 			}
 
+			// Initialize and persist safety and liveness data for cluster consensus
 			safetyData := &hotstuff.SafetyData{
 				LockedOneChainView:      genesis.View,
 				HighestAcknowledgedView: genesis.View,
 			}
-
 			livenessData := &hotstuff.LivenessData{
 				CurrentView: genesis.View + 1, // starting view for hotstuff
 				NewestQC:    rootQC,
 			}
-			// insert safety data
 			err = operation.UpsertSafetyData(lctx, rw, chainID, safetyData)
 			if err != nil {
 				return fmt.Errorf("could not insert safety data: %w", err)
 			}
-			// insert liveness data
 			err = operation.UpsertLivenessData(lctx, rw, chainID, livenessData)
 			if err != nil {
 				return fmt.Errorf("could not insert liveness data: %w", err)
