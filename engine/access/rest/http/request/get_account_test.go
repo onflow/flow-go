@@ -25,6 +25,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 
 	tests := []struct {
+		name                    string
 		address                 string
 		height                  string
 		agreeingExecutorsCount  string
@@ -33,6 +34,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 		err                     string
 	}{
 		{
+			"parse with invalid address",
 			"",
 			"",
 			"2",
@@ -41,6 +43,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 			"invalid address",
 		},
 		{
+			"parse with invalid height format",
 			validAddress,
 			"-1",
 			"2",
@@ -49,6 +52,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 			"invalid height format",
 		},
 		{
+			"parse with invalid agreeingExecutorCount value",
 			validAddress,
 			"1",
 			"abc",
@@ -57,6 +61,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 			"invalid agreeingExecutorCount",
 		},
 		{
+			"parse with invalid agreeingExecutorCount number",
 			validAddress,
 			"1",
 			"-5",
@@ -65,6 +70,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 			"invalid agreeingExecutorCount",
 		},
 		{
+			"parse with invalid agreeingExecutorsIds",
 			validAddress,
 			"1",
 			"2",
@@ -73,6 +79,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 			"invalid ID format",
 		},
 		{
+			"parse with invalid includeExecutorMetadata",
 			validAddress,
 			"1",
 			"2",
@@ -84,16 +91,18 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 
 	chain := flow.Localnet.Chain()
 	for i, test := range tests {
-		request, err := parseGetAccountRequest(
-			test.address,
-			test.height,
-			test.agreeingExecutorsCount,
-			test.agreeingExecutorsIds,
-			test.includeExecutorMetadata,
-			chain,
-		)
-		require.Nil(t, request)
-		require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
+		t.Run(test.name, func(t *testing.T) {
+			request, err := parseGetAccountRequest(
+				test.address,
+				test.height,
+				test.agreeingExecutorsCount,
+				test.agreeingExecutorsIds,
+				test.includeExecutorMetadata,
+				chain,
+			)
+			require.Nil(t, request)
+			require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
+		})
 	}
 }
 
