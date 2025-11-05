@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -273,9 +274,6 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 	}
 
 	for _, tt := range testCases {
-		// used in error conversion, when local provider fails
-		s.state.On("Params").Return(s.params)
-
 		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
 			s.executionResultProvider.
 				On("ExecutionResultInfo", s.block.ID(), s.criteria).
@@ -292,6 +290,8 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 			s.scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Height, s.registers).
 				Return(nil, tt.err).
 				Once()
+			// used in error conversion, when local provider fails
+			s.mockGetAccountErrorConversionFromStorage(tt.err)
 
 			s.testGetAccount(ctx, backend, tt.statusCode)
 		})
@@ -312,13 +312,13 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 			s.scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Height, s.registers).
 				Return(nil, tt.err).
 				Once()
+			// used in error conversion, when local provider fails
+			s.mockGetAccountErrorConversionFromStorage(tt.err)
 
 			s.testGetAccountAtLatestBlock(ctx, backend, tt.statusCode)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", tt.err), func() {
-			s.params.On("SporkRootBlockHeight").Return(s.block.Height-10, nil)
-			s.params.On("SealedRoot").Return(s.block.ToHeader(), nil)
 			s.executionResultProvider.
 				On("ExecutionResultInfo", s.block.ID(), s.criteria).
 				Return(s.executionResultInfo, nil).
@@ -334,11 +334,20 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 			s.scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Height, s.registers).
 				Return(nil, tt.err).
 				Once()
-			s.params.On("SporkRootBlockHeight").Return(s.block.Height-10, nil)
-			s.params.On("SealedRoot").Return(s.block.ToHeader(), nil)
+			// used in error conversion, when local provider fails
+			s.mockGetAccountErrorConversionFromStorage(tt.err)
 
 			s.testGetAccountAtBlockHeight(ctx, backend, tt.statusCode)
 		})
+	}
+}
+
+func (s *AccountsSuite) mockGetAccountErrorConversionFromStorage(err error) {
+	s.state.On("Params").Return(s.params).Once()
+
+	if errors.Is(err, storage.ErrNotFound) {
+		s.params.On("SporkRootBlockHeight").Return(s.block.Height-10, nil).Once()
+		s.params.On("SealedRoot").Return(s.block.ToHeader(), nil).Once()
 	}
 }
 
@@ -366,7 +375,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 				Return(nil, errToReturn).
 				Once()
 			// used in error conversion
-			s.state.On("Params").Return(s.params).Once()
+			s.mockGetAccountErrorConversionFromStorage(errToReturn)
 			s.setupENSuccessResponse(s.block.ID())
 
 			s.testGetAccount(ctx, backend, codes.OK)
@@ -389,7 +398,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 				Return(nil, errToReturn).
 				Once()
 			// used in error conversion
-			s.state.On("Params").Return(s.params).Once()
+			s.mockGetAccountErrorConversionFromStorage(errToReturn)
 			s.setupENSuccessResponse(s.block.ID())
 
 			s.testGetAccountAtLatestBlock(ctx, backend, codes.OK)
@@ -411,10 +420,8 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 			s.scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Height, s.registers).
 				Return(nil, errToReturn).
 				Once()
-			// used in error conversion
-			s.state.On("Params").Return(s.params).Once()
-			s.params.On("SporkRootBlockHeight").Return(s.block.Height-10, nil)
-			s.params.On("SealedRoot").Return(s.block.ToHeader(), nil)
+			// used in error conversion, when local provider fails
+			s.mockGetAccountErrorConversionFromStorage(errToReturn)
 			s.setupENSuccessResponse(s.block.ID())
 
 			s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)

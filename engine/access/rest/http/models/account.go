@@ -11,7 +11,7 @@ import (
 const expandableKeys = "keys"
 const expandableContracts = "contracts"
 
-// NewAccount creates an access API Account model.
+// NewAccount builds the REST API response model for GetAccount.
 //
 // No errors are expected during normal operation.
 func NewAccount(
@@ -59,7 +59,7 @@ func NewAccount(
 	return account, nil
 }
 
-// NewAccountPublicKey creates an access API AccountPublicKey model.
+// NewAccountPublicKey builds the REST API response model for GetAccountKey.
 func NewAccountPublicKey(
 	k flow.AccountPublicKey,
 	metadata *access.ExecutorMetadata,
@@ -118,7 +118,7 @@ func NewAccountPublicKeys(
 	}
 }
 
-// NewAccountBalance creates an access API AccountBalance model.
+// NewAccountBalance builds the REST API response model for GetAccountBalance.
 func NewAccountBalance(
 	balance uint64,
 	metadata *access.ExecutorMetadata,
