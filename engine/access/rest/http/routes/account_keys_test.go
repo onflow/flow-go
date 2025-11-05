@@ -23,7 +23,7 @@ import (
 
 // TestGetAccountKeyByIndex tests local getAccountKeyByIndex request.
 //
-// Runs the following tests:
+// Test cases:
 // 1. Get key by address and index at latest sealed block.
 // 2. Get key by address and index at latest finalized block.
 // 3. Get key by address and index at height.
@@ -225,7 +225,7 @@ func TestGetAccountKeys(t *testing.T) {
 	})
 
 	t.Run("get keys by address at height", func(t *testing.T) {
-		var height uint64 = 100
+		var height uint64 = 1337
 		account := accountWithKeysFixture(t)
 		req := getAccountKeysRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "false")
 

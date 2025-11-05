@@ -11,6 +11,9 @@ import (
 const expandableKeys = "keys"
 const expandableContracts = "contracts"
 
+// NewAccount creates an access API Account model.
+//
+// No errors are expected during normal operation.
 func NewAccount(
 	flowAccount *flow.Account,
 	link models.LinkGenerator,
@@ -56,7 +59,7 @@ func NewAccount(
 	return account, nil
 }
 
-// TODO(Uliana): maybe use pointer to return
+// NewAccountPublicKey creates an access API AccountPublicKey model.
 func NewAccountPublicKey(
 	k flow.AccountPublicKey,
 	metadata *access.ExecutorMetadata,
@@ -84,6 +87,7 @@ func NewAccountPublicKey(
 
 type AccountKeys []AccountPublicKey
 
+// NewAccountKeys creates an array of AccountPublicKey models.
 func NewAccountKeys(
 	accountKeys []flow.AccountPublicKey,
 	metadata *access.ExecutorMetadata,
@@ -114,6 +118,7 @@ func NewAccountPublicKeys(
 	}
 }
 
+// NewAccountBalance creates an access API AccountBalance model.
 func NewAccountBalance(
 	balance uint64,
 	metadata *access.ExecutorMetadata,

@@ -92,7 +92,7 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 	chain := flow.Localnet.Chain()
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := parseGetAccountBalanceRequest(
+			request, err := parseGetAccountBalanceRequest(
 				test.address,
 				test.height,
 				test.agreeingExecutorsCount,
@@ -100,8 +100,7 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 				test.includeExecutorMetadata,
 				chain,
 			)
-			//TODO(Uliana):
-			//require.Nil(t, request)
+			require.Nil(t, request)
 			require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
 		})
 	}

@@ -84,7 +84,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 
 	chain := flow.Localnet.Chain()
 	for i, test := range tests {
-		_, err := parseGetAccountRequest(
+		request, err := parseGetAccountRequest(
 			test.address,
 			test.height,
 			test.agreeingExecutorsCount,
@@ -92,6 +92,7 @@ func TestGetAccount_InvalidParse(t *testing.T) {
 			test.includeExecutorMetadata,
 			chain,
 		)
+		require.Nil(t, request)
 		require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
 	}
 }

@@ -10,6 +10,7 @@ import (
 const addressVar = "address"
 const blockHeightQuery = "block_height"
 
+// GetAccount represents a parsed HTTP request for retrieving an account.
 type GetAccount struct {
 	Address        flow.Address
 	Height         uint64
@@ -20,7 +21,7 @@ type GetAccount struct {
 // builds a GetAccount instance, and validates it.
 //
 // No errors are expected during normal operation.
-func NewGetAccountRequest(r *common.Request) (GetAccount, error) {
+func NewGetAccountRequest(r *common.Request) (*GetAccount, error) {
 	return parseGetAccountRequest(
 		r.GetVar(addressVar),
 		r.GetQueryParam(blockHeightQuery),
@@ -31,6 +32,11 @@ func NewGetAccountRequest(r *common.Request) (GetAccount, error) {
 	)
 }
 
+// parseGetAccountRequest parses raw HTTP query parameters into a GetAccount struct.
+// It validates the account address, height, and execution state fields, applying
+// defaults where necessary (using the sealed block when height is not provided).
+//
+// No errors are expected during normal operation.
 func parseGetAccountRequest(
 	rawAddress string,
 	rawHeight string,
@@ -38,16 +44,16 @@ func parseGetAccountRequest(
 	rawAgreeingExecutorsIds []string,
 	rawIncludeExecutorMetadata string,
 	chain flow.Chain,
-) (GetAccount, error) {
+) (*GetAccount, error) {
 	address, err := parser.ParseAddress(rawAddress, chain)
 	if err != nil {
-		return GetAccount{}, err
+		return nil, err
 	}
 
 	var h Height
 	err = h.Parse(rawHeight)
 	if err != nil {
-		return GetAccount{}, err
+		return nil, err
 	}
 	height := h.Flow()
 
@@ -62,10 +68,10 @@ func parseGetAccountRequest(
 		rawIncludeExecutorMetadata,
 	)
 	if err != nil {
-		return GetAccount{}, err
+		return nil, err
 	}
 
-	return GetAccount{
+	return &GetAccount{
 		Address:        address,
 		Height:         height,
 		ExecutionState: *executionStateQuery,

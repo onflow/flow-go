@@ -110,7 +110,7 @@ func TestGetAccountKey_InvalidParse(t *testing.T) {
 	chain := flow.Localnet.Chain()
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := parseGetAccountKeyRequest(
+			request, err := parseGetAccountKeyRequest(
 				test.address,
 				test.index,
 				test.height,
@@ -119,6 +119,7 @@ func TestGetAccountKey_InvalidParse(t *testing.T) {
 				test.includeExecutorMetadata,
 				chain,
 			)
+			require.Nil(t, request)
 			require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
 		})
 	}

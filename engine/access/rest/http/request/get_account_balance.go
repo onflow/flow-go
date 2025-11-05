@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// GetAccountBalance represents a parsed HTTP request for retrieving an account balance.
 type GetAccountBalance struct {
 	Address        flow.Address
 	Height         uint64
@@ -17,7 +18,7 @@ type GetAccountBalance struct {
 // builds a GetAccountBalance instance, and validates it.
 //
 // No errors are expected during normal operation.
-func NewGetAccountBalanceRequest(r *common.Request) (GetAccountBalance, error) {
+func NewGetAccountBalanceRequest(r *common.Request) (*GetAccountBalance, error) {
 	return parseGetAccountBalanceRequest(
 		r.GetVar(addressVar),
 		r.GetQueryParam(blockHeightQuery),
@@ -28,6 +29,11 @@ func NewGetAccountBalanceRequest(r *common.Request) (GetAccountBalance, error) {
 	)
 }
 
+// parseGetAccountBalanceRequest parses raw HTTP query parameters into a GetAccountBalance struct.
+// It validates the account address, block height, and execution state parameters, applying
+// defaults where necessary (using the sealed block when height is not provided).
+//
+// No errors are expected during normal operation.
 func parseGetAccountBalanceRequest(
 	rawAddress string,
 	rawHeight string,
@@ -35,16 +41,16 @@ func parseGetAccountBalanceRequest(
 	rawAgreeingExecutorsIds []string,
 	rawIncludeExecutorMetadata string,
 	chain flow.Chain,
-) (GetAccountBalance, error) {
+) (*GetAccountBalance, error) {
 	address, err := parser.ParseAddress(rawAddress, chain)
 	if err != nil {
-		return GetAccountBalance{}, err
+		return nil, err
 	}
 
 	var h Height
 	err = h.Parse(rawHeight)
 	if err != nil {
-		return GetAccountBalance{}, err
+		return nil, err
 	}
 	height := h.Flow()
 
@@ -59,10 +65,10 @@ func parseGetAccountBalanceRequest(
 		rawIncludeExecutorMetadata,
 	)
 	if err != nil {
-		return GetAccountBalance{}, err
+		return nil, err
 	}
 
-	return GetAccountBalance{
+	return &GetAccountBalance{
 		Address:        address,
 		Height:         height,
 		ExecutionState: *executionStateQuery,

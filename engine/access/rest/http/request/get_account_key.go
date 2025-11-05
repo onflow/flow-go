@@ -12,6 +12,7 @@ import (
 
 const indexVar = "index"
 
+// GetAccountKey represents a parsed HTTP request for retrieving an account key.
 type GetAccountKey struct {
 	Address        flow.Address
 	Index          uint32
@@ -23,7 +24,7 @@ type GetAccountKey struct {
 // builds a GetAccountKey instance, and validates it.
 //
 // No errors are expected during normal operation.
-func NewGetAccountKeyRequest(r *common.Request) (GetAccountKey, error) {
+func NewGetAccountKeyRequest(r *common.Request) (*GetAccountKey, error) {
 	return parseGetAccountKeyRequest(
 		r.GetVar(addressVar),
 		r.GetVar(indexVar),
@@ -35,6 +36,11 @@ func NewGetAccountKeyRequest(r *common.Request) (GetAccountKey, error) {
 	)
 }
 
+// parseGetAccountKeyRequest parses raw HTTP query parameters into a GetAccountKey struct.
+// It validates the account address, key index, block height, and execution state fields, applying
+// defaults where necessary (using the sealed block when height is not provided).
+//
+// No errors are expected during normal operation.
 func parseGetAccountKeyRequest(
 	rawAddress string,
 	rawIndex string,
@@ -43,21 +49,21 @@ func parseGetAccountKeyRequest(
 	rawAgreeingExecutorsIds []string,
 	rawIncludeExecutorMetadata string,
 	chain flow.Chain,
-) (GetAccountKey, error) {
+) (*GetAccountKey, error) {
 	address, err := parser.ParseAddress(rawAddress, chain)
 	if err != nil {
-		return GetAccountKey{}, err
+		return nil, err
 	}
 
 	index, err := util.ToUint32(rawIndex)
 	if err != nil {
-		return GetAccountKey{}, fmt.Errorf("invalid key index: %w", err)
+		return nil, fmt.Errorf("invalid key index: %w", err)
 	}
 
 	var h Height
 	err = h.Parse(rawHeight)
 	if err != nil {
-		return GetAccountKey{}, err
+		return nil, err
 	}
 	height := h.Flow()
 
@@ -72,10 +78,10 @@ func parseGetAccountKeyRequest(
 		rawIncludeExecutorMetadata,
 	)
 	if err != nil {
-		return GetAccountKey{}, err
+		return nil, err
 	}
 
-	return GetAccountKey{
+	return &GetAccountKey{
 		Address:        address,
 		Index:          index,
 		Height:         height,

@@ -312,10 +312,10 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 	keyIndex uint32,
 	height uint64,
 	criteria optimistic_sync.Criteria,
-) (*flow.AccountPublicKey, error) {
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -330,10 +330,20 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessageToAccountKey(accountKeyResponse.AccountKey)
+	accountKey, err := convert.MessageToAccountKey(accountKeyResponse.GetAccountKey())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountKeyResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountKey, metadata, nil
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
