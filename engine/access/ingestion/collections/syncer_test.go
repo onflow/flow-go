@@ -3,6 +3,7 @@ package collections
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -22,6 +23,7 @@ import (
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
@@ -60,6 +62,7 @@ func (s *SyncerSuite) SetupTest() {
 
 func (s *SyncerSuite) createSyncer() *Syncer {
 	execDataSyncer := NewExecutionDataSyncer(
+		unittest.Logger(),
 		s.executionDataCache,
 		s.indexer,
 	)
@@ -188,19 +191,6 @@ func (s *SyncerSuite) TestWorkerLoop_InitialCatchup_CollectionNodesOnly() {
 		}
 	}
 
-	// called once for the batch
-	s.requester.On("Force").Once()
-
-	for _, guarantees := range guaranteesByHeight {
-		for _, guarantee := range guarantees {
-			// simulate the collection being missing by randomly returning false. All collections should
-			// eventually be found in storage.
-			s.indexer.On("IsCollectionInStorage", guarantee.CollectionID).Return(func(collectionID flow.Identifier) (bool, error) {
-				return g.Random().Bool(), nil
-			})
-		}
-	}
-
 	syncer := NewSyncer(
 		unittest.Logger(),
 		s.requester,
@@ -276,10 +266,7 @@ func (s *SyncerSuite) TestWorkerLoop_InitialCatchup_SplitExecutionDataAndCollect
 
 		s.indexer.On("MissingCollectionsAtHeight", height).Return(guarantees, nil).Once()
 		s.executionDataCache.On("ByHeight", mock.Anything, height).Return(execData, nil).Once()
-
-		for _, chunkData := range execData.ChunkExecutionDatas[:len(execData.ChunkExecutionDatas)-1] {
-			s.indexer.On("OnCollectionReceived", chunkData.Collection).Once()
-		}
+		s.indexer.On("IndexCollections", execData.StandardCollections()).Return(nil).Once()
 	}
 
 	// the syncer should request collections from collection nodes for all remaining heights.
@@ -294,19 +281,6 @@ func (s *SyncerSuite) TestWorkerLoop_InitialCatchup_SplitExecutionDataAndCollect
 		for _, guarantee := range guarantees {
 			s.mockGuarantorsForCollection(guarantee, guarantors.ToSkeleton())
 			s.requester.On("EntityByID", guarantee.CollectionID, mock.Anything).Once()
-		}
-	}
-
-	// called once for the batch
-	s.requester.On("Force").Once()
-
-	for _, guarantees := range guaranteesByHeight {
-		for _, guarantee := range guarantees {
-			// simulate the collection being missing by randomly returning false. All collections should
-			// eventually be found in storage.
-			s.indexer.On("IsCollectionInStorage", guarantee.CollectionID).Return(func(collectionID flow.Identifier) (bool, error) {
-				return g.Random().Bool(), nil
-			})
 		}
 	}
 
@@ -373,9 +347,7 @@ func (s *SyncerSuite) TestWorkerLoop_InitialCatchup_AllAvailableFromExecutionDat
 		s.indexer.On("MissingCollectionsAtHeight", height).Return(guarantees, nil).Once()
 		s.executionDataCache.On("ByHeight", mock.Anything, height).Return(execData, nil).Once()
 
-		for _, chunkData := range execData.ChunkExecutionDatas[:len(execData.ChunkExecutionDatas)-1] {
-			s.indexer.On("OnCollectionReceived", chunkData.Collection).Once()
-		}
+		s.indexer.On("IndexCollections", execData.StandardCollections()).Return(nil).Once()
 	}
 
 	syncer := s.createSyncer()
@@ -406,14 +378,14 @@ func (s *SyncerSuite) TestWorkerLoop_InitialCatchup_Timesout() {
 	g := fixtures.NewGeneratorSuite()
 
 	synctest.Test(s.T(), func(t *testing.T) {
-		finalizedHeight := s.lastFullBlockHeight.Value() + 10
+		finalizedHeight := s.lastFullBlockHeight.Value() + 1
 		finalizedHeader := g.Headers().Fixture(fixtures.Header.WithHeight(finalizedHeight))
 		finalSnapshot := protocolmock.NewSnapshot(s.T())
 		finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
 		s.state.On("Final").Return(finalSnapshot).Once()
 
-		// block the first call to MissingCollectionsAtHeight that is called during startup until after
-		// the timeout. This simulates the catchup logic taking too long.
+		// block the first call to MissingCollectionsAtHeight during startup until after the timeout.
+		// This simulates the catchup logic taking too long.
 		unblockStartup := make(chan struct{})
 		s.indexer.
 			On("MissingCollectionsAtHeight", s.lastFullBlockHeight.Value()+1).
@@ -470,7 +442,7 @@ func (s *SyncerSuite) TestWorkerLoop_RequestsMissingCollections() {
 	}
 
 	s.Run("no missing collections", func() {
-		s.runWorkerLoopMissingCollections(g, nil, func(syncer *Syncer) {
+		s.runWorkerLoopMissingCollections(g, nil, nil, func(syncer *Syncer) {
 			finalSnapshot := protocolmock.NewSnapshot(s.T())
 			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
 			s.state.On("Final").Return(finalSnapshot).Once()
@@ -482,7 +454,7 @@ func (s *SyncerSuite) TestWorkerLoop_RequestsMissingCollections() {
 	})
 
 	s.Run("missing collections - request skipped below thresholds", func() {
-		s.runWorkerLoopMissingCollections(g, nil, func(syncer *Syncer) {
+		s.runWorkerLoopMissingCollections(g, nil, nil, func(syncer *Syncer) {
 			finalSnapshot := protocolmock.NewSnapshot(s.T())
 			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
 			s.state.On("Final").Return(finalSnapshot).Once()
@@ -493,9 +465,9 @@ func (s *SyncerSuite) TestWorkerLoop_RequestsMissingCollections() {
 		})
 	})
 
-	s.Run("missing collections - request sent when count exceeds missingCollsForBlockThreshold", func() {
-		s.runWorkerLoopMissingCollections(g, nil, func(syncer *Syncer) {
-			syncer.missingCollsForBlockThreshold = 9
+	s.Run("missing collections - request sent when missing blocks exceeds missingCollectionRequestThreshold", func() {
+		s.runWorkerLoopMissingCollections(g, nil, nil, func(syncer *Syncer) {
+			syncer.missingCollectionRequestThreshold = 9
 
 			finalSnapshot := protocolmock.NewSnapshot(s.T())
 			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
@@ -503,27 +475,7 @@ func (s *SyncerSuite) TestWorkerLoop_RequestsMissingCollections() {
 
 			for height := lastFullBlockHeight + 1; height <= finalizedHeight; height++ {
 				s.indexer.On("MissingCollectionsAtHeight", height).Return(allGuarantees[height], nil).Once()
-				for _, guarantee := range allGuarantees[height] {
-					s.requester.On("EntityByID", guarantee.CollectionID, mock.Anything).Once()
-					s.mockGuarantorsForCollection(guarantee, guarantors.ToSkeleton())
-				}
-			}
-		})
-	})
 
-	s.Run("missing collections - request sent when age exceeds missingCollsForAgeThreshold", func() {
-		s.runWorkerLoopMissingCollections(g, nil, func(syncer *Syncer) {
-			syncer.missingCollsForAgeThreshold = 9
-
-			finalSnapshot := protocolmock.NewSnapshot(s.T())
-			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
-			s.state.On("Final").Return(finalSnapshot).Once()
-
-			for height := s.lastFullBlockHeight.Value() + 1; height <= finalizedHeight; height++ {
-				s.indexer.On("MissingCollectionsAtHeight", height).Return(allGuarantees[height], nil).Once()
-			}
-
-			for height := s.lastFullBlockHeight.Value() + 1; height <= finalizedHeight; height++ {
 				for _, guarantee := range allGuarantees[height] {
 					s.requester.On("EntityByID", guarantee.CollectionID, mock.Anything).Once()
 					s.mockGuarantorsForCollection(guarantee, guarantors.ToSkeleton())
@@ -534,29 +486,92 @@ func (s *SyncerSuite) TestWorkerLoop_RequestsMissingCollections() {
 
 	s.Run("missing collections - processed from execution data", func() {
 		execDataSyncer := NewExecutionDataSyncer(
+			unittest.Logger(),
 			s.executionDataCache,
 			s.indexer,
 		)
 
-		s.runWorkerLoopMissingCollections(g, execDataSyncer, func(syncer *Syncer) {
+		s.runWorkerLoopMissingCollections(g, execDataSyncer, nil, func(syncer *Syncer) {
 			finalSnapshot := protocolmock.NewSnapshot(s.T())
 			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
 			s.state.On("Final").Return(finalSnapshot).Once()
 
 			for height := lastFullBlockHeight + 1; height <= finalizedHeight; height++ {
+				s.indexer.On("MissingCollectionsAtHeight", height).Return(allGuarantees[height], nil).Once()
+
 				execData, _ := executionDataFixture(g)
 				s.executionDataCache.On("ByHeight", mock.Anything, height).Return(execData, nil).Once()
-				for _, chunkData := range execData.ChunkExecutionDatas[:len(execData.ChunkExecutionDatas)-1] {
-					s.indexer.On("OnCollectionReceived", chunkData.Collection).Once()
-				}
+				s.indexer.On("IndexCollections", execData.StandardCollections()).Return(nil).Once()
 			}
-			// syncer continues until it receives a not found error.
-			s.executionDataCache.On("ByHeight", mock.Anything, finalizedHeight+1).Return(nil, execution_data.NewBlobNotFoundError(cid.Cid{})).Once()
+		})
+	})
+
+	s.Run("handles context cancelation gracefully", func() {
+		execDataSyncer := NewExecutionDataSyncer(
+			unittest.Logger(),
+			s.executionDataCache,
+			s.indexer,
+		)
+
+		s.runWorkerLoopMissingCollections(g, execDataSyncer, nil, func(syncer *Syncer) {
+			finalSnapshot := protocolmock.NewSnapshot(s.T())
+			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
+			s.state.On("Final").Return(finalSnapshot).Once()
+
+			height := lastFullBlockHeight + 1
+			s.indexer.On("MissingCollectionsAtHeight", height).Return(allGuarantees[height], nil).Once()
+			s.executionDataCache.On("ByHeight", mock.Anything, height).Return(nil, context.Canceled).Once()
+
+			// should exit without error
+		})
+	})
+
+	s.Run("throws exception if finalized block is not found", func() {
+		exception := fmt.Errorf("finalized block not found:  %w", storage.ErrNotFound)
+		s.runWorkerLoopMissingCollections(g, nil, exception, func(syncer *Syncer) {
+			finalSnapshot := protocolmock.NewSnapshot(s.T())
+			finalSnapshot.On("Head").Return(nil, exception).Once()
+			s.state.On("Final").Return(finalSnapshot).Once()
+
+			// should throw exception
+		})
+	})
+
+	s.Run("throws exception if MissingCollectionsAtHeight returns an error", func() {
+		exception := fmt.Errorf("missing collections at height: %w", storage.ErrNotFound)
+		s.runWorkerLoopMissingCollections(g, nil, exception, func(syncer *Syncer) {
+			finalSnapshot := protocolmock.NewSnapshot(s.T())
+			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
+			s.state.On("Final").Return(finalSnapshot).Once()
+
+			height := s.lastFullBlockHeight.Value() + 1
+			s.indexer.On("MissingCollectionsAtHeight", height).Return(nil, exception).Once()
+
+			// should throw exception
+		})
+	})
+
+	s.Run("throws exception if requestCollections returns an error", func() {
+		exception := fmt.Errorf("request collections: %w", storage.ErrNotFound)
+		s.runWorkerLoopMissingCollections(g, nil, exception, func(syncer *Syncer) {
+			syncer.missingCollectionRequestThreshold = 9 // make sure the request is sent
+
+			finalSnapshot := protocolmock.NewSnapshot(s.T())
+			finalSnapshot.On("Head").Return(finalizedHeader, nil).Once()
+			s.state.On("Final").Return(finalSnapshot).Once()
+
+			height := s.lastFullBlockHeight.Value() + 1
+			guarantee := allGuarantees[height][0]
+			s.indexer.On("MissingCollectionsAtHeight", height).Return(allGuarantees[height], nil).Once()
+
+			s.mockGuarantorsForCollectionReturnsError(guarantee, exception)
+
+			// should throw exception
 		})
 	})
 }
 
-func (s *SyncerSuite) runWorkerLoopMissingCollections(g *fixtures.GeneratorSuite, execDataSyncer *ExecutionDataSyncer, onReady func(*Syncer)) {
+func (s *SyncerSuite) runWorkerLoopMissingCollections(g *fixtures.GeneratorSuite, execDataSyncer *ExecutionDataSyncer, expectedError error, onReady func(*Syncer)) {
 	synctest.Test(s.T(), func(t *testing.T) {
 		// last full block is latest finalized block, so initial catchup is skipped
 		finalizedHeight := s.lastFullBlockHeight.Value()
@@ -575,14 +590,23 @@ func (s *SyncerSuite) runWorkerLoopMissingCollections(g *fixtures.GeneratorSuite
 			execDataSyncer,
 		)
 
-		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
+
+		var signalerCtx irrecoverable.SignalerContext
+		if expectedError == nil {
+			signalerCtx = irrecoverable.NewMockSignalerContext(s.T(), ctx)
+		} else {
+			signalerCtx = irrecoverable.NewMockSignalerContextWithCallback(s.T(), ctx, func(err error) {
+				s.Require().ErrorIs(err, expectedError)
+			})
+		}
 
 		done := make(chan struct{})
 		ready := make(chan struct{})
 
 		go func() {
 			defer close(done)
-			syncer.WorkerLoop(ctx, func() {
+			syncer.WorkerLoop(signalerCtx, func() {
 				onReady(syncer)
 				close(ready)
 			})
@@ -590,7 +614,7 @@ func (s *SyncerSuite) runWorkerLoopMissingCollections(g *fixtures.GeneratorSuite
 
 		<-ready
 
-		time.Sleep(syncer.missingCollsRequestInterval + 1)
+		time.Sleep(syncer.missingCollectionRequestInterval + 1)
 		synctest.Wait()
 
 		cancel()
