@@ -13,7 +13,7 @@ type PruningConfig struct {
 }
 
 var DefaultConfig = PruningConfig{
-	Threshold: 30 * 60 * 60 * 24 * 1.2, // (30 days of blocks) days * hours * minutes * seconds * block_per_second
+	Threshold: 15 * 60 * 60 * 24 * 1.2, // (15 days of blocks) days * hours * minutes * seconds * block_per_second
 	BatchSize: 1200,
 	// when choosing a value, consider the batch size and block time,
 	// for instance,
