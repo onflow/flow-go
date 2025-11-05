@@ -3,13 +3,13 @@ package ingestion
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,26 +25,6 @@ import (
 )
 
 const (
-	// time to wait for the all the missing collections to be received at node startup
-	collectionCatchupTimeout = 30 * time.Second
-
-	// time to poll the storage to check if missing collections have been received
-	collectionCatchupDBPollInterval = 10 * time.Millisecond
-
-	// time to update the FullBlockHeight index
-	fullBlockRefreshInterval = 1 * time.Second
-
-	// time to request missing collections from the network
-	missingCollsRequestInterval = 1 * time.Minute
-
-	// a threshold of number of blocks with missing collections beyond which collections should be re-requested
-	// this is to prevent spamming the collection nodes with request
-	missingCollsForBlockThreshold = 100
-
-	// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
-	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
-	missingCollsForAgeThreshold = 100
-
 	// default queue capacity
 	defaultQueueCapacity = 10_000
 
@@ -86,7 +66,9 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
-	collectionSyncer *CollectionSyncer
+	collectionSyncer  *collections.Syncer
+	collectionIndexer *collections.Indexer
+
 	// TODO: There's still a need for this metric to be in the ingestion engine rather than collection syncer.
 	// Maybe it is a good idea to split it up?
 	collectionExecutedMetric module.CollectionExecutedMetric
@@ -110,7 +92,8 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer,
-	collectionSyncer *CollectionSyncer,
+	collectionSyncer *collections.Syncer,
+	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 ) (*Engine, error) {
@@ -154,6 +137,7 @@ func New(
 		messageHandler:            messageHandler,
 		txErrorMessagesCore:       txErrorMessagesCore,
 		collectionSyncer:          collectionSyncer,
+		collectionIndexer:         collectionIndexer,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -183,11 +167,10 @@ func New(
 
 	// Add workers
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.collectionSyncer.RequestCollections).
+		AddWorker(e.collectionSyncer.WorkerLoop).
+		AddWorker(e.collectionIndexer.WorkerLoop).
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer)
-
-	//TODO: should I add a check for nil ptr for collection syncer ? (as done below)
 
 	// If txErrorMessagesCore is provided, add a worker responsible for processing
 	// transaction result error messages by receipts. This worker listens for blocks
@@ -403,6 +386,10 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	}
 
 	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
+	err = e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
+	if err != nil {
+		return fmt.Errorf("could not request collections for block: %w", err)
+	}
 	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil

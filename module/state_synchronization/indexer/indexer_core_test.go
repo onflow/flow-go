@@ -13,11 +13,11 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	collectionsmock "github.com/onflow/flow-go/engine/access/ingestion/collections/mock"
 	rpcconvert "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -44,6 +44,7 @@ type indexCoreTest struct {
 	results               *storagemock.LightTransactionResults
 	headers               *storagemock.Headers
 	scheduledTransactions *storagemock.ScheduledTransactions
+	collectionIndexer     *collectionsmock.CollectionIndexer
 	ctx                   context.Context
 	blocks                []*flow.Block
 	data                  *execution_data.BlockExecutionDataEntity
@@ -69,6 +70,7 @@ func newIndexCoreTest(
 		collections:           storagemock.NewCollections(t),
 		transactions:          storagemock.NewTransactions(t),
 		scheduledTransactions: storagemock.NewScheduledTransactions(t),
+		collectionIndexer:     collectionsmock.NewCollectionIndexer(t),
 		blocks:                blocks,
 		ctx:                   context.Background(),
 		data:                  exeData,
@@ -229,6 +231,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		i.scheduledTransactions,
 		i.g.ChainID(),
 		derivedChainData,
+		i.collectionIndexer,
 		collectionExecutedMetric,
 		lockManager,
 	)
@@ -249,7 +252,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	blocks := g.Blocks().List(4)
 
-	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1].ToHeader())
+	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1])
 	blockID := tf.Block.ID()
 
 	blocks = append(blocks, tf.Block)
@@ -277,9 +280,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				assert.ElementsMatch(t, tf.ExpectedRegisterEntries, entries)
 			}).
 			Return(nil)
-		for _, collection := range tf.ExpectedCollections {
-			test.collections.On("StoreAndIndexByTransaction", mock.Anything, collection).Return(&flow.LightCollection{}, nil)
-		}
+		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
 		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
 			test.scheduledTransactions.On("BatchIndex", mock.Anything, blockID, txID, scheduledTxID, mock.Anything).
 				Return(func(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
@@ -362,26 +363,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
 }
 
-// trieRegistersPayloadComparer checks that trie payloads and register payloads are same, used for testing.
-func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, registerPayloads flow.RegisterEntries) {
-	assert.Equal(t, len(triePayloads), len(registerPayloads.Values()), "registers length should equal")
-
-	// crate a lookup map that matches flow register ID to index in the payloads slice
-	payloadRegID := make(map[flow.RegisterID]int)
-	for i, p := range triePayloads {
-		k, _ := p.Key()
-		regKey, _ := convert.LedgerKeyToRegisterID(k)
-		payloadRegID[regKey] = i
-	}
-
-	for _, entry := range registerPayloads {
-		index, ok := payloadRegID[entry.Key]
-		assert.True(t, ok, fmt.Sprintf("register entry not found for key %s", entry.Key.String()))
-		val := triePayloads[index].Value()
-		assert.True(t, val.Equals(entry.Value), fmt.Sprintf("payload values not same %s - %s", val, entry.Value))
-	}
-}
-
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	regOwnerAddress := unittest.RandomAddressFixture()
@@ -416,6 +397,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -451,6 +433,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -479,6 +462,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -524,6 +508,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -538,7 +523,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 func TestCollectScheduledTransactions(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	blocks := g.Blocks().List(5)
-	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1].ToHeader())
+	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1])
 
 	chainID := g.ChainID()
 	fvmEnv := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
