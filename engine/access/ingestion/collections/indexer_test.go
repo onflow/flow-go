@@ -33,6 +33,7 @@ import (
 type IndexerSuite struct {
 	suite.Suite
 
+	db                  *storagemock.DB
 	state               *protocolmock.State
 	blocks              *storagemock.Blocks
 	collections         *storagemock.Collections
@@ -49,6 +50,7 @@ func TestIndexer(t *testing.T) {
 }
 
 func (s *IndexerSuite) SetupTest() {
+	s.db = storagemock.NewDB(s.T())
 	s.state = protocolmock.NewState(s.T())
 	s.blocks = storagemock.NewBlocks(s.T())
 	s.collections = storagemock.NewCollections(s.T())
@@ -67,6 +69,7 @@ func (s *IndexerSuite) SetupTest() {
 func (s *IndexerSuite) createIndexer(t *testing.T) *Indexer {
 	indexer, err := NewIndexer(
 		unittest.Logger(),
+		s.db,
 		metrics.NewNoopCollector(),
 		s.state,
 		s.blocks,
@@ -183,7 +186,7 @@ func (s *IndexerSuite) TestIsCollectionInStorage() {
 
 		indexer := s.createIndexer(s.T())
 
-		inStorage, err := indexer.IsCollectionInStorage(collection.ID())
+		inStorage, err := indexer.isCollectionInStorage(collection.ID())
 		s.Require().NoError(err)
 		s.Require().True(inStorage)
 	})
@@ -193,7 +196,7 @@ func (s *IndexerSuite) TestIsCollectionInStorage() {
 
 		indexer := s.createIndexer(s.T())
 
-		inStorage, err := indexer.IsCollectionInStorage(collection.ID())
+		inStorage, err := indexer.isCollectionInStorage(collection.ID())
 		s.Require().NoError(err)
 		s.Require().False(inStorage)
 	})
@@ -204,7 +207,7 @@ func (s *IndexerSuite) TestIsCollectionInStorage() {
 
 		indexer := s.createIndexer(s.T())
 
-		inStorage, err := indexer.IsCollectionInStorage(collection.ID())
+		inStorage, err := indexer.isCollectionInStorage(collection.ID())
 		s.Require().ErrorIs(err, exception)
 		s.Require().False(inStorage)
 	})
@@ -268,7 +271,11 @@ func (s *IndexerSuite) TestOnCollectionReceived() {
 
 	synctest.Test(s.T(), func(t *testing.T) {
 		s.collections.On("LightByID", collection.ID()).Return(nil, storage.ErrNotFound).Once()
-		s.collections.On("StoreAndIndexByTransaction", mock.Anything, collection).Return(collection.Light(), nil).Once()
+		s.collections.On("BatchStoreAndIndexByTransaction", mock.Anything, collection, mock.Anything).Return(collection.Light(), nil).Once()
+
+		s.db.On("WithReaderBatchWriter", mock.Anything).Return(func(fn func(storage.ReaderBatchWriter) error) error {
+			return fn(nil)
+		}).Once()
 
 		indexer := s.createIndexer(s.T())
 
@@ -312,6 +319,7 @@ func (s *IndexerSuite) TestWorkerProcessing_ProcessesCollections() {
 
 		indexer, err := NewIndexer(
 			unittest.Logger(),
+			bc.db,
 			metrics.NewNoopCollector(),
 			bc.state,
 			bc.all.Blocks,
