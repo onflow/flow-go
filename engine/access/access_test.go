@@ -726,6 +726,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
+			db,
 			collectionExecutedMetric,
 			suite.state,
 			all.Blocks,
@@ -816,8 +817,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// block until the collection is processed by the indexer
 		require.Eventually(suite.T(), func() bool {
-			isStored, err := collectionIndexer.IsCollectionInStorage(collection.ID())
-			return isStored && err == nil
+			_, err := collections.LightByID(collection.ID())
+			return err == nil
 		}, 1*time.Second, 10*time.Millisecond, "collection not indexed")
 
 		// 5. Client requests a transaction
@@ -984,6 +985,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
+			db,
 			collectionExecutedMetric,
 			suite.state,
 			all.Blocks,
@@ -1249,6 +1251,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
+			db,
 			collectionExecutedMetric,
 			suite.state,
 			all.Blocks,

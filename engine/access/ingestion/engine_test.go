@@ -183,6 +183,7 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 
 	indexer, err := collections.NewIndexer(
 		s.log,
+		s.db,
 		s.collectionExecutedMetric,
 		s.proto.state,
 		s.blocks,
