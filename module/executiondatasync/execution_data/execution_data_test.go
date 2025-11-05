@@ -27,19 +27,19 @@ func TestBlockExecutionDataHelpers(t *testing.T) {
 	expectedSystemCollection := expectedSystemChunk.Collection
 
 	t.Run("StandardChunks", func(t *testing.T) {
-		assert.Equal(t, blockData.StandardChunks(), expectedStardardChunks)
+		assert.Equal(t, expectedStardardChunks, blockData.StandardChunks())
 	})
 
 	t.Run("StandardCollections", func(t *testing.T) {
-		assert.Equal(t, blockData.StandardCollections(), expectedStandardCollections)
+		assert.Equal(t, expectedStandardCollections, blockData.StandardCollections())
 	})
 
 	t.Run("SystemChunk", func(t *testing.T) {
-		assert.Equal(t, blockData.SystemChunk(), expectedSystemChunk)
+		assert.Equal(t, expectedSystemChunk, blockData.SystemChunk())
 	})
 
 	t.Run("SystemCollection", func(t *testing.T) {
-		assert.Equal(t, blockData.SystemCollection(), expectedSystemCollection)
+		assert.Equal(t, expectedSystemCollection, blockData.SystemCollection())
 	})
 }
 
