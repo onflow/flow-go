@@ -57,6 +57,8 @@ func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, er
 }
 
 // FullCollectionToMessage converts a full collection to a slice of protobuf transaction messages
+//
+// All errors indicate the input could not be correctly converted.
 func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
 	if c == nil {
 		return nil, fmt.Errorf("invalid collection")
