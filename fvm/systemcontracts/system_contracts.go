@@ -112,11 +112,11 @@ var (
 	evmStorageAddressMainnet = flow.HexToAddress("d421a63faae318f9")
 
 	// scheduledTransactionExecutorAddressTestnet is the address of the Scheduled Transaction Executor contract on Testnet
-	scheduledTransactionExecutorAddressTestnet = flow.HexToAddress("9275945e651650bd") // todo define the address
+	scheduledTransactionExecutorAddressTestnet = flow.HexToAddress("9275945e651650bd")
 	// scheduledTransactionExecutorAddressMainnet is the address of the Scheduled Transaction Executor contract on Mainnet
-	scheduledTransactionExecutorAddressMainnet = flow.HexToAddress("") // todo define the address
+	scheduledTransactionExecutorAddressMainnet = flow.HexToAddress("45df3724e7c13957")
 	// scheduledTransactionExecutorAddressEmulator is the address of the Scheduled Transaction Executor contract on Emulator
-	scheduledTransactionExecutorAddressEmulator = flow.HexToAddress("") // todo evm storage
+	scheduledTransactionExecutorAddressEmulator = flow.HexToAddress("01cf0e2f2f715450")
 
 	// executionParametersAddressTestnet is the address of the Execution Parameters contract on Testnet
 	executionParametersAddressTestnet = flow.HexToAddress("6997a2f2cf57b73a")
