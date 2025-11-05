@@ -219,6 +219,10 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 		}
 
 		txs[i] = tx
+		// evm overflow protection
+		if totalGasLimit+types.GasLimit(tx.Gas()) < totalGasLimit {
+			return nil, fvmErrors.NewEVMError(fmt.Errorf("evm gas overflow"))
+		}
 		totalGasLimit += types.GasLimit(tx.Gas())
 	}
 
