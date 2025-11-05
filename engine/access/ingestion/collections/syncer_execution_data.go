@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 // ExecutionDataSyncer submits collections from execution data to the collections indexer. It is
