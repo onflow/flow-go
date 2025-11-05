@@ -37,7 +37,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -191,7 +190,6 @@ func (suite *Suite) RunTest(
 			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 			ExecutionStateCache:         suite.executionStateCache,
-			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
@@ -364,7 +362,6 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
 			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 			ExecutionStateCache:         suite.executionStateCache,
-			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
@@ -715,7 +712,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
 			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 			ExecutionStateCache:         suite.executionStateCache,
-			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
@@ -936,7 +932,6 @@ func (suite *Suite) TestGetTransactionResult() {
 			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
 			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 			ExecutionStateCache:         suite.executionStateCache,
-			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)
@@ -1194,7 +1189,6 @@ func (suite *Suite) TestExecuteScript() {
 			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
 			ExecutionResultInfoProvider: suite.executionResultInfoProvider,
 			ExecutionStateCache:         suite.executionStateCache,
-			OperatorCriteria:            optimistic_sync.DefaultCriteria,
 			MaxScriptAndArgumentSize:    commonrpc.DefaultAccessMaxRequestSize,
 		})
 		require.NoError(suite.T(), err)

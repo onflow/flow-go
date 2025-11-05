@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -95,6 +96,8 @@ func New(
 	registerIDsRequestLimit int,
 	subscriptionHandler *subscription.SubscriptionHandler,
 	executionDataTracker tracker.ExecutionDataTracker,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -113,11 +116,13 @@ func New(
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
-		log:                  logger,
-		headers:              headers,
-		subscriptionHandler:  subscriptionHandler,
-		getExecutionData:     b.getExecutionData,
-		executionDataTracker: executionDataTracker,
+		log:                     logger,
+		headers:                 headers,
+		subscriptionHandler:     subscriptionHandler,
+		getExecutionData:        b.getExecutionData,
+		executionDataTracker:    executionDataTracker,
+		executionResultProvider: executionResultProvider,
+		executionStateCache:     executionStateCache,
 	}
 
 	eventsProvider := EventsProvider{
