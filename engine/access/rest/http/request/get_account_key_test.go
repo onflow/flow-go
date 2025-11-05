@@ -135,30 +135,37 @@ func TestGetAccountKey_InvalidParse(t *testing.T) {
 //  4. A request using "final" as the block height.
 func TestGetAccountKey_ValidParse(t *testing.T) {
 	validAddress := flow.Localnet.Chain().ServiceAddress().String()
-	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 	keyIndex := "5"
 	height := "100"
+	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2)
 	chain := flow.Localnet.Chain()
+	agreeingExecutorsCount := uint64(2)
 
-	request, err := parseGetAccountKeyRequest(validAddress, keyIndex, height, "2", validAgreeingExecutorsIds, "false", chain)
+	agreeingExecutorsCountStr := fmt.Sprintf("%d", agreeingExecutorsCount)
+	validAgreeingExecutorsIdsStr := validAgreeingExecutorsIds.Strings()
+
+	request, err := parseGetAccountKeyRequest(validAddress, keyIndex, height, agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "true", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Address.String(), validAddress)
 	require.Equal(t, request.Index, uint32(5))
 	require.Equal(t, request.Height, uint64(100))
+	require.Equal(t, request.ExecutionState.AgreeingExecutorsCount, agreeingExecutorsCount)
+	require.EqualValues(t, request.ExecutionState.RequiredExecutorIDs, validAgreeingExecutorsIds)
+	require.True(t, request.ExecutionState.IncludeExecutorMetadata)
 
-	request, err = parseGetAccountKeyRequest(validAddress, keyIndex, "", "2", validAgreeingExecutorsIds, "false", chain)
+	request, err = parseGetAccountKeyRequest(validAddress, keyIndex, "", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Address.String(), validAddress)
 	require.Equal(t, request.Index, uint32(5))
 	require.Equal(t, request.Height, SealedHeight)
 
-	request, err = parseGetAccountKeyRequest(validAddress, keyIndex, "sealed", "2", validAgreeingExecutorsIds, "false", chain)
+	request, err = parseGetAccountKeyRequest(validAddress, keyIndex, "sealed", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Address.String(), validAddress)
 	require.Equal(t, request.Index, uint32(5))
 	require.Equal(t, request.Height, SealedHeight)
 
-	request, err = parseGetAccountKeyRequest(validAddress, keyIndex, "final", "2", validAgreeingExecutorsIds, "false", chain)
+	request, err = parseGetAccountKeyRequest(validAddress, keyIndex, "final", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Address.String(), validAddress)
 	require.Equal(t, request.Index, uint32(5))

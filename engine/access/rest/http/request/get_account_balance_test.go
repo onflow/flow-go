@@ -116,23 +116,30 @@ func TestGetAccountBalance_InvalidParse(t *testing.T) {
 //  4. A request using the "final" as the block height.
 func TestGetAccountBalance_ValidParse(t *testing.T) {
 	validAddress := flow.Localnet.Chain().ServiceAddress().String()
-	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
+	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2)
 	chain := flow.Localnet.Chain()
+	agreeingExecutorsCount := uint64(2)
 
-	request, err := parseGetAccountBalanceRequest(validAddress, "", "2", validAgreeingExecutorsIds, "false", chain)
+	agreeingExecutorsCountStr := fmt.Sprintf("%d", agreeingExecutorsCount)
+	validAgreeingExecutorsIdsStr := validAgreeingExecutorsIds.Strings()
+
+	request, err := parseGetAccountBalanceRequest(validAddress, "", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "true", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Address.String(), validAddress)
 	require.Equal(t, request.Height, SealedHeight)
+	require.Equal(t, request.ExecutionState.AgreeingExecutorsCount, agreeingExecutorsCount)
+	require.EqualValues(t, request.ExecutionState.RequiredExecutorIDs, validAgreeingExecutorsIds)
+	require.True(t, request.ExecutionState.IncludeExecutorMetadata)
 
-	request, err = parseGetAccountBalanceRequest(validAddress, "100", "2", validAgreeingExecutorsIds, "false", chain)
+	request, err = parseGetAccountBalanceRequest(validAddress, "100", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Height, uint64(100))
 
-	request, err = parseGetAccountBalanceRequest(validAddress, sealed, "2", validAgreeingExecutorsIds, "false", chain)
+	request, err = parseGetAccountBalanceRequest(validAddress, sealed, agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Height, SealedHeight)
 
-	request, err = parseGetAccountBalanceRequest(validAddress, final, "2", validAgreeingExecutorsIds, "false", chain)
+	request, err = parseGetAccountBalanceRequest(validAddress, final, agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
 	require.NoError(t, err)
 	require.Equal(t, request.Height, FinalHeight)
 }
