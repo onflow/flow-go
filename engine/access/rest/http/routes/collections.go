@@ -11,6 +11,10 @@ import (
 // GetCollectionByID retrieves a light collection by ID and builds a response. The light collection
 // contains only transaction IDs, not the full transaction bodies. If the expand query parameter
 // includes "transactions", the full transaction bodies are fetched and included in the response.
+//
+// Expected errors during normal operation:
+//   - common.BadRequestError if the request parameters are invalid
+//   - access.DataNotFoundError (converted to appropriate StatusError) if the collection or transactions are not found
 func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetCollectionRequest(r)
 	if err != nil {

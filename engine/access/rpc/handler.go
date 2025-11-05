@@ -200,6 +200,10 @@ func (h *Handler) GetBlockByID(
 }
 
 // GetCollectionByID gets a collection by ID.
+//
+// Expected errors during normal operation:
+//   - codes.InvalidArgument if the collection ID is invalid
+//   - codes.NotFound if the collection or transactions are not found
 func (h *Handler) GetCollectionByID(
 	ctx context.Context,
 	req *accessproto.GetCollectionByIDRequest,
@@ -232,6 +236,10 @@ func (h *Handler) GetCollectionByID(
 
 // GetFullCollectionByID retrieves a full collection by ID. The full collection contains the
 // complete transaction bodies for all transactions in the collection.
+//
+// Expected errors during normal operation:
+//   - codes.InvalidArgument if the collection ID is invalid
+//   - codes.NotFound if the collection or transactions are not found
 func (h *Handler) GetFullCollectionByID(
 	ctx context.Context,
 	req *accessproto.GetFullCollectionByIDRequest,
