@@ -26,6 +26,8 @@ const (
 	LockInsertCollection = "lock_insert_collection"
 	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
 	LockBootstrapping = "lock_bootstrapping"
+	// LockUpdateLatestPersistedSealedResult protects the update of the latest persisted sealed result.
+	LockUpdateLatestPersistedSealedResult = "lock_update_latest_persisted_sealed_result"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -38,6 +40,7 @@ func Locks() []string {
 		LockInsertOwnReceipt,
 		LockInsertCollection,
 		LockBootstrapping,
+		LockUpdateLatestPersistedSealedResult,
 	}
 }
 
@@ -61,6 +64,7 @@ func makeLockPolicy() lockctx.Policy {
 	return lockctx.NewDAGPolicyBuilder().
 		Add(LockInsertBlock, LockFinalizeBlock).
 		Add(LockFinalizeBlock, LockBootstrapping).
+		Add(LockInsertCollection, LockUpdateLatestPersistedSealedResult).
 		Build()
 }
 
