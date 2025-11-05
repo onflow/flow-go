@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/versioned"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -41,6 +42,7 @@ type ENTransactionProvider struct {
 	txStatusDeriver *txstatus.TxStatusDeriver
 
 	systemCollection                     *system.SystemCollection
+	sysCollection                        *versioned.Versioned[versioned.SystemCollection]
 	scheduledTransactionsEnabled         bool
 	processScheduledTransactionEventType flow.EventType
 }
@@ -56,6 +58,7 @@ func NewENTransactionProvider(
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	systemCollection *system.SystemCollection,
+	sysCollection *versioned.Versioned[versioned.SystemCollection],
 	chainID flow.ChainID,
 	scheduledTransactionsEnabled bool,
 ) *ENTransactionProvider {
@@ -69,6 +72,7 @@ func NewENTransactionProvider(
 		nodeProvider:                         execNodeIdentitiesProvider,
 		txStatusDeriver:                      txStatusDeriver,
 		systemCollection:                     systemCollection,
+		sysCollection:                        sysCollection,
 		chainID:                              chainID,
 		scheduledTransactionsEnabled:         scheduledTransactionsEnabled,
 		processScheduledTransactionEventType: blueprints.PendingExecutionEventType(env),
@@ -148,19 +152,14 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	// system transactions
-	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
-	// transactions were enabled for this block. See https://github.com/onflow/flow-go/issues/7873
-	if !e.scheduledTransactionsEnabled {
-		return append(transactions, e.systemCollection.Transactions()...), nil
-	}
-
 	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledTransactionEventType)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
-	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
+	sysCollection, err := e.sysCollection.
+		Get(block.Height).
+		SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
@@ -315,7 +314,10 @@ func (e *ENTransactionProvider) ScheduledTransactionsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
-	txs, err := blueprints.ExecuteCallbacksTransactions(e.chainID.Chain(), events)
+	txs, err := e.sysCollection.
+		Get(header.Height).
+		ExecuteCallbacksTransactions(e.chainID.Chain(), events)
+		//	txs, err := blueprints.ExecuteCallbacksTransactions(e.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct scheduled transactions: %v", err)
 	}
@@ -448,6 +450,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 		actualEventEncodingVersion,
 		entities.EventEncodingVersion_CCF_V0,
 	)
+
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
 	}
