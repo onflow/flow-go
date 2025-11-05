@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -13,6 +14,37 @@ const (
 	// DefaultRegisterIDsRequestLimit defines the default limit of register IDs for a single request to the get register endpoint
 	DefaultRegisterIDsRequestLimit = 100
 )
+
+type ExecutionDataAPI interface {
+	// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected errors:
+	// - [access.DataNotFoundError]: when data required to process the request is not available.
+	GetExecutionDataByBlockID(
+		ctx context.Context,
+		blockID flow.Identifier,
+		criteria optimistic_sync.Criteria,
+	) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error)
+
+	// SubscribeExecutionData is deprecated and will be removed in future versions.
+	// Use SubscribeExecutionDataFromStartBlockID, SubscribeExecutionDataFromStartBlockHeight or SubscribeExecutionDataFromLatest.
+	//
+	// SubscribeExecutionData subscribes to execution data starting from a specific block ID and block height.
+	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription
+
+	// SubscribeExecutionDataFromStartBlockID subscribes to execution data starting from a specific block id.
+	SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription
+
+	// SubscribeExecutionDataFromStartBlockHeight subscribes to execution data starting from a specific block height.
+	SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription
+
+	// SubscribeExecutionDataFromLatest subscribes to execution data starting from latest block.
+	SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription
+}
 
 type EventsAPI interface {
 	// SubscribeEvents is deprecated and will be removed in a future version.
@@ -143,20 +175,8 @@ type AccountsAPI interface {
 type API interface {
 	AccountsAPI
 	EventsAPI
+	ExecutionDataAPI
 
-	// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
-	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
-	// SubscribeExecutionData is deprecated and will be removed in future versions.
-	// Use SubscribeExecutionDataFromStartBlockID, SubscribeExecutionDataFromStartBlockHeight or SubscribeExecutionDataFromLatest.
-	//
-	// SubscribeExecutionData subscribes to execution data starting from a specific block ID and block height.
-	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription
-	// SubscribeExecutionDataFromStartBlockID subscribes to execution data starting from a specific block id.
-	SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription
-	// SubscribeExecutionDataFromStartBlockHeight subscribes to execution data starting from a specific block height.
-	SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription
-	// SubscribeExecutionDataFromLatest subscribes to execution data starting from latest block.
-	SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription
 	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
 	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
 }

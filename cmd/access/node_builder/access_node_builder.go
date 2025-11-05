@@ -147,48 +147,50 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	supportsObserver                     bool // True if this is an Access node that supports observers and consensus follower engines
-	pingEnabled                          bool
-	nodeInfoFile                         string
-	apiRatelimits                        map[string]int
-	apiBurstlimits                       map[string]int
-	rpcConf                              rpc.Config
-	stateStreamConf                      statestreambackend.Config
-	stateStreamFilterConf                map[string]int
-	ExecutionNodeAddress                 string // deprecated
-	HistoricalAccessRPCs                 []access.AccessAPIClient
-	logTxTimeToFinalized                 bool
-	logTxTimeToExecuted                  bool
-	logTxTimeToFinalizedExecuted         bool
-	logTxTimeToSealed                    bool
-	retryEnabled                         bool
-	rpcMetricsEnabled                    bool
-	executionDataSyncEnabled             bool
-	publicNetworkExecutionDataEnabled    bool
-	executionDataDBMode                  string
-	executionDataPrunerHeightRangeTarget uint64
-	executionDataPrunerThreshold         uint64
-	executionDataPruningInterval         time.Duration
-	executionDataDir                     string
-	executionDataStartHeight             uint64
-	executionDataConfig                  edrequester.ExecutionDataConfig
-	PublicNetworkConfig                  PublicNetworkConfig
-	TxResultCacheSize                    uint
-	executionDataIndexingEnabled         bool
-	registersDBPath                      string
-	checkpointFile                       string
-	scriptExecutorConfig                 query.QueryConfig
-	scriptExecMinBlock                   uint64
-	scriptExecMaxBlock                   uint64
-	registerCacheType                    string
-	registerCacheSize                    uint
-	programCacheSize                     uint
-	checkPayerBalanceMode                string
-	versionControlEnabled                bool
-	storeTxResultErrorMessages           bool
-	stopControlEnabled                   bool
-	registerDBPruneThreshold             uint64
-	scheduledCallbacksEnabled            bool
+	supportsObserver                      bool // True if this is an Access node that supports observers and consensus follower engines
+	pingEnabled                           bool
+	nodeInfoFile                          string
+	apiRatelimits                         map[string]int
+	apiBurstlimits                        map[string]int
+	rpcConf                               rpc.Config
+	stateStreamConf                       statestreambackend.Config
+	stateStreamFilterConf                 map[string]int
+	ExecutionNodeAddress                  string // deprecated
+	HistoricalAccessRPCs                  []access.AccessAPIClient
+	logTxTimeToFinalized                  bool
+	logTxTimeToExecuted                   bool
+	logTxTimeToFinalizedExecuted          bool
+	logTxTimeToSealed                     bool
+	retryEnabled                          bool
+	rpcMetricsEnabled                     bool
+	executionDataSyncEnabled              bool
+	publicNetworkExecutionDataEnabled     bool
+	executionDataDBMode                   string
+	executionDataPrunerHeightRangeTarget  uint64
+	executionDataPrunerThreshold          uint64
+	executionDataPruningInterval          time.Duration
+	executionDataDir                      string
+	executionDataStartHeight              uint64
+	executionDataConfig                   edrequester.ExecutionDataConfig
+	PublicNetworkConfig                   PublicNetworkConfig
+	TxResultCacheSize                     uint
+	executionDataIndexingEnabled          bool
+	registersDBPath                       string
+	checkpointFile                        string
+	scriptExecutorConfig                  query.QueryConfig
+	scriptExecMinBlock                    uint64
+	scriptExecMaxBlock                    uint64
+	registerCacheType                     string
+	registerCacheSize                     uint
+	programCacheSize                      uint
+	checkPayerBalanceMode                 string
+	versionControlEnabled                 bool
+	storeTxResultErrorMessages            bool
+	stopControlEnabled                    bool
+	registerDBPruneThreshold              uint64
+	scheduledCallbacksEnabled             bool
+	executionResultAgreeingExecutorsCount uint
+	executionResultRequiredExecutors      []string
 }
 
 type PublicNetworkConfig struct {
@@ -280,25 +282,27 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		executionDataIndexingEnabled:         false,
-		executionDataDBMode:                  execution_data.ExecutionDataDBModePebble.String(),
-		executionDataPrunerHeightRangeTarget: 0,
-		executionDataPrunerThreshold:         pruner.DefaultThreshold,
-		executionDataPruningInterval:         pruner.DefaultPruningInterval,
-		registersDBPath:                      filepath.Join(homedir, ".flow", "execution_state"),
-		checkpointFile:                       cmd.NotSet,
-		scriptExecutorConfig:                 query.NewDefaultConfig(),
-		scriptExecMinBlock:                   0,
-		scriptExecMaxBlock:                   math.MaxUint64,
-		registerCacheType:                    pstorage.CacheTypeTwoQueue.String(),
-		registerCacheSize:                    0,
-		programCacheSize:                     0,
-		checkPayerBalanceMode:                txvalidator.Disabled.String(),
-		versionControlEnabled:                true,
-		storeTxResultErrorMessages:           false,
-		stopControlEnabled:                   false,
-		registerDBPruneThreshold:             0,
-		scheduledCallbacksEnabled:            fvm.DefaultScheduledCallbacksEnabled,
+		executionDataIndexingEnabled:          false,
+		executionDataDBMode:                   execution_data.ExecutionDataDBModePebble.String(),
+		executionDataPrunerHeightRangeTarget:  0,
+		executionDataPrunerThreshold:          pruner.DefaultThreshold,
+		executionDataPruningInterval:          pruner.DefaultPruningInterval,
+		registersDBPath:                       filepath.Join(homedir, ".flow", "execution_state"),
+		checkpointFile:                        cmd.NotSet,
+		scriptExecutorConfig:                  query.NewDefaultConfig(),
+		scriptExecMinBlock:                    0,
+		scriptExecMaxBlock:                    math.MaxUint64,
+		registerCacheType:                     pstorage.CacheTypeTwoQueue.String(),
+		registerCacheSize:                     0,
+		programCacheSize:                      0,
+		checkPayerBalanceMode:                 txvalidator.Disabled.String(),
+		versionControlEnabled:                 true,
+		storeTxResultErrorMessages:            false,
+		stopControlEnabled:                    false,
+		registerDBPruneThreshold:              0,
+		scheduledCallbacksEnabled:             fvm.DefaultScheduledCallbacksEnabled,
+		executionResultAgreeingExecutorsCount: optimistic_sync.DefaultCriteria.AgreeingExecutorsCount,
+		executionResultRequiredExecutors:      optimistic_sync.DefaultCriteria.RequiredExecutors.Strings(),
 	}
 }
 
@@ -375,8 +379,10 @@ type FlowAccessNodeBuilder struct {
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	stateStreamBackend *statestreambackend.StateStreamBackend
-	nodeBackend        *backend.Backend
+	stateStreamBackend          *statestreambackend.StateStreamBackend
+	nodeBackend                 *backend.Backend
+	executionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	executionStateCache         optimistic_sync.ExecutionStateCache
 
 	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
 	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
@@ -650,6 +656,39 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			return nil
 		}).
+		Module("execution state cache", func(node *cmd.NodeConfig) error {
+
+			// check if all the storages are initialized before passing them to Snapshot
+			if builder.events == nil {
+				return fmt.Errorf("events store not initialized: ensure 'events storage' module runs before 'execution state cache'")
+			}
+			if builder.collections == nil {
+				return fmt.Errorf("collections store not initialized: ensure 'collections storage' module runs before 'execution state cache'")
+			}
+			if builder.transactions == nil {
+				return fmt.Errorf("transactions store not initialized: ensure 'transactions storage' module runs before 'execution state cache'")
+			}
+			if builder.lightTransactionResults == nil {
+				return fmt.Errorf("lightTransactionResults store not initialized: ensure 'lightTransactionResults storage' module runs before 'execution state cache'")
+			}
+			if builder.transactionResultErrorMessages == nil {
+				return fmt.Errorf("transactionResultErrorMessages store not initialized: ensure 'transactionResultErrorMessages storage' module runs before 'execution state cache'")
+			}
+
+			// TODO: use real objects instead of mocks once they're implemented
+			snapshot := osyncsnapshot.NewSnapshotMock(
+				builder.events,
+				builder.collections,
+				builder.transactions,
+				builder.lightTransactionResults,
+				builder.transactionResultErrorMessages,
+				nil,
+				notNil(executionDataStoreCache),
+			)
+			builder.executionStateCache = execution_state.NewExecutionStateCacheMock(snapshot)
+
+			return nil
+		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
@@ -854,10 +893,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				indexedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 				return nil
 			}).
-			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
-				return nil
-			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
@@ -1050,7 +1085,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			// use the events index for events if enabled and the node is configured to use it for
 			// regular event queries
-			fetchFromLocalStorage := builder.executionDataIndexingEnabled &&
+			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
@@ -1061,43 +1096,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
-				fetchFromLocalStorage,
+				useIndex,
 			)
-
-			cfg := builder.rpcConf.BackendConfig
-			preferredENIdentifiers, err := flow.IdentifierListFromHex(cfg.PreferredExecutionNodeIDs)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-			}
-
-			fixedENIdentifiers, err := flow.IdentifierListFromHex(cfg.FixedExecutionNodeIDs)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-			}
-
-			execNodeSelector := execution_result.NewExecutionNodeSelector(
-				preferredENIdentifiers,
-				fixedENIdentifiers,
-			)
-
-			execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
-				node.Logger,
-				node.State,
-				node.Storage.Receipts,
-				execNodeSelector,
-				optimistic_sync.DefaultCriteria,
-			)
-
-			// TODO: use real objects instead of mocks once they're implemented
-			snapshot := osyncsnapshot.NewSnapshotMock(
-				builder.events,
-				builder.collections,
-				builder.transactions,
-				builder.lightTransactionResults,
-				builder.transactionResultErrorMessages,
-				nil,
-			)
-			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
@@ -1108,7 +1108,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.RegistersAsyncStore,
-				fetchFromLocalStorage,
+				useIndex,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
 				subscription.NewSubscriptionFactory(
 					builder.Logger,
@@ -1118,8 +1118,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
 				executionDataTracker,
-				execResultInfoProvider,
-				execStateCache,
+				notNil(builder.executionResultInfoProvider),
+				builder.executionStateCache, // might be nil
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1472,6 +1472,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"store-tx-result-error-messages",
 			defaultConfig.storeTxResultErrorMessages,
 			"whether to enable storing transaction error messages into the db")
+		flags.UintVar(&builder.executionResultAgreeingExecutorsCount,
+			"execution-result-agreeing-executors-count",
+			defaultConfig.executionResultAgreeingExecutorsCount,
+			"minimum number of execution receipts with the same result required for execution result queries")
+		flags.StringSliceVar(&builder.executionResultRequiredExecutors,
+			"execution-result-required-executors",
+			defaultConfig.executionResultRequiredExecutors,
+			"comma separated list of execution node IDs, one of which must have produced the execution result")
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
@@ -1639,6 +1647,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		if builder.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize <= 0 {
 			return errors.New("rpc-max-execution-response-message-size must be greater than 0")
 		}
+		if builder.executionResultAgreeingExecutorsCount <= 0 {
+			return errors.New("execution-result-agreeing-executors-count must be greater than 0")
+		}
 
 		return nil
 	})
@@ -1750,9 +1761,75 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 	})
 }
 
+// buildStoragesData registers modules that initialize core read-only stores used by
+// the access node (events, lightTransactionResults, and transactionResultErrorMessages).
+func (builder *FlowAccessNodeBuilder) buildStoragesData() *FlowAccessNodeBuilder {
+	builder.Module("events storage", func(node *cmd.NodeConfig) error {
+		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
+		return nil
+	})
+	builder.Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+		builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+		return nil
+	})
+	builder.Module("transaction results storage", func(node *cmd.NodeConfig) error {
+		builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+		return nil
+	})
+
+	return builder
+}
+
+// buildExecutionResultInfoProvider registers a module that wires the
+// optimistic_sync.ExecutionResultInfoProvider on the builder.
+func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAccessNodeBuilder {
+	builder.Module("execution result info provider", func(node *cmd.NodeConfig) error {
+		backendConfig := builder.rpcConf.BackendConfig
+
+		preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		requiredENIdentifiers, err := flow.IdentifierListFromHex(builder.executionResultRequiredExecutors)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for required EN list: %w", err)
+		}
+
+		execNodeSelector := execution_result.NewExecutionNodeSelector(
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		operatorCriteria := optimistic_sync.Criteria{
+			AgreeingExecutorsCount: builder.executionResultAgreeingExecutorsCount,
+			RequiredExecutors:      requiredENIdentifiers,
+		}
+
+		builder.executionResultInfoProvider = execution_result.NewExecutionResultInfoProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Receipts,
+			execNodeSelector,
+			operatorCriteria,
+		)
+
+		return nil
+	})
+	return builder
+}
+
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
 	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
+
+	builder.buildStoragesData()
+	builder.buildExecutionResultInfoProvider()
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1960,10 +2037,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 			return nil
 		}).
-		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
-			return nil
-		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
 			builder.Reporter = index.NewReporter()
 			return nil
@@ -1991,13 +2064,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 			if err != nil {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
-			}
-
-			return nil
-		}).
-		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-			if builder.storeTxResultErrorMessages {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			}
 
 			return nil
@@ -2123,12 +2189,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
 			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN list: %w", err)
 			}
 
 			fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
 			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN list: %w", err)
 			}
 
 			builder.ExecNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
@@ -2148,30 +2214,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				nodeCommunicator,
 				notNil(builder.ExecNodeIdentitiesProvider),
 			)
-
-			execNodeSelector := execution_result.NewExecutionNodeSelector(
-				preferredENIdentifiers,
-				fixedENIdentifiers,
-			)
-
-			execResultInfoProvider := execution_result.NewExecutionResultInfoProvider(
-				node.Logger,
-				node.State,
-				node.Storage.Receipts,
-				execNodeSelector,
-				optimistic_sync.DefaultCriteria,
-			)
-
-			// TODO: use real objects instead of mocks once they're implemented
-			snapshot := osyncsnapshot.NewSnapshotMock(
-				builder.events,
-				builder.collections,
-				builder.transactions,
-				builder.lightTransactionResults,
-				builder.transactionResultErrorMessages,
-				nil,
-			)
-			execStateCache := execution_state.NewExecutionStateCacheMock(snapshot)
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
@@ -2213,9 +2255,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				VersionControl:              notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider:  notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:      notNil(builder.txResultErrorMessageProvider),
-				ExecutionResultInfoProvider: execResultInfoProvider,
-				ExecutionStateCache:         execStateCache,
-				OperatorCriteria:            optimistic_sync.DefaultCriteria,
+				ExecutionResultInfoProvider: notNil(builder.executionResultInfoProvider),
+				ExecutionStateCache:         builder.executionStateCache, // might be nil
 				MaxScriptAndArgumentSize:    config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 				ScheduledCallbacksEnabled:   builder.scheduledCallbacksEnabled,
 			})
@@ -2547,7 +2588,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 // notNil ensures that the input is not nil and returns it
 // the usage is to ensure the dependencies are initialized before initializing a module.
 // for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
-// different function, so we need to ensure that the storage.Collections is initialized before
+// different function, so we need to ensure that the storage.Collections were initialized before
 // creating the IngestionEngine.
 func notNil[T any](dep T) T {
 	if any(dep) == nil {

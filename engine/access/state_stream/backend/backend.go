@@ -90,7 +90,7 @@ func New(
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *cache.ExecutionDataCache,
 	registers *execution.RegistersAsyncStore,
-	fetchFromLocalStorage bool,
+	useEventsIndex bool,
 	registerIDsRequestLimit int,
 	subscriptionFactory *subscription.Factory,
 	executionDataTracker tracker.ExecutionDataTracker,
@@ -119,18 +119,20 @@ func New(
 	)
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
-		log:                  logger,
-		headers:              headers,
-		subscriptionFactory:  subscriptionFactory,
-		execDataProvider:     executionDataProvider,
-		executionDataTracker: executionDataTracker,
+		log:                     logger,
+		headers:                 headers,
+		subscriptionFactory:     subscriptionFactory,
+		executionDataTracker:    executionDataTracker,
+		execDataProvider:        executionDataProvider,
+		executionResultProvider: executionResultProvider,
+		executionStateCache:     executionStateCache,
 	}
 
 	eventProvider := NewEventsProvider(
 		log,
 		headers,
 		executionDataProvider,
-		fetchFromLocalStorage,
+		useEventsIndex,
 		executionResultProvider,
 		executionStateCache,
 	)
