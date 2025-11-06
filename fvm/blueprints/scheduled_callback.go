@@ -98,10 +98,10 @@ func executeCallbackTransaction(
 	id []byte,
 	effort uint64,
 ) (*flow.TransactionBody, error) {
-	script := templates.GenerateExecuteTransactionScript(env)
+	script := templates.GenerateSchedulerExecutorTransactionScript(env)
 
 	return flow.NewTransactionBodyBuilder().
-		AddAuthorizer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
 		SetScript(script).
 		AddArgument(id).
 		SetComputeLimit(effort).
@@ -188,4 +188,16 @@ func PendingExecutionEventType(env templates.Environment) flow.EventType {
 
 	scheduledContractAddress := env.FlowTransactionSchedulerAddress
 	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
+}
+
+// CreateScheduledTransactionExecutorTransaction creates a transaction to create an account that will be used for
+// authorizing the execution of scheduled transactions.
+func CreateScheduledTransactionExecutorTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	script := templates.GenerateCreateExecutionAccountScript(sc.AsTemplateEnv())
+
+	return flow.NewTransactionBodyBuilder().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		SetScript(script).
+		SetComputeLimit(callbackTransactionGasLimit).Build()
 }
