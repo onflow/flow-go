@@ -4,7 +4,32 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+
+	"github.com/onflow/flow-go/model/flow"
 )
+
+var latest = map[uint64]Version{0: VersionV2}
+
+var HardcodedChainHeightVersions = map[flow.ChainID]HeightVersionMapper{
+	// todo define these
+	flow.Mainnet: NewStaticHeightVersionMapper(map[uint64]Version{
+		100: VersionV0,
+		200: VersionV1,
+		300: VersionV2,
+	}),
+	flow.Testnet: NewStaticHeightVersionMapper(map[uint64]Version{
+		100: VersionV0,
+		200: VersionV1,
+		300: VersionV2,
+	}),
+	flow.Sandboxnet:        NewStaticHeightVersionMapper(latest),
+	flow.Previewnet:        NewStaticHeightVersionMapper(latest),
+	flow.Benchnet:          NewStaticHeightVersionMapper(latest),
+	flow.Localnet:          NewStaticHeightVersionMapper(latest),
+	flow.Emulator:          NewStaticHeightVersionMapper(latest),
+	flow.BftTestnet:        NewStaticHeightVersionMapper(latest),
+	flow.MonotonicEmulator: NewStaticHeightVersionMapper(latest),
+}
 
 // HeightVersionMapper defines the interface for mapping heights to protocol versions.
 type HeightVersionMapper interface {
