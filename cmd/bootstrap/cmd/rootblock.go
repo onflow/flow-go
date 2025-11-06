@@ -228,10 +228,6 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msgf("failed to merge node infos")
 	}
 
-	log.Info().Msg("running DKG for consensus nodes")
-	randomBeaconData, dkgIndexMap := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
-	log.Info().Msg("")
-
 	// create flow.IdentityList representation of the participant set
 	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
@@ -251,6 +247,10 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
 	clusterQCs := run.ConstructClusterRootQCsFromVotes(log, clusters, internalNodes, clusterBlocks, votes)
+	log.Info().Msg("")
+
+	log.Info().Msg("running DKG for consensus nodes")
+	randomBeaconData, dkgIndexMap := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root header")

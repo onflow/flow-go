@@ -181,7 +181,7 @@ func GenerateRecoverTxArgsWithDKG(
 		return nil, fmt.Errorf("could not initialize PRNG: %w", err)
 	}
 	log.Info().Msgf("partitioning %d partners + %d internal nodes into %d collector clusters", len(partnerCollectors), len(internalCollectors), collectionClusters)
-	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters, rng)
+	assignments, clusters, _, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters, rng)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate cluster assignment: %w", err)
 	}

@@ -34,7 +34,7 @@ func addGenerateClusterVoteCmdFlags() {
 }
 
 func generateClusterVote(c *cobra.Command, args []string) {
-	log.Info().Msg("generating root block vote")
+	log.Info().Msg("generating cluster block vote")
 
 	nodeIDString, err := readNodeID()
 	if err != nil {
