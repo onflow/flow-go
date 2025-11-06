@@ -13,12 +13,12 @@ var latest = map[uint64]Version{0: VersionV2}
 var HardcodedChainHeightVersions = map[flow.ChainID]HeightVersionMapper{
 	// todo define these
 	flow.Mainnet: NewStaticHeightVersionMapper(map[uint64]Version{
-		100: VersionV0,
+		0:   VersionV0,
 		200: VersionV1,
 		300: VersionV2,
 	}),
 	flow.Testnet: NewStaticHeightVersionMapper(map[uint64]Version{
-		100: VersionV0,
+		0:   VersionV0,
 		200: VersionV1,
 		300: VersionV2,
 	}),

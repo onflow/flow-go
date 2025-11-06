@@ -14,8 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/versioned"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -41,8 +39,7 @@ type ENTransactionProvider struct {
 
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	systemCollection                     *system.SystemCollection
-	sysCollection                        *versioned.Versioned[versioned.SystemCollection]
+	systemCollection                     accessmodel.Versioned[accessmodel.SystemCollection]
 	scheduledTransactionsEnabled         bool
 	processScheduledTransactionEventType flow.EventType
 }
@@ -57,8 +54,7 @@ func NewENTransactionProvider(
 	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
-	systemCollection *system.SystemCollection,
-	sysCollection *versioned.Versioned[versioned.SystemCollection],
+	systemCollection accessmodel.Versioned[accessmodel.SystemCollection],
 	chainID flow.ChainID,
 	scheduledTransactionsEnabled bool,
 ) *ENTransactionProvider {
@@ -72,7 +68,6 @@ func NewENTransactionProvider(
 		nodeProvider:                         execNodeIdentitiesProvider,
 		txStatusDeriver:                      txStatusDeriver,
 		systemCollection:                     systemCollection,
-		sysCollection:                        sysCollection,
 		chainID:                              chainID,
 		scheduledTransactionsEnabled:         scheduledTransactionsEnabled,
 		processScheduledTransactionEventType: blueprints.PendingExecutionEventType(env),
@@ -157,14 +152,14 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
-	sysCollection, err := e.sysCollection.
+	systemCollection, err := e.systemCollection.
 		Get(block.Height).
 		SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
 
-	return append(transactions, sysCollection.Transactions...), nil
+	return append(transactions, systemCollection.Transactions...), nil
 }
 
 func (e *ENTransactionProvider) TransactionResultByIndex(
@@ -314,10 +309,9 @@ func (e *ENTransactionProvider) ScheduledTransactionsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
-	txs, err := e.sysCollection.
+	txs, err := e.systemCollection.
 		Get(header.Height).
 		ExecuteCallbacksTransactions(e.chainID.Chain(), events)
-		//	txs, err := blueprints.ExecuteCallbacksTransactions(e.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct scheduled transactions: %v", err)
 	}

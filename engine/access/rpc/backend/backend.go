@@ -25,8 +25,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/versioned"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -139,22 +137,13 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	systemCollection, err := system.DefaultSystemCollection(params.ChainID, params.ScheduledCallbacksEnabled)
+	systemCollection, err := accessmodel.NewVersioned(
+		accessmodel.VersionedSystemCollections,
+		accessmodel.HardcodedChainHeightVersions[params.ChainID],
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+		return nil, fmt.Errorf("failed to create versioned system collections: %w", err)
 	}
-
-	staticVersionMapper := versioned.NewStaticVersionMapper(map[uint64]string{
-		0:    "v0.1.0", // version enum
-		1000: "v0.2.3",
-		2000: "v0.3.5",
-	})
-
-	sysCollection, err := versioned.NewVersioned(map[string]versioned.SystemCollection{
-		"v0.1.0": &versioned.SystemCollectionV0{},
-		"v0.2.3": &versioned.SystemCollectionV1{},
-		"v0.3.5": &versioned.SystemCollectionV2{},
-	}, staticVersionMapper)
 
 	accountsBackend, err := accounts.NewAccountsBackend(
 		params.Log,

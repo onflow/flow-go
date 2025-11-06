@@ -52,7 +52,6 @@ func NewLocalTransactionProvider(
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
 	txErrorMessages error_messages.Provider,
-	systemCollection *system.SystemCollection,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	chainID flow.ChainID,
 	scheduledTransactionsEnabled bool,
