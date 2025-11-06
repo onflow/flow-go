@@ -36,6 +36,7 @@ import (
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -234,7 +235,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		execNodeProvider,
 	)
 
-	s.scheduledTxEnabled = true
+	var systemCollections *systemcollection.Versioned
 	localTxProvider := provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
@@ -242,10 +243,9 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.eventIndex,
 		s.txResultIndex,
 		errorMessageProvider,
-		s.systemCollection,
+		systemCollections,
 		txStatusDeriver,
 		s.chainID,
-		s.scheduledTxEnabled,
 	)
 
 	execNodeTxProvider := provider.NewENTransactionProvider(
@@ -256,9 +256,8 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		nodeCommunicator,
 		execNodeProvider,
 		txStatusDeriver,
-		s.systemCollection,
+		systemCollections,
 		s.chainID,
-		s.scheduledTxEnabled,
 	)
 
 	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
@@ -304,11 +303,11 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Maybe() // used for some tests
 
 	txParams := transactions.Params{
-		Log:                         s.log,
-		Metrics:                     metrics.NewNoopCollector(),
-		State:                       s.state,
-		ChainID:                     s.chainID,
-		SystemCollection:            s.systemCollection,
+		Log:     s.log,
+		Metrics: metrics.NewNoopCollector(),
+		State:   s.state,
+		ChainID: s.chainID,
+		// SystemCollection:            s.systemCollection,
 		StaticCollectionRPCClient:   client,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,

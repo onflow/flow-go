@@ -34,10 +34,11 @@ func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error
 
 // ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
 // No errors are expected during normal operation.
-func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
+func ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
-	sc := systemcontracts.SystemContractsForChain(chainID.ChainID())
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	env := sc.AsTemplateEnv()
+	script := templates.GenerateSchedulerExecutorTransactionScript(env)
 
 	for _, event := range processEvents {
 		// todo make sure to check event index to ensure order is indeed correct
@@ -53,7 +54,12 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-		tx, err := executeCallbackTransaction(sc, env, id, effort)
+		tx, err := flow.NewTransactionBodyBuilder().
+			AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
+			SetScript(script).
+			AddArgument(id).
+			SetComputeLimit(effort).
+			Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
 		}
@@ -61,22 +67,6 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 	}
 
 	return txs, nil
-}
-
-func executeCallbackTransaction(
-	sc *systemcontracts.SystemContracts,
-	env templates.Environment,
-	id []byte,
-	effort uint64,
-) (*flow.TransactionBody, error) {
-	script := templates.GenerateSchedulerExecutorTransactionScript(env)
-
-	return flow.NewTransactionBodyBuilder().
-		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
-		SetScript(script).
-		AddArgument(id).
-		SetComputeLimit(effort).
-		Build()
 }
 
 // callbackArgsFromEvent decodes the event payload and returns the callback ID and effort.

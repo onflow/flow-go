@@ -13,12 +13,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/versioned"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
@@ -31,16 +29,15 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
 // LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
 type LocalTransactionProvider struct {
-	state                        protocol.State
-	collections                  storage.Collections
-	blocks                       storage.Blocks
-	eventsIndex                  *index.EventsIndex
-	txResultsIndex               *index.TransactionResultsIndex
-	txErrorMessages              error_messages.Provider
-	defaultSystemCollection      *system.SystemCollection
-	txStatusDeriver              *txstatus.TxStatusDeriver
-	scheduledTransactionsEnabled bool
-	chainID                      flow.ChainID
+	state             protocol.State
+	collections       storage.Collections
+	blocks            storage.Blocks
+	eventsIndex       *index.EventsIndex
+	txResultsIndex    *index.TransactionResultsIndex
+	txErrorMessages   error_messages.Provider
+	systemCollections *systemcollection.Versioned
+	txStatusDeriver   *txstatus.TxStatusDeriver
+	chainID           flow.ChainID
 }
 
 var _ TransactionProvider = (*LocalTransactionProvider)(nil)
@@ -52,21 +49,20 @@ func NewLocalTransactionProvider(
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
 	txErrorMessages error_messages.Provider,
+	systemCollections *systemcollection.Versioned,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	chainID flow.ChainID,
-	scheduledTransactionsEnabled bool,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
-		state:                        state,
-		collections:                  collections,
-		blocks:                       blocks,
-		eventsIndex:                  eventsIndex,
-		txResultsIndex:               txResultsIndex,
-		txErrorMessages:              txErrorMessages,
-		defaultSystemCollection:      systemCollection,
-		txStatusDeriver:              txStatusDeriver,
-		scheduledTransactionsEnabled: scheduledTransactionsEnabled,
-		chainID:                      chainID,
+		state:             state,
+		collections:       collections,
+		blocks:            blocks,
+		eventsIndex:       eventsIndex,
+		txResultsIndex:    txResultsIndex,
+		txErrorMessages:   txErrorMessages,
+		systemCollections: systemCollections,
+		txStatusDeriver:   txStatusDeriver,
+		chainID:           chainID,
 	}
 }
 
@@ -240,22 +236,14 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	var versionedCollection versioned.Versioned[versioned.SystemCollection]
-
-	// if !t.scheduledTransactionsEnabled {
-	// 	return append(transactions, t.defaultSystemCollection.Transactions()...), nil
-	// }
-
 	// generate the system collection which includes scheduled transactions
-	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
-	if err != nil {
-		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
+	eventProvider := func() (flow.EventsList, error) {
+		return t.eventsIndex.ByBlockID(blockID, block.Height)
 	}
 
-	sysCollection, err := versionedCollection.
-		Get(block.Height).
-		SystemCollection(t.chainID.Chain(), events)
-
+	sysCollection, err := t.systemCollections.
+		ByHeight(block.Height).
+		SystemCollection(t.chainID.Chain(), eventProvider)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
@@ -372,7 +360,9 @@ func (t *LocalTransactionProvider) ScheduledTransactionsByBlockID(
 		return nil, rpc.ConvertIndexError(err, header.Height, "failed to get events to reconstruct scheduled transactions")
 	}
 
-	txs, err := blueprints.ExecuteCallbacksTransactions(t.chainID.Chain(), events)
+	txs, err := t.systemCollections.
+		ByHeight(header.Height).
+		ExecuteCallbacksTransactions(t.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct scheduled transactions: %v", err)
 	}

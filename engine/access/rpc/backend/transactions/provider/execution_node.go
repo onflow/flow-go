@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -39,8 +40,7 @@ type ENTransactionProvider struct {
 
 	txStatusDeriver *txstatus.TxStatusDeriver
 
-	systemCollection                     accessmodel.Versioned[accessmodel.SystemCollection]
-	scheduledTransactionsEnabled         bool
+	systemCollections                    *systemcollection.Versioned
 	processScheduledTransactionEventType flow.EventType
 }
 
@@ -54,9 +54,8 @@ func NewENTransactionProvider(
 	nodeCommunicator node_communicator.Communicator,
 	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
-	systemCollection accessmodel.Versioned[accessmodel.SystemCollection],
+	systemCollections *systemcollection.Versioned,
 	chainID flow.ChainID,
-	scheduledTransactionsEnabled bool,
 ) *ENTransactionProvider {
 	env := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
 	return &ENTransactionProvider{
@@ -67,9 +66,8 @@ func NewENTransactionProvider(
 		nodeCommunicator:                     nodeCommunicator,
 		nodeProvider:                         execNodeIdentitiesProvider,
 		txStatusDeriver:                      txStatusDeriver,
-		systemCollection:                     systemCollection,
+		systemCollections:                    systemCollections,
 		chainID:                              chainID,
-		scheduledTransactionsEnabled:         scheduledTransactionsEnabled,
 		processScheduledTransactionEventType: blueprints.PendingExecutionEventType(env),
 	}
 }
@@ -147,14 +145,13 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	events, err := e.getBlockEvents(ctx, blockID, e.processScheduledTransactionEventType)
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
+	eventProvider := func() (flow.EventsList, error) {
+		return e.getBlockEvents(ctx, blockID, e.processScheduledTransactionEventType)
 	}
 
-	systemCollection, err := e.systemCollection.
-		Get(block.Height).
-		SystemCollection(e.chainID.Chain(), events)
+	systemCollection, err := e.systemCollections.
+		ByHeight(block.Height).
+		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
@@ -309,8 +306,8 @@ func (e *ENTransactionProvider) ScheduledTransactionsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
 	}
 
-	txs, err := e.systemCollection.
-		Get(header.Height).
+	txs, err := e.systemCollections.
+		ByHeight(header.Height).
 		ExecuteCallbacksTransactions(e.chainID.Chain(), events)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct scheduled transactions: %v", err)
@@ -389,7 +386,7 @@ func (e *ENTransactionProvider) systemTransactionResults(
 	resp *execproto.GetTransactionResultsResponse,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
-	systemTxIDs, err := e.systemTransactionIDs(systemTxResults, resp.GetEventEncodingVersion())
+	systemTxIDs, err := e.systemTransactionIDs(block.Height, systemTxResults, resp.GetEventEncodingVersion())
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to determine system transaction IDs", codes.Internal)
 	}
@@ -425,31 +422,26 @@ func (e *ENTransactionProvider) systemTransactionResults(
 
 // systemTransactionIDs determines the system transaction IDs upfront
 func (e *ENTransactionProvider) systemTransactionIDs(
+	blockHeight uint64,
 	systemTxResults []*execproto.GetTransactionResultResponse,
 	actualEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.Identifier, error) {
-	// TODO: implement system that allows this endpoint to dynamically determine if scheduled
-	// transactions were enabled for this block. See https://github.com/onflow/flow-go/issues/7873
-	if len(systemTxResults) == 1 {
-		return []flow.Identifier{e.systemCollection.SystemTxID()}, nil
+	eventProvider := func() (flow.EventsList, error) {
+		// if scheduled callbacks are enabled, the first transaction will always be the "process" transaction
+		// get its events to reconstruct the system collection
+		processResult := systemTxResults[0]
+
+		// SystemCollection builder requires events are CCF encoded
+		return convert.MessagesToEventsWithEncodingConversion(
+			processResult.GetEvents(),
+			actualEventEncodingVersion,
+			entities.EventEncodingVersion_CCF_V0,
+		)
 	}
 
-	// if scheduled callbacks are enabled, the first transaction will always be the "process" transaction
-	// get its events to reconstruct the system collection
-	processResult := systemTxResults[0]
-
-	// blueprints.SystemCollection requires events are CCF encoded
-	events, err := convert.MessagesToEventsWithEncodingConversion(
-		processResult.GetEvents(),
-		actualEventEncodingVersion,
-		entities.EventEncodingVersion_CCF_V0,
-	)
-
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to convert events", codes.Internal)
-	}
-
-	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
+	sysCollection, err := e.systemCollections.
+		ByHeight(blockHeight).
+		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to construct system collection", codes.Internal)
 	}
@@ -747,20 +739,13 @@ func (e *ENTransactionProvider) getTransactionIDByIndex(ctx context.Context, blo
 		}
 	}
 
-	// then search the system collection
-	if !e.scheduledTransactionsEnabled {
-		if i == index {
-			return e.systemCollection.SystemTxID(), nil
-		}
-		return flow.ZeroID, status.Errorf(codes.NotFound, "transaction with index %d not found in block", index)
+	eventProvider := func() (flow.EventsList, error) {
+		return e.getBlockEvents(ctx, block.ID(), e.processScheduledTransactionEventType)
 	}
 
-	events, err := e.getBlockEvents(ctx, block.ID(), e.processScheduledTransactionEventType)
-	if err != nil {
-		return flow.ZeroID, rpc.ConvertError(err, "failed to retrieve events from any execution node", codes.Internal)
-	}
-
-	systemCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
+	systemCollection, err := e.systemCollections.
+		ByHeight(block.Height).
+		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
 		return flow.ZeroID, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}

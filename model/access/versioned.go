@@ -3,15 +3,14 @@ package access
 import (
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 )
 
-type Version int8
+type Version uint8
 
 var (
-	VersionV0 Version = 0
-	VersionV1 Version = 1
-	VersionV2 Version = 2
+	VersionLatest Version = math.MaxInt8
 )
 
 // Versioned is a generic container that associates different versions of type T with their corresponding protocol versions,
@@ -22,30 +21,33 @@ type Versioned[T any] struct {
 	versionMapper  HeightVersionMapper
 }
 
-func NewVersioned[T any](versionedTypes map[Version]T, versionMapper HeightVersionMapper) (*Versioned[T], error) {
+func NewVersioned[T any](versionedTypes map[Version]T, versionMapper HeightVersionMapper) *Versioned[T] {
 	for _, ver := range slices.Collect(maps.Keys(versionedTypes)) {
 		if !versionMapper.VersionExists(ver) {
-			return nil, fmt.Errorf("version missing in the version mapper: %v", ver)
+			// the provided mapping is inconsistent. this is a development time error, so panic.
+			panic(fmt.Sprintf("version missing in the version mapper: %v", ver))
 		}
 	}
 
 	return &Versioned[T]{
 		versionedTypes: versionedTypes,
 		versionMapper:  versionMapper,
-	}, nil
+	}
 }
 
 // Get version of the type at the provided height.
 func (v *Versioned[T]) Get(height uint64) T {
-	version, err := v.versionMapper.GetVersion(height)
+	version := v.versionMapper.GetVersion(height)
 	t, ok := v.versionedTypes[version]
-	if err != nil || !ok {
-		return v.versionedTypes[VersionV2] // latest
+	if !ok {
+		// the constructor already checked that there is a version type for each possible version.
+		// if this every happens, there is a bug.
+		panic(fmt.Sprintf("version not found for height %d, version: %v", height, version))
 	}
 
 	return t
 }
 
-func (v *Versioned[T]) all() []T {
+func (v *Versioned[T]) All() []T {
 	return slices.Collect(maps.Values(v.versionedTypes))
 }

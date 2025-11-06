@@ -1,40 +1,17 @@
 package access
 
 import (
-	"fmt"
 	"maps"
 	"slices"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
-var latest = map[uint64]Version{0: VersionV2}
-
-var HardcodedChainHeightVersions = map[flow.ChainID]HeightVersionMapper{
-	// todo define these
-	flow.Mainnet: NewStaticHeightVersionMapper(map[uint64]Version{
-		0:   VersionV0,
-		200: VersionV1,
-		300: VersionV2,
-	}),
-	flow.Testnet: NewStaticHeightVersionMapper(map[uint64]Version{
-		0:   VersionV0,
-		200: VersionV1,
-		300: VersionV2,
-	}),
-	flow.Sandboxnet:        NewStaticHeightVersionMapper(latest),
-	flow.Previewnet:        NewStaticHeightVersionMapper(latest),
-	flow.Benchnet:          NewStaticHeightVersionMapper(latest),
-	flow.Localnet:          NewStaticHeightVersionMapper(latest),
-	flow.Emulator:          NewStaticHeightVersionMapper(latest),
-	flow.BftTestnet:        NewStaticHeightVersionMapper(latest),
-	flow.MonotonicEmulator: NewStaticHeightVersionMapper(latest),
-}
+var LatestBoundary = map[uint64]Version{0: VersionLatest}
 
 // HeightVersionMapper defines the interface for mapping heights to protocol versions.
 type HeightVersionMapper interface {
 	// GetVersion returns the version corresponding to the given height.
-	GetVersion(height uint64) (Version, error)
+	GetVersion(height uint64) Version
+
 	// VersionExists checks if a version exists in the mapper.
 	VersionExists(version Version) bool
 }
@@ -46,10 +23,20 @@ type StaticHeightVersionMapper struct {
 	boundaries              []uint64
 }
 
+var _ HeightVersionMapper = (*StaticHeightVersionMapper)(nil)
+
 func NewStaticHeightVersionMapper(heightVersionBoundaries map[uint64]Version) *StaticHeightVersionMapper {
 	boundaries := slices.Collect(maps.Keys(heightVersionBoundaries))
 	slices.Sort(boundaries)
 	slices.Reverse(boundaries)
+
+	if len(boundaries) == 0 {
+		panic("no height version boundaries provided. must at least include a catch all entry at height 0.")
+	}
+
+	if _, ok := heightVersionBoundaries[0]; !ok {
+		panic("version mapping must include a catch all entry at height 0")
+	}
 
 	return &StaticHeightVersionMapper{
 		heightVersionBoundaries: heightVersionBoundaries,
@@ -57,14 +44,15 @@ func NewStaticHeightVersionMapper(heightVersionBoundaries map[uint64]Version) *S
 	}
 }
 
-func (s *StaticHeightVersionMapper) GetVersion(height uint64) (Version, error) {
+func (s *StaticHeightVersionMapper) GetVersion(height uint64) Version {
 	for _, boundary := range s.boundaries {
 		if height >= boundary {
-			return s.heightVersionBoundaries[boundary], nil
+			return s.heightVersionBoundaries[boundary]
 		}
 	}
-
-	return 0, fmt.Errorf("height %d is before any known version boundary", height)
+	// since the constructor requires that a boundary exists at 0, it should not be possible to get here.
+	// this indicates there is a bug.
+	panic("height is before any known version boundary")
 }
 
 func (s *StaticHeightVersionMapper) VersionExists(version Version) bool {

@@ -211,11 +211,11 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	suite.Require().NoError(err)
 
 	return Params{
-		Log:                          suite.log,
-		Metrics:                      metrics.NewNoopCollector(),
-		State:                        suite.state,
-		ChainID:                      flow.Testnet,
-		SystemCollection:             suite.defaultSystemCollection,
+		Log:     suite.log,
+		Metrics: metrics.NewNoopCollector(),
+		State:   suite.state,
+		ChainID: flow.Testnet,
+		// SystemCollection:             suite.defaultSystemCollection,
 		NodeCommunicator:             node_communicator.NewNodeCommunicator(false),
 		ConnFactory:                  suite.connectionFactory,
 		NodeProvider:                 nodeProvider,
