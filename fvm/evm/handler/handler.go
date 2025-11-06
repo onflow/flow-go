@@ -207,7 +207,8 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 	// step 1 - transaction decoding and compute total gas needed
 	// This is safe to be done before checking the gas
 	// as it has its own metering
-	var totalGasLimit types.GasLimit
+	var totalGas types.GasLimit
+	gasLimit := h.backend.ComputationRemaining(environment.ComputationKindEVMGasUsage)
 	batchLen := len(rlpEncodedTxs)
 	txs := make([]*gethTypes.Transaction, batchLen)
 
@@ -219,18 +220,16 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 		}
 
 		txs[i] = tx
-		// evm overflow protection
-		if totalGasLimit+types.GasLimit(tx.Gas()) < totalGasLimit {
-			return nil, fvmErrors.NewEVMError(fmt.Errorf("evm gas overflow"))
-		}
-		totalGasLimit += types.GasLimit(tx.Gas())
-	}
 
-	// step 2 - check if enough computation is available
-	// for the whole batch
-	err := h.checkGasLimit(totalGasLimit)
-	if err != nil {
-		return nil, err
+		// overflow protection
+		if totalGas+types.GasLimit(tx.Gas()) < totalGas {
+			return nil, types.ErrInsufficientComputation
+		}
+		// step 2 - check if enough computation is available
+		totalGas += types.GasLimit(tx.Gas())
+		if uint64(totalGas) > gasLimit {
+			return nil, types.ErrInsufficientComputation
+		}
 	}
 
 	// step 3 - prepare block context

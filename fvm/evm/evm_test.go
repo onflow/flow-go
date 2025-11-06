@@ -1321,7 +1321,7 @@ func TestEVMBatchRun(t *testing.T) {
 				state, output, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
-				require.ErrorContains(t, output.Err, "overflow")
+				require.ErrorContains(t, output.Err, "insufficient computation")
 				require.Empty(t, state.WriteSet)
 			})
 	})
