@@ -6,11 +6,16 @@ import (
 	"slices"
 )
 
+// HeightVersionMapper defines the interface for mapping heights to protocol versions.
 type HeightVersionMapper interface {
+	// GetVersion returns the version corresponding to the given height.
 	GetVersion(height uint64) (Version, error)
+	// VersionExists checks if a version exists in the mapper.
 	VersionExists(version Version) bool
 }
 
+// StaticHeightVersionMapper is an implementation that allows hardcoding the height boundaries
+// for each protocol version.
 type StaticHeightVersionMapper struct {
 	heightVersionBoundaries map[uint64]Version
 	boundaries              []uint64
