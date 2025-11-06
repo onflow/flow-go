@@ -200,7 +200,7 @@ func TestCreateAccount(t *testing.T) {
 		account, err := LastCreatedAccount(b, result)
 		require.NoError(t, err)
 
-		assert.Equal(t, "0000000000000007", account.Address.Hex())
+		assert.Equal(t, "0000000000000006", account.Address.Hex())
 		assert.Equal(t, uint64(0x186a0), account.Balance)
 		require.Len(t, account.Keys, 1)
 		assert.Equal(t, accountKey.PublicKey.Encode(), account.Keys[0].PublicKey.Encode())
