@@ -360,7 +360,7 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	mockEvents := storagemock.NewEvents(p.T())
 	mockEvents.On("BatchStore",
 		mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
-		p.block.ID(), mock.Anything, mock.Anything).Return(expectedError).Once()
+		p.block.ID(), []flow.EventsList{p.expectedData.events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(expectedError).Once()
 	p.persistentEvents = mockEvents
 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
