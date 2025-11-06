@@ -385,7 +385,6 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	err = e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	if err != nil {
 		return fmt.Errorf("could not request collections for block: %w", err)
