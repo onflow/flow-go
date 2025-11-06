@@ -77,6 +77,7 @@ type Meter interface {
 
 	ComputationIntensities() meter.MeteredComputationIntensities
 	ComputationAvailable(common.ComputationUsage) bool
+	ComputationRemaining(kind common.ComputationKind) uint64
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
