@@ -42,7 +42,8 @@ func InsertBlockEvents(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID
 
 	for _, eventsList := range events {
 		for _, event := range eventsList {
-			err := insertEvent(writer, blockID, event)
+			// The event is stored with a key that includes the block ID, transaction ID, transaction index, and event index.
+			err = UpsertByKey(writer, eventPrefix(codeEvent, blockID, event), event)
 			if err != nil {
 				return fmt.Errorf("cannot batch insert event: %w", err)
 			}
@@ -50,12 +51,6 @@ func InsertBlockEvents(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID
 	}
 
 	return nil
-}
-
-// insertEvent stores a regular event in the database.
-// The event is stored with a key that includes the block ID, transaction ID, transaction index, and event index.
-func insertEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) error {
-	return UpsertByKey(w, eventPrefix(codeEvent, blockID, event), event)
 }
 
 // InsertBlockServiceEvents stores all service events for a given block in the database.
@@ -85,19 +80,14 @@ func InsertBlockServiceEvents(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 	writer := rw.Writer()
 
 	for _, event := range events {
-		err := insertServiceEvent(writer, blockID, event)
+		// The event is stored with a key that includes the block ID, transaction ID, transaction index, and event index.
+		err = UpsertByKey(writer, eventPrefix(codeServiceEvent, blockID, event), event)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert service event: %w", err)
 		}
 	}
 
 	return nil
-}
-
-// insertServiceEvent stores a service event in the database.
-// The event is stored with a key that includes the block ID, transaction ID, transaction index, and event index.
-func insertServiceEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) error {
-	return UpsertByKey(w, eventPrefix(codeServiceEvent, blockID, event), event)
 }
 
 func RetrieveEvents(r storage.Reader, blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) error {

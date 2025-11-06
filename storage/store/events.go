@@ -44,8 +44,7 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 // Expected error returns:
 //   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.ReaderBatchWriter) error {
-	// Use the new InsertBlockEvents operation to store all events
-	err := operation.InsertBlockEvents(lctx, batch, blockID, blockEvents)
+	err := operation.InsertBlockEvents(lctx, batch, blockID, blockEvents) // persists all events
 	if err != nil {
 		return fmt.Errorf("cannot batch insert events: %w", err)
 	}

@@ -45,43 +45,6 @@ func TestResultStoreAndRetrieve(t *testing.T) {
 
 // TestResultStoreTwice verifies that [ExecutionResults.BatchStore] and [ExecutionResults.BatchIndex]
 // are idempotent when called repeatedly with the same data.
-func TestResultStoreTwice(t *testing.T) {
-	lockManager := storage.NewTestingLockManager()
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-		metrics := metrics.NewNoopCollector()
-		store1 := store.NewExecutionResults(metrics, db)
-
-		result := unittest.ExecutionResultFixture()
-		blockID := unittest.IdentifierFixture()
-
-		err := unittest.WithLock(t, lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := store1.BatchStore(result, rw)
-				require.NoError(t, err)
-
-				err = store1.BatchIndex(lctx, rw, blockID, result.ID())
-				require.NoError(t, err)
-				return nil
-			})
-		})
-		require.NoError(t, err)
-
-		err = unittest.WithLock(t, lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := store1.BatchStore(result, rw)
-				require.NoError(t, err)
-
-				err = store1.BatchIndex(lctx, rw, blockID, result.ID())
-				require.NoError(t, err)
-				return nil
-			})
-		})
-		require.NoError(t, err)
-	})
-}
-
-// TestResultStoreTwice verifies that [ExecutionResults.BatchStore] and [ExecutionResults.BatchIndex]
-// are idempotent when called repeatedly with the same data.
 func TestResultBatchStoreTwice(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {

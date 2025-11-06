@@ -33,6 +33,8 @@ func InsertAndIndexTransactionResults(lctx lockctx.Proof, rw storage.ReaderBatch
 	}
 
 	// there is no existing transaction result for the block, we can proceed to insert
+	// what if a block has no transaction?
+	// this won't happen, because each block always have at least one system transaction,
 	w := rw.Writer()
 	for i, result := range transactionResults {
 		err := insertTransactionResult(w, blockID, &result)

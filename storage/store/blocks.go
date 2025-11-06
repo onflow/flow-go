@@ -218,6 +218,11 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}
+	// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
+	// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
+	// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
+	// Hence, this function should be treated as a temporary solution, which requires generalization
+	// (one-to-many mapping) for soft finality and the mature protocol.
 	return b.ByID(blockID)
 }
 
