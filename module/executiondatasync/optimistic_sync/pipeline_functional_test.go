@@ -358,7 +358,9 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages,
 	// it is hard to make a meaningful error explicitly.
 	mockEvents := storagemock.NewEvents(p.T())
-	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Once()
+	mockEvents.On("BatchStore",
+		mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+		p.block.ID(), mock.Anything, mock.Anything).Return(expectedError).Once()
 	p.persistentEvents = mockEvents
 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()

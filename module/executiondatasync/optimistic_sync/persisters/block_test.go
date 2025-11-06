@@ -177,12 +177,16 @@ func (p *PersisterSuite) TestPersister_ErrorHandling() {
 
 		collections := storagemock.NewCollections(p.T())
 		collections.
-			On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).
+			On("BatchStoreAndIndexByTransaction",
+				mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertCollection) }),
+				mock.Anything, mock.Anything).
 			Return(nil, nil).
 			Times(len(p.indexerData.Collections))
 
 		events := storagemock.NewEvents(p.T())
-		events.On("BatchStore", mock.Anything, p.executionResult.BlockID, mock.Anything, mock.Anything).Return(expectedErr).Once()
+		events.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			p.executionResult.BlockID, mock.Anything, mock.Anything).Return(expectedErr).Once()
 
 		persister := NewBlockPersister(
 			unittest.Logger(),
