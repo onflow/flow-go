@@ -217,9 +217,17 @@ func (e *Events) GetEventsForBlockIDs(
 	var newestView uint64
 	var newestBlockID flow.Identifier
 
-	// find the block headers for all the block IDs
+	// deduplicate block IDs while preserving order
+	seen := make(map[flow.Identifier]struct{}, len(blockIDs))
 	blockHeaders := make([]provider.BlockMetadata, 0, len(blockIDs))
+
 	for _, blockID := range blockIDs {
+		// skip duplicates
+		if _, exists := seen[blockID]; exists {
+			continue
+		}
+		seen[blockID] = struct{}{}
+
 		header, err := e.headers.ByBlockID(blockID)
 		if err != nil {
 			return nil, nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
