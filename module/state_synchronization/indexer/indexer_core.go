@@ -364,6 +364,7 @@ func collectScheduledTransactions(
 		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled callbacks", len(systemChunkResults), len(scheduledTransactionIDs))
 	}
 
+	// TODO: update this to use version system collection
 	// reconstruct the system collection, and verify that the results match the expected transaction
 	systemCollection, err := blueprints.SystemCollection(chainID.Chain(), pendingExecutionEvents)
 	if err != nil {
