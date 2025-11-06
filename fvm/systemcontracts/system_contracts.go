@@ -79,10 +79,14 @@ const (
 	// On long-running networks some of these contracts might have been deployed after bootstrapping,
 	// and therefore might not be at these indexes.
 
-	FungibleTokenAccountIndex                = 2
-	FlowTokenAccountIndex                    = 3
-	FlowFeesAccountIndex                     = 4
-	EVMStorageAccountIndex                   = 5
+	FungibleTokenAccountIndex = 2
+	FlowTokenAccountIndex     = 3
+	FlowFeesAccountIndex      = 4
+	EVMStorageAccountIndex    = 5
+	// ScheduledTransactionExecutorAccountIndex is the index of
+	// the account that is used to execute scheduled transactions.
+	// We decided to put it on the same account as the EVM storage,
+	// so we don't have to create a new account. Which would be a breaking change for the emulator.
 	ScheduledTransactionExecutorAccountIndex = 5
 
 	// LastSystemAccountIndex is the last index of a system accounts.
