@@ -14,6 +14,9 @@ var (
 	VersionV2 Version = 2
 )
 
+// Versioned is a generic container that associates different versions of type T with their corresponding protocol versions,
+// as determined by the HeightVersionMapper. This allows retaining and retrieving historical implementations of a type,
+// ensuring correct behavior when the protocol evolves and previous versions must remain accessible for older data.
 type Versioned[T any] struct {
 	versionedTypes map[Version]T
 	versionMapper  HeightVersionMapper
@@ -32,6 +35,7 @@ func NewVersioned[T any](versionedTypes map[Version]T, versionMapper HeightVersi
 	}, nil
 }
 
+// Get version of the type at the provided height.
 func (v *Versioned[T]) Get(height uint64) T {
 	version, err := v.versionMapper.GetVersion(height)
 	t, ok := v.versionedTypes[version]
