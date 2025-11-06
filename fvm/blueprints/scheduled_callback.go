@@ -1,6 +1,7 @@
 package blueprints
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -15,6 +16,9 @@ import (
 )
 
 const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
+
+//go:embed scripts/issueScheduledTransactionExecutorTemplate.cdc
+var issueScheduledTransactionExecutorTemplate string
 
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
 // No errors are expected during normal operation.
@@ -157,14 +161,16 @@ func PendingExecutionEventType(env templates.Environment) flow.EventType {
 	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
 }
 
-// CreateScheduledTransactionExecutorTransaction creates a transaction to create an account that will be used for
-// authorizing the execution of scheduled transactions.
-func CreateScheduledTransactionExecutorTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+// IssueScheduledTransactionExecutorTransaction creates a transaction that issues the
+// executeScheduledTransactionsCapability to an account will be used for authorizing
+// the execution of scheduled transactions.
+func IssueScheduledTransactionExecutorTransaction(chain flow.Chain, address flow.Address) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	script := templates.GenerateCreateExecutionAccountScript(sc.AsTemplateEnv())
+	script := templates.ReplaceAddresses(issueScheduledTransactionExecutorTemplate, sc.AsTemplateEnv())
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
-		SetScript(script).
+		AddAuthorizer(address).
+		SetScript([]byte(script)).
 		SetComputeLimit(callbackTransactionGasLimit).Build()
 }

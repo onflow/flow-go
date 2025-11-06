@@ -79,11 +79,15 @@ const (
 	// On long-running networks some of these contracts might have been deployed after bootstrapping,
 	// and therefore might not be at these indexes.
 
-	FungibleTokenAccountIndex                = 2
-	FlowTokenAccountIndex                    = 3
-	FlowFeesAccountIndex                     = 4
-	EVMStorageAccountIndex                   = 5
-	ScheduledTransactionExecutorAccountIndex = 6
+	FungibleTokenAccountIndex = 2
+	FlowTokenAccountIndex     = 3
+	FlowFeesAccountIndex      = 4
+	EVMStorageAccountIndex    = 5
+	// ScheduledTransactionExecutorAccountIndex is the index of
+	// the account that is used to execute scheduled transactions.
+	// We decided to put it on the same account as the EVM storage,
+	// so we don't have to create a new account. Which would be a breaking change for the emulator.
+	ScheduledTransactionExecutorAccountIndex = 5
 
 	// LastSystemAccountIndex is the last index of a system accounts.
 	// Other addresses will be created  after this one.
@@ -115,8 +119,6 @@ var (
 	scheduledTransactionExecutorAddressTestnet = flow.HexToAddress("9275945e651650bd")
 	// scheduledTransactionExecutorAddressMainnet is the address of the Scheduled Transaction Executor contract on Mainnet
 	scheduledTransactionExecutorAddressMainnet = flow.HexToAddress("45df3724e7c13957")
-	// scheduledTransactionExecutorAddressEmulator is the address of the Scheduled Transaction Executor contract on Emulator
-	scheduledTransactionExecutorAddressEmulator = flow.HexToAddress("01cf0e2f2f715450")
 
 	// executionParametersAddressTestnet is the address of the Execution Parameters contract on Testnet
 	executionParametersAddressTestnet = flow.HexToAddress("6997a2f2cf57b73a")
@@ -379,8 +381,6 @@ func init() {
 			return scheduledTransactionExecutorAddressMainnet
 		case flow.Testnet:
 			return scheduledTransactionExecutorAddressTestnet
-		case flow.Emulator:
-			return scheduledTransactionExecutorAddressEmulator
 		default:
 			return nthAddressFunc(ScheduledTransactionExecutorAccountIndex)(chain)
 		}
