@@ -520,9 +520,9 @@ func (s *Suite) TestCollectionSyncing() {
 
 	// setup finalized block indexer mocks
 	guaranteeIDs := []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))
-	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), guaranteeIDs).Return(nil).Once()
+	s.blocks.On("BatchIndexBlockContainingCollectionGuarantees", mock.Anything, mock.Anything, block.ID(), guaranteeIDs).Return(nil).Once()
 	for _, seal := range payload.Seals {
-		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
+		s.results.On("BatchIndex", mock.Anything, mock.Anything, seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
 
 	// initialize the engine using the initial finalized block
