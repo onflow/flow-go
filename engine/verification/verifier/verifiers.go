@@ -359,8 +359,18 @@ func verifyHeight(
 			}
 
 			log.Error().Err(err).Msgf("could not verify chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
+
+		} else {
+			log.Info().Msgf(
+				"verified chunk (index: %v) at block %v (%v) successfully (%d transactions)",
+				i,
+				height,
+				blockID,
+				chunk.NumberOfTransactions,
+			)
 		}
 	}
+
 	return nil
 }
 
