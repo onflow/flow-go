@@ -28,8 +28,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -132,7 +132,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.broadcaster = engine.NewBroadcaster()
 
-	suite.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
+	suite.execDataHeroCache = herocache.NewBlockExecutionData(subscription_old.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
 	suite.execDataCache = cache.NewExecutionDataCache(suite.eds, suite.headers, suite.seals, suite.results, suite.execDataHeroCache)
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -256,16 +256,16 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	).Maybe()
 
 	conf := statestreambackend.Config{
-		ClientSendTimeout:    subscription.DefaultSendTimeout,
-		ClientSendBufferSize: subscription.DefaultSendBufferSize,
+		ClientSendTimeout:    subscription_old.DefaultSendTimeout,
+		ClientSendBufferSize: subscription_old.DefaultSendBufferSize,
 	}
 
-	subscriptionHandler := subscription.NewSubscriptionHandler(
+	subscriptionHandler := subscription_old.NewSubscriptionHandler(
 		suite.log,
 		suite.broadcaster,
-		subscription.DefaultSendTimeout,
-		subscription.DefaultResponseLimit,
-		subscription.DefaultSendBufferSize,
+		subscription_old.DefaultSendTimeout,
+		subscription_old.DefaultResponseLimit,
+		subscription_old.DefaultSendBufferSize,
 	)
 
 	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)

@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,7 +31,7 @@ func (s *BackendBlockDigestSuite) SetupTest() {
 
 // TestSubscribeBlockDigestsFromStartBlockID tests the SubscribeBlockDigestsFromStartBlockID method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlockDigestsFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
@@ -40,7 +40,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
 
 // TestSubscribeBlockDigestsFromStartHeight tests the SubscribeBlockDigestsFromStartHeight method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartHeight() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlockDigestsFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
@@ -49,7 +49,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartHeight() {
 
 // TestSubscribeBlockDigestsFromLatest tests the SubscribeBlockDigestsFromLatest method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromLatest() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlockDigestsFromLatest(ctx, blockStatus)
 	}
 

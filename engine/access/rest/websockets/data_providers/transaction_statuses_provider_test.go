@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +54,7 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 		s.api,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval,
+		subscription_old.DefaultHeartbeatInterval,
 		s.linkGenerator,
 	)
 	s.Require().NotNil(s.factory)

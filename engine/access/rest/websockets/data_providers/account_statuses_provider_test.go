@@ -18,8 +18,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +54,7 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 		nil,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval,
+		subscription_old.DefaultHeartbeatInterval,
 		nil,
 	)
 	s.Require().NotNil(s.factory)
@@ -105,7 +105,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval,
+		subscription_old.DefaultHeartbeatInterval,
 	)
 	s.Require().Error(err)
 	s.Require().Nil(provider)
@@ -241,7 +241,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 				send,
 				s.chain,
 				state_stream.DefaultEventFilterConfig,
-				subscription.DefaultHeartbeatInterval,
+				subscription_old.DefaultHeartbeatInterval,
 			)
 			s.Require().Error(err)
 			s.Require().Nil(provider)
@@ -284,7 +284,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval,
+		subscription_old.DefaultHeartbeatInterval,
 	)
 	s.Require().NoError(err)
 	s.Require().NotNil(provider)

@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,7 +19,7 @@ import (
 )
 
 type Handler struct {
-	subscription.StreamingData
+	subscription_old.StreamingData
 
 	api   state_stream.API
 	chain flow.Chain
@@ -40,7 +40,7 @@ var _ executiondata.ExecutionDataAPIServer = (*Handler)(nil)
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		StreamingData:            subscription.NewStreamingData(config.MaxGlobalStreams),
+		StreamingData:            subscription_old.NewStreamingData(config.MaxGlobalStreams),
 		api:                      api,
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,
@@ -627,8 +627,8 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 //
 // Expected errors during normal operation:
 //   - codes.Internal: If the subscription encounters an error or gets an unexpected response.
-func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse func(resp T) error) error {
-	err := subscription.HandleSubscription(sub, handleResponse)
+func HandleRPCSubscription[T any](sub subscription_old.Subscription, handleResponse func(resp T) error) error {
+	err := subscription_old.HandleSubscription(sub, handleResponse)
 	if err != nil {
 		return rpc.ConvertError(err, "handle subscription error", codes.Internal)
 	}

@@ -31,8 +31,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription_old/tracker/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -263,12 +263,12 @@ func (s *TransactionStreamSuite) initializeBackend() {
 
 	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
-	subscriptionHandler := subscription.NewSubscriptionHandler(
+	subscriptionHandler := subscription_old.NewSubscriptionHandler(
 		s.log,
 		s.broadcaster,
-		subscription.DefaultSendTimeout,
-		subscription.DefaultResponseLimit,
-		subscription.DefaultSendBufferSize,
+		subscription_old.DefaultSendTimeout,
+		subscription_old.DefaultResponseLimit,
+		subscription_old.DefaultSendBufferSize,
 	)
 
 	validatorBlocks := validatormock.NewBlocks(s.T())
@@ -493,7 +493,7 @@ func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Trans
 
 // Create a special common function to read subscription messages from the channel and check converting it to transaction info
 // and check results for correctness
-func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription.Subscription, txId flow.Identifier, expectedTxStatuses []flow.TransactionStatus) {
+func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription_old.Subscription, txId flow.Identifier, expectedTxStatuses []flow.TransactionStatus) {
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		require.True(s.T(), ok,
@@ -514,7 +514,7 @@ func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription.Su
 }
 
 // checkGracefulShutdown ensures the provided subscription shuts down gracefully within a specified timeout duration.
-func (s *TransactionStreamSuite) checkGracefulShutdown(sub subscription.Subscription) {
+func (s *TransactionStreamSuite) checkGracefulShutdown(sub subscription_old.Subscription) {
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		<-sub.Channel()

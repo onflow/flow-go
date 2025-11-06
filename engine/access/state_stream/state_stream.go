@@ -3,7 +3,7 @@ package state_stream
 import (
 	"context"
 
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -30,13 +30,13 @@ type API interface {
 	// Use SubscribeExecutionDataFromStartBlockID, SubscribeExecutionDataFromStartBlockHeight or SubscribeExecutionDataFromLatest.
 	//
 	// SubscribeExecutionData subscribes to execution data starting from a specific block ID and block height.
-	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription
+	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription_old.Subscription
 	// SubscribeExecutionDataFromStartBlockID subscribes to execution data starting from a specific block id.
-	SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription
+	SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription_old.Subscription
 	// SubscribeExecutionDataFromStartBlockHeight subscribes to execution data starting from a specific block height.
-	SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription
+	SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription_old.Subscription
 	// SubscribeExecutionDataFromLatest subscribes to execution data starting from latest block.
-	SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription
+	SubscribeExecutionDataFromLatest(ctx context.Context) subscription_old.Subscription
 	// SubscribeEvents is deprecated and will be removed in a future version.
 	// Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 	//
@@ -59,7 +59,7 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEvents will return a failed subscription.
-	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) subscription.Subscription
+	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) subscription_old.Subscription
 	// SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
 	// up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -75,7 +75,7 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEventsFromStartBlockID will return a failed subscription.
-	SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter EventFilter) subscription_old.Subscription
 	// SubscribeEventsFromStartHeight streams events starting at the specified block height,
 	// up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -91,7 +91,7 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEventsFromStartHeight will return a failed subscription.
-	SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter EventFilter) subscription_old.Subscription
 	// SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
 	// up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -106,16 +106,16 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEventsFromLatest will return a failed subscription.
-	SubscribeEventsFromLatest(ctx context.Context, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromLatest(ctx context.Context, filter EventFilter) subscription_old.Subscription
 	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
 	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
 	// SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
 	// a specific block ID with an optional status filter.
-	SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter AccountStatusFilter) subscription.Subscription
+	SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter AccountStatusFilter) subscription_old.Subscription
 	// SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
 	// a specific block height, with an optional status filter.
-	SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter AccountStatusFilter) subscription.Subscription
+	SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter AccountStatusFilter) subscription_old.Subscription
 	// SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
 	// latest sealed block, with an optional status filter.
-	SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter AccountStatusFilter) subscription.Subscription
+	SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter AccountStatusFilter) subscription_old.Subscription
 }

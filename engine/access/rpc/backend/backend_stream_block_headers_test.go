@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,7 +31,7 @@ func (s *BackendBlockHeadersSuite) SetupTest() {
 
 // TestSubscribeBlockHeadersFromStartBlockID tests the SubscribeBlockHeadersFromStartBlockID method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
@@ -40,7 +40,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
 
 // TestSubscribeBlockHeadersFromStartHeight tests the SubscribeBlockHeadersFromStartHeight method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
@@ -49,7 +49,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
 
 // TestSubscribeBlockHeadersFromLatest tests the SubscribeBlockHeadersFromLatest method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromLatest() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlockHeadersFromLatest(ctx, blockStatus)
 	}
 

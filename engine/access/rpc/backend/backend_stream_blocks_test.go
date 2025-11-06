@@ -17,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/metrics"
@@ -161,12 +161,12 @@ func (s *BackendBlocksSuite) backendParams(broadcaster *engine.Broadcaster) Para
 		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
 		AccessMetrics:        metrics.NewNoopCollector(),
 		Log:                  s.log,
-		SubscriptionHandler: subscription.NewSubscriptionHandler(
+		SubscriptionHandler: subscription_old.NewSubscriptionHandler(
 			s.log,
 			broadcaster,
-			subscription.DefaultSendTimeout,
-			subscription.DefaultResponseLimit,
-			subscription.DefaultSendBufferSize,
+			subscription_old.DefaultSendTimeout,
+			subscription_old.DefaultResponseLimit,
+			subscription_old.DefaultSendBufferSize,
 		),
 		BlockTracker:                s.blockTracker,
 		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
@@ -320,7 +320,7 @@ func (s *BackendBlocksSuite) setupBlockTrackerMock(blockStatus flow.BlockStatus,
 
 // TestSubscribeBlocksFromStartBlockID tests the SubscribeBlocksFromStartBlockID method.
 func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartBlockID() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlocksFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
@@ -329,7 +329,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartBlockID() {
 
 // TestSubscribeBlocksFromStartHeight tests the SubscribeBlocksFromStartHeight method.
 func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartHeight() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlocksFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
@@ -338,7 +338,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartHeight() {
 
 // TestSubscribeBlocksFromLatest tests the SubscribeBlocksFromLatest method.
 func (s *BackendBlocksSuite) TestSubscribeBlocksFromLatest() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
 		return s.backend.SubscribeBlocksFromLatest(ctx, blockStatus)
 	}
 
@@ -371,7 +371,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromLatest() {
 //  7. Ensures that there are no new messages waiting after all blocks have been processed.
 //  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendBlocksSuite) subscribe(
-	subscribeFn func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription,
+	subscribeFn func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription,
 	requireFn func(interface{}, *flow.Block),
 	tests []testType,
 ) {

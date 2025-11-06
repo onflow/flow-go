@@ -20,9 +20,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription_old/tracker/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -168,7 +168,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription_old.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 	s.executionDataTracker = trackermock.NewExecutionDataTracker(s.T())
 
@@ -268,12 +268,12 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		s.eventsIndex,
 		useEventsIndex,
 		state_stream.DefaultRegisterIDsRequestLimit,
-		subscription.NewSubscriptionHandler(
+		subscription_old.NewSubscriptionHandler(
 			s.logger,
 			s.broadcaster,
-			subscription.DefaultSendTimeout,
-			subscription.DefaultResponseLimit,
-			subscription.DefaultSendBufferSize,
+			subscription_old.DefaultSendTimeout,
+			subscription_old.DefaultResponseLimit,
+			subscription_old.DefaultSendBufferSize,
 		),
 		s.executionDataTracker,
 		s.executionResultProvider,
@@ -560,7 +560,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 		},
 	}
 
-	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription_old.Subscription {
 		return s.backend.SubscribeExecutionData(ctx, blockID, startHeight)
 	}
 
@@ -593,7 +593,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockID()
 		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 	}, nil)
 
-	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription_old.Subscription {
 		return s.backend.SubscribeExecutionDataFromStartBlockID(ctx, blockID)
 	}
 
@@ -626,7 +626,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockHeig
 		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
 	}, nil)
 
-	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription_old.Subscription {
 		return s.backend.SubscribeExecutionDataFromStartBlockHeight(ctx, startHeight)
 	}
 
@@ -656,14 +656,14 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
 		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
 	}, nil)
 
-	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription_old.Subscription {
 		return s.backend.SubscribeExecutionDataFromLatest(ctx)
 	}
 
 	s.subscribe(subFunc, tests)
 }
 
-func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription.Subscription, tests []executionDataTestType) {
+func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription_old.Subscription, tests []executionDataTestType) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -756,7 +756,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
 		assert.Equal(s.T(), expected, resp)
 	}
 
-	assertSubscriptionResponses := func(sub subscription.Subscription, cancel context.CancelFunc) {
+	assertSubscriptionResponses := func(sub subscription_old.Subscription, cancel context.CancelFunc) {
 		// the first response should have details from the root block and no events
 		resp := <-sub.Channel()
 		assertExecutionDataResponse(resp, rootEventResponse)

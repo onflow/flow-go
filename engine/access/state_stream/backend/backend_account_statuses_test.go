@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -267,7 +267,7 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 // For each test case, it simulates backfill blocks and verifies the expected account events for each block.
 // It also ensures that the subscription shuts down gracefully after completing the test cases.
 func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
-	subscribeFn func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription,
+	subscribeFn func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription_old.Subscription,
 	tests []testType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -346,7 +346,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlock
 		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 	}, nil)
 
-	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription_old.Subscription {
 		return s.backend.SubscribeAccountStatusesFromStartBlockID(ctx, startValue.(flow.Identifier), filter)
 	}
 
@@ -362,7 +362,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeigh
 		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
 	}, nil)
 
-	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription_old.Subscription {
 		return s.backend.SubscribeAccountStatusesFromStartHeight(ctx, startValue.(uint64), filter)
 	}
 
@@ -378,7 +378,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
 	}, nil)
 
-	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription_old.Subscription {
 		return s.backend.SubscribeAccountStatusesFromLatestBlock(ctx, filter)
 	}
 
@@ -420,7 +420,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootB
 		AccountEvents: expectedEvents,
 	}
 
-	assertSubscriptionResponses := func(sub subscription.Subscription, cancel context.CancelFunc) {
+	assertSubscriptionResponses := func(sub subscription_old.Subscription, cancel context.CancelFunc) {
 		// the first response should have details from the root block and no events
 		resp := <-sub.Channel()
 		s.requireEventsResponse(resp, rootEventResponse)

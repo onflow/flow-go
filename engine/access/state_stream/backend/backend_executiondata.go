@@ -10,8 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -33,7 +33,7 @@ type ExecutionDataBackend struct {
 
 	getExecutionData GetExecutionDataFunc
 
-	subscriptionHandler  *subscription.SubscriptionHandler
+	subscriptionHandler  *subscription_old.SubscriptionHandler
 	executionDataTracker tracker.ExecutionDataTracker
 
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
@@ -111,10 +111,10 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 // - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription.Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription_old.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
+		return subscription_old.NewFailedSubscription(err, "could not get start block height")
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
@@ -129,10 +129,10 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 // - startBlockID: The identifier of the starting block.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription_old.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
+		return subscription_old.NewFailedSubscription(err, "could not get start block height")
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
@@ -147,10 +147,10 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx contex
 // - startHeight: The height of the starting block.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription_old.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
+		return subscription_old.NewFailedSubscription(err, "could not get start block height")
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
@@ -164,10 +164,10 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx co
 // - ctx: Context for the operation.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Context) subscription_old.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
+		return subscription_old.NewFailedSubscription(err, "could not get start block height")
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)

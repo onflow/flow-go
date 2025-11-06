@@ -29,7 +29,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -199,7 +199,7 @@ func (suite *Suite) RunTest(
 			suite.chainID.Chain(),
 			suite.finalizedHeaderCache,
 			suite.me,
-			subscription.DefaultMaxGlobalStreams,
+			subscription_old.DefaultMaxGlobalStreams,
 			rpc.WithBlockSignerDecoder(suite.signerIndicesDecoder),
 		)
 		f(handler, db, all)
@@ -366,7 +366,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription_old.DefaultMaxGlobalStreams)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -716,7 +716,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription_old.DefaultMaxGlobalStreams)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -936,7 +936,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription_old.DefaultMaxGlobalStreams)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -1193,7 +1193,7 @@ func (suite *Suite) TestExecuteScript() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		handler := rpc.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription_old.DefaultMaxGlobalStreams)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()

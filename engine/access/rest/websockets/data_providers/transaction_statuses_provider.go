@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -102,7 +102,7 @@ func (p *TransactionStatusesDataProvider) sendResponse(txResults []*accessmodel.
 func (p *TransactionStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args transactionStatusesArguments,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 

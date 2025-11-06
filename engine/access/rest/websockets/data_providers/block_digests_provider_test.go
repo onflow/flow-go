@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
 	"github.com/onflow/flow-go/model/flow"
 )
 

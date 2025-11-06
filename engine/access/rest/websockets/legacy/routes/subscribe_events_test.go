@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )

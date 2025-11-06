@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -76,7 +76,7 @@ type TransactionStreamAPI interface {
 		ctx context.Context,
 		txID flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) subscription.Subscription
+	) subscription_old.Subscription
 
 	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
 	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
@@ -88,7 +88,7 @@ type TransactionStreamAPI interface {
 		ctx context.Context,
 		tx *flow.TransactionBody,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) subscription.Subscription
+	) subscription_old.Subscription
 }
 
 // API provides all public-facing functionality of the Flow Access API.
@@ -258,7 +258,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlocksFromStartHeight subscribes to the finalized or sealed blocks starting at the requested
 	// start block height, up until the latest available block. Once the latest is
@@ -269,7 +269,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlocksFromLatest subscribes to the finalized or sealed blocks starting at the latest sealed block,
 	// up until the latest available block. Once the latest is
@@ -280,7 +280,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlockHeadersFromStartBlockID streams finalized or sealed block headers starting at the requested
 	// start block id, up until the latest available block header. Once the latest is
@@ -291,7 +291,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlockHeadersFromStartHeight streams finalized or sealed block headers starting at the requested
 	// start block height, up until the latest available block header. Once the latest is
@@ -302,7 +302,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlockHeadersFromLatest streams finalized or sealed block headers starting at the latest sealed block,
 	// up until the latest available block header. Once the latest is
@@ -313,7 +313,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlockDigestsFromStartBlockID streams finalized or sealed lightweight block starting at the requested
 	// start block id, up until the latest available block. Once the latest is
@@ -324,7 +324,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlockDigestsFromStartHeight streams finalized or sealed lightweight block starting at the requested
 	// start block height, up until the latest available block. Once the latest is
@@ -335,7 +335,7 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription_old.Subscription
 
 	// SubscribeBlockDigestsFromLatest streams finalized or sealed lightweight block starting at the latest sealed block,
 	// up until the latest available block. Once the latest is
@@ -346,5 +346,5 @@ type API interface {
 	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
 	//
 	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
+	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription_old.Subscription
 }

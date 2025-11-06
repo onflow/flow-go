@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -210,7 +210,7 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 		},
 	}
 
-	call := func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription_old.Subscription {
 		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter)
 	}
 
@@ -244,7 +244,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 	}, nil)
 
-	call := func(ctx context.Context, startBlockID flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(ctx context.Context, startBlockID flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription_old.Subscription {
 		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter)
 	}
 
@@ -278,7 +278,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
 	}, nil)
 
-	call := func(ctx context.Context, _ flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(ctx context.Context, _ flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription_old.Subscription {
 		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter)
 	}
 
@@ -309,7 +309,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
 	}, nil)
 
-	call := func(ctx context.Context, _ flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(ctx context.Context, _ flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription_old.Subscription {
 		return s.backend.SubscribeEventsFromLatest(ctx, filter)
 	}
 
@@ -342,7 +342,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 //  7. Ensures that there are no new messages waiting after all blocks have been processed.
 //  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendEventsSuite) subscribe(
-	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription,
+	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription_old.Subscription,
 	requireFn func(interface{}, *EventsResponse),
 	tests []eventsTestType,
 ) {
@@ -454,7 +454,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
 		Events:         flow.EventsList(s.blockEvents[s.blocks[0].ID()]),
 	}
 
-	assertSubscriptionResponses := func(sub subscription.Subscription, cancel context.CancelFunc) {
+	assertSubscriptionResponses := func(sub subscription_old.Subscription, cancel context.CancelFunc) {
 		// the first response should have details from the root block and no events
 		resp := <-sub.Channel()
 		s.requireEventsResponse(resp, rootEventResponse)

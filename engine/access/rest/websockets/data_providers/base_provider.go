@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 )
 
 // baseDataProvider holds common objects for the provider
@@ -90,7 +90,7 @@ type sendResponseCallback[T any] func(T) error
 //
 // No other errors are expected during normal operation
 func run[T any](
-	subscription subscription.Subscription,
+	subscription subscription_old.Subscription,
 	sendResponse sendResponseCallback[T],
 ) error {
 	for {

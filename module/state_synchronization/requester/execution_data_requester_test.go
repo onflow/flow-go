@@ -18,7 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
@@ -408,7 +408,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	suite.downloader = MockDownloader(cfg.executionDataEntries)
 	suite.distributor = NewExecutionDataDistributor()
 
-	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
+	heroCache := herocache.NewBlockExecutionData(subscription_old.DefaultCacheSize, logger, metricsCollector)
 	edCache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()

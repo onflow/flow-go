@@ -50,8 +50,8 @@ import (
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription_old/tracker"
 	"github.com/onflow/flow-go/engine/common/follower"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
@@ -215,13 +215,13 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: commonrpc.DefaultAccessMaxResponseSize,
-			ExecutionDataCacheSize:  subscription.DefaultCacheSize,
-			ClientSendTimeout:       subscription.DefaultSendTimeout,
-			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
-			MaxGlobalStreams:        subscription.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  subscription_old.DefaultCacheSize,
+			ClientSendTimeout:       subscription_old.DefaultSendTimeout,
+			ClientSendBufferSize:    subscription_old.DefaultSendBufferSize,
+			MaxGlobalStreams:        subscription_old.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           subscription.DefaultResponseLimit,
-			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
+			ResponseLimit:           subscription_old.DefaultResponseLimit,
+			HeartbeatInterval:       subscription_old.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 		},
 		stateStreamFilterConf:                nil,
@@ -1665,7 +1665,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.EventsIndex,
 				useIndex,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
+				subscription_old.NewSubscriptionHandler(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
@@ -2070,7 +2070,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			ScriptExecutionMode:  scriptExecMode,
 			EventQueryMode:       eventQueryMode,
 			TxResultQueryMode:    txResultQueryMode,
-			SubscriptionHandler: subscription.NewSubscriptionHandler(
+			SubscriptionHandler: subscription_old.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,
 				builder.stateStreamConf.ClientSendTimeout,

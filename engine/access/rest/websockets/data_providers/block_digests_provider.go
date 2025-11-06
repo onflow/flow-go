@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -69,7 +69,7 @@ func (p *BlockDigestsDataProvider) Run() error {
 func (p *BlockDigestsDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args blocksArguments,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockDigestsFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

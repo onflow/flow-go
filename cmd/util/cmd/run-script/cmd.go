@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -489,7 +489,7 @@ func (*api) SubscribeBlocksFromStartBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
@@ -497,14 +497,14 @@ func (*api) SubscribeBlocksFromStartHeight(
 	_ context.Context,
 	_ uint64,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
 func (*api) SubscribeBlocksFromLatest(
 	_ context.Context,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
@@ -512,7 +512,7 @@ func (*api) SubscribeBlockHeadersFromStartBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
@@ -520,14 +520,14 @@ func (*api) SubscribeBlockHeadersFromStartHeight(
 	_ context.Context,
 	_ uint64,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
 func (*api) SubscribeBlockHeadersFromLatest(
 	_ context.Context,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
@@ -535,7 +535,7 @@ func (*api) SubscribeBlockDigestsFromStartBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
@@ -543,14 +543,14 @@ func (*api) SubscribeBlockDigestsFromStartHeight(
 	_ context.Context,
 	_ uint64,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
 func (*api) SubscribeBlockDigestsFromLatest(
 	_ context.Context,
 	_ flow.BlockStatus,
-) subscription.Subscription {
+) subscription_old.Subscription {
 	return nil
 }
 
@@ -558,14 +558,14 @@ func (a *api) SubscribeTransactionStatuses(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
+) subscription_old.Subscription {
+	return subscription_old.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
 }
 
 func (a *api) SendAndSubscribeTransactionStatuses(
 	_ context.Context,
 	_ *flow.TransactionBody,
 	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
+) subscription_old.Subscription {
+	return subscription_old.NewFailedSubscription(ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
 }

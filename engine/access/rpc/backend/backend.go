@@ -26,8 +26,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -108,7 +108,7 @@ type Params struct {
 	CheckPayerBalanceMode    validator.PayerBalanceMode
 	EventQueryMode           query_mode.IndexQueryMode
 	BlockTracker             tracker.BlockTracker
-	SubscriptionHandler      *subscription.SubscriptionHandler
+	SubscriptionHandler      *subscription_old.SubscriptionHandler
 	MaxScriptAndArgumentSize uint
 
 	EventsIndex                *index.EventsIndex
