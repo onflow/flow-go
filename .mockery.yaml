@@ -34,6 +34,7 @@ packages:
   github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier:
   github.com/onflow/flow-go/engine/access/rpc/connection:
   github.com/onflow/flow-go/engine/access/state_stream:
+  github.com/onflow/flow-go/engine/access/subscription:
   github.com/onflow/flow-go/engine/access/subscription_old:
   github.com/onflow/flow-go/engine/access/subscription_old/tracker:
   github.com/onflow/flow-go/engine/access/wrapper:
