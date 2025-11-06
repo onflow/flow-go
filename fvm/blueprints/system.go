@@ -51,3 +51,36 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 
 	return systemTxBody, nil
 }
+
+// SystemCollection returns the re-created system collection after it has been already executed
+// using the events from the process callback transaction.
+func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Collection, error) {
+	process, err := ProcessCallbacksTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
+	}
+
+	executes, err := ExecuteCallbacksTransactions(chain, processEvents)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
+	}
+
+	systemTx, err := SystemChunkTransaction(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
+	}
+
+	transactions := make([]*flow.TransactionBody, 0, len(executes)+2) // +2 process and system tx
+	transactions = append(transactions, process)
+	transactions = append(transactions, executes...)
+	transactions = append(transactions, systemTx)
+
+	collection, err := flow.NewCollection(flow.UntrustedCollection{
+		Transactions: transactions,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+	}
+
+	return collection, nil
+}

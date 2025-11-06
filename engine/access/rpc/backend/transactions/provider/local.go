@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/versioned"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -51,7 +52,6 @@ func NewLocalTransactionProvider(
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
 	txErrorMessages error_messages.Provider,
-	systemCollection *system.SystemCollection,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	chainID flow.ChainID,
 	scheduledTransactionsEnabled bool,
@@ -240,9 +240,11 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	if !t.scheduledTransactionsEnabled {
-		return append(transactions, t.defaultSystemCollection.Transactions()...), nil
-	}
+	var versionedCollection versioned.Versioned[versioned.SystemCollection]
+
+	// if !t.scheduledTransactionsEnabled {
+	// 	return append(transactions, t.defaultSystemCollection.Transactions()...), nil
+	// }
 
 	// generate the system collection which includes scheduled transactions
 	events, err := t.eventsIndex.ByBlockID(blockID, block.Height)
@@ -250,7 +252,10 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get events")
 	}
 
-	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	sysCollection, err := versionedCollection.
+		Get(block.Height).
+		SystemCollection(t.chainID.Chain(), events)
+
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}

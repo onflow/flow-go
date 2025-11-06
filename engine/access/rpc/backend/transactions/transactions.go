@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/versioned"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -249,6 +250,9 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 		return nil, status.Errorf(codes.Internal, "failed to lookup transaction: %v", err)
 	}
 
+	var staticSystemCollection *versioned.StaticSystemCollection
+
+	staticSystemCollection.ByID(txID)
 	// check if it's one of the static system txs
 	if tx, ok := t.systemCollection.ByID(txID); ok {
 		return tx, nil

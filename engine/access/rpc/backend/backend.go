@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -138,9 +137,12 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	systemCollection, err := system.DefaultSystemCollection(params.ChainID, params.ScheduledCallbacksEnabled)
+	systemCollection, err := accessmodel.NewVersioned(
+		accessmodel.VersionedSystemCollections,
+		accessmodel.HardcodedChainHeightVersions[params.ChainID],
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+		return nil, fmt.Errorf("failed to create versioned system collections: %w", err)
 	}
 
 	accountsBackend, err := accounts.NewAccountsBackend(
@@ -234,6 +236,7 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
 		systemCollection,
+		sysCollection,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
 	)
