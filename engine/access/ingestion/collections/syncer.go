@@ -28,20 +28,15 @@ const (
 	// if missing collections have been received during the initial collection catchup process.
 	DefaultCollectionCatchupDBPollInterval = 1 * time.Second
 
-	// DefaultMissingCollsRequestInterval is the interval at which the syncer checks missing collections
+	// DefaultMissingCollectionRequestInterval is the interval at which the syncer checks missing collections
 	// and re-requests them from the network if needed.
-	DefaultMissingCollsRequestInterval = 1 * time.Minute
+	DefaultMissingCollectionRequestInterval = 1 * time.Minute
 
-	// DefaultMissingCollsForBlockThreshold is the threshold number of blocks with missing collections
-	// beyond which collections should be re-requested. This prevents spamming the collection nodes
-	// with requests for recent data.
-	DefaultMissingCollsForBlockThreshold = 100
-
-	// DefaultMissingCollsForAgeThreshold is the block height threshold below which collections
+	// DefaultMissingCollectionRequestThreshold is the block height threshold below which collections
 	// should be re-requested, regardless of the number of blocks for which collection are missing.
 	// This is to ensure that if a collection is missing for a long time (in terms of block height)
 	// it is eventually re-requested.
-	DefaultMissingCollsForAgeThreshold = 100
+	DefaultMissingCollectionRequestThreshold = 100
 )
 
 // The Syncer is responsible for syncing collections for finalized blocks from the network. It has
@@ -74,11 +69,10 @@ type Syncer struct {
 	execDataSyncer      *ExecutionDataSyncer // may be nil
 
 	// these are held as members to allow configuring their values during testing.
-	collectionCatchupTimeout        time.Duration
-	collectionCatchupDBPollInterval time.Duration
-	missingCollsForBlockThreshold   int
-	missingCollsForAgeThreshold     uint64
-	missingCollsRequestInterval     time.Duration
+	collectionCatchupTimeout          time.Duration
+	collectionCatchupDBPollInterval   time.Duration
+	missingCollectionRequestThreshold uint64
+	missingCollectionRequestInterval  time.Duration
 }
 
 // NewSyncer creates a new Syncer responsible for requesting, tracking, and indexing missing collections.
@@ -100,53 +94,61 @@ func NewSyncer(
 		indexer:             collectionIndexer,
 		execDataSyncer:      execDataSyncer,
 
-		collectionCatchupTimeout:        DefaultCollectionCatchupTimeout,
-		collectionCatchupDBPollInterval: DefaultCollectionCatchupDBPollInterval,
-		missingCollsForBlockThreshold:   DefaultMissingCollsForBlockThreshold,
-		missingCollsForAgeThreshold:     DefaultMissingCollsForAgeThreshold,
-		missingCollsRequestInterval:     DefaultMissingCollsRequestInterval,
+		collectionCatchupTimeout:          DefaultCollectionCatchupTimeout,
+		collectionCatchupDBPollInterval:   DefaultCollectionCatchupDBPollInterval,
+		missingCollectionRequestThreshold: DefaultMissingCollectionRequestThreshold,
+		missingCollectionRequestInterval:  DefaultMissingCollectionRequestInterval,
 	}
 }
 
 // WorkerLoop is a [component.ComponentWorker] that continuously monitors for missing collections, and
 // requests them from the network if needed. It also performs an initial collection catchup on startup.
 func (s *Syncer) WorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	requestCtx, cancel := context.WithTimeout(ctx, s.collectionCatchupTimeout)
-	defer cancel()
-
-	// attempt to download all known missing collections on start-up.
-	err := s.requestMissingCollectionsBlocking(requestCtx)
-	if err != nil {
-		if ctx.Err() != nil {
-			s.log.Error().Err(err).Msg("engine shutdown while downloading missing collections")
-			return
-		}
-
-		if !errors.Is(err, context.DeadlineExceeded) {
-			ctx.Throw(fmt.Errorf("error downloading missing collections: %w", err))
-			return
-		}
-
-		// timed out during catchup. continue with normal startup.
-		// missing collections will be requested periodically.
-		s.log.Error().Err(err).Msg("timed out syncing collections during startup")
-	}
-	ready()
-
-	requestCollectionsTicker := time.NewTicker(s.missingCollsRequestInterval)
-	defer requestCollectionsTicker.Stop()
-
-	for {
+	// Block marking the component ready until either the first run of the missing collections catchup
+	// completes, or `collectionCatchupTimeout` expires. This improves the user experience by preventing
+	// the Access API from starting while the initial catchup completes. The intention is to avoid
+	// returning NotFound errors immediately after startup for data that should be available, but has
+	// not yet been indexed.
+	// TODO (peter): consider removing this. I'm not convinced that this provides much value since in
+	// the common case (node restart), the block finalization would also pause so the node should not
+	// become farther behind in terms of collections.
+	readyChan := make(chan struct{})
+	go func() {
 		select {
 		case <-ctx.Done():
 			return
+		case <-readyChan:
+		case <-time.After(s.collectionCatchupTimeout):
+		}
+		ready()
+	}()
 
-		case <-requestCollectionsTicker.C:
-			err := s.requestMissingCollections(ctx)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("failed to request missing collections: %w", err))
+	requestCollectionsTicker := time.NewTicker(s.missingCollectionRequestInterval)
+	defer requestCollectionsTicker.Stop()
+
+	initialCatchupComplete := false
+	for {
+		err := s.requestMissingCollections(ctx, !initialCatchupComplete)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
 				return
 			}
+
+			ctx.Throw(fmt.Errorf("failed to request missing collections: %w", err))
+			return
+		}
+
+		// after the first successful run, mark the catchup as complete. This will cause the worker
+		// to call the ready function if it was not already called.
+		if !initialCatchupComplete {
+			initialCatchupComplete = true
+			close(readyChan)
+		}
+
+		select {
+		case <-requestCollectionsTicker.C:
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -197,168 +199,102 @@ func (s *Syncer) requestCollections(collections []*flow.CollectionGuarantee) err
 	return nil
 }
 
-// requestMissingCollections checks if missing collections should be requested based on configured
-// block or age thresholds and triggers requests if needed.
+// requestMissingCollections requests all missing collections using local execution data if available,
+// otherwise requests them from the network. Only sends requests to the network if we are more than
+// `missingCollectionRequestThreshold` blocks behind the latest finalized block.
 //
-// No error returns are expected during normal operation.
-func (s *Syncer) requestMissingCollections(ctx context.Context) error {
+// Expected error returns during normal operation:
+//   - [context.Canceled]: if the context is canceled before all collections are requested
+func (s *Syncer) requestMissingCollections(ctx context.Context, forceSendRequests bool) error {
 	lastFullBlockHeight := s.lastFullBlockHeight.Value()
 	lastFinalizedBlock, err := s.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("failed to get finalized block: %w", err)
 	}
 
-	// if the node is syncing execution data, use the already downloaded data to index any available
-	// collections we are still missing.
-	lastSyncedHeight := lastFullBlockHeight
-	if s.execDataSyncer != nil {
-		lastSyncedHeight, err = s.execDataSyncer.IndexFromStartHeight(ctx, lastFullBlockHeight)
-		if err != nil {
-			return fmt.Errorf("failed to index collections from execution data: %w", err)
-		}
-		// At this point, all collections within blocks up to and including `lastSyncedHeight` were
-		// submitted for indexing. However, indexing is completed asynchronously, so `lastSyncedHeight`
-		// was set to the last block for which we have execution data to avoid re-requesting already
-		// submitted collections.
-	}
-
-	// request all other missing collections from Collection nodes.
-	collections, incompleteBlocksCount, err := s.findMissingCollections(lastSyncedHeight, lastFinalizedBlock.Height)
-	if err != nil {
-		return fmt.Errorf("failed to find missing collections: %w", err)
+	if lastFullBlockHeight >= lastFinalizedBlock.Height {
+		return nil
 	}
 
 	// only send requests if we are sufficiently behind the latest finalized block to avoid spamming
 	// collection nodes with requests.
-	blocksThresholdReached := incompleteBlocksCount >= s.missingCollsForBlockThreshold
-	ageThresholdReached := lastFinalizedBlock.Height-lastFullBlockHeight > s.missingCollsForAgeThreshold
-	if len(collections) > 0 && (blocksThresholdReached || ageThresholdReached) {
-		// warn log since this should generally not happen
-		s.log.Warn().
-			Uint64("finalized_height", lastFinalizedBlock.Height).
-			Uint64("last_full_blk_height", lastFullBlockHeight).
-			Int("missing_collection_blk_count", incompleteBlocksCount).
-			Int("missing_collection_count", len(collections)).
-			Msg("re-requesting missing collections")
-
-		err = s.requestCollections(collections)
-		if err != nil {
-			return fmt.Errorf("failed to request collections: %w", err)
-		}
-		// since this is a re-request, do not use force. new finalized block requests will force
-		// dispatch. On the happy path, this will happen at least once per second.
-	}
-
-	return nil
-}
-
-// findMissingCollections scans block heights from last known full block up to the latest finalized
-// block and returns all missing collection along with the count of incomplete blocks.
-//
-// No error returns are expected during normal operation.
-func (s *Syncer) findMissingCollections(lastFullBlockHeight, finalizedBlockHeight uint64) ([]*flow.CollectionGuarantee, int, error) {
-	var missingCollections []*flow.CollectionGuarantee
-	var incompleteBlocksCount int
-
-	for height := lastFullBlockHeight + 1; height <= finalizedBlockHeight; height++ {
-		collections, err := s.indexer.MissingCollectionsAtHeight(height)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		if len(collections) > 0 {
-			missingCollections = append(missingCollections, collections...)
-			incompleteBlocksCount += 1
-		}
-	}
-
-	return missingCollections, incompleteBlocksCount, nil
-}
-
-// requestMissingCollectionsBlocking requests and waits for all missing collections to be downloaded,
-// blocking until either completion or context timeout.
-//
-// No error returns are expected during normal operation.
-func (s *Syncer) requestMissingCollectionsBlocking(ctx context.Context) error {
-	lastFullBlockHeight := s.lastFullBlockHeight.Value()
-	lastFinalizedBlock, err := s.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("failed to get finalized block: %w", err)
+	shouldSendRequestsToNetwork := forceSendRequests
+	if lastFinalizedBlock.Height-lastFullBlockHeight >= s.missingCollectionRequestThreshold {
+		shouldSendRequestsToNetwork = true
 	}
 
 	progress := util.LogProgress(s.log, util.DefaultLogProgressConfig("requesting missing collections", lastFinalizedBlock.Height-lastFullBlockHeight))
 
-	pendingCollections := make(map[flow.Identifier]struct{})
+	requestedBlocks := 0
+	requestedCollections := 0
 	for height := lastFullBlockHeight + 1; height <= lastFinalizedBlock.Height; height++ {
 		if ctx.Err() != nil {
 			return fmt.Errorf("missing collection catchup interrupted: %w", ctx.Err())
 		}
 
-		collections, err := s.indexer.MissingCollectionsAtHeight(height)
+		collections, requested, err := s.requestForHeight(ctx, height, shouldSendRequestsToNetwork)
 		if err != nil {
-			return fmt.Errorf("failed to find missing collections at height %d: %w", height, err)
+			return fmt.Errorf("failed to request collections for height %d: %w", height, err)
 		}
-
-		if len(collections) > 0 {
-			var submitted bool
-			if s.execDataSyncer != nil {
-				submitted, err = s.execDataSyncer.IndexForHeight(ctx, height)
-				if err != nil {
-					return fmt.Errorf("failed to index collections from execution data: %w", err)
-				}
-			}
-
-			// if the data wasn't available from execution data, request it from Collection nodes.
-			if !submitted {
-				err = s.requestCollections(collections)
-				if err != nil {
-					return fmt.Errorf("failed to request collections: %w", err)
-				}
-				for _, collection := range collections {
-					pendingCollections[collection.CollectionID] = struct{}{}
-				}
-			}
+		if requested {
+			requestedBlocks++
+			requestedCollections += len(collections)
 		}
 
 		progress(1)
 	}
 
-	if len(pendingCollections) == 0 {
-		s.log.Info().Msg("no missing collections to download")
-		return nil
+	if requestedBlocks > 0 {
+		s.log.Warn().
+			Uint64("finalized_height", lastFinalizedBlock.Height).
+			Uint64("last_full_block_height", lastFullBlockHeight).
+			Int("requested_block_count", requestedBlocks).
+			Int("requested_collection_count", requestedCollections).
+			Msg("re-requesting missing collections")
 	}
 
-	// trigger immediate dispatch of any pending collection requests.
-	s.requester.Force()
+	return nil
+}
 
-	collectionStoragePollTicker := time.NewTicker(s.collectionCatchupDBPollInterval)
-	defer collectionStoragePollTicker.Stop()
+// requestForHeight requests all missing collections for the given height.
+// If collections are available from execution data, they are indexed first. All other collections
+// are requested from the network if `requestFromNetwork` is true.
+// Returns true if the collections were missing and requested.
+// Returns the list of collections that were requested from the network.
+//
+// No error returns are expected during normal operation.
+func (s *Syncer) requestForHeight(ctx context.Context, height uint64, requestFromNetwork bool) ([]*flow.CollectionGuarantee, bool, error) {
+	collections, err := s.indexer.MissingCollectionsAtHeight(height)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to find missing collections at height %d: %w", height, err)
+	}
+	if len(collections) == 0 {
+		return nil, false, nil
+	}
 
-	// we want to wait for all collections to be downloaded so we poll local storage periodically to
-	// make sure each collection was successfully stored and indexed.
-	for len(pendingCollections) > 0 {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to complete collection retrieval: %w", ctx.Err())
-
-		case <-collectionStoragePollTicker.C:
-			s.log.Debug().
-				Int("total_missing_collections", len(pendingCollections)).
-				Msg("retrieving missing collections...")
-
-			for collectionID := range pendingCollections {
-				downloaded, err := s.indexer.IsCollectionInStorage(collectionID)
-				if err != nil {
-					return err
-				}
-
-				if downloaded {
-					delete(pendingCollections, collectionID)
-				}
-			}
+	// always index available collections from execution data.
+	if s.execDataSyncer != nil {
+		submitted, err := s.execDataSyncer.IndexForHeight(ctx, height)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to index collections from execution data: %w", err)
+		}
+		if submitted {
+			return nil, true, nil
 		}
 	}
 
-	s.log.Info().Msg("collection catchup done")
-	return nil
+	// only request collections from the network if asked to do so.
+	if !requestFromNetwork {
+		return nil, false, nil
+	}
+
+	err = s.requestCollections(collections)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to request collections: %w", err)
+	}
+	// request made during catchup do not use Force() so they can be batched together for efficiency.
+	// In practice, Force() is called once for each finalized block, so requests are dispatched at
+	// least as often as the block rate.
+
+	return collections, true, nil
 }
