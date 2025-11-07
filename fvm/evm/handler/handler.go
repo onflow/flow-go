@@ -204,14 +204,12 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types
 }
 
 func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, error) {
-	// step 1 - transaction decoding and compute total gas needed
-	// This is safe to be done before checking the gas
-	// as it has its own metering
-	var totalGas types.GasLimit
-	gasLimit := h.backend.ComputationRemaining(environment.ComputationKindEVMGasUsage)
+	// step 1 - transaction decoding and check that enough evm gas is available in the FVM transaction
+
+	// remainingGasLimit is the remaining EVM gas available in hte FVM transaction
+	remainingGasLimit := h.backend.ComputationRemaining(environment.ComputationKindEVMGasUsage)
 	batchLen := len(rlpEncodedTxs)
 	txs := make([]*gethTypes.Transaction, batchLen)
-
 	for i, rlpEncodedTx := range rlpEncodedTxs {
 		tx, err := h.decodeTransaction(rlpEncodedTx)
 		// if any tx fails decoding revert the batch
@@ -221,15 +219,12 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 
 		txs[i] = tx
 
-		// overflow protection
-		if totalGas+types.GasLimit(tx.Gas()) < totalGas {
-			return nil, types.ErrInsufficientComputation
-		}
 		// step 2 - check if enough computation is available
-		totalGas += types.GasLimit(tx.Gas())
-		if uint64(totalGas) > gasLimit {
+		txGasLimit := tx.Gas()
+		if remainingGasLimit < txGasLimit {
 			return nil, types.ErrInsufficientComputation
 		}
+		remainingGasLimit -= txGasLimit
 	}
 
 	// step 3 - prepare block context
