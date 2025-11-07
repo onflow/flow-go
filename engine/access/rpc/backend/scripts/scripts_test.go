@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts/executor"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
@@ -229,7 +228,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 
 	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
-	expectedErr := executor.NewInvalidArgumentError(errToReturn)
+	expectedErr := access.NewInvalidRequestError(errToReturn)
 
 	scripts := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 
@@ -344,23 +343,23 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	}{
 		{
 			err:           storage.ErrHeightNotIndexed,
-			expectedError: executor.NewOutOfRangeError(storage.ErrHeightNotIndexed),
+			expectedError: access.NewOutOfRangeError(storage.ErrHeightNotIndexed),
 		},
 		{
 			err:           storage.ErrNotFound,
-			expectedError: executor.NewDataNotFoundError("scriptExecutor", storage.ErrNotFound),
+			expectedError: access.NewDataNotFoundError("header", storage.ErrNotFound),
 		},
 		{
 			err:           systemErr,
-			expectedError: executor.NewInternalError(systemErr),
+			expectedError: access.NewInternalError(systemErr),
 		},
 		{
 			err:           cadenceErr,
-			expectedError: executor.NewInvalidArgumentError(cadenceErr),
+			expectedError: access.NewInvalidRequestError(cadenceErr),
 		},
 		{
 			err:           fvmFailureErr,
-			expectedError: executor.NewInternalError(fvmFailureErr),
+			expectedError: access.NewInternalError(fvmFailureErr),
 		},
 	}
 
@@ -518,11 +517,11 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 	}{
 		{
 			err:           cadenceErr,
-			expectedError: executor.NewInvalidArgumentError(cadenceErr),
+			expectedError: access.NewInvalidRequestError(cadenceErr),
 		},
 		{
 			err:           ctxCancelErr,
-			expectedError: executor.NewScriptExecutionCanceledError(ctxCancelErr),
+			expectedError: access.NewRequestCanceledError(ctxCancelErr),
 		},
 	}
 
@@ -599,7 +598,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
-	expectedErr := executor.NewInvalidArgumentError(errToReturn)
+	expectedErr := access.NewInvalidRequestError(errToReturn)
 
 	backend := s.defaultBackend(query_mode.IndexQueryModeFailover)
 

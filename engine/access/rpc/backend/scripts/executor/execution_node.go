@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -56,11 +57,10 @@ func NewENScriptExecutor(
 // Execute executes the provided script at the requested block.
 //
 // Expected error returns during normal operation:
-//   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [DataNotFoundError] - if the requested block has not been executed or has been pruned by the node.
-//   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed.
-//   - [ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [InternalError] - if the block state commitment could not be retrieved or for other internal execution node failures.
+//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError] - if the requested block has not been executed or has been pruned by the node.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - if an internal execution node failure occurs.
 func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	var result []byte
@@ -105,15 +105,15 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 
 		switch status.Code(errToReturn) {
 		case codes.InvalidArgument:
-			return nil, nil, NewInvalidArgumentError(errToReturn)
+			return nil, nil, access.NewInvalidRequestError(errToReturn)
 		case codes.NotFound:
-			return nil, nil, NewDataNotFoundError("block", err)
+			return nil, nil, access.NewDataNotFoundError("block", err)
 		case codes.Internal:
-			return nil, nil, NewInternalError(errToReturn)
+			return nil, nil, access.NewInternalError(errToReturn)
 		case codes.Unavailable:
-			return nil, nil, NewServiceUnavailable(errToReturn)
+			return nil, nil, access.NewServiceUnavailable(errToReturn)
 		default:
-			return nil, nil, common.NewFailedToQueryExternalNodeError(errToReturn)
+			return nil, nil, access.NewInternalError(errToReturn)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 //   - [codes.Unavailable] - if a connection to an execution node could not be established.
 //   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
 //   - [codes.NotFound] - if the requested block has not been executed or has been pruned by the node.
-//   - [codes.Internal] - if the block state commitment could not be retrieved or for other internal execution node failures.
+//   - [codes.Internal] - if an internal execution node failure occurs.
 func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,
