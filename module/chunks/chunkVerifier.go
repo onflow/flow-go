@@ -282,6 +282,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 	}
 
+	// NOTE: Ignore computation usage for the purposes of comparing Cadence VM and interpreter ONLY
+	for i := range txResults {
+		txResults[i].ComputationUsed = 0
+	}
+
 	// check read access to unknown registers
 	if len(unknownRegTouch) > 0 {
 		var missingRegs []string
