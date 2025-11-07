@@ -144,16 +144,16 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, nil, access.NewInvalidRequestError(commonrpc.ErrScriptTooLarge)
 	}
 
-	latestHeader, err := b.state.Sealed().Head()
+	sealedHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
 		err = irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
 		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
-	latestHeaderID := latestHeader.ID()
+	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(
-		latestHeaderID,
+		sealedHeaderID,
 		userCriteria,
 	)
 	if err != nil {
@@ -168,7 +168,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		}
 	}
 
-	request := executor.NewScriptExecutionRequest(latestHeaderID, latestHeader.Height, script, arguments)
+	request := executor.NewScriptExecutionRequest(sealedHeaderID, sealedHeader.Height, script, arguments)
 	res, metadata, err := b.executor.Execute(ctx, request, executionResultInfo)
 	if err != nil {
 		return nil, nil, handleScriptExecutionError(ctx, err)
