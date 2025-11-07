@@ -37,9 +37,12 @@ func (s *builderV1) SystemCollection(chain flow.Chain, providerFn access.EventPr
 		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
 	}
 
-	processEvents, err := providerFn()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get process events: %w", err)
+	var processEvents flow.EventsList
+	if providerFn != nil {
+		processEvents, err = providerFn()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get process transactions events: %w", err)
+		}
 	}
 
 	executes, err := s.ExecuteCallbacksTransactions(chain, processEvents)
