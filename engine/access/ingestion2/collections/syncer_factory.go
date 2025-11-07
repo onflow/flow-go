@@ -30,6 +30,13 @@ type CreateSyncerConfig struct {
 	EDILagThreshold uint64
 }
 
+// CreateSyncerResult holds the results of CreateSyncer.
+type CreateSyncerResult struct {
+	Syncer       *Syncer
+	JobProcessor ingestion2.JobProcessor
+	RequestEng   *requester.Engine
+}
+
 // CreateSyncer creates a new Syncer component with all its dependencies.
 // This function is in the collections package to avoid import cycles:
 // - collections package already imports ingestion2 (for interfaces)
@@ -51,6 +58,8 @@ type CreateSyncerConfig struct {
 //   - processedHeightRecorder: Recorder for execution data processed heights (can be nil if EDI is disabled)
 //   - config: Configuration for the syncer
 //
+// Returns both the Syncer and JobProcessor so they can be reused in other components.
+//
 // No error returns are expected during normal operation.
 func CreateSyncer(
 	log zerolog.Logger,
@@ -66,7 +75,7 @@ func CreateSyncer(
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	processedHeightRecorder execution_data.ProcessedHeightRecorder,
 	config CreateSyncerConfig,
-) (*Syncer, error) {
+) (*CreateSyncerResult, error) {
 	// Create requester engine for requesting collections
 	requestEng, err := requester.New(
 		log.With().Str("entity", "collection").Logger(),
@@ -146,5 +155,9 @@ func CreateSyncer(
 		return nil, fmt.Errorf("could not create syncer: %w", err)
 	}
 
-	return syncer, nil
+	return &CreateSyncerResult{
+		Syncer:       syncer,
+		JobProcessor: jobProcessor,
+		RequestEng:   requestEng,
+	}, nil
 }

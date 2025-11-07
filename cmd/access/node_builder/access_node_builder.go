@@ -40,9 +40,10 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
+	"github.com/onflow/flow-go/engine/access/ingestion2"
+	ingestion2collections "github.com/onflow/flow-go/engine/access/ingestion2/collections"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -170,6 +171,7 @@ type AccessNodeConfig struct {
 	PublicNetworkConfig                  PublicNetworkConfig
 	TxResultCacheSize                    uint
 	executionDataIndexingEnabled         bool
+	ediLagThreshold                      uint64
 	registersDBPath                      string
 	checkpointFile                       string
 	scriptExecutorConfig                 query.QueryConfig
@@ -275,6 +277,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 		executionDataIndexingEnabled:         false,
+		ediLagThreshold:                      100,
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -333,6 +336,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore         *indexer.IndexerCore
 	CollectionIndexer            *collections.Indexer
 	CollectionSyncer             *collections.Syncer
+	JobProcessor                 ingestion2.JobProcessor
+	CollectionSyncer2            ingestion2.Syncer
 	ScriptExecutor               *backend.ScriptExecutor
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
@@ -360,7 +365,7 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	IngestEng      *ingestion.Engine
+	IngestEng      *ingestion2.Engine
 	RequestEng     *requester.Engine
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
@@ -942,6 +947,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("could not create derived chain data: %w", err)
 				}
 
+				// JobProcessor should already be created in the "collection syncer and job processor" module
+				if builder.JobProcessor == nil {
+					return nil, fmt.Errorf("JobProcessor must be created before execution data indexer")
+				}
+
 				builder.ExecutionIndexerCore = indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
@@ -955,7 +965,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.scheduledTransactions),
 					builder.RootChainID,
 					indexerDerivedChainData,
-					notNil(builder.CollectionIndexer),
+					notNil(builder.JobProcessor),
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
 				)
@@ -1413,6 +1423,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
+		flags.Uint64Var(&builder.ediLagThreshold,
+			"edi-lag-threshold",
+			defaultConfig.ediLagThreshold,
+			"threshold in blocks. If (blockHeight - ediHeight) > threshold, fetch collections. Default: 100")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
@@ -1951,6 +1965,45 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			processedFinalizedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
+		Module("collection syncer and job processor", func(node *cmd.NodeConfig) error {
+			// Get ProcessedHeightRecorder from ExecutionIndexer if available
+			// Note: ExecutionIndexer may not exist yet, so we'll pass nil and update later if needed
+			var processedHeightRecorder execution_data.ProcessedHeightRecorder
+			if builder.ExecutionIndexer != nil {
+				processedHeightRecorder = builder.ExecutionIndexer
+			}
+
+			// Create syncer and job processor
+			syncerResult, err := ingestion2collections.CreateSyncer(
+				node.Logger,
+				node.EngineRegistry,
+				node.State,
+				node.Me,
+				node.Storage.Blocks,
+				notNil(builder.collections),
+				node.Storage.Guarantees,
+				builder.ProtocolDB,
+				node.StorageLockMgr,
+				processedFinalizedBlockHeight,
+				notNil(builder.collectionExecutedMetric),
+				processedHeightRecorder,
+				ingestion2collections.CreateSyncerConfig{
+					MaxProcessing:   10, // TODO: make configurable
+					MaxSearchAhead:  0,  // TODO: make configurable
+					EDILagThreshold: builder.ediLagThreshold,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not create collection syncer: %w", err)
+			}
+
+			// Store the results for use in other components
+			builder.JobProcessor = syncerResult.JobProcessor
+			builder.CollectionSyncer2 = syncerResult.Syncer
+			builder.RequestEng = syncerResult.RequestEng
+
+			return nil
+		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
 			rootBlockHeight := node.State.Params().FinalizedRoot().Height
 
@@ -2198,20 +2251,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return builder.RpcEng, nil
 		}).
 		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			requestEng, err := requester.New(
-				node.Logger.With().Str("entity", "collection").Logger(),
-				node.Metrics.Engine,
-				node.EngineRegistry,
-				node.Me,
-				node.State,
-				channels.RequestCollections,
-				filter.HasRole[flow.Identity](flow.RoleCollection),
-				func() flow.Entity { return new(flow.Collection) },
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			// RequestEng should already be created in the "collection syncer and job processor" module
+			if builder.RequestEng == nil {
+				return nil, fmt.Errorf("RequestEng must be created before requester engine component")
 			}
-			builder.RequestEng = requestEng
 
 			collectionIndexer, err := collections.NewIndexer(
 				node.Logger,
@@ -2266,29 +2309,44 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				)
 			}
 
-			ingestEng, err := ingestion.New(
+			// CollectionSyncer2 should already be created in the "collection syncer and job processor" module
+			if builder.CollectionSyncer2 == nil {
+				return nil, fmt.Errorf("CollectionSyncer2 must be created before ingestion engine")
+			}
+
+			// Create FinalizedBlockProcessor (still uses old syncer temporarily)
+			finalizedBlockProcessor, err := ingestion2.NewFinalizedBlockProcessor(
 				node.Logger,
-				node.EngineRegistry,
 				node.State,
-				node.Me,
 				node.Storage.Blocks,
 				node.Storage.Results,
-				node.Storage.Receipts,
 				processedFinalizedBlockHeight,
-				notNil(builder.CollectionSyncer),
-				notNil(builder.CollectionIndexer),
+				notNil(builder.CollectionSyncer), // TODO: update FinalizedBlockProcessor to not need this
 				notNil(builder.collectionExecutedMetric),
-				notNil(builder.TxResultErrorMessagesCore),
 			)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not create finalized block processor: %w", err)
 			}
+
+			// Create ingestion2 engine
+			ingestEng, err := ingestion2.New(
+				node.Logger,
+				node.EngineRegistry,
+				finalizedBlockProcessor,
+				builder.CollectionSyncer2,
+				node.Storage.Receipts,
+				notNil(builder.collectionExecutedMetric),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create ingestion2 engine: %w", err)
+			}
+
 			builder.IngestEng = ingestEng
 
-			ingestionDependable.Init(builder.IngestEng)
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
+			ingestionDependable.Init(ingestEng)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(ingestEng.OnFinalizedBlock)
 
-			return builder.IngestEng, nil
+			return ingestEng, nil
 		})
 
 	if builder.storeTxResultErrorMessages {
