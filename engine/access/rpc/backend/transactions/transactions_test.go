@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
@@ -210,6 +211,12 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	)
 	suite.Require().NoError(err)
 
+	versionedSystemCollections, err := systemcollection.NewVersioned(
+		suite.chainID.Chain(),
+		systemcollection.Default(suite.chainID),
+	)
+	suite.Require().NoError(err)
+
 	return Params{
 		Log:     suite.log,
 		Metrics: metrics.NewNoopCollector(),
@@ -230,6 +237,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		EventsIndex:                  suite.eventsIndex,
 		TxResultsIndex:               suite.txResultsIndex,
 		ScheduledTransactionsEnabled: suite.scheduledTransactionsEnabled,
+		SystemCollections:            versionedSystemCollections,
 	}
 }
 
@@ -1591,7 +1599,7 @@ func (suite *Suite) TestGetSystemTransaction() {
 		txID := tx.ID()
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
@@ -1654,6 +1662,13 @@ func (suite *Suite) TestGetSystemTransaction() {
 		tx := suite.g.Transactions().Fixture()
 		txID := tx.ID()
 
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
 		res, err := txBackend.GetSystemTransaction(context.Background(), txID, blockID)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
@@ -1680,17 +1695,18 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 
 	suite.Run("happy path", func() {
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Times(2)
 
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
+			Times(2)
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
 			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(expectedResult, nil)
+			Return(expectedResult, nil).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -1708,17 +1724,18 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 		systemTxID := systemTx.ID()
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Times(2)
 
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
+			Times(2)
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
 			On("TransactionResult", mock.Anything, block.ToHeader(), systemTxID, flow.ZeroID, encodingVersion).
-			Return(expectedResult, nil)
+			Return(expectedResult, nil).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -1734,6 +1751,14 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 	suite.Run("returns not found when tx is not a system tx", func() {
 		tx := suite.g.Transactions().Fixture()
 		txID := tx.ID()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
@@ -1751,17 +1776,18 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 		expectedErr := status.Errorf(codes.Internal, "some other error")
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Times(2)
 
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
+			Times(2)
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
 			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(nil, expectedErr)
+			Return(nil, expectedErr).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -1797,6 +1823,14 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 	})
 
 	suite.Run("block not provided", func() {
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+
+		suite.state.
+			On("AtBlockID", flow.ZeroID).
+			Return(snapshot, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 
