@@ -443,7 +443,11 @@ func verifyHeight(
 				)
 			}
 
-			log.Error().Err(err).Msgf("could not verify chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
+			if vcd.IsSystemChunk {
+				log.Warn().Err(err).Msgf("could not verify system chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
+			} else {
+				log.Error().Err(err).Msgf("could not verify chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
+			}
 
 			stats.MismatchedChunkCount++
 			stats.MismatchedTransactionCount += chunkTransactionCount
