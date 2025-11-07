@@ -15,7 +15,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	//   - [fvmerrors.ErrCodeScriptExecutionCancelledError] - if script execution canceled.
 	//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError] - if script execution timed out.
@@ -34,7 +34,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error)
@@ -44,7 +44,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error)
@@ -54,7 +54,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error)
@@ -64,7 +64,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error)
@@ -74,7 +74,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
 	//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
-	//   - [storage.ErrNotFound] - if header or registerSnapshot value at height was not found.
+	//   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 	// TODO(#7650): add godoc on fvmerrors.CodedError, which is any user fvm error that is not fatal.
 	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error)
