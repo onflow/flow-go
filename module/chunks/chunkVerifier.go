@@ -276,11 +276,15 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 
 		txResults[i] = flow.LightTransactionResult{
-			TransactionID: tx.ID,
-			// NOTE: ignored for the purposes of comparing Cadence VM and interpreter
-			//ComputationUsed: output.ComputationUsed,
-			Failed: output.Err != nil,
+			TransactionID:   tx.ID,
+			ComputationUsed: output.ComputationUsed,
+			Failed:          output.Err != nil,
 		}
+	}
+
+	// NOTE: Ignore computation usage for the purposes of comparing Cadence VM and interpreter ONLY
+	for i := range txResults {
+		txResults[i].ComputationUsed = 0
 	}
 
 	// check read access to unknown registers
