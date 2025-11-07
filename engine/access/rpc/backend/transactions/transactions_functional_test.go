@@ -487,8 +487,8 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 
 	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
 	systemCollection, err := versionedSystemCollection.
-		Get(block.Height).
-		SystemCollection(s.g.ChainID().Chain(), access.DefaultEventProvider(s.tf.ExpectedEvents))
+		ByHeight(block.Height).
+		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -663,8 +663,8 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 
 	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
 	systemCollection, err := versionedSystemCollection.
-		Get(block.Height).
-		SystemCollection(s.g.ChainID().Chain(), access.DefaultEventProvider(s.tf.ExpectedEvents))
+		ByHeight(block.Height).
+		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 

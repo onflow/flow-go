@@ -368,12 +368,13 @@ func collectScheduledTransactions(
 
 	// reconstruct the system collection, and verify that the results match the expected transaction
 	versionedCollection := systemcollection.Default(chainID)
-	systemCollection, err := versionedCollection.Get(height).SystemCollection(
-		chainID.Chain(),
-		func() (flow.EventsList, error) {
-			return pendingExecutionEvents, nil
-		},
-	)
+	systemCollection, err := versionedCollection.
+		ByHeight(height).
+		SystemCollection(chainID.Chain(),
+			func() (flow.EventsList, error) {
+				return pendingExecutionEvents, nil
+			},
+		)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct system collection: %w", err)
 	}

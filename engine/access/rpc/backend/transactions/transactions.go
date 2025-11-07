@@ -480,8 +480,6 @@ func (t *Transactions) lookupSystemTransactionResult(
 	blockID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, bool, error) {
-	// TODO: system transactions can change over time. Use the blockID to get the correct system tx
-	// for the provided block.
 	if _, ok := t.systemCollections.SearchAll(txID); !ok {
 		return nil, false, nil // tx is not a system tx
 	}

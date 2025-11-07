@@ -36,21 +36,27 @@ const (
 	placeholderMigrationAddressV1    = "\"Migration\""
 )
 
-func (s *builderV0) ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+// ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
+//
+// No error returns are expected during normal operation.
+func (b *builderV0) ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	script := templates.ReplaceAddresses(processScheduledTransactionsTemplateV1, sc.AsTemplateEnv())
+	script := b.prepareProcessScheduledTransactionsTemplate(sc.AsTemplateEnv())
 
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
-		SetScript([]byte(script)).
+		SetScript(script).
 		SetComputeLimit(callbackTransactionGasLimitV1).Build()
 }
 
-func (s *builderV0) ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
+// ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
+//
+// No error returns are expected during normal operation.
+func (b *builderV0) ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	env := sc.AsTemplateEnv()
-	script := prepareExecuteScheduledTransactionTemplateV1(chain.ChainID())
+	script := b.prepareExecuteScheduledTransactionTemplate(env)
 
 	slices.SortFunc(processEvents, func(a, b flow.Event) int {
 		return int(a.EventIndex - b.EventIndex)
@@ -62,7 +68,7 @@ func (s *builderV0) ExecuteCallbacksTransactions(chain flow.Chain, processEvents
 			continue
 		}
 
-		id, effort, err := callbackArgsFromEventV1(event)
+		id, effort, err := b.callbackArgsFromEvent(event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
@@ -82,7 +88,10 @@ func (s *builderV0) ExecuteCallbacksTransactions(chain flow.Chain, processEvents
 	return txs, nil
 }
 
-func callbackArgsFromEventV1(event flow.Event) ([]byte, uint64, error) {
+// callbackArgsFromEventV1 decodes the event payload and returns the callback ID and effort.
+//
+// No error returns are expected during normal operation.
+func (b *builderV0) callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 	cadenceId, cadenceEffort, err := blueprints.ParsePendingExecutionEvent(event)
 	if err != nil {
 		return nil, 0, err
@@ -103,8 +112,13 @@ func callbackArgsFromEventV1(event flow.Event) ([]byte, uint64, error) {
 	return encID, uint64(effort), nil
 }
 
-func (s *builderV0) SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
-	script := prepareSystemContractCodeV1(chain.ChainID())
+// SystemChunkTransaction creates and returns the transaction corresponding to the
+// system chunk for the given chain.
+//
+// No error returns are expected during normal operation.
+func (b *builderV0) SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	script := b.prepareSystemContractCode(sc)
 	systemTxBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
 		SetComputeLimit(systemChunkTransactionGasLimitV1).
@@ -117,8 +131,13 @@ func (s *builderV0) SystemChunkTransaction(chain flow.Chain) (*flow.TransactionB
 	return systemTxBody, nil
 }
 
-func (s *builderV0) SystemCollection(chain flow.Chain, providerFn access.EventProvider) (*flow.Collection, error) {
-	process, err := s.ProcessCallbacksTransaction(chain)
+// SystemCollection constructs a system collection for the given chain.
+// Uses the provided event provider to get events required to construct the system collection.
+// A nil event provider behaves the same as an event provider that returns an empty EventsList.
+//
+// No error returns are expected during normal operation.
+func (b *builderV0) SystemCollection(chain flow.Chain, providerFn access.EventProvider) (*flow.Collection, error) {
+	process, err := b.ProcessCallbacksTransaction(chain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
 	}
@@ -131,12 +150,12 @@ func (s *builderV0) SystemCollection(chain flow.Chain, providerFn access.EventPr
 		}
 	}
 
-	executes, err := s.ExecuteCallbacksTransactions(chain, processEvents)
+	executes, err := b.ExecuteCallbacksTransactions(chain, processEvents)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
 	}
 
-	systemTx, err := s.SystemChunkTransaction(chain)
+	systemTx, err := b.SystemChunkTransaction(chain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
 	}
@@ -156,8 +175,9 @@ func (s *builderV0) SystemCollection(chain flow.Chain, providerFn access.EventPr
 	return collection, nil
 }
 
-func prepareSystemContractCodeV1(chainID flow.ChainID) []byte {
-	sc := systemcontracts.SystemContractsForChain(chainID)
+// prepareSystemContractCode prepares the system contract code for the given system contracts,
+// and returns the transaction script.
+func (b *builderV0) prepareSystemContractCode(sc *systemcontracts.SystemContracts) []byte {
 	code := templates.ReplaceAddresses(systemChunkTransactionTemplateV1, sc.AsTemplateEnv())
 	code = strings.ReplaceAll(
 		code,
@@ -167,14 +187,16 @@ func prepareSystemContractCodeV1(chainID flow.ChainID) []byte {
 	return []byte(code)
 }
 
-func prepareProcessScheduledTransactionsTemplateV1(chainID flow.ChainID) []byte {
-	sc := systemcontracts.SystemContractsForChain(chainID)
-	code := templates.ReplaceAddresses(processScheduledTransactionsTemplateV1, sc.AsTemplateEnv())
+// prepareProcessScheduledTransactionsTemplate prepares the process scheduled transactions template
+// for the given environment, and returns the transaction script.
+func (b *builderV0) prepareProcessScheduledTransactionsTemplate(env templates.Environment) []byte {
+	code := templates.ReplaceAddresses(processScheduledTransactionsTemplateV1, env)
 	return []byte(code)
 }
 
-func prepareExecuteScheduledTransactionTemplateV1(chainID flow.ChainID) []byte {
-	sc := systemcontracts.SystemContractsForChain(chainID)
-	code := templates.ReplaceAddresses(executeScheduledTransactionTemplateV1, sc.AsTemplateEnv())
+// prepareExecuteScheduledTransactionTemplate prepares the execute scheduled transaction template
+// for the given environment, and returns the transaction script.
+func (b *builderV0) prepareExecuteScheduledTransactionTemplate(env templates.Environment) []byte {
+	code := templates.ReplaceAddresses(executeScheduledTransactionTemplateV1, env)
 	return []byte(code)
 }

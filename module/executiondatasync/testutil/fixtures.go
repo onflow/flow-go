@@ -155,8 +155,8 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentBlock *flow
 	}
 	versionedSystemCollection := systemcollection.Default(g.ChainID())
 	systemCollection, err := versionedSystemCollection.
-		Get(parentBlock.Height).
-		SystemCollection(g.ChainID().Chain(), access.DefaultEventProvider(pendingExecutionEvents))
+		ByHeight(parentBlock.Height).
+		SystemCollection(g.ChainID().Chain(), access.StaticEventProvider(pendingExecutionEvents))
 	require.NoError(t, err)
 
 	systemResults := g.LightTransactionResults().ForTransactions(systemCollection.Transactions)

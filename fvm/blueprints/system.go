@@ -2,7 +2,6 @@ package blueprints
 
 import (
 	_ "embed"
-	"fmt"
 	"strings"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -21,8 +20,7 @@ var systemChunkTransactionTemplate string
 
 const placeholderMigrationAddress = "\"Migration\""
 
-func prepareSystemContractCode(chainID flow.ChainID) []byte {
-	sc := systemcontracts.SystemContractsForChain(chainID)
+func prepareSystemContractCode(sc *systemcontracts.SystemContracts) []byte {
 	code := templates.ReplaceAddresses(systemChunkTransactionTemplate, sc.AsTemplateEnv())
 	code = strings.ReplaceAll(
 		code,
@@ -34,17 +32,16 @@ func prepareSystemContractCode(chainID flow.ChainID) []byte {
 
 // SystemChunkTransaction creates and returns the transaction corresponding to the
 // system chunk for the given chain.
+//
+// No error returns are expected during normal operation.
 func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	// The heartbeat resources needed by the system tx have are on the service account,
 	// therefore, the service account is the only authorizer needed.
-	systemTxBody, err := flow.NewTransactionBodyBuilder().
-		SetScript(prepareSystemContractCode(chain.ChainID())).
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	script := prepareSystemContractCode(sc)
+	return flow.NewTransactionBodyBuilder().
+		SetScript(script).
 		SetComputeLimit(SystemChunkTransactionGasLimit).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
-	if err != nil {
-		return nil, fmt.Errorf("could not build system chunk transaction: %w", err)
-	}
-
-	return systemTxBody, nil
 }

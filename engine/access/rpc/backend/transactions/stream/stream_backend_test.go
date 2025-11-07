@@ -101,7 +101,7 @@ type TransactionStreamSuite struct {
 	db                  storage.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
-	systemCollection    *system.SystemCollection
+	systemCollections   *systemcollection.Versioned
 	scheduledTxEnabled  bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
@@ -147,7 +147,7 @@ func (s *TransactionStreamSuite) SetupTest() {
 	s.eventIndex = index.NewEventsIndex(s.indexReporter, s.events)
 	s.txResultIndex = index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults)
 
-	s.systemCollection, err = system.DefaultSystemCollection(s.chainID, true)
+	s.systemCollections, err = systemcollection.NewVersioned(s.chainID.Chain(), systemcollection.Default(s.chainID))
 	s.Require().NoError(err)
 
 	s.fixedExecutionNodeIDs = nil

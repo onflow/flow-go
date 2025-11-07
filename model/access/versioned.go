@@ -35,19 +35,14 @@ func NewVersioned[T any](versionedTypes map[Version]T, versionMapper HeightVersi
 	}
 }
 
-// Get version of the type at the provided height.
-func (v *Versioned[T]) Get(height uint64) T {
+// ByHeight version of the type at the provided height.
+func (v *Versioned[T]) ByHeight(height uint64) T {
 	version := v.versionMapper.GetVersion(height)
-	t, ok := v.versionedTypes[version]
-	if !ok {
-		// the constructor already checked that there is a version type for each possible version.
-		// if this every happens, there is a bug.
-		panic(fmt.Sprintf("version not found for height %d, version: %v", height, version))
-	}
-
-	return t
+	return v.versionedTypes[version]
 }
 
+// All returns all versions of the type.
+// Note: the values are stored within a map, so the order of the returned slice is not deterministic.
 func (v *Versioned[T]) All() []T {
 	return slices.Collect(maps.Values(v.versionedTypes))
 }

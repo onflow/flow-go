@@ -1,13 +1,16 @@
 package systemcollection
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
 func TestDefault(t *testing.T) {
@@ -16,7 +19,10 @@ func TestDefault(t *testing.T) {
 		require.NotNil(t, versioned)
 
 		// Should be able to get builders by height
-		builder := versioned.Get(0)
+		builder := versioned.ByHeight(0)
+		require.NotNil(t, builder)
+
+		builder = versioned.ByHeight(math.MaxUint64)
 		require.NotNil(t, builder)
 	})
 
@@ -370,4 +376,136 @@ func TestVersioned_Integration(t *testing.T) {
 				"transaction %d should have non-zero ID", i)
 		}
 	})
+}
+
+// TestVersioned_SystemCollection tests that the latest builder version produces the expected system
+// collection, and handles different success and failure scenarios.
+// Note: we only test the latest, because the previous versions all passed this test at one point,
+// and we statically check that the produced collection matches an expected ID. The intention is that
+// past versions are never updated, so ongoing testing is not necessary.
+func TestVersioned_SystemCollection(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Mainnet.Chain()
+	g := fixtures.NewGeneratorSuite(fixtures.WithChainID(chain.ChainID()))
+
+	// use the latest system collection builder
+	systemCollections, err := NewVersioned(chain, Default(chain.ChainID()))
+	require.NoError(t, err)
+	latestBuilder := systemCollections.ByHeight(math.MaxUint64)
+
+	tests := []struct {
+		name            string
+		events          []flow.Event
+		expectedTxCount int
+		errorMessage    string
+	}{
+		{
+			name:            "no events",
+			events:          []flow.Event{},
+			expectedTxCount: 2, // process + system chunk
+		},
+		{
+			name:            "single valid callback event",
+			events:          []flow.Event{g.PendingExecutionEvents().Fixture()},
+			expectedTxCount: 3, // process + execute + system chunk
+		},
+		{
+			name: "multiple valid callback events",
+			events: []flow.Event{
+				g.PendingExecutionEvents().Fixture(),
+				g.PendingExecutionEvents().Fixture(),
+				g.PendingExecutionEvents().Fixture(),
+			},
+			expectedTxCount: 5, // process + 3 executes + system chunk
+		},
+		{
+			name: "mixed events - valid callbacks and invalid types",
+			events: []flow.Event{
+				g.PendingExecutionEvents().Fixture(),
+				createInvalidTypeEvent(g),
+				g.PendingExecutionEvents().Fixture(),
+				createInvalidTypeEvent(g),
+			},
+			expectedTxCount: 4, // process + 2 executes + system chunk
+		},
+		{
+			name: "only invalid event types",
+			events: []flow.Event{
+				createInvalidTypeEvent(g),
+				createInvalidTypeEvent(g),
+			},
+			expectedTxCount: 2, // process + system chunk
+		},
+		{
+			name:         "invalid CCF payload in callback event",
+			events:       []flow.Event{createInvalidPayloadEvent(g)},
+			errorMessage: "failed to construct execute callbacks transactions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			executor := systemcontracts.SystemContractsForChain(chain.ChainID()).ScheduledTransactionExecutor.Address
+
+			collection, err := latestBuilder.SystemCollection(chain, access.StaticEventProvider(tt.events))
+			if tt.errorMessage != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMessage)
+				assert.Nil(t, collection)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, collection)
+
+			transactions := collection.Transactions
+			assert.Len(t, transactions, tt.expectedTxCount)
+
+			if tt.expectedTxCount > 0 {
+				// First transaction should always be the process transaction
+				processTx := transactions[0]
+				assert.NotNil(t, processTx)
+				assert.NotEmpty(t, processTx.Script)
+				assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), processTx.GasLimit)
+				assert.Equal(t, []flow.Address{chain.ServiceAddress()}, processTx.Authorizers)
+				assert.Empty(t, processTx.Arguments)
+
+				// Last transaction should always be the system chunk transaction
+				systemChunkTx := transactions[len(transactions)-1]
+				assert.NotNil(t, systemChunkTx)
+				assert.NotEmpty(t, systemChunkTx.Script)
+				assert.Equal(t, []flow.Address{chain.ServiceAddress()}, systemChunkTx.Authorizers)
+
+				// Middle transactions should be execute callback transactions
+				executeCount := tt.expectedTxCount - 2 // subtract process and system chunk
+				if executeCount > 0 {
+					for i := 1; i < len(transactions)-1; i++ {
+						executeTx := transactions[i]
+						assert.NotNil(t, executeTx)
+						assert.NotEmpty(t, executeTx.Script)
+						assert.Equal(t, []flow.Address{executor}, executeTx.Authorizers)
+						assert.Len(t, executeTx.Arguments, 1)
+						assert.NotEmpty(t, executeTx.Arguments[0])
+					}
+				}
+			}
+
+			// Verify collection properties
+			assert.NotEmpty(t, collection.ID())
+			assert.Equal(t, len(transactions), len(collection.Transactions))
+		})
+	}
+}
+
+func createInvalidTypeEvent(g *fixtures.GeneratorSuite) flow.Event {
+	event := g.PendingExecutionEvents().Fixture()
+	event.Type = g.EventTypes().Fixture()
+	return event
+}
+
+func createInvalidPayloadEvent(g *fixtures.GeneratorSuite) flow.Event {
+	event := g.PendingExecutionEvents().Fixture()
+	event.Payload = []byte("not valid ccf")
+	return event
 }

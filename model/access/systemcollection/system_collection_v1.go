@@ -14,25 +14,41 @@ import (
 // from automatically affecting historical versions, ensuring version stability.
 //
 // When creating a new version, create a new versioned type and copy the implementation
-// from blueprints at that point in time.
+// from blueprints at that point in time. Include all constants by hard coding their values.
+// Create new static template files in the scripts directory if any of the templates changed.
 
 // builderV1 is the latest and current version of the system collection.
 type builderV1 struct{}
 
-func (s *builderV1) ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+// ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
+//
+// No error returns are expected during normal operation.
+func (b *builderV1) ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	return blueprints.ProcessCallbacksTransaction(chain)
 }
 
-func (s *builderV1) ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
+// ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
+//
+// No error returns are expected during normal operation.
+func (b *builderV1) ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	return blueprints.ExecuteCallbacksTransactions(chain, processEvents)
 }
 
-func (s *builderV1) SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
+// SystemChunkTransaction creates and returns the transaction corresponding to the
+// system chunk for the given chain.
+//
+// No error returns are expected during normal operation.
+func (b *builderV1) SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	return blueprints.SystemChunkTransaction(chain)
 }
 
-func (s *builderV1) SystemCollection(chain flow.Chain, providerFn access.EventProvider) (*flow.Collection, error) {
-	process, err := s.ProcessCallbacksTransaction(chain)
+// SystemCollection constructs a system collection for the given chain.
+// Uses the provided event provider to get events required to construct the system collection.
+// A nil event provider behaves the same as an event provider that returns an empty EventsList.
+//
+// No error returns are expected during normal operation.
+func (b *builderV1) SystemCollection(chain flow.Chain, providerFn access.EventProvider) (*flow.Collection, error) {
+	process, err := b.ProcessCallbacksTransaction(chain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
 	}
@@ -45,12 +61,12 @@ func (s *builderV1) SystemCollection(chain flow.Chain, providerFn access.EventPr
 		}
 	}
 
-	executes, err := s.ExecuteCallbacksTransactions(chain, processEvents)
+	executes, err := b.ExecuteCallbacksTransactions(chain, processEvents)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
 	}
 
-	systemTx, err := s.SystemChunkTransaction(chain)
+	systemTx, err := b.SystemChunkTransaction(chain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
 	}

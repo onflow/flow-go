@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -25,7 +26,6 @@ import (
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
@@ -135,7 +135,13 @@ func (suite *Suite) SetupTest() {
 
 	// this is the system collection with scheduled transactions used as block data
 	suite.pendingExecutionEvents = suite.g.PendingExecutionEvents().List(2)
-	suite.systemCollection, err = blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
+	systemCollections, err := systemcollection.NewVersioned(suite.chainID.Chain(), systemcollection.Default(suite.chainID))
+	suite.Require().NoError(err)
+	suite.systemCollection, err = systemCollections.
+		ByHeight(math.MaxUint64). // use the latest version
+		SystemCollection(suite.chainID.Chain(), func() (flow.EventsList, error) {
+			return suite.pendingExecutionEvents, nil
+		})
 	suite.Require().NoError(err)
 	suite.processScheduledTransactionEventType = suite.pendingExecutionEvents[0].Type
 

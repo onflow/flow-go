@@ -21,7 +21,8 @@ const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 var issueScheduledTransactionExecutorTemplate string
 
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
-// No errors are expected during normal operation.
+//
+// No error returns are expected during normal operation.
 func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	script := templates.GenerateProcessTransactionScript(sc.AsTemplateEnv())
@@ -33,7 +34,8 @@ func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error
 }
 
 // ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
-// No errors are expected during normal operation.
+//
+// No error returns are expected during normal operation.
 func ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())

@@ -37,6 +37,8 @@ var versionBuilder = map[access.Version]access.SystemCollectionBuilder{
 	access.VersionLatest: &builderV1{},
 }
 
+// Default returns the default versioned system collection builder for the provided chain.
+// This is the set of all available version builders for the chain.
 func Default(chainID flow.ChainID) *access.Versioned[access.SystemCollectionBuilder] {
 	return access.NewVersioned(versionBuilder, ChainHeightVersions[chainID])
 }
@@ -84,5 +86,5 @@ func (s *Versioned) SearchAll(id flow.Identifier) (*flow.TransactionBody, bool) 
 
 // ByHeight returns the system collection builder for the given height.
 func (s *Versioned) ByHeight(height uint64) access.SystemCollectionBuilder {
-	return s.versioned.Get(height)
+	return s.versioned.ByHeight(height)
 }
