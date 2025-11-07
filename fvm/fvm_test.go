@@ -2950,6 +2950,9 @@ func TestFlowCallbackScheduler(t *testing.T) {
 
 	ctxOpts := []fvm.Option{
 		fvm.WithScheduleCallbacksEnabled(true),
+		// use localnet to ensure the scheduled transaction executor account
+		// is created during bootstrap, since testnet is manually created
+		fvm.WithChain(flow.Localnet.Chain()),
 	}
 
 	newVMTest().
@@ -2962,17 +2965,41 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-			require.NotNil(t, sc.FlowCallbackScheduler.Address)
-			require.NotNil(t, sc.FlowCallbackScheduler.Name)
+			require.NotNil(t, sc.FlowTransactionScheduler.Address)
+			require.NotNil(t, sc.FlowTransactionScheduler.Name)
+			require.NotNil(t, sc.ScheduledTransactionExecutor.Address)
 
+			_, err := fvm.GetAccount(ctx, sc.ScheduledTransactionExecutor.Address, snapshotTree)
+			require.NoError(t, err)
+
+			// Verify that the capability was stored in the executor account
 			script := fvm.Script([]byte(fmt.Sprintf(`
+			import FlowTransactionScheduler from %s
+
+			access(all) fun main(executorAddress: Address): Bool {
+				let executorAccount = getAccount(executorAddress)
+				return executorAccount.storage.check<Capability<auth(FlowTransactionScheduler.Execute) &FlowTransactionScheduler.SharedScheduler>>(
+					from: /storage/executeScheduledTransactionsCapability
+				)
+			}
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
+
+			executorAddressArg, err := jsoncdc.Encode(cadence.Address(sc.ScheduledTransactionExecutor.Address))
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(ctx, script.WithArguments(executorAddressArg), snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Equal(t, cadence.Bool(true), output.Value)
+
+			script = fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): FlowTransactionScheduler.Status? {
 					return FlowTransactionScheduler.getStatus(id: 1)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
-			_, output, err := vm.Run(ctx, script, snapshotTree)
+			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 			require.NotNil(t, output.Value)
@@ -2983,7 +3010,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 				access(all) fun main(): UInt64 {
 					return FlowTransactionScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowTransactionScheduler.Priority.High)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)

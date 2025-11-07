@@ -1378,7 +1378,7 @@ func Test_ScheduledCallback(t *testing.T) {
 	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
 		// create callback events that process callback will return
 		env := systemcontracts.SystemContractsForChain(chain.ChainID())
-		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "FlowTransactionScheduler")
+		location := common.NewAddressLocation(nil, common.Address(env.FlowTransactionScheduler.Address), "FlowTransactionScheduler")
 
 		eventType := cadence.NewEventType(
 			location,
@@ -1789,7 +1789,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(string(txBody.Script), "scheduler.executeTransaction"):
+	case strings.Contains(string(txBody.Script), "schedulerRef.executeTransaction"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}
