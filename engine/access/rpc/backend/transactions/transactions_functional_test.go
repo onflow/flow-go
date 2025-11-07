@@ -257,17 +257,23 @@ func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
 	)
 	s.Require().NoError(err)
 
+	versionedSystemCollections, err := systemcollection.NewVersioned(
+		s.g.ChainID().Chain(),
+		systemcollection.Default(s.g.ChainID()),
+	)
+	s.Require().NoError(err)
+
 	return Params{
-		Log:     s.log,
-		Metrics: metrics.NewNoopCollector(),
-		ChainID: s.g.ChainID(),
-		State:   s.state,
-		// SystemCollection:             s.systemCollection,
+		Log:                          s.log,
+		Metrics:                      metrics.NewNoopCollector(),
+		ChainID:                      s.g.ChainID(),
+		State:                        s.state,
 		NodeProvider:                 s.nodeProvider,
 		Blocks:                       s.blocks,
 		Collections:                  s.collections,
 		Transactions:                 s.transactions,
 		ScheduledTransactions:        s.scheduledTransactions,
+		SystemCollections:            versionedSystemCollections,
 		TxErrorMessageProvider:       s.txErrorMessageProvider,
 		TxValidator:                  txValidator,
 		TxStatusDeriver:              s.txStatusDeriver,
@@ -288,8 +294,6 @@ func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
 	stateParams.On("FinalizedRoot").Return(s.rootBlock.ToHeader())
 	s.mockState.On("Params").Return(stateParams)
 
-	var systemCollections *systemcollection.Versioned
-
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewENTransactionProvider(
 		s.log,
@@ -299,7 +303,7 @@ func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
 		nodeCommunicator,
 		s.nodeProvider,
 		s.txStatusDeriver,
-		systemCollections,
+		params.SystemCollections,
 		s.g.ChainID(),
 	)
 
@@ -393,8 +397,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_Local() {
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
 
-	var systemCollections *systemcollection.Versioned
-
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
@@ -403,7 +405,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_Local() {
 		s.eventsIndex,
 		s.txResultsIndex,
 		s.txErrorMessageProvider,
-		systemCollections,
+		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
 	)
@@ -424,8 +426,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_Local() {
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
 
-	var systemCollections *systemcollection.Versioned
-
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
@@ -434,7 +434,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_Local() {
 		s.eventsIndex,
 		s.txResultsIndex,
 		s.txErrorMessageProvider,
-		systemCollections,
+		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
 	)
@@ -459,8 +459,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
 
-	var systemCollections *systemcollection.Versioned
-
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
@@ -469,7 +467,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
 		s.eventsIndex,
 		s.txResultsIndex,
 		s.txErrorMessageProvider,
-		systemCollections,
+		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
 	)
@@ -498,8 +496,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
 
-	var systemCollections *systemcollection.Versioned
-
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
@@ -508,7 +504,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 		s.eventsIndex,
 		s.txResultsIndex,
 		s.txErrorMessageProvider,
-		systemCollections,
+		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
 	)
@@ -530,9 +526,14 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
 
-	var systemCollections *systemcollection.Versioned
+	versionedSystemCollections, err := systemcollection.NewVersioned(
+		s.g.ChainID().Chain(),
+		systemcollection.Default(s.g.ChainID()),
+	)
+	s.Require().NoError(err)
 
 	params := s.defaultTransactionsParams()
+	params.SystemCollections = versionedSystemCollections
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
@@ -540,7 +541,7 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 		s.eventsIndex,
 		s.txResultsIndex,
 		s.txErrorMessageProvider,
-		systemCollections,
+		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
 	)
