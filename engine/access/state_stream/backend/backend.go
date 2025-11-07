@@ -118,12 +118,15 @@ func New(
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
-		log:                     logger,
-		headers:                 headers,
-		getExecutionData:        b.getExecutionData,
-		executionDataTracker:    executionDataTracker,
-		executionResultProvider: executionResultProvider,
-		executionStateCache:     executionStateCache,
+		log:                      logger,
+		headers:                  headers,
+		getExecutionData:         b.getExecutionData,
+		executionDataTracker:     executionDataTracker,
+		executionDataBroadcaster: broadcaster,
+		streamOptions:            streamOptions,
+		endHeight:                0, // execution data endpoints are unbounded streams
+		executionResultProvider:  executionResultProvider,
+		executionStateCache:      executionStateCache,
 	}
 
 	eventsProvider := EventsProvider{
