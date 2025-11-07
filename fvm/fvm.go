@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -149,10 +150,22 @@ func (vm *VirtualMachine) Run(
 	ProcedureOutput,
 	error,
 ) {
+	logger := ctx.Logger
+	if logger.GetLevel() == zerolog.Disabled {
+		logger = zerolog.Nop()
+	}
+
+	logger.Info().
+		Str("procedure_type", string(proc.Type())).
+		Uint64("execution_time", uint64(proc.ExecutionTime())).
+		Msg("vm.Run: starting")
+
 	blockDatabase := storage.NewBlockDatabase(
 		storageSnapshot,
 		proc.ExecutionTime(),
 		ctx.DerivedBlockData)
+
+	logger.Info().Msg("vm.Run: created blockDatabase")
 
 	stateParameters := ProcedureStateParameters(ctx, proc)
 
@@ -162,11 +175,14 @@ func (vm *VirtualMachine) Run(
 	case ScriptProcedureType:
 		if ctx.AllowProgramCacheWritesInScripts {
 			// if configured, allow scripts to update the programs cache
+			logger.Info().Msg("vm.Run: creating caching snapshot read transaction")
 			storageTxn, err = blockDatabase.NewCachingSnapshotReadTransaction(stateParameters)
 		} else {
+			logger.Info().Msg("vm.Run: creating snapshot read transaction")
 			storageTxn = blockDatabase.NewSnapshotReadTransaction(stateParameters)
 		}
 	case TransactionProcedureType, BootstrapProcedureType:
+		logger.Info().Msg("vm.Run: creating new transaction")
 		storageTxn, err = blockDatabase.NewTransaction(
 			proc.ExecutionTime(),
 			stateParameters)
@@ -177,26 +193,45 @@ func (vm *VirtualMachine) Run(
 	}
 
 	if err != nil {
+		logger.Error().Err(err).Msg("vm.Run: error creating transaction")
 		return nil, ProcedureOutput{}, fmt.Errorf(
 			"error creating derived transaction data: %w",
 			err)
 	}
 
+	logger.Info().Msg("vm.Run: created storage transaction, creating executor")
+
 	executor := proc.NewExecutor(ctx, storageTxn)
+
+	logger.Info().Msg("vm.Run: created executor, calling executor.Run (Preprocess + Execute)")
+
 	err = Run(executor)
+
+	logger.Info().
+		Err(err).
+		Msg("vm.Run: executor.Run completed")
+
 	if err != nil {
 		return nil, ProcedureOutput{}, err
 	}
+
+	logger.Info().Msg("vm.Run: finalizing storage transaction")
 
 	err = storageTxn.Finalize()
 	if err != nil {
+		logger.Error().Err(err).Msg("vm.Run: error finalizing transaction")
 		return nil, ProcedureOutput{}, err
 	}
 
+	logger.Info().Msg("vm.Run: committing storage transaction")
+
 	executionSnapshot, err := storageTxn.Commit()
 	if err != nil {
+		logger.Error().Err(err).Msg("vm.Run: error committing transaction")
 		return nil, ProcedureOutput{}, err
 	}
+
+	logger.Info().Msg("vm.Run: completed successfully")
 
 	return executionSnapshot, executor.Output(), nil
 }
