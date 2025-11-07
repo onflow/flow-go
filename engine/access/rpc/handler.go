@@ -531,7 +531,7 @@ func (h *Handler) GetAccount(
 
 	account, executorMetadata, err := h.api.GetAccount(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountMsg, err := convert.AccountToMessage(account)
@@ -568,7 +568,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 
 	account, executorMetadata, err := h.api.GetAccountAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountMsg, err := convert.AccountToMessage(account)
@@ -605,7 +605,7 @@ func (h *Handler) GetAccountAtBlockHeight(
 
 	account, executorMetadata, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountMsg, err := convert.AccountToMessage(account)
@@ -646,7 +646,7 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 
 	accountBalance, executorMetadata, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
@@ -683,7 +683,7 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 
 	accountBalance, executorMetadata, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	if executionState.GetIncludeExecutorMetadata() {
@@ -719,7 +719,7 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 
 	keyByIndex, executorMetadata, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, req.GetIndex(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
@@ -761,7 +761,7 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 
 	accountKeys, executorMetadata, err := h.api.GetAccountKeysAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	var publicKeys []*entities.AccountKey
@@ -815,7 +815,7 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 		convert.NewCriteria(executionState),
 	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
@@ -857,7 +857,7 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 
 	accountKeys, executorMetadata, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	var publicKeys []*entities.AccountKey

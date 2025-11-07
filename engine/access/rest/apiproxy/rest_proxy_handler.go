@@ -177,7 +177,6 @@ func (r *RestProxyHandler) GetTransactionResult(
 ) (*accessmodel.TransactionResult, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-
 		return nil, err
 	}
 	defer closer.Close()
@@ -200,11 +199,15 @@ func (r *RestProxyHandler) GetTransactionResult(
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.ServiceUnavailable] - if configured to use an external node for get account and
+//     no upstream server is available.
 func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -218,7 +221,7 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	r.log("upstream", "GetAccountAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
 	account, err := convert.MessageToAccount(accountResponse.Account)
@@ -235,11 +238,15 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 }
 
 // GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.ServiceUnavailable] - if configured to use an external node for get account and
+//     no upstream server is available.
 func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -253,7 +260,7 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, a
 	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
 
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, convertError(ctx, err, "register")
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -266,11 +273,15 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, a
 }
 
 // GetAccountKeys returns account keys by account address and block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.ServiceUnavailable] - if configured to use an external node for get account keys and
+//     no upstream server is available.
 func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -284,7 +295,7 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
 	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
@@ -306,6 +317,10 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 }
 
 // GetAccountKeyByIndex returns account key by account address, key index and block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.ServiceUnavailable] - if configured to use an external node for get account key and
+//     no upstream server is available.
 func (r *RestProxyHandler) GetAccountKeyByIndex(
 	ctx context.Context,
 	address flow.Address,
@@ -315,7 +330,7 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -330,7 +345,7 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
 	accountKey, err := convert.MessageToAccountKey(accountKeyResponse.GetAccountKey())
