@@ -26,7 +26,7 @@ type JobProcessor struct {
 	requester         ingestion2.CollectionRequester
 	blocks            storage.Blocks
 	collections       storage.CollectionsReader
-	ediHeightProvider EDIHeightProvider
+	ediHeightProvider EDIHeightProvider // when set as nil, EDI is considered disabled
 	ediLagThreshold   uint64
 }
 

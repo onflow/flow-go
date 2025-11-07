@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/access/ingestion2/collections"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -199,7 +200,7 @@ func (s *Suite) TestComponentShutdown() {
 
 // initEngineAndSyncer create new instance of ingestion engine and collection collectionSyncer.
 // It waits until the ingestion engine starts.
-func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine, *Syncer) {
+func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine, Syncer) {
 	processedHeightInitializer := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
 
 	lastFullBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
@@ -213,9 +214,9 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	// For now, we skip creating the new Syncer since FinalizedBlockProcessor still uses the old collections.Syncer
 	// and the test architecture needs to be updated to match the new design.
 	
-	// Create a placeholder syncer for the Engine (new ingestion2.Syncer)
+	// Create a placeholder syncer for the Engine (new collections.Syncer)
 	// Note: This won't work properly until the test is fully refactored
-	syncer, err := NewSyncer(
+	syncer, err := collections.NewSyncer(
 		s.log,
 		nil, // jobProcessor - needs to be created with proper dependencies
 		processedHeightInitializer,

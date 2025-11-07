@@ -35,7 +35,7 @@ type Engine struct {
 	log zerolog.Logger
 
 	finalizedBlockProcessor *FinalizedBlockProcessor
-	collectionSyncer        *Syncer
+	collectionSyncer        Syncer
 
 	messageHandler           *engine.MessageHandler
 	executionReceiptsQueue   *engine.FifoMessageStore
@@ -49,7 +49,7 @@ func New(
 	log zerolog.Logger,
 	net network.EngineRegistry,
 	finalizedBlockProcessor *FinalizedBlockProcessor,
-	collectionSyncer *Syncer,
+	collectionSyncer Syncer,
 	receipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {

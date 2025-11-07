@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -29,7 +30,7 @@ type CreateSyncerConfig struct {
 	EDILagThreshold uint64
 }
 
-// CreateSyncer creates a new ingestion2.Syncer component with all its dependencies.
+// CreateSyncer creates a new Syncer component with all its dependencies.
 // This function is in the collections package to avoid import cycles:
 // - collections package already imports ingestion2 (for interfaces)
 // - CreateSyncer needs to create concrete types from collections package
@@ -47,7 +48,7 @@ type CreateSyncerConfig struct {
 //   - lockManager: Lock manager for coordinating database access
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
 //   - collectionExecutedMetric: Metrics collector for tracking collection indexing
-//   - ediHeightProvider: Provider for EDI's highest indexed height (can be nil if EDI is disabled)
+//   - processedHeightRecorder: Recorder for execution data processed heights (can be nil if EDI is disabled)
 //   - config: Configuration for the syncer
 //
 // No error returns are expected during normal operation.
@@ -63,9 +64,9 @@ func CreateSyncer(
 	lockManager lockctx.Manager,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	ediHeightProvider ingestion2.EDIHeightProvider,
+	processedHeightRecorder execution_data.ProcessedHeightRecorder,
 	config CreateSyncerConfig,
-) (*ingestion2.Syncer, error) {
+) (*Syncer, error) {
 	// Create requester engine for requesting collections
 	requestEng, err := requester.New(
 		log.With().Str("entity", "collection").Logger(),
@@ -98,6 +99,12 @@ func CreateSyncer(
 		state,
 		guarantees,
 	)
+
+	// Wrap ProcessedHeightRecorder as EDIHeightProvider if provided
+	var ediHeightProvider ingestion2.EDIHeightProvider
+	if processedHeightRecorder != nil {
+		ediHeightProvider = NewProcessedHeightRecorderWrapper(processedHeightRecorder)
+	}
 
 	// Create JobProcessor
 	jobProcessor := NewJobProcessor(
@@ -132,8 +139,8 @@ func CreateSyncer(
 		}
 	})
 
-	// Create Syncer using ingestion2.NewSyncer
-	syncer, err := ingestion2.NewSyncer(
+	// Create Syncer
+	syncer, err := NewSyncer(
 		log,
 		jobProcessor,
 		processedFinalizedBlockHeight,
