@@ -332,14 +332,30 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 		fcv.logger.Info().
 			Uint64("chunk_index", chIndex).
-			Int("tx_index", i).
-			Str("tx_id", tx.ID.String()).
-			Msg("verifyTransactionsInContext: executing transaction")
+			Str("execution_result_id", execResID.String()).
+			Int("transaction_index", i).
+			Str("transaction_id", tx.ID.String()).
+			Uint32("transaction_offset", transactionOffset).
+			Str("procedure_type", string(tx.Type())).
+			Bool("system_chunk", systemChunk).
+			Bool("schedule_callbacks_enabled", context.ScheduleCallbacksEnabled).
+			Msg("starting vm.Run for transaction")
 
 		executionSnapshot, output, err := fcv.vm.Run(
 			ctx,
 			tx,
 			snapshotTree)
+
+		fcv.logger.Info().
+			Uint64("chunk_index", chIndex).
+			Str("execution_result_id", execResID.String()).
+			Int("transaction_index", i).
+			Str("transaction_id", tx.ID.String()).
+			Uint64("computation_used", output.ComputationUsed).
+			Bool("transaction_failed", output.Err != nil).
+			Err(err).
+			Msg("completed vm.Run for transaction")
+
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
@@ -666,7 +682,26 @@ func (fcv *ChunkVerifier) createSystemChunk(
 	processTx := fvm.Transaction(processBody, txIndex)
 
 	// Execute process callback transaction
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Str("execution_result_id", execResID.String()).
+		Str("transaction_id", processTx.ID.String()).
+		Uint32("transaction_index", txIndex).
+		Str("procedure_type", string(processTx.Type())).
+		Msg("starting vm.Run for process callback transaction")
+
 	executionSnapshot, processOutput, err := fcv.vm.Run(callbackCtx, processTx, *snapshotTree)
+
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Str("execution_result_id", execResID.String()).
+		Str("transaction_id", processTx.ID.String()).
+		Uint64("computation_used", processOutput.ComputationUsed).
+		Int("events_count", len(processOutput.Events)).
+		Bool("transaction_failed", processOutput.Err != nil).
+		Err(err).
+		Msg("completed vm.Run for process callback transaction")
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute process callback transaction: %w", err)
 	}
