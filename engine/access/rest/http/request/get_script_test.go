@@ -108,7 +108,7 @@ func TestGetScript_InvalidParse(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		_, err := parseGetScripts(
+		request, err := parseGetScripts(
 			test.height,
 			test.id,
 			test.agreeingExecutorsCount,
@@ -116,6 +116,7 @@ func TestGetScript_InvalidParse(t *testing.T) {
 			test.includeExecutorMetadata,
 			strings.NewReader(test.script),
 		)
+		require.Nil(t, request)
 		require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
 	}
 }
@@ -125,14 +126,22 @@ func TestGetScript_InvalidParse(t *testing.T) {
 func TestGetScript_ValidParse(t *testing.T) {
 	source := "access(all) fun main() {}"
 	validScript := strings.NewReader(fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(source))))
+	agreeingExecutorsCount := uint64(2)
 
-	request, err := parseGetScripts("1", "", "4", unittest.IdentifierListFixture(2).Strings(), "false", validScript)
+	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2)
+	agreeingExecutorsCountStr := fmt.Sprintf("%d", agreeingExecutorsCount)
+	validAgreeingExecutorsIdsStr := validAgreeingExecutorsIds.Strings()
+
+	request, err := parseGetScripts("1", "", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "true", validScript)
 	require.NoError(t, err)
 	require.Equal(t, request.BlockHeight, uint64(1))
 	require.Equal(t, string(request.Script.Source), source)
+	require.Equal(t, request.ExecutionState.AgreeingExecutorsCount, agreeingExecutorsCount)
+	require.EqualValues(t, request.ExecutionState.RequiredExecutorIDs, validAgreeingExecutorsIds)
+	require.True(t, request.ExecutionState.IncludeExecutorMetadata)
 
 	validScript1 := strings.NewReader(fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(source))))
-	request, err = parseGetScripts("", "", "4", unittest.IdentifierListFixture(2).Strings(), "false", validScript1)
+	request, err = parseGetScripts("", "", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", validScript1)
 	require.NoError(t, err)
 	require.Equal(t, request.BlockHeight, SealedHeight)
 }

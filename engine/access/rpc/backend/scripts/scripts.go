@@ -144,16 +144,16 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		return nil, nil, access.NewInvalidRequestError(commonrpc.ErrScriptTooLarge)
 	}
 
-	latestHeader, err := b.state.Sealed().Head()
+	sealedHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
 		err = irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
 		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
-	latestHeaderID := latestHeader.ID()
+	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := b.executionResultProvider.ExecutionResultInfo(
-		latestHeaderID,
+		sealedHeaderID,
 		userCriteria,
 	)
 	if err != nil {
@@ -168,10 +168,10 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		}
 	}
 
-	request := executor.NewScriptExecutionRequest(latestHeaderID, latestHeader.Height, script, arguments)
+	request := executor.NewScriptExecutionRequest(sealedHeaderID, sealedHeader.Height, script, arguments)
 	res, metadata, err := b.executor.Execute(ctx, request, executionResultInfo)
 	if err != nil {
-		return nil, nil, handleScriptExecutionError(ctx, err)
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return res, metadata, nil
@@ -232,7 +232,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 		executionResultInfo,
 	)
 	if err != nil {
-		return nil, nil, handleScriptExecutionError(ctx, err)
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return res, metadata, nil
@@ -295,49 +295,8 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		executionResultInfo,
 	)
 	if err != nil {
-		return nil, nil, handleScriptExecutionError(ctx, err)
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return res, metadata, nil
-}
-
-// handleScriptExecutionError converts storage, execution, version or gRPC errors
-// into access-layer errors according to the Access API error handling convention.
-//
-// Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if the script data or related execution data was not found,
-//     or if the block height is out of range or incompatible with node version.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection could not be established.
-//   - [access.InternalError] - for internal failures or conversion errors.
-func handleScriptExecutionError(ctx context.Context, err error) error {
-	switch {
-	case executor.IsInvalidArgumentError(err):
-		return access.NewInvalidRequestError(err)
-	case executor.IsResourceExhausted(err):
-		return access.NewResourceExhausted(err)
-	case executor.IsDataNotFoundError(err):
-		return access.NewDataNotFoundError("script", err)
-	case executor.IsOutOfRangeError(err):
-		return access.NewOutOfRangeError(err)
-	case executor.IsPreconditionFailedError(err):
-		return access.NewPreconditionFailedError(err)
-	case executor.IsScriptExecutionCanceledError(err):
-		return access.NewRequestCanceledError(err)
-	case executor.IsScriptExecutionTimedOutError(err):
-		return access.NewRequestTimedOutError(err)
-	case common.IsFailedToQueryExternalNodeError(err):
-		return access.NewInternalError(err)
-	case executor.IsServiceUnavailable(err):
-		return access.NewServiceUnavailable(err)
-	case executor.IsInternalError(err):
-		return access.NewInternalError(err)
-	default:
-		return access.RequireNoError(ctx, err)
-	}
 }
