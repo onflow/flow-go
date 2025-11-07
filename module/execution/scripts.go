@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm"
@@ -42,9 +41,7 @@ func NewScripts(
 	queryConf query.QueryConfig,
 	derivedChainData *derived.DerivedChainData,
 	enableProgramCacheWrites bool,
-	minHeight uint64,
-	maxHeight uint64,
-	versionControl *version.VersionControl,
+	compatibleHeights *CompatibleHeights,
 ) *Scripts {
 	vm := fvm.NewVirtualMachine()
 
@@ -73,7 +70,7 @@ func NewScripts(
 		log:               zerolog.New(log).With().Str("component", "script_executor").Logger(),
 		executor:          queryExecutor,
 		headers:           header,
-		compatibleHeights: NewCompatibleHeights(log, versionControl, minHeight, maxHeight),
+		compatibleHeights: compatibleHeights,
 	}
 }
 

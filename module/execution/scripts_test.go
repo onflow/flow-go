@@ -213,6 +213,7 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 
 // defaultScripts returns a pre-configured Scripts instance with default parameters for testing.
 func (s *scriptTestSuite) defaultScripts() *Scripts {
+	compatibleHeights := NewCompatibleHeights(s.logger, nil, 0, math.MaxUint64)
 	scripts := NewScripts(
 		s.logger,
 		metrics.NewNoopCollector(),
@@ -222,9 +223,7 @@ func (s *scriptTestSuite) defaultScripts() *Scripts {
 		query.NewDefaultConfig(),
 		s.derivedChainData,
 		true,
-		0,
-		math.MaxUint64,
-		nil,
+		compatibleHeights,
 	)
 
 	s.bootstrap()
