@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -1288,7 +1289,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				txBytes[0] = cadence.NewArray(
-					ConvertToCadence(tx),
+					unittest.BytesToCdcUInt8(tx),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				tx = testAccount.PrepareSignAndEncodeTx(t,
@@ -1300,11 +1301,11 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				txBytes[1] = cadence.NewArray(
-					ConvertToCadence(tx),
+					unittest.BytesToCdcUInt8(tx),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -1312,11 +1313,13 @@ func TestEVMBatchRun(t *testing.T) {
 						stdlib.EVMTransactionBytesCadenceType,
 					))
 
-				txBody := flow.NewTransactionBody().
+				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(batchRunCode).
 					SetPayer(sc.FlowServiceAccount.Address).
 					AddArgument(json.MustEncode(txs)).
-					AddArgument(json.MustEncode(coinbase))
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
 
 				state, output, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
 				require.NoError(t, err)

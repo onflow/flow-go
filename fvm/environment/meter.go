@@ -142,6 +142,10 @@ func (meter *meterImpl) ComputationAvailable(usage common.ComputationUsage) bool
 	return meter.txnState.ComputationAvailable(usage)
 }
 
+func (meter *meterImpl) ComputationRemaining(kind common.ComputationKind) uint64 {
+	return meter.txnState.ComputationRemaining(kind)
+}
+
 func (meter *meterImpl) ComputationUsed() (uint64, error) {
 	return meter.txnState.TotalComputationUsed(), nil
 }
