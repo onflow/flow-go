@@ -18,7 +18,7 @@ type ScriptExecutor interface {
 	// Expected error returns during normal operation:
 	//   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
 	//   - [ResourceExhausted] - if computation or memory limits were exceeded.
-	//   - [DataNotFoundError] - if data not found.
+	//   - [DataNotFoundError] - if the data was not found.
 	//   - [OutOfRangeError] - if the requested data is outside the available range.
 	//   - [PreconditionFailedError] - if the registers storage is still bootstrapping.
 	//   - [ScriptExecutionCanceledError] - if the script execution was canceled.

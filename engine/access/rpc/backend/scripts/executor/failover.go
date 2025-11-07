@@ -30,7 +30,7 @@ func NewFailoverScriptExecutor(localExecutor ScriptExecutor, execNodeExecutor Sc
 // Expected error returns during normal operation:
 //   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
 //   - [ScriptExecutionCanceledError] - if the script execution was canceled.
-//   - [DataNotFoundError] - if data not found.
+//   - [DataNotFoundError] - if the data was not found.
 //   - [common.FailedToQueryExternalNodeError] - when the request to execution node failed.
 //   - [ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
 //   - [InternalError] - for internal failures or index conversion errors.

@@ -53,9 +53,8 @@ func NewLocalScriptExecutor(
 // Expected error returns during normal operation:
 //   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
 //   - [ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [DataNotFoundError] - if block or registerSnapshot value at height was not found or snapshot at executionResultID was not found.
-//   - [OutOfRangeError] - if the requested height is outside the available range, if the block height is not compatible with the node version,
-//     if the requested height is outside the range of indexed blocks.
+//   - [DataNotFoundError] - if data was not found.
+//   - [OutOfRangeError] - if the data for the requested height is outside the node's available range.
 //   - [PreconditionFailedError] - if the registers storage is still bootstrapping.
 //   - [ScriptExecutionCanceledError] - if the script execution was canceled.
 //   - [ScriptExecutionTimedOutError] - if the script execution timed out.
@@ -127,9 +126,8 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 // Expected error returns during normal operation:
 //   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
 //   - [ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [DataNotFoundError] - if block or registerSnapshot value at height was not found or snapshot at executionResultID was not found.
-//   - [OutOfRangeError] - if the requested height is outside the available range, if the block height is not compatible with the node version,
-//     if the requested height is outside the range of indexed blocks.
+//   - [DataNotFoundError] - if data for the requested height was not found.
+//   - [OutOfRangeError] - if the data for the requested height is outside the node's available range.
 //   - [ScriptExecutionCanceledError] - if the script execution was canceled.
 //   - [ScriptExecutionTimedOutError] - if the script execution timed out.
 //   - [InternalError] - for internal failures or index conversion errors.
