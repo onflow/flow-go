@@ -55,17 +55,41 @@ func (fcv *ChunkVerifier) Verify(
 	[]byte,
 	error,
 ) {
+	fcv.logger.Info().
+		Uint64("chunk_index", vc.Chunk.Index).
+		Uint32("transaction_offset", vc.TransactionOffset).
+		Bool("is_system_chunk", vc.IsSystemChunk).
+		Str("chunk_id", vc.Chunk.ID().String()).
+		Str("block_id", vc.Chunk.BlockID.String()).
+		Msg("Verify: starting chunk verification")
 
 	var ctx fvm.Context
 	var callbackCtx fvm.Context
 	var transactions []*fvm.TransactionProcedure
+
+	fcv.logger.Debug().
+		Uint64("chunk_index", vc.Chunk.Index).
+		Msg("Verify: creating derivedBlockData")
 	derivedBlockData := derived.NewEmptyDerivedBlockData(logical.Time(vc.TransactionOffset))
+	fcv.logger.Debug().
+		Uint64("chunk_index", vc.Chunk.Index).
+		Msg("Verify: derivedBlockData created")
 
 	if vc.IsSystemChunk {
+		fcv.logger.Debug().
+			Uint64("chunk_index", vc.Chunk.Index).
+			Msg("Verify: creating contexts for system chunk")
 		ctx = contextFromVerifiableChunk(fcv.systemChunkCtx, vc, derivedBlockData)
 		callbackCtx = contextFromVerifiableChunk(fcv.callbackCtx, vc, derivedBlockData)
+		fcv.logger.Debug().
+			Uint64("chunk_index", vc.Chunk.Index).
+			Msg("Verify: system chunk contexts created, transactions will be dynamically created")
 		// transactions will be dynamically created for system chunk
 	} else {
+		fcv.logger.Debug().
+			Uint64("chunk_index", vc.Chunk.Index).
+			Int("num_transactions", len(vc.ChunkDataPack.Collection.Transactions)).
+			Msg("Verify: creating context and transactions for regular chunk")
 		ctx = contextFromVerifiableChunk(fcv.vmCtx, vc, derivedBlockData)
 
 		transactions = make(
@@ -76,7 +100,17 @@ func (fcv *ChunkVerifier) Verify(
 			tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 			transactions = append(transactions, tx)
 		}
+		fcv.logger.Debug().
+			Uint64("chunk_index", vc.Chunk.Index).
+			Int("num_transactions", len(transactions)).
+			Msg("Verify: regular chunk transactions created")
 	}
+
+	fcv.logger.Info().
+		Uint64("chunk_index", vc.Chunk.Index).
+		Int("num_transactions", len(transactions)).
+		Bool("is_system_chunk", vc.IsSystemChunk).
+		Msg("Verify: calling verifyTransactionsInContext")
 
 	res, err := fcv.verifyTransactionsInContext(
 		ctx,
@@ -88,6 +122,18 @@ func (fcv *ChunkVerifier) Verify(
 		transactions,
 		vc.EndState,
 		vc.IsSystemChunk)
+
+	if err != nil {
+		fcv.logger.Error().
+			Err(err).
+			Uint64("chunk_index", vc.Chunk.Index).
+			Msg("Verify: verifyTransactionsInContext returned error")
+	} else {
+		fcv.logger.Info().
+			Uint64("chunk_index", vc.Chunk.Index).
+			Int("spock_secret_len", len(res)).
+			Msg("Verify: verifyTransactionsInContext completed successfully")
+	}
 
 	return res, err
 }
@@ -147,13 +193,20 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	[]byte,
 	error,
 ) {
+	chIndex := chunk.Index
+	execResID := result.ID()
+
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Uint32("transaction_offset", transactionOffset).
+		Int("num_transactions", len(transactions)).
+		Bool("system_chunk", systemChunk).
+		Str("exec_result_id", execResID.String()).
+		Msg("verifyTransactionsInContext: starting")
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
 	// TODO check the number of transactions and computation used
-
-	chIndex := chunk.Index
-	execResID := result.ID()
 
 	if chunkDataPack == nil {
 		return nil, fmt.Errorf("missing chunk data pack")
@@ -180,6 +233,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var events flow.EventsList = nil
 	serviceEvents := make(flow.ServiceEventList, 0)
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: constructing partial trie")
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
 	if err != nil {
@@ -190,7 +246,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			chIndex,
 			execResID)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: partial trie constructed")
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: creating snapshot tree")
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
@@ -203,6 +265,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			unknownRegTouch: unknownRegTouch,
 		})
 	chunkState := fvmState.NewExecutionState(nil, fvmState.DefaultParameters())
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: snapshot tree created")
 
 	var problematicTx flow.Identifier
 	// collect execution data formatted transaction results
@@ -210,6 +275,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var processResult *flow.LightTransactionResult
 
 	if systemChunk {
+		fcv.logger.Info().
+			Uint64("chunk_index", chIndex).
+			Msg("verifyTransactionsInContext: creating system chunk transactions")
 		transactions, processResult, err = fcv.createSystemChunk(
 			callbackCtx,
 			&snapshotTree,
@@ -224,6 +292,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create system chunk transactions: %w", err)
 		}
+		fcv.logger.Info().
+			Uint64("chunk_index", chIndex).
+			Int("num_transactions_after_create", len(transactions)).
+			Msg("verifyTransactionsInContext: system chunk transactions created")
 	}
 
 	// collect execution data formatted transaction results
@@ -240,6 +312,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		txStartIndex = 1
 	}
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Int("tx_start_index", txStartIndex).
+		Int("num_transactions", len(transactions)).
+		Msg("verifyTransactionsInContext: starting transaction execution loop")
+
 	// Executes all transactions in this chunk (or remaining transactions for callbacks)
 	for i := txStartIndex; i < len(transactions); i++ {
 		tx := transactions[i]
@@ -252,6 +330,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			ctx = callbackCtx
 		}
 
+		fcv.logger.Info().
+			Uint64("chunk_index", chIndex).
+			Int("tx_index", i).
+			Str("tx_id", tx.ID.String()).
+			Msg("verifyTransactionsInContext: executing transaction")
+
 		executionSnapshot, output, err := fcv.vm.Run(
 			ctx,
 			tx,
@@ -261,6 +345,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
 			return nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
+
+		fcv.logger.Info().
+			Uint64("chunk_index", chIndex).
+			Int("tx_index", i).
+			Str("tx_id", tx.ID.String()).
+			Bool("tx_failed", output.Err != nil).
+			Int("num_events", len(output.Events)).
+			Msg("verifyTransactionsInContext: transaction executed")
 
 		if len(unknownRegTouch) > 0 {
 			problematicTx = tx.ID
@@ -282,11 +374,20 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 	}
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Int("num_transactions_executed", len(transactions)-txStartIndex).
+		Msg("verifyTransactionsInContext: transaction execution loop completed")
+
 	// NOTE: Ignore computation usage for the purposes of comparing Cadence VM and interpreter ONLY
 	for i := range txResults {
 		txResults[i].ComputationUsed = 0
 	}
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Int("unknown_reg_touch_count", len(unknownRegTouch)).
+		Msg("verifyTransactionsInContext: checking unknown register touches")
 	// check read access to unknown registers
 	if len(unknownRegTouch) > 0 {
 		var missingRegs []string
@@ -296,10 +397,19 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx)
 	}
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Int("num_events", len(events)).
+		Msg("verifyTransactionsInContext: calculating events hash")
 	eventsHash, err := flow.EventsMerkleRootHash(events)
 	if err != nil {
 		return nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Hex("events_hash", eventsHash[:]).
+		Hex("chunk_event_collection", chunk.EventCollection[:]).
+		Msg("verifyTransactionsInContext: events hash calculated")
 	if chunk.EventCollection != eventsHash {
 		collectionID := ""
 		if chunkDataPack.Collection != nil {
@@ -324,6 +434,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
 	}
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Int("num_service_events", len(serviceEvents)).
+		Msg("verifyTransactionsInContext: comparing service events")
 	serviceEventsInChunk := result.ServiceEventsByChunk(chunk.Index)
 	equal, err := serviceEventsInChunk.EqualTo(serviceEvents)
 	if err != nil {
@@ -332,14 +446,27 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if !equal {
 		return nil, chmodels.CFInvalidServiceSystemEventsEmitted(serviceEventsInChunk, serviceEvents, chIndex, execResID)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: service events comparison completed")
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: finalizing chunk state")
 	// Applying chunk updates to the partial trie.	This returns the expected
 	// end state commitment after updates and the list of register keys that
 	// was not provided by the chunk data package (err).
 	chunkExecutionSnapshot := chunkState.Finalize()
 	keys, values := executionState.RegisterEntriesToKeysValues(
 		chunkExecutionSnapshot.UpdatedRegisters())
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Int("num_updated_registers", len(keys)).
+		Msg("verifyTransactionsInContext: chunk state finalized")
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: creating ledger update")
 	update, err := ledger.NewUpdate(
 		ledger.State(chunkDataPack.StartState),
 		keys,
@@ -347,7 +474,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if err != nil {
 		return nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: ledger update created")
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: applying ledger update to partial trie")
 	expEndStateComm, trieUpdate, err := psmt.Set(update)
 	if err != nil {
 		if errors.Is(err, ledger.ErrMissingKeys{}) {
@@ -360,14 +493,28 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Hex("exp_end_state", expEndStateComm[:]).
+		Hex("chunk_end_state", endState[:]).
+		Msg("verifyTransactionsInContext: ledger update applied")
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: verifying end state commitment")
 	if flow.StateCommitment(expEndStateComm) != endState {
 		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: end state commitment verified")
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: starting execution data verification")
 	// verify the execution data ID included in the ExecutionResult
 	// 1. check basic execution data root fields
 	if chunk.BlockID != chunkDataPack.ExecutionDataRoot.BlockID {
@@ -383,6 +530,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// ChunkExecutionData. Create the collection here using the transaction bodies from the
 	// transactions list (includes process callback + callback executions + system transaction)
 	if systemChunk {
+		fcv.logger.Info().
+			Uint64("chunk_index", chIndex).
+			Msg("verifyTransactionsInContext: constructing system chunk collection")
 		systemTxBodies := make([]*flow.TransactionBody, len(transactions))
 		for i, tx := range transactions {
 			systemTxBodies[i] = tx.Transaction
@@ -395,8 +545,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		if err != nil {
 			return nil, fmt.Errorf("could not construct system collection: %w", err)
 		}
+		fcv.logger.Info().
+			Uint64("chunk_index", chIndex).
+			Msg("verifyTransactionsInContext: system chunk collection constructed")
 	}
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: building chunk execution data")
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
 	// its CID
 	chunkExecutionData := execution_data.ChunkExecutionData{
@@ -406,14 +562,24 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		TransactionResults: txResults,
 	}
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: calculating chunk execution data CID")
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
 	cedCID, err := cidProvider.CalculateChunkExecutionDataID(chunkExecutionData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Str("ced_cid", cedCID.String()).
+		Msg("verifyTransactionsInContext: chunk execution data CID calculated")
 
 	// 3. check that with the chunk execution results that we created locally,
 	// we can reproduce the ChunkExecutionData's ID, which the execution node is stating in its ChunkDataPack
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: verifying chunk execution data CID")
 	if cedCID != chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex] {
 		return nil, chmodels.NewCFExecutionDataInvalidChunkCID(
 			chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex],
@@ -422,16 +588,34 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			execResID,
 		)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: chunk execution data CID verified")
 
 	// 4. check the execution data root ID by calculating it using the provided execution data root
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: calculating execution data root ID")
 	executionDataID, err := cidProvider.CalculateExecutionDataRootID(chunkDataPack.ExecutionDataRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Str("execution_data_id", executionDataID.String()).
+		Str("result_execution_data_id", result.ExecutionDataID.String()).
+		Msg("verifyTransactionsInContext: execution data root ID calculated")
 	if executionDataID != result.ExecutionDataID {
 		return nil, chmodels.NewCFInvalidExecutionDataID(result.ExecutionDataID, executionDataID, chIndex, execResID)
 	}
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Msg("verifyTransactionsInContext: execution data root ID verified")
 
+	fcv.logger.Info().
+		Uint64("chunk_index", chIndex).
+		Int("spock_secret_len", len(chunkExecutionSnapshot.SpockSecret)).
+		Msg("verifyTransactionsInContext: verification completed successfully")
 	return chunkExecutionSnapshot.SpockSecret, nil
 }
 
