@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -26,8 +27,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -80,7 +81,7 @@ type Backend struct {
 	stateParams    protocol.Params
 	versionControl *version.VersionControl
 
-	BlockTracker tracker.BlockTracker
+	BlockTracker subscription.BlockTracker
 }
 
 type Params struct {
@@ -107,8 +108,7 @@ type Params struct {
 	ScriptExecutionMode      query_mode.IndexQueryMode
 	CheckPayerBalanceMode    validator.PayerBalanceMode
 	EventQueryMode           query_mode.IndexQueryMode
-	BlockTracker             tracker.BlockTracker
-	SubscriptionHandler      *subscription_old.SubscriptionHandler
+	BlockTracker             subscription.BlockTracker
 	MaxScriptAndArgumentSize uint
 
 	EventsIndex                *index.EventsIndex
@@ -123,6 +123,9 @@ type Params struct {
 	ExecutionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
 	ExecutionStateCache         optimistic_sync.ExecutionStateCache
 	ScheduledCallbacksEnabled   bool
+
+	FinalizedBlockBroadcaster *engine.Broadcaster
+	StreamOptions             *streamer.StreamOptions
 }
 
 var _ access.API = (*Backend)(nil)
@@ -289,7 +292,6 @@ func New(params Params) (*Backend, error) {
 	txStreamBackend := txstream.NewTransactionStreamBackend(
 		params.Log,
 		params.State,
-		params.SubscriptionHandler,
 		params.BlockTracker,
 		txBackend.SendTransaction,
 		params.Blocks,
@@ -297,6 +299,9 @@ func New(params Params) (*Backend, error) {
 		params.Transactions,
 		failoverTxProvider,
 		txStatusDeriver,
+		params.FinalizedBlockBroadcaster,
+		params.StreamOptions,
+		0, // all streams in backend are unbounded (not true for txs though TODO)
 	)
 
 	b := &Backend{
@@ -329,13 +334,14 @@ func New(params Params) (*Backend, error) {
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		backendSubscribeBlocks: backendSubscribeBlocks{
-			log:                 params.Log,
-			state:               params.State,
-			headers:             params.Headers,
-			blocks:              params.Blocks,
-			subscriptionHandler: params.SubscriptionHandler,
-			blockTracker:        params.BlockTracker,
-		},
+			log:                        params.Log,
+			state:                      params.State,
+			headers:                    params.Headers,
+			blocks:                     params.Blocks,
+			blockTracker:              params.BlockTracker,
+			finalizedBlockBroadcaster: params.FinalizedBlockBroadcaster,
+			streamOptions:             params.StreamOptions,
+		}, 
 
 		state:               params.State,
 		collections:         params.Collections,

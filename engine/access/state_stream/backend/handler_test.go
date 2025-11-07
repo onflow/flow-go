@@ -24,7 +24,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	subimpl "github.com/onflow/flow-go/engine/access/subscription/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -286,9 +287,9 @@ func TestExecutionDataStream(t *testing.T) {
 		stream *StreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse],
 		api *ssmock.API,
 		request *executiondata.SubscribeExecutionDataRequest,
-		response *ExecutionDataResponse,
+		response *state_stream.ExecutionDataResponse,
 	) {
-		sub := subscription_old.NewSubscription(1)
+		sub := subimpl.NewSubscription[*state_stream.ExecutionDataResponse](1)
 
 		api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
@@ -382,7 +383,7 @@ func TestExecutionDataStream(t *testing.T) {
 				&executiondata.SubscribeExecutionDataRequest{
 					EventEncodingVersion: test.eventVersion,
 				},
-				&ExecutionDataResponse{
+				&state_stream.ExecutionDataResponse{
 					Height: blockHeight,
 					ExecutionData: unittest.BlockExecutionDataFixture(
 						unittest.WithChunkExecutionDatas(
@@ -412,9 +413,9 @@ func TestEventStream(t *testing.T) {
 		stream *StreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse],
 		api *ssmock.API,
 		request *executiondata.SubscribeEventsRequest,
-		response *EventsResponse,
+		response *state_stream.EventsResponse,
 	) {
-		sub := subscription_old.NewSubscription(1)
+		sub := subimpl.NewSubscription[*state_stream.EventsResponse](1)
 
 		api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
@@ -508,7 +509,7 @@ func TestEventStream(t *testing.T) {
 				&executiondata.SubscribeEventsRequest{
 					EventEncodingVersion: test.eventVersion,
 				},
-				&EventsResponse{
+				&state_stream.EventsResponse{
 					BlockID: blockID,
 					Height:  blockHeight,
 					Events:  ccfEvents,
@@ -627,10 +628,10 @@ func generateEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
 func makeConfig(maxGlobalStreams uint32) Config {
 	return Config{
 		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
-		ClientSendTimeout:    subscription_old.DefaultSendTimeout,
-		ClientSendBufferSize: subscription_old.DefaultSendBufferSize,
+		ClientSendTimeout:    subscription.DefaultSendTimeout,
+		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 		MaxGlobalStreams:     maxGlobalStreams,
-		HeartbeatInterval:    subscription_old.DefaultHeartbeatInterval,
+		HeartbeatInterval:    subscription.DefaultHeartbeatInterval,
 	}
 }
 

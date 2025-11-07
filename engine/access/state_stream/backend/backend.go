@@ -10,10 +10,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -64,7 +65,7 @@ type Config struct {
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 
 type StateStreamBackend struct {
-	tracker.ExecutionDataTracker
+	subscription.ExecutionDataTracker
 
 	ExecutionDataBackend
 	EventsBackend
@@ -94,10 +95,11 @@ func New(
 	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
 	registerIDsRequestLimit int,
-	subscriptionHandler *subscription_old.SubscriptionHandler,
-	executionDataTracker tracker.ExecutionDataTracker,
+	executionDataTracker subscription.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
+	broadcaster *engine.Broadcaster,
+	streamOptions *streamer.StreamOptions,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -118,7 +120,6 @@ func New(
 	b.ExecutionDataBackend = ExecutionDataBackend{
 		log:                     logger,
 		headers:                 headers,
-		subscriptionHandler:     subscriptionHandler,
 		getExecutionData:        b.getExecutionData,
 		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
@@ -134,17 +135,21 @@ func New(
 	}
 
 	b.EventsBackend = EventsBackend{
-		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
-		executionDataTracker: executionDataTracker,
-		eventsProvider:       eventsProvider,
+		log:                      logger,
+		executionDataTracker:     executionDataTracker,
+		eventsProvider:           eventsProvider,
+		executionDataBroadcaster: broadcaster,
+		streamOptions:            streamOptions,
+		endHeight:                0, // events endpoints are unbounded streams
 	}
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
 		executionDataTracker: b.ExecutionDataTracker,
 		eventsProvider:       eventsProvider,
+		execDataBroadcaster:  broadcaster,
+		streamOptions:        streamOptions,
+		endHeight:            0, // account statues endpoints are unbounded streams
 	}
 
 	return b, nil
@@ -159,7 +164,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
 	if height > highestHeight {
-		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription_old.ErrBlockNotReady)
+		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
 	// the spork root block will never have execution data available. If requested, return an empty result.
@@ -175,7 +180,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) ||
 			execution_data.IsBlobNotFoundError(err) {
-			err = errors.Join(err, subscription_old.ErrBlockNotReady)
+			err = errors.Join(err, subscription.ErrBlockNotReady)
 			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 		}
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)

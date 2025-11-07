@@ -29,6 +29,9 @@ const (
 	DefaultHeartbeatInterval = 1
 )
 
+// TODO: I'm not sure subscription should be an interface. The impl will unlikely change.
+// I guess it is because lots of code depends on it. We don't want to depend on impl details.
+
 type Subscription[T any] interface {
 	ID() string
 	Channel() <-chan T

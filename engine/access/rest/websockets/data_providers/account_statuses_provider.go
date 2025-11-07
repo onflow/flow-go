@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -92,7 +91,7 @@ func (p *AccountStatusesDataProvider) Run() error {
 // This function is not expected to be called concurrently.
 //
 // No errors expected during normal operations.
-func (p *AccountStatusesDataProvider) handleResponse(response *backend.AccountStatusesResponse) error {
+func (p *AccountStatusesDataProvider) handleResponse(response *state_stream.AccountStatusesResponse) error {
 	// convert events to JSON-CDC format
 	convertedResponse, err := convertAccountStatusesResponse(response)
 	if err != nil {
@@ -106,7 +105,7 @@ func (p *AccountStatusesDataProvider) handleResponse(response *backend.AccountSt
 // This function is not safe to call concurrently.
 //
 // No errors are expected during normal operations
-func (p *AccountStatusesDataProvider) sendResponse(response *backend.AccountStatusesResponse) error {
+func (p *AccountStatusesDataProvider) sendResponse(response *state_stream.AccountStatusesResponse) error {
 	// Only send a response if there's meaningful data to send
 	// or the heartbeat interval limit is reached
 	p.blocksSinceLastMessage += 1
@@ -150,7 +149,7 @@ func (p *AccountStatusesDataProvider) createAndStartSubscription(
 // to JSON-CDC format.
 //
 // No errors expected during normal operations.
-func convertAccountStatusesResponse(resp *backend.AccountStatusesResponse) (*backend.AccountStatusesResponse, error) {
+func convertAccountStatusesResponse(resp *state_stream.AccountStatusesResponse) (*state_stream.AccountStatusesResponse, error) {
 	jsoncdcEvents := make(map[string]flow.EventsList, len(resp.AccountEvents))
 	for eventType, events := range resp.AccountEvents {
 		convertedEvents, err := convertEvents(events)
@@ -160,7 +159,7 @@ func convertAccountStatusesResponse(resp *backend.AccountStatusesResponse) (*bac
 		jsoncdcEvents[eventType] = convertedEvents
 	}
 
-	return &backend.AccountStatusesResponse{
+	return &state_stream.AccountStatusesResponse{
 		BlockID:       resp.BlockID,
 		Height:        resp.Height,
 		AccountEvents: jsoncdcEvents,

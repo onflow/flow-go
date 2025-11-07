@@ -3,15 +3,15 @@ package backend
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,36 +31,45 @@ func (s *BackendBlockHeadersSuite) SetupTest() {
 
 // TestSubscribeBlockHeadersFromStartBlockID tests the SubscribeBlockHeadersFromStartBlockID method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
+	call := func(
+		ctx context.Context,
+		startValue interface{},
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Header] {
 		return s.backend.SubscribeBlockHeadersFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockHeaders, s.subscribeFromStartBlockIdTestCases())
+	subscribe(&s.BackendBlocksSuite, call, s.requireBlockHeaders, s.subscribeFromStartBlockIdTestCases())
 }
 
 // TestSubscribeBlockHeadersFromStartHeight tests the SubscribeBlockHeadersFromStartHeight method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
+	call := func(
+		ctx context.Context,
+		startValue interface{},
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Header] {
 		return s.backend.SubscribeBlockHeadersFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockHeaders, s.subscribeFromStartHeightTestCases())
+	subscribe(&s.BackendBlocksSuite, call, s.requireBlockHeaders, s.subscribeFromStartHeightTestCases())
 }
 
 // TestSubscribeBlockHeadersFromLatest tests the SubscribeBlockHeadersFromLatest method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromLatest() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
+	call := func(
+		ctx context.Context,
+		startValue interface{},
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Header] {
 		return s.backend.SubscribeBlockHeadersFromLatest(ctx, blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockHeaders, s.subscribeFromLatestTestCases())
+	subscribe(&s.BackendBlocksSuite, call, s.requireBlockHeaders, s.subscribeFromLatestTestCases())
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBlock *flow.Block) {
-	actualHeader, ok := v.(*flow.Header)
-	require.True(s.T(), ok, "unexpected response type: %T", v)
-
+func (s *BackendBlockHeadersSuite) requireBlockHeaders(actualHeader *flow.Header, expectedBlock *flow.Block) {
 	s.Require().Equal(expectedBlock.Height, actualHeader.Height)
 	s.Require().Equal(expectedBlock.ToHeader().ID(), actualHeader.ID())
 	s.Require().Equal(*expectedBlock.ToHeader(), *actualHeader)
@@ -82,14 +91,14 @@ func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBl
 //
 // Each test case checks for specific error conditions and ensures that the methods responds appropriately.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	backend, err := New(s.backendParams(engine.NewBroadcaster()))
 	s.Require().NoError(err)
 
 	s.Run("returns error for unknown start block id is provided", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
+		subCtx, subCancel := context.WithTimeout(ctx, 2*time.Second)
 		defer subCancel()
 
 		sub := backend.SubscribeBlockHeadersFromStartBlockID(subCtx, unittest.IdentifierFixture(), flow.BlockStatusFinalized)
@@ -97,7 +106,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
 	})
 
 	s.Run("returns error if start height before root height", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
+		subCtx, subCancel := context.WithTimeout(ctx, 2*time.Second)
 		defer subCancel()
 
 		sub := backend.SubscribeBlockHeadersFromStartHeight(subCtx, s.rootBlock.Height-1, flow.BlockStatusFinalized)
@@ -105,7 +114,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
 	})
 
 	s.Run("returns error for unknown start height is provided", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
+		subCtx, subCancel := context.WithTimeout(ctx, 2*time.Second)
 		defer subCancel()
 
 		sub := backend.SubscribeBlockHeadersFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Height+10, flow.BlockStatusFinalized)

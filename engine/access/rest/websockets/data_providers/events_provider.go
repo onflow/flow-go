@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -94,7 +93,7 @@ func (p *EventsDataProvider) Run() error {
 // This function is not expected to be called concurrently.
 //
 // No errors expected during normal operations.
-func (p *EventsDataProvider) handleResponse(response *backend.EventsResponse) error {
+func (p *EventsDataProvider) handleResponse(response *state_stream.EventsResponse) error {
 	// convert events to JSON-CDC format
 	convertedResponse, err := convertEventsResponse(response)
 	if err != nil {
@@ -108,7 +107,7 @@ func (p *EventsDataProvider) handleResponse(response *backend.EventsResponse) er
 // This function is not expected to be called concurrently.
 //
 // No errors are expected during normal operations.
-func (p *EventsDataProvider) sendResponse(eventsResponse *backend.EventsResponse) error {
+func (p *EventsDataProvider) sendResponse(eventsResponse *state_stream.EventsResponse) error {
 	// Only send a response if there's meaningful data to send
 	// or the heartbeat interval limit is reached
 	p.blocksSinceLastMessage += 1
@@ -148,13 +147,13 @@ func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, arg
 // convertEventsResponse converts events in the provided EventsResponse from CCF to JSON-CDC format.
 //
 // No errors expected during normal operations.
-func convertEventsResponse(resp *backend.EventsResponse) (*backend.EventsResponse, error) {
+func convertEventsResponse(resp *state_stream.EventsResponse) (*state_stream.EventsResponse, error) {
 	jsoncdcEvents, err := convertEvents(resp.Events)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert events to JSON-CDC: %w", err)
 	}
 
-	return &backend.EventsResponse{
+	return &state_stream.EventsResponse{
 		BlockID:        resp.BlockID,
 		Height:         resp.Height,
 		BlockTimestamp: resp.BlockTimestamp,

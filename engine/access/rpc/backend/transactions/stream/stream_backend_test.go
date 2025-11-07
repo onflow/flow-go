@@ -31,8 +31,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	trackermock "github.com/onflow/flow-go/engine/access/subscription_old/tracker/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -263,14 +264,6 @@ func (s *TransactionStreamSuite) initializeBackend() {
 
 	txProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
-	subscriptionHandler := subscription_old.NewSubscriptionHandler(
-		s.log,
-		s.broadcaster,
-		subscription_old.DefaultSendTimeout,
-		subscription_old.DefaultResponseLimit,
-		subscription_old.DefaultSendBufferSize,
-	)
-
 	validatorBlocks := validatormock.NewBlocks(s.T())
 	validatorBlocks.
 		On("HeaderByID", mock.Anything).
@@ -328,11 +321,12 @@ func (s *TransactionStreamSuite) initializeBackend() {
 	}
 	txBackend, err := transactions.NewTransactionsBackend(txParams)
 	s.Require().NoError(err)
+	
+	streamOptions := streamer.NewDefaultStreamOptions()
 
 	s.txStreamBackend = NewTransactionStreamBackend(
 		s.log,
 		s.state,
-		subscriptionHandler,
 		s.blockTracker,
 		txBackend.SendTransaction,
 		s.blocks,
@@ -340,6 +334,9 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.transactions,
 		txProvider,
 		txStatusDeriver,
+		s.broadcaster,
+		streamOptions,
+		0,
 	)
 }
 
@@ -493,16 +490,16 @@ func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Trans
 
 // Create a special common function to read subscription messages from the channel and check converting it to transaction info
 // and check results for correctness
-func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription_old.Subscription, txId flow.Identifier, expectedTxStatuses []flow.TransactionStatus) {
+func (s *TransactionStreamSuite) checkNewSubscriptionMessage(
+	sub subscription.Subscription[[]*accessmodel.TransactionResult],
+	txId flow.Identifier,
+	expectedTxStatuses []flow.TransactionStatus,
+) {
 	unittest.RequireReturnsBefore(s.T(), func() {
-		v, ok := <-sub.Channel()
+		txResults, ok := <-sub.Channel()
 		require.True(s.T(), ok,
 			"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
 			txId, s.finalizedBlock.ID(), sub.Err())
-
-		txResults, ok := v.([]*accessmodel.TransactionResult)
-		require.True(s.T(), ok, "unexpected response type: %T", v)
-		require.Len(s.T(), txResults, len(expectedTxStatuses))
 
 		for i, expectedTxStatus := range expectedTxStatuses {
 			result := txResults[i]
@@ -514,7 +511,7 @@ func (s *TransactionStreamSuite) checkNewSubscriptionMessage(sub subscription_ol
 }
 
 // checkGracefulShutdown ensures the provided subscription shuts down gracefully within a specified timeout duration.
-func (s *TransactionStreamSuite) checkGracefulShutdown(sub subscription_old.Subscription) {
+func (s *TransactionStreamSuite) checkGracefulShutdown(sub subscription.Subscription[[]*accessmodel.TransactionResult]) {
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		<-sub.Channel()

@@ -13,10 +13,13 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine"
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/height_source"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
+	subimpl "github.com/onflow/flow-go/engine/access/subscription/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -35,18 +38,20 @@ type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
 // It provides functionalities to send transactions, subscribe to transaction status updates,
 // and handle subscription lifecycles.
 type TransactionStream struct {
-	log                 zerolog.Logger
-	state               protocol.State
-	subscriptionHandler *subscription_old.SubscriptionHandler
-	blockTracker        tracker.BlockTracker
-	sendTransaction     sendTransaction
+	log             zerolog.Logger
+	state           protocol.State
+	blockTracker    subscription.BlockTracker
+	sendTransaction sendTransaction
 
 	blocks       storage.Blocks
 	collections  storage.Collections
 	transactions storage.Transactions
 
-	txProvider      *txprovider.FailoverTransactionProvider
-	txStatusDeriver *txstatus.TxStatusDeriver
+	txProvider          *txprovider.FailoverTransactionProvider
+	txStatusDeriver     *txstatus.TxStatusDeriver
+	execDataBroadcaster *engine.Broadcaster
+	streamOptions       *streamer.StreamOptions
+	endHeight           uint64
 }
 
 var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
@@ -54,19 +59,20 @@ var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
 func NewTransactionStreamBackend(
 	log zerolog.Logger,
 	state protocol.State,
-	subscriptionHandler *subscription_old.SubscriptionHandler,
-	blockTracker tracker.BlockTracker,
+	blockTracker subscription.BlockTracker,
 	sendTransaction sendTransaction,
 	blocks storage.Blocks,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	execDataBroadcaster *engine.Broadcaster,
+	streamOptions *streamer.StreamOptions,
+	endHeight uint64,
 ) *TransactionStream {
 	return &TransactionStream{
 		log:                 log,
 		state:               state,
-		subscriptionHandler: subscriptionHandler,
 		blockTracker:        blockTracker,
 		sendTransaction:     sendTransaction,
 		blocks:              blocks,
@@ -74,6 +80,9 @@ func NewTransactionStreamBackend(
 		transactions:        transactions,
 		txProvider:          txProvider,
 		txStatusDeriver:     txStatusDeriver,
+		execDataBroadcaster: execDataBroadcaster,
+		streamOptions:       streamOptions,
+		endHeight:           endHeight,
 	}
 }
 
@@ -93,10 +102,10 @@ func (t *TransactionStream) SendAndSubscribeTransactionStatuses(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) subscription_old.Subscription {
+) subscription.Subscription[[]*accessmodel.TransactionResult] {
 	if err := t.sendTransaction(ctx, tx); err != nil {
 		t.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
-		return subscription_old.NewFailedSubscription(err, "failed to send transaction")
+		return subimpl.NewFailedSubscription[[]*accessmodel.TransactionResult](err, "failed to send transaction")
 	}
 
 	return t.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
@@ -116,12 +125,12 @@ func (t *TransactionStream) SubscribeTransactionStatuses(
 	ctx context.Context,
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) subscription_old.Subscription {
+) subscription.Subscription[[]*accessmodel.TransactionResult] {
 	header, err := t.state.Sealed().Head()
 	if err != nil {
 		// throw the exception as the node must have the current sealed block in storage
 		irrecoverable.Throw(ctx, fmt.Errorf("failed to lookup sealed block: %w", err))
-		return subscription_old.NewFailedSubscription(err, "failed to lookup sealed block")
+		return subimpl.NewFailedSubscription[[]*accessmodel.TransactionResult](err, "failed to lookup sealed block")
 	}
 
 	return t.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
@@ -149,12 +158,12 @@ func (t *TransactionStream) createSubscription(
 	startBlockID flow.Identifier,
 	referenceBlockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) subscription_old.Subscription {
+) subscription.Subscription[[]*accessmodel.TransactionResult] {
 	// Determine the height of the block to start the subscription from.
 	startHeight, err := t.blockTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		t.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
-		return subscription_old.NewFailedSubscription(err, "failed to get start height")
+		return subimpl.NewFailedSubscription[[]*accessmodel.TransactionResult](err, "failed to get start height")
 	}
 
 	txInfo := NewTransactionMetadata(
@@ -168,24 +177,41 @@ func (t *TransactionStream) createSubscription(
 		t.txStatusDeriver,
 	)
 
-	return t.subscriptionHandler.Subscribe(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
+	heightSource := height_source.NewHeightSource(
+		startHeight,
+		t.endHeight,
+		t.readyUpToHeight,
+		t.buildGetTransactionStatusesAtHeight(txInfo, startHeight),
+	)
+
+	sub := subimpl.NewSubscription[[]*accessmodel.TransactionResult](t.streamOptions.SendBufferSize)
+	streamer := streamer.NewHeightBasedStreamer(
+		t.log,
+		t.execDataBroadcaster,
+		sub,
+		heightSource,
+		t.streamOptions,
+	)
+	go streamer.Stream(ctx)
+
+	return sub
 }
 
-// getTransactionStatusResponse returns a callback function that produces transaction status
+// buildGetTransactionStatusesAtHeight returns a callback function that produces transaction status
 // subscription responses based on new blocks.
 // The returned callback is not concurrency-safe
-func (t *TransactionStream) getTransactionStatusResponse(
+func (t *TransactionStream) buildGetTransactionStatusesAtHeight(
 	txInfo *TransactionMetadata,
 	startHeight uint64,
-) func(context.Context, uint64) (interface{}, error) {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
+) subscription.GetItemAtHeightFunc[[]*accessmodel.TransactionResult] {
+	return func(ctx context.Context, height uint64) ([]*accessmodel.TransactionResult, error) {
 		err := t.checkBlockReady(height)
 		if err != nil {
 			return nil, err
 		}
 
 		if txInfo.txResult.IsFinal() {
-			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription_old.ErrEndOfData)
+			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription.ErrEndOfData)
 		}
 
 		// timeout waiting for unknown tx that are never indexed
@@ -198,7 +224,7 @@ func (t *TransactionStream) getTransactionStatusResponse(
 		prevTxStatus := txInfo.txResult.Status
 
 		if err = txInfo.Refresh(ctx); err != nil {
-			if errors.Is(err, subscription_old.ErrBlockNotReady) {
+			if errors.Is(err, subscription.ErrBlockNotReady) {
 				return nil, err
 			}
 			if statusErr, ok := status.FromError(err); ok {
@@ -235,10 +261,14 @@ func (t *TransactionStream) checkBlockReady(height uint64) error {
 	// Note: It's possible that the block is locally finalized before the notification is
 	// received. This ensures a consistent view is available to all streams.
 	if height > highestHeight {
-		return fmt.Errorf("block %d is not available yet: %w", height, subscription_old.ErrBlockNotReady)
+		return fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
 	return nil
+}
+
+func (t *TransactionStream) readyUpToHeight() (uint64, error) {
+	return t.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
 }
 
 // generateResultsStatuses checks if the current result differs from the previous result by more than one step.
@@ -255,7 +285,7 @@ func generateResultsStatuses(
 	// If the old and new transaction statuses are still the same, the status change should not be reported, so
 	// return here with no response.
 	if prevTxStatus == txResult.Status {
-		return nil, nil
+		return nil, subscription.ErrBlockNotReady
 	}
 
 	// return immediately if the new status is expired, since it's the last status

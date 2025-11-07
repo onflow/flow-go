@@ -6,37 +6,27 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/height_source"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
+	subimpl "github.com/onflow/flow-go/engine/access/subscription/subscription"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
-type AccountStatusesResponse struct {
-	BlockID       flow.Identifier
-	Height        uint64
-	AccountEvents map[string]flow.EventsList
-}
-
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
 type AccountStatusesBackend struct {
-	log                 zerolog.Logger
-	subscriptionHandler *subscription_old.SubscriptionHandler
+	log zerolog.Logger
 
-	executionDataTracker tracker.ExecutionDataTracker
+	executionDataTracker subscription.ExecutionDataTracker
 	eventsProvider       EventsProvider
-}
-
-// subscribe creates and returns a subscription to receive account status updates starting from the specified height.
-func (b *AccountStatusesBackend) subscribe(
-	ctx context.Context,
-	nextHeight uint64,
-	filter state_stream.AccountStatusFilter,
-) subscription_old.Subscription {
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getAccountStatusResponseFactory(filter))
+	execDataBroadcaster  *engine.Broadcaster
+	streamOptions        *streamer.StreamOptions
+	endHeight            uint64
 }
 
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
@@ -48,12 +38,12 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 	ctx context.Context,
 	startBlockID flow.Identifier,
 	filter state_stream.AccountStatusFilter,
-) subscription_old.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
+) subscription.Subscription[*state_stream.AccountStatusesResponse] {
+	startHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
-		return subscription_old.NewFailedSubscription(err, "could not get start height from block id")
+		return subimpl.NewFailedSubscription[*state_stream.AccountStatusesResponse](err, "could not get start height from block id")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
+	return b.subscribe(ctx, startHeight, filter)
 }
 
 // SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
@@ -65,12 +55,12 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 	ctx context.Context,
 	startHeight uint64,
 	filter state_stream.AccountStatusFilter,
-) subscription_old.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startHeight)
+) subscription.Subscription[*state_stream.AccountStatusesResponse] {
+	startHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startHeight)
 	if err != nil {
-		return subscription_old.NewFailedSubscription(err, "could not get start height from block height")
+		return subimpl.NewFailedSubscription[*state_stream.AccountStatusesResponse](err, "could not get start height from block height")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
+	return b.subscribe(ctx, startHeight, filter)
 }
 
 // SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
@@ -80,38 +70,68 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 	ctx context.Context,
 	filter state_stream.AccountStatusFilter,
-) subscription_old.Subscription {
+) subscription.Subscription[*state_stream.AccountStatusesResponse] {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
-		return subscription_old.NewFailedSubscription(err, "could not get start height from latest")
+		return subimpl.NewFailedSubscription[*state_stream.AccountStatusesResponse](err, "could not get start height from latest")
 	}
 	return b.subscribe(ctx, nextHeight, filter)
 }
 
-// getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
+// subscribe creates and returns a subscription to receive account status updates starting from the specified height.
+func (b *AccountStatusesBackend) subscribe(
+	ctx context.Context,
+	startHeight uint64,
+	filter state_stream.AccountStatusFilter,
+) subscription.Subscription[*state_stream.AccountStatusesResponse] {
+	heightSource := height_source.NewHeightSource(
+		startHeight,
+		b.endHeight,
+		b.readyUpToHeight,
+		b.buildGetAccountStatutesAtHeight(filter),
+	)
+
+	sub := subimpl.NewSubscription[*state_stream.AccountStatusesResponse](b.streamOptions.SendBufferSize)
+	streamer := streamer.NewHeightBasedStreamer(
+		b.log,
+		b.execDataBroadcaster,
+		sub,
+		heightSource,
+		b.streamOptions,
+	)
+	go streamer.Stream(ctx)
+
+	return sub
+}
+
+// buildGetAccountStatutesAtHeight returns a function that returns the account statuses response for a given height.
 //
 // Errors:
 // - subscription.ErrBlockNotReady: If block header for the specified block height is not found.
 // - error: An error, if any, encountered during getting events from storage or execution data.
-func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
+func (b *AccountStatusesBackend) buildGetAccountStatutesAtHeight(
 	filter state_stream.AccountStatusFilter,
-) subscription_old.GetDataByHeightFunc {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
+) subscription.GetItemAtHeightFunc[*state_stream.AccountStatusesResponse] {
+	return func(ctx context.Context, height uint64) (*state_stream.AccountStatusesResponse, error) {
 		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
-				return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription_old.ErrBlockNotReady)
+				return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 			}
 			return nil, err
 		}
 		filteredProtocolEvents := filter.Filter(eventsResponse.Events)
 		allAccountProtocolEvents := filter.GroupCoreEventsByAccountAddress(filteredProtocolEvents, b.log)
 
-		return &AccountStatusesResponse{
+		return &state_stream.AccountStatusesResponse{
 			BlockID:       eventsResponse.BlockID,
 			Height:        eventsResponse.Height,
 			AccountEvents: allAccountProtocolEvents,
 		}, nil
 	}
+}
+
+func (b *AccountStatusesBackend) readyUpToHeight() (uint64, error) {
+	return b.executionDataTracker.GetHighestHeight(), nil
 }

@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
 	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
@@ -87,7 +86,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
-func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendResponses []*backend.EventsResponse) []testType {
+func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendResponses []*state_stream.EventsResponse) []testType {
 	expectedResponses := s.expectedEventsResponses(backendResponses)
 
 	return []testType{
@@ -160,11 +159,11 @@ func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interfa
 }
 
 // backendEventsResponses creates backend events responses based on the provided events.
-func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
-	responses := make([]*backend.EventsResponse, len(events))
+func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*state_stream.EventsResponse {
+	responses := make([]*state_stream.EventsResponse, len(events))
 
 	for i := range events {
-		responses[i] = &backend.EventsResponse{
+		responses[i] = &state_stream.EventsResponse{
 			Height:         s.rootBlock.Height,
 			BlockID:        s.rootBlock.ID(),
 			Events:         events,
@@ -177,13 +176,13 @@ func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*bac
 
 // expectedEventsResponses creates the expected responses for the provided backend responses.
 func (s *EventsProviderSuite) expectedEventsResponses(
-	backendResponses []*backend.EventsResponse,
+	backendResponses []*state_stream.EventsResponse,
 ) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		// avoid updating the original response
-		expected := &backend.EventsResponse{
+		expected := &state_stream.EventsResponse{
 			Height:         resp.Height,
 			BlockID:        resp.BlockID,
 			BlockTimestamp: resp.BlockTimestamp,
@@ -264,7 +263,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		defer close(eventChan) // Close the channel when done
 
 		for i := 0; i < eventsCount; i++ {
-			eventChan <- &backend.EventsResponse{
+			eventChan <- &state_stream.EventsResponse{
 				Height: s.rootBlock.Height,
 			}
 		}

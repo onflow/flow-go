@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 )
 
 // EventResponse is the response message for 'events' topic.
@@ -15,7 +15,7 @@ type EventResponse struct {
 }
 
 // NewEventResponse creates EventResponse instance.
-func NewEventResponse(eventsResponse *backend.EventsResponse, index uint64) *EventResponse {
+func NewEventResponse(eventsResponse *state_stream.EventsResponse, index uint64) *EventResponse {
 	return &EventResponse{
 		BlockEvents: commonmodels.BlockEvents{
 			BlockId:        eventsResponse.BlockID.String(),

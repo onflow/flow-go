@@ -3,7 +3,7 @@ package models
 import (
 	"strconv"
 
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 )
 
 // AccountStatusesResponse is the response message for 'events' topic.
@@ -14,7 +14,7 @@ type AccountStatusesResponse struct {
 	MessageIndex  uint64        `json:"message_index"`
 }
 
-func NewAccountStatusesResponse(accountStatusesResponse *backend.AccountStatusesResponse, index uint64) *AccountStatusesResponse {
+func NewAccountStatusesResponse(accountStatusesResponse *state_stream.AccountStatusesResponse, index uint64) *AccountStatusesResponse {
 	accountEvents := NewAccountEvents(accountStatusesResponse.AccountEvents)
 
 	return &AccountStatusesResponse{

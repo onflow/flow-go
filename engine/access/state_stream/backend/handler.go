@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -337,8 +338,8 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert execution data to entity or could not convert execution data event payloads to JSON.
-func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, eventEncodingVersion entities.EventEncodingVersion) func(response *ExecutionDataResponse) error {
-	return func(resp *ExecutionDataResponse) error {
+func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, eventEncodingVersion entities.EventEncodingVersion) func(response *state_stream.ExecutionDataResponse) error {
+	return func(resp *state_stream.ExecutionDataResponse) error {
 		execData, err := convert.BlockExecutionDataToMessage(resp.ExecutionData)
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
@@ -370,7 +371,7 @@ func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, e
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert events to entity or the stream could not send a response.
-func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, heartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
+func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, heartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*state_stream.EventsResponse) error {
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
@@ -378,7 +379,7 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 	blocksSinceLastMessage := uint64(0)
 	messageIndex := counters.NewMonotonicCounter(0)
 
-	return func(resp *EventsResponse) error {
+	return func(resp *state_stream.EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
 		// response was more than HeartbeatInterval blocks ago
 		if len(resp.Events) == 0 {
@@ -465,7 +466,7 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 // convertAccountsStatusesResultsToMessage converts account status responses to the message
 func convertAccountsStatusesResultsToMessage(
 	eventVersion entities.EventEncodingVersion,
-	resp *AccountStatusesResponse,
+	resp *state_stream.AccountStatusesResponse,
 ) ([]*executiondata.SubscribeAccountStatusesResponse_Result, error) {
 	var results []*executiondata.SubscribeAccountStatusesResponse_Result
 	for address, events := range resp.AccountEvents {
@@ -490,7 +491,7 @@ func (h *Handler) handleAccountStatusesResponse(
 	heartbeatInterval uint64,
 	evenVersion entities.EventEncodingVersion,
 	send sendSubscribeAccountStatusesResponseFunc,
-) func(resp *AccountStatusesResponse) error {
+) func(resp *state_stream.AccountStatusesResponse) error {
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
@@ -498,7 +499,7 @@ func (h *Handler) handleAccountStatusesResponse(
 	blocksSinceLastMessage := uint64(0)
 	messageIndex := counters.NewMonotonicCounter(0)
 
-	return func(resp *AccountStatusesResponse) error {
+	return func(resp *state_stream.AccountStatusesResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
 		// response was more than HeartbeatInterval blocks ago
 		if len(resp.AccountEvents) == 0 {
@@ -627,8 +628,8 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 //
 // Expected errors during normal operation:
 //   - codes.Internal: If the subscription encounters an error or gets an unexpected response.
-func HandleRPCSubscription[T any](sub subscription_old.Subscription, handleResponse func(resp T) error) error {
-	err := subscription_old.HandleSubscription(sub, handleResponse)
+func HandleRPCSubscription[T any](sub subscription.Subscription[T], handleResponse func(resp T) error) error {
+	err := subscription.HandleSubscription(sub, handleResponse)
 	if err != nil {
 		return rpc.ConvertError(err, "handle subscription error", codes.Internal)
 	}

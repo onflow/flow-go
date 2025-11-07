@@ -3,15 +3,15 @@ package backend
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,36 +31,45 @@ func (s *BackendBlockDigestSuite) SetupTest() {
 
 // TestSubscribeBlockDigestsFromStartBlockID tests the SubscribeBlockDigestsFromStartBlockID method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
+	call := func(
+		ctx context.Context,
+		startValue interface{},
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.BlockDigest] {
 		return s.backend.SubscribeBlockDigestsFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockDigests, s.subscribeFromStartBlockIdTestCases())
+	subscribe(&s.BackendBlocksSuite, call, s.requireBlockDigests, s.subscribeFromStartBlockIdTestCases())
 }
 
 // TestSubscribeBlockDigestsFromStartHeight tests the SubscribeBlockDigestsFromStartHeight method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartHeight() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
+	call := func(
+		ctx context.Context,
+		startValue interface{},
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.BlockDigest] {
 		return s.backend.SubscribeBlockDigestsFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockDigests, s.subscribeFromStartHeightTestCases())
+	subscribe(&s.BackendBlocksSuite, call, s.requireBlockDigests, s.subscribeFromStartHeightTestCases())
 }
 
 // TestSubscribeBlockDigestsFromLatest tests the SubscribeBlockDigestsFromLatest method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromLatest() {
-	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription_old.Subscription {
+	call := func(
+		ctx context.Context,
+		startValue interface{},
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.BlockDigest] {
 		return s.backend.SubscribeBlockDigestsFromLatest(ctx, blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockDigests, s.subscribeFromLatestTestCases())
+	subscribe(&s.BackendBlocksSuite, call, s.requireBlockDigests, s.subscribeFromLatestTestCases())
 }
 
 // requireBlockDigests ensures that the received block digest information matches the expected data.
-func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlock *flow.Block) {
-	actualBlock, ok := v.(*flow.BlockDigest)
-	require.True(s.T(), ok, "unexpected response type: %T", v)
-
+func (s *BackendBlockDigestSuite) requireBlockDigests(actualBlock *flow.BlockDigest, expectedBlock *flow.Block) {
 	s.Require().Equal(expectedBlock.ID(), actualBlock.BlockID)
 	s.Require().Equal(expectedBlock.Height, actualBlock.Height)
 	s.Require().Equal(expectedBlock.Timestamp, uint64(actualBlock.Timestamp.UnixMilli()))
@@ -82,14 +91,14 @@ func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlo
 //
 // Each test case checks for specific error conditions and ensures that the methods responds appropriately.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	backend, err := New(s.backendParams(engine.NewBroadcaster()))
 	s.Require().NoError(err)
 
 	s.Run("returns error if unknown start block id is provided", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
+		subCtx, subCancel := context.WithTimeout(ctx, 2*time.Second)
 		defer subCancel()
 
 		sub := backend.SubscribeBlockDigestsFromStartBlockID(subCtx, unittest.IdentifierFixture(), flow.BlockStatusFinalized)
@@ -97,7 +106,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
 	})
 
 	s.Run("returns error for start height before root height", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
+		subCtx, subCancel := context.WithTimeout(ctx, 2*time.Second)
 		defer subCancel()
 
 		sub := backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.rootBlock.Height-1, flow.BlockStatusFinalized)
@@ -105,7 +114,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
 	})
 
 	s.Run("returns error if unknown start height is provided", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
+		subCtx, subCancel := context.WithTimeout(ctx, 2*time.Second)
 		defer subCancel()
 
 		sub := backend.SubscribeBlockDigestsFromStartHeight(subCtx, s.blocksArray[len(s.blocksArray)-1].Height+10, flow.BlockStatusFinalized)

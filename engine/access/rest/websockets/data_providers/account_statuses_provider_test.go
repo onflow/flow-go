@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
 	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
@@ -113,7 +112,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 }
 
 func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
-	backendResponses []*backend.AccountStatusesResponse,
+	backendResponses []*state_stream.AccountStatusesResponse,
 ) []testType {
 	expectedResponses := s.expectedAccountStatusesResponses(backendResponses)
 
@@ -190,12 +189,12 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}
 }
 
 // expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
-func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
+func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*state_stream.AccountStatusesResponse) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		// avoid updating the original response
-		expected := &backend.AccountStatusesResponse{
+		expected := &state_stream.AccountStatusesResponse{
 			Height:        resp.Height,
 			BlockID:       resp.BlockID,
 			AccountEvents: make(map[string]flow.EventsList, len(resp.AccountEvents)),
@@ -305,7 +304,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		defer close(accountStatusesChan) // Close the channel when done
 
 		for i := 0; i < accountStatusesCount; i++ {
-			accountStatusesChan <- &backend.AccountStatusesResponse{}
+			accountStatusesChan <- &state_stream.AccountStatusesResponse{}
 		}
 	}()
 
@@ -334,11 +333,11 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 }
 
 // backendAccountStatusesResponses creates backend account statuses responses based on the provided events.
-func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []flow.Event) []*backend.AccountStatusesResponse {
-	responses := make([]*backend.AccountStatusesResponse, len(events))
+func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []flow.Event) []*state_stream.AccountStatusesResponse {
+	responses := make([]*state_stream.AccountStatusesResponse, len(events))
 
 	for i := range events {
-		responses[i] = &backend.AccountStatusesResponse{
+		responses[i] = &state_stream.AccountStatusesResponse{
 			Height:  s.rootBlock.Height,
 			BlockID: s.rootBlock.ID(),
 			AccountEvents: map[string]flow.EventsList{

@@ -33,8 +33,8 @@ type StreamOptions struct {
 	ResponseLimit int
 }
 
-func NewDefaultStreamOptions() StreamOptions {
-	return StreamOptions{
+func NewDefaultStreamOptions() *StreamOptions {
+	return &StreamOptions{
 		SendTimeout:    DefaultSendTimeout,
 		SendBufferSize: DefaultSendBufferSize,
 		Heartbeat:      DefaultHeartbeatInterval,

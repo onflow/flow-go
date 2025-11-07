@@ -10,7 +10,7 @@ import (
 
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -174,7 +174,7 @@ func (t *TransactionMetadata) refreshBlock() error {
 	block, err := t.blocks.ByCollectionID(t.txResult.CollectionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return subscription_old.ErrBlockNotReady
+			return subscription.ErrBlockNotReady
 		}
 
 		return fmt.Errorf("failed to lookup block containing collection: %w", err)

@@ -79,8 +79,8 @@ func TestHeightSource_GetItemAtHeight_ErrorPropagation(t *testing.T) {
 
 	_, err := hs.GetItemAtHeight(context.Background(), 5)
 	require.Error(t, err)
-	// current implementation may wrap with ErrItemNotIngested; ensure we can still detect the sentinel
+	// current implementation may wrap with ErrBlockNotReady; ensure we can still detect the sentinel
 	assert.ErrorIs(t, err, sentinel)
 	// and often also tag as not ingested; allow either behavior here
-	_ = subpkg.ErrItemNotIngested
+	_ = subpkg.ErrBlockNotReady
 }

@@ -19,8 +19,12 @@ type HeightSource[T any] interface {
 	ReadyUpToHeight() (uint64, error)
 
 	// GetItemAtHeight returns an item by height.
-	// Returns ErrItemNotIngested if data is not available yet.
+	// Returns ErrBlockNotReady if data is not available yet.
 	GetItemAtHeight(ctx context.Context, height uint64) (T, error)
 }
 
-var ErrItemNotIngested = errors.New("data item is not ingested yet")
+type GetItemAtHeightFunc[T any] func(ctx context.Context, height uint64) (T, error)
+
+var ErrBlockNotReady = errors.New("data item is not ingested yet")
+
+var ErrEndOfData = errors.New("end of data")

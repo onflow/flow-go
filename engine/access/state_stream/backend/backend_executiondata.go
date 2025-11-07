@@ -4,27 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/height_source"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
+	subimpl "github.com/onflow/flow-go/engine/access/subscription/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
 )
-
-// ExecutionDataResponse bundles the execution data returned for a single block.
-type ExecutionDataResponse struct {
-	Height         uint64
-	ExecutionData  *execution_data.BlockExecutionData
-	BlockTimestamp time.Time
-}
 
 // ExecutionDataBackend exposes read-only access to execution data.
 type ExecutionDataBackend struct {
@@ -33,8 +29,10 @@ type ExecutionDataBackend struct {
 
 	getExecutionData GetExecutionDataFunc
 
-	subscriptionHandler  *subscription_old.SubscriptionHandler
-	executionDataTracker tracker.ExecutionDataTracker
+	executionDataTracker     subscription.ExecutionDataTracker
+	executionDataBroadcaster *engine.Broadcaster
+	streamOptions            *streamer.StreamOptions
+	endHeight                uint64
 
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	executionStateCache     optimistic_sync.ExecutionStateCache
@@ -111,13 +109,34 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 // - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription_old.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
+func (b *ExecutionDataBackend) SubscribeExecutionData(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	startHeight uint64,
+) subscription.Subscription[*state_stream.ExecutionDataResponse] {
+	startHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
-		return subscription_old.NewFailedSubscription(err, "could not get start block height")
+		return subimpl.NewFailedSubscription[*state_stream.ExecutionDataResponse](err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	heightSource := height_source.NewHeightSource(
+		startHeight,
+		b.endHeight,
+		b.readyUpToHeight,
+		b.getExecutionDataAtHeight,
+	)
+
+	sub := subimpl.NewSubscription[*state_stream.ExecutionDataResponse](b.streamOptions.SendBufferSize)
+	streamer := streamer.NewHeightBasedStreamer(
+		b.log,
+		b.executionDataBroadcaster,
+		sub,
+		heightSource,
+		b.streamOptions,
+	)
+	go streamer.Stream(ctx)
+
+	return sub
 }
 
 // SubscribeExecutionDataFromStartBlockID streams execution data for all blocks starting at the specified block ID
@@ -129,13 +148,33 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 // - startBlockID: The identifier of the starting block.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription_old.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+) subscription.Subscription[*state_stream.ExecutionDataResponse] {
+	startHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
-		return subscription_old.NewFailedSubscription(err, "could not get start block height")
+		return subimpl.NewFailedSubscription[*state_stream.ExecutionDataResponse](err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	heightSource := height_source.NewHeightSource(
+		startHeight,
+		b.endHeight,
+		b.readyUpToHeight,
+		b.getExecutionDataAtHeight,
+	)
+
+	sub := subimpl.NewSubscription[*state_stream.ExecutionDataResponse](b.streamOptions.SendBufferSize)
+	streamer := streamer.NewHeightBasedStreamer(
+		b.log,
+		b.executionDataBroadcaster,
+		sub,
+		heightSource,
+		b.streamOptions,
+	)
+	go streamer.Stream(ctx)
+
+	return sub
 }
 
 // SubscribeExecutionDataFromStartBlockHeight streams execution data for all blocks starting at the specified block height
@@ -147,13 +186,33 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx contex
 // - startHeight: The height of the starting block.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription_old.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
+	ctx context.Context,
+	startBlockHeight uint64,
+) subscription.Subscription[*state_stream.ExecutionDataResponse] {
+	startHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
 	if err != nil {
-		return subscription_old.NewFailedSubscription(err, "could not get start block height")
+		return subimpl.NewFailedSubscription[*state_stream.ExecutionDataResponse](err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	heightSource := height_source.NewHeightSource(
+		startHeight,
+		b.endHeight,
+		b.readyUpToHeight,
+		b.getExecutionDataAtHeight,
+	)
+
+	sub := subimpl.NewSubscription[*state_stream.ExecutionDataResponse](b.streamOptions.SendBufferSize)
+	streamer := streamer.NewHeightBasedStreamer(
+		b.log,
+		b.executionDataBroadcaster,
+		sub,
+		heightSource,
+		b.streamOptions,
+	)
+	go streamer.Stream(ctx)
+
+	return sub
 }
 
 // SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
@@ -164,23 +223,44 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx co
 // - ctx: Context for the operation.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Context) subscription_old.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription[*state_stream.ExecutionDataResponse] {
+	startHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
-		return subscription_old.NewFailedSubscription(err, "could not get start block height")
+		return subimpl.NewFailedSubscription[*state_stream.ExecutionDataResponse](err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	heightSource := height_source.NewHeightSource(
+		startHeight,
+		b.endHeight,
+		b.readyUpToHeight,
+		b.getExecutionDataAtHeight,
+	)
+
+	sub := subimpl.NewSubscription[*state_stream.ExecutionDataResponse](b.streamOptions.SendBufferSize)
+	streamer := streamer.NewHeightBasedStreamer(
+		b.log,
+		b.executionDataBroadcaster,
+		sub,
+		heightSource,
+		b.streamOptions,
+	)
+	go streamer.Stream(ctx)
+
+	return sub
 }
 
-func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {
+func (b *ExecutionDataBackend) getExecutionDataAtHeight(ctx context.Context, height uint64) (*state_stream.ExecutionDataResponse, error) {
 	executionData, err := b.getExecutionData(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
 
-	return &ExecutionDataResponse{
+	return &state_stream.ExecutionDataResponse{
 		Height:        height,
 		ExecutionData: executionData.BlockExecutionData,
 	}, nil
+}
+
+func (b *ExecutionDataBackend) readyUpToHeight() (uint64, error) {
+	return b.executionDataTracker.GetHighestHeight(), nil
 }

@@ -50,6 +50,7 @@ import (
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
 	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription_old/tracker"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -1653,6 +1654,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				useIndex,
 			)
 
+			streamOptions := streamer.NewDefaultStreamOptions()
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				node.State,
@@ -1675,6 +1678,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				executionDataTracker,
 				builder.executionResultInfoProvider,
 				builder.executionStateCache,
+				broadcaster,
+				streamOptions,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)

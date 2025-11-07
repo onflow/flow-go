@@ -15,7 +15,7 @@ import (
 
 type HeightBasedStreamer[T any] struct {
 	log          zerolog.Logger
-	options      StreamOptions
+	options      *StreamOptions
 	limiter      *rate.Limiter
 	subscription subscription.Subscription[T]
 	broadcaster  *engine.Broadcaster
@@ -29,7 +29,7 @@ func NewHeightBasedStreamer[T any](
 	broadcaster *engine.Broadcaster,
 	subscription subscription.Subscription[T],
 	heightSource subscription.HeightSource[T],
-	options StreamOptions,
+	options *StreamOptions,
 ) *HeightBasedStreamer[T] {
 	var limiter *rate.Limiter
 	if options.ResponseLimit > 0 {
@@ -60,6 +60,52 @@ func (s *HeightBasedStreamer[T]) Stream(ctx context.Context) {
 	next := s.heightSource.StartHeight()
 	end := s.heightSource.EndHeight()
 
+	// helper: send all currently available items before blocking
+	sendReady := func() (done bool) {
+		for {
+			// EOF. all data has been sent
+			if end != 0 && next > end {
+				s.subscription.Close()
+				return true
+			}
+
+			readyTo, err := s.heightSource.ReadyUpToHeight()
+			if err != nil {
+				s.subscription.CloseWithError(err)
+				return true
+			}
+			if next > readyTo {
+				return false
+			}
+
+			item, err := s.heightSource.GetItemAtHeight(ctx, next)
+			if err != nil {
+				if errors.Is(err, subscription.ErrBlockNotReady) {
+					return false // not ingested yet; try again later
+				}
+				// Treat end-of-data as a graceful completion
+				if errors.Is(err, subscription.ErrEndOfData) {
+					s.subscription.Close()
+					return true
+				}
+				s.subscription.CloseWithError(err)
+				return true
+			}
+
+			if err := s.send(ctx, item); err != nil {
+				s.subscription.CloseWithError(err)
+				return true
+			}
+
+			next++
+		}
+	}
+
+	// Drain available items immediately on start so consumers don't wait for a notifier/heartbeat
+	if done := sendReady(); done {
+		return
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,42 +115,8 @@ func (s *HeightBasedStreamer[T]) Stream(ctx context.Context) {
 		case <-heartbeatTicker.C:
 		}
 
-		for {
-			// TODO: not sure we needed bounded stream based on end height
-
-			// EOF. all data has been sent
-			if end != 0 && next > end {
-				s.subscription.Close()
-				return
-			}
-
-			// TODO: is it similar to sendAllAvailable ?
-
-			readyTo, err := s.heightSource.ReadyUpToHeight()
-			if err != nil {
-				s.subscription.CloseWithError(err)
-				return
-			}
-			if next > readyTo {
-				break
-			}
-
-			item, err := s.heightSource.GetItemAtHeight(ctx, next)
-			if err != nil {
-				if errors.Is(err, subscription.ErrItemNotIngested) {
-					break // not ingested yet; try again later
-				}
-
-				s.subscription.CloseWithError(err)
-				return
-			}
-
-			if err := s.send(ctx, item); err != nil {
-				s.subscription.CloseWithError(err)
-				return
-			}
-
-			next++
+		if done := sendReady(); done {
+			return
 		}
 	}
 }

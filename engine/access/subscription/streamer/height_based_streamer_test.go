@@ -124,7 +124,7 @@ func TestHeightBasedStreamer_NotIngestedThenAvailable(t *testing.T) {
 	var nextErrHeight uint64 = 2
 	get := func(ctx context.Context, h uint64) (int, error) {
 		if h == nextErrHeight {
-			return 0, subscription.ErrItemNotIngested
+			return 0, subscription.ErrBlockNotReady
 		}
 		return int(h), nil
 	}
