@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	providermock "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider/mock"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -82,7 +81,6 @@ type Suite struct {
 	errorMessageProvider error_messages.Provider
 
 	chainID                              flow.ChainID
-	defaultSystemCollection              *system.SystemCollection
 	systemCollection                     *flow.Collection
 	pendingExecutionEvents               []flow.Event
 	processScheduledTransactionEventType flow.EventType
@@ -133,9 +131,6 @@ func (suite *Suite) SetupTest() {
 	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
 
-	// this is the system collection with no scheduled transactions used within the backend
-	suite.defaultSystemCollection, err = system.DefaultSystemCollection(suite.chainID, true)
-	suite.Require().NoError(err)
 	suite.scheduledTransactionsEnabled = true
 
 	// this is the system collection with scheduled transactions used as block data

@@ -702,9 +702,6 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 	block := s.tf.Block
 	blockID := block.ID()
 
-	systemCollection, err := system.NewSystemCollection(s.g.ChainID(), s.tf.ExpectedEvents)
-	s.Require().NoError(err)
-
 	env := systemcontracts.SystemContractsForChain(s.g.ChainID()).AsTemplateEnv()
 	pendingExecuteEventType := blueprints.PendingExecutionEventType(env)
 
@@ -738,7 +735,7 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 	s.Require().NoError(err)
 
 	for txID, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
-		expectedTransaction, ok := systemCollection.ByID(txID)
+		expectedTransaction, ok := s.systemCollection.SearchAll(txID)
 		s.Require().True(ok)
 
 		results, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
