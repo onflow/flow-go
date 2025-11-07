@@ -32,8 +32,9 @@ var ChainHeightVersions = map[flow.ChainID]access.HeightVersionMapper{
 
 // versionBuilder is a map of all versions of the system collection.
 var versionBuilder = map[access.Version]access.SystemCollectionBuilder{
-	Version0: &builderV0{},
-	Version1: &builderV1{},
+	Version0:             &builderV0{},
+	Version1:             &builderV1{},
+	access.VersionLatest: &builderV1{},
 }
 
 func Default(chainID flow.ChainID) *access.Versioned[access.SystemCollectionBuilder] {

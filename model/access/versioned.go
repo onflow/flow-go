@@ -22,8 +22,8 @@ type Versioned[T any] struct {
 }
 
 func NewVersioned[T any](versionedTypes map[Version]T, versionMapper HeightVersionMapper) *Versioned[T] {
-	for _, ver := range slices.Collect(maps.Keys(versionedTypes)) {
-		if !versionMapper.VersionExists(ver) {
+	for _, ver := range versionMapper.AllVersions() {
+		if _, ok := versionedTypes[ver]; !ok {
 			// the provided mapping is inconsistent. this is a development time error, so panic.
 			panic(fmt.Sprintf("version missing in the version mapper: %v", ver))
 		}

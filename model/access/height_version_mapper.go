@@ -12,8 +12,8 @@ type HeightVersionMapper interface {
 	// GetVersion returns the version corresponding to the given height.
 	GetVersion(height uint64) Version
 
-	// VersionExists checks if a version exists in the mapper.
-	VersionExists(version Version) bool
+	// All versions defined in the mapper.
+	AllVersions() []Version
 }
 
 // StaticHeightVersionMapper is an implementation that allows hardcoding the height boundaries
@@ -21,6 +21,7 @@ type HeightVersionMapper interface {
 type StaticHeightVersionMapper struct {
 	heightVersionBoundaries map[uint64]Version
 	boundaries              []uint64
+	versions                []Version
 }
 
 var _ HeightVersionMapper = (*StaticHeightVersionMapper)(nil)
@@ -29,6 +30,7 @@ func NewStaticHeightVersionMapper(heightVersionBoundaries map[uint64]Version) *S
 	boundaries := slices.Collect(maps.Keys(heightVersionBoundaries))
 	slices.Sort(boundaries)
 	slices.Reverse(boundaries)
+	versions := slices.Collect(maps.Values(heightVersionBoundaries))
 
 	if len(boundaries) == 0 {
 		panic("no height version boundaries provided. must at least include a catch all entry at height 0.")
@@ -41,6 +43,7 @@ func NewStaticHeightVersionMapper(heightVersionBoundaries map[uint64]Version) *S
 	return &StaticHeightVersionMapper{
 		heightVersionBoundaries: heightVersionBoundaries,
 		boundaries:              boundaries,
+		versions:                versions,
 	}
 }
 
@@ -55,11 +58,6 @@ func (s *StaticHeightVersionMapper) GetVersion(height uint64) Version {
 	panic("height is before any known version boundary")
 }
 
-func (s *StaticHeightVersionMapper) VersionExists(version Version) bool {
-	for _, v := range s.heightVersionBoundaries {
-		if v == version {
-			return true
-		}
-	}
-	return false
+func (s *StaticHeightVersionMapper) AllVersions() []Version {
+	return s.versions
 }
