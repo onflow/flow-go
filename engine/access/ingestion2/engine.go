@@ -16,7 +16,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -36,7 +35,7 @@ type Engine struct {
 	log zerolog.Logger
 
 	finalizedBlockProcessor *FinalizedBlockProcessor
-	collectionSyncer        *collections.Syncer
+	collectionSyncer        *Syncer
 
 	messageHandler           *engine.MessageHandler
 	executionReceiptsQueue   *engine.FifoMessageStore
@@ -50,7 +49,7 @@ func New(
 	log zerolog.Logger,
 	net network.EngineRegistry,
 	finalizedBlockProcessor *FinalizedBlockProcessor,
-	collectionSyncer *collections.Syncer,
+	collectionSyncer *Syncer,
 	receipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
@@ -85,8 +84,7 @@ func New(
 	// engine notifies workers when new data is available so that they can start processing them.
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.messageHandlerLoop).
-		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
-		AddWorker(e.collectionSyncer.WorkerLoop)
+		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop)
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel
@@ -178,6 +176,7 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
 // Receives block finalized events from the finalization distributor and forwards them to the consumer.
-func (e *Engine) OnFinalizedBlock(_ *model.Block) {
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	e.finalizedBlockProcessor.Notify()
+	e.collectionSyncer.OnFinalizedBlock()
 }
