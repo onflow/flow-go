@@ -147,12 +147,18 @@ func (executor *transactionExecutor) Execute() error {
 }
 
 func (executor *transactionExecutor) preprocess() error {
+	logger := executor.ctx.Logger
+	
 	if executor.AuthorizationChecksEnabled {
+		logger.Info().Msg("preprocess: starting CheckAuthorization")
 		err := executor.CheckAuthorization(
 			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
+		logger.Info().
+			Err(err).
+			Msg("preprocess: CheckAuthorization completed")
 		if err != nil {
 			executor.errs.Collect(err)
 			return executor.errs.ErrorOrNil()
@@ -160,10 +166,14 @@ func (executor *transactionExecutor) preprocess() error {
 	}
 
 	if executor.SequenceNumberCheckAndIncrementEnabled {
+		logger.Info().Msg("preprocess: starting CheckAndIncrementSequenceNumber")
 		err := executor.CheckAndIncrementSequenceNumber(
 			executor.ctx.TracerSpan,
 			executor.proc,
 			executor.txnState)
+		logger.Info().
+			Err(err).
+			Msg("preprocess: CheckAndIncrementSequenceNumber completed")
 		if err != nil {
 			executor.errs.Collect(err)
 			return executor.errs.ErrorOrNil()
@@ -171,10 +181,15 @@ func (executor *transactionExecutor) preprocess() error {
 	}
 
 	if !executor.TransactionBodyExecutionEnabled {
+		logger.Info().Msg("preprocess: TransactionBodyExecution disabled, skipping")
 		return nil
 	}
 
+	logger.Info().Msg("preprocess: starting preprocessTransactionBody")
 	executor.errs.Collect(executor.preprocessTransactionBody())
+	logger.Info().
+		Bool("has_failure", executor.errs.CollectedFailure()).
+		Msg("preprocess: preprocessTransactionBody completed")
 	if executor.errs.CollectedFailure() {
 		return executor.errs.ErrorOrNil()
 	}
@@ -186,26 +201,35 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
+	logger := executor.ctx.Logger
 	chainID := executor.ctx.Chain.ChainID()
 
 	// setup EVM
 	if executor.ctx.EVMEnabled {
+		logger.Info().Msg("preprocessTransactionBody: starting EVM setup")
 		err := evm.SetupEnvironment(
 			chainID,
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 		)
+		logger.Info().
+			Err(err).
+			Msg("preprocessTransactionBody: EVM setup completed")
 		if err != nil {
 			return err
 		}
 	}
 
 	// get meter parameters
+	logger.Info().Msg("preprocessTransactionBody: starting getExecutionParameters")
 	executionParameters, executionStateRead, err := getExecutionParameters(
 		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
+	logger.Info().
+		Err(err).
+		Msg("preprocessTransactionBody: getExecutionParameters completed")
 	if err != nil {
 		return fmt.Errorf("error getting execution parameters: %w", err)
 	}
@@ -219,24 +243,34 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	// we need to save the execution state read for invalidation purposes
 	executor.executionStateRead = executionStateRead
 
+	logger.Info().Msg("preprocessTransactionBody: starting BeginNestedTransactionWithMeterParams")
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
 		executionParameters)
+	logger.Info().
+		Err(err).
+		Msg("preprocessTransactionBody: BeginNestedTransactionWithMeterParams completed")
 	if err != nil {
 		return err
 	}
 	executor.startedTransactionBodyExecution = true
 	executor.nestedTxnId = txnId
 
+	logger.Info().Msg("preprocessTransactionBody: creating NewTransactionExecutor")
 	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
 		runtime.Script{
 			Source:    executor.proc.Transaction.Script,
 			Arguments: executor.proc.Transaction.Arguments,
 		},
 		common.TransactionLocation(executor.proc.ID))
+	logger.Info().Msg("preprocessTransactionBody: NewTransactionExecutor created")
 
 	// This initializes various cadence variables and parses the programs used
 	// by the transaction body.
+	logger.Info().Msg("preprocessTransactionBody: starting txnBodyExecutor.Preprocess")
 	err = executor.txnBodyExecutor.Preprocess()
+	logger.Info().
+		Err(err).
+		Msg("preprocessTransactionBody: txnBodyExecutor.Preprocess completed")
 	if err != nil {
 		return fmt.Errorf(
 			"transaction preprocess failed: %w",
