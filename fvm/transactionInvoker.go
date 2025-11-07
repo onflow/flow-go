@@ -281,23 +281,36 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 }
 
 func (executor *transactionExecutor) execute() error {
+	logger := executor.ctx.Logger
+	
 	if !executor.startedTransactionBodyExecution {
+		logger.Info().Msg("execute: TransactionBodyExecution not started, skipping")
 		return executor.errs.ErrorOrNil()
 	}
 
-	return executor.ExecuteTransactionBody()
+	logger.Info().Msg("execute: starting ExecuteTransactionBody")
+	err := executor.ExecuteTransactionBody()
+	logger.Info().
+		Err(err).
+		Msg("execute: ExecuteTransactionBody completed")
+	return err
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	logger := executor.ctx.Logger
 	chainID := executor.ctx.Chain.ChainID()
 
 	// setup EVM
 	if executor.ctx.EVMEnabled {
+		logger.Info().Msg("ExecuteTransactionBody: starting EVM setup")
 		err := evm.SetupEnvironment(
 			chainID,
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 		)
+		logger.Info().
+			Err(err).
+			Msg("ExecuteTransactionBody: EVM setup completed")
 		if err != nil {
 			return err
 		}
@@ -305,17 +318,22 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
-
+		logger.Info().Msg("ExecuteTransactionBody: starting normalExecution")
 		var txError error
 		invalidator, txError = executor.normalExecution()
+		logger.Info().
+			Err(txError).
+			Msg("ExecuteTransactionBody: normalExecution completed")
 		if executor.errs.Collect(txError).CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
 	}
 
 	if executor.errs.CollectedError() {
+		logger.Info().Msg("ExecuteTransactionBody: starting errorExecution")
 		invalidator = nil
 		executor.txnState.RunWithMeteringDisabled(executor.errorExecution)
+		logger.Info().Msg("ExecuteTransactionBody: errorExecution completed")
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
@@ -323,9 +341,14 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	// log the execution intensities here, so that they do not contain data
 	// from transaction fee deduction, because the payer is not charged for that.
+	logger.Info().Msg("ExecuteTransactionBody: logging execution intensities")
 	executor.logExecutionIntensities()
 
+	logger.Info().Msg("ExecuteTransactionBody: starting commit")
 	executor.errs.Collect(executor.commit(invalidator))
+	logger.Info().
+		Bool("has_error", executor.errs.CollectedError()).
+		Msg("ExecuteTransactionBody: commit completed")
 
 	return executor.errs.ErrorOrNil()
 }
@@ -391,27 +414,42 @@ func (executor *transactionExecutor) normalExecution() (
 	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
+	logger := executor.ctx.Logger
+	
 	var maxTxFees uint64
 	// run with limits disabled since this is a static cost check
 	// and should be accounted for in the inclusion cost.
+	logger.Info().Msg("normalExecution: starting CheckPayerBalanceAndReturnMaxFees")
 	executor.txnState.RunWithMeteringDisabled(func() {
 		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(
 			executor.proc,
 			executor.txnState,
 			executor.env)
 	})
+	logger.Info().
+		Err(err).
+		Uint64("max_tx_fees", maxTxFees).
+		Msg("normalExecution: CheckPayerBalanceAndReturnMaxFees completed")
 
 	if err != nil {
 		return
 	}
 
+	logger.Info().Msg("normalExecution: starting BeginNestedTransaction")
 	var bodyTxnId state.NestedTransactionId
 	bodyTxnId, err = executor.txnState.BeginNestedTransaction()
+	logger.Info().
+		Err(err).
+		Msg("normalExecution: BeginNestedTransaction completed")
 	if err != nil {
 		return
 	}
 
+	logger.Info().Msg("normalExecution: starting txnBodyExecutor.Execute")
 	err = executor.txnBodyExecutor.Execute()
+	logger.Info().
+		Err(err).
+		Msg("normalExecution: txnBodyExecutor.Execute completed")
 	if err != nil {
 		err = fmt.Errorf("transaction execute failed: %w", err)
 		return
@@ -419,8 +457,12 @@ func (executor *transactionExecutor) normalExecution() (
 
 	// Before checking storage limits, we must apply all pending changes
 	// that may modify storage usage.
+	logger.Info().Msg("normalExecution: starting FlushPendingUpdates")
 	var contractUpdates environment.ContractUpdates
 	contractUpdates, err = executor.env.FlushPendingUpdates()
+	logger.Info().
+		Err(err).
+		Msg("normalExecution: FlushPendingUpdates completed")
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed to flush pending changes from "+
@@ -429,8 +471,12 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
+	logger.Info().Msg("normalExecution: starting CommitNestedTransaction")
 	var bodySnapshot *snapshot.ExecutionSnapshot
 	bodySnapshot, err = executor.txnState.CommitNestedTransaction(bodyTxnId)
+	logger.Info().
+		Err(err).
+		Msg("normalExecution: CommitNestedTransaction completed")
 	if err != nil {
 		return
 	}
@@ -447,20 +493,28 @@ func (executor *transactionExecutor) normalExecution() (
 	// The storage capacity of an account depends on its balance and should be higher than the accounts storage used.
 	// The payer account is special cased in this check and its balance is considered max_fees lower than its
 	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
+	logger.Info().Msg("normalExecution: starting CheckStorageLimits")
 	err = executor.CheckStorageLimits(
 		executor.ctx,
 		executor.env,
 		bodySnapshot,
 		executor.proc.Transaction.Payer,
 		maxTxFees)
+	logger.Info().
+		Err(err).
+		Msg("normalExecution: CheckStorageLimits completed")
 
 	if err != nil {
 		return
 	}
 
+	logger.Info().Msg("normalExecution: starting deductTransactionFees")
 	executor.txnState.RunWithMeteringDisabled(func() {
 		err = executor.deductTransactionFees()
 	})
+	logger.Info().
+		Err(err).
+		Msg("normalExecution: deductTransactionFees completed")
 
 	return
 }
