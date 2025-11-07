@@ -516,7 +516,7 @@ func TestCollectScheduledTransactions(t *testing.T) {
 	})
 
 	t.Run("empty system chunk returns error", func(t *testing.T) {
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, []flow.LightTransactionResult{}, []flow.Event{})
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, []flow.LightTransactionResult{}, []flow.Event{})
 		require.ErrorContains(t, err, "system chunk contained 0 transaction results")
 		require.Nil(t, actual)
 	})
