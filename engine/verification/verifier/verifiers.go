@@ -194,14 +194,14 @@ func verifyConcurrently(
 	state protocol.State,
 	verifier module.ChunkVerifier,
 	verifyHeight func(
-	height uint64,
-	headers storage.Headers,
-	chunkDataPacks storage.ChunkDataPacks,
-	results storage.ExecutionResults,
-	state protocol.State,
-	verifier module.ChunkVerifier,
-	stopOnMismatch bool,
-) (BlockVerificationStats, error),
+		height uint64,
+		headers storage.Headers,
+		chunkDataPacks storage.ChunkDataPacks,
+		results storage.ExecutionResults,
+		state protocol.State,
+		verifier module.ChunkVerifier,
+		stopOnMismatch bool,
+	) (BlockVerificationStats, error),
 ) (BlockVerificationStats, error) {
 
 	tasks := make(chan uint64, int(nWorker))
