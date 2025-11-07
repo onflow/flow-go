@@ -7,9 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	edprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -152,7 +153,10 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentBlock *flow
 		)
 		scheduledTransactionIDs[i] = id
 	}
-	systemCollection, err := blueprints.SystemCollection(g.ChainID().Chain(), pendingExecutionEvents)
+	versionedSystemCollection := systemcollection.Default(g.ChainID())
+	systemCollection, err := versionedSystemCollection.
+		Get(parentBlock.Height).
+		SystemCollection(g.ChainID().Chain(), access.DefaultEventProvider(pendingExecutionEvents))
 	require.NoError(t, err)
 
 	systemResults := g.LightTransactionResults().ForTransactions(systemCollection.Transactions)

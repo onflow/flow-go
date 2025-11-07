@@ -13,3 +13,9 @@ type SystemCollectionBuilder interface {
 	SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error)
 	SystemCollection(chain flow.Chain, providerFn EventProvider) (*flow.Collection, error)
 }
+
+func DefaultEventProvider(events flow.EventsList) EventProvider {
+	return func() (flow.EventsList, error) {
+		return events, nil
+	}
+}

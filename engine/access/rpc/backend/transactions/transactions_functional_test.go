@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/access"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
@@ -484,7 +485,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 		expectedTransactions = append(expectedTransactions, collection.Transactions...)
 	}
 
-	systemCollection, err := blueprints.SystemCollection(s.g.ChainID().Chain(), s.tf.ExpectedEvents)
+	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
+	systemCollection, err := versionedSystemCollection.
+		Get(block.Height).
+		SystemCollection(s.g.ChainID().Chain(), access.DefaultEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -657,7 +661,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 		expectedTransactions = append(expectedTransactions, collection.Transactions...)
 	}
 
-	systemCollection, err := blueprints.SystemCollection(s.g.ChainID().Chain(), s.tf.ExpectedEvents)
+	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
+	systemCollection, err := versionedSystemCollection.
+		Get(block.Height).
+		SystemCollection(s.g.ChainID().Chain(), access.DefaultEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
