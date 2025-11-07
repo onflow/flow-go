@@ -2178,6 +2178,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create query derived chain data: %w", err)
 			}
 
+			compatibleHeights := execution.NewCompatibleHeights(
+				builder.Logger,
+				builder.VersionControl,
+				builder.scriptExecMinBlock,
+				builder.scriptExecMaxBlock,
+			)
+
 			builder.ScriptExecutor = execution.NewScripts(
 				builder.Logger,
 				metrics.NewExecutionCollector(builder.Tracer),
@@ -2187,9 +2194,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.scriptExecutorConfig,
 				queryDerivedChainData,
 				builder.programCacheSize > 0,
-				builder.scriptExecMinBlock,
-				builder.scriptExecMaxBlock,
-				builder.VersionControl,
+				compatibleHeights,
 			)
 
 			builder.nodeBackend, err = backend.New(backend.Params{

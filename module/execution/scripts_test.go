@@ -115,7 +115,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		require.Equal(s.T(), s.height, uint64(val.(cadence.UInt64)))
 	})
 
-	s.Run("error when height is not indexed  ", func() {
+	s.Run("error when height is not indexed", func() {
 		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
 
 		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerSnapshot)
@@ -142,7 +142,7 @@ func (s *scriptTestSuite) TestGetAccount() {
 		require.Zero(s.T(), account.Balance)
 	})
 
-	s.Run("error when height is not indexed  ", func() {
+	s.Run("error when height is not indexed", func() {
 		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
 
 		account, err := scripts.GetAccountAtBlockHeight(context.Background(), address, s.height, s.registerSnapshot)
@@ -170,7 +170,7 @@ func (s *scriptTestSuite) TestGetAccountBalance() {
 		require.Equal(s.T(), transferAmount, balance)
 	})
 
-	s.Run("error when height is not indexed  ", func() {
+	s.Run("error when height is not indexed", func() {
 		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
 
 		balance, err := scripts.GetAccountBalance(context.Background(), address, s.height, s.registerSnapshot)
@@ -201,7 +201,7 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 		require.Equal(s.T(), publicKey.Weight, accountKeys[0].Weight)
 	})
 
-	s.Run("error when height is not indexed  ", func() {
+	s.Run("error when height is not indexed", func() {
 		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
 
 		accountKeys, err := scripts.GetAccountKeys(context.Background(), address, s.height, s.registerSnapshot)
@@ -213,6 +213,7 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 
 // defaultScripts returns a pre-configured Scripts instance with default parameters for testing.
 func (s *scriptTestSuite) defaultScripts() *Scripts {
+	compatibleHeights := NewCompatibleHeights(s.logger, nil, 0, math.MaxUint64)
 	scripts := NewScripts(
 		s.logger,
 		metrics.NewNoopCollector(),
@@ -222,9 +223,7 @@ func (s *scriptTestSuite) defaultScripts() *Scripts {
 		query.NewDefaultConfig(),
 		s.derivedChainData,
 		true,
-		0,
-		math.MaxUint64,
-		nil,
+		compatibleHeights,
 	)
 
 	s.bootstrap()
