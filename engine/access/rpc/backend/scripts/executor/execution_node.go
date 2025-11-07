@@ -139,7 +139,7 @@ func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 ) ([]byte, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "failed to create client for execution node %s: %v", executorAddress, err)
+		return nil, status.Errorf(codes.Unavailable, "failed to connect to execution node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
 

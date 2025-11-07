@@ -17,9 +17,7 @@ import (
 // the indexed range return a clear storage.ErrHeightNotIndexed error.
 //
 // This design improves user experience by preventing confusing error
-// propagation from deeper layers (such as FVM or Cadence) and ensures that
-// missing register values are handled gracefully by returning nil instead
-// of an error.
+// propagation from deeper layers (such as FVM or Cadence).
 type RegisterSnapshotReader struct {
 	storage.RegisterIndexReader
 }
