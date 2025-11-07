@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/access/ingestion2/collections"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -213,19 +212,9 @@ func (s *Suite) initEngineAndSyncer(ctx irrecoverable.SignalerContext) (*Engine,
 	// This test needs to be refactored to use the new JobProcessor-based architecture.
 	// For now, we skip creating the new Syncer since FinalizedBlockProcessor still uses the old collections.Syncer
 	// and the test architecture needs to be updated to match the new design.
-	
-	// Create a placeholder syncer for the Engine (new collections.Syncer)
-	// Note: This won't work properly until the test is fully refactored
-	syncer, err := collections.NewSyncer(
-		s.log,
-		nil, // jobProcessor - needs to be created with proper dependencies
-		processedHeightInitializer,
-		s.proto.state,
-		s.blocks,
-		10, // maxProcessing
-		0,  // maxSearchAhead
-	)
-	require.NoError(s.T(), err)
+	// The syncer will be created using collections.CreateSyncer in the actual node builder.
+	// For testing, we'll use nil for now until the test is fully refactored.
+	var syncer Syncer = nil
 
 	// TODO: FinalizedBlockProcessor still uses old collections.Syncer
 	// This needs to be updated to work with the new architecture
