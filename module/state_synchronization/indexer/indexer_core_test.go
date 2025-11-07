@@ -503,14 +503,14 @@ func TestCollectScheduledTransactions(t *testing.T) {
 	pendingExecutionEvents := systemChunk.Events
 
 	t.Run("happy path - with scheduled transactions", func(t *testing.T) {
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, systemResults, pendingExecutionEvents)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, pendingExecutionEvents)
 		require.NoError(t, err)
 		require.Equal(t, tf.ExpectedScheduledTransactions, actual)
 	})
 
 	t.Run("happy path - no scheduled transactions", func(t *testing.T) {
 		defaultSystemResults := append([]flow.LightTransactionResult{systemResults[0]}, systemResults[len(systemResults)-1])
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, defaultSystemResults, nil)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, defaultSystemResults, nil)
 		require.NoError(t, err)
 		require.Empty(t, actual)
 	})
@@ -525,20 +525,20 @@ func TestCollectScheduledTransactions(t *testing.T) {
 		events, err := rpcconvert.CcfEventsToJsonEvents(pendingExecutionEvents)
 		require.NoError(t, err)
 
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, systemResults, events)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, events)
 		require.ErrorContains(t, err, "could not get callback details from event")
 		require.Nil(t, actual)
 	})
 
 	t.Run("no scheduled transactions and incorrect number of results", func(t *testing.T) {
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, systemResults, []flow.Event{})
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, []flow.Event{})
 		require.ErrorContains(t, err, "system chunk contained 7 results, and 0 scheduled transactions")
 		require.Nil(t, actual)
 	})
 
 	t.Run("incorrect number of results", func(t *testing.T) {
 		invalidSystemResults := append(systemResults, g.LightTransactionResults().Fixture())
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, invalidSystemResults, pendingExecutionEvents)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, invalidSystemResults, pendingExecutionEvents)
 		require.ErrorContains(t, err, "system chunk contained 8 results, but found 5 scheduled callbacks")
 		require.Nil(t, actual)
 	})
@@ -547,7 +547,7 @@ func TestCollectScheduledTransactions(t *testing.T) {
 		invalidSystemResults := make([]flow.LightTransactionResult, len(systemResults))
 		copy(invalidSystemResults, systemResults)
 		invalidSystemResults[0], invalidSystemResults[1] = invalidSystemResults[1], invalidSystemResults[0]
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, invalidSystemResults, pendingExecutionEvents)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, invalidSystemResults, pendingExecutionEvents)
 		require.ErrorContains(t, err, "system chunk result at index 0 does not match expected.")
 		require.Nil(t, actual)
 	})
