@@ -124,18 +124,11 @@ func CreateSyncer(
 			return
 		}
 
-		// Forward collection to MCQ
-		receivedCols, height, complete := mcq.OnReceivedCollection(collection)
-		if complete {
-			// Block became complete, index it
-			err := indexer.OnReceivedCollectionsForBlock(height, receivedCols)
-			if err != nil {
-				log.Error().Err(err).Uint64("height", height).Msg("failed to index collections for block")
-				return
-			}
-
-			// Notify MCQ that the block has been indexed (this invokes the callback)
-			mcq.OnIndexedForBlock(height)
+		// Forward collection to JobProcessor, which handles MCQ, indexing, and completion
+		err := jobProcessor.OnReceiveCollection(collection)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to process received collection")
+			return
 		}
 	})
 
@@ -155,4 +148,3 @@ func CreateSyncer(
 
 	return syncer, nil
 }
-

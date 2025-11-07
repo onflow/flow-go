@@ -129,32 +129,53 @@ func (jp *JobProcessor) ProcessJob(
 	return nil
 }
 
+// OnReceiveCollection is called when a collection is received from the requester.
+// It passes the collection to MCQ, and if it completes a block, indexes it and marks it as done.
+//
+// No error returns are expected during normal operation.
+func (jp *JobProcessor) OnReceiveCollection(collection *flow.Collection) error {
+	// Pass collection to MCQ
+	collections, height, complete := jp.mcq.OnReceivedCollection(collection)
+	if !complete {
+		// Block is not complete yet, nothing more to do
+		return nil
+	}
+
+	// Block became complete, index it
+	err := jp.indexer.OnReceivedCollectionsForBlock(height, collections)
+	if err != nil {
+		return fmt.Errorf("failed to index collections for block height %d: %w", height, err)
+	}
+
+	// Mark the block as indexed (this invokes the callback)
+	jp.mcq.OnIndexedForBlock(height)
+
+	return nil
+}
+
 // OnReceivedCollectionsForBlock is called by the execution data indexer when collections are received.
 // It forwards collections to MCQ and handles block completion.
 //
 // The blockHeight parameter is provided by EDI to indicate which block these collections belong to.
-// Collections are forwarded individually to MCQ, which tracks completion per block.
 //
 // No error returns are expected during normal operation.
 func (jp *JobProcessor) OnReceivedCollectionsForBlock(
 	blockHeight uint64,
 	collections []*flow.Collection,
 ) error {
-	// Forward each collection to MCQ
-	// MCQ will track which block each collection belongs to and detect when a block becomes complete
-	for _, collection := range collections {
-		receivedCols, height, complete := jp.mcq.OnReceivedCollection(collection)
-		if complete {
-			// Block became complete, index it
-			err := jp.indexer.OnReceivedCollectionsForBlock(height, receivedCols)
-			if err != nil {
-				return fmt.Errorf("failed to index collections for block height %d: %w", height, err)
-			}
-
-			// Notify MCQ that the block has been indexed (this invokes the callback)
-			jp.mcq.OnIndexedForBlock(height)
-		}
+	// Mark the block as indexed (this invokes the callback if the height exists)
+	queued := jp.mcq.IsHeightQueued(blockHeight)
+	if !queued {
+		// If the height is not queued, nothing to do
+		return nil
 	}
+
+	err := jp.indexer.OnReceivedCollectionsForBlock(blockHeight, collections)
+	if err != nil {
+		return fmt.Errorf("failed to index collections for block height %d: %w", blockHeight, err)
+	}
+
+	jp.mcq.OnIndexedForBlock(blockHeight)
 
 	return nil
 }

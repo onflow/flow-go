@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/engine/access/ingestion/collections"
+	"github.com/onflow/flow-go/engine/access/ingestion2"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -31,7 +31,7 @@ type IndexerCore struct {
 	fvmEnv                   templates.Environment
 	metrics                  module.ExecutionStateIndexerMetrics
 	collectionExecutedMetric module.CollectionExecutedMetric
-	collectionIndexer        collections.CollectionIndexer
+	collectionIndexer        ingestion2.JobProcessor
 
 	registers             storage.RegisterIndex
 	headers               storage.Headers
@@ -63,7 +63,7 @@ func New(
 	scheduledTransactions storage.ScheduledTransactions,
 	chainID flow.ChainID,
 	derivedChainData *derived.DerivedChainData,
-	collectionIndexer collections.CollectionIndexer,
+	collectionIndexer ingestion2.JobProcessor,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
 ) *IndexerCore {
@@ -231,7 +231,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		// index all standard (non-system) collections
 		standardCollections := data.StandardCollections()
 		if len(standardCollections) > 0 {
-			err := c.collectionIndexer.IndexCollections(standardCollections)
+			err := c.collectionIndexer.OnReceivedCollectionsForBlock(header.Height, standardCollections)
 			if err != nil {
 				return fmt.Errorf("could not index collections: %w", err)
 			}

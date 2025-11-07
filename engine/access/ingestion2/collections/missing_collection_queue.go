@@ -63,8 +63,6 @@ func NewMissingCollectionQueue() *MissingCollectionQueue {
 // Only collections that are actually missing should be passed in collectionIDs.
 //
 // If the same block height is enqueued multiple times, the previous callback is replaced.
-//
-// No error returns are expected during normal operation.
 func (mcq *MissingCollectionQueue) EnqueueMissingCollections(
 	blockHeight uint64,
 	collectionIDs []flow.Identifier,
@@ -112,8 +110,6 @@ func (mcq *MissingCollectionQueue) EnqueueMissingCollections(
 // Returns:
 //   - (collections, height, true) if the block height became complete
 //   - (nil, 0, false) if no block height became complete
-//
-// No error returns are expected during normal operation.
 func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	collection *flow.Collection,
 ) ([]*flow.Collection, uint64, bool) {
@@ -131,16 +127,15 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 
 	jobState, exists := mcq.blockJobs[height]
 	if !exists {
-		// Job was already completed/removed, clean up the mapping.
-		delete(mcq.collectionToHeight, collectionID)
+		// Job was already completed/removed.
+		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
 		return nil, 0, false
 	}
 
 	// Check if this collection was still missing for this block.
 	if _, wasMissing := jobState.missingCollections[collectionID]; !wasMissing {
 		// Collection was already received or wasn't part of this block's missing set.
-		// Clean up the mapping since we've already processed this collection.
-		delete(mcq.collectionToHeight, collectionID)
+		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
 		return nil, 0, false
 	}
 
@@ -149,8 +144,7 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	// Store the collection so it can be returned when the block is complete.
 	jobState.receivedCollections[collectionID] = collection
 
-	// Remove this collection from the collection-to-height mapping since we've processed it.
-	delete(mcq.collectionToHeight, collectionID)
+	// Don't delete from collectionToHeight - the mapping is kept until OnIndexedForBlock cleans it up.
 
 	// Check if the block is now complete (all collections received).
 	if len(jobState.missingCollections) == 0 {
@@ -165,18 +159,28 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	return nil, 0, false
 }
 
+// IsHeightQueued returns true if the given height has queued collections
+// Returns false if the height is not tracked
+func (mcq *MissingCollectionQueue) IsHeightQueued(height uint64) bool {
+	mcq.mu.RLock()
+	defer mcq.mu.RUnlock()
+
+	_, exists := mcq.blockJobs[height]
+	return exists
+}
+
 // OnIndexedForBlock notifies the queue that a block height has been indexed.
 // This invokes the callback for that block height and removes it from tracking.
 //
-// No error returns are expected during normal operation.
-func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) {
+// Returns true if the height existed and was processed, false if the height was not tracked.
+func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) bool {
 	mcq.mu.Lock()
 
 	jobState, exists := mcq.blockJobs[blockHeight]
 	if !exists {
 		// Block was not tracked or already completed (callback already called and job removed).
 		mcq.mu.Unlock()
-		return
+		return false
 	}
 
 	// Get the callback before removing the job.
@@ -204,4 +208,5 @@ func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) {
 	mcq.mu.Unlock()
 	callback()
 	// Note: We manually unlocked above, so we don't use defer here to avoid double-unlock.
+	return true
 }

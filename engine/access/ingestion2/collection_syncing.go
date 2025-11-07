@@ -10,12 +10,15 @@ import (
 // Tracks missing collections per height and invokes job callbacks when complete.
 type MissingCollectionQueue interface {
 	EnqueueMissingCollections(blockHeight uint64, ids []flow.Identifier, callback func()) error
-	OnIndexedForBlock(blockHeight uint64) // mark done (post‑indexing)
+	OnIndexedForBlock(blockHeight uint64) bool // mark done (post‑indexing), returns true if height existed
 
 	// On receipt of a collection, MCQ updates internal state and, if a block
 	// just became complete, returns: (collections, height, true).
 	// Otherwise, returns (nil, 0, false).
 	OnReceivedCollection(collection *flow.Collection) ([]*flow.Collection, uint64, bool)
+
+	// IsHeightQueued returns true if the given height is still being tracked (has not been indexed yet).
+	IsHeightQueued(height uint64) bool
 }
 
 // Requests collections by their IDs.
@@ -32,6 +35,7 @@ type BlockCollectionIndexer interface {
 // Implements the job lifecycle for a single block height.
 type JobProcessor interface {
 	ProcessJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) error
+	OnReceiveCollection(collection *flow.Collection) error
 	OnReceivedCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error // called by EDI or requester
 }
 
