@@ -1027,12 +1027,12 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	// Mock GetEventsForBlockIDs for system collection construction
 	suite.execClient.
 		On("GetEventsForBlockIDs", mock.Anything, mock.Anything).
 		Return(&execproto.GetEventsForBlockIDsResponse{
 			Results: []*execproto.GetEventsForBlockIDsResponse_Result{},
-		}, nil)
+		}, nil).
+		Maybe()
 
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
