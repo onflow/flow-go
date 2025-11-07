@@ -17,9 +17,7 @@ import (
 // the indexed range return a clear storage.ErrHeightNotIndexed error.
 //
 // This design improves user experience by preventing confusing error
-// propagation from deeper layers (such as FVM or Cadence) and ensures that
-// missing register values are handled gracefully by returning nil instead
-// of an error.
+// propagation from deeper layers (such as FVM or Cadence).
 type RegisterSnapshotReader struct {
 	storage.RegisterIndexReader
 }
@@ -37,7 +35,6 @@ func NewRegisterSnapshotReader(registers storage.RegisterIndexReader) *RegisterS
 // StorageSnapshot returns a snapshot of register values at the given block height.
 //
 // Expected error returns during normal operation:
-//   - [storage.ErrNotFound] - if block or registerSnapshot value at height was not found.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
 func (r *RegisterSnapshotReader) StorageSnapshot(height uint64) (snapshot.StorageSnapshot, error) {
 	if height < r.RegisterIndexReader.FirstHeight() {

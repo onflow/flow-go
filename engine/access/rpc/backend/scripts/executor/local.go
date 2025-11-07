@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/version"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -51,15 +52,14 @@ func NewLocalScriptExecutor(
 // Execute executes the provided script at the requested block.
 //
 // Expected error returns during normal operation:
-//   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [DataNotFoundError] - if block or registerSnapshot value at height was not found or snapshot at executionResultID was not found.
-//   - [OutOfRangeError] - if the requested height is outside the available range, if the block height is not compatible with the node version,
-//     if the requested height is outside the range of indexed blocks.
-//   - [PreconditionFailedError] - if the registers storage is still bootstrapping.
-//   - [ScriptExecutionCanceledError] - if the script execution was canceled.
-//   - [ScriptExecutionTimedOutError] - if the script execution timed out.
-//   - [InternalError] - for internal failures or index conversion errors.
+//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	execStartTime := time.Now()
@@ -67,16 +67,16 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 	executionResultID := executionResultInfo.ExecutionResultID
 	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		err = RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		err = fmt.Errorf("could not find snapshot for execution result %s: %w", executionResultInfo.ExecutionResultID, err)
-		return nil, nil, NewDataNotFoundError("execution state snapshot", err)
+		return nil, nil, access.NewDataNotFoundError("execution state snapshot", err)
 	}
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		err = RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
 		err = fmt.Errorf("failed to get registers storage from snapshot: %w", err)
-		return nil, nil, NewPreconditionFailedError(err)
+		return nil, nil, access.NewPreconditionFailedError(err)
 	}
 
 	log := l.log.With().
@@ -100,7 +100,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 		convertedErr := convertScriptExecutionError(err)
 
 		switch {
-		case IsInvalidArgumentError(convertedErr), IsScriptExecutionCanceledError(convertedErr), IsScriptExecutionTimedOutError(convertedErr):
+		case access.IsInvalidRequestError(convertedErr), access.IsRequestCanceledError(convertedErr), access.IsRequestTimedOutError(convertedErr):
 			l.scriptLogger.LogFailedScript(r, "localhost")
 
 		default:
@@ -125,27 +125,26 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 // convertScriptExecutionError converts errors to the script execution errors.
 //
 // Expected error returns during normal operation:
-//   - [InvalidArgumentError] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [DataNotFoundError] - if block or registerSnapshot value at height was not found or snapshot at executionResultID was not found.
-//   - [OutOfRangeError] - if the requested height is outside the available range, if the block height is not compatible with the node version,
-//     if the requested height is outside the range of indexed blocks.
-//   - [ScriptExecutionCanceledError] - if the script execution was canceled.
-//   - [ScriptExecutionTimedOutError] - if the script execution timed out.
-//   - [InternalError] - for internal failures or index conversion errors.
+//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data for the requested height was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func convertScriptExecutionError(err error) error {
 	switch {
 	case errors.Is(err, version.ErrOutOfRange),
 		errors.Is(err, storage.ErrHeightNotIndexed),
 		errors.Is(err, execution.ErrIncompatibleNodeVersion):
-		return NewOutOfRangeError(err)
+		return access.NewOutOfRangeError(err)
 	case errors.Is(err, storage.ErrNotFound):
-		return NewDataNotFoundError("scriptExecutor", err)
+		return access.NewDataNotFoundError("header", err)
 	}
 
 	var failure fvmerrors.CodedFailure
 	if fvmerrors.As(err, &failure) {
-		return NewInternalError(err)
+		return access.NewInternalError(err)
 	}
 
 	// general FVM/ledger errors
@@ -153,20 +152,20 @@ func convertScriptExecutionError(err error) error {
 	if fvmerrors.As(err, &coded) {
 		switch coded.Code() {
 		case fvmerrors.ErrCodeScriptExecutionCancelledError:
-			return NewScriptExecutionCanceledError(err)
+			return access.NewRequestCanceledError(err)
 		case fvmerrors.ErrCodeScriptExecutionTimedOutError:
-			return NewScriptExecutionTimedOutError(err)
+			return access.NewRequestTimedOutError(err)
 		case fvmerrors.ErrCodeComputationLimitExceededError:
 			err = fmt.Errorf("script execution computation limit exceeded: %w", err)
-			return NewResourceExhausted(err)
+			return access.NewResourceExhausted(err)
 		case fvmerrors.ErrCodeMemoryLimitExceededError:
 			err = fmt.Errorf("script execution memory limit exceeded: %w", err)
-			return NewResourceExhausted(err)
+			return access.NewResourceExhausted(err)
 		default:
 			// runtime errors
-			return NewInvalidArgumentError(err)
+			return access.NewInvalidRequestError(err)
 		}
 	}
 
-	return NewInternalError(err)
+	return access.NewInternalError(err)
 }

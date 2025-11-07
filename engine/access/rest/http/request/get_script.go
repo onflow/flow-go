@@ -24,7 +24,7 @@ type GetScript struct {
 // builds a GetScript instance, and validates it.
 //
 // No errors are expected during normal operation.
-func NewGetScript(r *common.Request) (GetScript, error) {
+func NewGetScript(r *common.Request) (*GetScript, error) {
 	return parseGetScripts(
 		r.GetQueryParam(blockHeightQuery),
 		r.GetQueryParam(blockIDQuery),
@@ -41,6 +41,8 @@ func NewGetScript(r *common.Request) (GetScript, error) {
 // It ensures that only one of block height or block ID is provided, defaults
 // to the latest sealed block when neither is specified, and validates all
 // script and execution state parameters.
+//
+// No errors are expected during normal operation.
 func parseGetScripts(
 	rawHeight string,
 	rawID string,
@@ -48,24 +50,24 @@ func parseGetScripts(
 	rawAgreeingExecutorsIds []string,
 	rawIncludeExecutorMetadata string,
 	rawScript io.Reader,
-) (GetScript, error) {
+) (*GetScript, error) {
 	var height Height
 	err := height.Parse(rawHeight)
 	if err != nil {
-		return GetScript{}, err
+		return nil, err
 	}
 	blockHeight := height.Flow()
 
 	id, err := parser.NewID(rawID)
 	if err != nil {
-		return GetScript{}, err
+		return nil, err
 	}
 	blockID := id.Flow()
 
 	var script Script
 	err = script.Parse(rawScript)
 	if err != nil {
-		return GetScript{}, err
+		return nil, err
 	}
 
 	// default to last sealed block
@@ -74,7 +76,7 @@ func parseGetScripts(
 	}
 
 	if blockID != flow.ZeroID && blockHeight != EmptyHeight {
-		return GetScript{}, fmt.Errorf("can not provide both block ID and block height")
+		return nil, fmt.Errorf("can not provide both block ID and block height")
 	}
 
 	executionStateQuery, err := parser.NewExecutionStateQuery(
@@ -83,10 +85,10 @@ func parseGetScripts(
 		rawIncludeExecutorMetadata,
 	)
 	if err != nil {
-		return GetScript{}, err
+		return nil, err
 	}
 
-	return GetScript{
+	return &GetScript{
 		BlockHeight:    blockHeight,
 		BlockID:        blockID,
 		Script:         script,
