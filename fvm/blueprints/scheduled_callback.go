@@ -1,6 +1,7 @@
 package blueprints
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -15,6 +16,9 @@ import (
 )
 
 const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
+
+//go:embed scripts/issueScheduledTransactionExecutorTemplate.cdc
+var issueScheduledTransactionExecutorTemplate string
 
 // SystemCollection returns the re-created system collection after it has been already executed
 // using the events from the process callback transaction.
@@ -98,10 +102,10 @@ func executeCallbackTransaction(
 	id []byte,
 	effort uint64,
 ) (*flow.TransactionBody, error) {
-	script := templates.GenerateExecuteTransactionScript(env)
+	script := templates.GenerateSchedulerExecutorTransactionScript(env)
 
 	return flow.NewTransactionBodyBuilder().
-		AddAuthorizer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
 		SetScript(script).
 		AddArgument(id).
 		SetComputeLimit(effort).
@@ -188,4 +192,18 @@ func PendingExecutionEventType(env templates.Environment) flow.EventType {
 
 	scheduledContractAddress := env.FlowTransactionSchedulerAddress
 	return flow.EventType(fmt.Sprintf(processedEventTypeTemplate, scheduledContractAddress))
+}
+
+// IssueScheduledTransactionExecutorTransaction creates a transaction that issues the
+// executeScheduledTransactionsCapability to an account will be used for authorizing
+// the execution of scheduled transactions.
+func IssueScheduledTransactionExecutorTransaction(chain flow.Chain, address flow.Address) (*flow.TransactionBody, error) {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	script := templates.ReplaceAddresses(issueScheduledTransactionExecutorTemplate, sc.AsTemplateEnv())
+
+	return flow.NewTransactionBodyBuilder().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(address).
+		SetScript([]byte(script)).
+		SetComputeLimit(callbackTransactionGasLimit).Build()
 }

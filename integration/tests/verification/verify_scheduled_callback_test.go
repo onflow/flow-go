@@ -57,7 +57,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	}, 30*time.Second, 1000*time.Millisecond)
 
 	// make sure callback executed event was emitted
-	eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.Executed", sc.FlowCallbackScheduler.Address)
+	eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.Executed", sc.FlowTransactionScheduler.Address)
 	events, err := s.AccessClient().GetEventsForHeightRange(context.Background(), eventTypeString, blockA.HeaderBody.Height, sealedBlock.Height)
 	require.NoError(s.T(), err)
 
