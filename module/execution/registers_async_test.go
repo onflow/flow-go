@@ -36,6 +36,7 @@ func TestInitialize(t *testing.T) {
 		registers.On("LatestHeight").Return(latestHeight)
 
 		require.NoError(t, registersAsync.Initialize(registers))
+		registersAsync.
 		val1, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, firstHeight)
 		require.NoError(t, err)
 		require.Equal(t, val1[0], registerValue1)

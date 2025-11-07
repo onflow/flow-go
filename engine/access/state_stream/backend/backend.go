@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -24,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog"
 )
 
 // Config defines the configurable options for the ingress server.
@@ -188,72 +186,73 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected errors:
+// - [access.DataNotFoundError]: when data required to process the request is not available.
 func (b *StateStreamBackend) GetRegisterValues(
+	ctx context.Context,
 	ids flow.RegisterIDs,
 	height uint64,
 	criteria optimistic_sync.Criteria,
 ) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error) {
 	if len(ids) > b.registerRequestLimit {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
+		return nil, nil, access.NewPreconditionFailedError(
+			fmt.Errorf("number of register IDs exceeds limit of %d", b.registerRequestLimit))
 	}
 
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "no finalized block is known at the given height %d", height)
-		}
-		return nil, nil, err
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to find header by height %d: %w", height, err)
+		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) || common.IsInsufficientExecutionReceipts(err) {
-			return nil, nil, status.Errorf(codes.NotFound, "failed to get execution result info for block")
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
 		}
-		return nil, nil, err
 	}
 
 	executionResultID := execResultInfo.ExecutionResultID
 	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
-		}
-		return nil, nil, err
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
+		return nil, nil, access.NewDataNotFoundError("snapshot", err)
 	}
 
 	values := make([]flow.RegisterValue, len(ids))
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		if errors.Is(err, indexer.ErrIndexNotInitialized) {
-			return nil, nil, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
-		}
-
-		return nil, nil, err
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get registers from the storage: %w", err)
+		return nil, nil, access.NewPreconditionFailedError(err)
 	}
 
 	registersStorageSnapshot, err := registers.StorageSnapshot(height)
 	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) {
-			return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
-		}
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
-		}
-		return nil, nil, err
+		err = access.RequireErrorIs(ctx, err, storage.ErrHeightNotIndexed)
+		err = fmt.Errorf("failed to get registers snapshot from the snapshot reader: %w", err)
+		return nil, nil, access.NewOutOfRangeError(err)
 	}
 
 	for i, regID := range ids {
 		val, err := registersStorageSnapshot.Get(regID)
 		if err != nil {
-			if errors.Is(err, storage.ErrHeightNotIndexed) {
-				return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
-			}
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
-			}
-			return nil, nil, err
+			err = fmt.Errorf("failed to get the register (%s): %w", regID, err)
+			return nil, nil, access.NewOutOfRangeError(err)
 		}
 		values[i] = val
 	}
