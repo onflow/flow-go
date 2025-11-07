@@ -85,6 +85,27 @@ func Run(executor ProcedureExecutor) error {
 	return executor.Execute()
 }
 
+// RunWithLogger runs an executor with logging support
+func RunWithLogger(executor ProcedureExecutor, logger zerolog.Logger) error {
+	defer executor.Cleanup()
+	
+	logger.Info().Msg("executor.Run: starting Preprocess")
+	err := executor.Preprocess()
+	logger.Info().
+		Err(err).
+		Msg("executor.Run: Preprocess completed")
+	if err != nil {
+		return err
+	}
+	
+	logger.Info().Msg("executor.Run: starting Execute")
+	err = executor.Execute()
+	logger.Info().
+		Err(err).
+		Msg("executor.Run: Execute completed")
+	return err
+}
+
 // A Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	NewExecutor(
@@ -205,7 +226,7 @@ func (vm *VirtualMachine) Run(
 
 	logger.Info().Msg("vm.Run: created executor, calling executor.Run (Preprocess + Execute)")
 
-	err = Run(executor)
+	err = RunWithLogger(executor, logger)
 
 	logger.Info().
 		Err(err).
