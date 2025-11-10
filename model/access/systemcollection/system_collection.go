@@ -14,12 +14,11 @@ const (
 
 var ChainHeightVersions = map[flow.ChainID]access.HeightVersionMapper{
 	flow.Mainnet: access.NewStaticHeightVersionMapper(map[uint64]access.Version{
-		0:   Version0,
-		200: Version1, // TODO: set the height when we know it
+		0: access.VersionLatest, // TODO: set version 0 and 1 when it is determined.
 	}),
 	flow.Testnet: access.NewStaticHeightVersionMapper(map[uint64]access.Version{
-		0:   Version0,
-		200: Version1, // TODO: set the height when we know it
+		0:         Version0,
+		288677777: Version1, // TODO: set the height when we know it
 	}),
 	flow.Sandboxnet:        access.NewStaticHeightVersionMapper(access.LatestBoundary),
 	flow.Previewnet:        access.NewStaticHeightVersionMapper(access.LatestBoundary),
