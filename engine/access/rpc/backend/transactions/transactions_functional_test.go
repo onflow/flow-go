@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"slices"
 	"testing"
@@ -329,6 +330,30 @@ func eventsForTransaction(events flow.EventsList, txID flow.Identifier) flow.Eve
 	return filtered
 }
 
+func scheduledTransactionFromEvents(
+	chainID flow.ChainID,
+	blockHeight uint64,
+	events flow.EventsList,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	systemCollection, err := systemcollection.Default(chainID).
+		ByHeight(blockHeight).
+		SystemCollection(chainID.Chain(), access.StaticEventProvider(events))
+	if err != nil {
+		return nil, err
+	}
+
+	var expectedTransaction *flow.TransactionBody
+	ok := slices.ContainsFunc(systemCollection.Transactions, func(tx *flow.TransactionBody) bool {
+		expectedTransaction = tx
+		return tx.ID() == txID
+	})
+	if !ok {
+		return nil, fmt.Errorf("scheduled transaction not found in system collection")
+	}
+	return expectedTransaction, nil
+}
+
 func (s *TransactionsFunctionalSuite) expectedResultForIndex(index int, encodingVersion entities.EventEncodingVersion) *accessmodel.TransactionResult {
 	block := s.tf.Block
 	blockID := s.tf.Block.ID()
@@ -523,11 +548,6 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
 
-	systemCollection, err := s.systemCollection.
-		ByHeight(block.Height).
-		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
-	s.Require().NoError(err)
-
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
@@ -545,12 +565,8 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 	s.Require().NoError(err)
 
 	for txID, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
-		var expectedTransaction *flow.TransactionBody
-		ok := slices.ContainsFunc(systemCollection.Transactions, func(tx *flow.TransactionBody) bool {
-			expectedTransaction = tx
-			return tx.ID() == txID
-		})
-		s.Require().True(ok)
+		expectedTransaction, err := scheduledTransactionFromEvents(s.g.ChainID(), block.Height, s.tf.ExpectedEvents, txID)
+		s.Require().NoError(err)
 
 		results, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
 		s.Require().NoError(err)
@@ -752,8 +768,8 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 	s.Require().NoError(err)
 
 	for txID, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
-		expectedTransaction, ok := s.systemCollection.SearchAll(txID)
-		s.Require().True(ok)
+		expectedTransaction, err := scheduledTransactionFromEvents(s.g.ChainID(), block.Height, s.tf.ExpectedEvents, txID)
+		s.Require().NoError(err)
 
 		results, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
 		s.Require().NoError(err)
