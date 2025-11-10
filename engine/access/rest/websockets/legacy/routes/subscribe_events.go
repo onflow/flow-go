@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
 // SubscribeEvents create websocket connection and write to it requested events.
@@ -15,7 +15,7 @@ func SubscribeEvents(
 	ctx context.Context,
 	r *common.Request,
 	wsController *legacy.WebsocketController,
-) (subscription_old.Subscription, error) {
+) (subscription.Subscription[*state_stream.EventsResponse], error) {
 	req, err := request.SubscribeEventsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -37,5 +37,5 @@ func SubscribeEvents(
 		wsController.HeartbeatInterval = req.HeartbeatInterval
 	}
 
- return legacy.AdaptSubscription(wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter)), nil
+	return wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
 }

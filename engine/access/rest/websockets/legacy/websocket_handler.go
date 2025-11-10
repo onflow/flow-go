@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -102,7 +102,7 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 // It listens to the subscription's channel for events and writes them to the WebSocket connection.
 // If an error occurs or the subscription channel is closed, it handles the error or termination accordingly.
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
-func (wsController *WebsocketController) writeEvents(sub subscription_old.Subscription) {
+func (wsController *WebsocketController) writeEvents(sub subscription.Subscription[*state_stream.EventsResponse]) {
 	ticker := time.NewTicker(websockets.PingPeriod)
 	defer ticker.Stop()
 
@@ -118,7 +118,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription_old.Subscr
 				wsController.wsErrorHandler(err)
 			}
 			return
-		case event, ok := <-sub.Channel():
+		case resp, ok := <-sub.Channel():
 			if !ok {
 				if sub.Err() != nil {
 					err := fmt.Errorf("stream encountered an error: %v", sub.Err())
@@ -135,12 +135,6 @@ func (wsController *WebsocketController) writeEvents(sub subscription_old.Subscr
 				return
 			}
 
-			resp, ok := event.(*state_stream.EventsResponse)
-			if !ok {
-				err = fmt.Errorf("unexpected response type: %s", event)
-				wsController.wsErrorHandler(err)
-				return
-			}
 			// responses with empty events increase heartbeat interval counter, when threshold is met a heartbeat
 			// message will be emitted.
 			if len(resp.Events) == 0 {
@@ -177,7 +171,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription_old.Subscr
 			}
 
 			// Write the response to the WebSocket connection
-			err = wsController.conn.WriteJSON(event)
+			err = wsController.conn.WriteJSON(resp)
 			if err != nil {
 				wsController.wsErrorHandler(err)
 				return
@@ -234,7 +228,7 @@ type SubscribeHandlerFunc func(
 	ctx context.Context,
 	request *common.Request,
 	wsController *WebsocketController,
-) (subscription_old.Subscription, error)
+) (subscription.Subscription[*state_stream.EventsResponse], error)
 
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.
