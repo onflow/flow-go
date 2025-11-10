@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
@@ -522,6 +523,11 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
 
+	systemCollection, err := s.systemCollection.
+		ByHeight(block.Height).
+		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
+	s.Require().NoError(err)
+
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
@@ -539,7 +545,11 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 	s.Require().NoError(err)
 
 	for txID, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
-		expectedTransaction, ok := s.systemCollection.SearchAll(txID)
+		var expectedTransaction *flow.TransactionBody
+		ok := slices.ContainsFunc(systemCollection.Transactions, func(tx *flow.TransactionBody) bool {
+			expectedTransaction = tx
+			return tx.ID() == txID
+		})
 		s.Require().True(ok)
 
 		results, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
