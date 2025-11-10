@@ -1,4 +1,4 @@
-package block
+package blocks
 
 import (
 	"context"
@@ -12,16 +12,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// BlockBase provides shared functionality for block status determination
-type BlockBase struct {
+// BlocksBase provides shared functionality for block status determination
+type BlocksBase struct {
 	blocks  storage.Blocks
 	headers storage.Headers
 	state   protocol.State
 }
 
 // NewBlockBase creates a new BlockBase instance
-func NewBlockBase(blocks storage.Blocks, headers storage.Headers, state protocol.State) BlockBase {
-	return BlockBase{
+func NewBlockBase(blocks storage.Blocks, headers storage.Headers, state protocol.State) BlocksBase {
+	return BlocksBase{
 		blocks:  blocks,
 		headers: headers,
 		state:   state,
@@ -31,7 +31,7 @@ func NewBlockBase(blocks storage.Blocks, headers storage.Headers, state protocol
 // getBlockStatus returns the block status for a given header.
 //
 // No errors are expected during normal operations.
-func (b *BlockBase) GetBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
+func (b *BlocksBase) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
 	// check which block is finalized at the target block's height
 	// note: this index is only populated for finalized blocks
 	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(header.Height)
@@ -65,7 +65,7 @@ func (b *BlockBase) GetBlockStatus(header *flow.Header) (flow.BlockStatus, error
 // As documented in the [access.API], which we partially implement with this function
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
-func (b *BlockBase) GetLatestBlock(
+func (b *BlocksBase) GetLatestBlock(
 	ctx context.Context,
 	isSealed bool,
 ) (*flow.Block, flow.BlockStatus, error) {
@@ -117,9 +117,9 @@ func (b *BlockBase) GetLatestBlock(
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// Expected errors:
-//   - access.DataNotFoundError - No block with the given ID was found
-func (b *BlockBase) GetBlockByID(
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError]: No block with the given ID was found
+func (b *BlocksBase) GetBlockByID(
 	ctx context.Context,
 	id flow.Identifier,
 ) (*flow.Block, flow.BlockStatus, error) {
@@ -130,7 +130,7 @@ func (b *BlockBase) GetBlockByID(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", err)
 	}
 
-	status, err := b.GetBlockStatus(block.ToHeader())
+	status, err := b.getBlockStatus(block.ToHeader())
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
@@ -144,9 +144,9 @@ func (b *BlockBase) GetBlockByID(
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// Expected errors:
-//   - access.DataNotFoundError - No block with the given height was found
-func (b *BlockBase) GetBlockByHeight(
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError]: No block with the given height was found
+func (b *BlocksBase) GetBlockByHeight(
 	ctx context.Context,
 	height uint64,
 ) (*flow.Block, flow.BlockStatus, error) {
@@ -158,7 +158,7 @@ func (b *BlockBase) GetBlockByHeight(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("block", err)
 	}
 
-	status, err := b.GetBlockStatus(block.ToHeader())
+	status, err := b.getBlockStatus(block.ToHeader())
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
@@ -172,7 +172,7 @@ func (b *BlockBase) GetBlockByHeight(
 // As documented in the [access.API], which we partially implement with this function
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
-func (b *BlockBase) GetLatestBlockHeader(
+func (b *BlocksBase) GetLatestBlockHeader(
 	ctx context.Context,
 	isSealed bool,
 ) (*flow.Header, flow.BlockStatus, error) {
@@ -210,9 +210,9 @@ func (b *BlockBase) GetLatestBlockHeader(
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// Expected errors:
-//   - access.DataNotFoundError - No header with the given ID was found
-func (b *BlockBase) GetBlockHeaderByID(
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError]: No header with the given ID was found
+func (b *BlocksBase) GetBlockHeaderByID(
 	ctx context.Context,
 	id flow.Identifier,
 ) (*flow.Header, flow.BlockStatus, error) {
@@ -223,7 +223,7 @@ func (b *BlockBase) GetBlockHeaderByID(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("header", err)
 	}
 
-	status, err := b.GetBlockStatus(header)
+	status, err := b.getBlockStatus(header)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}
@@ -237,9 +237,9 @@ func (b *BlockBase) GetBlockHeaderByID(
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
-// Expected errors:
-//   - access.DataNotFoundError - No header with the given height was found
-func (b *BlockBase) GetBlockHeaderByHeight(
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.DataNotFoundError]: No header with the given height was found
+func (b *BlocksBase) GetBlockHeaderByHeight(
 	ctx context.Context,
 	height uint64,
 ) (*flow.Header, flow.BlockStatus, error) {
@@ -251,7 +251,7 @@ func (b *BlockBase) GetBlockHeaderByHeight(
 		return nil, flow.BlockStatusUnknown, access.NewDataNotFoundError("header", err)
 	}
 
-	status, err := b.GetBlockStatus(header)
+	status, err := b.getBlockStatus(header)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, access.RequireNoError(ctx, err)
 	}

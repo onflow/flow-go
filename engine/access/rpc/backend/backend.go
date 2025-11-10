@@ -15,8 +15,9 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/block"
-	blockstream "github.com/onflow/flow-go/engine/access/rpc/backend/block/stream"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/blocks"
+	blockstream "github.com/onflow/flow-go/engine/access/rpc/backend/blocks/stream"
+	collectionsbackend "github.com/onflow/flow-go/engine/access/rpc/backend/collections"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/execution_results"
@@ -55,16 +56,7 @@ const DefaultConnectionPoolSize = 250
 
 // Backend implements the Access API.
 //
-// It is composed of several sub-backends that implement part of the Access API.
-//
-// Script related calls are handled by Scripts.
-// Transaction related calls are handled by Transactions.
-// Block related calls are handled by BlockBase.
-// Block subscription calls are handled by SubscribeBlocks.
-// Event related calls are handled by Events.
-// Account related calls are handled by Accounts.
-// Execution result calls are handled by ExecutionResults.
-// Network and protocol snapshot calls are handled by Network.
+// It is composed of several sub-backends that implement parts of the Access API.
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
@@ -73,13 +65,13 @@ type Backend struct {
 	scripts.Scripts
 	transactions.Transactions
 	txstream.TransactionStream
-	block.BlockBase
+	blocks.BlocksBase
 	blockstream.SubscribeBlocks
 	execution_results.ExecutionResults
 	network.Network
+	collectionsbackend.Collections
 
 	state               protocol.State
-	collections         storage.Collections
 	staticCollectionRPC accessproto.AccessAPIClient
 
 	stateParams    protocol.Params
@@ -322,19 +314,21 @@ func New(params Params) (*Backend, error) {
 		params.SnapshotHistoryLimit,
 	)
 
+	collectionsBackend := collectionsbackend.NewCollectionsBackend(params.Collections)
+
 	b := &Backend{
 		Accounts:          *accountsBackend,
 		Events:            *eventsBackend,
 		Scripts:           *scriptsBackend,
 		Transactions:      *txBackend,
 		TransactionStream: *txStreamBackend,
-		BlockBase:         block.NewBlockBase(params.Blocks, params.Headers, params.State),
+		BlocksBase:        blocks.NewBlockBase(params.Blocks, params.Headers, params.State),
 		SubscribeBlocks:   *subscribeBlocksBackend,
 		ExecutionResults:  *executionResultsBackend,
 		Network:           *networkBackend,
+		Collections:       *collectionsBackend,
 
 		state:               params.State,
-		collections:         params.Collections,
 		staticCollectionRPC: params.CollectionRPC,
 		stateParams:         params.State.Params(),
 		versionControl:      params.VersionControl,
@@ -352,7 +346,7 @@ func New(params Params) (*Backend, error) {
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-// - access.ServiceUnavailable if the configured static collection node does not respond to ping.
+//   - [access.ServiceUnavailable]: if the configured static collection node does not respond to ping.
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
@@ -401,46 +395,4 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVers
 	}
 
 	return nodeInfo, nil
-}
-
-// GetCollectionByID returns a light collection by its ID.
-//
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-// As documented in the [access.API], which we partially implement with this function
-//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
-//
-// Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError if the collection is not found.
-func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
-	col, err := b.collections.LightByID(colID)
-	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
-		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
-	}
-
-	return col, nil
-}
-
-// GetFullCollectionByID returns a full collection by its ID.
-//
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-// As documented in the [access.API], which we partially implement with this function
-//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
-//
-// Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError if the collection is not found.
-func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
-	col, err := b.collections.ByID(colID)
-	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
-		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
-	}
-
-	return col, nil
 }

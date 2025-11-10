@@ -28,7 +28,7 @@ func NewExecutionResults(executionResults storage.ExecutionResults) *ExecutionRe
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError - No execution result with the given block ID was found
+//   - [access.DataNotFoundError]: No execution result with the given block ID was found
 func (e *ExecutionResults) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
 	result, err := e.executionResults.ByBlockID(blockID)
 	if err != nil {
@@ -47,7 +47,7 @@ func (e *ExecutionResults) GetExecutionResultForBlockID(ctx context.Context, blo
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError - No execution result with the given ID was found
+//   - [access.DataNotFoundError]: No execution result with the given ID was found
 func (e *ExecutionResults) GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error) {
 	result, err := e.executionResults.ByID(id)
 	if err != nil {
