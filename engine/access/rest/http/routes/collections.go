@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -12,9 +14,9 @@ import (
 // contains only transaction IDs, not the full transaction bodies. If the expand query parameter
 // includes "transactions", the full transaction bodies are fetched and included in the response.
 //
-// Expected errors during normal operation:
-//   - common.BadRequestError if the request parameters are invalid
-//   - access.DataNotFoundError (converted to appropriate StatusError) if the collection or transactions are not found
+// Expected error returns during normal operation:
+//   - [common.BadRequestError]: if the request parameters are invalid.
+//   - [common.NotFoundError]: if the collection or transactions are not found.
 func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetCollectionRequest(r)
 	if err != nil {
@@ -45,9 +47,7 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 	err = response.Build(collection, transactions, link, r.ExpandFields)
 	if err != nil {
 		// response.Build only returns errors from the link generator (router.URLPath)
-		// which are internal configuration errors, not accessSentinel errors from the backend
-		// the ErrorHandler's catch-all will convert this to 500 Internal Server Error.
-		return nil, err
+		return nil, common.NewRestError(http.StatusInternalServerError, "failed to build response", err)
 	}
 
 	return response, nil
