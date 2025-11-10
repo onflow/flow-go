@@ -108,14 +108,6 @@ type API interface {
 	// If invalid parameters will be supplied SubscribeEventsFromLatest will return a failed subscription.
 	SubscribeEventsFromLatest(ctx context.Context, filter EventFilter) subscription.Subscription
 	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
-	//
-	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
-	//
-	//
-	// Expected sentinel errors providing details to clients about failed requests:
-	// - [access.DataNotFoundError]: when data required to process the request is not available.
 	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64, criteria optimistic_sync.Criteria) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error)
 	// SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
 	// a specific block ID with an optional status filter.
