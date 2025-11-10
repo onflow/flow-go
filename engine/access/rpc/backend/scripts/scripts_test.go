@@ -423,6 +423,92 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	}
 }
 
+// TestExecuteScriptFromStorage_UnexpectedErrors tests that script execution methods correctly propagate
+// unexpected errors through the irrecoverable signaling context without returning results.
+func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_UnexpectedErrors() {
+	backend := s.defaultBackend(query_mode.IndexQueryModeLocalOnly)
+
+	err := fmt.Errorf("unexpected error")
+	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with unexpected error"), func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", s.block.ID(), s.criteria).
+			Return(s.executionResultInfo, nil).
+			Once()
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+		s.executionDataSnapshot.
+			On("Registers").
+			Return(s.registers, nil).
+			Once()
+		s.state.On("Sealed").Return(s.snapshot, nil).Once()
+		s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
+
+		s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
+			Return(nil, err).Once()
+
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err))
+		actual, metadata, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments, s.criteria)
+		s.Require().Error(err)
+		s.Require().Nil(actual)
+		s.Require().Nil(metadata)
+	})
+
+	s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - fails with unexpected error"), func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", s.block.ID(), s.criteria).
+			Return(s.executionResultInfo, nil).
+			Once()
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+		s.executionDataSnapshot.
+			On("Registers").
+			Return(s.registers, nil).
+			Once()
+		s.headers.On("ByBlockID", s.block.ID()).Return(s.block.ToHeader(), nil).Once()
+
+		s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
+			Return(nil, err).Once()
+
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err))
+		actual, metadata, err := backend.ExecuteScriptAtBlockID(signalerCtx, s.block.ID(), s.script, s.arguments, s.criteria)
+		s.Require().Error(err)
+		s.Require().Nil(actual)
+		s.Require().Nil(metadata)
+	})
+
+	s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - fails with unexpected error"), func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", s.block.ID(), s.criteria).
+			Return(s.executionResultInfo, nil).
+			Once()
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+		s.executionDataSnapshot.
+			On("Registers").
+			Return(s.registers, nil).
+			Once()
+		s.headers.On("ByHeight", s.block.Height).Return(s.block.ToHeader(), nil).Once()
+
+		s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
+			Return(nil, err).Once()
+
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err))
+		actual, metadata, err := backend.ExecuteScriptAtBlockHeight(signalerCtx, s.block.Height, s.script, s.arguments, s.criteria)
+		s.Require().Error(err)
+		s.Require().Nil(actual)
+		s.Require().Nil(metadata)
+	})
+}
+
 // TestExecuteScriptWithFailover_HappyPath tests that when an error is returned executing a script
 // from local storage, the backend will attempt to run it on an execution node
 func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
