@@ -231,6 +231,8 @@ func (e *Engine) processAvailableMessages(ctx context.Context) error {
 //   - engine.InvalidInputError if the transaction is invalid.
 //   - other error for any other unexpected error condition.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
+	// ANs uniquely send transactions via GRPC; when the GRPC engine passes it here, that appears as a self-origin message.
+	txIsFromAN := originID == e.me.NodeID()
 
 	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 
@@ -263,17 +265,23 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		Hex("tx_cluster", logging.ID(txClusterID)).
 		Logger()
 
+	// Access Nodes are responsible for sending transaction messages only to members of the responsible cluster.
+	// They should know who is responsible, and deliberately sending to the wrong cluster incurs unnecessary
+	// latency and cost for the network, so it is disallowed.
+	if localClusterID != txClusterID {
+		log.Warn().Msg("discarding transaction assigned to a different cluster")
+		return nil
+	}
+
 	// validate and ingest the transaction, so it is eligible for inclusion in
 	// a future collection proposed by this node
-	err = e.ingestTransaction(log, refEpoch, tx, txID, localClusterID, txClusterID)
+	err = e.ingestTransaction(log, refEpoch, tx, txID)
 	if err != nil {
 		return fmt.Errorf("could not ingest transaction: %w", err)
 	}
 
-	// if the message was submitted internally (ie. via the Access API)
-	// propagate it to members of the responsible cluster (either our cluster
-	// or a different cluster)
-	if originID == e.me.NodeID() {
+	// if the message originated from an Access Node, propagate it to other members of my cluster
+	if txIsFromAN {
 		e.propagateTransaction(log, tx, txCluster)
 	}
 
@@ -314,19 +322,18 @@ func (e *Engine) getLocalCluster(refEpoch protocol.CommittedEpoch) (flow.Identit
 	return localCluster, nil
 }
 
-// ingestTransaction validates and ingests the transaction, if it is routed to
-// our local cluster, is valid, and has not been seen previously.
+// ingestTransaction validates and ingests a transaction our cluster is responsible for.
+// If valid, the transaction is stored in the appropriate mempool.
+// The caller is responsible for ensuring this node's cluster is responsible for the transaction.
 //
-// Returns:
-// * engine.InvalidInputError if the transaction is invalid.
-// * other error for any other unexpected error condition.
+// Error returns:
+//   - engine.InvalidInputError if the transaction is invalid.
+//   - other error for any other unexpected error condition.
 func (e *Engine) ingestTransaction(
 	log zerolog.Logger,
 	refEpoch protocol.CommittedEpoch,
 	tx *flow.TransactionBody,
 	txID flow.Identifier,
-	localClusterFingerprint flow.Identifier,
-	txClusterFingerprint flow.Identifier,
 ) error {
 	// use the transaction pool for the epoch the reference block is part of
 	pool := e.pools.ForEpoch(refEpoch.Counter())
@@ -343,17 +350,15 @@ func (e *Engine) ingestTransaction(
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
 
-	// if our cluster is responsible for the transaction, add it to our local mempool
-	if localClusterFingerprint == txClusterFingerprint {
-		_ = pool.Add(tx.ID(), tx)
-		e.colMetrics.TransactionIngested(txID)
-	}
+	_ = pool.Add(tx.ID(), tx)
+	e.colMetrics.TransactionIngested(txID)
 
 	return nil
 }
 
 // propagateTransaction propagates the transaction to a number of the responsible
-// cluster's members. Any unexpected networking errors are logged.
+// cluster's members.
+// Any unexpected networking errors are logged.
 func (e *Engine) propagateTransaction(log zerolog.Logger, tx *flow.TransactionBody, txCluster flow.IdentitySkeletonList) {
 	log.Debug().Msg("propagating transaction to cluster")
 
