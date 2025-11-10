@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	storagesnapshotmock "github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
