@@ -274,7 +274,6 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 // Returns false and no error if the transaction is not a known scheduled tx.
 //
 // Expected error returns during normal operation:
-//   - [codes.NotFound]: if the transaction is not a scheduled transaction was not found in the block
 //   - [codes.Internal]: if there was an error looking up the events
 func (t *Transactions) lookupScheduledTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, bool, error) {
 	blockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
