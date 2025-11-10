@@ -173,108 +173,108 @@ func (s *BackendBlocksSuite) backendParams(broadcaster *engine.Broadcaster) Para
 	}
 }
 
-	// subscribeFromStartBlockIdTestCases generates variations of testType scenarios for subscriptions
-	// starting from a specified block ID. It is designed to test the subscription functionality when the subscription
-	// starts from a custom block ID, either sealed or finalized.
-	// Note: HeightTracker semantics skip the root block. When starting at root (or latest which equals root in tests),
-	// expectations should begin from root+1.
-	func (s *BackendBlocksSuite) subscribeFromStartBlockIdTestCases() []testType {
-		expectedFromAfterRoot := s.blocksArray // start from the block after root
-	
-		baseTests := []testType{
-			{
-				name:            "happy path - all new blocks",
-				highestBackfill: -1, // no backfill
-				startValue:      s.rootBlock.ID(),
-				expectedBlocks:  expectedFromAfterRoot,
-			},
-			{
-				name:            "happy path - partial backfill",
-				highestBackfill: 2, // backfill the first 3 blocks
-				startValue:      s.blocksArray[0].ID(),
-				expectedBlocks:  s.blocksArray,
-			},
-			{
-				name:            "happy path - complete backfill",
-				highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-				startValue:      s.blocksArray[0].ID(),
-				expectedBlocks:  s.blocksArray,
-			},
-			{
-				name:            "happy path - start from root block by id",
-				highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-				startValue:      s.rootBlock.ID(),       // start from root block
-				expectedBlocks:  expectedFromAfterRoot,
-			},
-		}
-	
-		return s.setupBlockStatusesForTestCases(baseTests)
+// subscribeFromStartBlockIdTestCases generates variations of testType scenarios for subscriptions
+// starting from a specified block ID. It is designed to test the subscription functionality when the subscription
+// starts from a custom block ID, either sealed or finalized.
+// Note: HeightTracker semantics skip the root block. When starting at root (or latest which equals root in tests),
+// expectations should begin from root+1.
+func (s *BackendBlocksSuite) subscribeFromStartBlockIdTestCases() []testType {
+	expectedFromAfterRoot := s.blocksArray // start from the block after root
+
+	baseTests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startValue:      s.rootBlock.ID(),
+			expectedBlocks:  expectedFromAfterRoot,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startValue:      s.blocksArray[0].ID(),
+			expectedBlocks:  s.blocksArray,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startValue:      s.blocksArray[0].ID(),
+			expectedBlocks:  s.blocksArray,
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startValue:      s.rootBlock.ID(),       // start from root block
+			expectedBlocks:  expectedFromAfterRoot,
+		},
 	}
-	
-	// subscribeFromStartHeightTestCases generates variations of testType scenarios for subscriptions
-	// starting from a specified block height. It is designed to test the subscription functionality when the subscription
-	// starts from a custom height, either sealed or finalized.
-	// Note: HeightTracker semantics skip the root block. When starting at root height, expectations begin from root+1.
-	func (s *BackendBlocksSuite) subscribeFromStartHeightTestCases() []testType {
-		expectedFromAfterRoot := s.blocksArray // start from the block after root
-	
-		baseTests := []testType{
-			{
-				name:            "happy path - all new blocks",
-				highestBackfill: -1, // no backfill
-				startValue:      s.rootBlock.Height,
-				expectedBlocks:  expectedFromAfterRoot,
-			},
-			{
-				name:            "happy path - partial backfill",
-				highestBackfill: 2, // backfill the first 3 blocks
-				startValue:      s.blocksArray[0].Height,
-				expectedBlocks:  s.blocksArray,
-			},
-			{
-				name:            "happy path - complete backfill",
-				highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-				startValue:      s.blocksArray[0].Height,
-				expectedBlocks:  s.blocksArray,
-			},
-			{
-				name:            "happy path - start from root block by id",
-				highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-				startValue:      s.rootBlock.Height,     // start from root block
-				expectedBlocks:  expectedFromAfterRoot,
-			},
-		}
-	
-		return s.setupBlockStatusesForTestCases(baseTests)
+
+	return s.setupBlockStatusesForTestCases(baseTests)
+}
+
+// subscribeFromStartHeightTestCases generates variations of testType scenarios for subscriptions
+// starting from a specified block height. It is designed to test the subscription functionality when the subscription
+// starts from a custom height, either sealed or finalized.
+// Note: HeightTracker semantics skip the root block. When starting at root height, expectations begin from root+1.
+func (s *BackendBlocksSuite) subscribeFromStartHeightTestCases() []testType {
+	expectedFromAfterRoot := s.blocksArray // start from the block after root
+
+	baseTests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startValue:      s.rootBlock.Height,
+			expectedBlocks:  expectedFromAfterRoot,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startValue:      s.blocksArray[0].Height,
+			expectedBlocks:  s.blocksArray,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startValue:      s.blocksArray[0].Height,
+			expectedBlocks:  s.blocksArray,
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startValue:      s.rootBlock.Height,     // start from root block
+			expectedBlocks:  expectedFromAfterRoot,
+		},
 	}
-	
-	// subscribeFromLatestTestCases generates variations of testType scenarios for subscriptions
-	// starting from the latest sealed block. It is designed to test the subscription functionality when the subscription
-	// starts from the latest available block, either sealed or finalized.
-	// Note: In these tests, latest equals root at start; expectations should begin from root+1.
-	func (s *BackendBlocksSuite) subscribeFromLatestTestCases() []testType {
-		expectedFromAfterRoot := s.blocksArray // start from the block after root
-	
-		baseTests := []testType{
-			{
-				name:            "happy path - all new blocks",
-				highestBackfill: -1, // no backfill
-				expectedBlocks:  expectedFromAfterRoot,
-			},
-			{
-				name:            "happy path - partial backfill",
-				highestBackfill: 2, // backfill the first 3 blocks
-				expectedBlocks:  expectedFromAfterRoot,
-			},
-			{
-				name:            "happy path - complete backfill",
-				highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-				expectedBlocks:  expectedFromAfterRoot,
-			},
-		}
-	
-		return s.setupBlockStatusesForTestCases(baseTests)
+
+	return s.setupBlockStatusesForTestCases(baseTests)
+}
+
+// subscribeFromLatestTestCases generates variations of testType scenarios for subscriptions
+// starting from the latest sealed block. It is designed to test the subscription functionality when the subscription
+// starts from the latest available block, either sealed or finalized.
+// Note: In these tests, latest equals root at start; expectations should begin from root+1.
+func (s *BackendBlocksSuite) subscribeFromLatestTestCases() []testType {
+	expectedFromAfterRoot := s.blocksArray // start from the block after root
+
+	baseTests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			expectedBlocks:  expectedFromAfterRoot,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			expectedBlocks:  expectedFromAfterRoot,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			expectedBlocks:  expectedFromAfterRoot,
+		},
 	}
+
+	return s.setupBlockStatusesForTestCases(baseTests)
+}
 
 // setupBlockStatusesForTestCases sets up variations for each of the base test cases.
 // The function performs the following actions:

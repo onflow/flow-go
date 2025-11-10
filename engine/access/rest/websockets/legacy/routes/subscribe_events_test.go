@@ -299,7 +299,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 	s.Run("returns error when channel closed", func() {
 		stateStreamBackend := ssmock.NewAPI(s.T())
- 	subscription := submock.NewSubscription[*state_stream.EventsResponse](s.T())
+		subscription := submock.NewSubscription[*state_stream.EventsResponse](s.T())
 
 		ch := make(chan *state_stream.EventsResponse)
 		var chReadOnly <-chan *state_stream.EventsResponse

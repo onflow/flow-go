@@ -75,7 +75,6 @@ func (s *BackendBlockDigestSuite) requireBlockDigests(actualBlock *flow.BlockDig
 	s.Require().Equal(expectedBlock.Timestamp, uint64(actualBlock.Timestamp.UnixMilli()))
 }
 
-
 // TestSubscribeBlockDigestsHandlesErrors tests error handling scenarios for the SubscribeBlockDigestsFromStartBlockID and SubscribeBlockDigestsFromStartHeight methods in the Backend.
 // It ensures that the method correctly returns errors for various invalid input cases.
 //

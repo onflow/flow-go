@@ -18,7 +18,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	subimpl "github.com/onflow/flow-go/engine/access/subscription/subscription"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -489,83 +490,83 @@ func (*api) SubscribeBlocksFromStartBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.Block] {
+	return subimpl.NewFailedSubscription[*flow.Block](ErrNotImplemented, "failed to call SubscribeBlocksFromStartBlockID")
 }
 
 func (*api) SubscribeBlocksFromStartHeight(
 	_ context.Context,
 	_ uint64,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.Block] {
+	return subimpl.NewFailedSubscription[*flow.Block](ErrNotImplemented, "failed to call SubscribeBlocksFromStartHeight")
 }
 
 func (*api) SubscribeBlocksFromLatest(
 	_ context.Context,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.Block] {
+	return subimpl.NewFailedSubscription[*flow.Block](ErrNotImplemented, "failed to call SubscribeBlocksFromLatest")
 }
 
 func (*api) SubscribeBlockHeadersFromStartBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.Header] {
+	return subimpl.NewFailedSubscription[*flow.Header](ErrNotImplemented, "failed to call SubscribeBlockHeadersFromStartBlockID")
 }
 
 func (*api) SubscribeBlockHeadersFromStartHeight(
 	_ context.Context,
 	_ uint64,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.Header] {
+	return subimpl.NewFailedSubscription[*flow.Header](ErrNotImplemented, "failed to call SubscribeBlockHeadersFromStartHeight")
 }
 
 func (*api) SubscribeBlockHeadersFromLatest(
 	_ context.Context,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.Header] {
+	return subimpl.NewFailedSubscription[*flow.Header](ErrNotImplemented, "failed to call SubscribeBlockHeadersFromLatest")
 }
 
 func (*api) SubscribeBlockDigestsFromStartBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.BlockDigest] {
+	return subimpl.NewFailedSubscription[*flow.BlockDigest](ErrNotImplemented, "failed to call SubscribeBlockDigestsFromStartBlockID")
 }
 
 func (*api) SubscribeBlockDigestsFromStartHeight(
 	_ context.Context,
 	_ uint64,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.BlockDigest] {
+	return subimpl.NewFailedSubscription[*flow.BlockDigest](ErrNotImplemented, "failed to call SubscribeBlockDigestsFromStartHeight")
 }
 
 func (*api) SubscribeBlockDigestsFromLatest(
 	_ context.Context,
 	_ flow.BlockStatus,
-) subscription_old.Subscription {
-	return nil
+) subscription.Subscription[*flow.BlockDigest] {
+	return subimpl.NewFailedSubscription[*flow.BlockDigest](ErrNotImplemented, "failed to call SubscribeBlockDigestsFromLatest")
 }
 
 func (a *api) SubscribeTransactionStatuses(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) subscription_old.Subscription {
-	return subscription_old.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
+) subscription.Subscription[[]*accessmodel.TransactionResult] {
+	return subimpl.NewFailedSubscription[[]*accessmodel.TransactionResult](ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
 }
 
 func (a *api) SendAndSubscribeTransactionStatuses(
 	_ context.Context,
 	_ *flow.TransactionBody,
 	_ entities.EventEncodingVersion,
-) subscription_old.Subscription {
-	return subscription_old.NewFailedSubscription(ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
+) subscription.Subscription[[]*accessmodel.TransactionResult] {
+	return subimpl.NewFailedSubscription[[]*accessmodel.TransactionResult](ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
 }

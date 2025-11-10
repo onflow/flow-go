@@ -10,9 +10,10 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,7 +21,8 @@ import (
 )
 
 type Handler struct {
-	subscription_old.StreamingData
+	MaxStreams  int32
+	StreamCount atomic.Int32
 
 	api   state_stream.API
 	chain flow.Chain
@@ -41,7 +43,7 @@ var _ executiondata.ExecutionDataAPIServer = (*Handler)(nil)
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		StreamingData:            subscription_old.NewStreamingData(config.MaxGlobalStreams),
+		MaxStreams:               int32(config.MaxGlobalStreams),
 		api:                      api,
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,

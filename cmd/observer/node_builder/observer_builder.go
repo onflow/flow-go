@@ -51,8 +51,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription/streamer"
+	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
-	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription_old/tracker"
 	"github.com/onflow/flow-go/engine/common/follower"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
@@ -1668,13 +1668,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.EventsIndex,
 				useIndex,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription_old.NewSubscriptionHandler(
-					builder.Logger,
-					broadcaster,
-					builder.stateStreamConf.ClientSendTimeout,
-					builder.stateStreamConf.ResponseLimit,
-					builder.stateStreamConf.ClientSendBufferSize,
-				),
 				executionDataTracker,
 				builder.executionResultInfoProvider,
 				builder.executionStateCache,
@@ -2056,32 +2049,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 
 		backendParams := backend.Params{
-			State:                node.State,
-			Blocks:               node.Storage.Blocks,
-			Headers:              node.Storage.Headers,
-			Collections:          node.Storage.Collections,
-			Transactions:         node.Storage.Transactions,
-			ExecutionReceipts:    node.Storage.Receipts,
-			ExecutionResults:     node.Storage.Results,
-			ChainID:              node.RootChainID,
-			AccessMetrics:        accessMetrics,
-			ConnFactory:          connFactory,
-			RetryEnabled:         false,
-			MaxHeightRange:       backendConfig.MaxHeightRange,
-			Log:                  node.Logger,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			BlockTracker:         blockTracker,
-			ScriptExecutionMode:  scriptExecMode,
-			EventQueryMode:       eventQueryMode,
-			TxResultQueryMode:    txResultQueryMode,
-			SubscriptionHandler: subscription_old.NewSubscriptionHandler(
-				builder.Logger,
-				broadcaster,
-				builder.stateStreamConf.ClientSendTimeout,
-				builder.stateStreamConf.ResponseLimit,
-				builder.stateStreamConf.ClientSendBufferSize,
-			),
+			State:                       node.State,
+			Blocks:                      node.Storage.Blocks,
+			Headers:                     node.Storage.Headers,
+			Collections:                 node.Storage.Collections,
+			Transactions:                node.Storage.Transactions,
+			ExecutionReceipts:           node.Storage.Receipts,
+			ExecutionResults:            node.Storage.Results,
+			ChainID:                     node.RootChainID,
+			AccessMetrics:               accessMetrics,
+			ConnFactory:                 connFactory,
+			RetryEnabled:                false,
+			MaxHeightRange:              backendConfig.MaxHeightRange,
+			Log:                         node.Logger,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			BlockTracker:                blockTracker,
+			ScriptExecutionMode:         scriptExecMode,
+			EventQueryMode:              eventQueryMode,
+			TxResultQueryMode:           txResultQueryMode,
 			IndexReporter:               indexReporter,
 			VersionControl:              builder.VersionControl,
 			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,

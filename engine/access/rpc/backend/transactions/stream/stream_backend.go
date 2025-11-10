@@ -242,26 +242,6 @@ func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.Transa
 	return height-startHeight >= TransactionExpiryForUnknownStatus
 }
 
-// checkBlockReady checks if the given block height is valid and available based on the expected block status.
-// Expected errors during normal operation:
-// - [subscription.ErrBlockNotReady]: block for the given block height is not available.
-func (t *TransactionStream) checkBlockReady(height uint64) error {
-	// Get the highest available finalized block height
-	highestHeight, err := t.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
-	if err != nil {
-		return fmt.Errorf("could not get highest height for block %d: %w", height, err)
-	}
-
-	// Fail early if no block finalized notification has been received for the given height.
-	// Note: It's possible that the block is locally finalized before the notification is
-	// received. This ensures a consistent view is available to all streams.
-	if height > highestHeight {
-		return fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
-	}
-
-	return nil
-}
-
 func (t *TransactionStream) buildReadyUpToHeight(height uint64) func() (uint64, error) {
 	return func() (uint64, error) {
 		// Get the highest available finalized block height

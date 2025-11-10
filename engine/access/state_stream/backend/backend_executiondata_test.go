@@ -21,10 +21,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/access/subscription/streamer"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
-	trackermock "github.com/onflow/flow-go/engine/access/subscription_old/tracker/mock"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -73,7 +72,7 @@ type BackendExecutionDataSuite struct {
 	execDataHeroCache        *herocache.BlockExecutionData
 	executionDataTracker     *trackermock.ExecutionDataTracker
 	backend                  *StateStreamBackend
-	executionDataTrackerReal tracker.ExecutionDataTracker
+	executionDataTrackerReal subscription.ExecutionDataTracker
 
 	executionResultProvider *osyncmock.ExecutionResultProvider
 	executionStateCache     *osyncmock.ExecutionStateCache
@@ -170,7 +169,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription_old.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 	s.executionDataTracker = trackermock.NewExecutionDataTracker(s.T())
 

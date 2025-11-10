@@ -11,10 +11,12 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -26,7 +28,9 @@ import (
 )
 
 type Handler struct {
-	subscription_old.StreamingData
+	MaxStreams  int32
+	StreamCount atomic.Int32
+
 	api                  access.API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -61,7 +65,7 @@ func NewHandler(
 	options ...HandlerOption,
 ) *Handler {
 	h := &Handler{
-		StreamingData:        subscription_old.NewStreamingData(maxStreams),
+		MaxStreams:           int32(maxStreams),
 		api:                  api,
 		chain:                chain,
 		finalizedHeaderCache: finalizedHeader,
@@ -1620,8 +1624,8 @@ func checkBlockStatus(blockStatus flow.BlockStatus) error {
 //
 // Expected errors during normal operation:
 //   - codes.Internal: If the subscription encounters an error or gets an unexpected response.
-func HandleRPCSubscription[T any](sub subscription_old.Subscription, handleResponse func(resp T) error) error {
-	err := subscription_old.HandleSubscription(sub, handleResponse)
+func HandleRPCSubscription[T any](sub subscription.Subscription[T], handleResponse func(resp T) error) error {
+	err := subscription.HandleSubscription(sub, handleResponse)
 	if err != nil {
 		return rpc.ConvertError(err, "handle subscription error", codes.Internal)
 	}

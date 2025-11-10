@@ -28,8 +28,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	"github.com/onflow/flow-go/engine/access/subscription_old/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -67,7 +68,7 @@ type SameGRPCPortTestSuite struct {
 	metrics              *metrics.NoopCollector
 	rpcEng               *rpc.Engine
 	stateStreamEng       *statestreambackend.Engine
-	executionDataTracker tracker.ExecutionDataTracker
+	executionDataTracker subscription.ExecutionDataTracker
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -92,6 +93,7 @@ type SameGRPCPortTestSuite struct {
 	broadcaster       *engine.Broadcaster
 	execDataCache     *cache.ExecutionDataCache
 	execDataHeroCache *herocache.BlockExecutionData
+	streamOptions     *streamer.StreamOptions
 
 	blockMap map[uint64]*flow.Block
 
@@ -131,8 +133,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.eds = execution_data.NewExecutionDataStore(suite.bs, execution_data.DefaultSerializer)
 
 	suite.broadcaster = engine.NewBroadcaster()
+	suite.streamOptions = streamer.NewDefaultStreamOptions()
 
-	suite.execDataHeroCache = herocache.NewBlockExecutionData(subscription_old.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
+	suite.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
 	suite.execDataCache = cache.NewExecutionDataCache(suite.eds, suite.headers, suite.seals, suite.results, suite.execDataHeroCache)
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -256,17 +259,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	).Maybe()
 
 	conf := statestreambackend.Config{
-		ClientSendTimeout:    subscription_old.DefaultSendTimeout,
-		ClientSendBufferSize: subscription_old.DefaultSendBufferSize,
+		ClientSendTimeout:    subscription.DefaultSendTimeout,
+		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 	}
-
-	subscriptionHandler := subscription_old.NewSubscriptionHandler(
-		suite.log,
-		suite.broadcaster,
-		subscription_old.DefaultSendTimeout,
-		subscription_old.DefaultResponseLimit,
-		subscription_old.DefaultSendBufferSize,
-	)
 
 	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)
 
@@ -293,10 +288,11 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		eventIndexer,
 		false,
 		state_stream.DefaultRegisterIDsRequestLimit,
-		subscriptionHandler,
 		suite.executionDataTracker,
 		suite.executionResultInfoProvider,
 		suite.executionStateCache,
+		suite.broadcaster,
+		suite.streamOptions,
 	)
 	assert.NoError(suite.T(), err)
 

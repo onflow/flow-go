@@ -504,10 +504,10 @@ func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Trans
 			},
 		)
 		require.NoError(s.T(), err)
-			s.collections.On("LightByID", colID).Return(light, nil).Maybe()
-			s.collections.On("LightByTransactionID", transaction.ID()).Return(light, nil).Maybe()
-			s.blocks.On("ByCollectionID", colID).Return(block, nil).Maybe()
-		})
+		s.collections.On("LightByID", colID).Return(light, nil).Maybe()
+		s.collections.On("LightByTransactionID", transaction.ID()).Return(light, nil).Maybe()
+		s.blocks.On("ByCollectionID", colID).Return(block, nil).Maybe()
+	})
 }
 
 // Create a special common function to read subscription messages from the channel and check converting it to transaction info

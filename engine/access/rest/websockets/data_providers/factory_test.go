@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/access/mock"
@@ -13,8 +12,7 @@ import (
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -52,17 +50,10 @@ func (s *DataProviderFactorySuite) SetupTest() {
 		s.accessApi,
 		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 		nil,
 	)
 	s.Require().NotNil(s.factory)
-}
-
-// setupSubscription creates a mock subscription instance for testing purposes.
-// It configures the return value of the specified API call to the mock subscription.
-func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
-	sub := submock.NewSubscription(s.T())
-	apiCall.Return(sub).Once()
 }
 
 // TestSupportedTopics verifies that supported topics return a valid provider and no errors.
