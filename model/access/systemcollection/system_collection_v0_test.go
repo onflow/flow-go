@@ -69,18 +69,18 @@ func (s *builderV0Suite) TestExecuteCallbacksTransactions() {
 	events := s.g.PendingExecutionEvents().List(5)
 
 	expectedIDs := []flow.Identifier{
-		flow.MustHexStringToIdentifier("5bb0f5398ac2239ca9144dd3ed154607b476f31fc700ed977de93f9d69b846c0"),
-		flow.MustHexStringToIdentifier("c8fd263ccc01b1886922d2250fd43f95ab4b50fa92391faae7d56e7c4006bcf6"),
-		flow.MustHexStringToIdentifier("dc1177b8c77c7a7f2291d0ff3f5c1633117406080f20bae363aec34698f9187d"),
-		flow.MustHexStringToIdentifier("60154fc6a81573209cec831ddca02eb46b21c9b3deac8163ae50a3246cf357c4"),
-		flow.MustHexStringToIdentifier("77137f278b48af272bfa0c1d4029f2d0d3c10abe5444ceec96a34391c6bb5b53"),
+		flow.MustHexStringToIdentifier("1205195687b7b48b57765d96e95d2f63de71f65abd04d50ce10b3f565576d287"),
+		flow.MustHexStringToIdentifier("1f8cb48ee75570537b52f6a12bc1f53cd71c1ab9afc14f0dd82f6fa9cb774c96"),
+		flow.MustHexStringToIdentifier("07a6813a5a7cb5d7c0fcfba01937148c08e61ba070ee9b4ea0d62617c7685352"),
+		flow.MustHexStringToIdentifier("1f8085602b449221727ee018bf9e2ee30423bc4db630404889ec858c8bcd8f3a"),
+		flow.MustHexStringToIdentifier("ecab0dd859325a07076a1d7af380d08771c77f3e3c707bb7d39a18b1b77fcd3d"),
 	}
 
 	txs, err := s.builder.ExecuteCallbacksTransactions(s.g.ChainID().Chain(), events)
 	s.Require().NoError(err)
 	s.Require().Len(txs, len(expectedIDs))
 	for i, tx := range txs {
-		s.Require().True(expectedIDs[i] == tx.ID(), "invalid change made in the v0 versioned system collection")
+		s.Require().True(expectedIDs[i] == tx.ID(), "invalid change made in the v0 versioned system collection, expected %s, got %s", expectedIDs[i], tx.ID())
 	}
 }
 
@@ -96,7 +96,7 @@ func (s *builderV0Suite) TestSystemCollection() {
 	s.Run("with scheduled transactions", func() {
 		events := s.g.PendingExecutionEvents().List(5)
 
-		expectedID := flow.MustHexStringToIdentifier("a6b2717447152c1944e0a067571326aef7111caa2ea989ce2245a4278b1b2950")
+		expectedID := flow.MustHexStringToIdentifier("7c490ce58ad80d4c7f4f45a6434666cdbe5d2bc3f9c27d86aa6027cfbbe2f492")
 
 		collection, err := s.builder.SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(events))
 		s.Require().NoError(err)
