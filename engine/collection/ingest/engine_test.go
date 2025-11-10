@@ -27,9 +27,10 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	mocknetwork "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/state"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -111,11 +112,11 @@ func (suite *Suite) SetupTest() {
 			snap := new(protocol.Snapshot)
 			block, ok := suite.blocks[blockID]
 			if ok {
+				snap.On("Epochs").Return(suite.epochQuery)
 				snap.On("Head").Return(block.ToHeader(), nil)
 			} else {
-				snap.On("Head").Return(nil, storage.ErrNotFound)
+				return invalid.NewSnapshot(state.ErrUnknownSnapshotReference)
 			}
-			snap.On("Epochs").Return(suite.epochQuery)
 			return snap
 		})
 

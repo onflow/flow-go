@@ -16,11 +16,13 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool/epochs"
+	epochmempool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -38,7 +40,7 @@ type Engine struct {
 	state                protocol.State
 	pendingTransactions  engine.MessageStore
 	messageHandler       *engine.MessageHandler
-	pools                *epochs.TransactionPools
+	pools                *epochmempool.TransactionPools
 	transactionValidator *validator.TransactionValidator
 
 	config Config
@@ -54,7 +56,7 @@ func New(
 	colMetrics module.CollectionMetrics,
 	me module.Local,
 	chain flow.Chain,
-	pools *epochs.TransactionPools,
+	pools *epochmempool.TransactionPools,
 	config Config,
 	limiter *AddressRateLimiter,
 ) (*Engine, error) {
@@ -242,42 +244,28 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	log.Info().Msg("transaction message received")
 
 	// get the state snapshot w.r.t. the reference block
-	refSnapshot := e.state.AtBlockID(tx.ReferenceBlockID)
-	// fail fast if this is an unknown reference
-	_, err := refSnapshot.Head()
+	refEpoch, txCluster, err := epochs.ClusterForTransaction(e.state, tx)
 	if err != nil {
-		return engine.NewUnverifiableInputError("could not get reference block for transaction (%x): %w", txID, err)
-	}
-
-	// using the transaction's reference block, determine which cluster we're in.
-	// if we don't know the reference block, we will fail when attempting to query the epoch.
-	refEpoch, err := refSnapshot.Epochs().Current()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch for reference block: %w", err)
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
+			return engine.NewUnverifiableInputError("could not get reference block for transaction (%x): %w", txID, err)
+		}
+		return fmt.Errorf("could not get reference block for transaction (%x): %w", txID, err)
 	}
 	localCluster, err := e.getLocalCluster(refEpoch)
 	if err != nil {
 		return fmt.Errorf("could not get local cluster: %w", err)
 	}
-	clusters, err := refEpoch.Clustering()
-	if err != nil {
-		return fmt.Errorf("could not get clusters for reference epoch: %w", err)
-	}
-	txCluster, ok := clusters.ByTxID(txID)
-	if !ok {
-		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
-	}
 
-	localClusterFingerPrint := localCluster.ID()
-	txClusterFingerPrint := txCluster.ID()
+	localClusterID := localCluster.ID()
+	txClusterID := txCluster.ID()
 	log = log.With().
-		Hex("local_cluster", logging.ID(localClusterFingerPrint)).
-		Hex("tx_cluster", logging.ID(txClusterFingerPrint)).
+		Hex("local_cluster", logging.ID(localClusterID)).
+		Hex("tx_cluster", logging.ID(txClusterID)).
 		Logger()
 
 	// validate and ingest the transaction, so it is eligible for inclusion in
 	// a future collection proposed by this node
-	err = e.ingestTransaction(log, refEpoch, tx, txID, localClusterFingerPrint, txClusterFingerPrint)
+	err = e.ingestTransaction(log, refEpoch, tx, txID, localClusterID, txClusterID)
 	if err != nil {
 		return fmt.Errorf("could not ingest transaction: %w", err)
 	}
