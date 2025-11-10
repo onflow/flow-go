@@ -215,7 +215,6 @@ func TestChainHeightVersions(t *testing.T) {
 
 		for _, chainID := range testNetworks {
 			mapper := ChainHeightVersions[chainID]
-			// LatestBoundary maps height 0 to VersionLatest
 			version := mapper.GetVersion(0)
 			assert.Equal(t, access.VersionLatest, version, "chain %s should use VersionLatest", chainID)
 		}
@@ -269,14 +268,14 @@ func TestVersioned_Integration(t *testing.T) {
 		collectionV0, err := builderV0.SystemCollection(chain, nil)
 		require.NoError(t, err)
 		require.NotNil(t, collectionV0)
-		assert.Equal(t, collectionV0.Transactions, 2, "V0 should have 2 transactions")
+		assert.Equal(t, len(collectionV0.Transactions), 2, "V0 should have 2 transactions")
 
 		// Test V1 at testMainnetVersion1Height
 		builderV1 := versioned.ByHeight(testMainnetV1Height)
 		collectionV1, err := builderV1.SystemCollection(chain, nil)
 		require.NoError(t, err)
 		require.NotNil(t, collectionV1)
-		assert.Equal(t, collectionV1.Transactions, 2, "V1 should have 2 transactions")
+		assert.Equal(t, len(collectionV1.Transactions), 2, "V1 should have 2 transactions")
 	})
 }
 
