@@ -62,7 +62,7 @@ func (s *builderV1Suite) TestProcessCallbacksTransaction() {
 
 	tx, err := s.builder.ProcessCallbacksTransaction(s.g.ChainID().Chain())
 	s.Require().NoError(err)
-	s.Require().Equal(expectedID, tx.ID())
+	s.Require().True(expectedID == tx.ID(), "invalid change made in the v1 versioned system collection")
 }
 
 func (s *builderV1Suite) TestExecuteCallbacksTransactions() {
@@ -80,7 +80,7 @@ func (s *builderV1Suite) TestExecuteCallbacksTransactions() {
 	s.Require().NoError(err)
 	s.Require().Len(txs, len(expectedIDs))
 	for i, tx := range txs {
-		s.Require().Equal(expectedIDs[i], tx.ID())
+		s.Require().True(expectedIDs[i] == tx.ID(), "invalid change made in the v1 versioned system collection")
 	}
 }
 
@@ -89,7 +89,7 @@ func (s *builderV1Suite) TestSystemChunkTransaction() {
 
 	tx, err := s.builder.SystemChunkTransaction(s.g.ChainID().Chain())
 	s.Require().NoError(err)
-	s.Require().Equal(expectedID, tx.ID())
+	s.Require().True(expectedID == tx.ID(), "invalid change made in the v1 versioned system collection")
 }
 
 func (s *builderV1Suite) TestSystemCollection() {
@@ -101,7 +101,7 @@ func (s *builderV1Suite) TestSystemCollection() {
 		collection, err := s.builder.SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(events))
 		s.Require().NoError(err)
 		s.Require().Len(collection.Transactions, 7)
-		s.Require().Equal(expectedID, collection.ID())
+		s.Require().True(expectedID == collection.ID(), "invalid change made in the v1 versioned system collection")
 	})
 
 	s.Run("without scheduled transactions - nil provider", func() {
@@ -110,7 +110,7 @@ func (s *builderV1Suite) TestSystemCollection() {
 		collection, err := s.builder.SystemCollection(s.g.ChainID().Chain(), nil)
 		s.Require().NoError(err)
 		s.Require().Len(collection.Transactions, 2)
-		s.Require().Equal(expectedID, collection.ID())
+		s.Require().True(expectedID == collection.ID(), "invalid change made in the v1 versioned system collection")
 	})
 
 	s.Run("without scheduled transactions - empty events list", func() {
@@ -119,6 +119,6 @@ func (s *builderV1Suite) TestSystemCollection() {
 		collection, err := s.builder.SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(flow.EventsList{}))
 		s.Require().NoError(err)
 		s.Require().Len(collection.Transactions, 2)
-		s.Require().Equal(expectedID, collection.ID())
+		s.Require().True(expectedID == collection.ID(), "invalid change made in the v1 versioned system collection")
 	})
 }
