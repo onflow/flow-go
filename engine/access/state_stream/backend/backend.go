@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -23,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 // Config defines the configurable options for the ingress server.
@@ -222,8 +223,6 @@ func (b *StateStreamBackend) GetRegisterValues(
 		return nil, nil, err
 	}
 
-	values := make([]flow.RegisterValue, len(ids))
-
 	registers, err := snapshot.Registers()
 	if err != nil {
 		if errors.Is(err, indexer.ErrIndexNotInitialized) {
@@ -233,23 +232,20 @@ func (b *StateStreamBackend) GetRegisterValues(
 		return nil, nil, err
 	}
 
-	registersStorageSnapshot, err := registers.StorageSnapshot(height)
-	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) {
-			return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
-		}
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
-		}
-		return nil, nil, err
-	}
-
+	result := make([]flow.RegisterValue, len(ids))
 	for i, regID := range ids {
-		val, err := registersStorageSnapshot.Get(regID)
+		val, err := registers.Get(regID, height)
 		if err != nil {
+			if errors.Is(err, storage.ErrHeightNotIndexed) {
+				return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+			}
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
+			}
+
 			return nil, nil, err
 		}
-		values[i] = val
+		result[i] = val
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -257,5 +253,5 @@ func (b *StateStreamBackend) GetRegisterValues(
 		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 	}
 
-	return values, metadata, nil
+	return result, metadata, nil
 }
