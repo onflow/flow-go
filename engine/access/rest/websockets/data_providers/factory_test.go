@@ -24,7 +24,7 @@ type DataProviderFactorySuite struct {
 	suite.Suite
 
 	ctx context.Context
-	ch  chan interface{}
+	ch  chan any
 
 	accessApi      *accessmock.API
 	stateStreamApi *ssmock.API
@@ -44,7 +44,7 @@ func (s *DataProviderFactorySuite) SetupTest() {
 	s.accessApi = accessmock.NewAPI(s.T())
 
 	s.ctx = context.Background()
-	s.ch = make(chan interface{})
+	s.ch = make(chan any)
 
 	s.factory = NewDataProviderFactory(
 		log,

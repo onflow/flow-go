@@ -130,7 +130,7 @@ type Controller struct {
 	//
 	// This design ensures that the channel is only closed when it is safe to do so, avoiding
 	// issues such as sending on a closed channel while maintaining proper cleanup.
-	multiplexedStream chan interface{}
+	multiplexedStream chan any
 
 	dataProviders       *concurrentmap.Map[SubscriptionID, dp.DataProvider]
 	dataProviderFactory dp.DataProviderFactory
@@ -153,7 +153,7 @@ func NewWebSocketController(
 		logger:              logger.With().Str("component", "websocket-controller").Logger(),
 		config:              config,
 		conn:                conn,
-		multiplexedStream:   make(chan interface{}),
+		multiplexedStream:   make(chan any),
 		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
@@ -571,7 +571,7 @@ func (c *Controller) writeErrorResponse(ctx context.Context, err error, msg mode
 	c.writeResponse(ctx, msg)
 }
 
-func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
+func (c *Controller) writeResponse(ctx context.Context, response any) {
 	select {
 	case <-ctx.Done():
 		return

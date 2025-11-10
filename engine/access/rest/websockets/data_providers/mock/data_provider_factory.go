@@ -17,7 +17,7 @@ type DataProviderFactory struct {
 }
 
 // NewDataProvider provides a mock function with given fields: ctx, subID, topic, args, stream
-func (_m *DataProviderFactory) NewDataProvider(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- interface{}) (data_providers.DataProvider, error) {
+func (_m *DataProviderFactory) NewDataProvider(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- any) (data_providers.DataProvider, error) {
 	ret := _m.Called(ctx, subID, topic, args, stream)
 
 	if len(ret) == 0 {
@@ -26,10 +26,10 @@ func (_m *DataProviderFactory) NewDataProvider(ctx context.Context, subID string
 
 	var r0 data_providers.DataProvider
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- interface{}) (data_providers.DataProvider, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- any) (data_providers.DataProvider, error)); ok {
 		return rf(ctx, subID, topic, args, stream)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- interface{}) data_providers.DataProvider); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- any) data_providers.DataProvider); ok {
 		r0 = rf(ctx, subID, topic, args, stream)
 	} else {
 		if ret.Get(0) != nil {
@@ -37,7 +37,7 @@ func (_m *DataProviderFactory) NewDataProvider(ctx context.Context, subID string
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, models.Arguments, chan<- interface{}) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, models.Arguments, chan<- any) error); ok {
 		r1 = rf(ctx, subID, topic, args, stream)
 	} else {
 		r1 = ret.Error(1)

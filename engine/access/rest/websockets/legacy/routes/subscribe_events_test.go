@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -164,7 +164,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			stateStreamBackend := ssmock.NewAPI(s.T())
-			subscription := submock.NewSubscription(s.T())
+			subscription := submock.NewSubscription[*state_stream.EventsResponse](s.T())
 
 			filter, err := state_stream.NewEventFilter(
 				state_stream.DefaultEventFilterConfig,
@@ -216,8 +216,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			}
 
 			// Create a channel to receive mock EventsResponse objects
-			ch := make(chan interface{})
-			var chReadOnly <-chan interface{}
+			ch := make(chan *state_stream.EventsResponse)
+			var chReadOnly <-chan *state_stream.EventsResponse
 			// Simulate sending a mock EventsResponse
 			go func() {
 				for _, eventResponse := range subscriptionEventsResponses {
@@ -266,10 +266,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for invalid block id", func() {
 		stateStreamBackend := ssmock.NewAPI(s.T())
 		invalidBlock := unittest.BlockFixture()
-		subscription := submock.NewSubscription(s.T())
+		subscription := submock.NewSubscription[*state_stream.EventsResponse](s.T())
 
-		ch := make(chan interface{})
-		var chReadOnly <-chan interface{}
+		ch := make(chan *state_stream.EventsResponse)
+		var chReadOnly <-chan *state_stream.EventsResponse
 		go func() {
 			close(ch)
 		}()
@@ -299,10 +299,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 	s.Run("returns error when channel closed", func() {
 		stateStreamBackend := ssmock.NewAPI(s.T())
-		subscription := submock.NewSubscription(s.T())
+ 	subscription := submock.NewSubscription[*state_stream.EventsResponse](s.T())
 
-		ch := make(chan interface{})
-		var chReadOnly <-chan interface{}
+		ch := make(chan *state_stream.EventsResponse)
+		var chReadOnly <-chan *state_stream.EventsResponse
 
 		go func() {
 			close(ch)

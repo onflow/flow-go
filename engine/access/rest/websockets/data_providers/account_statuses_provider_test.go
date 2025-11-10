@@ -19,7 +19,6 @@ import (
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -77,12 +76,12 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 
 	backendResponses := s.backendAccountStatusesResponses(events)
 
-	testHappyPath(
+	testHappyPath[*state_stream.AccountStatusesResponse, any](
 		s.T(),
 		AccountStatusesTopic,
 		s.factory,
 		s.subscribeAccountStatusesDataProviderTestCases(backendResponses),
-		func(dataChan chan interface{}) {
+		func(dataChan chan *state_stream.AccountStatusesResponse) {
 			for i := 0; i < len(backendResponses); i++ {
 				dataChan <- backendResponses[i]
 			}
@@ -92,7 +91,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 }
 
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStreamNotConfigured() {
-	send := make(chan interface{})
+	send := make(chan any)
 	topic := AccountStatusesTopic
 
 	provider, err := NewAccountStatusesDataProvider(
@@ -105,7 +104,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 	)
 	s.Require().Error(err)
 	s.Require().Nil(provider)
@@ -114,10 +113,10 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 
 func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
 	backendResponses []*state_stream.AccountStatusesResponse,
-) []testType[*state_stream.AccountStatusesResponse] {
+) []testType[*state_stream.AccountStatusesResponse, any] {
 	expectedResponses := s.expectedAccountStatusesResponses(backendResponses)
 
-	return []testType[*state_stream.AccountStatusesResponse]{
+	return []testType[*state_stream.AccountStatusesResponse, any]{
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
 			arguments: wsmodels.Arguments{
@@ -171,7 +170,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 }
 
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
-func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}, expected interface{}) {
+func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual any, expected any) {
 	expectedResponse, expectedResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), actual)
 
@@ -190,8 +189,8 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}
 }
 
 // expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
-func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*state_stream.AccountStatusesResponse) []interface{} {
-	expectedResponses := make([]interface{}, len(backendResponses))
+func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*state_stream.AccountStatusesResponse) []any {
+	expectedResponses := make([]any, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		// avoid updating the original response
@@ -226,7 +225,7 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidArguments() {
-	send := make(chan interface{})
+	send := make(chan any)
 	topic := AccountStatusesTopic
 
 	for _, test := range invalidAccountStatusesArgumentsTestCases() {
@@ -241,7 +240,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 				send,
 				s.chain,
 				state_stream.DefaultEventFilterConfig,
-				subscription_old.DefaultHeartbeatInterval,
+				subscription.DefaultHeartbeatInterval,
 			)
 			s.Require().Error(err)
 			s.Require().Nil(provider)
@@ -252,22 +251,22 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 
 // TestMessageIndexAccountStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderResponse_HappyPath() {
-	send := make(chan interface{}, 10)
+	send := make(chan any, 10)
 	topic := AccountStatusesTopic
 	accountStatusesCount := 4
 
 	// Create a channel to simulate the subscription's account statuses channel
-	accountStatusesChan := make(chan interface{})
+	accountStatusesChan := make(chan *state_stream.AccountStatusesResponse)
 
 	// Create a mock subscription and mock the channel
 	sub := submock.NewSubscription[*state_stream.AccountStatusesResponse](s.T())
-	sub.On("Channel").Return((<-chan interface{})(accountStatusesChan))
+	sub.On("Channel").Return((<-chan *state_stream.AccountStatusesResponse)(accountStatusesChan))
 	sub.On("Err").Return(nil).Once()
 
 	s.api.On("SubscribeAccountStatusesFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
-		map[string]interface{}{
+		map[string]any{
 			"start_block_id":    s.rootBlock.ID().String(),
 			"event_types":       []string{string(flow.EventAccountCreated)},
 			"account_addresses": []string{unittest.AddressFixture().String()},
@@ -284,7 +283,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 	)
 	s.Require().NoError(err)
 	s.Require().NotNil(provider)
@@ -364,7 +363,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_id":    "invalid_block_id",
 				"event_types":       []string{state_stream.CoreEventAccountCreated},
 				"account_addresses": []string{unittest.AddressFixture().String()},
@@ -373,7 +372,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_height": "-1",
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
@@ -382,7 +381,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'heartbeat_interval' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
@@ -392,7 +391,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "unexpected argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_id":      unittest.BlockFixture().ID().String(),
 				"event_types":         []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":   []string{unittest.AddressFixture().String()},

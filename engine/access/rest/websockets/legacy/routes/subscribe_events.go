@@ -37,5 +37,5 @@ func SubscribeEvents(
 		wsController.HeartbeatInterval = req.HeartbeatInterval
 	}
 
-	return wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
+ return legacy.AdaptSubscription(wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter)), nil
 }

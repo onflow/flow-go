@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -34,12 +34,12 @@ func (s *BlockHeadersProviderSuite) SetupTest() {
 // validates that block headers are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
-	testHappyPath(
+	testHappyPath[*flow.Header, any](
 		s.T(),
 		BlockHeadersTopic,
 		s.factory,
 		s.validBlockHeadersArgumentsTestCases(),
-		func(dataChan chan interface{}) {
+		func(dataChan chan *flow.Header) {
 			for _, block := range s.blocks {
 				dataChan <- block.ToHeader()
 			}
@@ -50,8 +50,8 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 
 // validBlockHeadersArgumentsTestCases defines test happy cases for block headers data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
-func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []testType {
-	expectedResponses := make([]interface{}, len(s.blocks))
+func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []testType[*flow.Header, any] {
+	expectedResponses := make([]any, len(s.blocks))
 	for i, b := range s.blocks {
 		var header commonmodels.BlockHeader
 		header.Build(b.ToHeader())
@@ -62,14 +62,14 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 		}
 	}
 
-	return []testType{
+	return []testType[*flow.Header, any]{
 		{
 			name: "happy path with start_block_id argument",
 			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*flow.Header]) {
 				s.api.On(
 					"SubscribeBlockHeadersFromStartBlockID",
 					mock.Anything,
@@ -85,7 +85,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*flow.Header]) {
 				s.api.On(
 					"SubscribeBlockHeadersFromStartHeight",
 					mock.Anything,
@@ -100,7 +100,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*flow.Header]) {
 				s.api.On(
 					"SubscribeBlockHeadersFromLatest",
 					mock.Anything,
@@ -113,7 +113,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expected interface{}) {
+func (s *BlockHeadersProviderSuite) requireBlockHeader(actual any, expected any) {
 	expectedResponse, expectedResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), actual)
 
@@ -125,7 +125,7 @@ func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expec
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArguments() {
-	send := make(chan interface{})
+	send := make(chan any)
 	topic := BlockHeadersTopic
 
 	for _, test := range s.invalidArgumentsTestCases() {

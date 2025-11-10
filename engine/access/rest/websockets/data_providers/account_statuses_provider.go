@@ -42,7 +42,7 @@ func NewAccountStatusesDataProvider(
 	subscriptionID string,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	defaultHeartbeatInterval uint64,

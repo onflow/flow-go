@@ -16,8 +16,8 @@ import (
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -52,7 +52,7 @@ func (s *EventsProviderSuite) SetupTest() {
 		nil,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 		nil,
 	)
 	s.Require().NotNil(s.factory)
@@ -71,12 +71,12 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 
 	backendResponses := s.backendEventsResponses(events)
 
-	testHappyPath(
+	testHappyPath[*state_stream.EventsResponse, any](
 		s.T(),
 		EventsTopic,
 		s.factory,
 		s.subscribeEventsDataProviderTestCases(backendResponses),
-		func(dataChan chan interface{}) {
+		func(dataChan chan *state_stream.EventsResponse) {
 			for i := 0; i < len(backendResponses); i++ {
 				dataChan <- backendResponses[i]
 			}
@@ -86,10 +86,10 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
-func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendResponses []*state_stream.EventsResponse) []testType {
+func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendResponses []*state_stream.EventsResponse) []testType[*state_stream.EventsResponse, any] {
 	expectedResponses := s.expectedEventsResponses(backendResponses)
 
-	return []testType{
+	return []testType[*state_stream.EventsResponse, any]{
 		{
 			name: "SubscribeBlocksFromStartBlockID happy path",
 			arguments: wsmodels.Arguments{
@@ -99,7 +99,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*state_stream.EventsResponse]) {
 				s.api.On(
 					"SubscribeEventsFromStartBlockID",
 					mock.Anything,
@@ -118,7 +118,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*state_stream.EventsResponse]) {
 				s.api.On(
 					"SubscribeEventsFromStartHeight",
 					mock.Anything,
@@ -136,7 +136,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*state_stream.EventsResponse]) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
 					mock.Anything,
@@ -149,7 +149,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 }
 
 // requireEvents ensures that the received event information matches the expected data.
-func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interface{}) {
+func (s *EventsProviderSuite) requireEvents(actual any, expected any) {
 	expectedResponse, expectedResponsePayload := extractPayload[*models.EventResponse](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*models.EventResponse](s.T(), actual)
 
@@ -177,8 +177,8 @@ func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*sta
 // expectedEventsResponses creates the expected responses for the provided backend responses.
 func (s *EventsProviderSuite) expectedEventsResponses(
 	backendResponses []*state_stream.EventsResponse,
-) []interface{} {
-	expectedResponses := make([]interface{}, len(backendResponses))
+) []any {
+	expectedResponses := make([]any, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		// avoid updating the original response
@@ -208,22 +208,22 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 
 // TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() {
-	send := make(chan interface{}, 10)
+	send := make(chan any, 10)
 	topic := EventsTopic
 	eventsCount := 4
 
 	// Create a channel to simulate the subscription's event channel
-	eventChan := make(chan interface{})
+	eventChan := make(chan *state_stream.EventsResponse)
 
 	// Create a mock subscription and mock the channel
-	sub := submock.NewSubscription(s.T())
-	sub.On("Channel").Return((<-chan interface{})(eventChan))
+	sub := submock.NewSubscription[*state_stream.EventsResponse](s.T())
+	sub.On("Channel").Return((<-chan *state_stream.EventsResponse)(eventChan))
 	sub.On("Err").Return(nil).Once()
 
 	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
-		map[string]interface{}{
+		map[string]any{
 			"start_block_id": s.rootBlock.ID().String(),
 			"event_types":    []string{state_stream.CoreEventAccountCreated},
 			"addresses":      []string{unittest.AddressFixture().String()},
@@ -241,7 +241,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 	)
 
 	s.Require().NoError(err)
@@ -301,7 +301,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 // 2. Invalid 'start_block_id' argument.
 // 3. Invalid 'start_block_height' argument.
 func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
-	send := make(chan interface{})
+	send := make(chan any)
 	topic := EventsTopic
 
 	for _, test := range invalidEventsArgumentsTestCases() {
@@ -316,7 +316,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				send,
 				s.chain,
 				state_stream.DefaultEventFilterConfig,
-				subscription_old.DefaultHeartbeatInterval,
+				subscription.DefaultHeartbeatInterval,
 			)
 			s.Require().Error(err)
 			s.Require().Nil(provider)
@@ -326,7 +326,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 }
 
 func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
-	send := make(chan interface{})
+	send := make(chan any)
 	topic := EventsTopic
 
 	provider, err := NewEventsDataProvider(
@@ -339,7 +339,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 	)
 	s.Require().Error(err)
 	s.Require().Nil(provider)
@@ -364,7 +364,7 @@ func invalidEventsArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_id": "invalid_block_id",
 				"event_types":    []string{state_stream.CoreEventAccountCreated},
 				"addresses":      []string{unittest.AddressFixture().String()},
@@ -374,7 +374,7 @@ func invalidEventsArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_height": "-1",
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"addresses":          []string{unittest.AddressFixture().String()},
@@ -384,7 +384,7 @@ func invalidEventsArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'heartbeat_interval' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"addresses":          []string{unittest.AddressFixture().String()},
@@ -395,7 +395,7 @@ func invalidEventsArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "unexpected argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"start_block_id":      unittest.BlockFixture().ID().String(),
 				"event_types":         []string{state_stream.CoreEventAccountCreated},
 				"addresses":           []string{unittest.AddressFixture().String()},

@@ -44,7 +44,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 	chain flow.Chain,
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
 	args, err := parseSendAndGetTransactionStatusesArguments(rawArguments, chain)

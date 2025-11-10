@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +54,7 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 		s.api,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 		s.linkGenerator,
 	)
 	s.Require().NotNil(s.factory)
@@ -73,28 +73,28 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 		},
 	)
 
-	testHappyPath(
+	testHappyPath[[]*accessmodel.TransactionResult, any](
 		s.T(),
 		TransactionStatusesTopic,
 		s.factory,
 		s.subscribeTransactionStatusesDataProviderTestCases(backendResponse),
-		func(dataChan chan interface{}) {
+		func(dataChan chan []*accessmodel.TransactionResult) {
 			dataChan <- backendResponse
 		},
 		s.requireTransactionStatuses,
 	)
 }
 
-func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*accessmodel.TransactionResult) []testType {
+func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*accessmodel.TransactionResult) []testType[[]*accessmodel.TransactionResult, any] {
 	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses, TransactionStatusesTopic)
 
-	return []testType{
+	return []testType[[]*accessmodel.TransactionResult, any]{
 		{
 			name: "SubscribeTransactionStatuses happy path",
 			arguments: wsmodels.Arguments{
 				"tx_id": unittest.IdentifierFixture().String(),
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[[]*accessmodel.TransactionResult]) {
 				s.api.On(
 					"SubscribeTransactionStatuses",
 					mock.Anything,
@@ -109,8 +109,8 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
-	actual interface{},
-	expected interface{},
+	actual any,
+	expected any,
 ) {
 	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
@@ -144,8 +144,8 @@ func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.Transa
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	backendResponses []*accessmodel.TransactionResult,
 	topic string,
-) []interface{} {
-	expectedResponses := make([]interface{}, len(backendResponses))
+) []any {
+	expectedResponses := make([]any, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
@@ -160,16 +160,16 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 
 // TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesProviderResponse_HappyPath() {
-	send := make(chan interface{}, 10)
+	send := make(chan any, 10)
 	topic := TransactionStatusesTopic
 	txStatusesCount := 4
 
 	// Create a channel to simulate the subscription's account statuses channel
-	txStatusesChan := make(chan interface{})
+	txStatusesChan := make(chan []*accessmodel.TransactionResult)
 
 	// Create a mock subscription and mock the channel
-	sub := submock.NewSubscription(s.T())
-	sub.On("Channel").Return((<-chan interface{})(txStatusesChan))
+	sub := submock.NewSubscription[[]*accessmodel.TransactionResult](s.T())
+	sub.On("Channel").Return((<-chan []*accessmodel.TransactionResult)(txStatusesChan))
 	sub.On("Err").Return(nil).Once()
 
 	s.api.On(
@@ -186,7 +186,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	)
 
 	arguments :=
-		map[string]interface{}{
+		map[string]any{
 			"tx_id": unittest.TransactionFixture().ID().String(),
 		}
 
@@ -255,7 +255,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	send := make(chan interface{})
+	send := make(chan any)
 
 	topic := TransactionStatusesTopic
 
@@ -285,26 +285,26 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "invalid 'tx_id' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"tx_id": "invalid_tx_id",
 			},
 			expectedErrorMsg: "invalid ID format",
 		},
 		{
 			name: "empty 'tx_id' argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"tx_id": "",
 			},
 			expectedErrorMsg: "'tx_id' must not be empty",
 		},
 		{
 			name:             "missing 'tx_id' argument",
-			arguments:        map[string]interface{}{},
+			arguments:        map[string]any{},
 			expectedErrorMsg: "missing 'tx_id' field",
 		},
 		{
 			name: "unexpected argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"unexpected_argument": "dummy",
 				"tx_id":               unittest.TransactionFixture().ID().String(),
 			},

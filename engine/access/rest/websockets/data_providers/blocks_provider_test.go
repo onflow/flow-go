@@ -98,12 +98,12 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
 		},
 	)
 
-	testHappyPath(
+	testHappyPath[*flow.Block, any](
 		s.T(),
 		BlocksTopic,
 		s.factory,
 		s.validBlockArgumentsTestCases(),
-		func(dataChan chan interface{}) {
+		func(dataChan chan *flow.Block) {
 			for _, block := range s.blocks {
 				dataChan <- block
 			}
@@ -114,10 +114,10 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
 
 // validBlockArgumentsTestCases defines test happy cases for block data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
-func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
+func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType[*flow.Block, any] {
 	expectedResponses := s.expectedBlockResponses(s.blocks, map[string]bool{commonmodels.ExpandableFieldPayload: true}, flow.BlockStatusFinalized)
 
-	return []testType{
+	return []testType[*flow.Block, any]{
 		{
 			name: "happy path with start_block_id argument",
 			arguments: wsmodels.Arguments{
@@ -140,7 +140,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*flow.Block]) {
 				s.api.On(
 					"SubscribeBlocksFromStartHeight",
 					mock.Anything,
@@ -155,7 +155,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*flow.Block]) {
 				s.api.On(
 					"SubscribeBlocksFromLatest",
 					mock.Anything,
@@ -169,7 +169,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*flow.Block]) {
 				s.api.On(
 					"SubscribeBlocksFromLatest",
 					mock.Anything,
@@ -182,7 +182,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 }
 
 // requireBlock ensures that the received block information matches the expected data.
-func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interface{}) {
+func (s *BlocksProviderSuite) requireBlock(actual any, expected any) {
 	expectedResponse, expectedResponsePayload := extractPayload[*commonmodels.Block](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*commonmodels.Block](s.T(), actual)
 
@@ -195,8 +195,8 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 	blocks []*flow.Block,
 	expand map[string]bool,
 	status flow.BlockStatus,
-) []interface{} {
-	responses := make([]interface{}, len(blocks))
+) []any {
+	responses := make([]any, len(blocks))
 	for i, b := range blocks {
 		var block commonmodels.Block
 		err := block.Build(b, nil, s.linkGenerator, status, expand)
@@ -215,7 +215,7 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
-	send := make(chan interface{})
+	send := make(chan any)
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
@@ -257,7 +257,7 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "unexpected argument",
-			arguments: map[string]interface{}{
+			arguments: map[string]any{
 				"block_status":        parser.Finalized,
 				"start_block_id":      unittest.BlockFixture().ID().String(),
 				"unexpected_argument": "dummy",
