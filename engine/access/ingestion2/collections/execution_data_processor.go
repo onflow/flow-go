@@ -52,7 +52,7 @@ func (edp *ExecutionDataProcessor) WrokerLoop(ctx irrecoverable.SignalerContext)
 			lowestMissing := edp.processedHeight.Value() + 1
 
 			for height := lowestMissing; height <= highestAvailableHeight; height++ {
-				collections, err := edp.ediHeightProvider.GetExecutionDataByHeight(height)
+				collections, err := edp.ediHeightProvider.GetExecutionDataByHeight(ctx, height)
 				if err != nil {
 					return fmt.Errorf("failed to get execution data for height %d: %w", height, err)
 				}

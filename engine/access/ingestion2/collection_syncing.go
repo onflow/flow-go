@@ -1,6 +1,8 @@
 package ingestion2
 
 import (
+	"context"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -42,7 +44,7 @@ type JobProcessor interface {
 // This can be nil if execution data indexing is disabled.
 type EDIHeightProvider interface {
 	HighestIndexedHeight() uint64
-	GetExecutionDataByHeight(height uint64) ([]*flow.Collection, error)
+	GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error)
 }
 
 // Syncer is a component that consumes finalized block jobs and processes them
