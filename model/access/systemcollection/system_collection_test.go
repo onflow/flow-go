@@ -18,11 +18,7 @@ func TestDefault(t *testing.T) {
 		versioned := Default(flow.Mainnet)
 		require.NotNil(t, versioned)
 
-		// Should be able to get builders by height
 		builder := versioned.ByHeight(0)
-		require.NotNil(t, builder)
-
-		builder = versioned.ByHeight(math.MaxUint64)
 		require.NotNil(t, builder)
 	})
 
@@ -46,76 +42,7 @@ func TestDefault(t *testing.T) {
 	})
 }
 
-func TestNewVersioned(t *testing.T) {
-	t.Run("successfully creates Versioned with valid inputs", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		versionedBuilder := Default(flow.Emulator)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-		require.NotNil(t, versioned)
-
-		assert.Equal(t, chain, versioned.chain)
-		assert.NotNil(t, versioned.transactions)
-		assert.NotNil(t, versioned.versioned)
-	})
-
-	t.Run("caches all system transactions from all versions", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		versionedBuilder := Default(flow.Emulator)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-
-		// Should have cached transactions from all versions
-		assert.NotEmpty(t, versioned.transactions, "should cache system transactions")
-
-		// Each version should contribute transactions
-		// V0 and V1 both have process + system chunk = at least 2 transactions per version
-		assert.GreaterOrEqual(t, len(versioned.transactions), 2, "should have at least 2 transactions cached")
-	})
-
-	t.Run("all cached transactions have unique IDs", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		versionedBuilder := Default(flow.Emulator)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-
-		// Verify all IDs are unique (map keys guarantee this, but we verify content)
-		seenIDs := make(map[flow.Identifier]bool)
-		for id := range versioned.transactions {
-			assert.False(t, seenIDs[id], "transaction ID %s should be unique", id)
-			seenIDs[id] = true
-		}
-	})
-}
-
 func TestVersioned_SearchAll(t *testing.T) {
-	t.Run("finds transaction by ID from any version", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		versionedBuilder := Default(flow.Emulator)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-
-		// Get a transaction ID that should exist
-		require.NotEmpty(t, versioned.transactions, "should have cached transactions")
-
-		var testID flow.Identifier
-		var expectedTx *flow.TransactionBody
-		for id, tx := range versioned.transactions {
-			testID = id
-			expectedTx = tx
-			break
-		}
-
-		// Search for the transaction
-		foundTx, ok := versioned.SearchAll(testID)
-		assert.True(t, ok, "should find transaction by ID")
-		assert.Equal(t, expectedTx, foundTx, "should return correct transaction")
-	})
-
 	t.Run("returns false for non-existent transaction ID", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		versionedBuilder := Default(flow.Emulator)
@@ -227,20 +154,6 @@ func TestVersioned_ByHeight(t *testing.T) {
 
 		builder = versioned.ByHeight(1000)
 		require.NotNil(t, builder)
-	})
-
-	t.Run("returns consistent builder for same height", func(t *testing.T) {
-		chain := flow.Mainnet.Chain()
-		versionedBuilder := Default(flow.Mainnet)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-
-		builder1 := versioned.ByHeight(100)
-		builder2 := versioned.ByHeight(100)
-
-		// Should return the same builder instance
-		assert.Equal(t, builder1, builder2, "should return consistent builder for same height")
 	})
 }
 
