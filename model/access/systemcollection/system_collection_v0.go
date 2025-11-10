@@ -22,18 +22,18 @@ import (
 type builderV0 struct{}
 
 //go:embed scripts/systemChunkTransactionTemplateV0.cdc
-var systemChunkTransactionTemplateV1 string
+var systemChunkTransactionTemplateV0 string
 
 //go:embed scripts/processScheduledTransactionsTemplateV0.cdc
-var processScheduledTransactionsTemplateV1 string
+var processScheduledTransactionsTemplateV0 string
 
 //go:embed scripts/executeScheduledTransactionTemplateV0.cdc
-var executeScheduledTransactionTemplateV1 string
+var executeScheduledTransactionTemplateV0 string
 
 const (
-	systemChunkTransactionGasLimitV1 = 100_000_000
-	callbackTransactionGasLimitV1    = flow.DefaultMaxTransactionGasLimit
-	placeholderMigrationAddressV1    = "\"Migration\""
+	systemChunkTransactionGasLimitV0 = 100_000_000
+	callbackTransactionGasLimitV0    = flow.DefaultMaxTransactionGasLimit
+	placeholderMigrationAddressV0    = "\"Migration\""
 )
 
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
@@ -46,7 +46,7 @@ func (b *builderV0) ProcessCallbacksTransaction(chain flow.Chain) (*flow.Transac
 	return flow.NewTransactionBodyBuilder().
 		AddAuthorizer(sc.FlowServiceAccount.Address).
 		SetScript(script).
-		SetComputeLimit(callbackTransactionGasLimitV1).Build()
+		SetComputeLimit(callbackTransactionGasLimitV0).Build()
 }
 
 // ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
@@ -121,7 +121,7 @@ func (b *builderV0) SystemChunkTransaction(chain flow.Chain) (*flow.TransactionB
 	script := b.prepareSystemContractCode(sc)
 	systemTxBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
-		SetComputeLimit(systemChunkTransactionGasLimitV1).
+		SetComputeLimit(systemChunkTransactionGasLimitV0).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
 	if err != nil {
@@ -178,10 +178,10 @@ func (b *builderV0) SystemCollection(chain flow.Chain, providerFn access.EventPr
 // prepareSystemContractCode prepares the system contract code for the given system contracts,
 // and returns the transaction script.
 func (b *builderV0) prepareSystemContractCode(sc *systemcontracts.SystemContracts) []byte {
-	code := templates.ReplaceAddresses(systemChunkTransactionTemplateV1, sc.AsTemplateEnv())
+	code := templates.ReplaceAddresses(systemChunkTransactionTemplateV0, sc.AsTemplateEnv())
 	code = strings.ReplaceAll(
 		code,
-		placeholderMigrationAddressV1,
+		placeholderMigrationAddressV0,
 		sc.Migration.Address.HexWithPrefix(),
 	)
 	return []byte(code)
@@ -190,13 +190,13 @@ func (b *builderV0) prepareSystemContractCode(sc *systemcontracts.SystemContract
 // prepareProcessScheduledTransactionsTemplate prepares the process scheduled transactions template
 // for the given environment, and returns the transaction script.
 func (b *builderV0) prepareProcessScheduledTransactionsTemplate(env templates.Environment) []byte {
-	code := templates.ReplaceAddresses(processScheduledTransactionsTemplateV1, env)
+	code := templates.ReplaceAddresses(processScheduledTransactionsTemplateV0, env)
 	return []byte(code)
 }
 
 // prepareExecuteScheduledTransactionTemplate prepares the execute scheduled transaction template
 // for the given environment, and returns the transaction script.
 func (b *builderV0) prepareExecuteScheduledTransactionTemplate(env templates.Environment) []byte {
-	code := templates.ReplaceAddresses(executeScheduledTransactionTemplateV1, env)
+	code := templates.ReplaceAddresses(executeScheduledTransactionTemplateV0, env)
 	return []byte(code)
 }
