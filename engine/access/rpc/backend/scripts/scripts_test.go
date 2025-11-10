@@ -197,7 +197,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, nil)
+		s.testExecuteScriptAtLatestBlock(ctx, scripts, s.script, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
@@ -207,7 +207,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testExecuteScriptAtBlockID(ctx, scripts, nil)
+		s.testExecuteScriptAtBlockID(ctx, scripts, s.script, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
@@ -217,7 +217,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, nil)
+		s.testExecuteScriptAtBlockHeight(ctx, scripts, s.script, nil)
 	})
 }
 
@@ -239,7 +239,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, expectedErr)
+		s.testExecuteScriptAtLatestBlock(ctx, scripts, s.failingScript, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
@@ -249,7 +249,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockID(ctx, scripts, expectedErr)
+		s.testExecuteScriptAtBlockID(ctx, scripts, s.failingScript, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
@@ -259,7 +259,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, expectedErr)
+		s.testExecuteScriptAtBlockHeight(ctx, scripts, s.failingScript, expectedErr)
 	})
 }
 
@@ -286,7 +286,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 			Return(expectedResponse, nil).
 			Once()
 
-		s.testExecuteScriptAtLatestBlock(ctx, scripts, nil)
+		s.testExecuteScriptAtLatestBlock(ctx, scripts, s.script, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockID - happy path", func() {
@@ -306,7 +306,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 			Return(expectedResponse, nil).
 			Once()
 
-		s.testExecuteScriptAtBlockID(ctx, scripts, nil)
+		s.testExecuteScriptAtBlockID(ctx, scripts, s.script, nil)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight - happy path", func() {
@@ -326,7 +326,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 			Return(expectedResponse, nil).
 			Once()
 
-		s.testExecuteScriptAtBlockHeight(ctx, scripts, nil)
+		s.testExecuteScriptAtBlockHeight(ctx, scripts, s.script, nil)
 	})
 }
 
@@ -334,32 +334,40 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 // and converted to the appropriate status code.
 func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	ctx := context.Background()
-
 	backend := s.defaultBackend(query_mode.IndexQueryModeLocalOnly)
 
 	testCases := []struct {
+		ctx           func() context.Context
 		err           error
 		expectedError error
 	}{
 		{
+			ctx:           func() context.Context { return ctx },
 			err:           storage.ErrHeightNotIndexed,
 			expectedError: access.NewOutOfRangeError(storage.ErrHeightNotIndexed),
 		},
 		{
+			ctx:           func() context.Context { return ctx },
 			err:           storage.ErrNotFound,
 			expectedError: access.NewDataNotFoundError("header", storage.ErrNotFound),
 		},
 		{
-			err:           systemErr,
-			expectedError: access.NewInternalError(systemErr),
-		},
-		{
+			ctx:           func() context.Context { return ctx },
 			err:           cadenceErr,
 			expectedError: access.NewInvalidRequestError(cadenceErr),
 		},
 		{
+			ctx:           func() context.Context { return ctx },
 			err:           fvmFailureErr,
 			expectedError: access.NewInternalError(fvmFailureErr),
+		},
+		{
+			ctx: func() context.Context {
+				return irrecoverable.WithSignalerContext(context.Background(),
+					irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), systemErr))
+			},
+			err:           systemErr,
+			expectedError: irrecoverable.NewException(systemErr),
 		},
 	}
 
@@ -377,10 +385,10 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 				On("Registers").
 				Return(s.registers, nil).
 				Once()
-			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
+			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
 
-			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.expectedError)
+			s.testExecuteScriptAtLatestBlock(tt.ctx(), backend, s.script, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - fails with %v", tt.err), func() {
@@ -396,10 +404,10 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 				On("Registers").
 				Return(s.registers, nil).
 				Once()
-			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
+			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
 
-			s.testExecuteScriptAtBlockID(ctx, backend, tt.expectedError)
+			s.testExecuteScriptAtBlockID(tt.ctx(), backend, s.script, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - fails with %v", tt.err), func() {
@@ -415,98 +423,12 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 				On("Registers").
 				Return(s.registers, nil).
 				Once()
-			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Height, s.registers).
+			s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
 				Return(nil, tt.err).Once()
 
-			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.expectedError)
+			s.testExecuteScriptAtBlockHeight(tt.ctx(), backend, s.script, tt.expectedError)
 		})
 	}
-}
-
-// TestExecuteScriptFromStorage_UnexpectedErrors tests that script execution methods correctly propagate
-// unexpected errors through the irrecoverable signaling context without returning results.
-func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_UnexpectedErrors() {
-	backend := s.defaultBackend(query_mode.IndexQueryModeLocalOnly)
-
-	err := fmt.Errorf("unexpected error")
-	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with unexpected error"), func() {
-		s.executionResultProvider.
-			On("ExecutionResultInfo", s.block.ID(), s.criteria).
-			Return(s.executionResultInfo, nil).
-			Once()
-		s.executionStateCache.
-			On("Snapshot", mock.Anything).
-			Return(s.executionDataSnapshot, nil).
-			Once()
-		s.executionDataSnapshot.
-			On("Registers").
-			Return(s.registers, nil).
-			Once()
-		s.state.On("Sealed").Return(s.snapshot, nil).Once()
-		s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
-
-		s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
-			Return(nil, err).Once()
-
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err))
-		actual, metadata, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments, s.criteria)
-		s.Require().Error(err)
-		s.Require().Nil(actual)
-		s.Require().Nil(metadata)
-	})
-
-	s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - fails with unexpected error"), func() {
-		s.executionResultProvider.
-			On("ExecutionResultInfo", s.block.ID(), s.criteria).
-			Return(s.executionResultInfo, nil).
-			Once()
-		s.executionStateCache.
-			On("Snapshot", mock.Anything).
-			Return(s.executionDataSnapshot, nil).
-			Once()
-		s.executionDataSnapshot.
-			On("Registers").
-			Return(s.registers, nil).
-			Once()
-		s.headers.On("ByBlockID", s.block.ID()).Return(s.block.ToHeader(), nil).Once()
-
-		s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
-			Return(nil, err).Once()
-
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err))
-		actual, metadata, err := backend.ExecuteScriptAtBlockID(signalerCtx, s.block.ID(), s.script, s.arguments, s.criteria)
-		s.Require().Error(err)
-		s.Require().Nil(actual)
-		s.Require().Nil(metadata)
-	})
-
-	s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - fails with unexpected error"), func() {
-		s.executionResultProvider.
-			On("ExecutionResultInfo", s.block.ID(), s.criteria).
-			Return(s.executionResultInfo, nil).
-			Once()
-		s.executionStateCache.
-			On("Snapshot", mock.Anything).
-			Return(s.executionDataSnapshot, nil).
-			Once()
-		s.executionDataSnapshot.
-			On("Registers").
-			Return(s.registers, nil).
-			Once()
-		s.headers.On("ByHeight", s.block.Height).Return(s.block.ToHeader(), nil).Once()
-
-		s.scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Height, s.registers).
-			Return(nil, err).Once()
-
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err))
-		actual, metadata, err := backend.ExecuteScriptAtBlockHeight(signalerCtx, s.block.Height, s.script, s.arguments, s.criteria)
-		s.Require().Error(err)
-		s.Require().Nil(actual)
-		s.Require().Nil(metadata)
-	})
 }
 
 // TestExecuteScriptWithFailover_HappyPath tests that when an error is returned executing a script
@@ -544,7 +466,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 				Return(nil, errToReturn).Once()
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testExecuteScriptAtLatestBlock(ctx, backend, nil)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, s.script, nil)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - recovers %v", errToReturn), func() {
@@ -565,7 +487,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 				Return(nil, errToReturn).Once()
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testExecuteScriptAtBlockID(ctx, backend, nil)
+			s.testExecuteScriptAtBlockID(ctx, backend, s.script, nil)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - recovers %v", errToReturn), func() {
@@ -586,7 +508,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 				Return(nil, errToReturn).Once()
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testExecuteScriptAtBlockHeight(ctx, backend, nil)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, s.script, nil)
 		})
 	}
 }
@@ -630,7 +552,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 				Return(nil, tt.err).
 				Once()
 
-			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.expectedError)
+			s.testExecuteScriptAtLatestBlock(ctx, backend, s.failingScript, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - %s", tt.expectedError), func() {
@@ -651,7 +573,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 				Return(nil, tt.err).
 				Once()
 
-			s.testExecuteScriptAtBlockID(ctx, backend, tt.expectedError)
+			s.testExecuteScriptAtBlockID(ctx, backend, s.failingScript, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - %s", tt.expectedError), func() {
@@ -672,7 +594,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 				Return(nil, tt.err).
 				Once()
 
-			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.expectedError)
+			s.testExecuteScriptAtBlockHeight(ctx, backend, s.failingScript, tt.expectedError)
 		})
 	}
 }
@@ -707,7 +629,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 			Return(nil, storage.ErrHeightNotIndexed).Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtLatestBlock(ctx, backend, expectedErr)
+		s.testExecuteScriptAtLatestBlock(ctx, backend, s.failingScript, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
@@ -730,7 +652,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockID(ctx, backend, expectedErr)
+		s.testExecuteScriptAtBlockID(ctx, backend, s.failingScript, expectedErr)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
@@ -753,7 +675,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testExecuteScriptAtBlockHeight(ctx, backend, expectedErr)
+		s.testExecuteScriptAtBlockHeight(ctx, backend, s.failingScript, expectedErr)
 	})
 }
 
@@ -820,18 +742,18 @@ func (s *BackendScriptsSuite) TestExecuteScript_ExceedsMaxSize() {
 func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	scripts *Scripts,
+	script []byte,
 	expectedError error,
 ) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
+	actual, metadata, err := scripts.ExecuteScriptAtLatestBlock(ctx, script, s.arguments, s.criteria)
 	if expectedError == nil {
-		actual, metadata, err := scripts.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
 		s.Require().Equal(s.expectedMetadata, metadata)
 	} else {
-		actual, metadata, err := scripts.ExecuteScriptAtLatestBlock(ctx, s.failingScript, s.arguments, s.criteria)
 		s.Require().Error(err)
 		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
@@ -851,18 +773,18 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(
 	ctx context.Context,
 	scripts *Scripts,
+	script []byte,
 	expectedError error,
 ) {
 	blockID := s.block.ID()
 	s.headers.On("ByBlockID", blockID).Return(s.block.ToHeader(), nil).Once()
 
+	actual, metadata, err := scripts.ExecuteScriptAtBlockID(ctx, blockID, script, s.arguments, s.criteria)
 	if expectedError == nil {
-		actual, metadata, err := scripts.ExecuteScriptAtBlockID(ctx, blockID, s.script, s.arguments, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
 		s.Require().Equal(s.expectedMetadata, metadata)
 	} else {
-		actual, metadata, err := scripts.ExecuteScriptAtBlockID(ctx, blockID, s.failingScript, s.arguments, s.criteria)
 		s.Require().Error(err)
 		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
@@ -882,19 +804,18 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(
 func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	scripts *Scripts,
+	script []byte,
 	expectedError error,
 ) {
 	height := s.block.Height
 	s.headers.On("ByHeight", height).Return(s.block.ToHeader(), nil).Once()
 
+	actual, metadata, err := scripts.ExecuteScriptAtBlockHeight(ctx, height, script, s.arguments, s.criteria)
 	if expectedError == nil {
-		s.script = []byte("access(all) fun main() { return 1 }")
-		actual, metadata, err := scripts.ExecuteScriptAtBlockHeight(ctx, height, s.script, s.arguments, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
 		s.Require().Equal(s.expectedMetadata, metadata)
 	} else {
-		actual, metadata, err := scripts.ExecuteScriptAtBlockHeight(ctx, height, s.failingScript, s.arguments, s.criteria)
 		s.Require().Error(err)
 		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)

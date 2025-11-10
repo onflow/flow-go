@@ -119,7 +119,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 		case codes.Unavailable:
 			return nil, nil, access.NewServiceUnavailable(errToReturn)
 		default:
-			return nil, nil, access.NewInternalError(errToReturn)
+			return nil, nil, errToReturn
 		}
 	}
 
