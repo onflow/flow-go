@@ -13,6 +13,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
+const (
+	// WARNING: these height should never change, if tests are failing, the solution
+	// is not to change these heights.
+	// TODO: set the actual height when it is determined.
+
+	// testMainnetV1Height is the height at which Mainnet transitions to Version1.
+	testMainnetV1Height = 200
+	// testTestnetV1Height is the height at which Testnet transitions to Version1.
+	testTestnetV1Height = 200
+)
+
 func TestDefault(t *testing.T) {
 	t.Run("returns versioned system collection for valid chain", func(t *testing.T) {
 		versioned := Default(flow.Mainnet)
@@ -111,34 +122,34 @@ func TestVersioned_ByHeight(t *testing.T) {
 		assert.True(t, isV0, "should return V0 builder for height 0")
 	})
 
-	t.Run("returns V0 builder for height < 200 on Mainnet", func(t *testing.T) {
+	t.Run("returns V0 builder for height < testMainnetVersion1Height on Mainnet", func(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 		versionedBuilder := Default(flow.Mainnet)
 
 		versioned, err := NewVersioned(chain, versionedBuilder)
 		require.NoError(t, err)
 
-		builder := versioned.ByHeight(100)
+		builder := versioned.ByHeight(testMainnetV1Height - 100)
 		require.NotNil(t, builder)
 
 		// Verify it's V0 by checking the type
 		_, isV0 := builder.(*builderV0)
-		assert.True(t, isV0, "should return V0 builder for height < 200")
+		assert.True(t, isV0, "should return V0 builder for height < testMainnetVersion1Height")
 	})
 
-	t.Run("returns V1 builder for height >= 200 on Mainnet", func(t *testing.T) {
+	t.Run("returns V1 builder for height >= testMainnetVersion1Height on Mainnet", func(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 		versionedBuilder := Default(flow.Mainnet)
 
 		versioned, err := NewVersioned(chain, versionedBuilder)
 		require.NoError(t, err)
 
-		builder := versioned.ByHeight(200)
+		builder := versioned.ByHeight(testMainnetV1Height)
 		require.NotNil(t, builder)
 
 		// Verify it's V1 by checking the type
 		_, isV1 := builder.(*builderV1)
-		assert.True(t, isV1, "should return V1 builder for height >= 200")
+		assert.True(t, isV1, "should return V1 builder for height >= testMainnetVersion1Height")
 	})
 
 	t.Run("returns latest version for Emulator at any height", func(t *testing.T) {
@@ -186,12 +197,12 @@ func TestChainHeightVersions(t *testing.T) {
 		assert.Equal(t, Version0, mainnetMapper.GetVersion(0))
 		assert.Equal(t, Version0, testnetMapper.GetVersion(0))
 
-		// Both should use V1 at height 200
-		assert.Equal(t, Version1, mainnetMapper.GetVersion(200))
-		assert.Equal(t, Version1, testnetMapper.GetVersion(200))
+		// Both should use V1 at their respective version boundaries
+		assert.Equal(t, Version1, mainnetMapper.GetVersion(testMainnetV1Height))
+		assert.Equal(t, Version1, testnetMapper.GetVersion(testTestnetV1Height))
 	})
 
-	t.Run("test networks use LatestBoundary", func(t *testing.T) {
+	t.Run("test transient networks use LatestBoundary", func(t *testing.T) {
 		testNetworks := []flow.ChainID{
 			flow.Sandboxnet,
 			flow.Previewnet,
@@ -260,8 +271,8 @@ func TestVersioned_Integration(t *testing.T) {
 		require.NotNil(t, collectionV0)
 		assert.NotEmpty(t, collectionV0.Transactions, "V0 should have transactions")
 
-		// Test V1 at height 200
-		builderV1 := versioned.ByHeight(200)
+		// Test V1 at testMainnetVersion1Height
+		builderV1 := versioned.ByHeight(testMainnetV1Height)
 		collectionV1, err := builderV1.SystemCollection(chain, nil)
 		require.NoError(t, err)
 		require.NotNil(t, collectionV1)
