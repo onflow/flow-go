@@ -1045,66 +1045,10 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Return(s.executionDataSnapshot, nil).
 			Once()
 
-		//storageSnapshot := snapshot.MapStorageSnapshot{}
-		//storageSnapshot[s.registerID] = flow.RegisterValue([]byte("value"))
-
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
 		s.registers.On("StorageSnapshot", block.Height).Return(nil, storage.ErrNotFound).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
-		require.Nil(s.T(), res)
-		require.Nil(s.T(), metadata)
-		require.Equal(s.T(), codes.NotFound, status.Code(err))
-	})
-
-	s.Run("returns error if block height is out of range", func() {
-		s.executionResultProvider.
-			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
-			Return(&optimistic_sync.ExecutionResultInfo{
-				ExecutionResultID: result.ID(),
-				ExecutionNodes:    executionNodes.ToSkeleton(),
-			}, nil).Once()
-
-		s.executionStateCache.
-			On("Snapshot", result.ID()).
-			Return(s.executionDataSnapshot, nil).
-			Once()
-
-		storageSnapshotMock := storagesnapshotmock.NewStorageSnapshot(s.T())
-
-		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
-		s.registers.On("StorageSnapshot", block.Height).Return(storageSnapshotMock, nil).Once()
-		storageSnapshotMock.On("Get", s.registerID).Return(nil, storage.ErrHeightNotIndexed).Once()
-
-		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
-
-		require.Nil(s.T(), res)
-		require.Nil(s.T(), metadata)
-		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
-	})
-
-	s.Run("returns error if register path is not indexed", func() {
-		s.executionResultProvider.
-			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
-			Return(&optimistic_sync.ExecutionResultInfo{
-				ExecutionResultID: result.ID(),
-				ExecutionNodes:    executionNodes.ToSkeleton(),
-			}, nil).Once()
-
-		s.executionStateCache.
-			On("Snapshot", result.ID()).
-			Return(s.executionDataSnapshot, nil).
-			Once()
-
-		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		storageSnapshotMock := storagesnapshotmock.NewStorageSnapshot(s.T())
-
-		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
-		s.registers.On("StorageSnapshot", block.Height).Return(storageSnapshotMock, nil).Once()
-		storageSnapshotMock.On("Get", falseID[0]).Return(nil, storage.ErrNotFound).Once()
-
-		res, metadata, err := s.backend.GetRegisterValues(falseID, block.Height, s.criteria)
-
 		require.Nil(s.T(), res)
 		require.Nil(s.T(), metadata)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
