@@ -20,11 +20,13 @@ var _ ingestion2.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
 
 func NewExecutionDataProcessor(
 	ediHeightProvider ingestion2.EDIHeightProvider,
+	indexer ingestion2.BlockCollectionIndexer,
 	processedHeight *counters.PersistentStrictMonotonicCounter,
 ) *ExecutionDataProcessor {
 	return &ExecutionDataProcessor{
 		newExecutionDataIndexed: make(chan struct{}, 1),
 		ediHeightProvider:       ediHeightProvider,
+		indexer:                 indexer,
 		processedHeight:         processedHeight,
 	}
 }

@@ -146,6 +146,7 @@ func New(
 	downloader execution_data.Downloader,
 	execDataCache *cache.ExecutionDataCache,
 	processedHeight storage.ConsumerProgressInitializer,
+	// ? (leo) what's the difference from processedHeight?
 	processedNotifications storage.ConsumerProgressInitializer,
 	state protocol.State,
 	headers storage.Headers,

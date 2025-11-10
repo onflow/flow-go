@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
@@ -14,14 +14,14 @@ var _ ingestion2.EDIHeightProvider = (*ediHeightProvider)(nil)
 // ediHeightProvider implements EDIHeightProvider by querying ExecutionDataCache.
 type ediHeightProvider struct {
 	cache                      execution_data.ExecutionDataCache
-	highestExectuionDataHeight counters.Reader
+	highestExectuionDataHeight tracker.ExecutionDataTracker
 }
 
 // NewEDIHeightProvider creates a new EDIHeightProvider that reads from the given ExecutionDataCache.
 // The headers storage is used to determine the search range for finding available heights.
 func NewEDIHeightProvider(
 	cache execution_data.ExecutionDataCache,
-	highestExectuionDataHeight counters.Reader,
+	highestExectuionDataHeight tracker.ExecutionDataTracker,
 ) *ediHeightProvider {
 	return &ediHeightProvider{
 		cache:                      cache,
@@ -31,7 +31,7 @@ func NewEDIHeightProvider(
 
 // HighestIndexedHeight returns the highest block height for which execution data is available.
 func (p *ediHeightProvider) HighestIndexedHeight() uint64 {
-	return p.highestExectuionDataHeight.Value()
+	return p.highestExectuionDataHeight.GetHighestHeight()
 }
 
 // GetExecutionDataByHeight returns the execution data for the given block height.
