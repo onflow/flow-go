@@ -13,7 +13,14 @@ const (
 
 	ConsumeProgressExecutionDataIndexerBlockHeight = "ConsumeProgressExecutionDataIndexerBlockHeight"
 
-	ConsumeProgressIngestionEngineBlockHeight       = "ConsumeProgressIngestionEngineBlockHeight"
+	ConsumeProgressIngestionEngineBlockHeight = "ConsumeProgressIngestionEngineBlockHeight"
+
+	// the highest block height that has indexed collections from fetching missing collections from LN
+	ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight = "ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight"
+
+	// the highest block height that has indexed collections from syncing execution data from EN
+	ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight = "ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight"
+
 	ConsumeProgressEngineTxErrorMessagesBlockHeight = "ConsumeProgressEngineTxErrorMessagesBlockHeight"
 	ConsumeProgressLastFullBlockHeight              = "ConsumeProgressLastFullBlockHeight"
 )

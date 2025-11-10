@@ -58,7 +58,7 @@ func NewSyncer(
 
 	// Create an adapter function that wraps the JobProcessor interface
 	processorFunc := func(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
-		err := jobProcessor.ProcessJob(ctx, job, done)
+		err := jobProcessor.ProcessJobConcurrently(ctx, job, done)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to process collection indexing job: %w", err))
 		}
@@ -93,17 +93,19 @@ func (s *Syncer) OnFinalizedBlock() {
 }
 
 // LastProcessedIndex returns the last processed job index.
+// Optional methods, not required for operation but useful for monitoring.
 func (s *Syncer) LastProcessedIndex() uint64 {
 	return s.consumer.LastProcessedIndex()
 }
 
 // Head returns the highest job index available.
+// Optional methods, not required for operation but useful for monitoring.
 func (s *Syncer) Head() (uint64, error) {
 	return s.consumer.Head()
 }
 
 // Size returns the number of in-memory jobs that the consumer is processing.
+// Optional methods, not required for operation but useful for monitoring.
 func (s *Syncer) Size() uint {
 	return s.consumer.Size()
 }
-

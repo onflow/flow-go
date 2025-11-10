@@ -12,22 +12,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// EDIHeightProvider provides the latest height for which execution data indexer has collections.
-type EDIHeightProvider interface {
-	// HighestIndexedHeight returns the highest block height for which EDI has indexed collections.
-	HighestIndexedHeight() (uint64, error)
-}
-
 // JobProcessor implements the job lifecycle for collection indexing.
 // It orchestrates the flow: request → receive → index → complete.
+// TODO: rename to fetch_job_processor
 type JobProcessor struct {
-	mcq               ingestion2.MissingCollectionQueue
-	indexer           ingestion2.BlockCollectionIndexer
-	requester         ingestion2.CollectionRequester
-	blocks            storage.Blocks
-	collections       storage.CollectionsReader
-	ediHeightProvider EDIHeightProvider // when set as nil, EDI is considered disabled
-	ediLagThreshold   uint64
+	mcq                     ingestion2.MissingCollectionQueue
+	indexer                 ingestion2.BlockCollectionIndexer
+	requester               ingestion2.CollectionRequester
+	blocks                  storage.Blocks
+	collections             storage.CollectionsReader
+	newExecutionDataIndexed <-chan struct{}
 }
 
 var _ ingestion2.JobProcessor = (*JobProcessor)(nil)
@@ -40,8 +34,6 @@ var _ ingestion2.JobProcessor = (*JobProcessor)(nil)
 //   - requester: CollectionRequester for requesting collections from the network
 //   - blocks: Blocks storage for retrieving block data
 //   - collections: Collections storage reader for checking if collections already exist
-//   - ediHeightProvider: Provider for EDI's highest indexed height (can be nil if EDI is disabled)
-//   - ediLagThreshold: Threshold in blocks. If (blockHeight - ediHeight) > threshold, fetch collections.
 //     Set to a very large value to effectively disable fetching and rely only on EDI.
 //
 // No error returns are expected during normal operation.
@@ -51,17 +43,13 @@ func NewJobProcessor(
 	requester ingestion2.CollectionRequester,
 	blocks storage.Blocks,
 	collections storage.CollectionsReader,
-	ediHeightProvider EDIHeightProvider,
-	ediLagThreshold uint64,
 ) *JobProcessor {
 	return &JobProcessor{
-		mcq:               mcq,
-		indexer:           indexer,
-		requester:         requester,
-		blocks:            blocks,
-		collections:       collections,
-		ediHeightProvider: ediHeightProvider,
-		ediLagThreshold:   ediLagThreshold,
+		mcq:         mcq,
+		indexer:     indexer,
+		requester:   requester,
+		blocks:      blocks,
+		collections: collections,
 	}
 }
 
@@ -70,7 +58,7 @@ func NewJobProcessor(
 // and optionally requests them based on EDI lag.
 //
 // No error returns are expected during normal operation.
-func (jp *JobProcessor) ProcessJob(
+func (jp *JobProcessor) ProcessJobConcurrently(
 	ctx irrecoverable.SignalerContext,
 	job module.Job,
 	done func(),
@@ -112,18 +100,10 @@ func (jp *JobProcessor) ProcessJob(
 		return fmt.Errorf("failed to enqueue missing collections for block height %d: %w", blockHeight, err)
 	}
 
-	// Check EDI lag to decide whether to fetch collections
-	shouldFetch, err := jp.shouldFetchCollections(blockHeight)
+	// Request collections from collection nodes
+	err = jp.requester.RequestCollections(collectionIDs)
 	if err != nil {
-		return fmt.Errorf("failed to check EDI lag for block height %d: %w", blockHeight, err)
-	}
-
-	if shouldFetch {
-		// Request collections from collection nodes
-		err = jp.requester.RequestCollections(collectionIDs)
-		if err != nil {
-			return fmt.Errorf("failed to request collections for block height %d: %w", blockHeight, err)
-		}
+		return fmt.Errorf("failed to request collections for block height %d: %w", blockHeight, err)
 	}
 
 	return nil
@@ -142,40 +122,13 @@ func (jp *JobProcessor) OnReceiveCollection(collection *flow.Collection) error {
 	}
 
 	// Block became complete, index it
-	err := jp.indexer.OnReceivedCollectionsForBlock(height, collections)
+	err := jp.indexer.IndexCollectionsForBlock(height, collections)
 	if err != nil {
 		return fmt.Errorf("failed to index collections for block height %d: %w", height, err)
 	}
 
 	// Mark the block as indexed (this invokes the callback)
 	jp.mcq.OnIndexedForBlock(height)
-
-	return nil
-}
-
-// OnReceivedCollectionsForBlock is called by the execution data indexer when collections are received.
-// It forwards collections to MCQ and handles block completion.
-//
-// The blockHeight parameter is provided by EDI to indicate which block these collections belong to.
-//
-// No error returns are expected during normal operation.
-func (jp *JobProcessor) OnReceivedCollectionsForBlock(
-	blockHeight uint64,
-	collections []*flow.Collection,
-) error {
-	// Mark the block as indexed (this invokes the callback if the height exists)
-	queued := jp.mcq.IsHeightQueued(blockHeight)
-	if !queued {
-		// If the height is not queued, nothing to do
-		return nil
-	}
-
-	err := jp.indexer.OnReceivedCollectionsForBlock(blockHeight, collections)
-	if err != nil {
-		return fmt.Errorf("failed to index collections for block height %d: %w", blockHeight, err)
-	}
-
-	jp.mcq.OnIndexedForBlock(blockHeight)
 
 	return nil
 }
@@ -205,25 +158,4 @@ func (jp *JobProcessor) getMissingCollections(blockHeight uint64) ([]*flow.Colle
 	}
 
 	return missingGuarantees, nil
-}
-
-// shouldFetchCollections determines whether to fetch collections based on EDI lag.
-// Returns true if collections should be fetched, false if we should wait for EDI.
-func (jp *JobProcessor) shouldFetchCollections(blockHeight uint64) (bool, error) {
-	// If EDI is not available, always fetch
-	if jp.ediHeightProvider == nil {
-		return true, nil
-	}
-
-	ediHeight, err := jp.ediHeightProvider.HighestIndexedHeight()
-	if err != nil {
-		// If we can't get EDI height, err on the side of fetching to avoid blocking
-		return true, nil
-	}
-
-	// Calculate lag
-	lag := blockHeight - ediHeight
-
-	// If lag exceeds threshold, fetch collections
-	return lag > jp.ediLagThreshold, nil
 }

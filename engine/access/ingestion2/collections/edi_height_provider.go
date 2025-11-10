@@ -23,7 +23,6 @@ func NewProcessedHeightRecorderWrapper(recorder execution_data.ProcessedHeightRe
 
 // HighestIndexedHeight returns the highest block height for which EDI has indexed collections.
 // It wraps the ProcessedHeightRecorder's HighestCompleteHeight method.
-func (p *ProcessedHeightRecorderWrapper) HighestIndexedHeight() (uint64, error) {
-	return p.recorder.HighestCompleteHeight(), nil
+func (p *ProcessedHeightRecorderWrapper) HighestIndexedHeight() uint64 {
+	return p.recorder.HighestCompleteHeight()
 }
-

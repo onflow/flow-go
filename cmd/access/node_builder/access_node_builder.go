@@ -171,7 +171,6 @@ type AccessNodeConfig struct {
 	PublicNetworkConfig                  PublicNetworkConfig
 	TxResultCacheSize                    uint
 	executionDataIndexingEnabled         bool
-	ediLagThreshold                      uint64
 	registersDBPath                      string
 	checkpointFile                       string
 	scriptExecutorConfig                 query.QueryConfig
@@ -277,7 +276,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 		executionDataIndexingEnabled:         false,
-		ediLagThreshold:                      100,
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -1423,10 +1421,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
-		flags.Uint64Var(&builder.ediLagThreshold,
-			"edi-lag-threshold",
-			defaultConfig.ediLagThreshold,
-			"threshold in blocks. If (blockHeight - ediHeight) > threshold, fetch collections. Default: 100")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
@@ -1737,6 +1731,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
+	var fetchAndIndexedCollectionsBlockHeight storage.ConsumerProgressInitializer
+	var syncAndIndexedCollectionsBlockHeight storage.ConsumerProgressInitializer
 	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 
 	if builder.executionDataSyncEnabled {
@@ -1961,18 +1957,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 			return nil
 		}).
-		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
+		Module("block height consumer progress", func(node *cmd.NodeConfig) error {
 			processedFinalizedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
+			fetchAndIndexedCollectionsBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
+			syncAndIndexedCollectionsBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight)
 			return nil
 		}).
 		Module("collection syncer and job processor", func(node *cmd.NodeConfig) error {
-			// Get ProcessedHeightRecorder from ExecutionIndexer if available
-			// Note: ExecutionIndexer may not exist yet, so we'll pass nil and update later if needed
-			var processedHeightRecorder execution_data.ProcessedHeightRecorder
-			if builder.ExecutionIndexer != nil {
-				processedHeightRecorder = builder.ExecutionIndexer
-			}
-
 			// Create syncer and job processor
 			syncerResult, err := ingestion2collections.CreateSyncer(
 				node.Logger,
@@ -1984,13 +1975,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Guarantees,
 				builder.ProtocolDB,
 				node.StorageLockMgr,
-				processedFinalizedBlockHeight,
+				fetchAndIndexedCollectionsBlockHeight,
 				notNil(builder.collectionExecutedMetric),
-				processedHeightRecorder,
 				ingestion2collections.CreateSyncerConfig{
-					MaxProcessing:   10, // TODO: make configurable
-					MaxSearchAhead:  0,  // TODO: make configurable
-					EDILagThreshold: builder.ediLagThreshold,
+					MaxProcessing:  10, // TODO: make configurable
+					MaxSearchAhead: 0,  // TODO: make configurable
 				},
 			)
 			if err != nil {
@@ -2321,7 +2310,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				processedFinalizedBlockHeight,
-				notNil(builder.CollectionSyncer), // TODO: update FinalizedBlockProcessor to not need this
 				notNil(builder.collectionExecutedMetric),
 			)
 			if err != nil {

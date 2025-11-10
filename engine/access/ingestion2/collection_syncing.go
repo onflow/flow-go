@@ -28,21 +28,21 @@ type CollectionRequester interface {
 
 // BlockCollectionIndexer stores and indexes collections for a given block height.
 type BlockCollectionIndexer interface {
-	// OnReceivedCollectionsForBlock stores and indexes collections for a given block height.
-	OnReceivedCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error
+	// IndexCollectionsForBlock stores and indexes collections for a given block height.
+	IndexCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error
 }
 
 // Implements the job lifecycle for a single block height.
 type JobProcessor interface {
-	ProcessJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) error
-	OnReceiveCollection(collection *flow.Collection) error
-	OnReceivedCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error // called by EDI or requester
+	ProcessJobConcurrently(ctx irrecoverable.SignalerContext, job module.Job, done func()) error
+	// OnReceivedCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error // called by EDI or requester
 }
 
 // EDIHeightProvider provides the latest height for which execution data indexer has collections.
 // This can be nil if execution data indexing is disabled.
 type EDIHeightProvider interface {
-	HighestIndexedHeight() (uint64, error)
+	HighestIndexedHeight() uint64
+	GetExecutionDataByHeight(height uint64) ([]*flow.Collection, error)
 }
 
 // Syncer is a component that consumes finalized block jobs and processes them
@@ -53,4 +53,8 @@ type Syncer interface {
 	LastProcessedIndex() uint64
 	Head() (uint64, error)
 	Size() uint
+}
+
+type ExecutionDataProcessor interface {
+	OnNewExectuionData()
 }

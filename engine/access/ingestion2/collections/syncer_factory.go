@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -25,9 +24,6 @@ type CreateSyncerConfig struct {
 	MaxProcessing uint64
 	// MaxSearchAhead is the maximum number of jobs beyond processedIndex to process. 0 means no limit.
 	MaxSearchAhead uint64
-	// EDILagThreshold is the threshold in blocks. If (blockHeight - ediHeight) > threshold, fetch collections.
-	// Set to a very large value to effectively disable fetching and rely only on EDI.
-	EDILagThreshold uint64
 }
 
 // CreateSyncerResult holds the results of CreateSyncer.
@@ -55,7 +51,6 @@ type CreateSyncerResult struct {
 //   - lockManager: Lock manager for coordinating database access
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
 //   - collectionExecutedMetric: Metrics collector for tracking collection indexing
-//   - processedHeightRecorder: Recorder for execution data processed heights (can be nil if EDI is disabled)
 //   - config: Configuration for the syncer
 //
 // Returns both the Syncer and JobProcessor so they can be reused in other components.
@@ -73,7 +68,6 @@ func CreateSyncer(
 	lockManager lockctx.Manager,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	processedHeightRecorder execution_data.ProcessedHeightRecorder,
 	config CreateSyncerConfig,
 ) (*CreateSyncerResult, error) {
 	// Create requester engine for requesting collections
@@ -109,12 +103,6 @@ func CreateSyncer(
 		guarantees,
 	)
 
-	// Wrap ProcessedHeightRecorder as EDIHeightProvider if provided
-	var ediHeightProvider ingestion2.EDIHeightProvider
-	if processedHeightRecorder != nil {
-		ediHeightProvider = NewProcessedHeightRecorderWrapper(processedHeightRecorder)
-	}
-
 	// Create JobProcessor
 	jobProcessor := NewJobProcessor(
 		mcq,
@@ -122,8 +110,6 @@ func CreateSyncer(
 		collectionRequester,
 		blocks,
 		collections,
-		ediHeightProvider,
-		config.EDILagThreshold,
 	)
 
 	// Register handler for received collections

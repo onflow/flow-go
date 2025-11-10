@@ -48,7 +48,7 @@ func NewBlockCollectionIndexer(
 // OnReceivedCollectionsForBlock stores and indexes collections for a given block height.
 //
 // No error returns are expected during normal operation.
-func (bci *blockCollectionIndexerImpl) OnReceivedCollectionsForBlock(
+func (bci *blockCollectionIndexerImpl) IndexCollectionsForBlock(
 	blockHeight uint64,
 	cols []*flow.Collection,
 ) error {
