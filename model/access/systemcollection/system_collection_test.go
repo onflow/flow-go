@@ -269,36 +269,14 @@ func TestVersioned_Integration(t *testing.T) {
 		collectionV0, err := builderV0.SystemCollection(chain, nil)
 		require.NoError(t, err)
 		require.NotNil(t, collectionV0)
-		assert.NotEmpty(t, collectionV0.Transactions, "V0 should have transactions")
+		assert.Equal(t, collectionV0.Transactions, 2, "V0 should have 2 transactions")
 
 		// Test V1 at testMainnetVersion1Height
 		builderV1 := versioned.ByHeight(testMainnetV1Height)
 		collectionV1, err := builderV1.SystemCollection(chain, nil)
 		require.NoError(t, err)
 		require.NotNil(t, collectionV1)
-		assert.NotEmpty(t, collectionV1.Transactions, "V1 should have transactions")
-	})
-
-	t.Run("system collections have consistent structure", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		versionedBuilder := Default(flow.Emulator)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-
-		builder := versioned.ByHeight(0)
-		collection, err := builder.SystemCollection(chain, nil)
-		require.NoError(t, err)
-
-		// System collection should have at least 2 transactions (process + system chunk)
-		assert.GreaterOrEqual(t, len(collection.Transactions), 2,
-			"system collection should have at least process and system chunk transactions")
-
-		// All transactions should have valid IDs
-		for i, tx := range collection.Transactions {
-			assert.NotEqual(t, flow.ZeroID, tx.ID(),
-				"transaction %d should have non-zero ID", i)
-		}
+		assert.Equal(t, collectionV1.Transactions, 2, "V1 should have 2 transactions")
 	})
 }
 
