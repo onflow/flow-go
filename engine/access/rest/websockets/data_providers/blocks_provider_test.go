@@ -18,8 +18,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -76,7 +76,7 @@ func (s *BlocksProviderSuite) SetupTest() {
 		s.api,
 		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 		s.linkGenerator,
 	)
 	s.Require().NotNil(s.factory)
@@ -124,7 +124,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*flow.Block]) {
 				s.api.On(
 					"SubscribeBlocksFromStartBlockID",
 					mock.Anything,

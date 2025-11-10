@@ -17,8 +17,9 @@ import (
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/access/subscription_old"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -53,7 +54,7 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 		nil,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription_old.DefaultHeartbeatInterval,
+		subscription.DefaultHeartbeatInterval,
 		nil,
 	)
 	s.Require().NotNil(s.factory)
@@ -113,10 +114,10 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 
 func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
 	backendResponses []*state_stream.AccountStatusesResponse,
-) []testType {
+) []testType[*state_stream.AccountStatusesResponse] {
 	expectedResponses := s.expectedAccountStatusesResponses(backendResponses)
 
-	return []testType{
+	return []testType[*state_stream.AccountStatusesResponse]{
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
 			arguments: wsmodels.Arguments{
@@ -124,7 +125,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*state_stream.AccountStatusesResponse]) {
 				s.api.On(
 					"SubscribeAccountStatusesFromStartBlockID",
 					mock.Anything,
@@ -141,7 +142,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*state_stream.AccountStatusesResponse]) {
 				s.api.On(
 					"SubscribeAccountStatusesFromStartHeight",
 					mock.Anything,
@@ -157,7 +158,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
-			setupBackend: func(sub *submock.Subscription) {
+			setupBackend: func(sub *submock.Subscription[*state_stream.AccountStatusesResponse]) {
 				s.api.On(
 					"SubscribeAccountStatusesFromLatestBlock",
 					mock.Anything,
@@ -259,7 +260,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	accountStatusesChan := make(chan interface{})
 
 	// Create a mock subscription and mock the channel
-	sub := submock.NewSubscription(s.T())
+	sub := submock.NewSubscription[*state_stream.AccountStatusesResponse](s.T())
 	sub.On("Channel").Return((<-chan interface{})(accountStatusesChan))
 	sub.On("Err").Return(nil).Once()
 

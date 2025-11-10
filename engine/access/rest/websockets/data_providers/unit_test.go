@@ -11,16 +11,16 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // testType represents a valid test scenario for subscribing
-type testType struct {
+type testType[T any] struct {
 	name              string
 	arguments         wsmodels.Arguments
-	setupBackend      func(sub *submock.Subscription)
-	expectedResponses []interface{}
+	setupBackend      func(sub *submock.Subscription[T])
+	expectedResponses []T
 }
 
 // testErrType represents an error cases for subscribing
@@ -42,13 +42,13 @@ type testErrType struct {
 // - tests: A slice of test cases to run, each specifying setup and validation logic.
 // - sendData: A function to simulate emitting data into the subscription's data channel.
 // - requireFn: A function to validate the output received in the send channel.
-func testHappyPath(
+func testHappyPath[T any](
 	t *testing.T,
 	topic string,
 	factory *DataProviderFactoryImpl,
-	tests []testType,
-	sendData func(chan interface{}),
-	requireFn func(interface{}, interface{}),
+	tests []testType[T],
+	sendData func(chan T),
+	requireFn func(T, T),
 ) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -64,7 +64,13 @@ func testHappyPath(
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider(context.Background(), "dummy-id", topic, test.arguments, send)
+			provider, err := factory.NewDataProvider(
+				context.Background(),
+				"dummy-id",
+				topic,
+				test.arguments,
+				send,
+			)
 			require.NoError(t, err)
 			require.NotNil(t, provider)
 

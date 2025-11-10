@@ -180,7 +180,7 @@ func (t *TransactionStream) createSubscription(
 	heightSource := height_source.NewHeightSource(
 		startHeight,
 		t.endHeight,
-		t.readyUpToHeight,
+		t.buildReadyUpToHeight(startHeight),
 		t.buildGetTransactionStatusesAtHeight(txInfo, startHeight),
 	)
 
@@ -205,11 +205,6 @@ func (t *TransactionStream) buildGetTransactionStatusesAtHeight(
 	startHeight uint64,
 ) subscription.GetItemAtHeightFunc[[]*accessmodel.TransactionResult] {
 	return func(ctx context.Context, height uint64) ([]*accessmodel.TransactionResult, error) {
-		err := t.checkBlockReady(height)
-		if err != nil {
-			return nil, err
-		}
-
 		if txInfo.txResult.IsFinal() {
 			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription.ErrEndOfData)
 		}
@@ -223,7 +218,7 @@ func (t *TransactionStream) buildGetTransactionStatusesAtHeight(
 		// Get old status here, as it could be replaced by status from founded tx result
 		prevTxStatus := txInfo.txResult.Status
 
-		if err = txInfo.Refresh(ctx); err != nil {
+		if err := txInfo.Refresh(ctx); err != nil {
 			if errors.Is(err, subscription.ErrBlockNotReady) {
 				return nil, err
 			}
@@ -267,8 +262,23 @@ func (t *TransactionStream) checkBlockReady(height uint64) error {
 	return nil
 }
 
-func (t *TransactionStream) readyUpToHeight() (uint64, error) {
-	return t.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
+func (t *TransactionStream) buildReadyUpToHeight(height uint64) func() (uint64, error) {
+	return func() (uint64, error) {
+		// Get the highest available finalized block height
+		highestHeight, err := t.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
+		if err != nil {
+			return 0, fmt.Errorf("could not get highest height for block %d: %w", height, err)
+		}
+
+		// Fail early if no block finalized notification has been received for the given height.
+		// Note: It's possible that the block is locally finalized before the notification is
+		// received. This ensures a consistent view is available to all streams.
+		if height > highestHeight {
+			return 0, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+		}
+
+		return highestHeight, nil
+	}
 }
 
 // generateResultsStatuses checks if the current result differs from the previous result by more than one step.

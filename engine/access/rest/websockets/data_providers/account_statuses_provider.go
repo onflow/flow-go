@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 )
@@ -133,7 +133,7 @@ func (p *AccountStatusesDataProvider) sendResponse(response *state_stream.Accoun
 func (p *AccountStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args accountStatusesArguments,
-) subscription_old.Subscription {
+) subscription.Subscription[*state_stream.AccountStatusesResponse] {
 	if args.StartBlockID != flow.ZeroID {
 		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}

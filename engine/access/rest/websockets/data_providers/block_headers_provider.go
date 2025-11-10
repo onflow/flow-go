@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -70,7 +70,7 @@ func (p *BlockHeadersDataProvider) Run() error {
 func (p *BlockHeadersDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args blocksArguments,
-) subscription_old.Subscription {
+) subscription.Subscription[*flow.Header] {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockHeadersFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

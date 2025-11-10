@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
 // baseDataProvider holds common objects for the provider
@@ -90,11 +90,11 @@ type sendResponseCallback[T any] func(T) error
 //
 // No other errors are expected during normal operation
 func run[T any](
-	subscription subscription_old.Subscription,
+	subscription subscription.Subscription[T],
 	sendResponse sendResponseCallback[T],
 ) error {
 	for {
-		value, ok := <-subscription.Channel()
+		response, ok := <-subscription.Channel()
 		if !ok {
 			err := subscription.Err()
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -102,11 +102,6 @@ func run[T any](
 			}
 
 			return nil
-		}
-
-		response, ok := value.(T)
-		if !ok {
-			return fmt.Errorf("unexpected response type: %T", value)
 		}
 
 		err := sendResponse(response)

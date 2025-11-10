@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/subscription_old"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -132,7 +132,10 @@ func (p *EventsDataProvider) sendResponse(eventsResponse *state_stream.EventsRes
 }
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
-func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, args eventsArguments) subscription_old.Subscription {
+func (p *EventsDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args eventsArguments,
+) subscription.Subscription[*state_stream.EventsResponse] {
 	if args.StartBlockID != flow.ZeroID {
 		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}

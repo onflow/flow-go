@@ -53,6 +53,7 @@ func NewHeightBasedStreamer[T any](
 func (s *HeightBasedStreamer[T]) Stream(ctx context.Context) {
 	newDataAvailableNotifier := engine.NewNotifier()
 	s.broadcaster.Subscribe(newDataAvailableNotifier) //TODO: we never unsubscribe but it is expected?
+	newDataAvailableNotifier.Notify()
 
 	heartbeatTicker := time.NewTicker(s.options.Heartbeat) // liveness fallback
 	defer heartbeatTicker.Stop()
@@ -88,6 +89,7 @@ func (s *HeightBasedStreamer[T]) Stream(ctx context.Context) {
 					s.subscription.Close()
 					return true
 				}
+
 				s.subscription.CloseWithError(err)
 				return true
 			}

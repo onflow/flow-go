@@ -32,8 +32,8 @@ import (
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -108,6 +108,9 @@ type TransactionStreamSuite struct {
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
+
+	// dynamic collection availability by txID to avoid fragile mock sequencing
+	collectionByTx *concurrentmap.Map[flow.Identifier, *flow.LightCollection]
 }
 
 func TestTransactionStatusSuite(t *testing.T) {
@@ -156,6 +159,22 @@ func (s *TransactionStreamSuite) SetupTest() {
 	s.preferredExecutionNodeIDs = nil
 
 	s.initializeBackend()
+
+	// Initialize stateful responder for Collections.LightByTransactionID:
+	// return ErrNotFound until the transaction's collection is registered in collectionByTx;
+	// once registered (during addBlockWithTransaction), return the light collection.
+	if s.collectionByTx == nil {
+		s.collectionByTx = concurrentmap.New[flow.Identifier, *flow.LightCollection]()
+	}
+	// Default responder for polling loop; tolerant to repeated calls.
+	s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (*flow.LightCollection, error) {
+			if col, ok := s.collectionByTx.Get(id); ok {
+				return col, nil
+			}
+			return nil, storage.ErrNotFound
+		},
+	).Maybe()
 }
 
 // TearDownTest cleans up the db
@@ -321,7 +340,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 	}
 	txBackend, err := transactions.NewTransactionsBackend(txParams)
 	s.Require().NoError(err)
-	
+
 	streamOptions := streamer.NewDefaultStreamOptions()
 
 	s.txStreamBackend = NewTransactionStreamBackend(
@@ -472,6 +491,9 @@ func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Trans
 	colID := col.ID()
 	guarantee := flow.CollectionGuarantee{CollectionID: colID}
 	light := col.Light()
+	// Make the collection discoverable by the stateful responder used in tests
+	s.collectionByTx.Add(transaction.ID(), light)
+
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true, func(block *flow.Block) {
 		var err error
@@ -482,10 +504,10 @@ func (s *TransactionStreamSuite) addBlockWithTransaction(transaction *flow.Trans
 			},
 		)
 		require.NoError(s.T(), err)
-		s.collections.On("LightByID", colID).Return(light, nil).Maybe()
-		s.collections.On("LightByTransactionID", transaction.ID()).Return(light, nil)
-		s.blocks.On("ByCollectionID", colID).Return(block, nil)
-	})
+			s.collections.On("LightByID", colID).Return(light, nil).Maybe()
+			s.collections.On("LightByTransactionID", transaction.ID()).Return(light, nil).Maybe()
+			s.blocks.On("ByCollectionID", colID).Return(block, nil).Maybe()
+		})
 }
 
 // Create a special common function to read subscription messages from the channel and check converting it to transaction info
@@ -522,7 +544,7 @@ func (s *TransactionStreamSuite) checkGracefulShutdown(sub subscription.Subscrip
 // TestSendAndSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusHappyCase() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	s.initializeHappyCaseMockInstructions()
@@ -530,8 +552,6 @@ func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := s.createSendTransaction()
 	txId := transaction.ID()
-
-	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
 
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
@@ -583,7 +603,10 @@ func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := s.createSendTransaction()
 	txId := transaction.ID()
-	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound)
+	s.collections.
+		On("LightByTransactionID", txId).
+		Return(nil, storage.ErrNotFound).
+		Maybe()
 
 	// Subscribe to transaction status and receive the first message with pending status
 	sub := s.txStreamBackend.SendAndSubscribeTransactionStatuses(ctx, &transaction, entities.EventEncodingVersion_CCF_V0)
@@ -618,7 +641,6 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentPendin
 
 	transaction := s.createSendTransaction()
 	txId := transaction.ID()
-	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
 
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)

@@ -95,6 +95,12 @@ func (b *backendSubscribeBlocks) SubscribeBlocksFromStartHeight(
 	startHeight uint64,
 	blockStatus flow.BlockStatus,
 ) subscription.Subscription[*flow.Block] {
+	// validate and normalize start height via tracker to surface errors early (e.g., before-root, unknown height)
+	startHeight, err := b.blockTracker.GetStartHeightFromHeight(startHeight)
+	if err != nil {
+		return subimpl.NewFailedSubscription[*flow.Block](err, "could not get start height from provided height")
+	}
+
 	heightSource := height_source.NewHeightSource(
 		startHeight,
 		b.endHeight,
@@ -220,6 +226,12 @@ func (b *backendSubscribeBlocks) SubscribeBlockHeadersFromStartHeight(
 	startHeight uint64,
 	blockStatus flow.BlockStatus,
 ) subscription.Subscription[*flow.Header] {
+	// validate and normalize start height via tracker to surface errors early (e.g., before-root, unknown height)
+	startHeight, err := b.blockTracker.GetStartHeightFromHeight(startHeight)
+	if err != nil {
+		return subimpl.NewFailedSubscription[*flow.Header](err, "could not get start height from provided height")
+	}
+
 	heightSource := height_source.NewHeightSource(
 		startHeight,
 		b.endHeight,
@@ -345,6 +357,12 @@ func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromStartHeight(
 	startHeight uint64,
 	blockStatus flow.BlockStatus,
 ) subscription.Subscription[*flow.BlockDigest] {
+	// validate and normalize start height via tracker to surface errors early (e.g., before-root, unknown height)
+	startHeight, err := b.blockTracker.GetStartHeightFromHeight(startHeight)
+	if err != nil {
+		return subimpl.NewFailedSubscription[*flow.BlockDigest](err, "could not get start height from provided height")
+	}
+
 	heightSource := height_source.NewHeightSource(
 		startHeight,
 		b.endHeight,

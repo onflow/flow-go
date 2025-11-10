@@ -451,7 +451,13 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	}
 
 	// register new provider
-	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
+	provider, err := c.dataProviderFactory.NewDataProvider(
+		ctx,
+		subscriptionID.String(),
+		msg.Topic,
+		msg.Arguments,
+		c.multiplexedStream,
+	)
 	if err != nil {
 		err = fmt.Errorf("error creating data provider: %w", err)
 		c.writeErrorResponse(

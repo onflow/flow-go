@@ -31,7 +31,7 @@ func (s *BackendBlockDigestSuite) SetupTest() {
 
 // TestSubscribeBlockDigestsFromStartBlockID tests the SubscribeBlockDigestsFromStartBlockID method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
-	call := func(
+	subscribeFunc := func(
 		ctx context.Context,
 		startValue interface{},
 		blockStatus flow.BlockStatus,
@@ -39,7 +39,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
 		return s.backend.SubscribeBlockDigestsFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
-	subscribe(&s.BackendBlocksSuite, call, s.requireBlockDigests, s.subscribeFromStartBlockIdTestCases())
+	subscribe(&s.BackendBlocksSuite, subscribeFunc, s.requireBlockDigests, s.subscribeFromStartBlockIdTestCases())
 }
 
 // TestSubscribeBlockDigestsFromStartHeight tests the SubscribeBlockDigestsFromStartHeight method.
@@ -74,6 +74,7 @@ func (s *BackendBlockDigestSuite) requireBlockDigests(actualBlock *flow.BlockDig
 	s.Require().Equal(expectedBlock.Height, actualBlock.Height)
 	s.Require().Equal(expectedBlock.Timestamp, uint64(actualBlock.Timestamp.UnixMilli()))
 }
+
 
 // TestSubscribeBlockDigestsHandlesErrors tests error handling scenarios for the SubscribeBlockDigestsFromStartBlockID and SubscribeBlockDigestsFromStartHeight methods in the Backend.
 // It ensures that the method correctly returns errors for various invalid input cases.
