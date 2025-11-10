@@ -174,13 +174,13 @@ func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.Transact
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
-func (t *Transactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
+func (t *Transactions) chooseCollectionNodes(tx *flow.TransactionBody) (flow.IdentitySkeletonList, error) {
 	// retrieve the set of collector clusters
-	currentEpoch, err := t.state.Final().Epochs().Current()
+	refEpoch, err := t.state.AtBlockID(tx.ReferenceBlockID).Epochs().Current()
 	if err != nil {
 		return nil, fmt.Errorf("could not get current epoch: %w", err)
 	}
-	clusters, err := currentEpoch.Clustering()
+	clusters, err := refEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}

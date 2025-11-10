@@ -1204,6 +1204,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"rest-max-response-size",
 			defaultConfig.rpcConf.RestConfig.MaxResponseSize,
 			"the maximum response size in bytes for payload sent from REST server")
+		// TODO remove
 		flags.StringVarP(&builder.rpcConf.CollectionAddr,
 			"static-collection-ingress-addr",
 			"",
