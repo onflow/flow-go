@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -59,12 +60,13 @@ func NewENScriptExecutor(
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
 //   - [access.DataNotFoundError] - if the requested block has not been executed or has been pruned by the node.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
 //   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
 //   - [access.InternalError] - if an internal execution node failure occurs.
 func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	var result []byte
-	var executionTime time.Time
 	var execDuration time.Duration
 	var exeNode *flow.IdentitySkeleton
 	var err error
@@ -72,19 +74,16 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 		executionResultInfo.ExecutionNodes,
 		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
-
-			result, err = e.tryExecuteScriptOnExecutionNode(ctx, node.Address, request)
-
-			executionTime = time.Now()
-			execDuration = executionTime.Sub(execStartTime)
 			exeNode = node
 
+			result, err = e.tryExecuteScriptOnExecutionNode(ctx, node.Address, request)
 			if err != nil {
 				return err
 			}
 
+			execDuration = time.Since(execStartTime)
 			e.scriptLogger.LogExecutedScript(request, node.Address, execDuration)
-			e.metrics.ScriptExecuted(time.Since(execStartTime), len(request.script))
+			e.metrics.ScriptExecuted(execDuration, len(request.script))
 
 			return nil
 		},
@@ -101,6 +100,13 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 		if status.Code(errToReturn) != codes.InvalidArgument {
 			e.metrics.ScriptExecutionErrorOnExecutionNode()
 			e.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
+		}
+
+		switch {
+		case errors.Is(errToReturn, context.Canceled):
+			return nil, nil, access.NewRequestCanceledError(errToReturn)
+		case errors.Is(errToReturn, context.DeadlineExceeded):
+			return nil, nil, access.NewRequestTimedOutError(errToReturn)
 		}
 
 		switch status.Code(errToReturn) {
@@ -129,9 +135,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 //
 // Expected error returns during normal operation:
 //   - [codes.Unavailable] - if a connection to an execution node could not be established.
-//   - [codes.InvalidArgument] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [codes.NotFound] - if the requested block has not been executed or has been pruned by the node.
-//   - [codes.Internal] - if an internal execution node failure occurs.
+//   - [status.Error] - if the execution node returned a gRPC error.
 func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,
