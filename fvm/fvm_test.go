@@ -2568,10 +2568,10 @@ func TestCapabilityControllers(t *testing.T) {
 						transaction {
 						  prepare(signer: auth(Capabilities) &Account) {
 							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
-							assert(cap.id == 8)
+							assert(cap.id == 7)
 
 							let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
-							assert(cap2.id == 9)
+							assert(cap2.id == 8)
 						  }
 						}
 					`)).
@@ -2950,9 +2950,9 @@ func TestFlowCallbackScheduler(t *testing.T) {
 
 	ctxOpts := []fvm.Option{
 		fvm.WithScheduledTransactionsEnabled(true),
-		// use emulator to ensure the scheduled transaction executor account
+		// use localnet to ensure the scheduled transaction executor account
 		// is created during bootstrap, since testnet is manually created
-		fvm.WithChain(flow.Emulator.Chain()),
+		fvm.WithChain(flow.Localnet.Chain()),
 	}
 
 	newVMTest().

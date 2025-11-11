@@ -833,15 +833,20 @@ func (b *bootstrapExecutor) deployFlowTransactionScheduler(deployTo flow.Address
 	env.FlowTransactionSchedulerUtilsAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowTransactionSchedulerUtils contract: %s", txError, err)
 
-	txBody, err = blueprints.CreateScheduledTransactionExecutorTransaction(b.ctx.Chain)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create scheduled transaction executor transaction: %s", err))
+	// scheduled transactions wont work on newly bootstrapped non-transient networks
+	// TODO: JanezP this could be controlled by a flag instead of a hidden check here
+	if b.ctx.Chain.ChainID().Transient() {
+		sc := systemcontracts.SystemContractsForChain(b.ctx.Chain.ChainID())
+		txBody, err = blueprints.IssueScheduledTransactionExecutorTransaction(b.ctx.Chain, sc.ScheduledTransactionExecutor.Address)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create scheduled transaction executor transaction: %s", err))
+		}
+		txError, err = b.invokeMetaTransaction(
+			b.ctx,
+			Transaction(txBody, 0),
+		)
+		panicOnMetaInvokeErrf("failed to create scheduled transaction executor: %s", txError, err)
 	}
-	txError, err = b.invokeMetaTransaction(
-		b.ctx,
-		Transaction(txBody, 0),
-	)
-	panicOnMetaInvokeErrf("failed to create scheduled transaction executor: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(

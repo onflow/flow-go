@@ -13,11 +13,11 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	collectionsmock "github.com/onflow/flow-go/engine/access/ingestion/collections/mock"
 	rpcconvert "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -44,6 +44,7 @@ type indexCoreTest struct {
 	results               *storagemock.LightTransactionResults
 	headers               *storagemock.Headers
 	scheduledTransactions *storagemock.ScheduledTransactions
+	collectionIndexer     *collectionsmock.CollectionIndexer
 	ctx                   context.Context
 	blocks                []*flow.Block
 	data                  *execution_data.BlockExecutionDataEntity
@@ -69,6 +70,7 @@ func newIndexCoreTest(
 		collections:           storagemock.NewCollections(t),
 		transactions:          storagemock.NewTransactions(t),
 		scheduledTransactions: storagemock.NewScheduledTransactions(t),
+		collectionIndexer:     collectionsmock.NewCollectionIndexer(t),
 		blocks:                blocks,
 		ctx:                   context.Background(),
 		data:                  exeData,
@@ -121,36 +123,6 @@ func (i *indexCoreTest) useDefaultHeights() *indexCoreTest {
 		On("LatestHeight").
 		Return(func() uint64 {
 			return i.blocks[len(i.blocks)-1].Height
-		})
-	return i
-}
-
-func (i *indexCoreTest) setStoreRegisters(f func(t *testing.T, entries flow.RegisterEntries, height uint64) error) *indexCoreTest {
-	i.registers.
-		On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
-		Return(func(entries flow.RegisterEntries, height uint64) error {
-			return f(i.t, entries, height)
-		}).Once()
-	return i
-}
-
-func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flow.EventsList) error) *indexCoreTest {
-	i.events.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
-		Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
-			require.NotNil(i.t, batch)
-			return f(i.t, blockID, events)
-		})
-	return i
-}
-
-func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Identifier, []flow.LightTransactionResult) error) *indexCoreTest {
-	i.results.
-		On("BatchStore", mock.Anything, mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
-		Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, blockID flow.Identifier, results []flow.LightTransactionResult) error {
-			require.True(i.t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
-			require.NotNil(i.t, batch)
-			return f(i.t, blockID, results)
 		})
 	return i
 }
@@ -229,6 +201,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		i.scheduledTransactions,
 		i.g.ChainID(),
 		derivedChainData,
+		i.collectionIndexer,
 		collectionExecutedMetric,
 		lockManager,
 	)
@@ -277,9 +250,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				assert.ElementsMatch(t, tf.ExpectedRegisterEntries, entries)
 			}).
 			Return(nil)
-		for _, collection := range tf.ExpectedCollections {
-			test.collections.On("StoreAndIndexByTransaction", mock.Anything, collection).Return(&flow.LightCollection{}, nil)
-		}
+		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
 		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
 			test.scheduledTransactions.On("BatchIndex", mock.Anything, blockID, txID, scheduledTxID, mock.Anything).
 				Return(func(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
@@ -362,26 +333,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
 }
 
-// trieRegistersPayloadComparer checks that trie payloads and register payloads are same, used for testing.
-func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, registerPayloads flow.RegisterEntries) {
-	assert.Equal(t, len(triePayloads), len(registerPayloads.Values()), "registers length should equal")
-
-	// crate a lookup map that matches flow register ID to index in the payloads slice
-	payloadRegID := make(map[flow.RegisterID]int)
-	for i, p := range triePayloads {
-		k, _ := p.Key()
-		regKey, _ := convert.LedgerKeyToRegisterID(k)
-		payloadRegID[regKey] = i
-	}
-
-	for _, entry := range registerPayloads {
-		index, ok := payloadRegID[entry.Key]
-		assert.True(t, ok, fmt.Sprintf("register entry not found for key %s", entry.Key.String()))
-		val := triePayloads[index].Value()
-		assert.True(t, val.Equals(entry.Value), fmt.Sprintf("payload values not same %s - %s", val, entry.Value))
-	}
-}
-
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	regOwnerAddress := unittest.RandomAddressFixture()
@@ -416,6 +367,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -451,6 +403,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -479,6 +432,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -524,6 +478,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -548,20 +503,20 @@ func TestCollectScheduledTransactions(t *testing.T) {
 	pendingExecutionEvents := systemChunk.Events
 
 	t.Run("happy path - with scheduled transactions", func(t *testing.T) {
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, systemResults, pendingExecutionEvents)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, pendingExecutionEvents)
 		require.NoError(t, err)
 		require.Equal(t, tf.ExpectedScheduledTransactions, actual)
 	})
 
 	t.Run("happy path - no scheduled transactions", func(t *testing.T) {
 		defaultSystemResults := append([]flow.LightTransactionResult{systemResults[0]}, systemResults[len(systemResults)-1])
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, defaultSystemResults, nil)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, defaultSystemResults, nil)
 		require.NoError(t, err)
 		require.Empty(t, actual)
 	})
 
 	t.Run("empty system chunk returns error", func(t *testing.T) {
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, []flow.LightTransactionResult{}, []flow.Event{})
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, []flow.LightTransactionResult{}, []flow.Event{})
 		require.ErrorContains(t, err, "system chunk contained 0 transaction results")
 		require.Nil(t, actual)
 	})
@@ -570,20 +525,20 @@ func TestCollectScheduledTransactions(t *testing.T) {
 		events, err := rpcconvert.CcfEventsToJsonEvents(pendingExecutionEvents)
 		require.NoError(t, err)
 
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, systemResults, events)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, events)
 		require.ErrorContains(t, err, "could not get callback details from event")
 		require.Nil(t, actual)
 	})
 
 	t.Run("no scheduled transactions and incorrect number of results", func(t *testing.T) {
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, systemResults, []flow.Event{})
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, []flow.Event{})
 		require.ErrorContains(t, err, "system chunk contained 7 results, and 0 scheduled transactions")
 		require.Nil(t, actual)
 	})
 
 	t.Run("incorrect number of results", func(t *testing.T) {
 		invalidSystemResults := append(systemResults, g.LightTransactionResults().Fixture())
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, invalidSystemResults, pendingExecutionEvents)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, invalidSystemResults, pendingExecutionEvents)
 		require.ErrorContains(t, err, "system chunk contained 8 results, but found 5 scheduled transactions")
 		require.Nil(t, actual)
 	})
@@ -592,7 +547,7 @@ func TestCollectScheduledTransactions(t *testing.T) {
 		invalidSystemResults := make([]flow.LightTransactionResult, len(systemResults))
 		copy(invalidSystemResults, systemResults)
 		invalidSystemResults[0], invalidSystemResults[1] = invalidSystemResults[1], invalidSystemResults[0]
-		actual, err := collectScheduledTransactions(fvmEnv, chainID, invalidSystemResults, pendingExecutionEvents)
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, invalidSystemResults, pendingExecutionEvents)
 		require.ErrorContains(t, err, "system chunk result at index 0 does not match expected.")
 		require.Nil(t, actual)
 	})

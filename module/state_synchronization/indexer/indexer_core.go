@@ -11,11 +11,13 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -30,6 +32,7 @@ type IndexerCore struct {
 	fvmEnv                   templates.Environment
 	metrics                  module.ExecutionStateIndexerMetrics
 	collectionExecutedMetric module.CollectionExecutedMetric
+	collectionIndexer        collections.CollectionIndexer
 
 	registers             storage.RegisterIndex
 	headers               storage.Headers
@@ -61,6 +64,7 @@ func New(
 	scheduledTransactions storage.ScheduledTransactions,
 	chainID flow.ChainID,
 	derivedChainData *derived.DerivedChainData,
+	collectionIndexer collections.CollectionIndexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
 ) *IndexerCore {
@@ -90,6 +94,7 @@ func New(
 		serviceAddress:        chainID.Chain().ServiceAddress(),
 		derivedChainData:      derivedChainData,
 
+		collectionIndexer:        collectionIndexer,
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
 	}
@@ -165,7 +170,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		systemChunkEvents := data.ChunkExecutionDatas[systemChunkIndex].Events
 		systemChunkResults := data.ChunkExecutionDatas[systemChunkIndex].TransactionResults
 
-		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, systemChunkResults, systemChunkEvents)
+		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, header.Height, systemChunkResults, systemChunkEvents)
 		if err != nil {
 			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
 		}
@@ -218,25 +223,23 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	g.Go(func() error {
 		start := time.Now()
 
-		// index all collections except the system chunk
 		// Note: the access ingestion engine also indexes collections, starting when the block is
 		// finalized. This process can fall behind due to the node being offline, resource issues
 		// or network congestion. This indexer ensures that collections are never farther behind
 		// than the latest indexed block. Calling the collection handler with a collection that
 		// has already been indexed is a noop.
-		indexedCount := 0
-		if len(data.ChunkExecutionDatas) > 0 {
-			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				err := c.indexCollection(chunk.Collection)
-				if err != nil {
-					return err
-				}
-				indexedCount++
+
+		// index all standard (non-system) collections
+		standardCollections := data.StandardCollections()
+		if len(standardCollections) > 0 {
+			err := c.collectionIndexer.IndexCollections(standardCollections)
+			if err != nil {
+				return fmt.Errorf("could not index collections: %w", err)
 			}
 		}
 
 		lg.Debug().
-			Int("collection_count", indexedCount).
+			Int("collection_count", len(standardCollections)).
 			Dur("duration_ms", time.Since(start)).
 			Msg("indexed collections")
 
@@ -314,6 +317,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 func collectScheduledTransactions(
 	fvmEnv templates.Environment,
 	chainID flow.ChainID,
+	height uint64,
 	systemChunkResults []flow.LightTransactionResult,
 	systemChunkEvents []flow.Event,
 ) (map[flow.Identifier]uint64, error) {
@@ -363,7 +367,14 @@ func collectScheduledTransactions(
 	}
 
 	// reconstruct the system collection, and verify that the results match the expected transaction
-	systemCollection, err := blueprints.SystemCollection(chainID.Chain(), pendingExecutionEvents)
+	versionedCollection := systemcollection.Default(chainID)
+	systemCollection, err := versionedCollection.
+		ByHeight(height).
+		SystemCollection(chainID.Chain(),
+			func() (flow.EventsList, error) {
+				return pendingExecutionEvents, nil
+			},
+		)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct system collection: %w", err)
 	}
@@ -449,44 +460,4 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	}
 
 	return c.registers.Store(regEntries, height)
-}
-
-func (c *IndexerCore) indexCollection(collection *flow.Collection) error {
-	lctx := c.lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for indexing collections: %w", err)
-	}
-
-	err = IndexCollection(lctx, collection, c.collections, c.log, c.collectionExecutedMetric)
-	if err != nil {
-		return fmt.Errorf("could not handle collection")
-	}
-	return nil
-}
-
-// IndexCollection handles the response of the collection request made earlier when a block was received.
-//
-// No error returns are expected during normal operations.
-func IndexCollection(
-	lctx lockctx.Proof,
-	collection *flow.Collection,
-	collections storage.Collections,
-	logger zerolog.Logger,
-	collectionExecutedMetric module.CollectionExecutedMetric,
-) error {
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// store the collection, including constituent transactions, and index transactionID -> collectionID
-	light, err := collections.StoreAndIndexByTransaction(lctx, collection)
-	if err != nil {
-		return err
-	}
-
-	collectionExecutedMetric.CollectionFinalized(light)
-	collectionExecutedMetric.CollectionExecuted(light)
-	return nil
 }

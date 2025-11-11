@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -65,7 +66,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -182,7 +182,6 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
-	scheduledTransactionsEnabled         bool
 }
 
 type PublicNetworkConfig struct {
@@ -290,7 +289,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
-		scheduledTransactionsEnabled:         fvm.DefaultScheduledTransactionsEnabled,
 	}
 }
 
@@ -330,6 +328,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
+	CollectionIndexer            *collections.Indexer
+	CollectionSyncer             *collections.Syncer
 	ScriptExecutor               *backend.ScriptExecutor
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
@@ -565,7 +565,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
-	var executionDataStoreCache *execdatacache.ExecutionDataCache
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -633,7 +632,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
 			// This ensures that it simply returns a not found error if the blob doesn't exist
 			// instead of attempting to download it from the network.
-			executionDataStoreCache = execdatacache.NewExecutionDataCache(
+			builder.ExecutionDataCache = execdatacache.NewExecutionDataCache(
 				builder.ExecutionDataStore,
 				builder.Storage.Headers,
 				builder.Storage.Seals,
@@ -953,6 +952,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.scheduledTransactions),
 					builder.RootChainID,
 					indexerDerivedChainData,
+					notNil(builder.CollectionIndexer),
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
 				)
@@ -963,7 +963,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					registers.FirstHeight(),
 					registers,
 					builder.ExecutionIndexerCore,
-					executionDataStoreCache,
+					notNil(builder.ExecutionDataCache),
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
 				)
@@ -1065,7 +1065,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
-				executionDataStoreCache,
+				notNil(builder.ExecutionDataCache),
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
@@ -1086,7 +1086,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			stateStreamEng, err := statestreambackend.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
-				executionDataStoreCache,
+				notNil(builder.ExecutionDataCache),
 				node.Storage.Headers,
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
@@ -1321,10 +1321,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
-		flags.BoolVar(&builder.scheduledTransactionsEnabled,
-			"scheduled-transactions-enabled",
-			defaultConfig.scheduledTransactionsEnabled,
-			"whether to include scheduled transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1513,6 +1509,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		var unusedRetryEnabled bool
 		flags.BoolVar(&unusedRetryEnabled, "retry-enabled", false, "[deprecated] whether to enable the retry mechanism at the access node level")
 		_ = flags.MarkDeprecated("retry-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
+
+		var unusedScheduledCallbacksEnabled bool
+		flags.BoolVar(&unusedScheduledCallbacksEnabled, "scheduled-callbacks-enabled", false, "[deprecated] whether to include scheduled callback transactions in system collections.")
+		_ = flags.MarkDeprecated("scheduled-callbacks-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -2148,16 +2148,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:                  notNil(builder.EventsIndex),
-				TxResultQueryMode:            txResultQueryMode,
-				TxResultsIndex:               notNil(builder.TxResultsIndex),
-				LastFullBlockHeight:          lastFullBlockHeight,
-				IndexReporter:                indexReporter,
-				VersionControl:               notNil(builder.VersionControl),
-				ExecNodeIdentitiesProvider:   notNil(builder.ExecNodeIdentitiesProvider),
-				TxErrorMessageProvider:       notNil(builder.txResultErrorMessageProvider),
-				MaxScriptAndArgumentSize:     config.BackendConfig.AccessConfig.MaxRequestMsgSize,
-				ScheduledTransactionsEnabled: builder.scheduledTransactionsEnabled,
+				EventsIndex:                notNil(builder.EventsIndex),
+				TxResultQueryMode:          txResultQueryMode,
+				TxResultsIndex:             notNil(builder.TxResultsIndex),
+				LastFullBlockHeight:        lastFullBlockHeight,
+				IndexReporter:              indexReporter,
+				VersionControl:             notNil(builder.VersionControl),
+				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
+				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
+				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2194,10 +2193,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return builder.RpcEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-
-			builder.RequestEng, err = requester.New(
+		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			requestEng, err := requester.New(
 				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
@@ -2210,7 +2207,51 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
+			builder.RequestEng = requestEng
 
+			collectionIndexer, err := collections.NewIndexer(
+				node.Logger,
+				builder.ProtocolDB,
+				notNil(builder.collectionExecutedMetric),
+				node.State,
+				node.Storage.Blocks,
+				notNil(builder.collections),
+				lastFullBlockHeight,
+				node.StorageLockMgr,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create collection indexer: %w", err)
+			}
+			builder.CollectionIndexer = collectionIndexer
+
+			// the collection syncer has support for indexing collections from execution data if the
+			// syncer falls behind. This is only needed if the execution state indexing is disabled,
+			// since it will also index collections.
+			var executionDataSyncer *collections.ExecutionDataSyncer
+			if builder.executionDataSyncEnabled && !builder.executionDataIndexingEnabled {
+				executionDataSyncer = collections.NewExecutionDataSyncer(
+					node.Logger,
+					notNil(builder.ExecutionDataCache),
+					collectionIndexer,
+				)
+			}
+
+			collectionSyncer := collections.NewSyncer(
+				node.Logger,
+				builder.RequestEng,
+				node.State,
+				notNil(builder.collections),
+				lastFullBlockHeight,
+				collectionIndexer,
+				executionDataSyncer,
+			)
+			builder.CollectionSyncer = collectionSyncer
+
+			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
+
+			return builder.RequestEng, nil
+		}).
+		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
@@ -2221,20 +2262,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				)
 			}
 
-			collectionSyncer := ingestion.NewCollectionSyncer(
-				node.Logger,
-				notNil(builder.collectionExecutedMetric),
-				builder.RequestEng,
-				node.State,
-				node.Storage.Blocks,
-				notNil(builder.collections),
-				notNil(builder.transactions),
-				lastFullBlockHeight,
-				node.StorageLockMgr,
-			)
-			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
-
-			builder.IngestEng, err = ingestion.New(
+			ingestEng, err := ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
 				node.State,
@@ -2243,34 +2271,31 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				processedFinalizedBlockHeight,
-				notNil(collectionSyncer),
+				notNil(builder.CollectionSyncer),
+				notNil(builder.CollectionIndexer),
 				notNil(builder.collectionExecutedMetric),
 				notNil(builder.TxResultErrorMessagesCore),
 			)
 			if err != nil {
 				return nil, err
 			}
+			builder.IngestEng = ingestEng
+
 			ingestionDependable.Init(builder.IngestEng)
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
-		}).
-		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
-			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
-			// be handled by the scaffold.
-			return builder.RequestEng, nil
-		}).
-		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
-			return storageCommands.NewBackfillTxErrorMessagesCommand(
-				builder.Logger,
-				builder.State,
-				builder.TxResultErrorMessagesCore,
-			)
 		})
 
 	if builder.storeTxResultErrorMessages {
 		builder.
+			AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
+				return storageCommands.NewBackfillTxErrorMessagesCommand(
+					builder.Logger,
+					builder.State,
+					builder.TxResultErrorMessagesCore,
+				)
+			}).
 			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(
 					node.Metrics.Cache,

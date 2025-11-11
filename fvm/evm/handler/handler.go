@@ -230,7 +230,12 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 	}
 
 	// step 3 - prepare block context
-	ctx, err := h.getBlockContext()
+	bp, err := h.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -276,12 +281,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 	// skip the rest of steps
 	if !hasAtLeastOneValid {
 		return res, nil
-	}
-
-	// load block proposal
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
 	}
 
 	// for valid transactions
@@ -378,7 +377,13 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 3 - prepare block context
-	ctx, err := h.getBlockContext()
+	// load block proposal
+	bp, err := h.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -414,10 +419,6 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 8 - update the block proposal
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
-	}
 	bp.AppendTransaction(res)
 	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
@@ -477,7 +478,11 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	ctx, err := h.getBlockContext()
+	bp, err := h.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -547,12 +552,10 @@ func (h *ContractHandler) emitEvent(event *events.Event) error {
 	return h.backend.EmitEvent(ev)
 }
 
-func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return types.BlockContext{}, err
-	}
-
+func (h *ContractHandler) getBlockContext(bp *types.BlockProposal) (
+	types.BlockContext,
+	error,
+) {
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
@@ -571,6 +574,10 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	}, nil
 }
 
+func (h *ContractHandler) getBlockProposal() (*types.BlockProposal, error) {
+	return h.blockStore.BlockProposal()
+}
+
 func (h *ContractHandler) executeAndHandleCall(
 	call *types.DirectCall,
 	totalSupplyDiff *big.Int,
@@ -582,7 +589,12 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// step 2 - prepare the block context
-	ctx, err := h.getBlockContext()
+	// load the block proposal
+	bp, err := h.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -619,11 +631,6 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// step 7 - update block proposal
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
 	// append transaction to the block proposal
 	bp.AppendTransaction(res)
 
@@ -704,7 +711,11 @@ func (a *Account) Nonce() uint64 {
 }
 
 func (a *Account) nonce() (uint64, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return 0, err
+	}
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return 0, err
 	}
@@ -728,7 +739,12 @@ func (a *Account) Balance() types.Balance {
 }
 
 func (a *Account) balance() (types.Balance, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +769,12 @@ func (a *Account) Code() types.Code {
 }
 
 func (a *Account) code() (types.Code, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -776,7 +797,12 @@ func (a *Account) CodeHash() []byte {
 }
 
 func (a *Account) codeHash() ([]byte, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
