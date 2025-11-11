@@ -35,17 +35,19 @@ type CreateFunc func() flow.Entity
 // on the flow network. It is the `request` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	cfg      Config
-	metrics  module.EngineMetrics
-	me       module.Local
-	state    protocol.State
-	con      network.Conduit
-	channel  channels.Channel
-	selector flow.IdentityFilter[flow.Identity]
-	create   CreateFunc
-	handle   HandleFunc
+	unit           *engine.Unit
+	log            zerolog.Logger
+	cfg            Config
+	metrics        module.EngineMetrics
+	me             module.Local
+	state          protocol.State
+	con            network.Conduit
+	channel        channels.Channel
+	requestHandler *engine.MessageHandler
+	requestQueue   engine.MessageStore
+	selector       flow.IdentityFilter[flow.Identity]
+	create         CreateFunc
+	handle         HandleFunc
 
 	// changing the following state variables must be guarded by unit.Lock()
 	items                 map[flow.Identifier]*Item
@@ -53,11 +55,23 @@ type Engine struct {
 	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
 }
 
+var _ network.MessageProcessor = (*Engine)(nil)
+
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineRegistry, me module.Local, state protocol.State,
-	channel channels.Channel, selector flow.IdentityFilter[flow.Identity], create CreateFunc, options ...OptionFunc) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	metrics module.EngineMetrics,
+	net network.EngineRegistry,
+	me module.Local,
+	state protocol.State,
+	requestQueue engine.MessageStore,
+	channel channels.Channel,
+	selector flow.IdentityFilter[flow.Identity],
+	create CreateFunc,
+	options ...OptionFunc,
+) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -102,6 +116,20 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 		)
 	}
 
+	handler := engine.NewMessageHandler(
+		log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			// Match is called on every new message coming to this engine.
+			// Provider engine only expects *flow.EntityResponse.
+			// Other message types are discarded by Match.
+			Match: func(message *engine.Message) bool {
+				_, ok := message.Payload.(*flow.EntityResponse)
+				return ok
+			},
+			Store: requestQueue,
+		})
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:                  engine.NewUnit(),
@@ -110,6 +138,8 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 		metrics:               metrics,
 		me:                    me,
 		state:                 state,
+		requestHandler:        handler,
+		requestQueue:          requestQueue,
 		channel:               channel,
 		selector:              selector,
 		create:                create,
@@ -155,41 +185,33 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// SubmitLocal submits an message originating on the local node.
-func (e *Engine) SubmitLocal(message interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), message)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// Submit submits the given message from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, message interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(channel, originID, message)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// ProcessLocal processes an message originating on the local node.
-func (e *Engine) ProcessLocal(message interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), message)
-	})
-}
-
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, message)
-	})
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+	select {
+	case <-e.unit.Quit():
+		e.log.Warn().
+			Hex("origin_id", logging.ID(originID)).
+			Msgf("received message after shutdown")
+		return nil
+	default:
+	}
+
+	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityResponse)
+	err := e.requestHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str("channel", channel.String()).
+				Str("event", fmt.Sprintf("%+v", event)).
+				Bool(logging.KeySuspicious, true).
+				Msg("received unsupported message type")
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine event: %w", err)
+	}
+	return nil
 }
 
 // EntityByID adds an entity to the list of entities to be requested from the
@@ -445,20 +467,6 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
 
 	return true, nil
-}
-
-// process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, message interface{}) error {
-
-	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityResponse)
-	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
-
-	switch msg := message.(type) {
-	case *flow.EntityResponse:
-		return e.onEntityResponse(originID, msg)
-	default:
-		return engine.NewInvalidInputErrorf("invalid message type (%T)", message)
-	}
 }
 
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResponse) error {
