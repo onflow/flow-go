@@ -400,7 +400,7 @@ func ScheduleTransactionAtTimestamp(
 					fees: <-fees
 				)
 
-				TestFlowTransactionSchedulerHandler.addScheduledTransaction(transaction: <-scheduledTransaction)
+				TestFlowTransactionSchedulerHandler.addScheduledTransaction(tx: <-scheduledTransaction)
 			}
 		} 
 	`, serviceAccountAddress.Hex(), flowTransactionScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
