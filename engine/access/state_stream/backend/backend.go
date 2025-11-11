@@ -246,7 +246,7 @@ func (b *StateStreamBackend) GetRegisterValues(
 	for i, regID := range ids {
 		val, err := registers.Get(regID, height)
 		if err != nil {
-			err = fmt.Errorf("failed to get register by the register ID at a given block height.: %w", err)
+			err = fmt.Errorf("failed to get register by the register ID at a given block height: %w", err)
 			switch {
 			case errors.Is(err, storage.ErrNotFound):
 				return nil, nil, access.NewDataNotFoundError("registers", err)
