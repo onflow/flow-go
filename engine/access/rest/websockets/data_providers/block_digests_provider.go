@@ -31,7 +31,7 @@ func NewBlockDigestsDataProvider(
 	subscriptionID string,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) (*BlockDigestsDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {
@@ -69,7 +69,7 @@ func (p *BlockDigestsDataProvider) Run() error {
 func (p *BlockDigestsDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args blocksArguments,
-) subscription.Subscription {
+) subscription.Subscription[*flow.BlockDigest] {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockDigestsFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

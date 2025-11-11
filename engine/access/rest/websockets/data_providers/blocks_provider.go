@@ -43,7 +43,7 @@ func NewBlocksDataProvider(
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) (*BlocksDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {
@@ -82,7 +82,7 @@ func (p *BlocksDataProvider) Run() error {
 func (p *BlocksDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args blocksArguments,
-) subscription.Subscription {
+) subscription.Subscription[*flow.Block] {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

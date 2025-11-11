@@ -20,7 +20,7 @@ type baseDataProvider struct {
 	subscriptionID            string
 	topic                     string
 	rawArguments              wsmodels.Arguments
-	send                      chan<- interface{}
+	send                      chan<- any
 	cancelSubscriptionContext context.CancelFunc
 }
 
@@ -32,7 +32,7 @@ func newBaseDataProvider(
 	subscriptionID string,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) *baseDataProvider {
 	ctx, cancel := context.WithCancel(ctx)
 	return &baseDataProvider{
@@ -90,11 +90,11 @@ type sendResponseCallback[T any] func(T) error
 //
 // No other errors are expected during normal operation
 func run[T any](
-	subscription subscription.Subscription,
+	subscription subscription.Subscription[T],
 	sendResponse sendResponseCallback[T],
 ) error {
 	for {
-		value, ok := <-subscription.Channel()
+		response, ok := <-subscription.Channel()
 		if !ok {
 			err := subscription.Err()
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -102,11 +102,6 @@ func run[T any](
 			}
 
 			return nil
-		}
-
-		response, ok := value.(T)
-		if !ok {
-			return fmt.Errorf("unexpected response type: %T", value)
 		}
 
 		err := sendResponse(response)

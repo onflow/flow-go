@@ -43,7 +43,7 @@ func NewTransactionStatusesDataProvider(
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) (*TransactionStatusesDataProvider, error) {
 	args, err := parseTransactionStatusesArguments(rawArguments)
 	if err != nil {
@@ -102,7 +102,7 @@ func (p *TransactionStatusesDataProvider) sendResponse(txResults []*accessmodel.
 func (p *TransactionStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args transactionStatusesArguments,
-) subscription.Subscription {
+) subscription.Subscription[[]*accessmodel.TransactionResult] {
 	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 

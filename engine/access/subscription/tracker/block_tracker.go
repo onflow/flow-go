@@ -5,6 +5,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -12,27 +13,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// BlockTracker is an interface for tracking blocks and handling block-related operations.
-type BlockTracker interface {
-	BaseTracker
+// BlockTracker is an implementation of the BlockTracker interface.
+type BlockTracker struct {
+	*HeightTracker
 
-	// GetHighestHeight returns the highest height based on the specified block status which could be only BlockStatusSealed
-	// or BlockStatusFinalized.
-	// No errors are expected during normal operation.
-	GetHighestHeight(flow.BlockStatus) (uint64, error)
-
-	// ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
-	// The input to this callback is treated as trusted. This method should be executed on
-	// `OnFinalizedBlock` notifications from the node-internal consensus instance.
-	// No errors are expected during normal operation.
-	ProcessOnFinalizedBlock() error
-}
-
-var _ BlockTracker = (*BlockTrackerImpl)(nil)
-
-// BlockTrackerImpl is an implementation of the BlockTracker interface.
-type BlockTrackerImpl struct {
-	BaseTracker
 	state       protocol.State
 	broadcaster *engine.Broadcaster
 
@@ -42,15 +26,23 @@ type BlockTrackerImpl struct {
 	sealedHighestHeight counters.StrictMonotonicCounter
 }
 
-// NewBlockTracker creates a new BlockTrackerImpl instance.
+var _ subscription.BlockTracker = (*BlockTracker)(nil)
+
+// NewBlockTracker creates a new BlockTracker instance.
+//
+// Parameters:
+// - state: The protocol state used for retrieving block information.
+// - rootHeight: The root block height, serving as the baseline for calculating the start height.
+// - headers: The storage headers for accessing block headers.
+// - broadcaster: The engine broadcaster for publishing notifications.
 //
 // No errors are expected during normal operation.
 func NewBlockTracker(
 	state protocol.State,
-	sealedRootHeight uint64,
+	rootHeight uint64,
 	headers storage.Headers,
 	broadcaster *engine.Broadcaster,
-) (*BlockTrackerImpl, error) {
+) (*BlockTracker, error) {
 	lastFinalized, err := state.Final().Head()
 	if err != nil {
 		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
@@ -63,8 +55,8 @@ func NewBlockTracker(
 		return nil, irrecoverable.NewExceptionf("could not retrieve last sealed block: %w", err)
 	}
 
-	return &BlockTrackerImpl{
-		BaseTracker:            NewBaseTrackerImpl(sealedRootHeight, state, headers),
+	return &BlockTracker{
+		HeightTracker:          NewHeightTracker(rootHeight, state, headers),
 		state:                  state,
 		finalizedHighestHeight: counters.NewMonotonicCounter(lastFinalized.Height),
 		sealedHighestHeight:    counters.NewMonotonicCounter(lastSealed.Height),
@@ -79,14 +71,15 @@ func NewBlockTracker(
 //
 // Expected errors during normal operation:
 // - codes.InvalidArgument    - if block status is flow.BlockStatusUnknown.
-func (b *BlockTrackerImpl) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error) {
+func (b *BlockTracker) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error) {
 	switch blockStatus {
 	case flow.BlockStatusFinalized:
 		return b.finalizedHighestHeight.Value(), nil
 	case flow.BlockStatusSealed:
 		return b.sealedHighestHeight.Value(), nil
+	default:
+		return 0, status.Errorf(codes.InvalidArgument, "invalid block status: %s", blockStatus)
 	}
-	return 0, status.Errorf(codes.InvalidArgument, "invalid block status: %s", blockStatus)
 }
 
 // ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
@@ -94,7 +87,7 @@ func (b *BlockTrackerImpl) GetHighestHeight(blockStatus flow.BlockStatus) (uint6
 // `OnFinalizedBlock` notifications from the node-internal consensus instance.
 // No errors are expected during normal operation. Any errors encountered should be
 // treated as an exception.
-func (b *BlockTrackerImpl) ProcessOnFinalizedBlock() error {
+func (b *BlockTracker) ProcessOnFinalizedBlock() error {
 	// get the finalized header from state
 	finalizedHeader, err := b.state.Final().Head()
 	if err != nil {

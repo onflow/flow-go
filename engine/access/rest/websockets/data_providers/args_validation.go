@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 )
 
-func ensureAllowedFields(fields map[string]interface{}, allowedFields map[string]struct{}) error {
+func ensureAllowedFields(fields map[string]any, allowedFields map[string]struct{}) error {
 	// Ensure only allowed fields are present
 	for key := range fields {
 		if _, exists := allowedFields[key]; !exists {

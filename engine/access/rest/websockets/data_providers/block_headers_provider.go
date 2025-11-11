@@ -32,7 +32,7 @@ func NewBlockHeadersDataProvider(
 	subscriptionID string,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) (*BlockHeadersDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {
@@ -70,7 +70,7 @@ func (p *BlockHeadersDataProvider) Run() error {
 func (p *BlockHeadersDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args blocksArguments,
-) subscription.Subscription {
+) subscription.Subscription[*flow.Header] {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockHeadersFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

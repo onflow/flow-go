@@ -8,18 +8,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
-
-// EventsResponse represents the response containing events for a specific block.
-type EventsResponse struct {
-	BlockID        flow.Identifier
-	Height         uint64
-	Events         flow.EventsList
-	BlockTimestamp time.Time
-}
 
 // EventsProvider retrieves events by block height. It can be configured to retrieve events from
 // the events indexer(if available) or using a dedicated callback to query it from other sources.
@@ -35,8 +28,8 @@ type EventsProvider struct {
 // Expected errors:
 // - codes.NotFound: If block header for the specified block height is not found.
 // - error: An error, if any, encountered during getting events from storage or execution data.
-func (b *EventsProvider) GetAllEventsResponse(ctx context.Context, height uint64) (*EventsResponse, error) {
-	var response *EventsResponse
+func (b *EventsProvider) GetAllEventsResponse(ctx context.Context, height uint64) (*state_stream.EventsResponse, error) {
+	var response *state_stream.EventsResponse
 	var err error
 	if b.useEventsIndex {
 		response, err = b.getEventsFromStorage(height)
@@ -66,7 +59,7 @@ func (b *EventsProvider) GetAllEventsResponse(ctx context.Context, height uint64
 // getEventsFromExecutionData returns the events for a given height extract from the execution data.
 // Expected errors:
 // - error: An error indicating issues with getting execution data for block
-func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height uint64) (*state_stream.EventsResponse, error) {
 	executionData, err := b.getExecutionData(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
@@ -77,7 +70,7 @@ func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height 
 		events = append(events, chunkExecutionData.Events...)
 	}
 
-	return &EventsResponse{
+	return &state_stream.EventsResponse{
 		BlockID: executionData.BlockID,
 		Height:  height,
 		Events:  events,
@@ -88,7 +81,7 @@ func (b *EventsProvider) getEventsFromExecutionData(ctx context.Context, height 
 // Expected errors:
 // - error: An error indicating any issues with the provided block height or
 // an error indicating issue with getting events for a block.
-func (b *EventsProvider) getEventsFromStorage(height uint64) (*EventsResponse, error) {
+func (b *EventsProvider) getEventsFromStorage(height uint64) (*state_stream.EventsResponse, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
@@ -99,7 +92,7 @@ func (b *EventsProvider) getEventsFromStorage(height uint64) (*EventsResponse, e
 		return nil, fmt.Errorf("could not get events for block %d: %w", height, err)
 	}
 
-	return &EventsResponse{
+	return &state_stream.EventsResponse{
 		BlockID: blockID,
 		Height:  height,
 		Events:  events,

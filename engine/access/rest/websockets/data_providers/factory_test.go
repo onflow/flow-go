@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/access/mock"
@@ -14,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -24,7 +22,7 @@ type DataProviderFactorySuite struct {
 	suite.Suite
 
 	ctx context.Context
-	ch  chan interface{}
+	ch  chan any
 
 	accessApi      *accessmock.API
 	stateStreamApi *ssmock.API
@@ -44,7 +42,7 @@ func (s *DataProviderFactorySuite) SetupTest() {
 	s.accessApi = accessmock.NewAPI(s.T())
 
 	s.ctx = context.Background()
-	s.ch = make(chan interface{})
+	s.ch = make(chan any)
 
 	s.factory = NewDataProviderFactory(
 		log,
@@ -56,13 +54,6 @@ func (s *DataProviderFactorySuite) SetupTest() {
 		nil,
 	)
 	s.Require().NotNil(s.factory)
-}
-
-// setupSubscription creates a mock subscription instance for testing purposes.
-// It configures the return value of the specified API call to the mock subscription.
-func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
-	sub := submock.NewSubscription(s.T())
-	apiCall.Return(sub).Once()
 }
 
 // TestSupportedTopics verifies that supported topics return a valid provider and no errors.

@@ -15,7 +15,7 @@ func SubscribeEvents(
 	ctx context.Context,
 	r *common.Request,
 	wsController *legacy.WebsocketController,
-) (subscription.Subscription, error) {
+) (subscription.Subscription[*state_stream.EventsResponse], error) {
 	req, err := request.SubscribeEventsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

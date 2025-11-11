@@ -56,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -1099,6 +1100,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				useIndex,
 			)
 
+			streamOptions := streamer.NewDefaultStreamOptions()
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				node.State,
@@ -1111,16 +1114,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.EventsIndex,
 				useIndex,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
-					builder.Logger,
-					broadcaster,
-					builder.stateStreamConf.ClientSendTimeout,
-					builder.stateStreamConf.ResponseLimit,
-					builder.stateStreamConf.ClientSendBufferSize,
-				),
 				executionDataTracker,
 				notNil(builder.executionResultInfoProvider),
 				builder.executionStateCache, // might be nil
+				broadcaster,
+				streamOptions,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -2217,37 +2215,30 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 
 			builder.nodeBackend, err = backend.New(backend.Params{
-				State:                 node.State,
-				CollectionRPC:         builder.CollectionRPC, // might be nil
-				HistoricalAccessNodes: notNil(builder.HistoricalAccessRPCs),
-				Blocks:                node.Storage.Blocks,
-				Headers:               node.Storage.Headers,
-				Collections:           notNil(builder.collections),
-				Transactions:          notNil(builder.transactions),
-				ExecutionReceipts:     node.Storage.Receipts,
-				ExecutionResults:      node.Storage.Results,
-				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
-				ChainID:               node.RootChainID,
-				AccessMetrics:         notNil(builder.AccessMetrics),
-				ConnFactory:           connFactory,
-				RetryEnabled:          builder.retryEnabled,
-				MaxHeightRange:        backendConfig.MaxHeightRange,
-				Log:                   node.Logger,
-				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-				Communicator:          nodeCommunicator,
-				TxResultCacheSize:     builder.TxResultCacheSize,
-				ScriptExecutor:        notNil(builder.ScriptExecutor),
-				ScriptExecutionMode:   scriptExecMode,
-				CheckPayerBalanceMode: checkPayerBalanceMode,
-				EventQueryMode:        eventQueryMode,
-				BlockTracker:          blockTracker,
-				SubscriptionHandler: subscription.NewSubscriptionHandler(
-					builder.Logger,
-					broadcaster,
-					builder.stateStreamConf.ClientSendTimeout,
-					builder.stateStreamConf.ResponseLimit,
-					builder.stateStreamConf.ClientSendBufferSize,
-				),
+				State:                       node.State,
+				CollectionRPC:               builder.CollectionRPC, // might be nil
+				HistoricalAccessNodes:       notNil(builder.HistoricalAccessRPCs),
+				Blocks:                      node.Storage.Blocks,
+				Headers:                     node.Storage.Headers,
+				Collections:                 notNil(builder.collections),
+				Transactions:                notNil(builder.transactions),
+				ExecutionReceipts:           node.Storage.Receipts,
+				ExecutionResults:            node.Storage.Results,
+				TxResultErrorMessages:       builder.transactionResultErrorMessages, // might be nil
+				ChainID:                     node.RootChainID,
+				AccessMetrics:               notNil(builder.AccessMetrics),
+				ConnFactory:                 connFactory,
+				RetryEnabled:                builder.retryEnabled,
+				MaxHeightRange:              backendConfig.MaxHeightRange,
+				Log:                         node.Logger,
+				SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+				Communicator:                nodeCommunicator,
+				TxResultCacheSize:           builder.TxResultCacheSize,
+				ScriptExecutor:              notNil(builder.ScriptExecutor),
+				ScriptExecutionMode:         scriptExecMode,
+				CheckPayerBalanceMode:       checkPayerBalanceMode,
+				EventQueryMode:              eventQueryMode,
+				BlockTracker:                blockTracker,
 				EventsIndex:                 notNil(builder.EventsIndex),
 				TxResultQueryMode:           txResultQueryMode,
 				TxResultsIndex:              notNil(builder.TxResultsIndex),

@@ -76,7 +76,7 @@ type TransactionStreamAPI interface {
 		ctx context.Context,
 		txID flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) subscription.Subscription
+	) subscription.Subscription[[]*accessmodel.TransactionResult]
 
 	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
 	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
@@ -88,7 +88,140 @@ type TransactionStreamAPI interface {
 		ctx context.Context,
 		tx *flow.TransactionBody,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) subscription.Subscription
+	) subscription.Subscription[[]*accessmodel.TransactionResult]
+}
+
+type BlockStreamAPI interface {
+	// SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the
+	// requested start block id, up until the latest available block. Once the latest is reached,
+	// the stream will remain open and responses are sent for each new block as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlocksFromStartBlockID(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Block]
+
+	// SubscribeBlocksFromStartHeight subscribes to the finalized or sealed blocks starting at the requested
+	// start block height, up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlocksFromStartHeight(
+		ctx context.Context,
+		startHeight uint64,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Block]
+
+	// SubscribeBlocksFromLatest subscribes to the finalized or sealed blocks starting at the latest sealed block,
+	// up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlocksFromLatest(
+		ctx context.Context,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Block]
+
+	// SubscribeBlockHeadersFromStartBlockID streams finalized or sealed block headers starting at the requested
+	// start block id, up until the latest available block header. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block header as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlockHeadersFromStartBlockID(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Header]
+
+	// SubscribeBlockHeadersFromStartHeight streams finalized or sealed block headers starting at the requested
+	// start block height, up until the latest available block header. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block header as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlockHeadersFromStartHeight(
+		ctx context.Context,
+		startHeight uint64,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Header]
+
+	// SubscribeBlockHeadersFromLatest streams finalized or sealed block headers starting at the latest sealed block,
+	// up until the latest available block header. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block header as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlockHeadersFromLatest(
+		ctx context.Context,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.Header]
+
+	// SubscribeBlockDigestsFromStartBlockID streams finalized or sealed lightweight block starting at the requested
+	// start block id, up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlockDigestsFromStartBlockID(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.BlockDigest]
+
+	// SubscribeBlockDigestsFromStartHeight streams finalized or sealed lightweight block starting at the requested
+	// start block height, up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlockDigestsFromStartHeight(
+		ctx context.Context,
+		startHeight uint64,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.BlockDigest]
+
+	// SubscribeBlockDigestsFromLatest streams finalized or sealed lightweight block starting at the latest sealed block,
+	// up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only blocks that match blockStatus
+	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters are supplied, a failed subscription is returned.
+	SubscribeBlockDigestsFromLatest(
+		ctx context.Context,
+		blockStatus flow.BlockStatus,
+	) subscription.Subscription[*flow.BlockDigest]
 }
 
 // API provides all public-facing functionality of the Flow Access API.
@@ -103,6 +236,7 @@ type API interface {
 	ScriptsAPI
 	TransactionsAPI
 	TransactionStreamAPI
+	BlockStreamAPI
 
 	// Ping responds to requests when the server is up.
 	//
@@ -249,102 +383,4 @@ type API interface {
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - access.DataNotFoundError - No execution result with the given ID was found
 	GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error)
-
-	// SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the
-	// requested start block id, up until the latest available block. Once the latest is reached,
-	// the stream will remain open and responses are sent for each new block as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlocksFromStartHeight subscribes to the finalized or sealed blocks starting at the requested
-	// start block height, up until the latest available block. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlocksFromLatest subscribes to the finalized or sealed blocks starting at the latest sealed block,
-	// up until the latest available block. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlockHeadersFromStartBlockID streams finalized or sealed block headers starting at the requested
-	// start block id, up until the latest available block header. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block header as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlockHeadersFromStartHeight streams finalized or sealed block headers starting at the requested
-	// start block height, up until the latest available block header. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block header as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlockHeadersFromLatest streams finalized or sealed block headers starting at the latest sealed block,
-	// up until the latest available block header. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block header as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlockDigestsFromStartBlockID streams finalized or sealed lightweight block starting at the requested
-	// start block id, up until the latest available block. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlockDigestsFromStartHeight streams finalized or sealed lightweight block starting at the requested
-	// start block height, up until the latest available block. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
-
-	// SubscribeBlockDigestsFromLatest streams finalized or sealed lightweight block starting at the latest sealed block,
-	// up until the latest available block. Once the latest is
-	// reached, the stream will remain open and responses are sent for each new
-	// block as it becomes available.
-	//
-	// Each block is filtered by the provided block status, and only blocks that match blockStatus
-	// are returned. blockStatus must be BlockStatusSealed or BlockStatusFinalized.
-	//
-	// If invalid parameters are supplied, a failed subscription is returned.
-	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
 }

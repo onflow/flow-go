@@ -10,10 +10,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -64,7 +65,7 @@ type Config struct {
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 
 type StateStreamBackend struct {
-	tracker.ExecutionDataTracker
+	subscription.ExecutionDataTracker
 
 	ExecutionDataBackend
 	EventsBackend
@@ -94,10 +95,11 @@ func New(
 	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
 	registerIDsRequestLimit int,
-	subscriptionHandler *subscription.SubscriptionHandler,
-	executionDataTracker tracker.ExecutionDataTracker,
+	executionDataTracker subscription.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
+	broadcaster *engine.Broadcaster,
+	streamOptions *streamer.StreamOptions,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -116,13 +118,15 @@ func New(
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
-		log:                     logger,
-		headers:                 headers,
-		subscriptionHandler:     subscriptionHandler,
-		getExecutionData:        b.getExecutionData,
-		executionDataTracker:    executionDataTracker,
-		executionResultProvider: executionResultProvider,
-		executionStateCache:     executionStateCache,
+		log:                      logger,
+		headers:                  headers,
+		getExecutionData:         b.getExecutionData,
+		executionDataTracker:     executionDataTracker,
+		executionDataBroadcaster: broadcaster,
+		streamOptions:            streamOptions,
+		endHeight:                0, // execution data endpoints are unbounded streams
+		executionResultProvider:  executionResultProvider,
+		executionStateCache:      executionStateCache,
 	}
 
 	eventsProvider := EventsProvider{
@@ -134,17 +138,21 @@ func New(
 	}
 
 	b.EventsBackend = EventsBackend{
-		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
-		executionDataTracker: executionDataTracker,
-		eventsProvider:       eventsProvider,
+		log:                      logger,
+		executionDataTracker:     executionDataTracker,
+		eventsProvider:           eventsProvider,
+		executionDataBroadcaster: broadcaster,
+		streamOptions:            streamOptions,
+		endHeight:                0, // events endpoints are unbounded streams
 	}
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
 		executionDataTracker: b.ExecutionDataTracker,
 		eventsProvider:       eventsProvider,
+		execDataBroadcaster:  broadcaster,
+		streamOptions:        streamOptions,
+		endHeight:            0, // account statues endpoints are unbounded streams
 	}
 
 	return b, nil

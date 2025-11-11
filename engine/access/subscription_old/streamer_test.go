@@ -1,4 +1,4 @@
-package subscription_test
+package subscription_old_test
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/subscription"
-	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
+	submock "github.com/onflow/flow-go/engine/access/subscription_old/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,7 +27,7 @@ func TestStream(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	timeout := subscription.DefaultSendTimeout
+	timeout := subscription_old.DefaultSendTimeout
 
 	sub := submock.NewStreamable(t)
 	sub.On("ID").Return(uuid.NewString())
@@ -39,7 +39,7 @@ func TestStream(t *testing.T) {
 	tests = append(tests, testData{"", testErr})
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+	streamer := subscription_old.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription_old.DefaultResponseLimit, sub)
 
 	for _, d := range tests {
 		sub.On("Next", mock.Anything).Return(d.data, d.err).Once()
@@ -64,7 +64,7 @@ func TestStreamRatelimited(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	timeout := subscription.DefaultSendTimeout
+	timeout := subscription_old.DefaultSendTimeout
 	duration := 100 * time.Millisecond
 
 	for _, limit := range []float64{0.2, 3, 20, 500} {
@@ -73,7 +73,7 @@ func TestStreamRatelimited(t *testing.T) {
 			sub.On("ID").Return(uuid.NewString())
 
 			broadcaster := engine.NewBroadcaster()
-			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
+			streamer := subscription_old.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 			var nextCalls, sendCalls int
 			sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {
@@ -115,7 +115,7 @@ func TestLongStreamRatelimited(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skipping long stream rate limit test")
 
 	ctx := context.Background()
-	timeout := subscription.DefaultSendTimeout
+	timeout := subscription_old.DefaultSendTimeout
 
 	limit := 5.0
 	duration := 30 * time.Second
@@ -124,7 +124,7 @@ func TestLongStreamRatelimited(t *testing.T) {
 	sub.On("ID").Return(uuid.NewString())
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
+	streamer := subscription_old.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 	var nextCalls, sendCalls int
 	sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {

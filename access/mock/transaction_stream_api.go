@@ -5,8 +5,11 @@ package mock
 import (
 	context "context"
 
-	flow "github.com/onflow/flow-go/model/flow"
+	access "github.com/onflow/flow-go/model/access"
+
 	entities "github.com/onflow/flow/protobuf/go/flow/entities"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -19,19 +22,19 @@ type TransactionStreamAPI struct {
 }
 
 // SendAndSubscribeTransactionStatuses provides a mock function with given fields: ctx, tx, requiredEventEncodingVersion
-func (_m *TransactionStreamAPI) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
+func (_m *TransactionStreamAPI) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription[[]*access.TransactionResult] {
 	ret := _m.Called(ctx, tx, requiredEventEncodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendAndSubscribeTransactionStatuses")
 	}
 
-	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody, entities.EventEncodingVersion) subscription.Subscription); ok {
+	var r0 subscription.Subscription[[]*access.TransactionResult]
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody, entities.EventEncodingVersion) subscription.Subscription[[]*access.TransactionResult]); ok {
 		r0 = rf(ctx, tx, requiredEventEncodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(subscription.Subscription)
+			r0 = ret.Get(0).(subscription.Subscription[[]*access.TransactionResult])
 		}
 	}
 
@@ -39,19 +42,19 @@ func (_m *TransactionStreamAPI) SendAndSubscribeTransactionStatuses(ctx context.
 }
 
 // SubscribeTransactionStatuses provides a mock function with given fields: ctx, txID, requiredEventEncodingVersion
-func (_m *TransactionStreamAPI) SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
+func (_m *TransactionStreamAPI) SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription[[]*access.TransactionResult] {
 	ret := _m.Called(ctx, txID, requiredEventEncodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeTransactionStatuses")
 	}
 
-	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) subscription.Subscription); ok {
+	var r0 subscription.Subscription[[]*access.TransactionResult]
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) subscription.Subscription[[]*access.TransactionResult]); ok {
 		r0 = rf(ctx, txID, requiredEventEncodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(subscription.Subscription)
+			r0 = ret.Get(0).(subscription.Subscription[[]*access.TransactionResult])
 		}
 	}
 

@@ -12,19 +12,14 @@ import (
 // - handleResponse: The function responsible for handling the response of the subscribed type.
 //
 // No errors are expected during normal operations.
-func HandleSubscription[T any](sub Subscription, handleResponse func(resp T) error) error {
+func HandleSubscription[T any](sub Subscription[T], handleResponse func(resp T) error) error {
 	for {
-		v, ok := <-sub.Channel()
+		resp, ok := <-sub.Channel()
 		if !ok {
 			if sub.Err() != nil {
 				return fmt.Errorf("stream encountered an error: %w", sub.Err())
 			}
 			return nil
-		}
-
-		resp, ok := v.(T)
-		if !ok {
-			return fmt.Errorf("unexpected response type: %T", v)
 		}
 
 		err := handleResponse(resp)

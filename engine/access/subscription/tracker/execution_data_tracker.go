@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,44 +30,10 @@ const (
 	maxIndexBlockDiff = 30
 )
 
-// ExecutionDataTracker is an interface for tracking the highest consecutive block height for which we have received a
-// new Execution Data notification
-type ExecutionDataTracker interface {
-	BaseTracker
+// ExecutionDataTracker is an implementation of the ExecutionDataTracker interface.
+type ExecutionDataTracker struct {
+	*HeightTracker
 
-	// GetStartHeight returns the start height to use when searching.
-	// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
-	// If a block is provided and does not exist, a NotFound error is returned.
-	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-	//
-	// Parameters:
-	// - ctx: Context for the operation.
-	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
-	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
-	//
-	// Returns:
-	// - uint64: The start height for searching.
-	// - error: An error indicating the result of the operation, if any.
-	//
-	// Expected errors during normal operation:
-	// - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is less than the root block height,
-	// if the start height is out of bounds based on indexed heights (when index is used).
-	// - codes.NotFound   - if a block is provided and does not exist.
-	// - codes.Internal        - if there is an internal error.
-	GetStartHeight(context.Context, flow.Identifier, uint64) (uint64, error)
-
-	// GetHighestHeight returns the highest height that we have consecutive execution data for.
-	GetHighestHeight() uint64
-
-	// OnExecutionData is used to notify the tracker when a new execution data is received.
-	OnExecutionData(*execution_data.BlockExecutionDataEntity)
-}
-
-var _ ExecutionDataTracker = (*ExecutionDataTrackerImpl)(nil)
-
-// ExecutionDataTrackerImpl is an implementation of the ExecutionDataTracker interface.
-type ExecutionDataTrackerImpl struct {
-	BaseTracker
 	log           zerolog.Logger
 	headers       storage.Headers
 	broadcaster   *engine.Broadcaster
@@ -77,7 +44,9 @@ type ExecutionDataTrackerImpl struct {
 	highestHeight counters.StrictMonotonicCounter
 }
 
-// NewExecutionDataTracker creates a new ExecutionDataTrackerImpl instance.
+var _ subscription.ExecutionDataTracker = (*ExecutionDataTracker)(nil)
+
+// NewExecutionDataTracker creates a new ExecutionDataTracker instance.
 //
 // Parameters:
 // - log: The logger to use for logging.
@@ -90,7 +59,7 @@ type ExecutionDataTrackerImpl struct {
 // - useIndex: A flag indicating whether to use indexed block heights for validation.
 //
 // Returns:
-// - *ExecutionDataTrackerImpl: A new instance of ExecutionDataTrackerImpl.
+// - *ExecutionDataTracker: A new instance of ExecutionDataTracker.
 func NewExecutionDataTracker(
 	log zerolog.Logger,
 	state protocol.State,
@@ -100,9 +69,9 @@ func NewExecutionDataTracker(
 	highestAvailableFinalizedHeight uint64,
 	indexReporter state_synchronization.IndexReporter,
 	useIndex bool,
-) *ExecutionDataTrackerImpl {
-	return &ExecutionDataTrackerImpl{
-		BaseTracker:   NewBaseTrackerImpl(rootHeight, state, headers),
+) *ExecutionDataTracker {
+	return &ExecutionDataTracker{
+		HeightTracker: NewHeightTracker(rootHeight, state, headers),
 		log:           log,
 		headers:       headers,
 		broadcaster:   broadcaster,
@@ -110,43 +79,6 @@ func NewExecutionDataTracker(
 		indexReporter: indexReporter,
 		useIndex:      useIndex,
 	}
-}
-
-// GetStartHeight returns the start height to use when searching.
-// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
-// If a block is provided and does not exist, a NotFound error is returned.
-// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-//
-// Parameters:
-// - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
-// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
-//
-// Returns:
-// - uint64: The start height for searching.
-// - error: An error indicating the result of the operation, if any.
-//
-// Expected errors during normal operation:
-// - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is less than the root block height,
-// if the start height is out of bounds based on indexed heights (when index is used).
-// - codes.NotFound        - if a block is provided and does not exist.
-// - codes.Internal        - if there is an internal error.
-func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
-	if startBlockID != flow.ZeroID && startHeight > 0 {
-		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
-	}
-
-	// get the start height based on the provided starting block ID
-	if startBlockID != flow.ZeroID {
-		return e.GetStartHeightFromBlockID(startBlockID)
-	}
-
-	// get start height based on the provided starting block height
-	if startHeight > 0 {
-		return e.GetStartHeightFromHeight(startHeight)
-	}
-
-	return e.GetStartHeightFromLatest(ctx)
 }
 
 // GetStartHeightFromBlockID returns the start height based on the provided starting block ID.
@@ -163,9 +95,9 @@ func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBloc
 // - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - for any other error during validation.
-func (e *ExecutionDataTrackerImpl) GetStartHeightFromBlockID(startBlockID flow.Identifier) (uint64, error) {
+func (e *ExecutionDataTracker) GetStartHeightFromBlockID(startBlockID flow.Identifier) (uint64, error) {
 	// get start height based on the provided starting block id
-	height, err := e.BaseTracker.GetStartHeightFromBlockID(startBlockID)
+	height, err := e.HeightTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		return 0, err
 	}
@@ -188,9 +120,9 @@ func (e *ExecutionDataTrackerImpl) GetStartHeightFromBlockID(startBlockID flow.I
 // - codes.NotFound           - if the header was not found in storage.
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - for any other error during validation.
-func (e *ExecutionDataTrackerImpl) GetStartHeightFromHeight(startHeight uint64) (uint64, error) {
+func (e *ExecutionDataTracker) GetStartHeightFromHeight(startHeight uint64) (uint64, error) {
 	// get start height based on the provided starting block height
-	height, err := e.BaseTracker.GetStartHeightFromHeight(startHeight)
+	height, err := e.HeightTracker.GetStartHeightFromHeight(startHeight)
 	if err != nil {
 		return 0, err
 	}
@@ -208,9 +140,9 @@ func (e *ExecutionDataTrackerImpl) GetStartHeightFromHeight(startHeight uint64) 
 // - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - for any other error during validation.
-func (e *ExecutionDataTrackerImpl) GetStartHeightFromLatest(ctx context.Context) (uint64, error) {
+func (e *ExecutionDataTracker) GetStartHeightFromLatest(ctx context.Context) (uint64, error) {
 	// get start height based latest sealed block
-	height, err := e.BaseTracker.GetStartHeightFromLatest(ctx)
+	height, err := e.HeightTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -220,14 +152,13 @@ func (e *ExecutionDataTrackerImpl) GetStartHeightFromLatest(ctx context.Context)
 }
 
 // GetHighestHeight returns the highest height that we have consecutive execution data for.
-func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
+func (e *ExecutionDataTracker) GetHighestHeight() uint64 {
 	return e.highestHeight.Value()
 }
 
-// OnExecutionData is used to notify the tracker when a new execution data is received.
-func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
+// OnExecutionData is used to notify the tracker when new execution data is received.
+func (e *ExecutionDataTracker) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
 	log := e.log.With().Hex("block_id", logging.ID(executionData.BlockID)).Logger()
-
 	log.Trace().Msg("received execution data")
 
 	header, err := e.headers.ByBlockID(executionData.BlockID)
@@ -265,7 +196,7 @@ func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data
 // - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - for any other error during validation.
-func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
+func (e *ExecutionDataTracker) checkStartHeight(height uint64) (uint64, error) {
 	if !e.useIndex {
 		return height, nil
 	}
@@ -293,7 +224,7 @@ func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, erro
 // Expected errors during normal operation:
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - if there was any other error getting the heights.
-func (e *ExecutionDataTrackerImpl) getIndexedHeightBound() (uint64, uint64, error) {
+func (e *ExecutionDataTracker) getIndexedHeightBound() (uint64, uint64, error) {
 	lowestHeight, err := e.indexReporter.LowestIndexedHeight()
 	if err != nil {
 		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {

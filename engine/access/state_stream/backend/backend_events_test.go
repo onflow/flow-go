@@ -210,11 +210,16 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 		},
 	}
 
-	call := func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		startHeight uint64,
+		filter state_stream.EventFilter,
+	) subscription.Subscription[*state_stream.EventsResponse] {
 		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	subscribe(s, call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromStartBlockID runs the test suite for SubscribeEventsFromStartBlockID subscription
@@ -244,11 +249,16 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 	}, nil)
 
-	call := func(ctx context.Context, startBlockID flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		_ uint64,
+		filter state_stream.EventFilter,
+	) subscription.Subscription[*state_stream.EventsResponse] {
 		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	subscribe(s, call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromStartHeight runs the test suite for SubscribeEventsFromStartHeight subscription
@@ -278,11 +288,16 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
 	}, nil)
 
-	call := func(ctx context.Context, _ flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(
+		ctx context.Context,
+		_ flow.Identifier,
+		startHeight uint64,
+		filter state_stream.EventFilter,
+	) subscription.Subscription[*state_stream.EventsResponse] {
 		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	subscribe(s, call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromLatest runs the test suite for SubscribeEventsFromLatest subscription
@@ -309,11 +324,16 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
 	}, nil)
 
-	call := func(ctx context.Context, _ flow.Identifier, _ uint64, filter state_stream.EventFilter) subscription.Subscription {
+	call := func(
+		ctx context.Context,
+		_ flow.Identifier,
+		_ uint64,
+		filter state_stream.EventFilter,
+	) subscription.Subscription[*state_stream.EventsResponse] {
 		return s.backend.SubscribeEventsFromLatest(ctx, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	subscribe(s, call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // subscribe is a helper function to run test scenarios for event subscription in the BackendEventsSuite.
@@ -341,9 +361,10 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 //  6. Simulates the reception of new blocks and consumes them from the subscription channel.
 //  7. Ensures that there are no new messages waiting after all blocks have been processed.
 //  8. Cancels the subscription and ensures it shuts down gracefully.
-func (s *BackendEventsSuite) subscribe(
-	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription,
-	requireFn func(interface{}, *EventsResponse),
+func subscribe[T any](
+	s *BackendEventsSuite,
+	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription[T],
+	requireFn func(T, *state_stream.EventsResponse),
 	tests []eventsTestType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -391,7 +412,7 @@ func (s *BackendEventsSuite) subscribe(
 					v, ok := <-sub.Channel()
 					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Height, b.ID(), sub.Err())
 
-					expected := &EventsResponse{
+					expected := &state_stream.EventsResponse{
 						BlockID:        b.ID(),
 						Height:         b.Height,
 						Events:         expectedEvents,
@@ -422,18 +443,15 @@ func (s *BackendEventsSuite) subscribe(
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *EventsResponse) {
-	actual, ok := v.(*EventsResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", v)
-
+func (s *BackendEventsSuite) requireEventsResponse(actual *state_stream.EventsResponse, expected *state_stream.EventsResponse) {
 	assert.Equal(s.T(), expected.BlockID, actual.BlockID)
 	assert.Equal(s.T(), expected.Height, actual.Height)
 	assert.Equal(s.T(), expected.Events, actual.Events)
 	assert.Equal(s.T(), expected.BlockTimestamp, actual.BlockTimestamp)
 }
 
-// TestSubscribeEventsFromSporkRootBlock tests that events subscriptions starting from the spork
-// root block return an empty result for the root block.
+// TestSubscribeEventsFromSporkRootBlock verifies that when subscribing from the spork
+// root block, the stream starts from the first non-root block with actual events (no empty root response).
 func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -441,26 +459,19 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
 	// setup the backend to have 1 available block
 	s.highestBlockHeader = s.blocks[0].ToHeader()
 
-	rootEventResponse := &EventsResponse{
-		BlockID:        s.rootBlock.ID(),
-		Height:         s.rootBlock.Height,
-		BlockTimestamp: time.UnixMilli(int64(s.rootBlock.Timestamp)).UTC(),
-	}
-
-	firstEventResponse := &EventsResponse{
+	firstEventResponse := &state_stream.EventsResponse{
 		BlockID:        s.blocks[0].ID(),
 		Height:         s.blocks[0].Height,
 		BlockTimestamp: time.UnixMilli(int64(s.blocks[0].Timestamp)).UTC(),
 		Events:         flow.EventsList(s.blockEvents[s.blocks[0].ID()]),
 	}
 
-	assertSubscriptionResponses := func(sub subscription.Subscription, cancel context.CancelFunc) {
-		// the first response should have details from the root block and no events
+	assertSubscriptionResponses := func(
+		sub subscription.Subscription[*state_stream.EventsResponse],
+		cancel context.CancelFunc,
+	) {
+		// the first response should have details from the first non-root block and its events
 		resp := <-sub.Channel()
-		s.requireEventsResponse(resp, rootEventResponse)
-
-		// the second response should have details from the first block and its events
-		resp = <-sub.Channel()
 		s.requireEventsResponse(resp, firstEventResponse)
 
 		cancel()

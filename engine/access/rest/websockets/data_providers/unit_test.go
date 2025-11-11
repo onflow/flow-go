@@ -16,11 +16,13 @@ import (
 )
 
 // testType represents a valid test scenario for subscribing
-type testType struct {
+// In: type flowing through the subscription channel
+// Out: type of the expected response produced by the provider (often any wrapping BaseDataProvidersResponse)
+type testType[In any, Out any] struct {
 	name              string
 	arguments         wsmodels.Arguments
-	setupBackend      func(sub *submock.Subscription)
-	expectedResponses []interface{}
+	setupBackend      func(sub *submock.Subscription[In])
+	expectedResponses []Out
 }
 
 // testErrType represents an error cases for subscribing
@@ -42,29 +44,35 @@ type testErrType struct {
 // - tests: A slice of test cases to run, each specifying setup and validation logic.
 // - sendData: A function to simulate emitting data into the subscription's data channel.
 // - requireFn: A function to validate the output received in the send channel.
-func testHappyPath(
+func testHappyPath[In any, Out any](
 	t *testing.T,
 	topic string,
 	factory *DataProviderFactoryImpl,
-	tests []testType,
-	sendData func(chan interface{}),
-	requireFn func(interface{}, interface{}),
+	tests []testType[In, Out],
+	sendData func(chan In),
+	requireFn func(actual any, expected Out),
 ) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			send := make(chan interface{}, 10)
+			send := make(chan any, 10)
 
 			// Create a channel to simulate the subscription's data channel
-			dataChan := make(chan interface{})
+			dataChan := make(chan In)
 
 			// Create a mock subscription and mock the channel
-			sub := submock.NewSubscription(t)
-			sub.On("Channel").Return((<-chan interface{})(dataChan))
+			sub := submock.NewSubscription[In](t)
+			sub.On("Channel").Return((<-chan In)(dataChan))
 			sub.On("Err").Return(nil)
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider(context.Background(), "dummy-id", topic, test.arguments, send)
+			provider, err := factory.NewDataProvider(
+				context.Background(),
+				"dummy-id",
+				topic,
+				test.arguments,
+				send,
+			)
 			require.NoError(t, err)
 			require.NotNil(t, provider)
 
@@ -102,7 +110,7 @@ func testHappyPath(
 }
 
 // extractPayload extracts the BaseDataProvidersResponse and its typed Payload.
-func extractPayload[T any](t *testing.T, v interface{}) (*models.BaseDataProvidersResponse, T) {
+func extractPayload[T any](t *testing.T, v any) (*models.BaseDataProvidersResponse, T) {
 	response, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(t, ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
@@ -125,7 +133,7 @@ func TestEnsureAllowedFields(t *testing.T) {
 	}
 
 	t.Run("Valid fields with all required", func(t *testing.T) {
-		fields := map[string]interface{}{
+		fields := map[string]any{
 			"start_block_id":     "abc",
 			"start_block_height": 123,
 			"event_types":        []string{"flow.Event"},
@@ -138,7 +146,7 @@ func TestEnsureAllowedFields(t *testing.T) {
 	})
 
 	t.Run("Unexpected field present", func(t *testing.T) {
-		fields := map[string]interface{}{
+		fields := map[string]any{
 			"start_block_id":     "abc",
 			"start_block_height": 123,
 			"unknown_field":      "unexpected",
@@ -184,7 +192,7 @@ func TestExtractArrayOfStrings(t *testing.T) {
 		},
 		{
 			name:      "Invalid type in array",
-			args:      wsmodels.Arguments{"tags": []interface{}{"a", 123}},
+			args:      wsmodels.Arguments{"tags": []any{"a", 123}},
 			key:       "tags",
 			required:  true,
 			expect:    nil,

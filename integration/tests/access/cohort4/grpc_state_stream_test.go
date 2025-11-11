@@ -17,7 +17,7 @@ import (
 
 	"github.com/onflow/flow-go-sdk/test"
 
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -38,7 +38,7 @@ var (
 
 // SubscribeEventsResponse represents the subscription response containing events for a specific block and messageIndex
 type SubscribeEventsResponse struct {
-	backend.EventsResponse
+	state_stream.EventsResponse
 	MessageIndex uint64
 }
 
@@ -427,7 +427,7 @@ func eventsResponseHandler(msg *executiondata.SubscribeEventsResponse) (*Subscri
 	}
 
 	return &SubscribeEventsResponse{
-		EventsResponse: backend.EventsResponse{
+		EventsResponse: state_stream.EventsResponse{
 			Height:         msg.GetBlockHeight(),
 			BlockID:        convert.MessageToIdentifier(msg.GetBlockId()),
 			Events:         events,

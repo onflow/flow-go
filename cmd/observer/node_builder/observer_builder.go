@@ -50,8 +50,9 @@ import (
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/streamer"
 	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/engine/access/subscription_old"
 	"github.com/onflow/flow-go/engine/common/follower"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
@@ -215,13 +216,13 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: commonrpc.DefaultAccessMaxResponseSize,
-			ExecutionDataCacheSize:  subscription.DefaultCacheSize,
-			ClientSendTimeout:       subscription.DefaultSendTimeout,
-			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
-			MaxGlobalStreams:        subscription.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  subscription_old.DefaultCacheSize,
+			ClientSendTimeout:       subscription_old.DefaultSendTimeout,
+			ClientSendBufferSize:    subscription_old.DefaultSendBufferSize,
+			MaxGlobalStreams:        subscription_old.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           subscription.DefaultResponseLimit,
-			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
+			ResponseLimit:           subscription_old.DefaultResponseLimit,
+			HeartbeatInterval:       subscription_old.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 		},
 		stateStreamFilterConf:                nil,
@@ -1653,6 +1654,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				useIndex,
 			)
 
+			streamOptions := streamer.NewDefaultStreamOptions()
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				node.State,
@@ -1665,16 +1668,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.EventsIndex,
 				useIndex,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
-					builder.Logger,
-					broadcaster,
-					builder.stateStreamConf.ClientSendTimeout,
-					builder.stateStreamConf.ResponseLimit,
-					builder.stateStreamConf.ClientSendBufferSize,
-				),
 				executionDataTracker,
 				builder.executionResultInfoProvider,
 				builder.executionStateCache,
+				broadcaster,
+				streamOptions,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -2051,32 +2049,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 
 		backendParams := backend.Params{
-			State:                node.State,
-			Blocks:               node.Storage.Blocks,
-			Headers:              node.Storage.Headers,
-			Collections:          node.Storage.Collections,
-			Transactions:         node.Storage.Transactions,
-			ExecutionReceipts:    node.Storage.Receipts,
-			ExecutionResults:     node.Storage.Results,
-			ChainID:              node.RootChainID,
-			AccessMetrics:        accessMetrics,
-			ConnFactory:          connFactory,
-			RetryEnabled:         false,
-			MaxHeightRange:       backendConfig.MaxHeightRange,
-			Log:                  node.Logger,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			BlockTracker:         blockTracker,
-			ScriptExecutionMode:  scriptExecMode,
-			EventQueryMode:       eventQueryMode,
-			TxResultQueryMode:    txResultQueryMode,
-			SubscriptionHandler: subscription.NewSubscriptionHandler(
-				builder.Logger,
-				broadcaster,
-				builder.stateStreamConf.ClientSendTimeout,
-				builder.stateStreamConf.ResponseLimit,
-				builder.stateStreamConf.ClientSendBufferSize,
-			),
+			State:                       node.State,
+			Blocks:                      node.Storage.Blocks,
+			Headers:                     node.Storage.Headers,
+			Collections:                 node.Storage.Collections,
+			Transactions:                node.Storage.Transactions,
+			ExecutionReceipts:           node.Storage.Receipts,
+			ExecutionResults:            node.Storage.Results,
+			ChainID:                     node.RootChainID,
+			AccessMetrics:               accessMetrics,
+			ConnFactory:                 connFactory,
+			RetryEnabled:                false,
+			MaxHeightRange:              backendConfig.MaxHeightRange,
+			Log:                         node.Logger,
+			SnapshotHistoryLimit:        backend.DefaultSnapshotHistoryLimit,
+			Communicator:                node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			BlockTracker:                blockTracker,
+			ScriptExecutionMode:         scriptExecMode,
+			EventQueryMode:              eventQueryMode,
+			TxResultQueryMode:           txResultQueryMode,
 			IndexReporter:               indexReporter,
 			VersionControl:              builder.VersionControl,
 			ExecNodeIdentitiesProvider:  execNodeIdentitiesProvider,
