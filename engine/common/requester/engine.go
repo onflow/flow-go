@@ -470,6 +470,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 }
 
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResponse) error {
+	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
 	lg := e.log.With().Str("origin_id", originID.String()).Uint64("nonce", res.Nonce).Logger()
 
 	lg.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")
