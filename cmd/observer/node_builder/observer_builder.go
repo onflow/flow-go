@@ -304,7 +304,6 @@ type ObserverServiceBuilder struct {
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
-	ScriptExecutor      *execution.Scripts
 
 	// storage
 	events                  storage.Events
@@ -2037,7 +2036,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.scriptExecMaxBlock,
 		)
 
-		builder.ScriptExecutor = execution.NewScripts(
+		scriptExecutor := execution.NewScripts(
 			builder.Logger,
 			metrics.NewExecutionCollector(builder.Tracer),
 			builder.RootChainID,
@@ -2090,7 +2089,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			backendParams.EventQueryMode = query_mode.IndexQueryModeLocalOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
 			backendParams.EventsIndex = builder.EventsIndex
-			backendParams.ScriptExecutor = builder.ScriptExecutor
+			backendParams.ScriptExecutor = scriptExecutor
 		}
 
 		accessBackend, err := backend.New(backendParams)

@@ -23,7 +23,7 @@ type GetScript struct {
 // NewGetScript extracts necessary variables from the provided request,
 // builds a GetScript instance, and validates it.
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func NewGetScript(r *common.Request) (*GetScript, error) {
 	return parseGetScripts(
 		r.GetQueryParam(blockHeightQuery),
@@ -42,7 +42,7 @@ func NewGetScript(r *common.Request) (*GetScript, error) {
 // to the latest sealed block when neither is specified, and validates all
 // script and execution state parameters.
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func parseGetScripts(
 	rawHeight string,
 	rawID string,

@@ -93,8 +93,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 		r.height,
 		registers,
 	)
-	execEndTime := time.Now()
-	execDuration := execEndTime.Sub(execStartTime)
+	execDuration := time.Since(execStartTime)
 
 	if err != nil {
 		convertedErr := convertScriptExecutionError(err)
@@ -167,5 +166,5 @@ func convertScriptExecutionError(err error) error {
 		}
 	}
 
-	return access.NewInternalError(err)
+	return err
 }
