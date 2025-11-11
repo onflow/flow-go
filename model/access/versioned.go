@@ -41,7 +41,7 @@ func (v *Versioned[T]) ByHeight(height uint64) T {
 	return v.versionedTypes[version]
 }
 
-// All returns all versions of the type.
+// AllVersions returns All versions defined in the mapper.
 // Note: the values are stored within a map, so the order of the returned slice is not deterministic.
 func (v *Versioned[T]) All() []T {
 	return slices.Collect(maps.Values(v.versionedTypes))

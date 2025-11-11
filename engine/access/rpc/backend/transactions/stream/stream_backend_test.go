@@ -302,11 +302,10 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Maybe() // used for some tests
 
 	txParams := transactions.Params{
-		Log:     s.log,
-		Metrics: metrics.NewNoopCollector(),
-		State:   s.state,
-		ChainID: s.chainID,
-		// SystemCollection:            s.systemCollection,
+		Log:                         s.log,
+		Metrics:                     metrics.NewNoopCollector(),
+		State:                       s.state,
+		ChainID:                     s.chainID,
 		StaticCollectionRPCClient:   client,
 		HistoricalAccessNodeClients: nil,
 		NodeCommunicator:            nodeCommunicator,

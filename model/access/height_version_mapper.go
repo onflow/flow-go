@@ -48,6 +48,7 @@ func NewStaticHeightVersionMapper(heightVersionBoundaries map[uint64]Version) *S
 }
 
 func (s *StaticHeightVersionMapper) GetVersion(height uint64) Version {
+	// note: if the boundaries slice grows a lot it might be worth doing binary search.
 	for _, boundary := range s.boundaries {
 		if height >= boundary {
 			return s.heightVersionBoundaries[boundary]

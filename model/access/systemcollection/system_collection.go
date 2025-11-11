@@ -13,20 +13,10 @@ const (
 )
 
 var ChainHeightVersions = map[flow.ChainID]access.HeightVersionMapper{
-	flow.Mainnet: access.NewStaticHeightVersionMapper(map[uint64]access.Version{
-		0: access.VersionLatest, // TODO: set version 0 and 1 when it is determined.
-	}),
 	flow.Testnet: access.NewStaticHeightVersionMapper(map[uint64]access.Version{
 		0:         Version0,
-		288677777: Version1, // TODO: set the height when we know it
+		288677777: Version1, // TODO: update after mirgationnet tests
 	}),
-	flow.Sandboxnet:        access.NewStaticHeightVersionMapper(access.LatestBoundary),
-	flow.Previewnet:        access.NewStaticHeightVersionMapper(access.LatestBoundary),
-	flow.Benchnet:          access.NewStaticHeightVersionMapper(access.LatestBoundary),
-	flow.Localnet:          access.NewStaticHeightVersionMapper(access.LatestBoundary),
-	flow.Emulator:          access.NewStaticHeightVersionMapper(access.LatestBoundary),
-	flow.BftTestnet:        access.NewStaticHeightVersionMapper(access.LatestBoundary),
-	flow.MonotonicEmulator: access.NewStaticHeightVersionMapper(access.LatestBoundary),
 }
 
 // versionBuilder is a map of all versions of the system collection.
@@ -39,7 +29,11 @@ var versionBuilder = map[access.Version]access.SystemCollectionBuilder{
 // Default returns the default versioned system collection builder for the provided chain.
 // This is the set of all available version builders for the chain.
 func Default(chainID flow.ChainID) *access.Versioned[access.SystemCollectionBuilder] {
-	return access.NewVersioned(versionBuilder, ChainHeightVersions[chainID])
+	versionMapper, ok := ChainHeightVersions[chainID]
+	if !ok {
+		versionMapper = access.NewStaticHeightVersionMapper(access.LatestBoundary)
+	}
+	return access.NewVersioned(versionBuilder, versionMapper)
 }
 
 // Versioned is a collection of all versions of the system collections.
