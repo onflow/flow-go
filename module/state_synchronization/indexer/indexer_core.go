@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -169,7 +170,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		systemChunkEvents := data.ChunkExecutionDatas[systemChunkIndex].Events
 		systemChunkResults := data.ChunkExecutionDatas[systemChunkIndex].TransactionResults
 
-		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, systemChunkResults, systemChunkEvents)
+		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, header.Height, systemChunkResults, systemChunkEvents)
 		if err != nil {
 			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
 		}
@@ -316,6 +317,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 func collectScheduledTransactions(
 	fvmEnv templates.Environment,
 	chainID flow.ChainID,
+	height uint64,
 	systemChunkResults []flow.LightTransactionResult,
 	systemChunkEvents []flow.Event,
 ) (map[flow.Identifier]uint64, error) {
@@ -365,7 +367,14 @@ func collectScheduledTransactions(
 	}
 
 	// reconstruct the system collection, and verify that the results match the expected transaction
-	systemCollection, err := blueprints.SystemCollection(chainID.Chain(), pendingExecutionEvents)
+	versionedCollection := systemcollection.Default(chainID)
+	systemCollection, err := versionedCollection.
+		ByHeight(height).
+		SystemCollection(chainID.Chain(),
+			func() (flow.EventsList, error) {
+				return pendingExecutionEvents, nil
+			},
+		)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct system collection: %w", err)
 	}

@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/integration/utils"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1360,17 +1361,21 @@ func (s *AccessAPISuite) TestSystemTransactions() {
 
 	// block until a few blocks have executed to ensure there are blocks with system transactions
 	var blockID flow.Identifier
+	var header *flow.Header
 	require.Eventually(s.T(), func() bool {
-		header, err := rpcClient.GetBlockHeaderByHeight(s.ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: 5})
+		rpcHeader, err := rpcClient.GetBlockHeaderByHeight(s.ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: 5})
 		if err == nil {
-			blockID = convert.MessageToIdentifier(header.GetBlock().GetId())
+			blockID = convert.MessageToIdentifier(rpcHeader.GetBlock().GetId())
+			header, err = convert.MessageToBlockHeader(rpcHeader.GetBlock())
+			s.Require().NoError(err)
 			return true
 		}
 		return false
 	}, 30*time.Second, 500*time.Millisecond)
 
-	// construct the expected system collection
-	systemCollection, err := blueprints.SystemCollection(s.net.Root().ChainID.Chain(), nil)
+	systemCollection, err := systemcollection.Default(s.net.Root().ChainID).
+		ByHeight(header.Height).
+		SystemCollection(s.net.Root().ChainID.Chain(), nil)
 	s.Require().NoError(err)
 	s.Require().Len(systemCollection.Transactions, 2)
 
