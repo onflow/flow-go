@@ -2,7 +2,10 @@ package requester
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -35,7 +38,8 @@ type CreateFunc func() flow.Entity
 // on the flow network. It is the `request` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
 type Engine struct {
-	unit           *engine.Unit
+	*component.ComponentManager
+	mu             sync.Mutex
 	log            zerolog.Logger
 	cfg            Config
 	metrics        module.EngineMetrics
@@ -132,7 +136,6 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:                  engine.NewUnit(),
 		log:                   log.With().Str("engine", "requester").Logger(),
 		cfg:                   cfg,
 		metrics:               metrics,
@@ -156,6 +159,11 @@ func New(
 	}
 	e.con = con
 
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.poll).
+		AddWorker(e.processQueuedRequestsShovellerWorker).
+		Build()
+
 	return e, nil
 }
 
@@ -168,28 +176,11 @@ func (e *Engine) WithHandle(handle HandleFunc) {
 	e.handle = handle
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
-	if e.handle == nil {
-		panic("must initialize requester engine with handler")
-	}
-	e.unit.Launch(e.poll)
-	return e.unit.Ready()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the consensus engine, we wait for hotstuff to finish.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
-}
-
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	select {
-	case <-e.unit.Quit():
+	case <-e.ShutdownSignal():
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
 			Msgf("received message after shutdown")
@@ -212,6 +203,50 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 		return fmt.Errorf("unexpected error while processing engine event: %w", err)
 	}
 	return nil
+}
+
+func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	e.log.Debug().Msg("process entity request shoveller worker started")
+
+	for {
+		select {
+		case <-e.requestHandler.GetNotifier():
+			// there is at least a single request in the queue, so we try to process it.
+			e.processAvailableMessages(ctx)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		msg, ok := e.requestQueue.Get()
+		if !ok {
+			// no more requests, return
+			return
+		}
+
+		responseEvent, ok := msg.Payload.(*flow.EntityResponse)
+		if !ok {
+			// should never happen, as we only put EntityRequest in the queue,
+			// if it does happen, it means there is a bug in the queue implementation.
+			ctx.Throw(fmt.Errorf("invalid message type in entity request queue: %T", msg.Payload))
+		}
+
+		err := e.onEntityResponse(msg.OriginID, responseEvent)
+		if err != nil {
+			ctx.Throw(err)
+		}
+	}
 }
 
 // EntityByID adds an entity to the list of entities to be requested from the
@@ -237,8 +272,8 @@ func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Id
 }
 
 func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity], checkIntegrity bool) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	// check if we already have an item for this entity
 	_, duplicate := e.items[entityID]
@@ -267,7 +302,7 @@ func (e *Engine) Force() {
 	}
 
 	// using Launch to ensure the caller won't be blocked
-	e.unit.Launch(func() {
+	go func() {
 		// using atomic bool to ensure there is at most one caller would trigger dispatching requests
 		if e.forcedDispatchOngoing.CompareAndSwap(false, true) {
 			count := uint(0)
@@ -285,35 +320,39 @@ func (e *Engine) Force() {
 			}
 			e.forcedDispatchOngoing.Store(false)
 		}
-	})
+	}()
 }
 
-func (e *Engine) poll() {
-	ticker := time.NewTicker(e.cfg.BatchInterval)
+func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	if e.handle == nil {
+		ctx.Throw(fmt.Errorf("must initialize requester engine with handler"))
+	}
 
-PollLoop:
+	ready()
+
+	ticker := time.NewTicker(e.cfg.BatchInterval)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-e.unit.Quit():
-			break PollLoop
+		case <-e.ShutdownSignal():
+			return nil
 
 		case <-ticker.C:
 			if e.forcedDispatchOngoing.Load() {
-				return
+				continue
 			}
 
 			dispatched, err := e.dispatchRequest()
 			if err != nil {
+				// TODO(yuraolex): check error handling, some errors are benign
 				e.log.Error().Err(err).Msg("could not dispatch requests")
-				continue PollLoop
+				ctx.Throw(err)
 			}
 			if dispatched {
 				e.log.Debug().Uint("requests", 1).Msg("regular request dispatch")
 			}
 		}
 	}
-
-	ticker.Stop()
 }
 
 // dispatchRequest dispatches a subset of requests (selection based on internal heuristic).
@@ -322,9 +361,8 @@ PollLoop:
 // `dispatchRequest` sends no request, but there is something to be requested.
 // The boolean return value indicates whether a request was dispatched at all.
 func (e *Engine) dispatchRequest() (bool, error) {
-
-	e.unit.Lock()
-	defer e.unit.Unlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
 
@@ -451,9 +489,9 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	go func() {
 		<-time.After(e.cfg.RetryInitial)
 
-		e.unit.Lock()
-		defer e.unit.Unlock()
+		e.mu.Lock()
 		delete(e.requests, req.Nonce)
+		e.mu.Unlock()
 	}()
 
 	if e.log.Debug().Enabled() {
@@ -498,8 +536,8 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 			Msg("onEntityResponse entries received")
 	}
 
-	e.unit.Lock()
-	defer e.unit.Unlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	// build a list of needed entities; if not available, process anyway,
 	// but in that case we can't re-queue missing items
