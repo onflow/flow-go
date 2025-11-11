@@ -85,7 +85,7 @@ func TestFlowScheduledTransactionHandlerContract(transactionScheduler sdk.Addres
 					
 					access(FlowTransactionScheduler.Execute) 
 					fun executeTransaction(id: UInt64, data: AnyStruct?) {
-						TestFlowScheduledTransactionsHandler.executedCallbacks.append(id)
+						TestFlowTransactionSchedulerHandler.executedCallbacks.append(id)
 					}
 				}
 
