@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,6 +13,7 @@ import (
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -22,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// ENAccountProvider is a provider that read account data using execution nodes.
 type ENAccountProvider struct {
 	log                        zerolog.Logger
 	state                      protocol.State
@@ -32,6 +36,7 @@ type ENAccountProvider struct {
 
 var _ AccountProvider = (*ENAccountProvider)(nil)
 
+// NewENAccountProvider creates a new instance of ENAccountProvider.
 func NewENAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
@@ -48,6 +53,16 @@ func NewENAccountProvider(
 	}
 }
 
+// GetAccountAtBlock returns a Flow account for the given address and block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - if an internal execution node failure occurs.
 func (e *ENAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -67,9 +82,9 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 		func(node *flow.IdentitySkeleton) error {
 			var err error
 			start := time.Now()
+			nodeID = node.NodeID
 
 			resp, err = e.tryGetAccount(ctx, node.Address, req)
-			nodeID = node.NodeID
 			duration := time.Since(start)
 
 			lg := e.log.With().
@@ -92,12 +107,33 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 	)
 
 	if errToReturn != nil {
-		return nil, nil, rpc.ConvertError(errToReturn, "failed to get account from the execution node", codes.Internal)
+		switch {
+		case errors.Is(errToReturn, context.Canceled):
+			return nil, nil, access.NewRequestCanceledError(errToReturn)
+		case errors.Is(errToReturn, context.DeadlineExceeded):
+			return nil, nil, access.NewRequestTimedOutError(errToReturn)
+		}
+
+		switch status.Code(errToReturn) {
+		case codes.InvalidArgument:
+			return nil, nil, access.NewInvalidRequestError(errToReturn)
+		case codes.NotFound:
+			return nil, nil, access.NewDataNotFoundError("block", errToReturn)
+		case codes.OutOfRange:
+			return nil, nil, access.NewOutOfRangeError(errToReturn)
+		case codes.Internal:
+			return nil, nil, access.NewInternalError(errToReturn)
+		case codes.Unavailable:
+			return nil, nil, access.NewServiceUnavailable(errToReturn)
+		default:
+			return nil, nil, errToReturn
+		}
 	}
 
 	account, err := convert.MessageToAccount(resp.GetAccount())
 	if err != nil {
-		return nil, nil, status.Errorf(codes.Internal, "failed to convert account message: %v", err)
+		err = fmt.Errorf("failed to convert account message: %w", err)
+		return nil, nil, access.NewInternalError(err)
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -108,6 +144,17 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 	return account, metadata, nil
 }
 
+// GetAccountBalanceAtBlock returns the balance of a Flow account
+// at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - if an internal execution node failure occurs.
 func (e *ENAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -123,6 +170,17 @@ func (e *ENAccountProvider) GetAccountBalanceAtBlock(
 	return account.Balance, metadata, nil
 }
 
+// GetAccountKeyAtBlock returns a specific public key of a Flow account
+// by its key index and block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - if an internal execution node failure occurs.
 func (e *ENAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -142,9 +200,21 @@ func (e *ENAccountProvider) GetAccountKeyAtBlock(
 		}
 	}
 
-	return nil, nil, status.Errorf(codes.NotFound, "failed to get account key by index: %d", keyIndex)
+	err = fmt.Errorf("failed to get account key by index: %d", keyIndex)
+	return nil, nil, access.NewDataNotFoundError("key", err)
 }
 
+// GetAccountKeysAtBlock returns all public keys associated with a Flow account
+// at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - if an internal execution node failure occurs.
 func (e *ENAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -161,6 +231,10 @@ func (e *ENAccountProvider) GetAccountKeysAtBlock(
 }
 
 // tryGetAccount attempts to get the account from the given execution node.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - if a connection to an execution node could not be established.
+//   - [status.Error] - if the execution node returned a gRPC error.
 func (e *ENAccountProvider) tryGetAccount(
 	ctx context.Context,
 	executorAddress string,
@@ -168,7 +242,7 @@ func (e *ENAccountProvider) tryGetAccount(
 ) (*execproto.GetAccountAtBlockIDResponse, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "failed to create client for execution node %s: %v", executorAddress, err)
+		return nil, status.Errorf(codes.Unavailable, "failed to connect to execution node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
 

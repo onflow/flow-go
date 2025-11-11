@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -73,38 +74,76 @@ func NewAccountsBackend(
 
 // GetAccount returns the account details at the latest sealed block.
 // Alias for GetAccountAtLatestBlock
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	return a.GetAccountAtLatestBlock(ctx, address, userCriteria)
 }
 
 // GetAccountAtLatestBlock returns the account details at the latest sealed block.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
-	sealed, err := a.state.Sealed().Head()
+	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, nil, err
+		// the latest sealed header MUST be available
+		err = irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
+		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
-		sealedBlockID,
+		sealedHeaderID,
 		userCriteria,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
-	account, metadata, err := a.provider.GetAccountAtBlock(ctx, address, sealedBlockID, sealed.Height, executionResultInfo)
+	account, metadata, err := a.provider.GetAccountAtBlock(ctx, address, sealedHeaderID, sealedHeader.Height, executionResultInfo)
 	if err != nil {
-		a.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
-		return nil, nil, err
+		a.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedHeaderID)
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return account, metadata, nil
 }
 
 // GetAccountAtBlockHeight returns the account details at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -113,7 +152,10 @@ func (a *Accounts) GetAccountAtBlockHeight(
 ) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = common.ResolveHeightError(a.state.Params(), height, err)
+		err = fmt.Errorf("failed to find header by ID: %w", err)
+		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
@@ -121,47 +163,83 @@ func (a *Accounts) GetAccountAtBlockHeight(
 		userCriteria,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
 	account, metadata, err := a.provider.GetAccountAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account at height: %d", height)
-		return nil, nil, err
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return account, metadata, nil
 }
 
 // GetAccountBalanceAtLatestBlock returns the account balance at the latest sealed block.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
-	sealed, err := a.state.Sealed().Head()
+	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return 0, nil, err
+		// the latest sealed header MUST be available
+		err = irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
+		return 0, nil, access.RequireNoError(ctx, err)
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
-		sealedBlockID,
+		sealedHeaderID,
 		userCriteria,
 	)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return 0, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return 0, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return 0, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
-	balance, metadata, err := a.provider.GetAccountBalanceAtBlock(ctx, address, sealedBlockID, sealed.Height, executionResultInfo)
+	balance, metadata, err := a.provider.GetAccountBalanceAtBlock(ctx, address, sealedHeaderID, sealedHeader.Height, executionResultInfo)
 	if err != nil {
-		a.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedBlockID)
-		return 0, nil, err
+		a.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedHeaderID)
+		return 0, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return balance, metadata, nil
 }
 
 // GetAccountBalanceAtBlockHeight returns the account balance at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -170,7 +248,10 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return 0, nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = common.ResolveHeightError(a.state.Params(), height, err)
+		err = fmt.Errorf("failed to find header by ID: %w", err)
+		return 0, nil, access.NewDataNotFoundError("header", err)
 	}
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
@@ -178,51 +259,87 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 		userCriteria,
 	)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return 0, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return 0, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return 0, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
 	balance, metadata, err := a.provider.GetAccountBalanceAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account balance at height: %v", height)
-		return 0, nil, err
+		return 0, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return balance, metadata, nil
 }
 
 // GetAccountKeyAtLatestBlock returns the account public key at the latest sealed block.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
 	userCriteria optimistic_sync.Criteria,
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
-	sealed, err := a.state.Sealed().Head()
+	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, nil, err
+		// the latest sealed header MUST be available
+		err = irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
+		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
-		sealedBlockID,
+		sealedHeaderID,
 		userCriteria,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
-	key, metadata, err := a.provider.GetAccountKeyAtBlock(ctx, address, keyIndex, sealedBlockID, sealed.Height, executionResultInfo)
+	key, metadata, err := a.provider.GetAccountKeyAtBlock(ctx, address, keyIndex, sealedHeaderID, sealedHeader.Height, executionResultInfo)
 	if err != nil {
-		a.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", sealedBlockID)
-		return nil, nil, err
+		a.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", sealedHeaderID)
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return key, metadata, nil
 }
 
 // GetAccountKeyAtBlockHeight returns the account public key by key index at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -232,7 +349,10 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = common.ResolveHeightError(a.state.Params(), height, err)
+		err = fmt.Errorf("failed to find header by ID: %w", err)
+		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
@@ -240,50 +360,86 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 		userCriteria,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
 	key, metadata, err := a.provider.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height, executionResultInfo)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account key at height: %v", height)
-		return nil, nil, err
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return key, metadata, nil
 }
 
 // GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountKeysAtLatestBlock(
 	ctx context.Context,
 	address flow.Address,
 	userCriteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
-	sealed, err := a.state.Sealed().Head()
+	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, nil, err
+		// the latest sealed header MUST be available
+		err = irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
+		return nil, nil, access.RequireNoError(ctx, err)
 	}
 
-	sealedBlockID := sealed.ID()
+	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
-		sealedBlockID,
+		sealedHeaderID,
 		userCriteria,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
-	keys, metadata, err := a.provider.GetAccountKeysAtBlock(ctx, address, sealedBlockID, sealed.Height, executionResultInfo)
+	keys, metadata, err := a.provider.GetAccountKeysAtBlock(ctx, address, sealedHeaderID, sealedHeader.Height, executionResultInfo)
 	if err != nil {
-		a.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
-		return nil, nil, err
+		a.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedHeaderID)
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return keys, metadata, nil
 }
 
 // GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (a *Accounts) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -292,7 +448,10 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, nil, commonrpc.ConvertStorageError(common.ResolveHeightError(a.state.Params(), height, err))
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = common.ResolveHeightError(a.state.Params(), height, err)
+		err = fmt.Errorf("failed to find header by ID: %w", err)
+		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
@@ -300,13 +459,21 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 		userCriteria,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
 	}
 
 	keys, metadata, err := a.provider.GetAccountKeysAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if err != nil {
 		a.log.Debug().Err(err).Msgf("failed to get account keys at height: %v", height)
-		return nil, nil, err
+		return nil, nil, access.RequireAccessError(ctx, err)
 	}
 
 	return keys, metadata, nil

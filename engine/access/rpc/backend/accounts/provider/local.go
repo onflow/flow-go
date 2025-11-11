@@ -6,20 +6,20 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
-	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/version"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
+// LocalAccountProvider is a provider that read account data using only the local node's storage.
 type LocalAccountProvider struct {
 	log                 zerolog.Logger
 	state               protocol.State
@@ -29,6 +29,7 @@ type LocalAccountProvider struct {
 
 var _ AccountProvider = (*LocalAccountProvider)(nil)
 
+// NewLocalAccountProvider creates a new instance of LocalAccountProvider.
 func NewLocalAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
@@ -43,6 +44,17 @@ func NewLocalAccountProvider(
 	}
 }
 
+// GetAccountAtBlock returns a Flow account by the provided address and block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -53,17 +65,21 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 	executionResultID := executionResultInfo.ExecutionResultID
 	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("could not find snapshot for execution result %s: %w", executionResultInfo.ExecutionResultID, err)
+		return nil, nil, access.NewDataNotFoundError("execution state snapshot", err)
 	}
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return nil, nil, access.NewPreconditionFailedError(err)
 	}
 
 	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registers)
 	if err != nil {
-		return nil, nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
+		return nil, nil, convertAccountError(err)
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -74,6 +90,17 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 	return account, metadata, nil
 }
 
+// GetAccountBalanceAtBlock returns the balance of a Flow account at the given block.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -84,18 +111,22 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	executionResultID := executionResultInfo.ExecutionResultID
 	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("could not find snapshot for execution result %s: %w", executionResultInfo.ExecutionResultID, err)
+		return 0, nil, access.NewDataNotFoundError("execution state snapshot", err)
 	}
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return 0, nil, access.NewPreconditionFailedError(err)
 	}
 
 	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
-		return 0, nil, err
+		return 0, nil, convertAccountError(err)
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -106,6 +137,18 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	return accountBalance, metadata, nil
 }
 
+// GetAccountKeyAtBlock returns a specific public key of a Flow account
+// by its key index and block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -117,18 +160,22 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	executionResultID := executionResultInfo.ExecutionResultID
 	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("could not find snapshot for execution result %s: %w", executionResultInfo.ExecutionResultID, err)
+		return nil, nil, access.NewDataNotFoundError("execution state snapshot", err)
 	}
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return nil, nil, access.NewPreconditionFailedError(err)
 	}
 
 	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account key at height: %d", height)
-		return nil, nil, err
+		return nil, nil, convertAccountError(err)
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -139,6 +186,18 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	return accountKey, metadata, nil
 }
 
+// GetAccountKeysAtBlock returns all public keys associated with a Flow account
+// at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -149,18 +208,22 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	executionResultID := executionResultInfo.ExecutionResultID
 	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("could not find snapshot for execution result %s: %w", executionResultInfo.ExecutionResultID, err)
+		return nil, nil, access.NewDataNotFoundError("execution state snapshot", err)
 	}
 
 	registers, err := snapshot.Registers()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return nil, nil, access.NewPreconditionFailedError(err)
 	}
 
 	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
-		return nil, nil, err
+		return nil, nil, convertAccountError(err)
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{
@@ -171,19 +234,50 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	return accountKeys, metadata, nil
 }
 
-// convertAccountError converts the script execution error to a gRPC error
-func convertAccountError(err error, address flow.Address, height uint64) error {
-	if err == nil {
-		return nil
+// convertAccountError maps script executor and FVM errors to corresponding access-layer sentinel errors.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data for the requested height was not found.
+//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError] - if the request was canceled.
+//   - [access.RequestTimedOutError] - if the request timed out.
+//   - [access.InternalError] - for internal failures or index conversion errors.
+func convertAccountError(err error) error {
+	switch {
+	case errors.Is(err, version.ErrOutOfRange),
+		errors.Is(err, storage.ErrHeightNotIndexed),
+		errors.Is(err, execution.ErrIncompatibleNodeVersion):
+		return access.NewOutOfRangeError(err)
+	case errors.Is(err, storage.ErrNotFound):
+		return access.NewDataNotFoundError("header", err)
+	case errors.Is(err, context.Canceled):
+		return access.NewRequestCanceledError(err)
+	case errors.Is(err, context.DeadlineExceeded):
+		return access.NewRequestTimedOutError(err)
 	}
 
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "account with address %s not found: %v", address, err)
+	var failure fvmerrors.CodedFailure
+	if fvmerrors.As(err, &failure) {
+		return access.NewInternalError(err)
 	}
 
-	if fvmerrors.IsAccountNotFoundError(err) {
-		return status.Errorf(codes.NotFound, "account not found")
+	// general FVM/ledger errors
+	var coded fvmerrors.CodedError
+	if fvmerrors.As(err, &coded) {
+		switch coded.Code() {
+		case fvmerrors.ErrCodeAccountNotFoundError:
+			return access.NewDataNotFoundError("account", err)
+		case fvmerrors.ErrCodeAccountPublicKeyNotFoundError:
+			return access.NewDataNotFoundError("account public key", err)
+		case fvmerrors.ErrCodeComputationLimitExceededError:
+			return access.NewResourceExhausted(err)
+		default:
+			// runtime errors
+			return access.NewInvalidRequestError(err)
+		}
 	}
 
-	return rpc.ConvertIndexError(err, height, "failed to get account")
+	return err
 }
