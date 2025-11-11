@@ -450,20 +450,14 @@ func (s *BackendEventsSuite) requireEventsResponse(actual *state_stream.EventsRe
 	assert.Equal(s.T(), expected.BlockTimestamp, actual.BlockTimestamp)
 }
 
-// TestSubscribeEventsFromSporkRootBlock tests that events subscriptions starting from the spork
-// root block return an empty result for the root block.
+// TestSubscribeEventsFromSporkRootBlock verifies that when subscribing from the spork
+// root block, the stream starts from the first non-root block with actual events (no empty root response).
 func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// setup the backend to have 1 available block
 	s.highestBlockHeader = s.blocks[0].ToHeader()
-
-	rootEventResponse := &state_stream.EventsResponse{
-		BlockID:        s.rootBlock.ID(),
-		Height:         s.rootBlock.Height,
-		BlockTimestamp: time.UnixMilli(int64(s.rootBlock.Timestamp)).UTC(),
-	}
 
 	firstEventResponse := &state_stream.EventsResponse{
 		BlockID:        s.blocks[0].ID(),
@@ -476,12 +470,8 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
 		sub subscription.Subscription[*state_stream.EventsResponse],
 		cancel context.CancelFunc,
 	) {
-		// the first response should have details from the root block and no events
+		// the first response should have details from the first non-root block and its events
 		resp := <-sub.Channel()
-		s.requireEventsResponse(resp, rootEventResponse)
-
-		// the second response should have details from the first block and its events
-		resp = <-sub.Channel()
 		s.requireEventsResponse(resp, firstEventResponse)
 
 		cancel()

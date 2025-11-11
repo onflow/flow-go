@@ -740,21 +740,14 @@ func subscribeExecData(
 	}
 }
 
-// TestSubscribeEventsFromSporkRootBlock tests that events subscriptions starting from the spork
-// root block return an empty result for the root block.
+// TestSubscribeExecutionFromSporkRootBlock verifies that when subscribing from the spork
+// root block, the stream starts from the first non-root block with actual data (no empty root response).
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// setup the backend to have 1 available block
 	s.highestBlockHeader = s.blocks[0].ToHeader()
-
-	rootEventResponse := &state_stream.ExecutionDataResponse{
-		Height: s.rootBlock.Height,
-		ExecutionData: &execution_data.BlockExecutionData{
-			BlockID: s.rootBlock.ID(),
-		},
-	}
 
 	firstEventResponse := &state_stream.ExecutionDataResponse{
 		Height:        s.blocks[0].Height,
@@ -769,12 +762,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
 	}
 
 	assertSubscriptionResponses := func(sub subscription.Subscription[*state_stream.ExecutionDataResponse], cancel context.CancelFunc) {
-		// the first response should have details from the root block and no events
+		// the first response should have details from the first non-root block
 		resp := <-sub.Channel()
-		assertExecutionDataResponse(resp, rootEventResponse)
-
-		// the second response should have details from the first block and its events
-		resp = <-sub.Channel()
 		assertExecutionDataResponse(resp, firstEventResponse)
 
 		cancel()

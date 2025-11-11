@@ -386,17 +386,17 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendAccountStatusesSuite) requireEventsResponse(v interface{}, expected *state_stream.AccountStatusesResponse) {
-	actual, ok := v.(*state_stream.AccountStatusesResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", v)
-
+func (s *BackendAccountStatusesSuite) requireEventsResponse(
+	actual *state_stream.AccountStatusesResponse,
+	expected *state_stream.AccountStatusesResponse,
+) {
 	assert.Equal(s.T(), expected.BlockID, actual.BlockID)
 	assert.Equal(s.T(), expected.Height, actual.Height)
 	assert.Equal(s.T(), expected.AccountEvents, actual.AccountEvents)
 }
 
-// TestSubscribeAccountStatusesFromSporkRootBlock tests that events subscriptions starting from the spork
-// root block return an empty result for the root block.
+// TestSubscribeAccountStatusesFromSporkRootBlock verifies that when subscribing from the spork
+// root block, the stream starts from the first non-root block with actual events (no empty root response).
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootBlock() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -404,13 +404,12 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootB
 	// setup the backend to have 1 available block
 	s.highestBlockHeader = s.blocks[0].ToHeader()
 
-	rootEventResponse := &state_stream.AccountStatusesResponse{
-		BlockID:       s.rootBlock.ID(),
-		Height:        s.rootBlock.Height,
-		AccountEvents: map[string]flow.EventsList{},
-	}
-
-	filter, err := state_stream.NewAccountStatusFilter(state_stream.DefaultEventFilterConfig, chainID.Chain(), []string{}, []string{})
+	filter, err := state_stream.NewAccountStatusFilter(
+		state_stream.DefaultEventFilterConfig,
+		chainID.Chain(),
+		[]string{},
+		[]string{},
+	)
 	require.NoError(s.T(), err)
 
 	expectedEvents := s.expectedAccountStatuses(s.blocks[0].ID(), filter)
@@ -420,13 +419,12 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootB
 		AccountEvents: expectedEvents,
 	}
 
-	assertSubscriptionResponses := func(sub subscription.Subscription[*state_stream.AccountStatusesResponse], cancel context.CancelFunc) {
-		// the first response should have details from the root block and no events
+	assertSubscriptionResponses := func(
+		sub subscription.Subscription[*state_stream.AccountStatusesResponse],
+		cancel context.CancelFunc,
+	) {
+		// the first response should have details from the first block and its events
 		resp := <-sub.Channel()
-		s.requireEventsResponse(resp, rootEventResponse)
-
-		// the second response should have details from the first block and its events
-		resp = <-sub.Channel()
 		s.requireEventsResponse(resp, firstEventResponse)
 
 		cancel()
