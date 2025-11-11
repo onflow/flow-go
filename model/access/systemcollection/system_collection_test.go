@@ -15,12 +15,9 @@ import (
 )
 
 const (
-	// WARNING: these height should never change, if tests are failing, the solution
+	// WARNING: these heights should never change, if tests are failing, the solution
 	// is not to change these heights.
-	// TODO: set the actual height when it is determined.
 
-	// testMainnetV1Height is the height at which Mainnet transitions to Version1.
-	testMainnetV1Height = 200
 	// testTestnetV1Height is the height at which Testnet transitions to Version1.
 	testTestnetV1Height = 288677777
 )
@@ -71,22 +68,11 @@ func TestVersioned_SearchAll(t *testing.T) {
 	})
 
 	t.Run("finds system chunk transaction", func(t *testing.T) {
-		chain := flow.Testnet.Chain()
-		versionedBuilder := Default(flow.Testnet)
+		chain := flow.Emulator.Chain()
+		versionedBuilder := Default(flow.Emulator)
 
 		versioned, err := NewVersioned(chain, versionedBuilder)
 		require.NoError(t, err)
-
-		for _, builder := range versionedBuilder.All() {
-			collection, err := builder.SystemCollection(chain, nil)
-			require.NoError(t, err)
-			fmt.Println("collection", collection.ID())
-			for _, tx := range collection.Transactions {
-				fmt.Println(tx.ID())
-			}
-		}
-
-		assert.Fail(t, "should not get here")
 
 		// Get the system chunk transaction from V0
 		builder := &builderV0{}
@@ -119,103 +105,112 @@ func TestVersioned_SearchAll(t *testing.T) {
 }
 
 func TestVersioned_ByHeight(t *testing.T) {
-	t.Run("returns V1 builder for height 0 on Mainnet", func(t *testing.T) {
-		chain := flow.Mainnet.Chain()
-		versionedBuilder := Default(flow.Mainnet)
+	// Define network version configurations
+	// - For networks with explicit version boundaries: add heightTests map with height -> expected version
+	// - For networks that always use latest: leave heightTests nil (empty)
+	type networkConfig struct {
+		chainID     flow.ChainID
+		heightTests map[uint64]access.Version // height -> expected version (nil/empty = always latest)
+	}
 
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
+	networkConfigs := []networkConfig{
+		// Testnet has explicit version boundaries
+		{
+			chainID: flow.Testnet,
+			heightTests: map[uint64]access.Version{
+				0:                         Version0,
+				testTestnetV1Height:       Version1,
+				testTestnetV1Height + 100: Version1,
+			},
+		},
+		// Uncomment and configure when Mainnet boundaries are defined:
+		// {
+		// 	chainID: flow.Mainnet,
+		// 	heightTests: map[uint64]access.Version{
+		// 		0:                          Version0,
+		// 		testMainnetV1Height - 100:  Version0,
+		// 		testMainnetV1Height:        Version1,
+		// 		testMainnetV1Height + 100:  Version1,
+		// 	},
+		// },
 
-		builder := versioned.ByHeight(0)
-		require.NotNil(t, builder)
+		// Networks that always use the latest version (nil heightTests = always latest)
+		{chainID: flow.Mainnet},
+		{chainID: flow.Emulator},
+		{chainID: flow.Sandboxnet},
+		{chainID: flow.Previewnet},
+		{chainID: flow.Benchnet},
+		{chainID: flow.Localnet},
+		{chainID: flow.BftTestnet},
+		{chainID: flow.MonotonicEmulator},
+	}
 
-		// Verify it's V0 by checking the type
-		_, isV0 := builder.(*builderV1)
-		assert.True(t, isV0, "should return V1 builder for height 0")
-	})
+	for _, config := range networkConfigs {
+		t.Run(config.chainID.String(), func(t *testing.T) {
+			chain := config.chainID.Chain()
+			versionedBuilder := Default(config.chainID)
 
-	t.Run("returns V0 builder for height < testMainnetVersion1Height on Mainnet", func(t *testing.T) {
-		chain := flow.Mainnet.Chain()
-		versionedBuilder := Default(flow.Mainnet)
+			versioned, err := NewVersioned(chain, versionedBuilder)
+			require.NoError(t, err)
 
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
+			// If heightTests is nil/empty, test that it always uses latest version
+			if len(config.heightTests) == 0 {
+				testHeights := []uint64{0, 1000}
+				for _, height := range testHeights {
+					t.Run(fmt.Sprintf("height_%d_returns_latest", height), func(t *testing.T) {
+						builder := versioned.ByHeight(height)
+						require.NotNil(t, builder)
+						_, isV1 := builder.(*builderV1)
+						assert.True(t, isV1, "should return latest builder (V1) at height %d", height)
+					})
+				}
+				return
+			}
 
-		builder := versioned.ByHeight(testMainnetV1Height - 100)
-		require.NotNil(t, builder)
+			// Otherwise, test specific height boundaries
+			for height, expectedVersion := range config.heightTests {
+				t.Run(fmt.Sprintf("height_%d_returns_v%d", height, expectedVersion), func(t *testing.T) {
+					builder := versioned.ByHeight(height)
+					require.NotNil(t, builder)
 
-		// Verify it's V0 by checking the type
-		_, isV0 := builder.(*builderV0)
-		assert.True(t, isV0, "should return V0 builder for height < testMainnetVersion1Height")
-	})
-
-	t.Run("returns V1 builder for height >= testMainnetVersion1Height on Mainnet", func(t *testing.T) {
-		chain := flow.Mainnet.Chain()
-		versionedBuilder := Default(flow.Mainnet)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-
-		builder := versioned.ByHeight(testMainnetV1Height)
-		require.NotNil(t, builder)
-
-		// Verify it's V1 by checking the type
-		_, isV1 := builder.(*builderV1)
-		assert.True(t, isV1, "should return V1 builder for height >= testMainnetVersion1Height")
-	})
-
-	t.Run("returns latest version for Emulator at any height", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		versionedBuilder := Default(flow.Emulator)
-
-		versioned, err := NewVersioned(chain, versionedBuilder)
-		require.NoError(t, err)
-
-		// Emulator uses LatestBoundary, so all heights should use the latest version
-		builder := versioned.ByHeight(0)
-		require.NotNil(t, builder)
-
-		builder = versioned.ByHeight(1000)
-		require.NotNil(t, builder)
-	})
+					switch expectedVersion {
+					case Version0:
+						_, isV0 := builder.(*builderV0)
+						assert.True(t, isV0, "should return V0 builder at height %d", height)
+					case Version1:
+						_, isV1 := builder.(*builderV1)
+						assert.True(t, isV1, "should return V1 builder at height %d", height)
+					default:
+						t.Fatalf("unknown expected version: %d", expectedVersion)
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestChainHeightVersions(t *testing.T) {
-	t.Run("all chains have version mappings", func(t *testing.T) {
-		chains := []flow.ChainID{
-			flow.Mainnet,
-			flow.Testnet,
-			flow.Sandboxnet,
-			flow.Previewnet,
-			flow.Benchnet,
-			flow.Localnet,
-			flow.Emulator,
-			flow.BftTestnet,
-			flow.MonotonicEmulator,
-		}
-
-		for _, chainID := range chains {
-			mapper, exists := ChainHeightVersions[chainID]
-			assert.True(t, exists, "chain %s should have version mapping", chainID)
-			assert.NotNil(t, mapper, "chain %s mapper should not be nil", chainID)
-		}
+	t.Run("Testnet has explicit version mapping", func(t *testing.T) {
+		mapper, exists := ChainHeightVersions[flow.Testnet]
+		assert.True(t, exists, "Testnet should have version mapping")
+		assert.NotNil(t, mapper, "Testnet mapper should not be nil")
 	})
 
-	t.Run("Mainnet and Testnet use explicit version boundaries", func(t *testing.T) {
-		mainnetMapper := ChainHeightVersions[flow.Mainnet]
+	t.Run("Testnet uses explicit version boundaries", func(t *testing.T) {
 		testnetMapper := ChainHeightVersions[flow.Testnet]
 
-		// Both should use V0 at height 0
-		assert.Equal(t, Version1, mainnetMapper.GetVersion(0))
+		// Testnet should use V0 at height 0
 		assert.Equal(t, Version0, testnetMapper.GetVersion(0))
 
-		// Both should use V1 at their respective version boundaries
-		assert.Equal(t, Version1, mainnetMapper.GetVersion(testMainnetV1Height))
+		// Testnet should use V1 at testTestnetV1Height
 		assert.Equal(t, Version1, testnetMapper.GetVersion(testTestnetV1Height))
 	})
 
-	t.Run("test transient networks use LatestBoundary", func(t *testing.T) {
+	t.Run("chains without explicit mappings use LatestBoundary via Default", func(t *testing.T) {
+		// These chains don't have explicit entries in ChainHeightVersions,
+		// so Default() will give them LatestBoundary
 		testNetworks := []flow.ChainID{
+			flow.Mainnet,
 			flow.Sandboxnet,
 			flow.Previewnet,
 			flow.Benchnet,
@@ -226,9 +221,10 @@ func TestChainHeightVersions(t *testing.T) {
 		}
 
 		for _, chainID := range testNetworks {
-			mapper := ChainHeightVersions[chainID]
-			version := mapper.GetVersion(0)
-			assert.Equal(t, access.VersionLatest, version, "chain %s should use VersionLatest", chainID)
+			versioned := Default(chainID)
+			builder := versioned.ByHeight(0)
+			_, isV1 := builder.(*builderV1)
+			assert.True(t, isV1, "chain %s should use latest version (V1) at height 0", chainID)
 		}
 	})
 }
@@ -268,9 +264,9 @@ func TestVersionBuilder(t *testing.T) {
 }
 
 func TestVersioned_Integration(t *testing.T) {
-	t.Run("can construct system collections for different heights", func(t *testing.T) {
-		chain := flow.Mainnet.Chain()
-		versionedBuilder := Default(flow.Mainnet)
+	t.Run("can construct system collections for different heights on Testnet", func(t *testing.T) {
+		chain := flow.Testnet.Chain()
+		versionedBuilder := Default(flow.Testnet)
 
 		versioned, err := NewVersioned(chain, versionedBuilder)
 		require.NoError(t, err)
@@ -282,12 +278,27 @@ func TestVersioned_Integration(t *testing.T) {
 		require.NotNil(t, collectionV0)
 		assert.Equal(t, len(collectionV0.Transactions), 2, "V0 should have 2 transactions")
 
-		// Test V1 at testMainnetVersion1Height
-		builderV1 := versioned.ByHeight(testMainnetV1Height)
+		// Test V1 at testTestnetV1Height
+		builderV1 := versioned.ByHeight(testTestnetV1Height)
 		collectionV1, err := builderV1.SystemCollection(chain, nil)
 		require.NoError(t, err)
 		require.NotNil(t, collectionV1)
 		assert.Equal(t, len(collectionV1.Transactions), 2, "V1 should have 2 transactions")
+	})
+
+	t.Run("Mainnet uses latest version for all heights", func(t *testing.T) {
+		chain := flow.Mainnet.Chain()
+		versionedBuilder := Default(flow.Mainnet)
+
+		versioned, err := NewVersioned(chain, versionedBuilder)
+		require.NoError(t, err)
+
+		// Mainnet should use V1 (latest) at all heights
+		builder := versioned.ByHeight(0)
+		collection, err := builder.SystemCollection(chain, nil)
+		require.NoError(t, err)
+		require.NotNil(t, collection)
+		assert.Equal(t, len(collection.Transactions), 2, "V1 should have 2 transactions")
 	})
 }
 
