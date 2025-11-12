@@ -248,7 +248,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		// For system chunks with callbacks:
 		// - Process callback transaction and callback executions use callbackCtx
 		// - System transaction (last one) uses the original system chunk context
-		if systemChunk && context.ScheduledTransactionsEnabled && i < len(transactions)-1 {
+		if systemChunk && i < len(transactions)-1 {
 			ctx = callbackCtx
 		}
 
@@ -455,20 +455,6 @@ func (fcv *ChunkVerifier) createSystemChunk(
 	chIndex uint64,
 ) ([]*fvm.TransactionProcedure, *flow.LightTransactionResult, error) {
 	txIndex := transactionOffset
-
-	// If scheduled transactions are disabled we only have the system transaction in the chunk
-	if !fcv.vmCtx.ScheduledTransactionsEnabled {
-		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-		}
-
-		// Need to return a placeholder result that will be filled by the caller
-		// when the transaction is actually executed
-		return []*fvm.TransactionProcedure{
-			fvm.Transaction(txBody, txIndex),
-		}, nil, nil
-	}
 
 	processBody, err := blueprints.ProcessCallbacksTransaction(fcv.vmCtx.Chain)
 	if err != nil {

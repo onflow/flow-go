@@ -1451,7 +1451,6 @@ func testScheduledTransactionsWithError(
 	testLogger := NewTestLogger()
 
 	execCtx := fvm.NewContext(
-		fvm.WithScheduledTransactionsEnabled(true), // Enable scheduled transactions
 		fvm.WithChain(chain),
 		fvm.WithLogger(testLogger.Logger),
 	)

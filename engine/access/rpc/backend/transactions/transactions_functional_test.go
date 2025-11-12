@@ -262,22 +262,21 @@ func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
 	s.Require().NoError(err)
 
 	return Params{
-		Log:                          s.log,
-		Metrics:                      metrics.NewNoopCollector(),
-		ChainID:                      s.g.ChainID(),
-		State:                        s.state,
-		NodeProvider:                 s.nodeProvider,
-		Blocks:                       s.blocks,
-		Collections:                  s.collections,
-		Transactions:                 s.transactions,
-		ScheduledTransactions:        s.scheduledTransactions,
-		SystemCollections:            s.systemCollection,
-		TxErrorMessageProvider:       s.txErrorMessageProvider,
-		TxValidator:                  txValidator,
-		TxStatusDeriver:              s.txStatusDeriver,
-		EventsIndex:                  s.eventsIndex,
-		TxResultsIndex:               s.txResultsIndex,
-		ScheduledTransactionsEnabled: true,
+		Log:                    s.log,
+		Metrics:                metrics.NewNoopCollector(),
+		ChainID:                s.g.ChainID(),
+		State:                  s.state,
+		NodeProvider:           s.nodeProvider,
+		Blocks:                 s.blocks,
+		Collections:            s.collections,
+		Transactions:           s.transactions,
+		ScheduledTransactions:  s.scheduledTransactions,
+		SystemCollections:      s.systemCollection,
+		TxErrorMessageProvider: s.txErrorMessageProvider,
+		TxValidator:            txValidator,
+		TxStatusDeriver:        s.txStatusDeriver,
+		EventsIndex:            s.eventsIndex,
+		TxResultsIndex:         s.txResultsIndex,
 	}
 }
 

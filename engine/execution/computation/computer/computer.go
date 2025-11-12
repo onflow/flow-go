@@ -522,48 +522,36 @@ func (e *blockComputer) executeSystemTransactions(
 
 	var callbackTxs []*flow.TransactionBody
 
-	if e.vmCtx.ScheduledTransactionsEnabled {
-		// We pass in the `systemCollectionInfo` here. However, note that at this point, the composition of the system chunk
-		// is not yet known. Specifically, the `entity.CompleteCollection` represents the *final* output of a process and is
-		// immutable by protocol mandate. If we had a bug in our software that accidentally illegally mutated such structs,
-		// likely the node encountering that bug would misbehave and get slashed, or in the worst case the flow protocol might
-		// be compromised. Therefore, we have the rigorous convention in our code base that the `CompleteCollection` is only
-		// constructed once the final composition of the system chunk has been determined.
-		// To that end, the CompleteCollection is nil here, such that any attempt to access the Collection will panic.
-		callbacks, updatedTxnIndex, err := e.executeProcessCallback(
-			callbackCtx,
-			systemCollectionInfo,
-			database,
-			blockSpan,
-			txIndex,
-			systemChunkLogger,
-		)
-		if err != nil {
-			return err
-		}
+	// We pass in the `systemCollectionInfo` here. However, note that at this point, the composition of the system chunk
+	// is not yet known. Specifically, the `entity.CompleteCollection` represents the *final* output of a process and is
+	// immutable by protocol mandate. If we had a bug in our software that accidentally illegally mutated such structs,
+	// likely the node encountering that bug would misbehave and get slashed, or in the worst case the flow protocol might
+	// be compromised. Therefore, we have the rigorous convention in our code base that the `CompleteCollection` is only
+	// constructed once the final composition of the system chunk has been determined.
+	// To that end, the CompleteCollection is nil here, such that any attempt to access the Collection will panic.
+	callbacks, updatedTxnIndex, err := e.executeProcessCallback(
+		callbackCtx,
+		systemCollectionInfo,
+		database,
+		blockSpan,
+		txIndex,
+		systemChunkLogger,
+	)
+	if err != nil {
+		return err
+	}
 
-		callbackTxs = callbacks
-		txIndex = updatedTxnIndex
+	callbackTxs = callbacks
+	txIndex = updatedTxnIndex
 
-		finalCollection, err := flow.NewCollection(flow.UntrustedCollection{
-			Transactions: append(append([]*flow.TransactionBody{e.processCallbackTxn}, callbackTxs...), e.systemTxn),
-		})
-		if err != nil {
-			return err
-		}
-		systemCollectionInfo.CompleteCollection = &entity.CompleteCollection{
-			Collection: finalCollection,
-		}
-	} else {
-		finalCollection, err := flow.NewCollection(flow.UntrustedCollection{
-			Transactions: []*flow.TransactionBody{e.systemTxn},
-		})
-		if err != nil {
-			return err
-		}
-		systemCollectionInfo.CompleteCollection = &entity.CompleteCollection{
-			Collection: finalCollection,
-		}
+	finalCollection, err := flow.NewCollection(flow.UntrustedCollection{
+		Transactions: append(append([]*flow.TransactionBody{e.processCallbackTxn}, callbackTxs...), e.systemTxn),
+	})
+	if err != nil {
+		return err
+	}
+	systemCollectionInfo.CompleteCollection = &entity.CompleteCollection{
+		Collection: finalCollection,
 	}
 
 	txQueue := e.queueSystemTransactions(

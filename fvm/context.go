@@ -403,16 +403,3 @@ func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option
 		return ctx
 	}
 }
-
-// WithScheduledTransactionsEnabled enables execution of scheduled transactions.
-func WithScheduledTransactionsEnabled(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.ScheduledTransactionsEnabled = enabled
-		return ctx
-	}
-}
-
-// Deprecated: WithScheduleCallbacksEnabled is deprecated, use WithScheduledTransactionsEnabled instead.
-func WithScheduleCallbacksEnabled(enabled bool) Option {
-	return WithScheduledTransactionsEnabled(enabled)
-}

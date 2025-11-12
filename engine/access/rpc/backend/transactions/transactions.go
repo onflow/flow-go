@@ -59,58 +59,54 @@ type Transactions struct {
 	txStatusDeriver   *txstatus.TxStatusDeriver
 	systemCollections *systemcollection.Versioned
 	txResultCache     TxResultCache
-
-	scheduledTransactionsEnabled bool
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
 
 type Params struct {
-	Log                          zerolog.Logger
-	Metrics                      module.TransactionMetrics
-	State                        protocol.State
-	ChainID                      flow.ChainID
-	SystemCollections            *systemcollection.Versioned
-	StaticCollectionRPCClient    accessproto.AccessAPIClient
-	HistoricalAccessNodeClients  []accessproto.AccessAPIClient
-	NodeCommunicator             node_communicator.Communicator
-	ConnFactory                  connection.ConnectionFactory
-	EnableRetries                bool
-	NodeProvider                 *rpc.ExecutionNodeIdentitiesProvider
-	Blocks                       storage.Blocks
-	Collections                  storage.Collections
-	Transactions                 storage.Transactions
-	ScheduledTransactions        storage.ScheduledTransactionsReader
-	TxErrorMessageProvider       error_messages.Provider
-	TxResultCache                TxResultCache
-	TxProvider                   provider.TransactionProvider
-	TxValidator                  *validator.TransactionValidator
-	TxStatusDeriver              *txstatus.TxStatusDeriver
-	EventsIndex                  *index.EventsIndex
-	TxResultsIndex               *index.TransactionResultsIndex
-	ScheduledTransactionsEnabled bool
+	Log                         zerolog.Logger
+	Metrics                     module.TransactionMetrics
+	State                       protocol.State
+	ChainID                     flow.ChainID
+	SystemCollections           *systemcollection.Versioned
+	StaticCollectionRPCClient   accessproto.AccessAPIClient
+	HistoricalAccessNodeClients []accessproto.AccessAPIClient
+	NodeCommunicator            node_communicator.Communicator
+	ConnFactory                 connection.ConnectionFactory
+	EnableRetries               bool
+	NodeProvider                *rpc.ExecutionNodeIdentitiesProvider
+	Blocks                      storage.Blocks
+	Collections                 storage.Collections
+	Transactions                storage.Transactions
+	ScheduledTransactions       storage.ScheduledTransactionsReader
+	TxErrorMessageProvider      error_messages.Provider
+	TxResultCache               TxResultCache
+	TxProvider                  provider.TransactionProvider
+	TxValidator                 *validator.TransactionValidator
+	TxStatusDeriver             *txstatus.TxStatusDeriver
+	EventsIndex                 *index.EventsIndex
+	TxResultsIndex              *index.TransactionResultsIndex
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
 	txs := &Transactions{
-		log:                          params.Log,
-		metrics:                      params.Metrics,
-		state:                        params.State,
-		chainID:                      params.ChainID,
-		systemCollections:            params.SystemCollections,
-		collectionRPCClient:          params.StaticCollectionRPCClient,
-		historicalAccessNodeClients:  params.HistoricalAccessNodeClients,
-		nodeCommunicator:             params.NodeCommunicator,
-		connectionFactory:            params.ConnFactory,
-		blocks:                       params.Blocks,
-		collections:                  params.Collections,
-		transactions:                 params.Transactions,
-		scheduledTransactions:        params.ScheduledTransactions,
-		txResultCache:                params.TxResultCache,
-		txValidator:                  params.TxValidator,
-		txProvider:                   params.TxProvider,
-		txStatusDeriver:              params.TxStatusDeriver,
-		scheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
+		log:                         params.Log,
+		metrics:                     params.Metrics,
+		state:                       params.State,
+		chainID:                     params.ChainID,
+		systemCollections:           params.SystemCollections,
+		collectionRPCClient:         params.StaticCollectionRPCClient,
+		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
+		nodeCommunicator:            params.NodeCommunicator,
+		connectionFactory:           params.ConnFactory,
+		blocks:                      params.Blocks,
+		collections:                 params.Collections,
+		transactions:                params.Transactions,
+		scheduledTransactions:       params.ScheduledTransactions,
+		txResultCache:               params.TxResultCache,
+		txValidator:                 params.TxValidator,
+		txProvider:                  params.TxProvider,
+		txStatusDeriver:             params.TxStatusDeriver,
 	}
 
 	return txs, nil
