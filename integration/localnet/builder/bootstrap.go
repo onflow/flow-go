@@ -398,7 +398,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(service.Command,
 		"--chunk-alpha=1",
-		"--scheduled-transactions-enabled=true",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	return service
@@ -437,7 +437,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 		"--pruning-config-threshold=20",
 		"--pruning-config-sleep-after-iteration=1m",
-		"--scheduled-transactions-enabled=true",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -472,7 +472,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--script-execution-mode=execution-nodes-only",
 		"--event-query-mode=execution-nodes-only",
 		"--tx-result-query-mode=execution-nodes-only",
-		"--scheduled-transactions-enabled=true",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	service.AddExposedPorts(

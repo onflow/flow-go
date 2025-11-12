@@ -130,7 +130,7 @@ func (s *Suite) SetupTest() {
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlag("--scheduled-transactions-enabled=true"))
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	// need two collection node

@@ -92,7 +92,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
-		testnet.WithAdditionalFlag("--scheduled-transactions-enabled=true"),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
 	)
 	nodeConfigs = append(nodeConfigs, verConfig)
 
@@ -103,7 +103,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
-		testnet.WithAdditionalFlag("--scheduled-transactions-enabled=true"),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
 	)
 	nodeConfigs = append(nodeConfigs, exe1Config)
 
@@ -113,7 +113,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
-		testnet.WithAdditionalFlag("--scheduled-transactions-enabled=true"),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
 	)
 	nodeConfigs = append(nodeConfigs, exe2Config)
 
