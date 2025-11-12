@@ -142,7 +142,7 @@ func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storag
 
 	// Check if any keys already exist
 	for _, guaranteeID := range guaranteeIDs {
-		key := MakePrefix(codeCollectionBlock, guaranteeID)
+		key := MakePrefix(codeGuaranteeBlock, guaranteeID)
 		exists, err := KeyExists(rw.GlobalReader(), key)
 		if err != nil {
 			return fmt.Errorf("could not check if collection guarantee is already indexed: %w", err)
@@ -154,7 +154,7 @@ func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storag
 
 	// Index all collection guarantees
 	for _, guaranteeID := range guaranteeIDs {
-		key := MakePrefix(codeCollectionBlock, guaranteeID)
+		key := MakePrefix(codeGuaranteeBlock, guaranteeID)
 		err := UpsertByKey(rw.Writer(), key, blockID)
 		if err != nil {
 			return fmt.Errorf("could not index collection guarantee (%x): %w", guaranteeID, err)
@@ -173,9 +173,9 @@ func BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storag
 // (one-to-many mapping) for soft finality and the mature protocol.
 //
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound] if no block is known that contains the specified collection ID.
-func LookupBlockContainingCollectionGuarantee(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
-	return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
+//   - [storage.ErrNotFound] if no block is known that contains the specified guarantee ID.
+func LookupBlockContainingCollectionGuarantee(r storage.Reader, guaranteeID flow.Identifier, blockID *flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeGuaranteeBlock, guaranteeID), blockID)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
