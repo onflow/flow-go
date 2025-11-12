@@ -14,15 +14,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestVerifyScheduledCallback(t *testing.T) {
-	suite.Run(t, new(VerifyScheduledCallbackSuite))
+func TestVerifyScheduledTransactions(t *testing.T) {
+	suite.Run(t, new(VerifyScheduledTransactionsSuite))
 }
 
-type VerifyScheduledCallbackSuite struct {
+type VerifyScheduledTransactionsSuite struct {
 	Suite
 }
 
-func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
+func (s *VerifyScheduledTransactionsSuite) TestVerifyScheduledTransactions() {
 	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
 
 	// Wait for next height finalized (potentially first height)
@@ -31,22 +31,22 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
+	_, err := lib.DeployScheduledTransactionsTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// Wait for next height finalized before scheduling callback
+	// Wait for next height finalized before scheduling transaction
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
-	// Schedule a callback for 10 seconds in the future
+	// Schedule a transaction for 10 seconds in the future
 	scheduleDelta := int64(10)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 
-	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, s.AccessClient(), sc)
-	require.NoError(s.T(), err, "could not schedule callback transaction")
-	s.T().Logf("scheduled callback with ID: %d", callbackID)
+	s.T().Logf("scheduling transaction at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	transactionID, err := lib.ScheduleTransactionAtTimestamp(futureTimestamp, s.AccessClient(), sc)
+	require.NoError(s.T(), err, "could not schedule transaction")
+	s.T().Logf("scheduled transaction with ID: %d", transactionID)
 
-	// wait for block that executed the scheduled callbacks to be sealed (plus some buffer)
+	// wait for block that executed the scheduled transactions to be sealed (plus some buffer)
 	var sealedBlock *flow.Block
 	require.Eventually(s.T(), func() bool {
 		sealed, ok := s.BlockState.HighestSealed()
@@ -56,7 +56,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 		return uint64(sealed.Timestamp/1000) > uint64(futureTimestamp+5)
 	}, 30*time.Second, 1000*time.Millisecond)
 
-	// make sure callback executed event was emitted
+	// make sure transaction executed event was emitted
 	eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.Executed", sc.FlowTransactionScheduler.Address)
 	events, err := s.AccessClient().GetEventsForHeightRange(context.Background(), eventTypeString, blockA.HeaderBody.Height, sealedBlock.Height)
 	require.NoError(s.T(), err)
@@ -68,5 +68,5 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 		}
 	}
 
-	require.Equal(s.T(), eventCount, 1, "expected 1 callback executed event")
+	require.Equal(s.T(), eventCount, 1, "expected 1 scheduled transaction executed event")
 }

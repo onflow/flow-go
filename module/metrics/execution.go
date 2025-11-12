@@ -910,9 +910,9 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 }
 
-// ExecutionCallbacksExecuted reports callback execution metrics
-func (ec *ExecutionCollector) ExecutionCallbacksExecuted(callbackCount int, processComputationUsed, executeComputationLimits uint64) {
-	ec.callbacksExecutedCount.Observe(float64(callbackCount))
+// ExecutionScheduledTransactionsExecuted reports scheduled transaction execution metrics
+func (ec *ExecutionCollector) ExecutionScheduledTransactionsExecuted(scheduledTransactionCount int, processComputationUsed, executeComputationLimits uint64) {
+	ec.callbacksExecutedCount.Observe(float64(scheduledTransactionCount))
 	ec.callbacksProcessComputationUsed.Observe(float64(processComputationUsed))
 	ec.callbacksExecuteComputationLimits.Observe(float64(executeComputationLimits))
 }

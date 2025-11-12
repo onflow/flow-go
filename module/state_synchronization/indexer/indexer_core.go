@@ -342,9 +342,9 @@ func collectScheduledTransactions(
 
 	// there are 3 possible valid cases:
 	// 1. N (1 or more) scheduled transaction were executed, there should be N + 2 results
-	//    (N scheduled transactions, process callback tx, and the standard system tx)
+	//    (N scheduled transactions, process scheduled transactions tx, and the standard system tx)
 	// 2. 0 scheduled transactions were executed, and scheduled transactions are enabled. there should be 2 results
-	//    (process callback tx, and the standard system tx)
+	//    (process scheduled transactions tx, and the standard system tx)
 	// 3. 0 scheduled transactions were executed, and scheduled transactions are disabled. there should be 1 result
 	//    (the standard system tx)
 	// there is currently no way to determine if scheduled transactions are enabled or disabled, so
@@ -363,7 +363,7 @@ func collectScheduledTransactions(
 	// if there were scheduled transactions, there should be exactly 2 more results than there were
 	// scheduled transactions.
 	if len(scheduledTransactionIDs) != len(systemChunkResults)-2 {
-		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled callbacks", len(systemChunkResults), len(scheduledTransactionIDs))
+		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled transactions", len(systemChunkResults), len(scheduledTransactionIDs))
 	}
 
 	// reconstruct the system collection, and verify that the results match the expected transaction
