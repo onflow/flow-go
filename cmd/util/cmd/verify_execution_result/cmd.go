@@ -60,7 +60,7 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
-	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_transactions_enabled", fvm.DefaultScheduledTransactionsEnabled, "enable scheduled transactions")
+	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
 }
 
 func run(*cobra.Command, []string) {
