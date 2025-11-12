@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/version"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -79,7 +80,7 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 
 	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registers)
 	if err != nil {
-		return nil, nil, convertAccountError(err)
+		return nil, nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err))
 	}
 
 	metadata := &accessmodel.ExecutorMetadata{

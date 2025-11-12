@@ -103,7 +103,12 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 			lg.Debug().Msg("Successfully got account info")
 			return nil
 		},
-		nil,
+		func(node *flow.IdentitySkeleton, err error) bool {
+			if status.Code(err) == codes.InvalidArgument {
+				return true
+			}
+			return false
+		},
 	)
 
 	if errToReturn != nil {

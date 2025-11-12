@@ -150,9 +150,9 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	ctx := context.Background()
 	// use a status code that's not used in the API to make sure it's passed through
-	statusCode := codes.FailedPrecondition
+	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
-	expectedErr := access.NewPreconditionFailedError(errToReturn)
+	expectedErr := access.NewInvalidRequestError(errToReturn)
 
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 
@@ -446,9 +446,9 @@ func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	ctx := context.Background()
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover)
 
-	statusCode := codes.FailedPrecondition
+	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
-	expectedErr := access.NewPreconditionFailedError(errToReturn)
+	expectedErr := access.NewInvalidRequestError(errToReturn)
 
 	// used in error conversion
 	s.state.On("Params").Return(s.params)
@@ -931,12 +931,13 @@ func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, e
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
-	actual, metadata, err := backend.GetAccount(ctx, s.account.Address, s.criteria)
 	if expectedError == nil {
+		actual, metadata, err := backend.GetAccount(ctx, s.account.Address, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(s.account, actual)
 		s.Require().Equal(s.expectedMetadata, metadata)
 	} else {
+		actual, metadata, err := backend.GetAccount(ctx, s.failingAddress, s.criteria)
 		s.Require().Error(err)
 		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
@@ -948,12 +949,13 @@ func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
-	actual, metadata, err := backend.GetAccountAtLatestBlock(ctx, s.account.Address, s.criteria)
 	if expectedError == nil {
+		actual, metadata, err := backend.GetAccountAtLatestBlock(ctx, s.account.Address, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(s.account, actual)
 		s.Require().Equal(s.expectedMetadata, metadata)
 	} else {
+		actual, metadata, err := backend.GetAccountAtLatestBlock(ctx, s.failingAddress, s.criteria)
 		s.Require().Error(err)
 		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
@@ -965,12 +967,13 @@ func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend
 	height := s.block.Height
 	s.headers.On("BlockIDByHeight", height).Return(s.block.ID(), nil).Once()
 
-	actual, metadata, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height, s.criteria)
 	if expectedError == nil {
+		actual, metadata, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(s.account, actual)
 		s.Require().Equal(s.expectedMetadata, metadata)
 	} else {
+		actual, metadata, err := backend.GetAccountAtBlockHeight(ctx, s.failingAddress, height, s.criteria)
 		s.Require().Error(err)
 		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
