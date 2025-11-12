@@ -202,10 +202,12 @@ func (executor *scriptExecutor) executeScript() error {
 
 	chainID := executor.ctx.Chain.ChainID()
 
+	cadenceVMEnabled := executor.ctx.CadenceVMEnabled
+
 	if executor.ctx.EVMEnabled {
 
 		var scriptRuntimeEnv runtime.Environment
-		if executor.ctx.VMScriptExecutionEnabled {
+		if cadenceVMEnabled {
 			scriptRuntimeEnv = rt.VMScriptRuntimeEnv
 		} else {
 			scriptRuntimeEnv = rt.ScriptRuntimeEnv
@@ -227,7 +229,7 @@ func (executor *scriptExecutor) executeScript() error {
 			Arguments: executor.proc.Arguments,
 		},
 		common.ScriptLocation(executor.proc.ID),
-		executor.ctx.VMScriptExecutionEnabled,
+		cadenceVMEnabled,
 	)
 	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {

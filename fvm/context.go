@@ -52,9 +52,6 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
-
-	VMScriptExecutionEnabled      bool
-	VMTransactionExecutionEnabled bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -76,7 +73,7 @@ func newContext(ctx Context, opts ...Option) Context {
 }
 
 func defaultContext() Context {
-	ctx := Context{
+	return Context{
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
@@ -86,7 +83,6 @@ func defaultContext() Context {
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
-	return ctx
 }
 
 // An Option sets a configuration parameter for a virtual machine context.
@@ -327,18 +323,10 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 	}
 }
 
-// WithVMScriptExecutionEnabled enables or disables execution of scripts with the Cadence VM.
-func WithVMScriptExecutionEnabled(enabled bool) Option {
+// WithCadenceVMEnabled enables or disables execution with the Cadence VM.
+func WithCadenceVMEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
-		ctx.VMScriptExecutionEnabled = enabled
-		return ctx
-	}
-}
-
-// WithVMTransactionExecutionEnabled enables or disables execution of transactions with the Cadence VM.
-func WithVMTransactionExecutionEnabled(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.VMTransactionExecutionEnabled = enabled
+		ctx.CadenceVMEnabled = enabled
 		return ctx
 	}
 }

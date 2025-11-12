@@ -14,7 +14,6 @@ type ContractFunctionSpec struct {
 	LocationName     string
 	FunctionName     string
 	ArgumentTypes    []sema.Type
-	UseVM            bool
 }
 
 // ContractFunctionInvoker invokes a contract function

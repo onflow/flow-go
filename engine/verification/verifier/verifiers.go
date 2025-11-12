@@ -41,8 +41,6 @@ func VerifyLastKHeight(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
 		lockManager,
@@ -51,8 +49,6 @@ func VerifyLastKHeight(
 		chunkDataPackDir,
 		transactionFeesDisabled,
 		scheduledCallbacksEnabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
 	)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
@@ -109,8 +105,6 @@ func VerifyRange(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
 		lockManager,
@@ -119,8 +113,6 @@ func VerifyRange(
 		chunkDataPackDir,
 		transactionFeesDisabled,
 		scheduledCallbacksEnabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
 	)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
@@ -251,8 +243,6 @@ func initStorages(
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
 ) (
 	func() error,
 	*store.All,
@@ -288,8 +278,6 @@ func initStorages(
 		storages.Headers,
 		transactionFeesDisabled,
 		scheduledCallbacksEnabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
 	)
 
 	closer := func() error {
@@ -370,8 +358,6 @@ func makeVerifier(
 	headers storage.Headers,
 	transactionFeesDisabled bool,
 	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -379,8 +365,6 @@ func makeVerifier(
 		chainID,
 		headers,
 		transactionFeesDisabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
 	)
 	fvmOptions = append(
 		[]fvm.Option{fvm.WithLogger(logger)},

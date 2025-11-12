@@ -16,17 +16,15 @@ import (
 )
 
 var (
-	flagLastK                         uint64
-	flagDatadir                       string
-	flagChunkDataPackDir              string
-	flagChain                         string
-	flagFromTo                        string
-	flagWorkerCount                   uint // number of workers to verify the blocks concurrently
-	flagStopOnMismatch                bool
-	flagTransactionFeesDisabled       bool
-	flagScheduledCallbacksEnabled     bool
-	flagVMScriptExecutionEnabled      bool
-	flagVMTransactionExecutionEnabled bool
+	flagLastK                     uint64
+	flagDatadir                   string
+	flagChunkDataPackDir          string
+	flagChain                     string
+	flagFromTo                    string
+	flagWorkerCount               uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch            bool
+	flagTransactionFeesDisabled   bool
+	flagScheduledCallbacksEnabled bool
 )
 
 // # verify the last 100 sealed blocks
@@ -63,20 +61,6 @@ func init() {
 	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
 	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledCallbacksEnabled, "enable scheduled callbacks")
-
-	Cmd.Flags().BoolVar(
-		&flagVMScriptExecutionEnabled,
-		"vm_script_execution_enabled",
-		false,
-		"enable script execution with VM",
-	)
-
-	Cmd.Flags().BoolVar(
-		&flagVMTransactionExecutionEnabled,
-		"vm_transaction_execution_enabled",
-		false,
-		"enable transaction execution with VM",
-	)
 }
 
 func run(*cobra.Command, []string) {
@@ -123,8 +107,6 @@ func run(*cobra.Command, []string) {
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
 			flagScheduledCallbacksEnabled,
-			flagVMScriptExecutionEnabled,
-			flagVMTransactionExecutionEnabled,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
@@ -142,8 +124,6 @@ func run(*cobra.Command, []string) {
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
 			flagScheduledCallbacksEnabled,
-			flagVMScriptExecutionEnabled,
-			flagVMTransactionExecutionEnabled,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")

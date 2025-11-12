@@ -189,10 +189,12 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	chainID := executor.ctx.Chain.ChainID()
 
 	// setup EVM
+	cadenceVMEnabled := executor.ctx.CadenceVMEnabled
+
 	if executor.ctx.EVMEnabled {
 
 		var txRuntimeEnv runtime.Environment
-		if executor.ctx.VMTransactionExecutionEnabled {
+		if cadenceVMEnabled {
 			txRuntimeEnv = executor.cadenceRuntime.VMTxRuntimeEnv
 		} else {
 			txRuntimeEnv = executor.cadenceRuntime.TxRuntimeEnv
@@ -241,7 +243,7 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			Arguments: executor.proc.Transaction.Arguments,
 		},
 		common.TransactionLocation(executor.proc.ID),
-		executor.ctx.VMTransactionExecutionEnabled,
+		cadenceVMEnabled,
 	)
 
 	// This initializes various cadence variables and parses the programs used
@@ -271,7 +273,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 	if executor.ctx.EVMEnabled {
 
 		var txRuntimeEnv runtime.Environment
-		if executor.ctx.VMTransactionExecutionEnabled {
+		if executor.ctx.CadenceVMEnabled {
 			txRuntimeEnv = executor.cadenceRuntime.VMTxRuntimeEnv
 		} else {
 			txRuntimeEnv = executor.cadenceRuntime.TxRuntimeEnv

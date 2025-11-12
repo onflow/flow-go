@@ -187,14 +187,6 @@ type BaseConfig struct {
 	BitswapReprovideEnabled bool
 
 	TransactionFeesDisabled bool
-
-	// VMTransactionExecutionEnabled configures whether transactions are executed with the Cadence compiler/VM
-	// instead of the Cadence interpreter.
-	VMTransactionExecutionEnabled bool
-
-	// VMScriptExecutionEnabled configures whether transactions are executed with the Cadence compiler/VM
-	// instead of the Cadence interpreter.
-	VMScriptExecutionEnabled bool
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
