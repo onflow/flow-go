@@ -19,13 +19,18 @@ type signerInfo struct {
 	index  int
 }
 
-// WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator.
-// It is a wrapper around module/signature.SignatureAggregatorSameMessage, which implements a
+// WeightedSignatureAggregator implements [hotstuff.WeightedSignatureAggregator].
+// It is a wrapper around [signature.SignatureAggregatorSameMessage], implementing a
 // mapping from node IDs (as used by HotStuff) to index-based addressing of authorized
-// signers (as used by SignatureAggregatorSameMessage).
+// signers (as used by [signature.SignatureAggregatorSameMessage]).
 //
-// Similarly to module/signature.SignatureAggregatorSameMessage, this module assumes proofs of possession (PoP)
-// of all identity public keys are valid.
+// We delegate the handling of duplicate signatures to the underlying [signature.SignatureAggregatorSameMessage].
+// NOTE: This is possible, because [signature.SignatureAggregatorSameMessage] does not support signatures with
+// multiplicity higher than 1, i.e. each signer is allowed to sign at most once. Should this constraint every be
+// changed in [signature.SignatureAggregatorSameMessage], this module would need to be updated accordingly.
+//
+// Similarly to [signature.SignatureAggregatorSameMessage], this module assumes proofs
+// of possession (PoP) of all identity public keys are valid.
 type WeightedSignatureAggregator struct {
 	aggregator  *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
 	ids         flow.IdentityList                         // all possible ids (only gets updated by constructor)
@@ -82,8 +87,8 @@ func NewWeightedSignatureAggregator(
 
 // Verify verifies the signature under the stored public keys and message.
 // Expected errors during normal operations:
-//   - model.InvalidSignerError if signerID is invalid (not a consensus participant)
-//   - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//   - [model.InvalidSignerError] if signerID is invalid (not a consensus participant)
+//   - [model.ErrInvalidSignature] if signerID is valid but signature is cryptographically invalid
 //
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
@@ -108,8 +113,8 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
 // The function errors with:
-//   - model.InvalidSignerError if signerID is invalid (not a consensus participant)
-//   - model.DuplicatedSignerError if the signer has been already added
+//   - [model.InvalidSignerError] if signerID is invalid (not a consensus participant)
+//   - [model.DuplicatedSignerError] if the signer has been already added
 //
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
@@ -122,6 +127,11 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
+	// NOTE: We delegate the handling of duplicate signatures to the underlying [signature.SignatureAggregatorSameMessage].
+	// This is valid only because [signature.SignatureAggregatorSameMessage] does not support signatures with multiplicity
+	// higher than 1, i.e. each signer is allowed to sign at most once. Should this constraint every be relaxed in
+	// [signature.SignatureAggregatorSameMessage], we should update the `WeightedSignatureAggregator` here, because in
+	// the context of HotStuff each consensus replica is allowed to vote at most once.
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
 		if signature.IsDuplicatedSignerIdxError(err) {
@@ -146,12 +156,12 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 // The function performs a final verification and errors if the aggregated signature is invalid. This is
 // required for the function safety since `TrustedAdd` allows adding invalid signatures.
 // The function errors with:
-//   - model.InsufficientSignaturesError if no signatures have been added yet
-//   - model.InvalidSignatureIncludedError if:
+//   - [model.InsufficientSignaturesError] if no signatures have been added yet
+//   - [model.InvalidSignatureIncludedError] if:
 //   - some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
 //     -- or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
 //     invalid (while aggregated public key is valid)
-//     -- model.InvalidAggregatedKeyError if all signatures deserialize correctly but the signer's
+//     -- [model.InvalidAggregatedKeyError] if all signatures deserialize correctly but the signer's
 //     staking public keys sum up to an invalid key (BLS identity public key).
 //     Any aggregated signature would fail the cryptographic verification under the identity public
 //     key and therefore such signature is considered invalid. Such scenario can only happen if

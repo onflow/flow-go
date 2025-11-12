@@ -226,10 +226,38 @@ func (s *StateMachineTestSuite) TestProcessBlock_ErrorHandlingOfCachedVotes() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
 	processor := s.prepareMockedProcessor(proposal)
+	proposalVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
 
-	// test equivocating votes, this is byzantine behavior and needs to be reported to the respective consumer
-	firstVote := unittest.VoteForBlockFixture(block)
-	doubleVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(firstVote.SignerID))
+	// Byzantine Leader might mount the following attacks:
+	// 1. Vote-equivocation attack: send block proposal and equivocate by sending a different conflicting vote.
+	// 2. Spamming attack: send a block proposal and (repeatedly) send the same vote again as an independent message.
+	// 3. Leader might send multiple individual vote messages (repeated identical votes, or equivocating with different votes)
+	// Attacks 1. and 2. are only available to the leader, because these attacks exploit the fact that stand-alone votes and
+	// proposals are processed through different code paths: while stand-alone votes always hit the cache in the VoteCollector,
+	// the vote embedded into the proposal is processed with priority (potentially concurrently to other incoming stand-alone votes).
+	// Attack 3. can be mounted also by replicas
+
+	// Attach 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
+	// Case (1.a): proposal arriving first, stand-alone vote arriving later:
+	//<configure mock processor>
+	require.NoError(s.T(), s.collector.ProcessBlock(proposal))
+	doubleVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(proposalVote.SignerID))
+	processor.On("Process", doubleVote).Return(model.NewDoubleVoteErrorf(proposalVote, doubleVote, "")).Once()
+	s.notifier.On("OnDoubleVotingDetected", proposalVote, doubleVote).Once() // expect notification about equivocating votes
+	// Notification [VoteCollectorConsumer.OnVoteProcessed] should NOT be emitted, because the vote is right away detected as byzantine
+	require.NoError(s.T(), s.collector.AddVote(doubleVote))
+
+	// Case (1.b): stand-alone vote arriving first, proposal arriving second:
+	// Notification [VoteCollectorConsumer.OnVoteProcessed] should NOT be emitted, because the vote is first cached (proposal still unknown)
+	require.NoError(s.T(), s.collector.AddVote(doubleVote))
+	//<configure mock processor>
+	processor.On("Process", doubleVote).Return(model.NewDoubleVoteErrorf(proposalVote, doubleVote, "")).Once()
+	s.notifier.On("OnDoubleVotingDetected", proposalVote, doubleVote).Once() // expect notification about equivocating votes
+
+	require.NoError(s.T(), s.collector.ProcessBlock(proposal))
+
+	doubleVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(proposalVote.SignerID))
 	s.notifier.On("OnVoteProcessed", doubleVote).Once()
 	processor.On("Process", doubleVote).Return(model.NewDoubleVoteErrorf(firstVote, doubleVote, "")).Once()
 	// expect delivery to the notifier
@@ -242,7 +270,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ErrorHandlingOfCachedVotes() {
 	processor.On("Process", repeatedVote).Return(model.NewDuplicatedSignerErrorf("")).Once()
 	require.NoError(s.T(), s.collector.AddVote(repeatedVote))
 
-	// test invalid vote,  this is byzantine behavior and needs to be reported to the respective consumer
+	// test invalid vote, this is byzantine behavior and needs to be reported to the respective consumer
 	invalidVote := unittest.VoteForBlockFixture(block)
 	s.notifier.On("OnVoteProcessed", invalidVote).Once()
 	invalidVoteErr := model.NewInvalidVoteErrorf(invalidVote, "")

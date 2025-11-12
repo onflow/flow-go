@@ -59,14 +59,15 @@ type VoteCollector interface {
 	// ProcessBlock performs validation of block signature and processes block with respected collector.
 	// Calling this function will mark conflicting collector as stale and change state of valid collectors
 	// It returns nil if the block is valid.
-	// It returns model.InvalidProposalError if block is invalid.
+	// It returns [model.InvalidProposalError] if block is invalid.
 	// It returns other error if there is exception processing the block.
 	ProcessBlock(block *model.SignedProposal) error
 
-	// AddVote adds a vote to the collector
-	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
-	// passed to EventLoop through a callback.
-	// No errors are expected during normal operations.
+	// AddVote adds a vote to current vote collector. The vote must be for the `VoteCollector`'s view (otherwise,
+	// an exception is returned). When enough votes have been added to produce a QC, the QC will be created
+	// asynchronously, and passed to EventLoop through a callback.
+	// All byzantine edge cases are handled internally via callbacks to notifier.
+	// Under normal execution only exceptions are propagated to caller.
 	AddVote(vote *model.Vote) error
 
 	// RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector
@@ -88,13 +89,15 @@ type VoteCollector interface {
 // Depending on their implementation, a VoteProcessor might drop votes or attempt to construct a QC.
 type VoteProcessor interface {
 	// Process performs processing of single vote. This function is safe to call from multiple goroutines.
+	//
 	// Expected error returns during normal operations:
-	//   - [VoteForIncompatibleBlockError] - submitted vote for incompatible block
-	//   - [VoteForIncompatibleViewError] - submitted vote for incompatible view
-	//   - [model.InvalidVoteError] - submitted vote with invalid signature
-	//   - [model.DuplicatedSignerError] - vote from a signer whose vote was previously already processed
-	//   - [model.DoubleVoteError] is returned if the voter is equivocating
-	//     (i.e. voting in the same view for different blocks).
+	//   - [VoteForIncompatibleBlockError] if vote is for incompatible block
+	//   - [VoteForIncompatibleViewError] if vote is for incompatible view
+	//   - [model.InvalidVoteError] if vote has invalid signature
+	//   - [model.DuplicatedSignerError] if the same vote from the same signer has been already added
+	//   - [model.DoubleVoteError] indicates that the voter has equivocated and submitted different votes for the same block.
+	//     (i.e. using different voting schemas for the same block).
+	//
 	// All other errors should be treated as exceptions.
 	Process(vote *model.Vote) error
 
@@ -102,7 +105,13 @@ type VoteProcessor interface {
 	Status() VoteCollectorStatus
 }
 
-// VerifyingVoteProcessor is a VoteProcessor that attempts to construct a QC for the given block.
+// VerifyingVoteProcessor is a VoteProcessor that attempts to construct a QC for a specific given block
+// (provided at construction time).
+//
+// IMPORTANT: The VerifyingVoteProcessor provides the final defense against any vote-equivocation attacks
+// for its specific block. These attacks typically aim at multiple votes from the same node being counted
+// towards the supermajority threshold. This must cover attacks by the leader concurrently utilizing
+// stand-alone votes and votes embedded into the proposal.
 type VerifyingVoteProcessor interface {
 	VoteProcessor
 
@@ -117,6 +126,6 @@ type VoteProcessorFactory interface {
 	// Create instantiates a VerifyingVoteProcessor for processing votes for a specific proposal.
 	// Caller can be sure that proposal vote was successfully verified and processed.
 	// Expected error returns during normal operations:
-	// * model.InvalidProposalError - proposal has invalid proposer vote
+	// * [model.InvalidProposalError] - proposal has invalid proposer vote
 	Create(log zerolog.Logger, proposal *model.SignedProposal) (VerifyingVoteProcessor, error)
 }
