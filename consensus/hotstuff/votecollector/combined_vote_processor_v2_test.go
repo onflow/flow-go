@@ -985,6 +985,12 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 // key only and the other one is signed with the random beacon key.
 // This is a form of vote equivocation where a node sends a different vote from the one it has submitted previously.
 // CombinedVoteProcessorV2 has to detect that the vote from given participant has been already processed and return a respective error.
+//
+// There are two conceptually different attack scenarios we are testing here:
+//   - Leader-based attacks:
+//     (a) The leader might send block proposal and equivocate by sending a different conflicting vote.
+//     (b) The leader might send a block proposal and (repeatedly) send the same vote again as an independent message.
+//   - Any byzantine node (replicas and leader alike) might send multiple individual vote messages (repeated identical votes, or equivocating with different votes).
 func TestCombinedVoteProcessorV2_DoubleVoting(t *testing.T) {
 	proposerView := uint64(20)
 
