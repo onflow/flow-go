@@ -109,7 +109,7 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 	r.log("upstream", "GetCollectionByID", err)
 
 	if err != nil {
-		return nil, convertError(ctx, err, "collection")
+		return nil, convertError(ctx, err)
 	}
 
 	collection, err := convert.MessageToLightCollection(collectionResponse.Collection)
@@ -229,7 +229,7 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	r.log("upstream", "GetAccountAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	account, err := convert.MessageToAccount(accountResponse.Account)
@@ -276,7 +276,7 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, a
 	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
 
 	if err != nil {
-		return 0, nil, convertError(ctx, err, "register")
+		return 0, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -319,7 +319,7 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
@@ -377,7 +377,7 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	accountKey, err := convert.MessageToAccountKey(accountKeyResponse.GetAccountKey())
@@ -422,7 +422,7 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -469,7 +469,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -516,7 +516,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -611,11 +611,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
 // to a local access sentinel error.
 // if conversion fails, an irrecoverable error is thrown.
-func convertError(ctx context.Context, err error, typeName string) error {
+func convertError(ctx context.Context, err error) error {
 	// this is a bit fragile since we're decoding error strings. it's only needed until we add support for execution data on the public network
 	switch status.Code(err) {
 	case codes.NotFound:
-		if sourceErrStr, ok := splitOnPrefix(err.Error(), fmt.Sprintf("data not found for %s: ", typeName)); ok {
+		if typeName, sourceErrStr, ok := splitNotFoundError(err.Error()); ok {
 			return access.NewDataNotFoundError(typeName, errors.New(sourceErrStr))
 		}
 	case codes.Internal:
@@ -671,6 +671,42 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 		return parts[1], true
 	}
 	return "", false
+}
+
+// splitNotFoundError extracts the type name and the cleaned error message that follows the type name.
+//
+// Example:
+//
+//	input:  "code = NotFound desc = data not found for header: failed to find header by ID: could not lookup block id by height 1"
+//	output: typeName="header", errorStr="failed to find header by ID: could not lookup block id by height 1", ok=true
+func splitNotFoundError(original string) (string, string, bool) {
+	// Use the existing split helper
+	afterPrefix, found := splitOnPrefix(original, access.DataNotFountPrefix)
+	if !found {
+		return "", "", false
+	}
+
+	remaining := strings.TrimSpace(afterPrefix)
+	if remaining == "" {
+		return "", "", false
+	}
+
+	// Extract the first word (type name)
+	fields := strings.Fields(remaining)
+	if len(fields) == 0 {
+		return "", "", false
+	}
+
+	typeName := strings.TrimSuffix(fields[0], ":")
+
+	// Now use splitOnPrefix again with "prefix + typeName" to get sourceErrStr
+	fullPrefix := fmt.Sprintf("%s %s:", access.DataNotFountPrefix, typeName)
+	if errStr, ok2 := splitOnPrefix(original, fullPrefix); ok2 {
+		sourceErrStr := strings.TrimSpace(errStr)
+		return typeName, sourceErrStr, true
+	}
+
+	return "", "", false
 }
 
 // executionStateQuery constructs an ExecutionStateQuery protobuf message from

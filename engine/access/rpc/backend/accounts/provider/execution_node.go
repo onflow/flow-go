@@ -104,10 +104,7 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 			return nil
 		},
 		func(node *flow.IdentitySkeleton, err error) bool {
-			if status.Code(err) == codes.InvalidArgument {
-				return true
-			}
-			return false
+			return status.Code(err) == codes.InvalidArgument
 		},
 	)
 

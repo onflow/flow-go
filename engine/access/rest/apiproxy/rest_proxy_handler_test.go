@@ -20,72 +20,58 @@ import (
 func TestConvertError_Success(t *testing.T) {
 	tests := []struct {
 		name     string
-		typeName string
 		expected error
 	}{
 		{
 			name:     "NotFound with data not found prefix",
-			typeName: "collection",
 			expected: access.NewDataNotFoundError("collection", storage.ErrNotFound),
 		},
 		{
 			name:     "Internal with internal error prefix",
-			typeName: "execution result",
 			expected: access.NewInternalError(errors.New("database connection failed")),
 		},
 		{
 			name:     "OutOfRange with out of range prefix",
-			typeName: "block",
 			expected: access.NewOutOfRangeError(errors.New("block height 1000 not available")),
 		},
 		{
 			name:     "FailedPrecondition with precondition failed prefix",
-			typeName: "events",
 			expected: access.NewPreconditionFailedError(errors.New("index not initialized")),
 		},
 		{
 			name:     "InvalidArgument with invalid argument prefix",
-			typeName: "transaction",
 			expected: access.NewInvalidRequestError(errors.New("malformed transaction")),
 		},
 		{
 			name:     "Canceled with request canceled prefix",
-			typeName: "script",
 			expected: access.NewRequestCanceledError(errors.New("client disconnected")),
 		},
 		{
 			name:     "Canceled without prefix (client side)",
-			typeName: "account",
 			expected: access.NewRequestCanceledError(status.Error(codes.Canceled, "context canceled")),
 		},
 		{
 			name:     "DeadlineExceeded with request timed out prefix",
-			typeName: "script",
 			expected: access.NewRequestTimedOutError(errors.New("execution took too long")),
 		},
 		{
 			name:     "DeadlineExceeded without prefix (client side)",
-			typeName: "account",
 			expected: access.NewRequestTimedOutError(status.Error(codes.DeadlineExceeded, "context deadline exceeded")),
 		},
 		{
 			name:     "Unavailable with service unavailable error prefix",
-			typeName: "execution result",
 			expected: access.NewServiceUnavailable(errors.New("upstream service down")),
 		},
 		{
 			name:     "Unavailable without prefix (client side)",
-			typeName: "collection",
 			expected: access.NewServiceUnavailable(status.Error(codes.Unavailable, "connection refused")),
 		},
 		{
 			name:     "ResourceExhausted with service resource exhausted error prefix",
-			typeName: "",
 			expected: access.NewResourceExhausted(errors.New("execution computation limit reached")),
 		},
 		{
 			name:     "ResourceExhausted without prefix (client side)",
-			typeName: "",
 			expected: access.NewResourceExhausted(status.Error(codes.ResourceExhausted, "execution computation limit reached")),
 		},
 	}
@@ -96,7 +82,7 @@ func TestConvertError_Success(t *testing.T) {
 
 			grpcError := rpc.ErrorToStatus(tt.expected)
 
-			actual := convertError(ctx, grpcError, tt.typeName)
+			actual := convertError(ctx, grpcError)
 			require.Error(t, actual, "convertError should return an access sentinel error")
 
 			assert.Equal(t, tt.expected.Error(), actual.Error())
@@ -134,44 +120,36 @@ func TestConvertError_Irrecoverable(t *testing.T) {
 	// the original error directly, so they don't trigger irrecoverable errors.
 
 	tests := []struct {
-		name     string
-		grpcErr  error
-		typeName string
+		name    string
+		grpcErr error
 	}{
 		{
-			name:     "generic error",
-			grpcErr:  fmt.Errorf("generic error"),
-			typeName: "account",
+			name:    "generic error",
+			grpcErr: fmt.Errorf("generic error"),
 		},
 		{
-			name:     "unknown status code",
-			grpcErr:  status.Error(codes.PermissionDenied, "permission denied"),
-			typeName: "account",
+			name:    "unknown status code",
+			grpcErr: status.Error(codes.PermissionDenied, "permission denied"),
 		},
 		{
-			name:     "not found with incorrect prefix",
-			grpcErr:  status.Error(codes.NotFound, "wrong prefix: key not found"),
-			typeName: "collection",
+			name:    "not found with incorrect prefix",
+			grpcErr: status.Error(codes.NotFound, "wrong prefix: key not found"),
 		},
 		{
-			name:     "internal error with incorrect prefix",
-			grpcErr:  status.Error(codes.Internal, "wrong prefix: database connection failed"),
-			typeName: "execution result",
+			name:    "internal error with incorrect prefix",
+			grpcErr: status.Error(codes.Internal, "wrong prefix: database connection failed"),
 		},
 		{
-			name:     "out of range with incorrect prefix",
-			grpcErr:  status.Error(codes.OutOfRange, "wrong prefix: block height 1000 not available"),
-			typeName: "block",
+			name:    "out of range with incorrect prefix",
+			grpcErr: status.Error(codes.OutOfRange, "wrong prefix: block height 1000 not available"),
 		},
 		{
-			name:     "precondition failed with incorrect prefix",
-			grpcErr:  status.Error(codes.FailedPrecondition, "wrong prefix: index not initialized"),
-			typeName: "events",
+			name:    "precondition failed with incorrect prefix",
+			grpcErr: status.Error(codes.FailedPrecondition, "wrong prefix: index not initialized"),
 		},
 		{
-			name:     "invalid argument with incorrect prefix",
-			grpcErr:  status.Error(codes.InvalidArgument, "wrong prefix: malformed transaction"),
-			typeName: "transaction",
+			name:    "invalid argument with incorrect prefix",
+			grpcErr: status.Error(codes.InvalidArgument, "wrong prefix: malformed transaction"),
 		},
 	}
 
@@ -183,7 +161,7 @@ func TestConvertError_Irrecoverable(t *testing.T) {
 			ctx := irrecoverable.WithSignalerContext(context.Background(), mockSignalerCtx)
 
 			// convertError should call Throw and return an irrecoverable exception
-			result := convertError(ctx, tt.grpcErr, tt.typeName)
+			result := convertError(ctx, tt.grpcErr)
 
 			// The returned error should be an irrecoverable exception (not nil)
 			require.Error(t, result)
