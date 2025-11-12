@@ -69,6 +69,7 @@ type RestAPITestSuite struct {
 	transactions     *storagemock.Transactions
 	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
+	seals            *storagemock.Seals
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -114,6 +115,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.executionResults = new(storagemock.ExecutionResults)
+	suite.seals = new(storagemock.Seals)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -176,6 +178,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		Collections:          suite.collections,
 		Transactions:         suite.transactions,
 		ExecutionResults:     suite.executionResults,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		AccessMetrics:        suite.metrics,
 		MaxHeightRange:       0,

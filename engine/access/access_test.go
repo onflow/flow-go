@@ -172,6 +172,7 @@ func (suite *Suite) RunTest(
 			Transactions:             all.Transactions,
 			ExecutionResults:         all.Results,
 			ExecutionReceipts:        all.Receipts,
+			Seals:                    all.Seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            suite.metrics,
 			MaxHeightRange:           events.DefaultMaxHeightRange,
@@ -298,6 +299,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
+		seals := store.NewSeals(metrics, db)
 
 		// create collection node cluster
 		count := 2
@@ -340,6 +342,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		bnd, err := backend.New(backend.Params{State: suite.state,
 			Collections:              collections,
 			Transactions:             transactions,
+			Seals:                    seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            metrics,
 			ConnFactory:              connFactory,
@@ -687,6 +690,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -945,6 +949,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -1200,6 +1205,7 @@ func (suite *Suite) TestExecuteScript() {
 			Transactions:               all.Transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
