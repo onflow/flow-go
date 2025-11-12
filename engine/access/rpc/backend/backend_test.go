@@ -11,7 +11,6 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -77,6 +76,7 @@ type Suite struct {
 	transactions          *storagemock.Transactions
 	receipts              *storagemock.ExecutionReceipts
 	results               *storagemock.ExecutionResults
+	seals                 *storagemock.Seals
 	transactionResults    *storagemock.LightTransactionResults
 	events                *storagemock.Events
 	scheduledTransactions *storagemock.ScheduledTransactions
@@ -125,6 +125,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
+	suite.seals = new(storagemock.Seals)
 	suite.txErrorMessages = storagemock.NewTransactionResultErrorMessages(suite.T())
 	suite.colClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -1573,13 +1574,28 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 	nonexistingBlockID := unittest.IdentifierFixture()
 
+	// Create a seal for the existing block
+	seal := unittest.Seal.Fixture(
+		unittest.Seal.WithBlockID(blockID),
+		unittest.Seal.WithResult(executionResult),
+	)
+
 	results := new(storagemock.ExecutionResults)
-	results.
-		On("ByBlockID", nonexistingBlockID).
+	seals := new(storagemock.Seals)
+
+	// Mock seals for nonexisting block
+	seals.
+		On("FinalizedSealForBlock", nonexistingBlockID).
 		Return(nil, storage.ErrNotFound)
 
+	// Mock seals for existing block
+	seals.
+		On("FinalizedSealForBlock", blockID).
+		Return(seal, nil)
+
+	// Mock execution results by ID (using seal.ResultID)
 	results.
-		On("ByBlockID", blockID).
+		On("ByID", seal.ResultID).
 		Return(executionResult, nil)
 
 	suite.Run("nonexisting execution results", func() {
@@ -1587,6 +1603,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
+		params.Seals = seals
 		params.ConnFactory = connFactory
 
 		backend, err := New(params)
@@ -1603,6 +1620,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
+		params.Seals = seals
 		params.ConnFactory = connFactory
 
 		backend, err := New(params)
@@ -1617,6 +1635,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	})
 
 	results.AssertExpectations(suite.T())
+	seals.AssertExpectations(suite.T())
 	suite.assertAllExpectations()
 }
 
@@ -2046,7 +2065,7 @@ func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 }
 
 func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
-	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entitiesproto.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, n)
 	for i, e := range ccfEvents {
 		jsonEvent, err := convert.CcfEventToJsonEvent(e)
@@ -2065,6 +2084,7 @@ func (suite *Suite) defaultBackendParams() Params {
 		Transactions:         suite.transactions,
 		ExecutionReceipts:    suite.receipts,
 		ExecutionResults:     suite.results,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		CollectionRPC:        suite.colClient,
 		MaxHeightRange:       events.DefaultMaxHeightRange,

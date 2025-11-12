@@ -560,6 +560,18 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		require.NoError(suite.T(), all.Results.Store(er))
 		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
 
+		// Create and store a seal for the block
+		seal := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(blockID),
+			unittest.Seal.WithResult(er),
+		)
+		require.NoError(suite.T(), all.Seals.Store(seal))
+
+		// Index the seal by block ID so FinalizedSealForBlock can find it
+		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedSealByBlockID(rw.Writer(), blockID, seal.ID())
+		}))
+
 		assertResp := func(
 			resp *accessproto.ExecutionResultForBlockIDResponse,
 			err error,

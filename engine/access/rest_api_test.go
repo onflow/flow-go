@@ -258,8 +258,15 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		testBlocks[i] = block
 		testBlockIDs[i] = block.ID().String()
 
-		execResult := unittest.ExecutionResultFixture()
-		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
+		execResult := unittest.ExecutionResultFixture(
+			unittest.WithExecutionResultBlockID(block.ID()),
+		)
+		seal := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block.ID()),
+			unittest.Seal.WithResult(execResult),
+		)
+		suite.seals.On("FinalizedSealForBlock", block.ID()).Return(seal, nil)
+		suite.executionResults.On("ByID", seal.ResultID).Return(execResult, nil)
 	}
 
 	suite.sealedBlock = testBlocks[len(testBlocks)-1].ToHeader()
@@ -412,6 +419,8 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		invalidBlockIndex := rand.Intn(len(testBlocks))
 		invalidID := unittest.IdentifierFixture()
 		suite.blocks.On("ByID", invalidID).Return(nil, storage.ErrNotFound).Once()
+		// Also mock seal lookup in case the block lookup succeeds but seal lookup fails
+		suite.seals.On("FinalizedSealForBlock", invalidID).Return(nil, storage.ErrNotFound).Maybe()
 		blockIDs := make([]string, len(testBlockIDs))
 		copy(blockIDs, testBlockIDs)
 		blockIDs[invalidBlockIndex] = invalidID.String()
