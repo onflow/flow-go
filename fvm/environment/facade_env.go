@@ -68,6 +68,7 @@ func newFacadeEnvironment(
 	chain := params.Chain
 	systemContracts := NewSystemContracts(
 		chain,
+		params.CadenceVMEnabled,
 		tracer,
 		logger,
 		runtime)

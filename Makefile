@@ -70,20 +70,9 @@ update-cadence-version:
 
 .PHONY: unittest-main
 unittest-main:
-	# test all packages
-	# TODO: CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
-ifneq ($(filter github.com/onflow/flow-go/fvm,$(GO_TEST_PACKAGES)),)
-	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) \
-		github.com/onflow/flow-go/fvm github.com/onflow/flow-go/fvm/evm github.com/onflow/flow-go/fvm/evm/stdlib -testWithVMTransactionExecution=true -testWithVMScriptExecution=true
-endif
-ifneq ($(filter github.com/onflow/flow-go/engine/execution/state/bootstrap,$(GO_TEST_PACKAGES)),)
-	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) \
-		github.com/onflow/flow-go/engine/execution/state/bootstrap -testWithVMTransactionExecution=true -testWithVMScriptExecution=true
-endif
-ifneq ($(filter github.com/onflow/flow-go/engine/access/rpc/backend,$(GO_TEST_PACKAGES)),)
-	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) \
-		github.com/onflow/flow-go/engine/access/rpc/backend -testWithVMScriptExecution=true
-endif
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
+	# Re-run tests with Cadence VM enabled
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test -tags cadence_vm $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
 
 .PHONY: install-mock-generators
 install-mock-generators:

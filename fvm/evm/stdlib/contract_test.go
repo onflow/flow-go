@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"flag"
 	"math/big"
 	"strings"
 	"testing"
@@ -25,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -32,18 +32,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
-)
-
-var testWithVMTransactionExecution = flag.Bool(
-	"testWithVMTransactionExecution",
-	false,
-	"Run transactions in tests using the Cadence compiler/VM",
-)
-
-var testWithVMScriptExecution = flag.Bool(
-	"testWithVMScriptExecution",
-	false,
-	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func newLocationResolver(
@@ -340,7 +328,7 @@ func deployContracts(
 				Interface:   runtimeInterface,
 				Environment: transactionEnvironment,
 				Location:    nextTransactionLocation(),
-				UseVM:       *testWithVMTransactionExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		require.NoError(t, err)
@@ -353,7 +341,7 @@ func newEVMTransactionEnvironment(
 	contractAddress flow.Address,
 ) runtime.Environment {
 	var transactionEnvironment runtime.Environment
-	if *testWithVMTransactionExecution {
+	if cadence_vm.DefaultEnabled {
 		transactionEnvironment = runtime.NewBaseVMEnvironment(runtime.Config{})
 	} else {
 		transactionEnvironment = runtime.NewBaseInterpreterEnvironment(runtime.Config{})
@@ -382,7 +370,7 @@ func newEVMTransactionEnvironment(
 
 func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	var scriptEnvironment runtime.Environment
-	if *testWithVMScriptExecution {
+	if cadence_vm.DefaultEnabled {
 		scriptEnvironment = runtime.NewScriptVMEnvironment(runtime.Config{})
 	} else {
 		scriptEnvironment = runtime.NewScriptInterpreterEnvironment(runtime.Config{})
@@ -484,7 +472,7 @@ func TestEVMEncodeABI(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -594,7 +582,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -659,7 +647,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -734,7 +722,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -794,7 +782,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -865,7 +853,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -936,7 +924,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -1061,7 +1049,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -1109,7 +1097,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -1155,7 +1143,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -1202,7 +1190,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -1258,7 +1246,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -1315,7 +1303,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Interface:        runtimeInterface,
 				Environment:      scriptEnvironment,
 				Location:         nextScriptLocation(),
-				UseVM:            *testWithVMScriptExecution,
+				UseVM:            cadence_vm.DefaultEnabled,
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
 			},
@@ -1419,7 +1407,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -1513,7 +1501,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -1616,7 +1604,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -1737,7 +1725,7 @@ func TestEVMDecodeABI(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -1845,7 +1833,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -1952,7 +1940,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		require.NoError(t, err)
@@ -1996,7 +1984,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		require.NoError(t, err)
@@ -2030,7 +2018,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		require.Error(t, err)
@@ -2068,7 +2056,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		require.Error(t, err)
@@ -2106,7 +2094,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		require.Error(t, err)
@@ -2385,7 +2373,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -2475,7 +2463,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -2560,7 +2548,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -2646,7 +2634,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -2732,7 +2720,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -2828,7 +2816,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -2914,7 +2902,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -3000,7 +2988,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -3086,7 +3074,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -3172,7 +3160,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -3258,7 +3246,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -3354,7 +3342,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		RequireError(t, err)
@@ -3457,7 +3445,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -3607,7 +3595,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 			Interface:        runtimeInterface,
 			Environment:      scriptEnvironment,
 			Location:         nextScriptLocation(),
-			UseVM:            *testWithVMScriptExecution,
+			UseVM:            cadence_vm.DefaultEnabled,
 			MemoryGauge:      gauge,
 			ComputationGauge: gauge,
 		},
@@ -3724,7 +3712,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.Error(t, err)
@@ -3819,7 +3807,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -3928,7 +3916,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -3965,7 +3953,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 
@@ -4002,7 +3990,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 
@@ -4091,7 +4079,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4218,7 +4206,7 @@ func TestEVMRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4247,7 +4235,7 @@ func TestEVMRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4349,7 +4337,7 @@ func TestEVMDryRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4468,7 +4456,7 @@ func TestEVMDryCall(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4596,7 +4584,7 @@ func TestEVMBatchRun(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4703,7 +4691,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4854,7 +4842,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -4984,7 +4972,7 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -5105,7 +5093,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -5222,7 +5210,7 @@ func TestCOADeposit(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -5395,7 +5383,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -5545,7 +5533,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -5622,7 +5610,7 @@ func RunEVMScript(
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.NoError(t, err)
@@ -5887,7 +5875,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: transactionEnvironment,
 				Location:    nextTransactionLocation(),
-				UseVM:       *testWithVMTransactionExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 		require.NoError(t, err)
@@ -5925,7 +5913,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
-				UseVM:       *testWithVMScriptExecution,
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 
@@ -6158,7 +6146,7 @@ func TestInternalEVMAccess(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
-			UseVM:       *testWithVMScriptExecution,
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.Error(t, err)

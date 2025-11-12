@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/sema"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	"github.com/onflow/flow-go/fvm/environment"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
@@ -73,11 +74,13 @@ func TestSystemContractsInvoke(t *testing.T) {
 			)
 			invoker := environment.NewSystemContracts(
 				chainID.Chain(),
+				cadence_vm.DefaultEnabled,
 				tracer,
 				environment.NewProgramLogger(
 					tracer,
 					environment.DefaultProgramLoggerParams()),
-				runtime)
+				runtime,
+			)
 			value, err := invoker.Invoke(
 				environment.ContractFunctionSpec{
 					AddressFromChain: func(_ flow.Chain) flow.Address {
@@ -85,7 +88,8 @@ func TestSystemContractsInvoke(t *testing.T) {
 					},
 					FunctionName: "functionName",
 				},
-				[]cadence.Value{})
+				nil,
+			)
 
 			tc.require(t, value, err)
 		})

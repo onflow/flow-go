@@ -14,16 +14,12 @@ func InitFvmOptions(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
 ) []fvm.Option {
 	blockFinder := environment.NewBlockFinder(headers)
 	vmOpts := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
-		fvm.WithVMScriptExecutionEnabled(vmScriptExecutionEnabled),
-		fvm.WithVMTransactionExecutionEnabled(vmTransactionExecutionEnabled),
 	}
 	switch chainID {
 	case flow.Testnet,
