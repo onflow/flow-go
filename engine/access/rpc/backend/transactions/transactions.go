@@ -251,15 +251,12 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 	}
 
 	// check if it's a scheduled transaction
-	if t.scheduledTransactions != nil {
-		tx, isScheduledTx, err := t.lookupScheduledTransaction(ctx, txID)
-		if err != nil {
-			return nil, err
-		}
-		if isScheduledTx {
-			return tx, nil
-		}
-		// else, this is not a system collection tx. continue with the normal lookup
+	tx, isScheduledTx, err := t.lookupScheduledTransaction(ctx, txID)
+	if err != nil {
+		return nil, err
+	}
+	if isScheduledTx {
+		return tx, nil
 	}
 
 	// otherwise, check if it's a historic transaction
@@ -346,16 +343,12 @@ func (t *Transactions) GetTransactionResult(
 		return txResult, nil
 	}
 
-	// if the node is not indexing scheduled transactions, then fallback to the normal lookup. if the
-	// request was for a scheduled transaction, it will fail with a not found error.
-	if t.scheduledTransactions != nil {
-		txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, blockID, encodingVersion)
-		if err != nil {
-			return nil, err
-		}
-		if isScheduledTx {
-			return txResult, nil
-		}
+	txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, blockID, encodingVersion)
+	if err != nil {
+		return nil, err
+	}
+	if isScheduledTx {
+		return txResult, nil
 	}
 
 	txResult, tx, err := t.lookupSubmittedTransactionResult(ctx, txID, blockID, collectionID, encodingVersion)
@@ -711,12 +704,6 @@ func (t *Transactions) GetSystemTransactionResult(
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if the scheduled transaction is not found
 func (t *Transactions) GetScheduledTransaction(ctx context.Context, scheduledTxID uint64) (*flow.TransactionBody, error) {
-	// The scheduled transactions index is only written if execution state indexing is enabled.
-	// Note: it's possible indexing is enabled and requests are still served from execution nodes.
-	if t.scheduledTransactions == nil {
-		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
-	}
-
 	txID, err := t.scheduledTransactions.TransactionIDByID(scheduledTxID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
@@ -742,12 +729,6 @@ func (t *Transactions) GetScheduledTransaction(ctx context.Context, scheduledTxI
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if the scheduled transaction is not found
 func (t *Transactions) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
-	// The scheduled transactions index is only written if execution state indexing is enabled.
-	// Note: it's possible indexing is enabled and requests are still served from execution nodes.
-	if t.scheduledTransactions == nil {
-		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
-	}
-
 	txID, err := t.scheduledTransactions.TransactionIDByID(scheduledTxID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)

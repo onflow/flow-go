@@ -2023,19 +2023,6 @@ func (suite *Suite) TestGetScheduledTransaction() {
 		suite.Require().Error(err) // specific error doen't matter since it's thrown
 		suite.Require().Nil(actual)
 	})
-
-	suite.Run("returns unimplemented error when scheduled transactions are not enabled", func() {
-		params := suite.defaultTransactionsParams()
-		params.ScheduledTransactions = nil
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetScheduledTransaction(context.Background(), 0)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.Unimplemented, status.Code(err))
-		suite.Require().Nil(res)
-	})
 }
 
 func (suite *Suite) TestGetScheduledTransactionResult() {
@@ -2202,19 +2189,6 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 
 		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
 		suite.Require().ErrorIs(err, expectedErr)
-		suite.Require().Nil(res)
-	})
-
-	suite.Run("returns unimplemented error when scheduled transactions are not enabled", func() {
-		params := suite.defaultTransactionsParams()
-		params.ScheduledTransactions = nil
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.Unimplemented, status.Code(err))
 		suite.Require().Nil(res)
 	})
 }
