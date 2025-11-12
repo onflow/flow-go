@@ -54,8 +54,7 @@ type VerificationConfig struct {
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
-	stopAtHeight                 uint64 // height to stop the node on
-	scheduledTransactionsEnabled bool   // enable execution of scheduled transactions
+	stopAtHeight uint64 // height to stop the node on
 }
 
 type VerificationNodeBuilder struct {
@@ -71,6 +70,7 @@ func NewVerificationNodeBuilder(nodeBuilder *FlowNodeBuilder) *VerificationNodeB
 }
 
 func (v *VerificationNodeBuilder) LoadFlags() {
+
 	v.FlowNodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&v.verConf.chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
@@ -83,7 +83,10 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
-			flags.BoolVar(&v.verConf.scheduledTransactionsEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "enable execution of scheduled transactions")
+
+			var unusedScheduledCallbacksEnabled bool // todo remove after deprecation period
+			flags.BoolVar(&unusedScheduledCallbacksEnabled, "scheduled-callbacks-enabled", true, "[deprecated] enable execution of scheduled transactions")
+			_ = flags.MarkDeprecated("scheduled-callbacks-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
 		})
 }
 
@@ -211,7 +214,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				computation.DefaultFVMOptions(
 					node.RootChainID,
 					false,
-					v.verConf.scheduledTransactionsEnabled,
 				)...,
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)

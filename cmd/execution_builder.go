@@ -579,7 +579,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		computation.DefaultFVMOptions(
 			node.RootChainID,
 			exeNode.exeConf.computationConfig.ExtensiveTracing,
-			exeNode.exeConf.scheduleCallbacksEnabled,
 		)...,
 	)
 
