@@ -120,7 +120,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 // Note: this method call is not concurrent safe, because it checks if the different result is already indexed
 // by the same blockID, and if it is, it returns an error.
 // The caller needs to ensure that there is no concurrent call to this method with the same blockID.
-// deprecated
+// Deprecated: Use the blockID->sealID index (FinalizedSealForBlock) and Seal.ResultID field to look up sealed results instead. This function will be removed in a future version.
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
 	err := r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return r.index(rw.Writer(), blockID, resultID, false)
