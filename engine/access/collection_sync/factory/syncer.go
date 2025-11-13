@@ -1,4 +1,4 @@
-package collections
+package factory
 
 import (
 	"fmt"
@@ -6,7 +6,8 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
+	"github.com/onflow/flow-go/engine/access/collection_sync/collections"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -28,16 +29,16 @@ type CreateSyncerConfig struct {
 
 // CreateSyncerResult holds the results of CreateSyncer.
 type CreateSyncerResult struct {
-	Syncer       *Syncer
-	JobProcessor ingestion2.JobProcessor
+	Syncer       *collections.Syncer
+	JobProcessor collection_sync.JobProcessor
 	RequestEng   *requester.Engine
 }
 
 // CreateSyncer creates a new Syncer component with all its dependencies.
 // This function is in the collections package to avoid import cycles:
-// - collections package already imports ingestion2 (for interfaces)
+// - collections package already imports collection_sync (for interfaces)
 // - CreateSyncer needs to create concrete types from collections package
-// - Placing it in ingestion2 would create: ingestion2 -> collections -> ingestion2 (cycle)
+// - Placing it in collection_sync would create: collection_sync -> collections -> collection_sync (cycle)
 //
 // Parameters:
 //   - log: Logger for the component
@@ -62,7 +63,7 @@ func CreateSyncer(
 	state protocol.State,
 	me module.Local,
 	blocks storage.Blocks,
-	collections storage.Collections,
+	collStore storage.Collections,
 	guarantees storage.Guarantees,
 	db storage.DB,
 	lockManager lockctx.Manager,
@@ -86,30 +87,30 @@ func CreateSyncer(
 	}
 
 	// Create MissingCollectionQueue
-	mcq := NewMissingCollectionQueue()
+	mcq := collections.NewMissingCollectionQueue()
 
 	// Create BlockCollectionIndexer
-	indexer := NewBlockCollectionIndexer(
+	indexer := collections.NewBlockCollectionIndexer(
 		collectionExecutedMetric,
 		lockManager,
 		db,
-		collections,
+		collStore,
 	)
 
 	// Create CollectionRequester
-	collectionRequester := NewCollectionRequester(
+	collectionRequester := collections.NewCollectionRequester(
 		requestEng,
 		state,
 		guarantees,
 	)
 
 	// Create JobProcessor
-	jobProcessor := NewJobProcessor(
+	jobProcessor := collections.NewJobProcessor(
 		mcq,
 		indexer,
 		collectionRequester,
 		blocks,
-		collections,
+		collStore,
 	)
 
 	// Register handler for received collections
@@ -128,7 +129,7 @@ func CreateSyncer(
 	})
 
 	// Create Syncer
-	syncer, err := NewSyncer(
+	syncer, err := collections.NewSyncer(
 		log,
 		jobProcessor,
 		processedFinalizedBlockHeight,

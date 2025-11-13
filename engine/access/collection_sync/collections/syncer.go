@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ ingestion2.Syncer = (*Syncer)(nil)
+var _ collection_sync.Syncer = (*Syncer)(nil)
 
 // Syncer is a component that consumes finalized block jobs and processes them
 // to index collections. It uses a job consumer with windowed throttling to prevent node overload.
@@ -23,7 +23,7 @@ type Syncer struct {
 	component.Component
 
 	consumer     *jobqueue.ComponentConsumer
-	jobProcessor ingestion2.JobProcessor
+	jobProcessor collection_sync.JobProcessor
 	workSignal   engine.Notifier
 }
 
@@ -41,7 +41,7 @@ type Syncer struct {
 // No error returns are expected during normal operation.
 func NewSyncer(
 	log zerolog.Logger,
-	jobProcessor ingestion2.JobProcessor,
+	jobProcessor collection_sync.JobProcessor,
 	progressInitializer storage.ConsumerProgressInitializer,
 	state protocol.State,
 	blocks storage.Blocks,

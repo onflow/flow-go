@@ -3,13 +3,13 @@ package collections
 import (
 	"context"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
-var _ ingestion2.EDIHeightProvider = (*ediHeightProvider)(nil)
+var _ collection_sync.EDIHeightProvider = (*ediHeightProvider)(nil)
 
 // ediHeightProvider implements EDIHeightProvider by querying ExecutionDataCache.
 type ediHeightProvider struct {

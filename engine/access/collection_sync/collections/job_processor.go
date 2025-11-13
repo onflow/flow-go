@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -16,15 +16,15 @@ import (
 // It orchestrates the flow: request → receive → index → complete.
 // TODO: rename to fetch_job_processor
 type JobProcessor struct {
-	mcq                     ingestion2.MissingCollectionQueue
-	indexer                 ingestion2.BlockCollectionIndexer
-	requester               ingestion2.CollectionRequester
+	mcq                     collection_sync.MissingCollectionQueue
+	indexer                 collection_sync.BlockCollectionIndexer
+	requester               collection_sync.CollectionRequester
 	blocks                  storage.Blocks
 	collections             storage.CollectionsReader
 	newExecutionDataIndexed <-chan struct{}
 }
 
-var _ ingestion2.JobProcessor = (*JobProcessor)(nil)
+var _ collection_sync.JobProcessor = (*JobProcessor)(nil)
 
 // NewJobProcessor creates a new JobProcessor.
 //
@@ -38,9 +38,9 @@ var _ ingestion2.JobProcessor = (*JobProcessor)(nil)
 //
 // No error returns are expected during normal operation.
 func NewJobProcessor(
-	mcq ingestion2.MissingCollectionQueue,
-	indexer ingestion2.BlockCollectionIndexer,
-	requester ingestion2.CollectionRequester,
+	mcq collection_sync.MissingCollectionQueue,
+	indexer collection_sync.BlockCollectionIndexer,
+	requester collection_sync.CollectionRequester,
 	blocks storage.Blocks,
 	collections storage.CollectionsReader,
 ) *JobProcessor {

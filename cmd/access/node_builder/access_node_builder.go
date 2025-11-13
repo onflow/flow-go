@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/engine/access/ingestion2"
 	ingestion2collections "github.com/onflow/flow-go/engine/access/ingestion2/collections"
+	ingestion2factory "github.com/onflow/flow-go/engine/access/ingestion2/factory"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -327,6 +328,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataDownloader      execution_data.Downloader
 	PublicBlobService            network.BlobService
 	ExecutionDataRequester       state_synchronization.ExecutionDataRequester
+	ExecutionDataDistributor     *edrequester.ExecutionDataDistributor
 	ExecutionDataStore           execution_data.ExecutionDataStore
 	ExecutionDataBlobstore       blobs.Blobstore
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
@@ -738,6 +740,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
+			builder.ExecutionDataDistributor = execDataDistributor
 
 			// Execution Data cache with a downloader as the backend. This is used by the requester
 			// to download and cache execution data for each block. It shares a cache backend instance
@@ -945,11 +948,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("could not create derived chain data: %w", err)
 				}
 
-				// JobProcessor should already be created in the "collection syncer and job processor" module
-				if builder.JobProcessor == nil {
-					return nil, fmt.Errorf("JobProcessor must be created before execution data indexer")
-				}
-
 				builder.ExecutionIndexerCore = indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
@@ -963,7 +961,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.scheduledTransactions),
 					builder.RootChainID,
 					indexerDerivedChainData,
-					notNil(builder.JobProcessor),
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
 				)
@@ -1965,7 +1962,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("collection syncer and job processor", func(node *cmd.NodeConfig) error {
 			// Create syncer and job processor
-			syncerResult, err := ingestion2collections.CreateSyncer(
+			syncerResult, err := ingestion2factory.CreateSyncer(
 				node.Logger,
 				node.EngineRegistry,
 				node.State,
@@ -1977,7 +1974,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.StorageLockMgr,
 				fetchAndIndexedCollectionsBlockHeight,
 				notNil(builder.collectionExecutedMetric),
-				ingestion2collections.CreateSyncerConfig{
+				ingestion2factory.CreateSyncerConfig{
 					MaxProcessing:  10, // TODO: make configurable
 					MaxSearchAhead: 0,  // TODO: make configurable
 				},
@@ -2286,56 +2283,122 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
 
 			return builder.RequestEng, nil
-		}).
-		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.storeTxResultErrorMessages {
-				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
-					node.Logger,
-					notNil(builder.txResultErrorMessageProvider),
-					builder.transactionResultErrorMessages,
-					notNil(builder.ExecNodeIdentitiesProvider),
-					node.StorageLockMgr,
-				)
-			}
-
-			// CollectionSyncer2 should already be created in the "collection syncer and job processor" module
-			if builder.CollectionSyncer2 == nil {
-				return nil, fmt.Errorf("CollectionSyncer2 must be created before ingestion engine")
-			}
-
-			// Create FinalizedBlockProcessor (still uses old syncer temporarily)
-			finalizedBlockProcessor, err := ingestion2.NewFinalizedBlockProcessor(
-				node.Logger,
-				node.State,
-				node.Storage.Blocks,
-				node.Storage.Results,
-				processedFinalizedBlockHeight,
-				notNil(builder.collectionExecutedMetric),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized block processor: %w", err)
-			}
-
-			// Create ingestion2 engine
-			ingestEng, err := ingestion2.New(
-				node.Logger,
-				node.EngineRegistry,
-				finalizedBlockProcessor,
-				builder.CollectionSyncer2,
-				node.Storage.Receipts,
-				notNil(builder.collectionExecutedMetric),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create ingestion2 engine: %w", err)
-			}
-
-			builder.IngestEng = ingestEng
-
-			ingestionDependable.Init(ingestEng)
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(ingestEng.OnFinalizedBlock)
-
-			return ingestEng, nil
 		})
+	if builder.executionDataSyncEnabled {
+		builder.Component("execution data processor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// ExecutionDataCache should already be created in BuildExecutionSyncComponents
+			if builder.ExecutionDataCache == nil {
+				return nil, fmt.Errorf("ExecutionDataCache must be created before execution data processor")
+			}
+
+			// Create execution data tracker for the processor
+			// This is similar to the one created in state stream engine but used for collection indexing
+			broadcaster := engine.NewBroadcaster()
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+
+			useIndex := builder.executionDataIndexingEnabled
+			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
+				builder.Logger,
+				node.State,
+				builder.executionDataConfig.InitialBlockHeight,
+				node.Storage.Headers,
+				broadcaster,
+				highestAvailableHeight,
+				builder.EventsIndex,
+				useIndex,
+			)
+
+			// Initialize processed height
+			rootBlockHeight := node.State.Params().FinalizedRoot().Height
+			processedHeight, err := syncAndIndexedCollectionsBlockHeight.Initialize(rootBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed height: %w", err)
+			}
+
+			// Get BlockCollectionIndexer from syncer result
+			// The indexer is created in the CreateSyncer call, we need to extract it
+			// For now, we'll create a new one since we need it for the processor
+			blockCollectionIndexer := ingestion2collections.NewBlockCollectionIndexer(
+				notNil(builder.collectionExecutedMetric),
+				node.StorageLockMgr,
+				builder.ProtocolDB,
+				notNil(builder.collections),
+			)
+
+			// Create execution data processor
+			executionDataProcessor, err := ingestion2factory.CreateExecutionDataProcessor(
+				notNil(builder.ExecutionDataCache),
+				executionDataTracker,
+				processedHeight,
+				blockCollectionIndexer,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create execution data processor: %w", err)
+			}
+
+			// Setup requester to notify processor when new execution data is received
+			if builder.ExecutionDataDistributor != nil {
+				builder.ExecutionDataDistributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
+					executionDataTracker.OnExecutionData(executionData)
+					executionDataProcessor.OnNewExectuionData()
+				})
+			}
+
+			return executionDataProcessor, nil
+		})
+	}
+	builder.Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		if builder.storeTxResultErrorMessages {
+			builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
+				node.Logger,
+				notNil(builder.txResultErrorMessageProvider),
+				builder.transactionResultErrorMessages,
+				notNil(builder.ExecNodeIdentitiesProvider),
+				node.StorageLockMgr,
+			)
+		}
+
+		// CollectionSyncer2 should already be created in the "collection syncer and job processor" module
+		if builder.CollectionSyncer2 == nil {
+			return nil, fmt.Errorf("CollectionSyncer2 must be created before ingestion engine")
+		}
+
+		// Create FinalizedBlockProcessor (still uses old syncer temporarily)
+		finalizedBlockProcessor, err := ingestion2.NewFinalizedBlockProcessor(
+			node.Logger,
+			node.State,
+			node.Storage.Blocks,
+			node.Storage.Results,
+			processedFinalizedBlockHeight,
+			notNil(builder.collectionExecutedMetric),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create finalized block processor: %w", err)
+		}
+
+		// Create ingestion2 engine
+		ingestEng, err := ingestion2.New(
+			node.Logger,
+			node.EngineRegistry,
+			finalizedBlockProcessor,
+			builder.CollectionSyncer2,
+			node.Storage.Receipts,
+			notNil(builder.collectionExecutedMetric),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create ingestion2 engine: %w", err)
+		}
+
+		builder.IngestEng = ingestEng
+
+		ingestionDependable.Init(ingestEng)
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(ingestEng.OnFinalizedBlock)
+
+		return ingestEng, nil
+	})
 
 	if builder.storeTxResultErrorMessages {
 		builder.

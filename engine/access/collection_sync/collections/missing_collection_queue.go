@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -44,7 +44,7 @@ type MissingCollectionQueue struct {
 	collectionToHeight map[flow.Identifier]uint64
 }
 
-var _ ingestion2.MissingCollectionQueue = (*MissingCollectionQueue)(nil)
+var _ collection_sync.MissingCollectionQueue = (*MissingCollectionQueue)(nil)
 
 // NewMissingCollectionQueue creates a new MissingCollectionQueue.
 //

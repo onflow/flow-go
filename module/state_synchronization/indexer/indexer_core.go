@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -31,7 +30,6 @@ type IndexerCore struct {
 	fvmEnv                   templates.Environment
 	metrics                  module.ExecutionStateIndexerMetrics
 	collectionExecutedMetric module.CollectionExecutedMetric
-	collectionIndexer        ingestion2.JobProcessor
 
 	registers             storage.RegisterIndex
 	headers               storage.Headers
@@ -63,7 +61,6 @@ func New(
 	scheduledTransactions storage.ScheduledTransactions,
 	chainID flow.ChainID,
 	derivedChainData *derived.DerivedChainData,
-	collectionIndexer ingestion2.JobProcessor,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
 ) *IndexerCore {
@@ -93,7 +90,6 @@ func New(
 		serviceAddress:        chainID.Chain().ServiceAddress(),
 		derivedChainData:      derivedChainData,
 
-		collectionIndexer:        collectionIndexer,
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
 	}
@@ -215,32 +211,6 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			Int("scheduled_tx_count", len(scheduledTransactionData)).
 			Dur("duration_ms", time.Since(start)).
 			Msg("indexed protocol data")
-
-		return nil
-	})
-
-	g.Go(func() error {
-		start := time.Now()
-
-		// Note: the access ingestion engine also indexes collections, starting when the block is
-		// finalized. This process can fall behind due to the node being offline, resource issues
-		// or network congestion. This indexer ensures that collections are never farther behind
-		// than the latest indexed block. Calling the collection handler with a collection that
-		// has already been indexed is a noop.
-
-		// index all standard (non-system) collections
-		standardCollections := data.StandardCollections()
-		if len(standardCollections) > 0 {
-			err := c.collectionIndexer.OnReceivedCollectionsForBlock(header.Height, standardCollections)
-			if err != nil {
-				return fmt.Errorf("could not index collections: %w", err)
-			}
-		}
-
-		lg.Debug().
-			Int("collection_count", len(standardCollections)).
-			Dur("duration_ms", time.Since(start)).
-			Msg("indexed collections")
 
 		return nil
 	})

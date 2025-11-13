@@ -3,7 +3,7 @@ package collections
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -12,18 +12,18 @@ import (
 type ExecutionDataProcessor struct {
 	component.Component
 	newExecutionDataIndexed chan struct{}
-	ediHeightProvider       ingestion2.EDIHeightProvider
-	indexer                 ingestion2.BlockCollectionIndexer
+	ediHeightProvider       collection_sync.EDIHeightProvider
+	indexer                 collection_sync.BlockCollectionIndexer
 	// state
 	processedHeight *counters.PersistentStrictMonotonicCounter
 }
 
-var _ ingestion2.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
+var _ collection_sync.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
 var _ component.Component = (*ExecutionDataProcessor)(nil)
 
 func NewExecutionDataProcessor(
-	ediHeightProvider ingestion2.EDIHeightProvider,
-	indexer ingestion2.BlockCollectionIndexer,
+	ediHeightProvider collection_sync.EDIHeightProvider,
+	indexer collection_sync.BlockCollectionIndexer,
 	processedHeight *counters.PersistentStrictMonotonicCounter,
 ) *ExecutionDataProcessor {
 	edp := &ExecutionDataProcessor{

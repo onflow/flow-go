@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -12,10 +12,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ ingestion2.CollectionRequester = (*CollectionRequester)(nil)
+var _ collection_sync.CollectionRequester = (*CollectionRequester)(nil)
 
 // CollectionRequester requests collections from collection nodes on the network.
-// It implements the ingestion2.CollectionRequester interface.
+// It implements the collection_sync.CollectionRequester interface.
 type CollectionRequester struct {
 	requester  module.Requester
 	state      protocol.State
@@ -76,4 +76,3 @@ func (cr *CollectionRequester) RequestCollections(ids []flow.Identifier) error {
 
 	return nil
 }
-

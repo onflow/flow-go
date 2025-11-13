@@ -1,4 +1,4 @@
-package ingestion2
+package collection_sync
 
 import (
 	"context"
@@ -37,14 +37,6 @@ type BlockCollectionIndexer interface {
 // Implements the job lifecycle for a single block height.
 type JobProcessor interface {
 	ProcessJobConcurrently(ctx irrecoverable.SignalerContext, job module.Job, done func()) error
-	// OnReceivedCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error // called by EDI or requester
-}
-
-// EDIHeightProvider provides the latest height for which execution data indexer has collections.
-// This can be nil if execution data indexing is disabled.
-type EDIHeightProvider interface {
-	HighestIndexedHeight() uint64
-	GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error)
 }
 
 // Syncer is a component that consumes finalized block jobs and processes them
@@ -55,6 +47,13 @@ type Syncer interface {
 	LastProcessedIndex() uint64
 	Head() (uint64, error)
 	Size() uint
+}
+
+// EDIHeightProvider provides the latest height for which execution data indexer has collections.
+// This can be nil if execution data indexing is disabled.
+type EDIHeightProvider interface {
+	HighestIndexedHeight() uint64
+	GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error)
 }
 
 type ExecutionDataProcessor interface {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/jordanschalm/lockctx"
 
-	"github.com/onflow/flow-go/engine/access/ingestion2"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
@@ -20,7 +20,7 @@ type blockCollectionIndexerImpl struct {
 	collections storage.Collections
 }
 
-var _ ingestion2.BlockCollectionIndexer = (*blockCollectionIndexerImpl)(nil)
+var _ collection_sync.BlockCollectionIndexer = (*blockCollectionIndexerImpl)(nil)
 
 // NewBlockCollectionIndexer creates a new BlockCollectionIndexer implementation.
 //

@@ -8,21 +8,28 @@ const (
 	ConsumeProgressVerificationBlockHeight = "ConsumeProgressVerificationBlockHeight"
 	ConsumeProgressVerificationChunkIndex  = "ConsumeProgressVerificationChunkIndex"
 
-	ConsumeProgressExecutionDataRequesterBlockHeight  = "ConsumeProgressExecutionDataRequesterBlockHeight"
+	// for each sealed block height, request and store the execution data
+	ConsumeProgressExecutionDataRequesterBlockHeight = "ConsumeProgressExecutionDataRequesterBlockHeight"
+
+	// for OnExecutionDataFetched notification distributor to distribute the events
 	ConsumeProgressExecutionDataRequesterNotification = "ConsumeProgressExecutionDataRequesterNotification"
 
 	ConsumeProgressExecutionDataIndexerBlockHeight = "ConsumeProgressExecutionDataIndexerBlockHeight"
 
+	// for AN ingestion engine to index guarantee by block id
 	ConsumeProgressIngestionEngineBlockHeight = "ConsumeProgressIngestionEngineBlockHeight"
 
-	// the highest block height that has indexed collections from fetching missing collections from LN
+	// (new)the highest block height that has indexed collections from fetching missing collections from LN
 	ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight = "ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight"
 
-	// the highest block height that has indexed collections from syncing execution data from EN
+	// (new)the highest block height that has indexed collections from syncing execution data from EN
 	ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight = "ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight"
 
+	// on finalized block, fetch tx error message from EN
 	ConsumeProgressEngineTxErrorMessagesBlockHeight = "ConsumeProgressEngineTxErrorMessagesBlockHeight"
-	ConsumeProgressLastFullBlockHeight              = "ConsumeProgressLastFullBlockHeight"
+
+	// fetch collections
+	ConsumeProgressLastFullBlockHeight = "ConsumeProgressLastFullBlockHeight"
 )
 
 // JobID is a unique ID of the job.
