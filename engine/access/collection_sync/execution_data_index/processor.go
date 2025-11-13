@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/collection_sync"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -16,6 +17,7 @@ type ExecutionDataProcessor struct {
 	indexer                 collection_sync.BlockCollectionIndexer
 	// state
 	processedHeight *counters.PersistentStrictMonotonicCounter
+	metrics         module.CollectionSyncMetrics
 }
 
 var _ collection_sync.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
@@ -26,12 +28,14 @@ func NewExecutionDataProcessor(
 	provider collection_sync.ExecutionDataProvider,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedHeight *counters.PersistentStrictMonotonicCounter,
+	metrics module.CollectionSyncMetrics, // optional metrics collector
 ) *ExecutionDataProcessor {
 	edp := &ExecutionDataProcessor{
 		newExecutionDataIndexed: make(chan struct{}, 1),
 		provider:                provider,
 		indexer:                 indexer,
 		processedHeight:         processedHeight,
+		metrics:                 metrics,
 	}
 
 	// Initialize the channel so that even if no new execution data comes in,
@@ -99,6 +103,11 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 				if err != nil {
 					ctx.Throw(fmt.Errorf("failed to update processed height to %d: %w", height, err))
 					return
+				}
+
+				// Update metrics if available
+				if edp.metrics != nil {
+					edp.metrics.CollectionSyncedHeight(height)
 				}
 			}
 		}

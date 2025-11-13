@@ -23,6 +23,7 @@ type Fetcher struct {
 	consumer     *jobqueue.ComponentConsumer
 	jobProcessor collection_sync.JobProcessor
 	workSignal   engine.Notifier
+	metrics      module.CollectionSyncMetrics
 }
 
 var _ collection_sync.Fetcher = (*Fetcher)(nil)
@@ -39,6 +40,7 @@ var _ component.Component = (*Fetcher)(nil)
 //   - blocks: Blocks storage for reading blocks by height
 //   - maxProcessing: Maximum number of jobs to process concurrently
 //   - maxSearchAhead: Maximum number of jobs beyond processedIndex to process. 0 means no limit
+//   - metrics: Optional metrics collector for reporting collection fetched height
 //
 // No error returns are expected during normal operation.
 func NewFetcher(
@@ -49,6 +51,7 @@ func NewFetcher(
 	blocks storage.Blocks,
 	maxProcessing uint64, // max number of blocks to fetch collections
 	maxSearchAhead uint64, // max number of blocks beyond the next unfullfilled height to fetch collections for
+	metrics module.CollectionSyncMetrics, // optional metrics collector
 ) (*Fetcher, error) {
 	workSignal := engine.NewNotifier()
 
@@ -80,12 +83,23 @@ func NewFetcher(
 		return nil, fmt.Errorf("failed to create collection syncing consumer: %w", err)
 	}
 
-	return &Fetcher{
+	f := &Fetcher{
 		Component:    consumer,
 		consumer:     consumer,
 		jobProcessor: jobProcessor,
 		workSignal:   workSignal,
-	}, nil
+		metrics:      metrics,
+	}
+
+	// Set up post-notifier to update metrics when a job is done
+	if metrics != nil {
+		consumer.SetPostNotifier(func(jobID module.JobID) {
+			height := f.ProcessedHeight()
+			metrics.CollectionFetchedHeight(height)
+		})
+	}
+
+	return f, nil
 }
 
 // OnFinalizedBlock is called when a new block is finalized. It notifies the job consumer

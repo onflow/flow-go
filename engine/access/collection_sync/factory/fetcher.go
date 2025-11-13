@@ -43,6 +43,7 @@ type CreateFetcherConfig struct {
 //   - db: Database for storage operations
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
 //   - collectionExecutedMetric: Metrics collector for tracking collection indexing
+//   - collectionSyncMetrics: Optional metrics collector for tracking collection sync progress
 //   - config: Configuration for the fetcher
 //
 // Returns both the Fetcher and JobProcessor so they can be reused in other components.
@@ -60,6 +61,7 @@ func CreateFetcher(
 	indexer collection_sync.BlockCollectionIndexer,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	collectionSyncMetrics module.CollectionSyncMetrics, // optional metrics collector
 	config CreateFetcherConfig,
 ) (*requester.Engine, collection_sync.Fetcher, error) {
 	// Create requester engine for requesting collections
@@ -120,6 +122,7 @@ func CreateFetcher(
 		blocks,
 		config.MaxProcessing,
 		config.MaxSearchAhead,
+		collectionSyncMetrics,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create fetcher: %w", err)

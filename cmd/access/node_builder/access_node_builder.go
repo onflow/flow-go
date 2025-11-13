@@ -321,6 +321,7 @@ type FlowAccessNodeBuilder struct {
 	RestMetrics                  *metrics.RestCollector
 	AccessMetrics                module.AccessMetrics
 	PingMetrics                  module.PingMetrics
+	CollectionSyncMetrics        module.CollectionSyncMetrics
 	Committee                    hotstuff.DynamicCommittee
 	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
 	Pending                      []*flow.ProposalHeader
@@ -1876,6 +1877,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.PingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
+		Module("collection sync metrics", func(node *cmd.NodeConfig) error {
+			builder.CollectionSyncMetrics = metrics.NewCollectionSyncCollector()
+			return nil
+		}).
 		Module("server certificate", func(node *cmd.NodeConfig) error {
 			// generate the server certificate that will be served by the GRPC server
 			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
@@ -2238,6 +2243,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				executionDataTracker,
 				collectionIndexedHeight,
 				notNil(builder.blockCollectionIndexer),
+				builder.CollectionSyncMetrics,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create execution data processor: %w", err)
@@ -2555,6 +2561,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				notNil(builder.blockCollectionIndexer),
 				fetchAndIndexedCollectionsBlockHeight,
 				notNil(builder.collectionExecutedMetric),
+				builder.CollectionSyncMetrics,
 				collection_syncfactory.CreateFetcherConfig{
 					MaxProcessing:  10, // TODO: make configurable
 					MaxSearchAhead: 20, // TODO: make configurable

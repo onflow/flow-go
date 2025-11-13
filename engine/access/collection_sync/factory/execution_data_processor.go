@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/collection_sync/execution_data_index"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
@@ -18,6 +19,7 @@ import (
 //   - executionDataTracker: Tracker for execution data that provides the highest available height
 //   - processedHeight: Consumer progress for tracking processed heights
 //   - indexer: Block collection indexer for indexing collections
+//   - collectionSyncMetrics: Optional metrics collector for tracking collection sync progress
 //
 // Returns:
 //   - *ExecutionDataProcessor: A new ExecutionDataProcessor instance
@@ -29,6 +31,7 @@ func CreateExecutionDataProcessor(
 	executionDataTracker tracker.ExecutionDataTracker,
 	processedHeight storage.ConsumerProgress,
 	indexer collection_sync.BlockCollectionIndexer,
+	collectionSyncMetrics module.CollectionSyncMetrics, // optional metrics collector
 ) (*execution_data_index.ExecutionDataProcessor, error) {
 	// Create execution data provider
 	executionDataProvider := execution_data_index.NewExecutionDataProvider(cache, executionDataTracker)
@@ -40,7 +43,7 @@ func CreateExecutionDataProcessor(
 	}
 
 	// Create the execution data processor
-	processor := execution_data_index.NewExecutionDataProcessor(executionDataProvider, indexer, processedHeightCounter)
+	processor := execution_data_index.NewExecutionDataProcessor(executionDataProvider, indexer, processedHeightCounter, collectionSyncMetrics)
 
 	return processor, nil
 }
