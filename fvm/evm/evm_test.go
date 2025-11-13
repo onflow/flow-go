@@ -4007,13 +4007,7 @@ func getEVMAccountNonce(
 func RunWithNewEnvironment(
 	t *testing.T,
 	chain flow.Chain,
-	f func(
-	fvm.Context,
-	fvm.VM,
-	snapshot.SnapshotTree,
-	*TestContract,
-	*EOATestAccount,
-),
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 	RunWithTestBackend(t, func(backend *TestBackend) {
@@ -4069,13 +4063,7 @@ func RunContractWithNewEnvironment(
 	t *testing.T,
 	chain flow.Chain,
 	tc *TestContract,
-	f func(
-	fvm.Context,
-	fvm.VM,
-	snapshot.SnapshotTree,
-	*TestContract,
-	*EOATestAccount,
-),
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
 	bootstrapOpts ...fvm.BootstrapProcedureOption,
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
