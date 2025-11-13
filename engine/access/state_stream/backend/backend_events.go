@@ -172,30 +172,52 @@ func (b *EventsBackend) SubscribeEventsFromLatest(
 	return b.subscriptionFactory.CreateHeightBasedSubscription(ctx, nextHeight, b.createResponseHandler(filter, criteria))
 }
 
-// createResponseHandler returns a function that retrieves the event response for a given height.
+// createResponseHandler constructs a height-indexed response producer for event streaming.
 //
-// Parameters:
-// - filter: The event filter used to filter events.
+// It returns a closure compatible with height-based streaming that, for each requested
+// block height, fetches the block’s events, applies the provided filter and returns a response
+// The closure preserves fork affinity across sequential calls by capturing and propagating
+// the previous call’s ExecutionResultID into the optimistic_sync.Criteria as
+// ParentExecutionResultID for the next call. This scoping ensures that lineage is maintained
+// per stream without relying on backend-global mutable state.
 //
-// Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
+// Concurrency and lifecycle:
+//   - The returned closure maintains an internal state (nextCriteria) and is intended for sequential
+//     invocation within a single subscription/stream. It should not be used concurrently from
+//     multiple goroutines.
+//
+// Errors:
+// - Returns subscription.ErrBlockNotReady when the requested block’s data is not yet available.
 func (b *EventsBackend) createResponseHandler(
 	filter state_stream.EventFilter,
 	criteria optimistic_sync.Criteria,
 ) subscription.GetDataByHeightFunc {
+	// Make a private copy of the initial criteria and thread it across invocations of the
+	// returned closure. On each successful fetch we advance lineage by setting
+	// ParentExecutionResultID for the next call to preserve fork affinity within this stream.
+	nextCriteria := criteria
+
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
-		eventsResponse, err := b.eventsProvider.Events(ctx, height, criteria)
+		// Fetch events for the requested height using the current criteria. If a
+		// ParentExecutionResultID was captured previously, this biases the lookup toward the
+		// same execution fork.
+		eventsResponse, err := b.eventsProvider.Events(ctx, height, nextCriteria)
 		if err != nil {
+			// Normalize "not yet available" conditions so the streaming layer can retry/back off.
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) {
 				return nil, subscription.ErrBlockNotReady
 			}
 
+			// For any other error, return a consistent NotReady wrapper to callers.
 			return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 		}
 
-		eventsResponse.Events = filter.Filter(eventsResponse.Events)
+		// Advance lineage only after a successful fetch: carry forward the current block’s
+		// ExecutionResultID so the next call remains on the same execution fork.
+		nextCriteria.ParentExecutionResultID = eventsResponse.ExecutorMetadata.ExecutionResultID
 
+		eventsResponse.Events = filter.Filter(eventsResponse.Events)
 		return eventsResponse, nil
 	}
 }

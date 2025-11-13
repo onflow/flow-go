@@ -17,16 +17,12 @@ import (
 // Provider is a container for elements required to retrieve
 // execution results and execution node identities for a given block ID based on specified criteria.
 type Provider struct {
-	log zerolog.Logger
-
-	executionReceipts storage.ExecutionReceipts
-	state             protocol.State
-
+	log                   zerolog.Logger
+	state                 protocol.State
+	executionReceipts     storage.ExecutionReceipts
 	executionNodeSelector *ExecutionNodeSelector
-
-	rootBlockID flow.Identifier
-
-	operatorCriteria optimistic_sync.Criteria
+	rootBlockID           flow.Identifier
+	operatorCriteria      optimistic_sync.Criteria
 }
 
 var _ optimistic_sync.ExecutionResultInfoProvider = (*Provider)(nil)

@@ -114,3 +114,24 @@ func (c *ExecutionDataCache) LookupID(blockID flow.Identifier) (flow.Identifier,
 
 	return result.ExecutionDataID, nil
 }
+
+func (c *ExecutionDataCache) ByExecutionResultID(ctx context.Context, resultID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
+	result, err := c.results.ByID(resultID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup execution result %s: %w", resultID, err)
+	}
+
+	if execData, ok := c.cache.Get(result.BlockID); ok {
+		return execData, nil
+	}
+
+	execData, err := c.backend.Get(ctx, result.ExecutionDataID)
+	if err != nil {
+		return nil, err
+	}
+
+	execDataEntity := execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
+	_ = c.cache.Add(execDataEntity.BlockID, execDataEntity)
+
+	return execDataEntity, nil
+}

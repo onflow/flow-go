@@ -33,8 +33,6 @@ type EventsProvider struct {
 	fetchFromLocalCache bool
 	execResultProvider  optimistic_sync.ExecutionResultInfoProvider
 	execStateCache      optimistic_sync.ExecutionStateCache
-
-	parentExecutionResultID flow.Identifier
 }
 
 func NewEventsProvider(
@@ -46,20 +44,19 @@ func NewEventsProvider(
 	execStateCache optimistic_sync.ExecutionStateCache,
 ) *EventsProvider {
 	return &EventsProvider{
-		log:                     log,
-		headers:                 headers,
-		execDataProvider:        execDataProvider,
-		fetchFromLocalCache:     fetchFromLocalCache,
-		execResultProvider:      execResultProvider,
-		execStateCache:          execStateCache,
-		parentExecutionResultID: flow.ZeroID,
+		log:                 log,
+		headers:             headers,
+		execDataProvider:    execDataProvider,
+		fetchFromLocalCache: fetchFromLocalCache,
+		execResultProvider:  execResultProvider,
+		execStateCache:      execStateCache,
 	}
 }
 
-// Events returns a function that retrieves the event response for a given block height.
-// Expected errors:
-// - codes.NotFound: If block header for the specified block height is not found.
-// - error: An error, if any, encountered during getting events from storage or execution data.
+// Events return events for a given block height.
+//
+// Expected error returns during normal operations:
+//   - [codes.NotFound]: If a block header for the specified block height is not found.
 func (b *EventsProvider) Events(
 	ctx context.Context,
 	height uint64,
@@ -71,26 +68,28 @@ func (b *EventsProvider) Events(
 	if b.fetchFromLocalCache {
 		response, err = b.getEventsFromStorage(height, criteria)
 	} else {
-		response, err = b.getEventsFromExecutionData(ctx, height)
+		response, err = b.getEventsFromExecutionData(ctx, height, criteria)
 	}
 
-	if err == nil {
-		header, err := b.headers.ByHeight(height)
-		if err != nil {
-			return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
-		}
-		response.BlockTimestamp = time.UnixMilli(int64(header.Timestamp)).UTC()
-
-		if b.log.GetLevel() == zerolog.TraceLevel {
-			b.log.Trace().
-				Hex("block_id", logging.ID(response.BlockID)).
-				Uint64("height", height).
-				Int("events", len(response.Events)).
-				Msg("sending events")
-		}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get events: %w", err)
 	}
 
-	return response, err
+	header, err := b.headers.ByHeight(height)
+	if err != nil {
+		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	response.BlockTimestamp = time.UnixMilli(int64(header.Timestamp)).UTC()
+
+	if b.log.GetLevel() == zerolog.TraceLevel {
+		b.log.Trace().
+			Hex("block_id", logging.ID(response.BlockID)).
+			Uint64("height", height).
+			Int("events", len(response.Events)).
+			Msg("sending events")
+	}
+
+	return response, nil
 }
 
 // getEventsFromExecutionData returns the events for a given height extract from the execution data.
@@ -99,8 +98,18 @@ func (b *EventsProvider) Events(
 func (b *EventsProvider) getEventsFromExecutionData(
 	ctx context.Context,
 	height uint64,
+	criteria optimistic_sync.Criteria,
 ) (*EventsResponse, error) {
-	executionData, err := b.execDataProvider.ExecutionDataByBlockHeight(ctx, height)
+	blockID, err := b.headers.BlockIDByHeight(height)
+	execResult, err := b.execResultProvider.ExecutionResultInfo(
+		blockID,
+		criteria,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching execution execResult: %w", err)
+	}
+
+	executionData, err := b.execDataProvider.ExecutionDataByExecutionResultID(ctx, height, execResult.ExecutionResultID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
@@ -130,29 +139,17 @@ func (b *EventsProvider) getEventsFromStorage(
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
 
-	// we want to fetch events from the execution node that produced the previous result
-	// so that we get data from the same execution fork, if any.
-	if b.parentExecutionResultID != flow.ZeroID {
-		criteria.ParentExecutionResultID = b.parentExecutionResultID
-	}
-
 	result, err := b.execResultProvider.ExecutionResultInfo(
 		blockID,
 		criteria,
 	)
 	if err != nil {
-		return &EventsResponse{}, fmt.Errorf("error fetching execution result: %w", err)
+		return nil, fmt.Errorf("error fetching execution result: %w", err)
 	}
-	b.parentExecutionResultID = result.ExecutionResultID
 
 	snapshot, err := b.execStateCache.Snapshot(result.ExecutionResultID)
 	if err != nil {
-		return &EventsResponse{},
-			fmt.Errorf(
-				"failed to get snapshot for execution result %s: %w",
-				result.ExecutionResultID,
-				err,
-			)
+		return nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", result.ExecutionResultID, err)
 	}
 
 	events, err := snapshot.Events().ByBlockID(blockID)
