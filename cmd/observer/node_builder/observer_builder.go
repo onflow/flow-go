@@ -1662,10 +1662,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.RegistersAsyncStore,
-				builder.EventsIndex,
 				useIndex,
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
-				subscription.NewSubscriptionHandler(
+				subscription.NewSubscriptionFactory(
 					builder.Logger,
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
@@ -2070,7 +2069,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			ScriptExecutionMode:  scriptExecMode,
 			EventQueryMode:       eventQueryMode,
 			TxResultQueryMode:    txResultQueryMode,
-			SubscriptionHandler: subscription.NewSubscriptionHandler(
+			SubscriptionFactory: subscription.NewSubscriptionFactory(
 				builder.Logger,
 				broadcaster,
 				builder.stateStreamConf.ClientSendTimeout,
