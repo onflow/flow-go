@@ -202,8 +202,8 @@ func (h *Handler) GetBlockByID(
 // GetCollectionByID gets a collection by ID.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if the collection ID is invalid.
-//   - [codes.NotFound]: if the collection or transactions are not found.
+//   - [codes.InvalidArgument]: The collection ID is invalid.
+//   - [codes.NotFound]: The collection or transactions are not found.
 func (h *Handler) GetCollectionByID(
 	ctx context.Context,
 	req *accessproto.GetCollectionByIDRequest,
@@ -238,8 +238,8 @@ func (h *Handler) GetCollectionByID(
 // complete transaction bodies for all transactions in the collection.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if the collection ID is invalid.
-//   - [codes.NotFound]: if the collection or transactions are not found.
+//   - [codes.InvalidArgument]: The collection ID is invalid.
+//   - [codes.NotFound]: The collection or transactions are not found.
 func (h *Handler) GetFullCollectionByID(
 	ctx context.Context,
 	req *accessproto.GetFullCollectionByIDRequest,
@@ -618,8 +618,7 @@ func (h *Handler) GetAccountAtBlockHeight(
 // GetAccountBalanceAtLatestBlock returns an account balance by address at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid account address provided.
-//   - [codes.Internal]: if failed to get account from the execution node or failed to convert account message.
+//   - [codes.InvalidArgument]: Invalid account address provided.
 func (h *Handler) GetAccountBalanceAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountBalanceAtLatestBlockRequest,
@@ -648,8 +647,7 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 // GetAccountBalanceAtBlockHeight returns an account balance by address at the given block height.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid account address provided.
-//   - [codes.Internal]: if failed to get account from the execution node or failed to convert account message.
+//   - [codes.InvalidArgument]: Invalid account address provided.
 func (h *Handler) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountBalanceAtBlockHeightRequest,
@@ -678,8 +676,7 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 // GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid account address provided.
-//   - [codes.Internal]: if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+//   - [codes.InvalidArgument]: Invalid account address provided.
 func (h *Handler) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountKeyAtLatestBlockRequest,
@@ -714,8 +711,7 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 // GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid account address provided.
-//   - [codes.Internal]: if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+//   - [codes.InvalidArgument]: Invalid account address provided.
 func (h *Handler) GetAccountKeysAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountKeysAtLatestBlockRequest,
@@ -756,8 +752,7 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 // GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid account address provided.
-//   - [codes.Internal]: if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+//   - [codes.InvalidArgument]: Invalid account address provided.
 func (h *Handler) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountKeyAtBlockHeightRequest,
@@ -792,8 +787,7 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 // GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid account address provided.
-//   - [codes.Internal]: if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+//   - [codes.InvalidArgument]: Invalid account address provided.
 func (h *Handler) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountKeysAtBlockHeightRequest,
@@ -1103,9 +1097,8 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *accessproto.G
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid startBlockID provided or unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+//   - [codes.InvalidArgument]: Invalid startBlockID provided or unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlocksFromStartBlockID(request *accessproto.SubscribeBlocksFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1129,9 +1122,8 @@ func (h *Handler) SubscribeBlocksFromStartBlockID(request *accessproto.Subscribe
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+//   - [codes.InvalidArgument]: Unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlocksFromStartHeight(request *accessproto.SubscribeBlocksFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1156,9 +1148,8 @@ func (h *Handler) SubscribeBlocksFromStartHeight(request *accessproto.SubscribeB
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+//   - [codes.InvalidArgument]: Unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlocksFromLatest(request *accessproto.SubscribeBlocksFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlocksFromLatestServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1189,9 +1180,6 @@ func (h *Handler) SubscribeBlocksFromLatest(request *accessproto.SubscribeBlocks
 //
 // This function is designed to be used as a callback for block updates in a subscription.
 // It takes a block, processes it, and sends the corresponding response to the client using the provided send function.
-//
-// Expected error returns during normal operation:
-//   - [codes.Internal]: If cannot convert a block to a message or the stream could not send a response.
 func (h *Handler) handleBlocksResponse(send sendSubscribeBlocksResponseFunc, fullBlockResponse bool, blockStatus flow.BlockStatus) func(*flow.Block) error {
 	return func(block *flow.Block) error {
 		msgBlockResponse, err := h.blockResponse(block, fullBlockResponse, blockStatus)
@@ -1216,9 +1204,8 @@ func (h *Handler) handleBlocksResponse(send sendSubscribeBlocksResponseFunc, ful
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid startBlockID provided or unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
+//   - [codes.InvalidArgument]: Invalid startBlockID provided or unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *accessproto.SubscribeBlockHeadersFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1242,9 +1229,8 @@ func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *accessproto.Sub
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
+//   - [codes.InvalidArgument]: Unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *accessproto.SubscribeBlockHeadersFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1269,9 +1255,8 @@ func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *accessproto.Subs
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
+//   - [codes.InvalidArgument]: Unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlockHeadersFromLatest(request *accessproto.SubscribeBlockHeadersFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1300,9 +1285,6 @@ func (h *Handler) SubscribeBlockHeadersFromLatest(request *accessproto.Subscribe
 //
 // This function is designed to be used as a callback for block header updates in a subscription.
 // It takes a block header, processes it, and sends the corresponding response to the client using the provided send function.
-//
-// Expected error returns during normal operation:
-//   - [codes.Internal]: if could not decode the signer indices from the given block header, could not convert a block header to a message or the stream could not send a response.
 func (h *Handler) handleBlockHeadersResponse(send sendSubscribeBlockHeadersResponseFunc) func(*flow.Header) error {
 	return func(header *flow.Header) error {
 		signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
@@ -1330,9 +1312,8 @@ func (h *Handler) handleBlockHeadersResponse(send sendSubscribeBlockHeadersRespo
 // It takes a SubscribeBlockDigestsFromStartBlockIDRequest and an AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer stream as input.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if invalid startBlockID provided or unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+//   - [codes.InvalidArgument]: Invalid startBlockID provided or unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *accessproto.SubscribeBlockDigestsFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1356,9 +1337,8 @@ func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *accessproto.Sub
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+//   - [codes.InvalidArgument]: Unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *accessproto.SubscribeBlockDigestsFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1383,9 +1363,8 @@ func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *accessproto.Subs
 // to the client via the provided stream.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if unknown block status provided.
-//   - [codes.ResourceExhausted]: if the maximum number of streams is reached.
-//   - [codes.Internal]: if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+//   - [codes.InvalidArgument]: Unknown block status provided.
+//   - [codes.ResourceExhausted]: The maximum number of streams is reached.
 func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.SubscribeBlockDigestsFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1414,9 +1393,6 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.Subscribe
 //
 // This function is designed to be used as a callback for block digest updates in a subscription.
 // It takes a block digest, processes it, and sends the corresponding response to the client using the provided send function.
-//
-// Expected error returns during normal operation:
-//   - [codes.Internal]: if the stream cannot send a response.
 func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsResponseFunc) func(*flow.BlockDigest) error {
 	return func(blockDigest *flow.BlockDigest) error {
 		err := send(&accessproto.SubscribeBlockDigestsResponse{
@@ -1442,7 +1418,7 @@ func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsRespo
 // - error: An error indicating the result of the operation, if any.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: If blockStatus is flow.BlockStatusUnknown, or startBlockID could not convert to flow.Identifier.
+//   - [codes.InvalidArgument]: BlockStatus is unknown, or startBlockID could not convert to flow.Identifier.
 func (h *Handler) getSubscriptionDataFromStartBlockID(msgBlockId []byte, msgBlockStatus entities.BlockStatus) (flow.Identifier, flow.BlockStatus, error) {
 	startBlockID, err := convert.BlockID(msgBlockId)
 	if err != nil {
@@ -1556,8 +1532,8 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 
 // buildMetadataResponse builds and returns the metadata response object.
 // Expected error returns during normal operation:
-//   - [codes.NotFound]: if result cannot be provided by storage due to the absence of data.
-//   - [storage.ErrHeightNotIndexed]: when data is unavailable.
+//   - [codes.NotFound]: Result cannot be provided by storage due to the absence of data.
+//   - [storage.ErrHeightNotIndexed]: Data is unavailable.
 func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()
@@ -1613,7 +1589,7 @@ func WithIndexReporter(indexReporter state_synchronization.IndexReporter) func(*
 // checkBlockStatus checks the validity of the provided block status.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: if blockStatus is flow.BlockStatusUnknown.
+//   - [codes.InvalidArgument]: Block status is unknown.
 func checkBlockStatus(blockStatus flow.BlockStatus) error {
 	if blockStatus != flow.BlockStatusFinalized && blockStatus != flow.BlockStatusSealed {
 		return status.Errorf(codes.InvalidArgument, "block status is unknown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
@@ -1626,9 +1602,6 @@ func checkBlockStatus(blockStatus flow.BlockStatus) error {
 // Parameters:
 // - sub: The subscription.
 // - handleResponse: The function responsible for handling the response of the subscribed type.
-//
-// Expected error returns during normal operation:
-//   - [codes.Internal]: If the subscription encounters an error or gets an unexpected response.
 func HandleRPCSubscription[T any](sub subscription.Subscription, handleResponse func(resp T) error) error {
 	err := subscription.HandleSubscription(sub, handleResponse)
 	if err != nil {

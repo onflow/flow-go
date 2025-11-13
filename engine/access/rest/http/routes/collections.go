@@ -15,8 +15,8 @@ import (
 // includes "transactions", the full transaction bodies are fetched and included in the response.
 //
 // Expected error returns during normal operation:
-//   - [common.BadRequestError]: if the request parameters are invalid.
-//   - [common.NotFoundError]: if the collection or transactions are not found.
+//   - [common.BadRequestError]: The request parameters are invalid.
+//   - [common.NotFoundError]: The collection or transactions are not found.
 func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetCollectionRequest(r)
 	if err != nil {
