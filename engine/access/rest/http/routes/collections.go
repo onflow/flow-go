@@ -46,7 +46,10 @@ func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.
 	var response commonmodels.Collection
 	err = response.Build(collection, transactions, link, r.ExpandFields)
 	if err != nil {
-		// response.Build only returns errors from the link generator (router.URLPath)
+		// response.Build only returns errors from the link generator (router.URLPath),
+		// and that happens only when we misconfigure the route.
+		// The inputs passed in (IDs, addresses) are simply substituted into the template,
+		// so URLPath won’t return an error even if the client provides something "invalid".
 		return nil, common.NewRestError(http.StatusInternalServerError, "failed to build response", err)
 	}
 
