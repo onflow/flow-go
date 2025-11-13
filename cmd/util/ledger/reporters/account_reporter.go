@@ -126,6 +126,7 @@ type balanceProcessor struct {
 	vm              fvm.VM
 	ctx             fvm.Context
 	storageSnapshot snapshot.StorageSnapshot
+	runtime         *environment.Runtime
 	env             environment.Environment
 	balanceScript   []byte
 	momentsScript   []byte
@@ -148,7 +149,11 @@ func NewBalanceReporter(
 
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
-		snapshot)
+		snapshot,
+	)
+
+	runtime := environment.NewRuntime(ctx.RuntimeParams)
+	runtime.SetFvmEnvironment(env)
 
 	return &balanceProcessor{
 		vm:              vm,
@@ -392,10 +397,7 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 		return nil, err
 	}
 
-	rt := c.env.BorrowCadenceRuntime()
-	defer c.env.ReturnCadenceRuntime(rt)
-
-	receiver, err := rt.ReadStored(
+	receiver, err := c.runtime.ReadStored(
 		addr,
 		cadence.Path{
 			Domain:     domain,

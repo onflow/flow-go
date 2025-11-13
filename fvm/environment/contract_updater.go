@@ -187,10 +187,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 ) {
 	service := impl.chain.ServiceAddress()
 
-	runtime := impl.runtime.BorrowCadenceRuntime()
-	defer impl.runtime.ReturnCadenceRuntime(runtime)
-
-	value, err := runtime.ReadStored(
+	value, err := impl.runtime.ReadStored(
 		common.MustBytesToAddress(service.Bytes()),
 		blueprints.IsContractDeploymentRestrictedPath)
 	if err != nil {
@@ -234,10 +231,7 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 	service := impl.chain.ServiceAddress()
 	defaultAccounts := []flow.Address{service}
 
-	runtime := impl.runtime.BorrowCadenceRuntime()
-	defer impl.runtime.ReturnCadenceRuntime(runtime)
-
-	value, err := runtime.ReadStored(
+	value, err := impl.runtime.ReadStored(
 		common.MustBytesToAddress(service.Bytes()),
 		path)
 

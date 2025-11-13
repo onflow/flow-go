@@ -7,7 +7,6 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -333,13 +332,10 @@ func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
 	}
 }
 
-// WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
-// use for creating the cadence runtime.
-func WithReusableCadenceRuntimePool(
-	pool reusableRuntime.ReusableCadenceRuntimePool,
-) Option {
+// WithRuntimeParams sets the Cadence runtime parameters
+func WithRuntimeParams(params environment.RuntimeParams) Option {
 	return func(ctx Context) Context {
-		ctx.ReusableCadenceRuntimePool = pool
+		ctx.EnvironmentParams.RuntimeParams = params
 		return ctx
 	}
 }

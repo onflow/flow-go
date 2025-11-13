@@ -112,7 +112,8 @@ type scriptExecutor struct {
 	proc     *ScriptProcedure
 	txnState storage.TransactionPreparer
 
-	env environment.Environment
+	env     environment.Environment
+	runtime *environment.Runtime
 
 	output ProcedureOutput
 }
@@ -126,15 +127,30 @@ func newScriptExecutor(
 	// creating the executor
 	scriptInfo := environment.NewScriptInfoParams(proc.Script, proc.Arguments)
 	ctx.EnvironmentParams.SetScriptInfoParams(scriptInfo)
+	env := environment.NewScriptEnv(
+		proc.RequestContext,
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		txnState,
+	)
+
+	rt := environment.NewRuntime(ctx.RuntimeParams)
+	rt.SetFvmEnvironment(env)
+
+	if ctx.EVMEnabled {
+		evm.SetupEnvironment(
+			ctx.Chain.ChainID(),
+			env,
+			rt.ScriptEnv,
+		)
+	}
+
 	return &scriptExecutor{
 		ctx:      ctx,
 		proc:     proc,
 		txnState: txnState,
-		env: environment.NewScriptEnv(
-			proc.RequestContext,
-			ctx.TracerSpan,
-			ctx.EnvironmentParams,
-			txnState),
+		runtime:  rt,
+		env:      env,
 	}
 }
 
@@ -197,23 +213,7 @@ func (executor *scriptExecutor) execute() error {
 }
 
 func (executor *scriptExecutor) executeScript() error {
-	rt := executor.env.BorrowCadenceRuntime()
-	defer executor.env.ReturnCadenceRuntime(rt)
-
-	chainID := executor.ctx.Chain.ChainID()
-
-	if executor.ctx.EVMEnabled {
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			rt.ScriptRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	value, err := rt.ExecuteScript(
+	value, err := executor.runtime.ExecuteScript(
 		runtime.Script{
 			Source:    executor.proc.Script,
 			Arguments: executor.proc.Arguments,

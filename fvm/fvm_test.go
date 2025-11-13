@@ -43,7 +43,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -2511,7 +2510,6 @@ func TestAttachments(t *testing.T) {
 	t.Parallel()
 
 	newVMTest().
-		withBootstrapProcedureOptions().
 		run(
 			func(
 				t *testing.T,
@@ -2547,15 +2545,6 @@ func TestCapabilityControllers(t *testing.T) {
 
 	test := func(t *testing.T) {
 		newVMTest().
-			withBootstrapProcedureOptions().
-			withContextOptions(
-				fvm.WithReusableCadenceRuntimePool(
-					reusableRuntime.NewReusableCadenceRuntimePool(
-						1,
-						runtime.Config{},
-					),
-				),
-			).
 			run(func(
 				t *testing.T,
 				vm fvm.VM,
@@ -2604,14 +2593,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 	t.Parallel()
 
 	newVMTest().
-		withBootstrapProcedureOptions().
 		withContextOptions(
-			fvm.WithReusableCadenceRuntimePool(
-				reusableRuntime.NewReusableCadenceRuntimePool(
-					1,
-					runtime.Config{},
-				),
-			),
 			fvm.WithContractDeploymentRestricted(false),
 		).
 		run(
@@ -2820,7 +2802,6 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 
 	test := func(t *testing.T, allowed bool) {
 		newVMTest().
-			withBootstrapProcedureOptions().
 			withContextOptions(
 				fvm.WithRandomSourceHistoryCallAllowed(allowed),
 				fvm.WithEntropyProvider(source),
@@ -2879,7 +2860,6 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 
 	source := testutil.EntropyProviderFixture(nil)
 	newVMTest().
-		withBootstrapProcedureOptions().
 		withContextOptions(
 			fvm.WithRandomSourceHistoryCallAllowed(true),
 			fvm.WithEntropyProvider(source),

@@ -16,8 +16,6 @@ import (
 
 	flow "github.com/onflow/flow-go/model/flow"
 
-	fvmruntime "github.com/onflow/flow-go/fvm/runtime"
-
 	interpreter "github.com/onflow/cadence/interpreter"
 
 	meter "github.com/onflow/flow-go/fvm/meter"
@@ -248,26 +246,6 @@ func (_m *Environment) BLSVerifyPOP(publicKey *runtime.PublicKey, signature []by
 	}
 
 	return r0, r1
-}
-
-// BorrowCadenceRuntime provides a mock function with no fields
-func (_m *Environment) BorrowCadenceRuntime() *fvmruntime.ReusableCadenceRuntime {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for BorrowCadenceRuntime")
-	}
-
-	var r0 *fvmruntime.ReusableCadenceRuntime
-	if rf, ok := ret.Get(0).(func() *fvmruntime.ReusableCadenceRuntime); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fvmruntime.ReusableCadenceRuntime)
-		}
-	}
-
-	return r0
 }
 
 // CheckPayerBalanceAndGetMaxTxFees provides a mock function with given fields: payer, inclusionEffort, executionEffort
@@ -1472,11 +1450,6 @@ func (_m *Environment) ResolveLocation(identifiers []runtime.Identifier, locatio
 // ResourceOwnerChanged provides a mock function with given fields: _a0, resource, oldOwner, newOwner
 func (_m *Environment) ResourceOwnerChanged(_a0 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common.Address, newOwner common.Address) {
 	_m.Called(_a0, resource, oldOwner, newOwner)
-}
-
-// ReturnCadenceRuntime provides a mock function with given fields: _a0
-func (_m *Environment) ReturnCadenceRuntime(_a0 *fvmruntime.ReusableCadenceRuntime) {
-	_m.Called(_a0)
 }
 
 // RevokeAccountKey provides a mock function with given fields: address, index

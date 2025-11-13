@@ -56,10 +56,7 @@ func (sys *SystemContracts) Invoke(
 			contractLocation.String()+"."+spec.FunctionName))
 	defer span.End()
 
-	runtime := sys.runtime.BorrowCadenceRuntime()
-	defer sys.runtime.ReturnCadenceRuntime(runtime)
-
-	value, err := runtime.InvokeContractFunction(
+	value, err := sys.runtime.InvokeContractFunction(
 		contractLocation,
 		spec.FunctionName,
 		arguments,

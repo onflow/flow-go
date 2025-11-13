@@ -37,7 +37,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
@@ -701,15 +700,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			execCtx = fvm.NewContextFromParent(
 				execCtx,
-				fvm.WithReusableCadenceRuntimePool(
-					reusableRuntime.NewCustomReusableCadenceRuntimePool(
-						0,
-						runtime.Config{},
-						func(_ runtime.Config) runtime.Runtime {
-							return emittingRuntime
-						},
-					),
-				),
+				fvm.WithRuntimeParams(environment.RuntimeParams{
+					NewRuntime: func(_ runtime.Config) runtime.Runtime {
+						return emittingRuntime
+					},
+				}),
 			)
 
 			vm := fvm.NewVirtualMachine()
@@ -815,13 +810,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx = fvm.NewContextFromParent(
 			execCtx,
-			fvm.WithReusableCadenceRuntimePool(
-				reusableRuntime.NewCustomReusableCadenceRuntimePool(
-					0,
-					runtime.Config{},
-					func(_ runtime.Config) runtime.Runtime {
-						return rt
-					})),
+			fvm.WithRuntimeParams(environment.RuntimeParams{
+				NewRuntime: func(_ runtime.Config) runtime.Runtime {
+					return rt
+				},
+			}),
 		)
 
 		vm := fvm.NewVirtualMachine()
@@ -929,13 +922,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx = fvm.NewContextFromParent(
 			execCtx,
-			fvm.WithReusableCadenceRuntimePool(
-				reusableRuntime.NewCustomReusableCadenceRuntimePool(
-					0,
-					runtime.Config{},
-					func(_ runtime.Config) runtime.Runtime {
-						return rt
-					})),
+			fvm.WithRuntimeParams(environment.RuntimeParams{
+				NewRuntime: func(_ runtime.Config) runtime.Runtime {
+					return rt
+				},
+			}),
 		)
 
 		vm := fvm.NewVirtualMachine()

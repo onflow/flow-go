@@ -10,7 +10,6 @@ import (
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -159,11 +157,6 @@ func benchmarkComputeBlock(
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				ReusableCadenceRuntimePoolSize,
-				runtime.Config{},
-			)),
 	)
 	snapshotTree := testutil.RootBootstrappedLedger(
 		vm,

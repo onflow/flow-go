@@ -127,11 +127,6 @@ func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 		fvm.WithComputationLimit(b.conf.ScriptGasLimit),
 		fvm.WithAccountStorageLimit(b.conf.StorageLimitEnabled),
 		fvm.WithTransactionFeesEnabled(b.conf.TransactionFeesEnabled),
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				0,
-				runtime.Config{}),
-		),
 		fvm.WithEntropyProvider(b.entropyProvider),
 		fvm.WithEVMEnabled(true),
 		fvm.WithAuthorizationChecksEnabled(b.conf.TransactionValidationEnabled),

@@ -68,6 +68,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 		require.Equal(t, accountKey.PublicKey.Encode(), rtKey.PublicKey.PublicKey)
 	})
 }
+
 func TestAccountKeyReader_get_valid_key(t *testing.T) {
 	t.Parallel()
 	address := bytesToAddress(1, 2, 3, 4)

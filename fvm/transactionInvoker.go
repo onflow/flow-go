@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -58,7 +57,9 @@ type transactionExecutor struct {
 	txnState storage.TransactionPreparer
 
 	span otelTrace.Span
-	env  environment.Environment
+
+	runtime *environment.Runtime
+	env     environment.Environment
 
 	errs *errors.ErrorsCollector
 
@@ -70,7 +71,6 @@ type transactionExecutor struct {
 	// writes to any of those registers
 	executionStateRead *snapshot.ExecutionSnapshot
 
-	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
 
 	output ProcedureOutput
@@ -91,7 +91,19 @@ func newTransactionExecutor(
 	env := environment.NewTransactionEnvironment(
 		span,
 		ctx.EnvironmentParams,
-		txnState)
+		txnState,
+	)
+
+	rt := environment.NewRuntime(ctx.RuntimeParams)
+	rt.SetFvmEnvironment(env)
+
+	if ctx.EVMEnabled {
+		evm.SetupEnvironment(
+			ctx.Chain.ChainID(),
+			env,
+			rt.TxEnv,
+		)
+	}
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
@@ -103,14 +115,13 @@ func newTransactionExecutor(
 		txnState:                        txnState,
 		span:                            span,
 		env:                             env,
+		runtime:                         rt,
 		errs:                            errors.NewErrorsCollector(),
 		startedTransactionBodyExecution: false,
-		cadenceRuntime:                  env.BorrowCadenceRuntime(),
 	}
 }
 
 func (executor *transactionExecutor) Cleanup() {
-	executor.env.ReturnCadenceRuntime(executor.cadenceRuntime)
 	executor.span.End()
 }
 
@@ -186,19 +197,6 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
-	chainID := executor.ctx.Chain.ChainID()
-
-	// setup EVM
-	if executor.ctx.EVMEnabled {
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			executor.cadenceRuntime.TxRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
-	}
 
 	// get meter parameters
 	executionParameters, executionStateRead, err := getExecutionParameters(
@@ -227,7 +225,7 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	executor.startedTransactionBodyExecution = true
 	executor.nestedTxnId = txnId
 
-	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
+	executor.txnBodyExecutor = executor.runtime.NewTransactionExecutor(
 		runtime.Script{
 			Source:    executor.proc.Transaction.Script,
 			Arguments: executor.proc.Transaction.Arguments,
@@ -255,20 +253,6 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	chainID := executor.ctx.Chain.ChainID()
-
-	// setup EVM
-	if executor.ctx.EVMEnabled {
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			executor.cadenceRuntime.TxRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 

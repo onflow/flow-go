@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestSystemContractsInvoke(t *testing.T) {
+	t.Parallel()
 
 	type testCase struct {
 		name             string
@@ -57,27 +57,22 @@ func TestSystemContractsInvoke(t *testing.T) {
 			const chainID = flow.Mainnet
 
 			tracer := tracing.NewTracerSpan()
-			runtimePool := reusableRuntime.NewCustomReusableCadenceRuntimePool(
-				0,
-				runtime.Config{},
-				func(_ runtime.Config) runtime.Runtime {
+
+			rt := environment.NewRuntime(environment.RuntimeParams{
+				NewRuntime: func(_ runtime.Config) runtime.Runtime {
 					return &testutil.TestRuntime{
 						InvokeContractFunc: tc.contractFunction,
 					}
 				},
-			)
-			runtime := environment.NewRuntime(
-				environment.RuntimeParams{
-					ReusableCadenceRuntimePool: runtimePool,
-				},
-			)
+			})
 			invoker := environment.NewSystemContracts(
 				chainID.Chain(),
 				tracer,
 				environment.NewProgramLogger(
 					tracer,
 					environment.DefaultProgramLoggerParams()),
-				runtime)
+				rt,
+			)
 			value, err := invoker.Invoke(
 				environment.ContractFunctionSpec{
 					AddressFromChain: func(_ flow.Chain) flow.Address {

@@ -16,6 +16,8 @@ import (
 )
 
 func TestRandomGenerator(t *testing.T) {
+	t.Parallel()
+
 	randomSourceHistoryProvider := &mock.EntropyProvider{}
 	randomSourceHistoryProvider.On("RandomSource").Return(unittest.RandomBytes(48), nil)
 

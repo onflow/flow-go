@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,10 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
-)
-
-const (
-	ReusableCadenceRuntimePoolSize = 1000
 )
 
 type ComputationManager interface {
@@ -226,12 +220,6 @@ func (e *Manager) QueryExecutor() query.Executor {
 func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCallbacksEnabled bool) []fvm.Option {
 	options := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				ReusableCadenceRuntimePoolSize,
-				runtime.Config{},
-			),
-		),
 		fvm.WithEVMEnabled(true),
 		fvm.WithScheduledTransactionsEnabled(scheduleCallbacksEnabled),
 	}

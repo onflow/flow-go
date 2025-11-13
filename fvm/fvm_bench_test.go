@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -27,7 +26,6 @@ import (
 	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	exeState "github.com/onflow/flow-go/engine/execution/state"
@@ -37,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -164,12 +161,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
 		fvm.WithMaxStateInteractionSize(interactionLimit),
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				computation.ReusableCadenceRuntimePoolSize,
-				runtime.Config{},
-			),
-		),
 		fvm.WithEVMEnabled(true),
 	}
 	fvmContext := fvm.NewContext(opts...)

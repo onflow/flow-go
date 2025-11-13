@@ -4,7 +4,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -18,10 +17,6 @@ type Environment interface {
 	Meter
 
 	MetricsReporter
-
-	// Runtime
-	BorrowCadenceRuntime() *reusableRuntime.ReusableCadenceRuntime
-	ReturnCadenceRuntime(*reusableRuntime.ReusableCadenceRuntime)
 
 	TransactionInfo
 

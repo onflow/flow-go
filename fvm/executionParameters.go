@@ -153,11 +153,16 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 	// service account.
 	service := common.Address(sc.ExecutionParametersAccount.Address)
 
+	// TODO: use existing, if available
+	rt := environment.NewRuntime(computer.ctx.RuntimeParams)
+
 	env := environment.NewScriptEnv(
 		context.Background(),
 		computer.ctx.TracerSpan,
 		computer.ctx.EnvironmentParams,
 		computer.txnState)
+
+	rt.SetFvmEnvironment(env)
 
 	overrides := derived.StateExecutionParameters{}
 
@@ -189,7 +194,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return nil
 	}
 
-	computationWeights, err := GetExecutionEffortWeights(env, service)
+	computationWeights, err := GetExecutionEffortWeights(rt, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
@@ -198,7 +203,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return overrides, err
 	}
 
-	memoryWeights, err := GetExecutionMemoryWeights(env, service)
+	memoryWeights, err := GetExecutionMemoryWeights(rt, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
@@ -207,7 +212,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return overrides, err
 	}
 
-	memoryLimit, err := GetExecutionMemoryLimit(env, service)
+	memoryLimit, err := GetExecutionMemoryLimit(rt, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
@@ -220,7 +225,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 }
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
-	env environment.Environment,
+	runtime *environment.Runtime,
 	service common.Address,
 	path cadence.Path,
 	defaultWeights map[KindType]uint64,
@@ -228,9 +233,6 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	map[KindType]uint64,
 	error,
 ) {
-	runtime := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtime)
-
 	value, err := runtime.ReadStored(service, path)
 
 	if err != nil {
@@ -291,14 +293,14 @@ func cadenceValueToWeights(value cadence.Value) (map[uint]uint64, bool) {
 
 // GetExecutionEffortWeights reads stored execution effort weights from the service account
 func GetExecutionEffortWeights(
-	env environment.Environment,
+	runtime *environment.Runtime,
 	service common.Address,
 ) (
 	computationWeights meter.ExecutionEffortWeights,
 	err error,
 ) {
 	return getExecutionWeights(
-		env,
+		runtime,
 		service,
 		blueprints.TransactionFeesExecutionEffortWeightsPath,
 		meter.DefaultComputationWeights)
@@ -306,14 +308,14 @@ func GetExecutionEffortWeights(
 
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
 func GetExecutionMemoryWeights(
-	env environment.Environment,
+	runtime *environment.Runtime,
 	service common.Address,
 ) (
 	memoryWeights meter.ExecutionMemoryWeights,
 	err error,
 ) {
 	return getExecutionWeights(
-		env,
+		runtime,
 		service,
 		blueprints.TransactionFeesExecutionMemoryWeightsPath,
 		meter.DefaultMemoryWeights)
@@ -321,15 +323,12 @@ func GetExecutionMemoryWeights(
 
 // GetExecutionMemoryLimit reads the stored execution memory limit from the service account
 func GetExecutionMemoryLimit(
-	env environment.Environment,
+	runtime *environment.Runtime,
 	service common.Address,
 ) (
 	memoryLimit uint64,
 	err error,
 ) {
-	runtime := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(runtime)
-
 	value, err := runtime.ReadStored(
 		service,
 		blueprints.TransactionFeesExecutionMemoryLimitPath)

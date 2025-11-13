@@ -19,7 +19,7 @@ var _ Environment = &facadeEnvironment{}
 
 // facadeEnvironment exposes various fvm business logic as a single interface.
 type facadeEnvironment struct {
-	*Runtime
+	Runtime *Runtime
 
 	tracing.TracerSpan
 	Meter
@@ -152,7 +152,7 @@ func newFacadeEnvironment(
 		txnState: txnState,
 	}
 
-	env.Runtime.SetEnvironment(env)
+	runtime.SetFvmEnvironment(env)
 
 	return env
 }

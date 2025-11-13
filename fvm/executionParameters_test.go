@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -17,266 +16,238 @@ import (
 	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
 )
 
+func newRuntimeMock(
+	readStored func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error),
+) *environment.Runtime {
+	envMock := &fvmmock.Environment{}
+	rt := environment.NewRuntime(environment.RuntimeParams{
+		NewRuntime: func(_ runtime.Config) runtime.Runtime {
+			return &testutil.TestRuntime{
+				ReadStoredFunc: readStored,
+			}
+		},
+	})
+	rt.SetFvmEnvironment(envMock)
+	return rt
+}
+
 func TestGetExecutionMemoryWeights(t *testing.T) {
-	address := common.Address{}
+	t.Parallel()
 
-	setupEnvMock := func(readStored func(
-		address common.Address,
-		path cadence.Path,
-		context runtime.Context,
-	) (cadence.Value, error)) environment.Environment {
-		envMock := &fvmmock.Environment{}
-		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestRuntime{
-					ReadStoredFunc: readStored,
-				},
-				runtime.Config{},
-			),
+	var address common.Address
+
+	t.Run("return error if nothing is stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+				return nil, nil
+			},
 		)
-		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
-		return envMock
-	}
-
-	t.Run("return error if nothing is stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return nil, nil
-				})
-			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
+		_, err := fvm.GetExecutionMemoryWeights(rt, address)
+		require.Error(t, err)
+		require.EqualError(t,
+			err,
+			errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
-		},
-	)
-	t.Run("return error if can't parse stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewBool(false), nil
-				})
-			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String(),
+			).Error(),
+		)
+	})
+
+	t.Run("return error if can't parse stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewBool(false), nil
+			},
+		)
+		_, err := fvm.GetExecutionMemoryWeights(rt, address)
+		require.Error(t, err)
+		require.EqualError(t,
+			err,
+			errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
-		},
-	)
-	t.Run("return error if get stored returns error",
-		func(t *testing.T) {
-			someErr := fmt.Errorf("some error")
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return nil, someErr
-				})
-			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
-		},
-	)
-	t.Run("return error if get stored returns error",
-		func(t *testing.T) {
-			someErr := fmt.Errorf("some error")
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return nil, someErr
-				})
-			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
-		},
-	)
-	t.Run("no error if a dictionary is stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
-				})
-			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
-			require.NoError(t, err)
-		},
-	)
-	t.Run("return defaults if empty dict is stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
-				})
-			weights, err := fvm.GetExecutionMemoryWeights(envMock, address)
-			require.NoError(t, err)
-			require.InDeltaMapValues(t, meter.DefaultMemoryWeights, weights, 0)
-		},
-	)
-	t.Run("return merged if some dict is stored",
-		func(t *testing.T) {
-			expectedWeights := meter.ExecutionMemoryWeights{}
-			var existingWeightKey common.MemoryKind
-			var existingWeightValue uint64
-			for k, v := range meter.DefaultMemoryWeights {
-				expectedWeights[k] = v
-			}
-			// change one existing value
-			for kind, u := range meter.DefaultMemoryWeights {
-				existingWeightKey = kind
-				existingWeightValue = u
-				expectedWeights[kind] = u + 1
-				break
-			}
-			expectedWeights[0] = 0
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String(),
+			).Error(),
+		)
+	})
 
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewDictionary([]cadence.KeyValuePair{
-						{
-							Value: cadence.UInt64(0),
-							Key:   cadence.UInt64(0),
-						}, // a new key
-						{
-							Value: cadence.UInt64(existingWeightValue + 1),
-							Key:   cadence.UInt64(existingWeightKey),
-						}, // existing key with new value
-					}), nil
-				})
+	t.Run("return error if get stored returns error", func(t *testing.T) {
+		someErr := fmt.Errorf("some error")
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return nil, someErr
+			},
+		)
+		_, err := fvm.GetExecutionMemoryWeights(rt, address)
+		require.Error(t, err)
+		require.EqualError(t, err, someErr.Error())
+	})
 
-			weights, err := fvm.GetExecutionMemoryWeights(envMock, address)
-			require.NoError(t, err)
-			require.InDeltaMapValues(t, expectedWeights, weights, 0)
-		},
-	)
+	t.Run("no error if a dictionary is stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
+			},
+		)
+		_, err := fvm.GetExecutionMemoryWeights(rt, address)
+		require.NoError(t, err)
+	})
+
+	t.Run("return defaults if empty dict is stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
+			},
+		)
+		weights, err := fvm.GetExecutionMemoryWeights(rt, address)
+		require.NoError(t, err)
+		require.InDeltaMapValues(t, meter.DefaultMemoryWeights, weights, 0)
+	})
+
+	t.Run("return merged if some dict is stored", func(t *testing.T) {
+		expectedWeights := meter.ExecutionMemoryWeights{}
+		var existingWeightKey common.MemoryKind
+		var existingWeightValue uint64
+		for k, v := range meter.DefaultMemoryWeights {
+			expectedWeights[k] = v
+		}
+		// change one existing value
+		for kind, u := range meter.DefaultMemoryWeights {
+			existingWeightKey = kind
+			existingWeightValue = u
+			expectedWeights[kind] = u + 1
+			break
+		}
+		expectedWeights[0] = 0
+
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewDictionary([]cadence.KeyValuePair{
+					{
+						Value: cadence.UInt64(0),
+						Key:   cadence.UInt64(0),
+					}, // a new key
+					{
+						Value: cadence.UInt64(existingWeightValue + 1),
+						Key:   cadence.UInt64(existingWeightKey),
+					}, // existing key with new value
+				}), nil
+			},
+		)
+
+		weights, err := fvm.GetExecutionMemoryWeights(rt, address)
+		require.NoError(t, err)
+		require.InDeltaMapValues(t, expectedWeights, weights, 0)
+	})
 }
 
 func TestGetExecutionEffortWeights(t *testing.T) {
-	address := common.Address{}
+	t.Parallel()
 
-	setupEnvMock := func(readStored func(
-		address common.Address,
-		path cadence.Path,
-		context runtime.Context,
-	) (cadence.Value, error)) environment.Environment {
-		envMock := &fvmmock.Environment{}
-		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestRuntime{
-					ReadStoredFunc: readStored,
-				},
-				runtime.Config{},
-			),
+	var address common.Address
+
+	t.Run("return error if nothing is stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return nil, nil
+			},
 		)
-		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
-		return envMock
-	}
-
-	t.Run("return error if nothing is stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return nil, nil
-				})
-			_, err := fvm.GetExecutionEffortWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
+		_, err := fvm.GetExecutionEffortWeights(rt, address)
+		require.Error(t, err)
+		require.EqualError(t,
+			err,
+			errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
-		},
-	)
-	t.Run("return error if can't parse stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewBool(false), nil
-				})
-			_, err := fvm.GetExecutionEffortWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String(),
+			).Error(),
+		)
+	})
+
+	t.Run("return error if can't parse stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewBool(false), nil
+			},
+		)
+		_, err := fvm.GetExecutionEffortWeights(rt, address)
+		require.Error(t, err)
+		require.EqualError(t,
+			err,
+			errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
-		},
-	)
-	t.Run("return error if get stored returns error",
-		func(t *testing.T) {
-			someErr := fmt.Errorf("some error")
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return nil, someErr
-				})
-			_, err := fvm.GetExecutionEffortWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
-		},
-	)
-	t.Run("return error if get stored returns error",
-		func(t *testing.T) {
-			someErr := fmt.Errorf("some error")
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return nil, someErr
-				})
-			_, err := fvm.GetExecutionEffortWeights(envMock, address)
-			require.Error(t, err)
-			require.EqualError(t, err, someErr.Error())
-		},
-	)
-	t.Run("no error if a dictionary is stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
-				})
-			_, err := fvm.GetExecutionEffortWeights(envMock, address)
-			require.NoError(t, err)
-		},
-	)
-	t.Run("return defaults if empty dict is stored",
-		func(t *testing.T) {
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
-				})
-			weights, err := fvm.GetExecutionEffortWeights(envMock, address)
-			require.NoError(t, err)
-			require.InDeltaMapValues(t, meter.DefaultComputationWeights, weights, 0)
-		},
-	)
-	t.Run("return merged if some dict is stored",
-		func(t *testing.T) {
-			expectedWeights := meter.ExecutionEffortWeights{}
-			var existingWeightKey common.ComputationKind
-			var existingWeightValue uint64
-			for k, v := range meter.DefaultComputationWeights {
-				expectedWeights[k] = v
-			}
-			// change one existing value
-			for kind, u := range meter.DefaultComputationWeights {
-				existingWeightKey = kind
-				existingWeightValue = u
-				expectedWeights[kind] = u + 1
-				break
-			}
-			expectedWeights[0] = 0
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String(),
+			).Error(),
+		)
+	})
 
-			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
-					return cadence.NewDictionary([]cadence.KeyValuePair{
-						{
-							Value: cadence.UInt64(0),
-							Key:   cadence.UInt64(0),
-						}, // a new key
-						{
-							Value: cadence.UInt64(existingWeightValue + 1),
-							Key:   cadence.UInt64(existingWeightKey),
-						}, // existing key with new value
-					}), nil
-				})
+	t.Run("return error if get stored returns error", func(t *testing.T) {
+		someErr := fmt.Errorf("some error")
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return nil, someErr
+			},
+		)
+		_, err := fvm.GetExecutionEffortWeights(rt, address)
+		require.Error(t, err)
+		require.EqualError(t, err, someErr.Error())
+	})
 
-			weights, err := fvm.GetExecutionEffortWeights(envMock, address)
-			require.NoError(t, err)
-			require.InDeltaMapValues(t, expectedWeights, weights, 0)
-		},
-	)
+	t.Run("no error if a dictionary is stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
+			},
+		)
+		_, err := fvm.GetExecutionEffortWeights(rt, address)
+		require.NoError(t, err)
+	})
+
+	t.Run("return defaults if empty dict is stored", func(t *testing.T) {
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
+			},
+		)
+		weights, err := fvm.GetExecutionEffortWeights(rt, address)
+		require.NoError(t, err)
+		require.InDeltaMapValues(t, meter.DefaultComputationWeights, weights, 0)
+	})
+
+	t.Run("return merged if some dict is stored", func(t *testing.T) {
+		expectedWeights := meter.ExecutionEffortWeights{}
+		var existingWeightKey common.ComputationKind
+		var existingWeightValue uint64
+		for k, v := range meter.DefaultComputationWeights {
+			expectedWeights[k] = v
+		}
+		// change one existing value
+		for kind, u := range meter.DefaultComputationWeights {
+			existingWeightKey = kind
+			existingWeightValue = u
+			expectedWeights[kind] = u + 1
+			break
+		}
+		expectedWeights[0] = 0
+
+		rt := newRuntimeMock(
+			func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				return cadence.NewDictionary([]cadence.KeyValuePair{
+					{
+						Value: cadence.UInt64(0),
+						Key:   cadence.UInt64(0),
+					}, // a new key
+					{
+						Value: cadence.UInt64(existingWeightValue + 1),
+						Key:   cadence.UInt64(existingWeightKey),
+					}, // existing key with new value
+				}), nil
+			},
+		)
+
+		weights, err := fvm.GetExecutionEffortWeights(rt, address)
+		require.NoError(t, err)
+		require.InDeltaMapValues(t, expectedWeights, weights, 0)
+	})
 }
