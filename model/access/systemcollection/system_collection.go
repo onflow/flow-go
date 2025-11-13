@@ -15,7 +15,7 @@ const (
 var ChainHeightVersions = map[flow.ChainID]access.HeightVersionMapper{
 	flow.Testnet: access.NewStaticHeightVersionMapper(map[uint64]access.Version{
 		0:         Version0,
-		288677777: Version1, // TODO: update after mirgationnet tests
+		290050888: Version1,
 	}),
 }
 
