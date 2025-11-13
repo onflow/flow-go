@@ -190,7 +190,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 
 	i.indexer = New(
 		log,
-		metrics.NewNoopCollector(),
+		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
 		db,
 		i.registers,
 		i.headers,
@@ -201,7 +201,6 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		i.scheduledTransactions,
 		i.g.ChainID(),
 		derivedChainData,
-		i.collectionIndexer,
 		collectionExecutedMetric,
 		lockManager,
 	)
@@ -250,7 +249,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				assert.ElementsMatch(t, tf.ExpectedRegisterEntries, entries)
 			}).
 			Return(nil)
-		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
 		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
 			test.scheduledTransactions.On("BatchIndex", mock.Anything, blockID, txID, scheduledTxID, mock.Anything).
 				Return(func(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
@@ -367,7 +365,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
-				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -403,7 +400,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
-				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -432,7 +428,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
-				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
@@ -478,7 +473,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				flow.Testnet,
 				derivedChainData,
-				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
