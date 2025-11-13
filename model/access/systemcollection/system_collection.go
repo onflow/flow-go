@@ -17,6 +17,10 @@ var ChainHeightVersions = map[flow.ChainID]access.HeightVersionMapper{
 		0:         Version0,
 		290050888: Version1,
 	}),
+	flow.Mainnet: access.NewStaticHeightVersionMapper(map[uint64]access.Version{
+		0:         Version0,
+		133084444: Version1,
+	}),
 }
 
 // versionBuilder is a map of all versions of the system collection.
