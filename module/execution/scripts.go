@@ -112,6 +112,7 @@ func (s *Scripts) ExecuteAtBlockHeight(
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 //   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+//   - [fvmerrors.ErrCodeAccountNotFoundError] - if the account is not found by address.
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
@@ -160,6 +161,7 @@ func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.A
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 //   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError] - a public keys not found for the given address.
 func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
@@ -176,6 +178,7 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 //   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
 //   - [storage.ErrNotFound] - if no block is finalized at the provided height.
 //   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError] - a public key not found for the given address and key index.
 func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error) {
 	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
