@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -16,6 +18,7 @@ import (
 // It orchestrates the flow: request → receive → index → complete.
 // TODO: rename to fetch_job_processor
 type JobProcessor struct {
+	log         zerolog.Logger
 	mcq         collection_sync.MissingCollectionQueue
 	indexer     collection_sync.BlockCollectionIndexer
 	requester   collection_sync.CollectionRequester
@@ -28,6 +31,7 @@ var _ collection_sync.JobProcessor = (*JobProcessor)(nil)
 // NewJobProcessor creates a new JobProcessor.
 //
 // Parameters:
+//   - log: Logger for the component
 //   - mcq: MissingCollectionQueue for tracking missing collections and callbacks
 //   - indexer: BlockCollectionIndexer for storing and indexing collections
 //   - requester: CollectionRequester for requesting collections from the network
@@ -37,6 +41,7 @@ var _ collection_sync.JobProcessor = (*JobProcessor)(nil)
 //
 // No error returns are expected during normal operation.
 func NewJobProcessor(
+	log zerolog.Logger,
 	mcq collection_sync.MissingCollectionQueue,
 	indexer collection_sync.BlockCollectionIndexer,
 	requester collection_sync.CollectionRequester,
@@ -44,6 +49,7 @@ func NewJobProcessor(
 	collections storage.CollectionsReader,
 ) *JobProcessor {
 	return &JobProcessor{
+		log:         log,
 		mcq:         mcq,
 		indexer:     indexer,
 		requester:   requester,
@@ -112,9 +118,27 @@ func (jp *JobProcessor) ProcessJobConcurrently(
 // It passes the collection to MCQ, and if it completes a block, indexes it and marks it as done.
 //
 // No error returns are expected during normal operation.
-func (jp *JobProcessor) OnReceiveCollection(collection *flow.Collection) error {
+func (jp *JobProcessor) OnReceiveCollection(originID flow.Identifier, collection *flow.Collection) error {
+	collectionID := collection.ID()
+
 	// Pass collection to MCQ
 	collections, height, complete := jp.mcq.OnReceivedCollection(collection)
+
+	// Log collection receipt and whether it completes a block
+	if complete {
+		jp.log.Info().
+			Hex("collection_id", collectionID[:]).
+			Hex("origin_id", originID[:]).
+			Uint64("block_height", height).
+			Int("collections_count", len(collections)).
+			Msg("received collection completing block to be indexed")
+	} else {
+		jp.log.Debug().
+			Hex("collection_id", collectionID[:]).
+			Hex("origin_id", originID[:]).
+			Msg("received collection (block not yet complete)")
+	}
+
 	if !complete {
 		// Block is not complete yet, nothing more to do
 		return nil

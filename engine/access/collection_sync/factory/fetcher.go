@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
@@ -34,6 +33,7 @@ type CreateFetcherConfig struct {
 //
 // Parameters:
 //   - log: Logger for the component
+//   - engineMetrics: Metrics collector for the requester engine
 //   - engineRegistry: Engine registry for creating the requester engine
 //   - state: Protocol state
 //   - me: Local node identity
@@ -51,6 +51,7 @@ type CreateFetcherConfig struct {
 // No error returns are expected during normal operation.
 func CreateFetcher(
 	log zerolog.Logger,
+	engineMetrics module.EngineMetrics,
 	engineRegistry network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
@@ -67,7 +68,7 @@ func CreateFetcher(
 	// Create requester engine for requesting collections
 	requestEng, err := requester.New(
 		log.With().Str("entity", "collection").Logger(),
-		metrics.NewNoopCollector(), // TODO: pass proper metrics if available
+		engineMetrics,
 		engineRegistry,
 		me,
 		state,
@@ -91,6 +92,7 @@ func CreateFetcher(
 
 	// Create JobProcessor
 	jobProcessor := fetcher.NewJobProcessor(
+		log.With().Str("component", "coll_sync_fetcher").Logger(),
 		mcq,
 		indexer,
 		collectionRequester,
@@ -106,7 +108,7 @@ func CreateFetcher(
 		}
 
 		// Forward collection to JobProcessor, which handles MCQ, indexing, and completion
-		err := jobProcessor.OnReceiveCollection(collection)
+		err := jobProcessor.OnReceiveCollection(originID, collection)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to process received collection")
 			return

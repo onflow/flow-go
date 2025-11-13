@@ -3,6 +3,8 @@ package factory
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/collection_sync/execution_data_index"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -15,6 +17,7 @@ import (
 // CreateExecutionDataProcessor creates a new ExecutionDataProcessor with the provided dependencies.
 //
 // Parameters:
+//   - log: Logger for the component
 //   - cache: Execution data cache for retrieving execution data by height
 //   - executionDataTracker: Tracker for execution data that provides the highest available height
 //   - processedHeight: Consumer progress for tracking processed heights
@@ -27,6 +30,7 @@ import (
 //
 // No errors are expected during normal operation.
 func CreateExecutionDataProcessor(
+	log zerolog.Logger,
 	cache execution_data.ExecutionDataCache,
 	executionDataTracker tracker.ExecutionDataTracker,
 	processedHeight storage.ConsumerProgress,
@@ -43,7 +47,7 @@ func CreateExecutionDataProcessor(
 	}
 
 	// Create the execution data processor
-	processor := execution_data_index.NewExecutionDataProcessor(executionDataProvider, indexer, processedHeightCounter, collectionSyncMetrics)
+	processor := execution_data_index.NewExecutionDataProcessor(log, executionDataProvider, indexer, processedHeightCounter, collectionSyncMetrics)
 
 	return processor, nil
 }

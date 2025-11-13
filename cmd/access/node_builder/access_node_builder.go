@@ -2230,6 +2230,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			// Create execution data processor
 			executionDataProcessor, err := collection_syncfactory.CreateExecutionDataProcessor(
+				builder.Logger,
 				notNil(builder.ExecutionDataCache),
 				executionDataTracker,
 				collectionIndexedHeight,
@@ -2542,6 +2543,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 			// Create fetcher and requesterEng
 			requesterEng, fetcher, err := factory.CreateFetcher(
 				node.Logger,
+				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.State,
 				node.Me,

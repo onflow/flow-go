@@ -3,6 +3,8 @@ package execution_data_index
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -12,6 +14,7 @@ import (
 
 type ExecutionDataProcessor struct {
 	component.Component
+	log                     zerolog.Logger
 	newExecutionDataIndexed chan struct{}
 	provider                collection_sync.ExecutionDataProvider
 	indexer                 collection_sync.BlockCollectionIndexer
@@ -25,12 +28,14 @@ var _ collection_sync.ProgressReader = (*ExecutionDataProcessor)(nil)
 var _ component.Component = (*ExecutionDataProcessor)(nil)
 
 func NewExecutionDataProcessor(
+	log zerolog.Logger,
 	provider collection_sync.ExecutionDataProvider,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedHeight *counters.PersistentStrictMonotonicCounter,
 	metrics module.CollectionSyncMetrics, // optional metrics collector
 ) *ExecutionDataProcessor {
 	edp := &ExecutionDataProcessor{
+		log:                     log.With().Str("component", "coll_sync_ed_processor").Logger(),
 		newExecutionDataIndexed: make(chan struct{}, 1),
 		provider:                provider,
 		indexer:                 indexer,
@@ -104,6 +109,16 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 					ctx.Throw(fmt.Errorf("failed to update processed height to %d: %w", height, err))
 					return
 				}
+
+				// Log progress for each height with all relevant information
+				edp.log.Info().
+					Uint64("indexed", height).
+					Uint64("lowest_missing", lowestMissing).
+					Uint64("highest_available", highestAvailableHeight).
+					Uint64("processed_count", height-lowestMissing+1).
+					Uint64("remaining_count", highestAvailableHeight-height).
+					Uint64("total_to_process", highestAvailableHeight-lowestMissing+1).
+					Msg("indexed execution data progress")
 
 				// Update metrics if available
 				if edp.metrics != nil {
