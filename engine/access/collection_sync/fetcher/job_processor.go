@@ -16,12 +16,11 @@ import (
 // It orchestrates the flow: request → receive → index → complete.
 // TODO: rename to fetch_job_processor
 type JobProcessor struct {
-	mcq                     collection_sync.MissingCollectionQueue
-	indexer                 collection_sync.BlockCollectionIndexer
-	requester               collection_sync.CollectionRequester
-	blocks                  storage.Blocks
-	collections             storage.CollectionsReader
-	newExecutionDataIndexed <-chan struct{}
+	mcq         collection_sync.MissingCollectionQueue
+	indexer     collection_sync.BlockCollectionIndexer
+	requester   collection_sync.CollectionRequester
+	blocks      storage.Blocks
+	collections storage.CollectionsReader
 }
 
 var _ collection_sync.JobProcessor = (*JobProcessor)(nil)

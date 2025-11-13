@@ -23,8 +23,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/cmd/build"
-	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
+	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
