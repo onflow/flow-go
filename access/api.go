@@ -12,17 +12,17 @@ import (
 )
 
 type AccountsAPI interface {
-	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+	GetAccount(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
+	GetAccountAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
+	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
 
-	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
-	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
+	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (uint64, *accessmodel.ExecutorMetadata, error)
+	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (uint64, *accessmodel.ExecutorMetadata, error)
 
-	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
-	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
-	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
-	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
+	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32, criteria optimistic_sync.Criteria) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
+	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, criteria optimistic_sync.Criteria) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
+	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
+	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
 }
 
 type EventsAPI interface {

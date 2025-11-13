@@ -159,7 +159,8 @@ func New(params Params) (*Backend, error) {
 		params.ScriptExecutionMode,
 		params.ScriptExecutor,
 		params.ExecNodeIdentitiesProvider,
-		params.RegistersAsyncStore,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounts: %w", err)

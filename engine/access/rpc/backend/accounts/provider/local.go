@@ -12,19 +12,19 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type LocalAccountProvider struct {
-	log            zerolog.Logger
-	state          protocol.State
-	scriptExecutor execution.ScriptExecutor
-
-	// TODO(Data availability #7650): remove registersAsyncStore and current usages when fork-aware account endpoints will be implemented
-	registersAsyncStore *execution.RegistersAsyncStore
+	log                 zerolog.Logger
+	state               protocol.State
+	scriptExecutor      execution.ScriptExecutor
+	executionStateCache optimistic_sync.ExecutionStateCache
 }
 
 var _ AccountProvider = (*LocalAccountProvider)(nil)
@@ -33,13 +33,13 @@ func NewLocalAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,
-	registersAsyncStore *execution.RegistersAsyncStore,
+	executionStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalAccountProvider {
 	return &LocalAccountProvider{
 		log:                 log.With().Str("account_provider", "local").Logger(),
 		state:               state,
 		scriptExecutor:      scriptExecutor,
-		registersAsyncStore: registersAsyncStore,
+		executionStateCache: executionStateCache,
 	}
 }
 
@@ -48,18 +48,30 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 	address flow.Address,
 	_ flow.Identifier,
 	height uint64,
-) (*flow.Account, error) {
-	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	executionResultID := executionResultInfo.ExecutionResultID
+	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
 
-	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registerSnapshotReader)
+	registers, err := snapshot.Registers()
 	if err != nil {
-		return nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
+		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}
 
-	return account, nil
+	account, err := l.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height, registers)
+	if err != nil {
+		return nil, nil, convertAccountError(common.ResolveHeightError(l.state.Params(), height, err), address, height)
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return account, metadata, nil
 }
 
 func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
@@ -67,19 +79,31 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
-) (uint64, error) {
-	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
+	executionResultID := executionResultInfo.ExecutionResultID
+	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return 0, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
 
-	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, registerSnapshotReader)
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+	}
+
+	accountBalance, err := l.scriptExecutor.GetAccountBalance(ctx, address, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
-		return 0, err
+		return 0, nil, err
 	}
 
-	return accountBalance, nil
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return accountBalance, metadata, nil
 }
 
 func (l *LocalAccountProvider) GetAccountKeyAtBlock(
@@ -88,19 +112,31 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	keyIndex uint32,
 	_ flow.Identifier,
 	height uint64,
-) (*flow.AccountPublicKey, error) {
-	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	executionResultID := executionResultInfo.ExecutionResultID
+	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
 
-	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, registerSnapshotReader)
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+	}
+
+	accountKey, err := l.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account key at height: %d", height)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return accountKey, nil
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return accountKey, metadata, nil
 }
 
 func (l *LocalAccountProvider) GetAccountKeysAtBlock(
@@ -108,19 +144,31 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	address flow.Address,
 	_ flow.Identifier,
 	height uint64,
-) ([]flow.AccountPublicKey, error) {
-	registerSnapshotReader, err := l.registersAsyncStore.RegisterSnapshotReader()
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	executionResultID := executionResultInfo.ExecutionResultID
+	snapshot, err := l.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+		return nil, nil, fmt.Errorf("failed to get snapshot for execution result %s: %w", executionResultID, err)
 	}
 
-	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, registerSnapshotReader)
+	registers, err := snapshot.Registers()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get register snapshot reader: %w", err)
+	}
+
+	accountKeys, err := l.scriptExecutor.GetAccountKeys(ctx, address, height, registers)
 	if err != nil {
 		l.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return accountKeys, nil
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       executionResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return accountKeys, metadata, nil
 }
 
 // convertAccountError converts the script execution error to a gRPC error

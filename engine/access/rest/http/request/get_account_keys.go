@@ -3,55 +3,74 @@ package request
 import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// GetAccountKeys represents a parsed HTTP request for retrieving account keys.
 type GetAccountKeys struct {
-	Address flow.Address
-	Height  uint64
+	Address        flow.Address
+	Height         uint64
+	ExecutionState models.ExecutionStateQuery
 }
 
-// GetAccountKeysRequest extracts necessary variables and query parameters from the provided request,
+// NewGetAccountKeysRequest extracts necessary variables and query parameters from the provided request,
 // builds a GetAccountKeys instance, and validates it.
 //
-// No errors are expected during normal operation.
-func GetAccountKeysRequest(r *common.Request) (GetAccountKeys, error) {
-	var req GetAccountKeys
-	err := req.Build(r)
-	return req, err
-}
-
-func (g *GetAccountKeys) Build(r *common.Request) error {
-	return g.Parse(
+// All errors indicate the request is invalid.
+func NewGetAccountKeysRequest(r *common.Request) (*GetAccountKeys, error) {
+	return parseGetAccountKeysRequest(
 		r.GetVar(addressVar),
 		r.GetQueryParam(blockHeightQuery),
+		r.GetQueryParam(agreeingExecutorCountQuery),
+		r.GetQueryParams(requiredExecutorIdsQuery),
+		r.GetQueryParam(includeExecutorMetadataQuery),
 		r.Chain,
 	)
 }
 
-func (g *GetAccountKeys) Parse(
+// parseGetAccountKeysRequest parses raw HTTP query parameters into a GetAccountKeys struct.
+// It validates the account address and block height, and execution state fields, applying
+// defaults where necessary (using the sealed block when height is not provided).
+//
+// All errors indicate the request is invalid.
+func parseGetAccountKeysRequest(
 	rawAddress string,
 	rawHeight string,
+	rawAgreeingExecutorsCount string,
+	rawAgreeingExecutorsIds []string,
+	rawIncludeExecutorMetadata string,
 	chain flow.Chain,
-) error {
+) (*GetAccountKeys, error) {
 	address, err := parser.ParseAddress(rawAddress, chain)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var height Height
-	err = height.Parse(rawHeight)
+	var h Height
+	err = h.Parse(rawHeight)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	g.Address = address
-	g.Height = height.Flow()
+	height := h.Flow()
 
 	// default to last block
-	if g.Height == EmptyHeight {
-		g.Height = SealedHeight
+	if height == EmptyHeight {
+		height = SealedHeight
 	}
 
-	return nil
+	executionStateQuery, err := parser.NewExecutionStateQuery(
+		rawAgreeingExecutorsCount,
+		rawAgreeingExecutorsIds,
+		rawIncludeExecutorMetadata,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetAccountKeys{
+		Address:        address,
+		Height:         height,
+		ExecutionState: *executionStateQuery,
+	}, nil
 }

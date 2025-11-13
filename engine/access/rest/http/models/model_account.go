@@ -16,6 +16,7 @@ type Account struct {
 	Balance    string             `json:"balance"`
 	Keys       []AccountPublicKey `json:"keys,omitempty"`
 	Contracts  map[string]string  `json:"contracts,omitempty"`
+	Metadata   *models.Metadata   `json:"metadata,omitempty"`
 	Expandable *AccountExpandable `json:"_expandable"`
 	Links      *models.Links      `json:"_links,omitempty"`
 }
