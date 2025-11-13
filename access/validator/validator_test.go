@@ -20,8 +20,10 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,6 +34,7 @@ func TestTransactionValidatorSuite(t *testing.T) {
 type TransactionValidatorSuite struct {
 	suite.Suite
 	blocks           *validatormock.Blocks
+	registersAsync   *execution.RegistersAsyncStore
 	header           *flow.Header
 	chain            flow.Chain
 	validatorOptions validator.TransactionValidationOptions
@@ -41,10 +44,11 @@ type TransactionValidatorSuite struct {
 func (s *TransactionValidatorSuite) SetupTest() {
 	s.metrics = metrics.NewNoopCollector()
 	s.blocks = validatormock.NewBlocks(s.T())
-	assert.NotNil(s.T(), s.blocks)
-
 	s.header = unittest.BlockHeaderFixture()
-	assert.NotNil(s.T(), s.header)
+
+	registers := storagemock.NewRegisterSnapshotReader(s.T())
+	s.registersAsync = execution.NewRegistersAsyncStore()
+	require.NoError(s.T(), s.registersAsync.Initialize(registers))
 
 	s.blocks.
 		On("HeaderByID", mock.Anything).
@@ -95,11 +99,11 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_ScriptExecutorInter
 		Return(s.header.Height, nil)
 
 	scriptExecutor.
-		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("script executor internal error")).
 		Once()
 
-	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor, s.registersAsync)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -126,11 +130,11 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SufficientBalance()
 		Return(s.header.Height, nil)
 
 	scriptExecutor.
-		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(actualResponse, nil).
 		Once()
 
-	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor, s.registersAsync)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -157,7 +161,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 		Return(s.header.Height, nil)
 
 	scriptExecutor.
-		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(actualResponse, nil).Twice()
 
 	actualAccountResponse, err := unittest.AccountFixture()
@@ -166,7 +170,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 
 	validateTx := func() error {
 		txBody := unittest.TransactionBodyFixture()
-		validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+		validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor, s.registersAsync)
 		assert.NoError(s.T(), err)
 		assert.NotNil(s.T(), validator)
 
@@ -200,7 +204,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeight
 		On("IndexedHeight").
 		Return(indexedHeight, nil)
 
-	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor, s.registersAsync)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -220,7 +224,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SignatureValidation
 		On("IndexedHeight").
 		Return(indexedHeight, nil)
 
-	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor, s.registersAsync)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 

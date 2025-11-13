@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -10,34 +11,39 @@ import (
 
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
+// ENScriptExecutor is a script executor that executes scripts using execution nodes.
 type ENScriptExecutor struct {
 	log     zerolog.Logger
-	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptCache struct?
+	metrics module.BackendScriptsMetrics //TODO: move this metrics to scriptLogger struct?
 
 	nodeProvider     *commonrpc.ExecutionNodeIdentitiesProvider
 	nodeCommunicator node_communicator.Communicator
 	connFactory      connection.ConnectionFactory
 
-	scriptCache *LoggedScriptCache
+	scriptLogger *ScriptLogger
 }
 
 var _ ScriptExecutor = (*ENScriptExecutor)(nil)
 
+// NewENScriptExecutor creates a new [ENScriptExecutor].
 func NewENScriptExecutor(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
 	nodeProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 	nodeCommunicator node_communicator.Communicator,
 	connFactory connection.ConnectionFactory,
-	scriptCache *LoggedScriptCache,
+	scriptLogger *ScriptLogger,
 ) *ENScriptExecutor {
 	return &ENScriptExecutor{
 		log:              zerolog.New(log).With().Str("script_executor", "execution_node").Logger(),
@@ -45,46 +51,45 @@ func NewENScriptExecutor(
 		nodeProvider:     nodeProvider,
 		nodeCommunicator: nodeCommunicator,
 		connFactory:      connFactory,
-		scriptCache:      scriptCache,
+		scriptLogger:     scriptLogger,
 	}
 }
 
-func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byte, time.Duration, error) {
-	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	executors, err := e.nodeProvider.ExecutionNodesForBlockID(ctx, request.blockID)
-	if err != nil {
-		return nil, 0, status.Errorf(
-			codes.Internal, "failed to find script executors at blockId %v: %v",
-			request.blockID.String(),
-			err,
-		)
-	}
-
+// Execute executes the provided script at the requested block.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError] - if the requested block has not been executed or has been pruned by the node.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError] - if an internal execution node failure occurs.
+func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	var result []byte
-	var executionTime time.Time
 	var execDuration time.Duration
+	var exeNode *flow.IdentitySkeleton
+	var err error
 	errToReturn := e.nodeCommunicator.CallAvailableNode(
-		executors,
+		executionResultInfo.ExecutionNodes,
 		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
+			exeNode = node
 
 			result, err = e.tryExecuteScriptOnExecutionNode(ctx, node.Address, request)
-
-			executionTime = time.Now()
-			execDuration = executionTime.Sub(execStartTime)
-
 			if err != nil {
 				return err
 			}
 
-			e.scriptCache.LogExecutedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script, execDuration)
-			e.metrics.ScriptExecuted(time.Since(execStartTime), len(request.script))
+			execDuration = time.Since(execStartTime)
+			e.scriptLogger.LogExecutedScript(request, node.Address, execDuration)
+			e.metrics.ScriptExecuted(execDuration, len(request.script))
 
 			return nil
 		},
 		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
-				e.scriptCache.LogFailedScript(request.blockID, request.insecureScriptHash, executionTime, node.Address, request.script)
+				e.scriptLogger.LogFailedScript(request, node.Address)
 				return true
 			}
 			return false
@@ -96,13 +101,41 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 			e.metrics.ScriptExecutionErrorOnExecutionNode()
 			e.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
-		return nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
+
+		switch {
+		case errors.Is(errToReturn, context.Canceled):
+			return nil, nil, access.NewRequestCanceledError(errToReturn)
+		case errors.Is(errToReturn, context.DeadlineExceeded):
+			return nil, nil, access.NewRequestTimedOutError(errToReturn)
+		}
+
+		switch status.Code(errToReturn) {
+		case codes.InvalidArgument:
+			return nil, nil, access.NewInvalidRequestError(errToReturn)
+		case codes.NotFound:
+			return nil, nil, access.NewDataNotFoundError("block", errToReturn)
+		case codes.Internal:
+			return nil, nil, access.NewInternalError(errToReturn)
+		case codes.Unavailable:
+			return nil, nil, access.NewServiceUnavailable(errToReturn)
+		default:
+			return nil, nil, errToReturn
+		}
 	}
 
-	return result, execDuration, nil
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultInfo.ExecutionResultID,
+		ExecutorIDs:       common.OrderedExecutors(exeNode.NodeID, executionResultInfo.ExecutionNodes.NodeIDs()),
+	}
+
+	return result, metadata, nil
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable] - if a connection to an execution node could not be established.
+//   - [status.Error] - if the execution node returned a gRPC error.
 func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,
@@ -110,18 +143,19 @@ func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 ) ([]byte, error) {
 	execRPCClient, closer, err := e.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v",
-			executorAddress, err)
+		return nil, status.Errorf(codes.Unavailable, "failed to connect to execution node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
 
-	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   r.blockID[:],
-		Script:    r.script,
-		Arguments: r.arguments,
-	})
+	execResp, err := execRPCClient.ExecuteScriptAtBlockID(
+		ctx, &execproto.ExecuteScriptAtBlockIDRequest{
+			BlockId:   r.blockID[:],
+			Script:    r.script,
+			Arguments: r.arguments,
+		},
+	)
 	if err != nil {
-		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
+		return nil, err
 	}
 
 	return execResp.GetValue(), nil

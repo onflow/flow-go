@@ -76,9 +76,10 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		executionData: executionData,
 	}
 
+	registers.On("FirstHeight").Return(test.first().Height).Once()
+
 	test.worker, err = NewIndexer(
 		unittest.Logger(),
-		test.first().Height,
 		registers,
 		indexerCoreTest.indexer,
 		exeCache,
@@ -187,10 +188,12 @@ func TestIndexer_Success(t *testing.T) {
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
-				Collection: &collection,
-				TrieUpdate: trie,
-			}},
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+				{
+					Collection: &collection,
+					TrieUpdate: trie,
+				},
+			},
 		}
 
 		// create this to capture the closure of the creation of block execution data, so we can for each returned
@@ -231,10 +234,12 @@ func TestIndexer_Failure(t *testing.T) {
 		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
-				Collection: &collection,
-				TrieUpdate: trie,
-			}},
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+				{
+					Collection: &collection,
+					TrieUpdate: trie,
+				},
+			},
 		}
 
 		// fail when trying to persist registers
