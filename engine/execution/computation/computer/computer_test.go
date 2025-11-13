@@ -165,7 +165,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}),
 			mock.Anything).
 			Return(nil).
-			Times(2 + 1) // 2 txs in collection + system chunk tx
+			Times(2 + 2) // 2 txs in collection + 1 process scheduled transactions tx + 1 system chunk tx
 
 		exemetrics.On(
 			"ExecutionChunkDataPackGenerated",
@@ -260,7 +260,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		chunk2 := receipt.Chunks[1]
 		assert.Equal(t, block.BlockID(), chunk2.BlockID)
 		assert.Equal(t, uint(1), chunk2.CollectionIndex)
-		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
+		assert.Equal(t, uint64(2), chunk2.NumberOfTransactions) // process scheduled transactions + system chunk
 		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
 
 		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
@@ -351,7 +351,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
 			Return(noOpExecutor{}).
-			Once() // just system chunk
+			Times(2) // process scheduled transactions + system chunk
 
 		snapshot := storehouse.NewExecutingBlockSnapshot(
 			snapshot.MapStorageSnapshot{},
@@ -370,7 +370,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), 1)
-		assert.Len(t, result.AllTransactionResults(), 1)
+		assert.Len(t, result.AllTransactionResults(), 2) // process scheduled transactions + system chunk
 		assert.Len(t, result.ChunkExecutionDatas, 1)
 
 		assertEventHashesMatch(t, 1, result)
@@ -468,10 +468,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			derivedBlockData.NewChildDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), 1)
-		assert.Len(t, result.AllTransactionResults(), 1)
+		assert.Len(t, result.AllTransactionResults(), 2) // process scheduled transactions + system chunk
 		assert.Len(t, result.ChunkExecutionDatas, 1)
 
 		assert.Empty(t, result.AllTransactionResults()[0].ErrorMessage)
+		assert.Empty(t, result.AllTransactionResults()[1].ErrorMessage)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
@@ -516,7 +517,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		collectionCount := 2
 		transactionsPerCollection := 2
 		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
-		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
+		totalTransactionCount := (collectionCount * transactionsPerCollection) + 2 // +2 for system chunk (process + system tx)
 		// totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
@@ -549,8 +550,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			assert.Len(t, events, eventsPerCollection)
 		}
 
-		// system chunk
-		assert.Len(t, result.CollectionExecutionResultAt(collectionCount).Events(), eventsPerTransaction)
+		// system chunk - now has 2 transactions (process + system), each emitting eventsPerTransaction events
+		assert.Len(t, result.CollectionExecutionResultAt(collectionCount).Events(), eventsPerTransaction*2)
 
 		events := result.AllEvents()
 
@@ -578,7 +579,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 		}
 		txResults := result.AllTransactionResults()
-		assert.ElementsMatch(t, expectedResults, txResults[0:len(txResults)-1]) // strip system chunk
+		assert.ElementsMatch(t, expectedResults, txResults[0:len(txResults)-2]) // strip system chunk (process + system tx)
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
@@ -672,6 +673,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				serviceEventC,
 			}
 
+			// Track how many times we've seen system transactions (transactions not in the events map)
+			// The first system transaction is "process scheduled transactions" (emits no events)
+			// The second system transaction is the system chunk (emits service events)
+			var systemTxCount int
+			var systemTxMutex sync.Mutex
+
 			emittingRuntime := &testRuntime{
 				executeTransaction: func(
 					script runtime.Script,
@@ -679,7 +686,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				) error {
 					scriptEvents, ok := events[context.Location]
 					if !ok {
-						scriptEvents = systemTransactionEvents
+						// This is a system transaction
+						systemTxMutex.Lock()
+						systemTxCount++
+						currentSystemTx := systemTxCount
+						systemTxMutex.Unlock()
+
+						// First system transaction (process scheduled transactions) emits no events
+						// Second system transaction (system chunk) emits service events
+						if currentSystemTx == 1 {
+							scriptEvents = []cadence.Event{} // process scheduled transactions: no events
+						} else {
+							scriptEvents = systemTransactionEvents // system chunk: service events
+						}
 					}
 
 					for _, e := range scriptEvents {
