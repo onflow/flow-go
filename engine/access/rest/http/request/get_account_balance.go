@@ -17,7 +17,7 @@ type GetAccountBalance struct {
 // NewGetAccountBalanceRequest extracts necessary variables and query parameters from the provided request,
 // builds a GetAccountBalance instance, and validates it.
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func NewGetAccountBalanceRequest(r *common.Request) (*GetAccountBalance, error) {
 	return parseGetAccountBalanceRequest(
 		r.GetVar(addressVar),
@@ -33,7 +33,7 @@ func NewGetAccountBalanceRequest(r *common.Request) (*GetAccountBalance, error) 
 // It validates the account address, block height, and execution state parameters, applying
 // defaults where necessary (using the sealed block when height is not provided).
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func parseGetAccountBalanceRequest(
 	rawAddress string,
 	rawHeight string,

@@ -20,7 +20,7 @@ type GetAccount struct {
 // NewGetAccountRequest extracts necessary variables and query parameters from the provided request,
 // builds a GetAccount instance, and validates it.
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func NewGetAccountRequest(r *common.Request) (*GetAccount, error) {
 	return parseGetAccountRequest(
 		r.GetVar(addressVar),
@@ -36,7 +36,7 @@ func NewGetAccountRequest(r *common.Request) (*GetAccount, error) {
 // It validates the account address, height, and execution state fields, applying
 // defaults where necessary (using the sealed block when height is not provided).
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func parseGetAccountRequest(
 	rawAddress string,
 	rawHeight string,

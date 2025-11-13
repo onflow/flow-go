@@ -23,7 +23,7 @@ type GetAccountKey struct {
 // NewGetAccountKeyRequest extracts necessary variables and query parameters from the provided request,
 // builds a GetAccountKey instance, and validates it.
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func NewGetAccountKeyRequest(r *common.Request) (*GetAccountKey, error) {
 	return parseGetAccountKeyRequest(
 		r.GetVar(addressVar),
@@ -40,7 +40,7 @@ func NewGetAccountKeyRequest(r *common.Request) (*GetAccountKey, error) {
 // It validates the account address, key index, block height, and execution state fields, applying
 // defaults where necessary (using the sealed block when height is not provided).
 //
-// No errors are expected during normal operation.
+// All errors indicate the request is invalid.
 func parseGetAccountKeyRequest(
 	rawAddress string,
 	rawIndex string,
