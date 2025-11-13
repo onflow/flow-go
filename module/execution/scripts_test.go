@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
@@ -180,7 +181,7 @@ func (s *scriptTestSuite) SetupTest() {
 
 	index := indexer.New(
 		logger,
-		metrics.NewNoopCollector(),
+		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
 		nil,
 		s.registerIndex,
 		headers,
@@ -191,8 +192,7 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		flow.Testnet,
 		derivedChainData,
-		nil,
-		nil,
+		metrics.NewNoopCollector(),
 		lockManager,
 	)
 
