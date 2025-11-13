@@ -80,7 +80,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -367,6 +366,10 @@ type FlowAccessNodeBuilder struct {
 	CollectionRequesterEngine *requester.Engine
 	FollowerEng               *followereng.ComplianceEngine
 	StateStreamEng            *statestreambackend.Engine
+
+	// for tx status deriver to know about the highest full block (a block with all collections synced)
+	// backed by either collection fetcher to execution data syncing
+	lastFullBlockHeight *factory.ProgressReader
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -1730,7 +1733,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.IndexerDependencies.Add(versionControlDependable)
 	stopControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(stopControlDependable)
-	var lastFullBlockHeight counters.Reader
 	var collectionIndexedHeight storage.ConsumerProgress
 
 	builder.
@@ -1960,11 +1962,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return err
 			}
 
-			// TODO: won't work
-			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
+			lastProgress, err := progress.ProcessedIndex()
 			if err != nil {
-				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
+				return fmt.Errorf("failed to get last processed index for last full block height: %w", err)
 			}
+
+			// Create ProgressReader that aggregates progress from executionDataProcessor and collectionFetcher
+			builder.lastFullBlockHeight = factory.NewProgressReader(lastProgress)
 
 			collectionIndexedHeight = progress
 
@@ -2158,7 +2162,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				EventsIndex:                notNil(builder.EventsIndex),
 				TxResultQueryMode:          txResultQueryMode,
 				TxResultsIndex:             notNil(builder.TxResultsIndex),
-				LastFullBlockHeight:        lastFullBlockHeight,
+				LastFullBlockHeight:        notNil(builder.lastFullBlockHeight),
 				IndexReporter:              indexReporter,
 				VersionControl:             notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
@@ -2238,6 +2242,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not create execution data processor: %w", err)
 			}
+
+			// Store and register with ProgressReader
+			builder.lastFullBlockHeight.SetExecutionDataProcessor(executionDataProcessor)
 
 			// Setup requester to notify processor when new execution data is received
 			if builder.ExecutionDataDistributor != nil {
@@ -2559,6 +2566,9 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 			}
 
 			builder.CollectionRequesterEngine = requesterEng
+
+			// Store and register with ProgressReader
+			builder.lastFullBlockHeight.SetCollectionFetcher(fetcher)
 
 			return fetcher, nil
 		}).

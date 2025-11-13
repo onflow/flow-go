@@ -19,6 +19,7 @@ type ExecutionDataProcessor struct {
 }
 
 var _ collection_sync.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
+var _ collection_sync.ProgressReader = (*ExecutionDataProcessor)(nil)
 var _ component.Component = (*ExecutionDataProcessor)(nil)
 
 func NewExecutionDataProcessor(
@@ -102,4 +103,8 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 			}
 		}
 	}
+}
+
+func (edp *ExecutionDataProcessor) ProcessedHeight() uint64 {
+	return edp.processedHeight.Value()
 }

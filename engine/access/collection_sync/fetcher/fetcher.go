@@ -15,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ collection_sync.Fetcher = (*Fetcher)(nil)
-
 // Fetcher is a component that consumes finalized block jobs and processes them
 // to index collections. It uses a job consumer with windowed throttling to prevent node overload.
 type Fetcher struct {
@@ -27,6 +25,8 @@ type Fetcher struct {
 	workSignal   engine.Notifier
 }
 
+var _ collection_sync.Fetcher = (*Fetcher)(nil)
+var _ collection_sync.ProgressReader = (*Fetcher)(nil)
 var _ component.Component = (*Fetcher)(nil)
 
 // NewFetcher creates a new Fetcher component.
@@ -95,15 +95,8 @@ func (s *Fetcher) OnFinalizedBlock() {
 }
 
 // LastProcessedIndex returns the last processed job index.
-// Optional methods, not required for operation but useful for monitoring.
-func (s *Fetcher) LastProcessedIndex() uint64 {
+func (s *Fetcher) ProcessedHeight() uint64 {
 	return s.consumer.LastProcessedIndex()
-}
-
-// Head returns the highest job index available.
-// Optional methods, not required for operation but useful for monitoring.
-func (s *Fetcher) Head() (uint64, error) {
-	return s.consumer.Head()
 }
 
 // Size returns the number of in-memory jobs that the consumer is processing.

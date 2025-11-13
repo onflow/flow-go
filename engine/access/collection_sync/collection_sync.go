@@ -43,9 +43,8 @@ type JobProcessor interface {
 // to index collections. It uses a job consumer with windowed throttling to prevent node overload.
 type Fetcher interface {
 	component.Component
+	ProgressReader
 	OnFinalizedBlock()
-	LastProcessedIndex() uint64
-	Head() (uint64, error)
 	Size() uint
 }
 
@@ -58,4 +57,8 @@ type ExecutionDataProvider interface {
 
 type ExecutionDataProcessor interface {
 	OnNewExectuionData()
+}
+
+type ProgressReader interface {
+	ProcessedHeight() uint64
 }
