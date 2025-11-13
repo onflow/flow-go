@@ -2533,8 +2533,8 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight)
 
 			// skip if execution data sync is enabled
-			// Create syncer and requesterEng
-			requesterEng, syncer, err := factory.CreateSyncer(
+			// Create fetcher and requesterEng
+			requesterEng, fetcher, err := factory.CreateFetcher(
 				node.Logger,
 				node.EngineRegistry,
 				node.State,
@@ -2546,19 +2546,19 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				notNil(builder.blockCollectionIndexer),
 				fetchAndIndexedCollectionsBlockHeight,
 				notNil(builder.collectionExecutedMetric),
-				collection_syncfactory.CreateSyncerConfig{
+				collection_syncfactory.CreateFetcherConfig{
 					MaxProcessing:  10, // TODO: make configurable
 					MaxSearchAhead: 20, // TODO: make configurable
 				},
 			)
 
 			if err != nil {
-				return nil, fmt.Errorf("could not create collection syncer: %w", err)
+				return nil, fmt.Errorf("could not create collection fetcher: %w", err)
 			}
 
 			builder.CollectionRequesterEngine = requesterEng
 
-			return syncer, nil
+			return fetcher, nil
 		}).
 		Component("collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if builder.executionDataSyncEnabled {

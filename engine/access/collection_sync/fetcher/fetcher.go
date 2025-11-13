@@ -15,11 +15,11 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ collection_sync.Syncer = (*Syncer)(nil)
+var _ collection_sync.Fetcher = (*Fetcher)(nil)
 
-// Syncer is a component that consumes finalized block jobs and processes them
+// Fetcher is a component that consumes finalized block jobs and processes them
 // to index collections. It uses a job consumer with windowed throttling to prevent node overload.
-type Syncer struct {
+type Fetcher struct {
 	component.Component
 
 	consumer     *jobqueue.ComponentConsumer
@@ -27,9 +27,9 @@ type Syncer struct {
 	workSignal   engine.Notifier
 }
 
-var _ component.Component = (*Syncer)(nil)
+var _ component.Component = (*Fetcher)(nil)
 
-// NewSyncer creates a new Syncer component.
+// NewFetcher creates a new Fetcher component.
 //
 // Parameters:
 //   - log: Logger for the component
@@ -41,7 +41,7 @@ var _ component.Component = (*Syncer)(nil)
 //   - maxSearchAhead: Maximum number of jobs beyond processedIndex to process. 0 means no limit
 //
 // No error returns are expected during normal operation.
-func NewSyncer(
+func NewFetcher(
 	log zerolog.Logger,
 	jobProcessor collection_sync.JobProcessor,
 	progressInitializer storage.ConsumerProgressInitializer,
@@ -49,7 +49,7 @@ func NewSyncer(
 	blocks storage.Blocks,
 	maxProcessing uint64, // max number of blocks to fetch collections
 	maxSearchAhead uint64, // max number of blocks beyond the next unfullfilled height to fetch collections for
-) (*Syncer, error) {
+) (*Fetcher, error) {
 	workSignal := engine.NewNotifier()
 
 	// Read the default index from the finalized root height
@@ -80,7 +80,7 @@ func NewSyncer(
 		return nil, fmt.Errorf("failed to create collection syncing consumer: %w", err)
 	}
 
-	return &Syncer{
+	return &Fetcher{
 		Component:    consumer,
 		consumer:     consumer,
 		jobProcessor: jobProcessor,
@@ -90,24 +90,24 @@ func NewSyncer(
 
 // OnFinalizedBlock is called when a new block is finalized. It notifies the job consumer
 // that new work is available.
-func (s *Syncer) OnFinalizedBlock() {
+func (s *Fetcher) OnFinalizedBlock() {
 	s.workSignal.Notify()
 }
 
 // LastProcessedIndex returns the last processed job index.
 // Optional methods, not required for operation but useful for monitoring.
-func (s *Syncer) LastProcessedIndex() uint64 {
+func (s *Fetcher) LastProcessedIndex() uint64 {
 	return s.consumer.LastProcessedIndex()
 }
 
 // Head returns the highest job index available.
 // Optional methods, not required for operation but useful for monitoring.
-func (s *Syncer) Head() (uint64, error) {
+func (s *Fetcher) Head() (uint64, error) {
 	return s.consumer.Head()
 }
 
 // Size returns the number of in-memory jobs that the consumer is processing.
 // Optional methods, not required for operation but useful for monitoring.
-func (s *Syncer) Size() uint {
+func (s *Fetcher) Size() uint {
 	return s.consumer.Size()
 }

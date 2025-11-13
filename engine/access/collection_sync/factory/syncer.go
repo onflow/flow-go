@@ -18,18 +18,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// CreateSyncerConfig holds configuration parameters for creating a Syncer.
-type CreateSyncerConfig struct {
+// CreateFetcherConfig holds configuration parameters for creating a Fetcher.
+type CreateFetcherConfig struct {
 	// MaxProcessing is the maximum number of jobs to process concurrently.
 	MaxProcessing uint64
 	// MaxSearchAhead is the maximum number of jobs beyond processedIndex to process. 0 means no limit.
 	MaxSearchAhead uint64
 }
 
-// CreateSyncer creates a new Syncer component with all its dependencies.
+// CreateFetcher creates a new Fetcher component with all its dependencies.
 // This function is in the collections package to avoid import cycles:
 // - collections package already imports collection_sync (for interfaces)
-// - CreateSyncer needs to create concrete types from collections package
+// - CreateFetcher needs to create concrete types from collections package
 // - Placing it in collection_sync would create: collection_sync -> collections -> collection_sync (cycle)
 //
 // Parameters:
@@ -43,12 +43,12 @@ type CreateSyncerConfig struct {
 //   - db: Database for storage operations
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
 //   - collectionExecutedMetric: Metrics collector for tracking collection indexing
-//   - config: Configuration for the syncer
+//   - config: Configuration for the fetcher
 //
-// Returns both the Syncer and JobProcessor so they can be reused in other components.
+// Returns both the Fetcher and JobProcessor so they can be reused in other components.
 //
 // No error returns are expected during normal operation.
-func CreateSyncer(
+func CreateFetcher(
 	log zerolog.Logger,
 	engineRegistry network.EngineRegistry,
 	state protocol.State,
@@ -60,8 +60,8 @@ func CreateSyncer(
 	indexer collection_sync.BlockCollectionIndexer,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	config CreateSyncerConfig,
-) (*requester.Engine, collection_sync.Syncer, error) {
+	config CreateFetcherConfig,
+) (*requester.Engine, collection_sync.Fetcher, error) {
 	// Create requester engine for requesting collections
 	requestEng, err := requester.New(
 		log.With().Str("entity", "collection").Logger(),
@@ -111,8 +111,8 @@ func CreateSyncer(
 		}
 	})
 
-	// Create Syncer
-	syncer, err := fetcher.NewSyncer(
+	// Create Fetcher
+	collectionFetcher, err := fetcher.NewFetcher(
 		log,
 		jobProcessor,
 		processedFinalizedBlockHeight,
@@ -122,8 +122,8 @@ func CreateSyncer(
 		config.MaxSearchAhead,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create syncer: %w", err)
+		return nil, nil, fmt.Errorf("could not create fetcher: %w", err)
 	}
 
-	return requestEng, syncer, nil
+	return requestEng, collectionFetcher, nil
 }

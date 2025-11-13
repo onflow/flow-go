@@ -39,9 +39,9 @@ type JobProcessor interface {
 	ProcessJobConcurrently(ctx irrecoverable.SignalerContext, job module.Job, done func()) error
 }
 
-// Syncer is a component that consumes finalized block jobs and processes them
+// Fetcher is a component that consumes finalized block jobs and processes them
 // to index collections. It uses a job consumer with windowed throttling to prevent node overload.
-type Syncer interface {
+type Fetcher interface {
 	component.Component
 	OnFinalizedBlock()
 	LastProcessedIndex() uint64
