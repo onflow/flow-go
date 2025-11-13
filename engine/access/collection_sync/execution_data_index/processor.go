@@ -1,4 +1,4 @@
-package collections
+package execution_data_index
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 type ExecutionDataProcessor struct {
 	component.Component
 	newExecutionDataIndexed chan struct{}
-	ediHeightProvider       collection_sync.EDIHeightProvider
+	provider                collection_sync.ExecutionDataProvider
 	indexer                 collection_sync.BlockCollectionIndexer
 	// state
 	processedHeight *counters.PersistentStrictMonotonicCounter
@@ -22,16 +22,20 @@ var _ collection_sync.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
 var _ component.Component = (*ExecutionDataProcessor)(nil)
 
 func NewExecutionDataProcessor(
-	ediHeightProvider collection_sync.EDIHeightProvider,
+	provider collection_sync.ExecutionDataProvider,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedHeight *counters.PersistentStrictMonotonicCounter,
 ) *ExecutionDataProcessor {
 	edp := &ExecutionDataProcessor{
 		newExecutionDataIndexed: make(chan struct{}, 1),
-		ediHeightProvider:       ediHeightProvider,
+		provider:                provider,
 		indexer:                 indexer,
 		processedHeight:         processedHeight,
 	}
+
+	// Initialize the channel so that even if no new execution data comes in,
+	// the worker loop can still be triggered to process any existing data.
+	edp.newExecutionDataIndexed <- struct{}{}
 
 	// Build component manager with worker loop
 	cm := component.NewComponentManagerBuilder().
@@ -64,23 +68,23 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 		case <-ctx.Done():
 			return
 		case <-edp.newExecutionDataIndexed:
-			highestAvailableHeight := edp.ediHeightProvider.HighestIndexedHeight()
+			highestAvailableHeight := edp.provider.HighestIndexedHeight()
 			lowestMissing := edp.processedHeight.Value() + 1
 
 			for height := lowestMissing; height <= highestAvailableHeight; height++ {
-				collections, err := edp.ediHeightProvider.GetExecutionDataByHeight(ctx, height)
+				collections, err := edp.provider.GetExecutionDataByHeight(ctx, height)
 				if err != nil {
 					ctx.Throw(fmt.Errorf("failed to get execution data for height %d: %w", height, err))
 					return
 				}
 
-				// TODO: since both fetcher and execution data processor are the data source of
+				// TODO: since both collections and execution data processor are the data source of
 				// collections, before indexing the collections, double check if it was indexed
-				// by the fetcher already by simply comparing the missing height with the
-				// fetcher's lowest height.
-				// if fetcher's lowest height is higher than the missing height, it means the collections
-				// has been indexed by the fetcher already, no need to index again.
-				// And make sure reading the fetcher's lowest height is cheap operation (only hitting RW lock)
+				// by the collections already by simply comparing the missing height with the
+				// collections's lowest height.
+				// if collections's lowest height is higher than the missing height, it means the collections
+				// has been indexed by the collections already, no need to index again.
+				// And make sure reading the collections's lowest height is cheap operation (only hitting RW lock)
 
 				err = edp.indexer.IndexCollectionsForBlock(height, collections)
 				// TODO: handle already exists

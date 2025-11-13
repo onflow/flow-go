@@ -1,4 +1,4 @@
-package collections
+package execution_data_index
 
 import (
 	"context"
@@ -9,33 +9,33 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
-var _ collection_sync.EDIHeightProvider = (*ediHeightProvider)(nil)
+var _ collection_sync.ExecutionDataProvider = (*executionDataProvider)(nil)
 
-// ediHeightProvider implements EDIHeightProvider by querying ExecutionDataCache.
-type ediHeightProvider struct {
+// executionDataProvider implements ExecutionDataProvider by querying ExecutionDataCache.
+type executionDataProvider struct {
 	cache                      execution_data.ExecutionDataCache
 	highestExectuionDataHeight tracker.ExecutionDataTracker
 }
 
-// NewEDIHeightProvider creates a new EDIHeightProvider that reads from the given ExecutionDataCache.
+// NewExecutionDataProvider creates a new ExecutionDataProvider that reads from the given ExecutionDataCache.
 // The headers storage is used to determine the search range for finding available heights.
-func NewEDIHeightProvider(
+func NewExecutionDataProvider(
 	cache execution_data.ExecutionDataCache,
 	highestExectuionDataHeight tracker.ExecutionDataTracker,
-) *ediHeightProvider {
-	return &ediHeightProvider{
+) *executionDataProvider {
+	return &executionDataProvider{
 		cache:                      cache,
 		highestExectuionDataHeight: highestExectuionDataHeight,
 	}
 }
 
 // HighestIndexedHeight returns the highest block height for which execution data is available.
-func (p *ediHeightProvider) HighestIndexedHeight() uint64 {
+func (p *executionDataProvider) HighestIndexedHeight() uint64 {
 	return p.highestExectuionDataHeight.GetHighestHeight()
 }
 
 // GetExecutionDataByHeight returns the execution data for the given block height.
-func (p *ediHeightProvider) GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error) {
+func (p *executionDataProvider) GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error) {
 	blockExecutionData, err := p.cache.ByHeight(ctx, height)
 	if err != nil {
 		return nil, err

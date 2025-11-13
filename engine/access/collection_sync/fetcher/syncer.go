@@ -1,4 +1,4 @@
-package collections
+package fetcher
 
 import (
 	"fmt"
@@ -26,6 +26,8 @@ type Syncer struct {
 	jobProcessor collection_sync.JobProcessor
 	workSignal   engine.Notifier
 }
+
+var _ component.Component = (*Syncer)(nil)
 
 // NewSyncer creates a new Syncer component.
 //

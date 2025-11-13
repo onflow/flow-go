@@ -1,4 +1,4 @@
-package collections
+package fetcher
 
 import (
 	"fmt"

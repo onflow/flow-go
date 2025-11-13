@@ -3,11 +3,10 @@ package factory
 import (
 	"fmt"
 
-	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/collection_sync"
-	"github.com/onflow/flow-go/engine/access/collection_sync/collections"
+	"github.com/onflow/flow-go/engine/access/collection_sync/fetcher"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -27,13 +26,6 @@ type CreateSyncerConfig struct {
 	MaxSearchAhead uint64
 }
 
-// CreateSyncerResult holds the results of CreateSyncer.
-type CreateSyncerResult struct {
-	Syncer       *collections.Syncer
-	JobProcessor collection_sync.JobProcessor
-	RequestEng   *requester.Engine
-}
-
 // CreateSyncer creates a new Syncer component with all its dependencies.
 // This function is in the collections package to avoid import cycles:
 // - collections package already imports collection_sync (for interfaces)
@@ -49,7 +41,6 @@ type CreateSyncerResult struct {
 //   - collections: Collections storage
 //   - guarantees: Guarantees storage
 //   - db: Database for storage operations
-//   - lockManager: Lock manager for coordinating database access
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
 //   - collectionExecutedMetric: Metrics collector for tracking collection indexing
 //   - config: Configuration for the syncer
@@ -66,11 +57,11 @@ func CreateSyncer(
 	collStore storage.Collections,
 	guarantees storage.Guarantees,
 	db storage.DB,
-	lockManager lockctx.Manager,
+	indexer collection_sync.BlockCollectionIndexer,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	config CreateSyncerConfig,
-) (*CreateSyncerResult, error) {
+) (*requester.Engine, collection_sync.Syncer, error) {
 	// Create requester engine for requesting collections
 	requestEng, err := requester.New(
 		log.With().Str("entity", "collection").Logger(),
@@ -83,29 +74,21 @@ func CreateSyncer(
 		func() flow.Entity { return new(flow.Collection) },
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create requester engine: %w", err)
+		return nil, nil, fmt.Errorf("could not create requester engine: %w", err)
 	}
 
 	// Create MissingCollectionQueue
-	mcq := collections.NewMissingCollectionQueue()
-
-	// Create BlockCollectionIndexer
-	indexer := collections.NewBlockCollectionIndexer(
-		collectionExecutedMetric,
-		lockManager,
-		db,
-		collStore,
-	)
+	mcq := fetcher.NewMissingCollectionQueue()
 
 	// Create CollectionRequester
-	collectionRequester := collections.NewCollectionRequester(
+	collectionRequester := fetcher.NewCollectionRequester(
 		requestEng,
 		state,
 		guarantees,
 	)
 
 	// Create JobProcessor
-	jobProcessor := collections.NewJobProcessor(
+	jobProcessor := fetcher.NewJobProcessor(
 		mcq,
 		indexer,
 		collectionRequester,
@@ -129,7 +112,7 @@ func CreateSyncer(
 	})
 
 	// Create Syncer
-	syncer, err := collections.NewSyncer(
+	syncer, err := fetcher.NewSyncer(
 		log,
 		jobProcessor,
 		processedFinalizedBlockHeight,
@@ -139,12 +122,8 @@ func CreateSyncer(
 		config.MaxSearchAhead,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create syncer: %w", err)
+		return nil, nil, fmt.Errorf("could not create syncer: %w", err)
 	}
 
-	return &CreateSyncerResult{
-		Syncer:       syncer,
-		JobProcessor: jobProcessor,
-		RequestEng:   requestEng,
-	}, nil
+	return requestEng, syncer, nil
 }

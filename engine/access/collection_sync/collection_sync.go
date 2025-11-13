@@ -49,9 +49,9 @@ type Syncer interface {
 	Size() uint
 }
 
-// EDIHeightProvider provides the latest height for which execution data indexer has collections.
+// ExecutionDataProvider provides the latest height for which execution data indexer has collections.
 // This can be nil if execution data indexing is disabled.
-type EDIHeightProvider interface {
+type ExecutionDataProvider interface {
 	HighestIndexedHeight() uint64
 	GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error)
 }

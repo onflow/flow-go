@@ -39,12 +39,14 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
+	"github.com/onflow/flow-go/engine/access/collection_sync/factory"
+	collection_syncfactory "github.com/onflow/flow-go/engine/access/collection_sync/factory"
+	"github.com/onflow/flow-go/engine/access/collection_sync/fetcher"
+	"github.com/onflow/flow-go/engine/access/finalized_indexer"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/ingestion/collections"
+	"github.com/onflow/flow-go/engine/access/ingest_receipt"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
-	"github.com/onflow/flow-go/engine/access/ingestion2"
-	ingestion2collections "github.com/onflow/flow-go/engine/access/ingestion2/collections"
-	ingestion2factory "github.com/onflow/flow-go/engine/access/ingestion2/factory"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -334,10 +336,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
-	CollectionIndexer            *collections.Indexer
-	CollectionSyncer             *collections.Syncer
-	JobProcessor                 ingestion2.JobProcessor
-	CollectionSyncer2            ingestion2.Syncer
+	blockCollectionIndexer       collection_sync.BlockCollectionIndexer
 	ScriptExecutor               *backend.ScriptExecutor
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
@@ -365,11 +364,9 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	IngestEng      *ingestion2.Engine
-	RequestEng     *requester.Engine
-	FollowerEng    *followereng.ComplianceEngine
-	SyncEng        *synceng.Engine
-	StateStreamEng *statestreambackend.Engine
+	CollectionRequesterEngine *requester.Engine
+	FollowerEng               *followereng.ComplianceEngine
+	StateStreamEng            *statestreambackend.Engine
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -380,7 +377,6 @@ type FlowAccessNodeBuilder struct {
 	nodeBackend        *backend.Backend
 
 	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
-	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
 	txResultErrorMessageProvider error_messages.Provider
 }
 
@@ -544,10 +540,9 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
-		builder.SyncEng = sync
 		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
-		return builder.SyncEng, nil
+		return sync, nil
 	})
 
 	return builder
@@ -1730,14 +1725,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
 	var fetchAndIndexedCollectionsBlockHeight storage.ConsumerProgressInitializer
 	var syncAndIndexedCollectionsBlockHeight storage.ConsumerProgressInitializer
-	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
 
-	ingestionDependable := module.NewProxiedReadyDoneAware()
-	builder.IndexerDependencies.Add(ingestionDependable)
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
 	stopControlDependable := module.NewProxiedReadyDoneAware()
@@ -1960,34 +1952,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			syncAndIndexedCollectionsBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight)
 			return nil
 		}).
-		Module("collection syncer and job processor", func(node *cmd.NodeConfig) error {
-			// Create syncer and job processor
-			syncerResult, err := ingestion2factory.CreateSyncer(
-				node.Logger,
-				node.EngineRegistry,
-				node.State,
-				node.Me,
-				node.Storage.Blocks,
-				notNil(builder.collections),
-				node.Storage.Guarantees,
-				builder.ProtocolDB,
-				node.StorageLockMgr,
-				fetchAndIndexedCollectionsBlockHeight,
+		Module("block collection indexer", func(node *cmd.NodeConfig) error {
+			builder.blockCollectionIndexer = fetcher.NewBlockCollectionIndexer(
 				notNil(builder.collectionExecutedMetric),
-				ingestion2factory.CreateSyncerConfig{
-					MaxProcessing:  10, // TODO: make configurable
-					MaxSearchAhead: 0,  // TODO: make configurable
-				},
+				node.StorageLockMgr,
+				builder.ProtocolDB,
+				notNil(builder.collections),
 			)
-			if err != nil {
-				return fmt.Errorf("could not create collection syncer: %w", err)
-			}
-
-			// Store the results for use in other components
-			builder.JobProcessor = syncerResult.JobProcessor
-			builder.CollectionSyncer2 = syncerResult.Syncer
-			builder.RequestEng = syncerResult.RequestEng
-
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -2235,54 +2206,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
-		}).
-		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// RequestEng should already be created in the "collection syncer and job processor" module
-			if builder.RequestEng == nil {
-				return nil, fmt.Errorf("RequestEng must be created before requester engine component")
-			}
-
-			collectionIndexer, err := collections.NewIndexer(
-				node.Logger,
-				builder.ProtocolDB,
-				notNil(builder.collectionExecutedMetric),
-				node.State,
-				node.Storage.Blocks,
-				notNil(builder.collections),
-				lastFullBlockHeight,
-				node.StorageLockMgr,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create collection indexer: %w", err)
-			}
-			builder.CollectionIndexer = collectionIndexer
-
-			// the collection syncer has support for indexing collections from execution data if the
-			// syncer falls behind. This is only needed if the execution state indexing is disabled,
-			// since it will also index collections.
-			var executionDataSyncer *collections.ExecutionDataSyncer
-			if builder.executionDataSyncEnabled && !builder.executionDataIndexingEnabled {
-				executionDataSyncer = collections.NewExecutionDataSyncer(
-					node.Logger,
-					notNil(builder.ExecutionDataCache),
-					collectionIndexer,
-				)
-			}
-
-			collectionSyncer := collections.NewSyncer(
-				node.Logger,
-				builder.RequestEng,
-				node.State,
-				notNil(builder.collections),
-				lastFullBlockHeight,
-				collectionIndexer,
-				executionDataSyncer,
-			)
-			builder.CollectionSyncer = collectionSyncer
-
-			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
-
-			return builder.RequestEng, nil
 		})
 	if builder.executionDataSyncEnabled {
 		builder.Component("execution data processor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -2318,22 +2241,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not initialize processed height: %w", err)
 			}
 
-			// Get BlockCollectionIndexer from syncer result
-			// The indexer is created in the CreateSyncer call, we need to extract it
-			// For now, we'll create a new one since we need it for the processor
-			blockCollectionIndexer := ingestion2collections.NewBlockCollectionIndexer(
-				notNil(builder.collectionExecutedMetric),
-				node.StorageLockMgr,
-				builder.ProtocolDB,
-				notNil(builder.collections),
-			)
-
 			// Create execution data processor
-			executionDataProcessor, err := ingestion2factory.CreateExecutionDataProcessor(
+			executionDataProcessor, err := collection_syncfactory.CreateExecutionDataProcessor(
 				notNil(builder.ExecutionDataCache),
 				executionDataTracker,
 				processedHeight,
-				blockCollectionIndexer,
+				notNil(builder.blockCollectionIndexer),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create execution data processor: %w", err)
@@ -2350,28 +2263,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return executionDataProcessor, nil
 		})
 	}
-	builder.Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		if builder.storeTxResultErrorMessages {
-			builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
-				node.Logger,
-				notNil(builder.txResultErrorMessageProvider),
-				builder.transactionResultErrorMessages,
-				notNil(builder.ExecNodeIdentitiesProvider),
-				node.StorageLockMgr,
-			)
-		}
 
-		// CollectionSyncer2 should already be created in the "collection syncer and job processor" module
-		if builder.CollectionSyncer2 == nil {
-			return nil, fmt.Errorf("CollectionSyncer2 must be created before ingestion engine")
-		}
-
-		// Create FinalizedBlockProcessor (still uses old syncer temporarily)
-		finalizedBlockProcessor, err := ingestion2.NewFinalizedBlockProcessor(
+	builder.Component("finalized block indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		finalizedBlockProcessor, err := finalized_indexer.NewFinalizedBlockProcessor(
 			node.Logger,
 			node.State,
 			node.Storage.Blocks,
-			node.Storage.Results,
 			processedFinalizedBlockHeight,
 			notNil(builder.collectionExecutedMetric),
 		)
@@ -2379,34 +2276,73 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil, fmt.Errorf("could not create finalized block processor: %w", err)
 		}
 
-		// Create ingestion2 engine
-		ingestEng, err := ingestion2.New(
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(finalizedBlockProcessor.OnBlockFinalized)
+
+		return finalizedBlockProcessor, nil
+	})
+
+	builder.Component("ingest receipt", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return ingest_receipt.New(
 			node.Logger,
 			node.EngineRegistry,
-			finalizedBlockProcessor,
-			builder.CollectionSyncer2,
 			node.Storage.Receipts,
 			notNil(builder.collectionExecutedMetric),
 		)
+	})
+
+	builder.Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// skip if execution data sync is enabled
+		// Create syncer and requesterEng
+		requesterEng, syncer, err := factory.CreateSyncer(
+			node.Logger,
+			node.EngineRegistry,
+			node.State,
+			node.Me,
+			node.Storage.Blocks,
+			notNil(builder.collections),
+			node.Storage.Guarantees,
+			builder.ProtocolDB,
+			notNil(builder.blockCollectionIndexer),
+			fetchAndIndexedCollectionsBlockHeight,
+			notNil(builder.collectionExecutedMetric),
+			collection_syncfactory.CreateSyncerConfig{
+				MaxProcessing:  10, // TODO: make configurable
+				MaxSearchAhead: 0,  // TODO: make configurable
+			},
+		)
+
 		if err != nil {
-			return nil, fmt.Errorf("could not create ingestion2 engine: %w", err)
+			return nil, fmt.Errorf("could not create collection syncer: %w", err)
 		}
 
-		builder.IngestEng = ingestEng
+		builder.CollectionRequesterEngine = requesterEng
 
-		ingestionDependable.Init(ingestEng)
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(ingestEng.OnFinalizedBlock)
+		return syncer, nil
+	})
 
-		return ingestEng, nil
+	builder.Component("collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return builder.CollectionRequesterEngine, nil
 	})
 
 	if builder.storeTxResultErrorMessages {
+		var txResultErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
+		var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 		builder.
+			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+				txResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
+					node.Logger,
+					notNil(builder.txResultErrorMessageProvider),
+					builder.transactionResultErrorMessages,
+					notNil(builder.ExecNodeIdentitiesProvider),
+					node.StorageLockMgr,
+				)
+				return nil
+			}).
 			AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
 				return storageCommands.NewBackfillTxErrorMessagesCommand(
 					builder.Logger,
 					builder.State,
-					builder.TxResultErrorMessagesCore,
+					txResultErrorMessagesCore,
 				)
 			}).
 			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
@@ -2431,7 +2367,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					node.State,
 					node.Storage.Headers,
 					processedTxErrorMessagesBlockHeight,
-					builder.TxResultErrorMessagesCore,
+					txResultErrorMessagesCore,
 				)
 				if err != nil {
 					return nil, err

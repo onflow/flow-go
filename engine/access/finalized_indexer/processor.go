@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -22,6 +23,8 @@ import (
 // When notified of a new finalized block, it processes all blocks up to the current
 // finalized head height.
 type FinalizedBlockProcessor struct {
+	component.Component
+
 	log zerolog.Logger
 
 	state           protocol.State
@@ -31,6 +34,8 @@ type FinalizedBlockProcessor struct {
 	blockFinalizedNotifier   chan struct{}
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
+
+var _ component.Component = (*FinalizedBlockProcessor)(nil)
 
 // NewFinalizedBlockProcessor creates and initializes a new FinalizedBlockProcessor.
 //
@@ -66,11 +71,21 @@ func NewFinalizedBlockProcessor(
 		collectionExecutedMetric: collectionExecutedMetric,
 	}
 
+	// Initialize the channel so that even if no new finalized blocks come in,
+	// the worker loop can still be triggered to process any existing finalized blocks.
+	processor.blockFinalizedNotifier <- struct{}{}
+
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(processor.workerLoop).
+		Build()
+
+	processor.Component = cm
+
 	return processor, nil
 }
 
 // OnBlockFinalized notifies the processor that a new finalized block is available for processing.
-func (p *FinalizedBlockProcessor) OnBlockFinalized() {
+func (p *FinalizedBlockProcessor) OnBlockFinalized(_ *model.Block) {
 	select {
 	case p.blockFinalizedNotifier <- struct{}{}:
 	default:
@@ -80,9 +95,9 @@ func (p *FinalizedBlockProcessor) OnBlockFinalized() {
 	}
 }
 
-// StartWorkerLoop begins processing of finalized blocks and signals readiness when initialization is complete.
+// workerLoop begins processing of finalized blocks and signals readiness when initialization is complete.
 // It uses a single-threaded loop to process each finalized block height sequentially.
-func (p *FinalizedBlockProcessor) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (p *FinalizedBlockProcessor) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {

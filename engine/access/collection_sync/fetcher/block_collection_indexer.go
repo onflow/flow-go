@@ -1,4 +1,4 @@
-package collections
+package fetcher
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 )
 
 // blockCollectionIndexerImpl implements BlockCollectionIndexer.
-// It stores and indexes collections for a given block height.
+// It stores and indexes fetcher for a given block height.
 type blockCollectionIndexerImpl struct {
 	metrics     module.CollectionExecutedMetric
 	lockManager lockctx.Manager
@@ -28,7 +28,7 @@ var _ collection_sync.BlockCollectionIndexer = (*blockCollectionIndexerImpl)(nil
 //   - metrics: Metrics collector for tracking collection indexing
 //   - lockManager: Lock manager for coordinating database access
 //   - db: Database for storage operations
-//   - collections: Collections storage for storing and indexing collections
+//   - collections: collections storage for storing and indexing collections
 //
 // No error returns are expected during normal operation.
 func NewBlockCollectionIndexer(
@@ -45,7 +45,7 @@ func NewBlockCollectionIndexer(
 	}
 }
 
-// OnReceivedCollectionsForBlock stores and indexes collections for a given block height.
+// IndexCollectionsForBlock stores and indexes collections for a given block height.
 //
 // No error returns are expected during normal operation.
 func (bci *blockCollectionIndexerImpl) IndexCollectionsForBlock(
