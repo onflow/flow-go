@@ -49,7 +49,7 @@ func NewJobProcessor(
 	collections storage.CollectionsReader,
 ) *JobProcessor {
 	return &JobProcessor{
-		log:         log,
+		log:         log.With().Str("component", "coll_fetcher").Logger(),
 		mcq:         mcq,
 		indexer:     indexer,
 		requester:   requester,
@@ -75,6 +75,8 @@ func (jp *JobProcessor) ProcessJobConcurrently(
 	}
 
 	blockHeight := block.Height
+	jp.log.Debug().Uint64("block_height", blockHeight).
+		Msg("processing collection indexing job for finalized block")
 
 	// Get missing collections for this block
 	missingGuarantees, err := jp.getMissingCollections(blockHeight)
