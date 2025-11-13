@@ -354,8 +354,6 @@ type FlowAccessNodeBuilder struct {
 	events                         storage.Events
 	lightTransactionResults        storage.LightTransactionResults
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
-	transactions                   storage.Transactions
-	collections                    storage.Collections
 	scheduledTransactions          storage.ScheduledTransactions
 
 	// The sync engine participants provider is the libp2p peer store for the access node
@@ -582,14 +580,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
-		}).
-		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
-			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
-			collections := store.NewCollections(node.ProtocolDB, transactions)
-			builder.transactions = transactions
-			builder.collections = collections
-
-			return nil
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			var err error
@@ -954,8 +944,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.Storage.RegisterIndex),
 					notNil(builder.Storage.Headers),
 					notNil(builder.events),
-					notNil(builder.collections),
-					notNil(builder.transactions),
+					notNil(builder.Storage.Collections),
+					notNil(builder.Storage.Transactions),
 					notNil(builder.lightTransactionResults),
 					notNil(builder.scheduledTransactions),
 					builder.RootChainID,
@@ -1686,7 +1676,8 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, notNil(builder.collections))
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads,
+			notNil(builder.Storage.Collections))
 	})
 
 	// if this is an access node that supports public followers, enqueue the public network
@@ -1863,7 +1854,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
-				builder.collections,
+				builder.Storage.Collections,
 				builder.Storage.Blocks,
 				builder.BlockTransactions,
 			)
@@ -1955,7 +1946,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.collectionExecutedMetric),
 				node.StorageLockMgr,
 				builder.ProtocolDB,
-				notNil(builder.collections),
+				notNil(builder.Storage.Collections),
 			)
 			return nil
 		}).
@@ -2138,8 +2129,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				HistoricalAccessNodes: notNil(builder.HistoricalAccessRPCs),
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
-				Collections:           notNil(builder.collections),
-				Transactions:          notNil(builder.transactions),
+				Collections:           node.Storage.Collections,
+				Transactions:          node.Storage.Transactions,
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
@@ -2555,7 +2546,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				node.State,
 				node.Me,
 				node.Storage.Blocks,
-				notNil(builder.collections),
+				node.Storage.Collections,
 				node.Storage.Guarantees,
 				builder.ProtocolDB,
 				notNil(builder.blockCollectionIndexer),
