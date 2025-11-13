@@ -2949,7 +2949,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 	t.Parallel()
 
 	ctxOpts := []fvm.Option{
-		fvm.WithScheduleCallbacksEnabled(true),
+		fvm.WithScheduledTransactionsEnabled(true),
 		// use localnet to ensure the scheduled transaction executor account
 		// is created during bootstrap, since testnet is manually created
 		fvm.WithChain(flow.Localnet.Chain()),

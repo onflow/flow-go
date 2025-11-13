@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -169,7 +170,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		systemChunkEvents := data.ChunkExecutionDatas[systemChunkIndex].Events
 		systemChunkResults := data.ChunkExecutionDatas[systemChunkIndex].TransactionResults
 
-		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, systemChunkResults, systemChunkEvents)
+		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, header.Height, systemChunkResults, systemChunkEvents)
 		if err != nil {
 			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
 		}
@@ -316,6 +317,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 func collectScheduledTransactions(
 	fvmEnv templates.Environment,
 	chainID flow.ChainID,
+	height uint64,
 	systemChunkResults []flow.LightTransactionResult,
 	systemChunkEvents []flow.Event,
 ) (map[flow.Identifier]uint64, error) {
@@ -340,9 +342,9 @@ func collectScheduledTransactions(
 
 	// there are 3 possible valid cases:
 	// 1. N (1 or more) scheduled transaction were executed, there should be N + 2 results
-	//    (N scheduled transactions, process callback tx, and the standard system tx)
+	//    (N scheduled transactions, process scheduled transactions tx, and the standard system tx)
 	// 2. 0 scheduled transactions were executed, and scheduled transactions are enabled. there should be 2 results
-	//    (process callback tx, and the standard system tx)
+	//    (process scheduled transactions tx, and the standard system tx)
 	// 3. 0 scheduled transactions were executed, and scheduled transactions are disabled. there should be 1 result
 	//    (the standard system tx)
 	// there is currently no way to determine if scheduled transactions are enabled or disabled, so
@@ -361,11 +363,18 @@ func collectScheduledTransactions(
 	// if there were scheduled transactions, there should be exactly 2 more results than there were
 	// scheduled transactions.
 	if len(scheduledTransactionIDs) != len(systemChunkResults)-2 {
-		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled callbacks", len(systemChunkResults), len(scheduledTransactionIDs))
+		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled transactions", len(systemChunkResults), len(scheduledTransactionIDs))
 	}
 
 	// reconstruct the system collection, and verify that the results match the expected transaction
-	systemCollection, err := blueprints.SystemCollection(chainID.Chain(), pendingExecutionEvents)
+	versionedCollection := systemcollection.Default(chainID)
+	systemCollection, err := versionedCollection.
+		ByHeight(height).
+		SystemCollection(chainID.Chain(),
+			func() (flow.EventsList, error) {
+				return pendingExecutionEvents, nil
+			},
+		)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct system collection: %w", err)
 	}

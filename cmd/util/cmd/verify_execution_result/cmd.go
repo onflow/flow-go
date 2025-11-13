@@ -16,15 +16,15 @@ import (
 )
 
 var (
-	flagLastK                     uint64
-	flagDatadir                   string
-	flagChunkDataPackDir          string
-	flagChain                     string
-	flagFromTo                    string
-	flagWorkerCount               uint // number of workers to verify the blocks concurrently
-	flagStopOnMismatch            bool
-	flagtransactionFeesDisabled   bool
-	flagScheduledCallbacksEnabled bool
+	flagLastK                        uint64
+	flagDatadir                      string
+	flagChunkDataPackDir             string
+	flagChain                        string
+	flagFromTo                       string
+	flagWorkerCount                  uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch               bool
+	flagtransactionFeesDisabled      bool
+	flagScheduledTransactionsEnabled bool
 )
 
 // # verify the last 100 sealed blocks
@@ -60,7 +60,7 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
-	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledCallbacksEnabled, "enable scheduled callbacks")
+	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
 }
 
 func run(*cobra.Command, []string) {
@@ -95,14 +95,14 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(lockManager, from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledCallbacksEnabled)
+		err = verifier.VerifyRange(lockManager, from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledTransactionsEnabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
 		lg.Info().Msgf("finished verified range from %d to %d", from, to)
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(lockManager, flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledCallbacksEnabled)
+		err := verifier.VerifyLastKHeight(lockManager, flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledTransactionsEnabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}

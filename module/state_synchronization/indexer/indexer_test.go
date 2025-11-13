@@ -3,13 +3,14 @@ package indexer
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -175,7 +176,13 @@ func (w *mockProgress) WaitForIndex(n uint64) <-chan struct{} {
 func TestIndexer_Success(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	blocks := g.Blocks().List(10)
-	systemCollection, err := blueprints.SystemCollection(g.ChainID().Chain(), nil)
+
+	systemCollections, err := systemcollection.NewVersioned(g.ChainID().Chain(), systemcollection.Default(g.ChainID()))
+	require.NoError(t, err)
+
+	systemCollection, err := systemCollections.
+		ByHeight(math.MaxUint64). // use the latest version
+		SystemCollection(g.ChainID().Chain(), nil)
 	require.NoError(t, err)
 
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
@@ -213,7 +220,13 @@ func TestIndexer_Success(t *testing.T) {
 func TestIndexer_Failure(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	blocks := g.Blocks().List(10)
-	systemCollection, err := blueprints.SystemCollection(g.ChainID().Chain(), nil)
+
+	systemCollections, err := systemcollection.NewVersioned(g.ChainID().Chain(), systemcollection.Default(g.ChainID()))
+	require.NoError(t, err)
+
+	systemCollection, err := systemCollections.
+		ByHeight(math.MaxUint64). // use the latest version
+		SystemCollection(g.ChainID().Chain(), nil)
 	require.NoError(t, err)
 
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test

@@ -20,41 +20,9 @@ const callbackTransactionGasLimit = flow.DefaultMaxTransactionGasLimit
 //go:embed scripts/issueScheduledTransactionExecutorTemplate.cdc
 var issueScheduledTransactionExecutorTemplate string
 
-// SystemCollection returns the re-created system collection after it has been already executed
-// using the events from the process callback transaction.
-func SystemCollection(chain flow.Chain, processEvents flow.EventsList) (*flow.Collection, error) {
-	process, err := ProcessCallbacksTransaction(chain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct process callbacks transaction: %w", err)
-	}
-
-	executes, err := ExecuteCallbacksTransactions(chain, processEvents)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct execute callbacks transactions: %w", err)
-	}
-
-	systemTx, err := SystemChunkTransaction(chain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
-	}
-
-	transactions := make([]*flow.TransactionBody, 0, len(executes)+2) // +2 process and system tx
-	transactions = append(transactions, process)
-	transactions = append(transactions, executes...)
-	transactions = append(transactions, systemTx)
-
-	collection, err := flow.NewCollection(flow.UntrustedCollection{
-		Transactions: transactions,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct system collection: %w", err)
-	}
-
-	return collection, nil
-}
-
 // ProcessCallbacksTransaction constructs a transaction for processing callbacks, for the given callback.
-// No errors are expected during normal operation.
+//
+// No error returns are expected during normal operation.
 func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	script := templates.GenerateProcessTransactionScript(sc.AsTemplateEnv())
@@ -66,11 +34,13 @@ func ProcessCallbacksTransaction(chain flow.Chain) (*flow.TransactionBody, error
 }
 
 // ExecuteCallbacksTransactions constructs a list of transaction to execute callbacks, for the given chain.
-// No errors are expected during normal operation.
-func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
+//
+// No error returns are expected during normal operation.
+func ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error) {
 	txs := make([]*flow.TransactionBody, 0, len(processEvents))
-	env := systemcontracts.SystemContractsForChain(chainID.ChainID()).AsTemplateEnv()
-	sc := systemcontracts.SystemContractsForChain(chainID.ChainID())
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	env := sc.AsTemplateEnv()
+	script := templates.GenerateSchedulerExecutorTransactionScript(env)
 
 	for _, event := range processEvents {
 		// todo make sure to check event index to ensure order is indeed correct
@@ -86,7 +56,12 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-		tx, err := executeCallbackTransaction(sc, env, id, effort)
+		tx, err := flow.NewTransactionBodyBuilder().
+			AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
+			SetScript(script).
+			AddArgument(id).
+			SetComputeLimit(effort).
+			Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
 		}
@@ -94,22 +69,6 @@ func ExecuteCallbacksTransactions(chainID flow.Chain, processEvents flow.EventsL
 	}
 
 	return txs, nil
-}
-
-func executeCallbackTransaction(
-	sc *systemcontracts.SystemContracts,
-	env templates.Environment,
-	id []byte,
-	effort uint64,
-) (*flow.TransactionBody, error) {
-	script := templates.GenerateSchedulerExecutorTransactionScript(env)
-
-	return flow.NewTransactionBodyBuilder().
-		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
-		SetScript(script).
-		AddArgument(id).
-		SetComputeLimit(effort).
-		Build()
 }
 
 // callbackArgsFromEvent decodes the event payload and returns the callback ID and effort.

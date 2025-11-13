@@ -1,6 +1,7 @@
 package convert_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,7 +11,8 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/model/access/systemcollection"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
@@ -47,7 +49,14 @@ func TestConvertSystemTransaction(t *testing.T) {
 	g := fixtures.NewGeneratorSuite()
 	events := g.PendingExecutionEvents().List(3)
 
-	systemCollection, err := blueprints.SystemCollection(g.ChainID().Chain(), events)
+	systemCollections, err := systemcollection.NewVersioned(g.ChainID().Chain(), systemcollection.Default(g.ChainID()))
+	require.NoError(t, err)
+
+	systemCollection, err := systemCollections.
+		ByHeight(math.MaxUint64). // use the latest version
+		SystemCollection(g.ChainID().Chain(), func() (flow.EventsList, error) {
+			return events, nil
+		})
 	require.NoError(t, err)
 
 	for _, tx := range systemCollection.Transactions {
