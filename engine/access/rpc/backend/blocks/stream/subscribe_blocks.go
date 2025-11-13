@@ -305,7 +305,7 @@ func (s *SubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockStatus) s
 
 // getBlockHeader returns the block header for the given block height.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
+//   - [subscription.ErrBlockNotReady]: Block for the given block height is not available.
 func (s *SubscribeBlocks) getBlockHeader(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Header, error) {
 	err := s.validateHeight(height, expectedBlockStatus)
 	if err != nil {
@@ -326,7 +326,7 @@ func (s *SubscribeBlocks) getBlockHeader(height uint64, expectedBlockStatus flow
 
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
+//   - [subscription.ErrBlockNotReady]: Block for the given block height is not available.
 func (s *SubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
 	err := s.validateHeight(height, expectedBlockStatus)
 	if err != nil {
@@ -347,7 +347,7 @@ func (s *SubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.Block
 
 // validateHeight checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady when unable to retrieve the block by height.
+//   - [subscription.ErrBlockNotReady]: Unable to retrieve the block by height.
 func (s *SubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
 	highestHeight, err := s.blockTracker.GetHighestHeight(expectedBlockStatus)
 	if err != nil {

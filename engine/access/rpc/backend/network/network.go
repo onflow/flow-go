@@ -69,8 +69,8 @@ func (n *Network) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, e
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.DataNotFoundError]: No block with the given ID was found
-//   - [access.InvalidRequestError]: Block ID is for an orphaned block and will never have a valid snapshot
+//   - [access.DataNotFoundError]: No block with the given ID was found.
+//   - [access.InvalidRequestError]: Block ID is for an orphaned block and will never have a valid snapshot.
 //   - [access.PreconditionFailedError]: A block was found, but it is not finalized and is above the finalized height.
 func (n *Network) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
 	snapshot := n.state.AtBlockID(blockID)

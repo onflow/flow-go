@@ -118,7 +118,7 @@ func (b *BlocksBase) GetLatestBlock(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.DataNotFoundError]: No block with the given ID was found
+//   - [access.DataNotFoundError]: No block with the given ID was found.
 func (b *BlocksBase) GetBlockByID(
 	ctx context.Context,
 	id flow.Identifier,
@@ -145,7 +145,7 @@ func (b *BlocksBase) GetBlockByID(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.DataNotFoundError]: No block with the given height was found
+//   - [access.DataNotFoundError]: No block with the given height was found.
 func (b *BlocksBase) GetBlockByHeight(
 	ctx context.Context,
 	height uint64,
@@ -211,7 +211,7 @@ func (b *BlocksBase) GetLatestBlockHeader(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.DataNotFoundError]: No header with the given ID was found
+//   - [access.DataNotFoundError]: No header with the given ID was found.
 func (b *BlocksBase) GetBlockHeaderByID(
 	ctx context.Context,
 	id flow.Identifier,
@@ -238,7 +238,7 @@ func (b *BlocksBase) GetBlockHeaderByID(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.DataNotFoundError]: No header with the given height was found
+//   - [access.DataNotFoundError]: No header with the given height was found.
 func (b *BlocksBase) GetBlockHeaderByHeight(
 	ctx context.Context,
 	height uint64,
