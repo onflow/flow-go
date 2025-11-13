@@ -1960,6 +1960,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return err
 			}
 
+			// TODO: won't work
 			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 			if err != nil {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
@@ -2530,6 +2531,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 			}
 
 			// fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
+
 			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight)
 
 			// skip if execution data sync is enabled
