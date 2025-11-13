@@ -38,4 +38,3 @@ func (c *CollectionSyncCollector) CollectionFetchedHeight(height uint64) {
 func (c *CollectionSyncCollector) CollectionSyncedHeight(height uint64) {
 	c.collectionSyncedHeight.Set(float64(height))
 }
-
