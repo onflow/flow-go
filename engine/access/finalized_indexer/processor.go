@@ -43,6 +43,7 @@ const (
 // mappings, as well as requesting the associated collections.
 type FinalizedBlockProcessor struct {
 	log zerolog.Logger
+	component.Component
 
 	consumer               *jobqueue.ComponentConsumer
 	blockFinalizedNotifier engine.Notifier
@@ -90,6 +91,13 @@ func NewFinalizedBlockProcessor(
 		return nil, fmt.Errorf("error creating finalized block jobqueue: %w", err)
 	}
 
+	// Build component manager with worker loop
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(processor.workerLoop).
+		Build()
+
+	processor.Component = cm
+
 	return processor, nil
 }
 
@@ -99,7 +107,7 @@ func (p *FinalizedBlockProcessor) OnBlockFinalized(_ *model.Block) {
 }
 
 // StartWorkerLoop begins processing of finalized blocks and signals readiness when initialization is complete.
-func (p *FinalizedBlockProcessor) WorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (p *FinalizedBlockProcessor) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	p.consumer.Start(ctx)
 
 	err := util.WaitClosed(ctx, p.consumer.Ready())
