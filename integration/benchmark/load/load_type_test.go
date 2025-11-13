@@ -139,7 +139,6 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 	opts := computation.DefaultFVMOptions(
 		chain.ChainID(),
 		false,
-		false,
 	)
 	opts = append(opts,
 		fvm.WithTransactionFeesEnabled(true),
