@@ -166,5 +166,5 @@ func convertScriptExecutionError(err error) error {
 		}
 	}
 
-	return access.NewInternalError(err)
+	return err
 }

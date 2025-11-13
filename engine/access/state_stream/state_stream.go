@@ -113,7 +113,6 @@ type API interface {
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
-	//
 	// Expected sentinel errors providing details to clients about failed requests:
 	//   - [access.DataNotFoundError]: when data required to process the request is not available.
 	//   - [access.OutOfRangeError]: - if the data for the requested height is outside the node's available range.

@@ -11,13 +11,12 @@ import (
 	"testing"
 
 	mocks "github.com/stretchr/testify/mock"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/model/access"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -64,7 +63,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend := mock.NewAPI(t)
 		blockID := unittest.IdentifierFixture()
 		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -84,7 +83,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		backend := mock.NewAPI(t)
 		height := uint64(1337)
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -103,7 +102,7 @@ func TestScripts_HappyPath(t *testing.T) {
 	t.Run("latest height (legacyParams)", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -126,7 +125,7 @@ func TestScripts_HappyPath(t *testing.T) {
 			Return(finalBlock, flow.BlockStatusFinalized, nil).
 			Once()
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, finalBlock.Height, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return([]byte("hello world"), &access.ExecutorMetadata{}, nil).
+			Return([]byte("hello world"), &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		req := buildScriptRequest(
@@ -142,7 +141,7 @@ func TestScripts_HappyPath(t *testing.T) {
 		router.AssertOKResponse(t, req, expectedResp, backend)
 	})
 
-	metadata := &access.ExecutorMetadata{
+	metadata := &accessmodel.ExecutorMetadata{
 		ExecutionResultID: unittest.IdentifierFixture(),
 		ExecutorIDs:       unittest.IdentifierListFixture(2),
 	}
@@ -221,9 +220,10 @@ func TestScripts_HappyPath(t *testing.T) {
 //
 // Test cases:
 //  1. Invalid script arguments (bad block ID format), expect 400 Bad Request.
-//  2. Backend error when executing at a specific block ID, expect 400 Bad Request.
-//  3. Backend error when executing at a specific block height, expect 400 Bad Request.
-//  4. Backend error when executing at the latest block, expect 400 Bad Request.
+//  2. Backend internal error when executing at a specific block ID, expect 500 Internal Server Error.
+//  3. Backend internal error when executing at a specific block height, expect 500 Internal Server Error.
+//  4. Backend internal error when executing at the latest block, expect 500 Internal Server Error.
+//  5. Backend returns a specific mapped error (DataNotFoundError), expect the corresponding HTTP status (404 Not Found).
 func TestScripts_Errors(t *testing.T) {
 	t.Run("invalid arguments", func(t *testing.T) {
 		backend := mock.NewAPI(t)
@@ -251,10 +251,10 @@ func TestScripts_Errors(t *testing.T) {
 		)
 
 		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
+			Return(nil, &accessmodel.ExecutorMetadata{}, access.NewInternalError(fmt.Errorf("internal server error"))).
 			Once()
 
-		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
+		expectedResp := `{"code":500, "message":"internal error: internal server error"}`
 		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
 	})
 
@@ -269,10 +269,10 @@ func TestScripts_Errors(t *testing.T) {
 		)
 
 		backend.On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}, mocks.Anything).
-			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
+			Return(nil, &accessmodel.ExecutorMetadata{}, access.NewInternalError(fmt.Errorf("internal server error"))).
 			Once()
 
-		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
+		expectedResp := `{"code":500, "message":"internal error: internal server error"}`
 		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
 	})
 
@@ -286,11 +286,30 @@ func TestScripts_Errors(t *testing.T) {
 		)
 
 		backend.On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}, mocks.Anything).
-			Return(nil, &access.ExecutorMetadata{}, status.Error(codes.Internal, "internal server error")).
+			Return(nil, &accessmodel.ExecutorMetadata{}, access.NewInternalError(fmt.Errorf("internal server error"))).
 			Once()
 
-		expectedResp := `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`
+		expectedResp := `{"code":500, "message":"internal error: internal server error"}`
 		router.AssertResponse(t, req, http.StatusInternalServerError, expectedResp, backend)
+	})
+
+	t.Run("backend data not found error", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		blockID := unittest.IdentifierFixture()
+
+		req := buildScriptRequest(
+			requestScriptParams{
+				id:   blockID.String(),
+				body: validBody,
+			},
+		)
+
+		backend.On("ExecuteScriptAtBlockID", mocks.Anything, blockID, validCode, [][]byte{validArgs}, mocks.Anything).
+			Return(nil, &accessmodel.ExecutorMetadata{}, access.NewDataNotFoundError("block", fmt.Errorf("not found"))).
+			Once()
+
+		expectedResp := `{"code":404, "message":"Flow resource not found: data not found for block: not found"}`
+		router.AssertResponse(t, req, http.StatusNotFound, expectedResp, backend)
 	})
 }
 
@@ -327,7 +346,7 @@ func buildScriptRequest(
 // buildScriptResponse builds the expected JSON response for ExecuteScript tests.
 // If metadata is empty, only the value is returned (legacy behavior).
 // Otherwise, the full ExecuteScriptResponse with executor metadata is returned.
-func buildScriptResponse(value []byte, metadata *access.ExecutorMetadata) string {
+func buildScriptResponse(value []byte, metadata *accessmodel.ExecutorMetadata) string {
 	if metadata == nil {
 		// legacyParams: only value is returned
 		return fmt.Sprintf(`"%s"`, base64.StdEncoding.EncodeToString(value))
