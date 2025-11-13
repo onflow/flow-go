@@ -1,4 +1,4 @@
-package backend
+package stream
 
 import (
 	"context"
@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// backendSubscribeBlocks is a struct representing a backend implementation for subscribing to blocks.
-type backendSubscribeBlocks struct {
+// SubscribeBlocks provides functionality for subscribing to blocks, block headers, and block digests.
+type SubscribeBlocks struct {
 	log     zerolog.Logger
 	state   protocol.State
 	blocks  storage.Blocks
@@ -25,6 +25,25 @@ type backendSubscribeBlocks struct {
 
 	subscriptionHandler *subscription.SubscriptionHandler
 	blockTracker        tracker.BlockTracker
+}
+
+// NewSubscribeBlocks creates a new SubscribeBlocks instance.
+func NewSubscribeBlocks(
+	log zerolog.Logger,
+	state protocol.State,
+	headers storage.Headers,
+	blocks storage.Blocks,
+	subscriptionHandler *subscription.SubscriptionHandler,
+	blockTracker tracker.BlockTracker,
+) *SubscribeBlocks {
+	return &SubscribeBlocks{
+		log:                 log,
+		state:               state,
+		headers:             headers,
+		blocks:              blocks,
+		subscriptionHandler: subscriptionHandler,
+		blockTracker:        blockTracker,
+	}
 }
 
 // SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the requested
@@ -41,8 +60,8 @@ type backendSubscribeBlocks struct {
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlocksFromStartBlockID will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromStartBlockID(ctx, startBlockID, b.getBlockResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromStartBlockID(ctx, startBlockID, s.getBlockResponse(blockStatus))
 }
 
 // SubscribeBlocksFromStartHeight subscribes to the finalized or sealed blocks starting at the requested
@@ -59,8 +78,8 @@ func (b *backendSubscribeBlocks) SubscribeBlocksFromStartBlockID(ctx context.Con
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlocksFromStartHeight will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromStartHeight(ctx, startHeight, b.getBlockResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromStartHeight(ctx, startHeight, s.getBlockResponse(blockStatus))
 }
 
 // SubscribeBlocksFromLatest subscribes to the finalized or sealed blocks starting at the latest sealed block,
@@ -76,8 +95,8 @@ func (b *backendSubscribeBlocks) SubscribeBlocksFromStartHeight(ctx context.Cont
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlocksFromLatest will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromLatest(ctx, b.getBlockResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromLatest(ctx, s.getBlockResponse(blockStatus))
 }
 
 // SubscribeBlockHeadersFromStartBlockID streams finalized or sealed block headers starting at the requested
@@ -94,8 +113,8 @@ func (b *backendSubscribeBlocks) SubscribeBlocksFromLatest(ctx context.Context, 
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlockHeadersFromStartBlockID will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromStartBlockID(ctx, startBlockID, b.getBlockHeaderResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromStartBlockID(ctx, startBlockID, s.getBlockHeaderResponse(blockStatus))
 }
 
 // SubscribeBlockHeadersFromStartHeight streams finalized or sealed block headers starting at the requested
@@ -112,8 +131,8 @@ func (b *backendSubscribeBlocks) SubscribeBlockHeadersFromStartBlockID(ctx conte
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlockHeadersFromStartHeight will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromStartHeight(ctx, startHeight, b.getBlockHeaderResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromStartHeight(ctx, startHeight, s.getBlockHeaderResponse(blockStatus))
 }
 
 // SubscribeBlockHeadersFromLatest streams finalized or sealed block headers starting at the latest sealed block,
@@ -129,8 +148,8 @@ func (b *backendSubscribeBlocks) SubscribeBlockHeadersFromStartHeight(ctx contex
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlockHeadersFromLatest will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromLatest(ctx, b.getBlockHeaderResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromLatest(ctx, s.getBlockHeaderResponse(blockStatus))
 }
 
 // SubscribeBlockDigestsFromStartBlockID streams finalized or sealed lightweight block starting at the requested
@@ -147,8 +166,8 @@ func (b *backendSubscribeBlocks) SubscribeBlockHeadersFromLatest(ctx context.Con
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlockDigestsFromStartBlockID will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromStartBlockID(ctx, startBlockID, b.getBlockDigestResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromStartBlockID(ctx, startBlockID, s.getBlockDigestResponse(blockStatus))
 }
 
 // SubscribeBlockDigestsFromStartHeight streams finalized or sealed lightweight block starting at the requested
@@ -165,8 +184,8 @@ func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromStartBlockID(ctx conte
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlockDigestsFromStartHeight will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromStartHeight(ctx, startHeight, b.getBlockDigestResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromStartHeight(ctx, startHeight, s.getBlockDigestResponse(blockStatus))
 }
 
 // SubscribeBlockDigestsFromLatest streams finalized or sealed lightweight block starting at the latest sealed block,
@@ -182,8 +201,8 @@ func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromStartHeight(ctx contex
 // - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // If invalid parameters will be supplied SubscribeBlockDigestsFromLatest will return a failed subscription.
-func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribeFromLatest(ctx, b.getBlockDigestResponse(blockStatus))
+func (s *SubscribeBlocks) SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
+	return s.subscribeFromLatest(ctx, s.getBlockDigestResponse(blockStatus))
 }
 
 // subscribeFromStartBlockID is common method that allows clients to subscribe starting at the requested start block id.
@@ -194,12 +213,12 @@ func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromLatest(ctx context.Con
 // - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
 //
 // If invalid parameters are supplied, subscribeFromStartBlockID will return a failed subscription.
-func (b *backendSubscribeBlocks) subscribeFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
+func (s *SubscribeBlocks) subscribeFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, getData subscription.GetDataByHeightFunc) subscription.Subscription {
+	nextHeight, err := s.blockTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
+	return s.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromStartHeight is common method that allows clients to subscribe starting at the requested start block height.
@@ -210,12 +229,12 @@ func (b *backendSubscribeBlocks) subscribeFromStartBlockID(ctx context.Context, 
 // - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
 //
 // If invalid parameters are supplied, subscribeFromStartHeight will return a failed subscription.
-func (b *backendSubscribeBlocks) subscribeFromStartHeight(ctx context.Context, startHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	nextHeight, err := b.blockTracker.GetStartHeightFromHeight(startHeight)
+func (s *SubscribeBlocks) subscribeFromStartHeight(ctx context.Context, startHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
+	nextHeight, err := s.blockTracker.GetStartHeightFromHeight(startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
+	return s.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromLatest is common method that allows clients to subscribe starting at the latest sealed block.
@@ -225,23 +244,23 @@ func (b *backendSubscribeBlocks) subscribeFromStartHeight(ctx context.Context, s
 // - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
 //
 // No errors are expected during normal operation.
-func (b *backendSubscribeBlocks) subscribeFromLatest(ctx context.Context, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	nextHeight, err := b.blockTracker.GetStartHeightFromLatest(ctx)
+func (s *SubscribeBlocks) subscribeFromLatest(ctx context.Context, getData subscription.GetDataByHeightFunc) subscription.Subscription {
+	nextHeight, err := s.blockTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from latest")
 	}
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
+	return s.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // getBlockResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
-func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
+func (s *SubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(_ context.Context, height uint64) (interface{}, error) {
-		block, err := b.getBlock(height, blockStatus)
+		block, err := s.getBlock(height, blockStatus)
 		if err != nil {
 			return nil, err
 		}
 
-		b.log.Trace().
+		s.log.Trace().
 			Hex("block_id", logging.ID(block.ID())).
 			Uint64("height", height).
 			Msgf("sending block info")
@@ -251,14 +270,14 @@ func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) 
 }
 
 // getBlockHeaderResponse returns a GetDataByHeightFunc that retrieves block header information for the specified height.
-func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
+func (s *SubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(_ context.Context, height uint64) (interface{}, error) {
-		header, err := b.getBlockHeader(height, blockStatus)
+		header, err := s.getBlockHeader(height, blockStatus)
 		if err != nil {
 			return nil, err
 		}
 
-		b.log.Trace().
+		s.log.Trace().
 			Hex("block_id", logging.ID(header.ID())).
 			Uint64("height", height).
 			Msgf("sending block header info")
@@ -268,14 +287,14 @@ func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockSt
 }
 
 // getBlockDigestResponse returns a GetDataByHeightFunc that retrieves lightweight block information for the specified height.
-func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
+func (s *SubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(_ context.Context, height uint64) (interface{}, error) {
-		header, err := b.getBlockHeader(height, blockStatus)
+		header, err := s.getBlockHeader(height, blockStatus)
 		if err != nil {
 			return nil, err
 		}
 
-		b.log.Trace().
+		s.log.Trace().
 			Hex("block_id", logging.ID(header.ID())).
 			Uint64("height", height).
 			Msgf("sending lightweight block info")
@@ -286,15 +305,15 @@ func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockSt
 
 // getBlockHeader returns the block header for the given block height.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
-func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Header, error) {
-	err := b.validateHeight(height, expectedBlockStatus)
+//   - [subscription.ErrBlockNotReady]: Block for the given block height is not available.
+func (s *SubscribeBlocks) getBlockHeader(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Header, error) {
+	err := s.validateHeight(height, expectedBlockStatus)
 	if err != nil {
 		return nil, err
 	}
 
 	// since we are querying a finalized or sealed block header, we can use the height index and save an ID computation
-	header, err := b.headers.ByHeight(height)
+	header, err := s.headers.ByHeight(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("failed to retrieve block header for height %d: %w", height, subscription.ErrBlockNotReady)
@@ -307,15 +326,15 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
-func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
-	err := b.validateHeight(height, expectedBlockStatus)
+//   - [subscription.ErrBlockNotReady]: Block for the given block height is not available.
+func (s *SubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
+	err := s.validateHeight(height, expectedBlockStatus)
 	if err != nil {
 		return nil, err
 	}
 
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
-	block, err := b.blocks.ByHeight(height)
+	block, err := s.blocks.ByHeight(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("failed to retrieve block for height %d: %w", height, subscription.ErrBlockNotReady)
@@ -328,9 +347,9 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 
 // validateHeight checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady when unable to retrieve the block by height.
-func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
-	highestHeight, err := b.blockTracker.GetHighestHeight(expectedBlockStatus)
+//   - [subscription.ErrBlockNotReady]: Unable to retrieve the block by height.
+func (s *SubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
+	highestHeight, err := s.blockTracker.GetHighestHeight(expectedBlockStatus)
 	if err != nil {
 		return fmt.Errorf("could not get highest available height: %w", err)
 	}

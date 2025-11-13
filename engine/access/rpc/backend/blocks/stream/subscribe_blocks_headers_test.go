@@ -1,4 +1,4 @@
-package backend
+package stream_test
 
 import (
 	"context"
@@ -16,48 +16,48 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type BackendBlockHeadersSuite struct {
+type BackendBlocksHeadersSuite struct {
 	BackendBlocksSuite
 }
 
-func TestBackendBlockHeadersSuite(t *testing.T) {
-	suite.Run(t, new(BackendBlockHeadersSuite))
+func TestBackendBlocksHeadersSuite(t *testing.T) {
+	suite.Run(t, new(BackendBlocksHeadersSuite))
 }
 
 // SetupTest initializes the test suite with required dependencies.
-func (s *BackendBlockHeadersSuite) SetupTest() {
+func (s *BackendBlocksHeadersSuite) SetupTest() {
 	s.BackendBlocksSuite.SetupTest()
 }
 
-// TestSubscribeBlockHeadersFromStartBlockID tests the SubscribeBlockHeadersFromStartBlockID method.
-func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
+// TestSubscribeBlocksHeadersFromStartBlockID tests the SubscribeBlockHeadersFromStartBlockID method.
+func (s *BackendBlocksHeadersSuite) TestSubscribeBlocksHeadersFromStartBlockID() {
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockHeaders, s.subscribeFromStartBlockIdTestCases())
+	s.subscribe(call, s.requireBlocksHeaders, s.subscribeFromStartBlockIdTestCases())
 }
 
-// TestSubscribeBlockHeadersFromStartHeight tests the SubscribeBlockHeadersFromStartHeight method.
-func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
+// TestSubscribeBlocksHeadersFromStartHeight tests the SubscribeBlockHeadersFromStartHeight method.
+func (s *BackendBlocksHeadersSuite) TestSubscribeBlocksHeadersFromStartHeight() {
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockHeaders, s.subscribeFromStartHeightTestCases())
+	s.subscribe(call, s.requireBlocksHeaders, s.subscribeFromStartHeightTestCases())
 }
 
-// TestSubscribeBlockHeadersFromLatest tests the SubscribeBlockHeadersFromLatest method.
-func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromLatest() {
+// TestSubscribeBlocksHeadersFromLatest tests the SubscribeBlockHeadersFromLatest method.
+func (s *BackendBlocksHeadersSuite) TestSubscribeBlocksHeadersFromLatest() {
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromLatest(ctx, blockStatus)
 	}
 
-	s.subscribe(call, s.requireBlockHeaders, s.subscribeFromLatestTestCases())
+	s.subscribe(call, s.requireBlocksHeaders, s.subscribeFromLatestTestCases())
 }
 
-// requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBlock *flow.Block) {
+// requireBlocksHeaders ensures that the received block header information matches the expected data.
+func (s *BackendBlocksHeadersSuite) requireBlocksHeaders(v interface{}, expectedBlock *flow.Block) {
 	actualHeader, ok := v.(*flow.Header)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
@@ -66,7 +66,7 @@ func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBl
 	s.Require().Equal(*expectedBlock.ToHeader(), *actualHeader)
 }
 
-// TestSubscribeBlockHeadersHandlesErrors tests error handling scenarios for the SubscribeBlockHeadersFromStartBlockID and SubscribeBlockHeadersFromStartHeight methods in the Backend.
+// TestSubscribeBlocksHeadersHandlesErrors tests error handling scenarios for the SubscribeBlockHeadersFromStartBlockID and SubscribeBlockHeadersFromStartHeight methods in the Backend.
 // It ensures that the method correctly returns errors for various invalid input cases.
 //
 // Test Cases:
@@ -81,12 +81,11 @@ func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBl
 //   - Tests that subscribing to block headers with an unindexed start height results in a NotFound error.
 //
 // Each test case checks for specific error conditions and ensures that the methods responds appropriately.
-func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
+func (s *BackendBlocksHeadersSuite) TestSubscribeBlocksHeadersHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	backend, err := New(s.backendParams(engine.NewBroadcaster()))
-	s.Require().NoError(err)
+	backend := s.createSubscribeBlocks(engine.NewBroadcaster())
 
 	s.Run("returns error for unknown start block id is provided", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
