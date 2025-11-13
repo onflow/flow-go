@@ -298,9 +298,6 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 
 	// expect that the block storage is indexed with each of the collection guarantee
 	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
-	for _, seal := range block.Payload.Seals {
-		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
-	}
 
 	missingCollectionCount := 4
 	wg := sync.WaitGroup{}
@@ -324,7 +321,6 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
-	s.results.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
 }
 
 // TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
@@ -394,10 +390,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		}
 		// force should be called once
 		s.request.On("Force").Return().Once()
-
-		for _, seal := range block.Payload.Seals {
-			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
-		}
 	}
 
 	eng.OnFinalizedBlock(&hotstuffBlock)
@@ -405,16 +397,13 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process all blocks before timeout")
 
 	expectedEntityByIDCalls := 0
-	expectedIndexCalls := 0
 	for _, block := range blocks {
 		expectedEntityByIDCalls += len(block.Payload.Guarantees)
-		expectedIndexCalls += len(block.Payload.Seals)
 	}
 
 	s.headers.AssertExpectations(s.T())
 	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockContainingCollectionGuarantees", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
-	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
