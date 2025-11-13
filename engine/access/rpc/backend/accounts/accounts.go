@@ -118,7 +118,7 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -168,7 +168,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -214,7 +214,7 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 		case errors.Is(err, storage.ErrNotFound):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return 0, nil, access.NewDataNotFoundError("execution receipts", err)
+			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return 0, nil, access.RequireNoError(ctx, err)
 		}
@@ -264,7 +264,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 		case errors.Is(err, storage.ErrNotFound):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return 0, nil, access.NewDataNotFoundError("execution receipts", err)
+			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return 0, nil, access.RequireNoError(ctx, err)
 		}
@@ -314,7 +314,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -365,7 +365,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -414,7 +414,7 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -464,7 +464,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
-			return nil, nil, access.NewDataNotFoundError("execution receipts", err)
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
