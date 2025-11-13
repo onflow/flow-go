@@ -142,7 +142,6 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		nil,
 		s.chain.ChainID(),
 		derivedChainData,
-		nil,
 		metrics.NewNoopCollector(),
 		lockManager,
 	)

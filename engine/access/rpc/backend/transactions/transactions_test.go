@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access/validator"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -44,6 +45,17 @@ import (
 
 func TestTransactionsBackend(t *testing.T) {
 	suite.Run(t, new(Suite))
+}
+
+// progressReaderAdapter adapts a PersistentStrictMonotonicCounter to implement collection_sync.ProgressReader
+type progressReaderAdapter struct {
+	counter *counters.PersistentStrictMonotonicCounter
+}
+
+var _ collection_sync.ProgressReader = (*progressReaderAdapter)(nil)
+
+func (p *progressReaderAdapter) ProcessedHeight() uint64 {
+	return p.counter.Value()
 }
 
 type Suite struct {
@@ -187,7 +199,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 
 	txStatusDeriver := txstatus.NewTxStatusDeriver(
 		suite.state,
-		suite.lastFullBlockHeight,
+		&progressReaderAdapter{counter: suite.lastFullBlockHeight},
 	)
 
 	validatorBlocks := validator.NewProtocolStateBlocks(suite.state, suite.indexReporter)
