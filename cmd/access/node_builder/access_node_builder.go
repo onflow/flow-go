@@ -1722,10 +1722,6 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
-	var fetchAndIndexedCollectionsBlockHeight storage.ConsumerProgressInitializer
-	var syncAndIndexedCollectionsBlockHeight storage.ConsumerProgressInitializer
-
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
@@ -1734,7 +1730,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.IndexerDependencies.Add(versionControlDependable)
 	stopControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(stopControlDependable)
-	var lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	var lastFullBlockHeight counters.Reader
+	var collectionIndexedHeight storage.ConsumerProgress
 
 	builder.
 		BuildConsensusFollower().
@@ -1946,12 +1943,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 			return nil
 		}).
-		Module("block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedFinalizedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
-			fetchAndIndexedCollectionsBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
-			syncAndIndexedCollectionsBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight)
-			return nil
-		}).
 		Module("block collection indexer", func(node *cmd.NodeConfig) error {
 			builder.blockCollectionIndexer = fetcher.NewBlockCollectionIndexer(
 				notNil(builder.collectionExecutedMetric),
@@ -1973,6 +1964,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
 			}
+
+			collectionIndexedHeight = progress
 
 			return nil
 		}).
@@ -2234,18 +2227,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				useIndex,
 			)
 
-			// Initialize processed height
-			rootBlockHeight := node.State.Params().FinalizedRoot().Height
-			processedHeight, err := syncAndIndexedCollectionsBlockHeight.Initialize(rootBlockHeight)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize processed height: %w", err)
-			}
-
 			// Create execution data processor
 			executionDataProcessor, err := collection_syncfactory.CreateExecutionDataProcessor(
 				notNil(builder.ExecutionDataCache),
 				executionDataTracker,
-				processedHeight,
+				collectionIndexedHeight,
 				notNil(builder.blockCollectionIndexer),
 			)
 			if err != nil {
@@ -2264,65 +2250,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		})
 	}
 
-	builder.Component("finalized block indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedBlockProcessor, err := finalized_indexer.NewFinalizedBlockProcessor(
-			node.Logger,
-			node.State,
-			node.Storage.Blocks,
-			processedFinalizedBlockHeight,
-			notNil(builder.collectionExecutedMetric),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not create finalized block processor: %w", err)
-		}
-
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(finalizedBlockProcessor.OnBlockFinalized)
-
-		return finalizedBlockProcessor, nil
-	})
-
-	builder.Component("ingest receipt", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return ingest_receipt.New(
-			node.Logger,
-			node.EngineRegistry,
-			node.Storage.Receipts,
-			notNil(builder.collectionExecutedMetric),
-		)
-	})
-
-	builder.Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// skip if execution data sync is enabled
-		// Create syncer and requesterEng
-		requesterEng, syncer, err := factory.CreateSyncer(
-			node.Logger,
-			node.EngineRegistry,
-			node.State,
-			node.Me,
-			node.Storage.Blocks,
-			notNil(builder.collections),
-			node.Storage.Guarantees,
-			builder.ProtocolDB,
-			notNil(builder.blockCollectionIndexer),
-			fetchAndIndexedCollectionsBlockHeight,
-			notNil(builder.collectionExecutedMetric),
-			collection_syncfactory.CreateSyncerConfig{
-				MaxProcessing:  10, // TODO: make configurable
-				MaxSearchAhead: 0,  // TODO: make configurable
-			},
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not create collection syncer: %w", err)
-		}
-
-		builder.CollectionRequesterEngine = requesterEng
-
-		return syncer, nil
-	})
-
-	builder.Component("collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return builder.CollectionRequesterEngine, nil
-	})
+	builder.Component("finalized block indexer", createFinalizedBlockIndexer(builder))
+	builder.Component("ingest receipt", createIngestReceiptEngine(builder))
+	createCollectionSyncFetcher(builder)
 
 	if builder.storeTxResultErrorMessages {
 		var txResultErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
@@ -2568,6 +2498,86 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
+}
+
+func createFinalizedBlockIndexer(builder *FlowAccessNodeBuilder) func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	return func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		processedFinalizedBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
+
+		finalizedBlockProcessor, err := finalized_indexer.NewFinalizedBlockProcessor(
+			node.Logger,
+			node.State,
+			node.Storage.Blocks,
+			processedFinalizedBlockHeight,
+			notNil(builder.collectionExecutedMetric),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create finalized block processor: %w", err)
+		}
+
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(finalizedBlockProcessor.OnBlockFinalized)
+
+		return finalizedBlockProcessor, nil
+	}
+}
+
+func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
+	builder.
+		Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if builder.executionDataSyncEnabled {
+				// skip if execution data sync is enabled
+				return &module.NoopReadyDoneAware{}, nil
+			}
+
+			// fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
+			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight)
+
+			// skip if execution data sync is enabled
+			// Create syncer and requesterEng
+			requesterEng, syncer, err := factory.CreateSyncer(
+				node.Logger,
+				node.EngineRegistry,
+				node.State,
+				node.Me,
+				node.Storage.Blocks,
+				notNil(builder.collections),
+				node.Storage.Guarantees,
+				builder.ProtocolDB,
+				notNil(builder.blockCollectionIndexer),
+				fetchAndIndexedCollectionsBlockHeight,
+				notNil(builder.collectionExecutedMetric),
+				collection_syncfactory.CreateSyncerConfig{
+					MaxProcessing:  10, // TODO: make configurable
+					MaxSearchAhead: 20, // TODO: make configurable
+				},
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create collection syncer: %w", err)
+			}
+
+			builder.CollectionRequesterEngine = requesterEng
+
+			return syncer, nil
+		}).
+		Component("collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if builder.executionDataSyncEnabled {
+				return &module.NoopReadyDoneAware{}, nil
+			}
+			return builder.CollectionRequesterEngine, nil
+		})
+
+}
+
+func createIngestReceiptEngine(builder *FlowAccessNodeBuilder) func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	return func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return ingest_receipt.New(
+			node.Logger,
+			node.EngineRegistry,
+			node.Storage.Receipts,
+			notNil(builder.collectionExecutedMetric),
+		)
+	}
 }
 
 // notNil ensures that the input is not nil and returns it

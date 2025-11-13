@@ -9,10 +9,10 @@ import (
 
 type TxStatusDeriver struct {
 	state               protocol.State
-	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lastFullBlockHeight counters.Reader
 }
 
-func NewTxStatusDeriver(state protocol.State, lastFullBlockHeight *counters.PersistentStrictMonotonicCounter) *TxStatusDeriver {
+func NewTxStatusDeriver(state protocol.State, lastFullBlockHeight counters.Reader) *TxStatusDeriver {
 	return &TxStatusDeriver{
 		state:               state,
 		lastFullBlockHeight: lastFullBlockHeight,

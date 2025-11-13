@@ -113,7 +113,8 @@ type Params struct {
 	EventsIndex                *index.EventsIndex
 	TxResultQueryMode          query_mode.IndexQueryMode
 	TxResultsIndex             *index.TransactionResultsIndex
-	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
+	CollectionIndexedHeight    storage.ConsumerProgress
+	LastFullBlockHeight        counters.Reader
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
