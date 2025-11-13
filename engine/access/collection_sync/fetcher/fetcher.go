@@ -91,13 +91,15 @@ func NewFetcher(
 		metrics:      metrics,
 	}
 
-	// Set up post-notifier to update metrics when a job is done
-	if metrics != nil {
-		consumer.SetPostNotifier(func(jobID module.JobID) {
-			height := f.ProcessedHeight()
-			metrics.CollectionFetchedHeight(height)
-		})
+	if metrics == nil {
+		return nil, fmt.Errorf("collection sync metrics not provided")
 	}
+
+	// Set up post-notifier to update metrics when a job is done
+	consumer.SetPostNotifier(func(jobID module.JobID) {
+		height := f.ProcessedHeight()
+		metrics.CollectionFetchedHeight(height)
+	})
 
 	return f, nil
 }
