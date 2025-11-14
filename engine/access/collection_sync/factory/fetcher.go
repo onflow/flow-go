@@ -46,7 +46,7 @@ type CreateFetcherConfig struct {
 //   - collectionSyncMetrics: Optional metrics collector for tracking collection sync progress
 //   - config: Configuration for the fetcher
 //
-// Returns both the Fetcher and JobProcessor so they can be reused in other components.
+// Returns both the Fetcher and BlockProcessor so they can be reused in other components.
 //
 // No error returns are expected during normal operation.
 func CreateFetcher(
@@ -90,8 +90,8 @@ func CreateFetcher(
 		guarantees,
 	)
 
-	// Create JobProcessor
-	jobProcessor := fetcher.NewJobProcessor(
+	// Create BlockProcessor
+	blockProcessor := fetcher.NewBlockProcessor(
 		log.With().Str("component", "coll_sync_fetcher").Logger(),
 		mcq,
 		indexer,
@@ -107,8 +107,8 @@ func CreateFetcher(
 			return
 		}
 
-		// Forward collection to JobProcessor, which handles MCQ, indexing, and completion
-		err := jobProcessor.OnReceiveCollection(originID, collection)
+		// Forward collection to BlockProcessor, which handles MCQ, indexing, and completion
+		err := blockProcessor.OnReceiveCollection(originID, collection)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to process received collection")
 			return
@@ -118,7 +118,7 @@ func CreateFetcher(
 	// Create Fetcher
 	collectionFetcher, err := fetcher.NewFetcher(
 		log,
-		jobProcessor,
+		blockProcessor,
 		processedFinalizedBlockHeight,
 		state,
 		blocks,

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -35,8 +34,8 @@ type BlockCollectionIndexer interface {
 }
 
 // Implements the job lifecycle for a single block height.
-type JobProcessor interface {
-	ProcessJobConcurrently(ctx irrecoverable.SignalerContext, job module.Job, done func()) error
+type BlockProcessor interface {
+	FetchCollections(ctx irrecoverable.SignalerContext, block *flow.Block, done func()) error
 }
 
 // Fetcher is a component that consumes finalized block jobs and processes them

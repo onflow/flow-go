@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -20,10 +21,12 @@ import (
 type Fetcher struct {
 	component.Component
 
-	consumer     *jobqueue.ComponentConsumer
-	jobProcessor collection_sync.JobProcessor
-	workSignal   engine.Notifier
-	metrics      module.CollectionSyncMetrics
+	consumer           *jobqueue.ComponentConsumer
+	jobProcessor       collection_sync.BlockProcessor
+	workSignal         engine.Notifier
+	metrics            module.CollectionSyncMetrics
+	lastReportedMu     sync.Mutex
+	lastReportedHeight uint64
 }
 
 var _ collection_sync.Fetcher = (*Fetcher)(nil)
@@ -34,7 +37,7 @@ var _ component.Component = (*Fetcher)(nil)
 //
 // Parameters:
 //   - log: Logger for the component
-//   - jobProcessor: JobProcessor implementation for processing collection indexing jobs
+//   - jobProcessor: BlockProcessor implementation for processing collection indexing jobs
 //   - progressInitializer: Initializer for tracking processed block heights
 //   - state: Protocol state for reading finalized block information
 //   - blocks: Blocks storage for reading blocks by height
@@ -45,7 +48,7 @@ var _ component.Component = (*Fetcher)(nil)
 // No error returns are expected during normal operation.
 func NewFetcher(
 	log zerolog.Logger,
-	jobProcessor collection_sync.JobProcessor,
+	jobProcessor collection_sync.BlockProcessor,
 	progressInitializer storage.ConsumerProgressInitializer,
 	state protocol.State,
 	blocks storage.Blocks,
@@ -59,11 +62,18 @@ func NewFetcher(
 	defaultIndex := state.Params().FinalizedRoot().Height
 
 	// Create a Jobs instance that reads finalized blocks by height
+	// each job is a finalized block
 	jobs := jobqueue.NewFinalizedBlockReader(state, blocks)
 
-	// Create an adapter function that wraps the JobProcessor interface
+	// Create an adapter function that wraps the BlockProcessor interface
 	processorFunc := func(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
-		err := jobProcessor.ProcessJobConcurrently(ctx, job, done)
+		// Convert job to block
+		block, err := jobs.ConvertJobToBlock(job)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("could not convert job to block: %w", err))
+			return
+		}
+		err = jobProcessor.FetchCollections(ctx, block, done)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to process collection indexing job: %w", err))
 		}
@@ -96,9 +106,19 @@ func NewFetcher(
 	}
 
 	// Set up post-notifier to update metrics when a job is done
+	// Only update metrics when the processed height actually changes, since processedIndex
+	// only advances when consecutive jobs complete, not on every individual job completion.
 	consumer.SetPostNotifier(func(jobID module.JobID) {
 		height := f.ProcessedHeight()
-		metrics.CollectionFetchedHeight(height)
+
+		f.lastReportedMu.Lock()
+		if height > f.lastReportedHeight {
+			f.lastReportedHeight = height
+			f.lastReportedMu.Unlock()
+			metrics.CollectionFetchedHeight(height)
+		} else {
+			f.lastReportedMu.Unlock()
+		}
 	})
 
 	return f, nil
