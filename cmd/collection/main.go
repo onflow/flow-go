@@ -435,12 +435,12 @@ func main() {
 				node.Storage.Headers,
 				node.LastFinalizedHeader,
 				core,
+				followerDistributor,
 				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
