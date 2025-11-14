@@ -152,9 +152,6 @@ func NewBalanceReporter(
 		snapshot,
 	)
 
-	runtime := environment.NewRuntime(ctx.RuntimeParams)
-	runtime.SetFvmEnvironment(env)
-
 	return &balanceProcessor{
 		vm:              vm,
 		ctx:             ctx,
