@@ -109,7 +109,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		rbRector:          rbRector,
 		onQCCreated:       f.onQCCreated,
 		packer:            f.packer,
-		votesCache:        NewVotesCache(block.View),
+		votesCache:        NewConcurrentIdentifierSet(),
 		minRequiredWeight: minRequiredWeight,
 		done:              *atomic.NewBool(false),
 	}, nil
@@ -131,7 +131,7 @@ type CombinedVoteProcessorV3 struct {
 	rbRector          hotstuff.RandomBeaconReconstructor
 	onQCCreated       hotstuff.OnQCCreated
 	packer            hotstuff.Packer
-	votesCache        *VotesCache
+	votesCache        *ConcurrentIdentifierSet
 	minRequiredWeight uint64
 	done              atomic.Bool
 }
@@ -157,8 +157,6 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 //   - [VoteForIncompatibleViewError] - submitted vote for incompatible view
 //   - [model.InvalidVoteError] - submitted vote with invalid signature
 //   - [model.DuplicatedSignerError] - vote from a signer whose vote was previously already processed
-//   - [model.DoubleVoteError] - indicates that the voter has equivocated and submitted different votes for the same view.
-//     (i.e. voting in the same view for different blocks or using different voting schemas).
 //
 // All other errors should be treated as exceptions.
 //
@@ -169,6 +167,11 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
 // by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
+	err := EnsureVoteForBlock(vote, p.block)
+	if err != nil {
+		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
+	}
+
 	// Add vote to a local cache to track repeated and double votes before processing them by specific aggregators.
 	// Since consensus committee member can provide vote in two forms: a staking signature and a random beacon signature
 	// this leads to a situation where we first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
@@ -188,20 +191,13 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	// Since all honest replicas must provide valid votes at all times then this behavior of producing one invalid and one valid vote
 	// is accounted for byzantine behavior and affects the liveness threshold _f_ of the consensus algorithm.
 	// If this component receives _f+1_ invalid votes then we won't be able to produce a QC for this particular view.
-	if err := p.votesCache.AddVote(vote); err != nil {
-		if errors.Is(err, RepeatedVoteErr) {
-			return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
-		}
-		return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
+	if !p.votesCache.Add(vote.SignerID) {
+		return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
 	}
 
 	// in order to catch all cases of vote equivocation we are first adding the vote to the cache and only after
 	// we ensure that indeed the vote is for designated vote processor, otherwise we won't be able to track equivocation
 	// cases where replica voted for two different block IDs in the same view.
-	err := EnsureVoteForBlock(vote, p.block)
-	if err != nil {
-		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
-	}
 
 	// Vote Processing state machine
 	if p.done.Load() {

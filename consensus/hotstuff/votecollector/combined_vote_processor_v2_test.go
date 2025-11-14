@@ -84,7 +84,7 @@ func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 		onQCCreated:       s.onQCCreated,
 		packer:            s.packer,
 		minRequiredWeight: s.minRequiredWeight,
-		votesCache:        NewVotesCache(s.proposal.Block.View),
+		votesCache:        NewConcurrentIdentifierSet(),
 		done:              *atomic.NewBool(false),
 	}
 }
@@ -304,7 +304,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 			rbRector:          rbReconstructor,
 			onQCCreated:       s.onQCCreated,
 			packer:            packer,
-			votesCache:        NewVotesCache(s.proposal.Block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			minRequiredWeight: s.minRequiredWeight,
 			done:              *atomic.NewBool(false),
 		}
@@ -563,7 +563,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			rbRector:          reconstructor,
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
-			votesCache:        NewVotesCache(block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			minRequiredWeight: minRequiredWeight,
 			done:              *atomic.NewBool(false),
 		}
@@ -716,7 +716,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 			rbRector:          reconstructor,
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
-			votesCache:        NewVotesCache(block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			minRequiredWeight: minRequiredWeight,
 			done:              *atomic.NewBool(false),
 		}

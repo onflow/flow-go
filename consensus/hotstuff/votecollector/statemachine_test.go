@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -42,7 +43,7 @@ func (s *StateMachineTestSuite) TearDownTest() {
 	// Without this line we are risking running into weird situations where one test has finished but there are active workers
 	// that are executing some work on the shared pool. Need to ensure that all pending work has been executed before
 	// starting next test.
-	s.workerPool.StopWait()
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
 func (s *StateMachineTestSuite) SetupTest() {
@@ -216,7 +217,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
-	s.workerPool.StopWait()
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 	processor.AssertExpectations(s.T())
 }
 
@@ -254,7 +255,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ErrorHandlingOfCachedVotes() {
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
-	s.workerPool.StopWait()
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 	processor.AssertExpectations(s.T())
 }
 

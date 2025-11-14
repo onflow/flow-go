@@ -3,6 +3,8 @@ package votecollector
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
+	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -42,4 +44,25 @@ func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 		return fmt.Errorf("expecting only votes for block %v, but vote %v is for block %v: %w ", block.BlockID, vote.ID(), vote.BlockID, VoteForIncompatibleBlockError)
 	}
 	return nil
+}
+
+type ConcurrentIdentifierSet struct {
+	set  map[flow.Identifier]struct{}
+	lock sync.RWMutex
+}
+
+func NewConcurrentIdentifierSet() *ConcurrentIdentifierSet {
+	return &ConcurrentIdentifierSet{
+		set: make(map[flow.Identifier]struct{}),
+	}
+}
+
+func (s *ConcurrentIdentifierSet) Add(identifier flow.Identifier) bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	_, exists := s.set[identifier]
+	if exists {
+		return false
+	}
+	return true
 }

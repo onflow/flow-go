@@ -98,7 +98,7 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 		onQCCreated:       s.onQCCreated,
 		packer:            s.packer,
 		minRequiredWeight: s.minRequiredWeight,
-		votesCache:        NewVotesCache(s.proposal.Block.View),
+		votesCache:        NewConcurrentIdentifierSet(),
 		done:              *atomic.NewBool(false),
 	}
 }
@@ -297,7 +297,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 			onQCCreated:       s.onQCCreated,
 			packer:            packer,
 			minRequiredWeight: s.minRequiredWeight,
-			votesCache:        NewVotesCache(s.proposal.Block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 	}
@@ -615,7 +615,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			votesCache:        NewVotesCache(block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 
@@ -716,7 +716,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 		onQCCreated:       func(qc *flow.QuorumCertificate) { /* no op */ },
 		packer:            packer,
 		minRequiredWeight: 70,
-		votesCache:        NewVotesCache(block.View),
+		votesCache:        NewConcurrentIdentifierSet(),
 		done:              *atomic.NewBool(false),
 	}
 
@@ -857,7 +857,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			votesCache:        NewVotesCache(block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 

@@ -86,17 +86,12 @@ func NewStateMachine(
 // Under normal execution only exceptions are propagated to caller.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
-	err := m.votesCache.AddVote(vote)
+	unique, err := m.ensureVoteUnique(vote)
 	if err != nil {
-		if errors.Is(err, RepeatedVoteErr) {
-			return nil
-		}
-		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
-			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
-			return nil
-		}
-		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
-			vote.ID(), vote.BlockID, err)
+		return err
+	}
+	if !unique {
+		return nil
 	}
 
 	err = m.processVote(vote)
@@ -121,6 +116,22 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			vote.ID(), vote.BlockID, err)
 	}
 	return nil
+}
+
+func (m *VoteCollector) ensureVoteUnique(vote *model.Vote) (bool, error) {
+	err := m.votesCache.AddVote(vote)
+	if err != nil {
+		if errors.Is(err, RepeatedVoteErr) {
+			return false, nil
+		}
+		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
+			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
+			return false, nil
+		}
+		return false, fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
+			vote.ID(), vote.BlockID, err)
+	}
+	return true, nil
 }
 
 // processVote uses compare-and-repeat pattern to process vote with underlying vote processor.
@@ -205,6 +216,14 @@ func (m *VoteCollector) View() uint64 {
 //	CachingVotes   -> Invalid
 //	VerifyingVotes -> Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
+	proposerVote, err := proposal.ProposerVote()
+	if err != nil {
+		return model.NewInvalidProposalErrorf(proposal, "invalid proposer vote")
+	}
+	_, err = m.ensureVoteUnique(proposerVote)
+	if err != nil {
+		return err
+	}
 
 	if proposal.Block.View != m.View() {
 		return fmt.Errorf("this VoteCollector requires a proposal for view %d but received block %v with view %d",
