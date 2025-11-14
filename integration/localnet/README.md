@@ -32,7 +32,7 @@ FLITE is a tool for running a full version of the Flow blockchain.
 Before running the Flow network it is necessary to run a bootstrapping process.
 This generates keys for each of the nodes and a genesis block to build on.
 
-Bootstrap a new network:
+Bootstrap a new network (from [integration/localnet](https://github.com/onflow/flow-go/tree/master/integration/localnet) directory):
 
 ```sh
 make bootstrap
