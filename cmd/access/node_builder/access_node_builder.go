@@ -532,13 +532,12 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
 			spamConfig,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
-		builder.FollowerDistributor.AddOnBlockIncorporatedConsumer(sync.OnBlockIncorporated)
 
 		return builder.SyncEng, nil
 	})
@@ -2276,6 +2275,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.CollectionIndexer),
 				notNil(builder.collectionExecutedMetric),
 				notNil(builder.TxResultErrorMessagesCore),
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, err
@@ -2283,7 +2283,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.IngestEng = ingestEng
 
 			ingestionDependable.Init(builder.IngestEng)
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
 		})

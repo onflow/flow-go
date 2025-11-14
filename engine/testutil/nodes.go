@@ -827,11 +827,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 			idCache,
 		),
 		spamConfig,
+		followerDistributor,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
-	followerDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
-	followerDistributor.AddOnBlockIncorporatedConsumer(syncEngine.OnBlockIncorporated)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,

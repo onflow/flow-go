@@ -478,14 +478,11 @@ func main() {
 				chunkAssigner,
 				seals,
 				getSealingConfigs,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize sealing engine: %w", err)
 			}
-
-			// subscribe for finalization events from hotstuff
-			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -532,6 +529,7 @@ func main() {
 				node.Storage.Receipts,
 				node.Storage.Index,
 				core,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, err
@@ -539,8 +537,6 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -885,12 +881,11 @@ func main() {
 				syncCore,
 				node.SyncEngineIdentifierProvider,
 				spamConfig,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(sync.OnBlockIncorporated)
 
 			return sync, nil
 		}).

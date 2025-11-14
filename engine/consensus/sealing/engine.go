@@ -6,6 +6,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -105,6 +106,7 @@ func NewEngine(log zerolog.Logger,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
+	distributor hotstuff.Distributor,
 ) (*Engine, error) {
 	rootHeader := state.Params().FinalizedRoot()
 
@@ -156,6 +158,21 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not repopulate assignment collectors tree: %w", err)
 	}
 	e.core = core
+
+	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
+		e.finalizationEventsNotifier.Notify()
+	})
+
+	distributor.AddOnBlockIncorporatedConsumer(func(incorporatedBlock *model.Block) {
+		added := e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
+		if !added {
+			// Not being able to queue an incorporated block is a fatal edge case. It might happen, if the
+			// queue capacity is depleted. However, we cannot drop incorporated blocks, because there
+			// is no way that any contained incorporated result would be re-added later once dropped.
+			e.log.Fatal().Msgf("failed to queue incorporated block %v", incorporatedBlock.BlockID)
+		}
+		e.blockIncorporatedNotifier.Notify()
+	})
 
 	return e, nil
 }
@@ -431,30 +448,6 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	return nil
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// It informs sealing.Core about finalization of respective block.
-//
-// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
-// from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(*model.Block) {
-	e.finalizationEventsNotifier.Notify()
-}
-
-// OnBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
-// It processes all execution results that were incorporated in parent block payload.
-//
-// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
-// from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
-	added := e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
-	if !added {
-		// Not being able to queue an incorporated block is a fatal edge case. It might happen, if the
-		// queue capacity is depleted. However, we cannot drop incorporated blocks, because there
-		// is no way that any contained incorporated result would be re-added later once dropped.
-		e.log.Fatal().Msgf("failed to queue incorporated block %v", incorporatedBlock.BlockID)
-	}
-	e.blockIncorporatedNotifier.Notify()
-}
 
 // processIncorporatedBlock selects receipts that were included into incorporated block and submits them
 // for further processing to sealing core. No errors expected during normal operations.

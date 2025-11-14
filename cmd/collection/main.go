@@ -462,12 +462,11 @@ func main() {
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,
 				spamConfig,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(sync.OnBlockIncorporated)
 
 			return sync, nil
 		}).

@@ -1350,12 +1350,11 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 		exeNode.syncCore,
 		node.SyncEngineIdentifierProvider,
 		spamConfig,
+		exeNode.followerDistributor,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 	}
-	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.syncEngine.OnFinalizedBlock)
-	exeNode.followerDistributor.AddOnBlockIncorporatedConsumer(exeNode.syncEngine.OnBlockIncorporated)
 
 	return exeNode.syncEngine, nil
 }

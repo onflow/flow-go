@@ -291,13 +291,12 @@ func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
 			spamConfig,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
-		builder.FollowerDistributor.AddOnBlockIncorporatedConsumer(sync.OnBlockIncorporated)
 
 		return builder.SyncEng, nil
 	})
