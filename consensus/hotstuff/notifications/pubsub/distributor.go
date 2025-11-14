@@ -14,6 +14,7 @@ type Distributor struct {
 }
 
 var _ hotstuff.Consumer = (*Distributor)(nil)
+var _ hotstuff.Distributor = (*Distributor)(nil)
 
 func NewDistributor() *Distributor {
 	return &Distributor{
@@ -48,7 +49,8 @@ func NewFollowerDistributor() *FollowerDistributor {
 
 // AddFollowerConsumer registers the input `consumer` to be notified on `hotstuff.ConsensusFollowerConsumer` events.
 func (d *FollowerDistributor) AddFollowerConsumer(consumer hotstuff.FollowerConsumer) {
-	d.FinalizationDistributor.AddFinalizationConsumer(consumer)
+	d.FinalizationDistributor.AddOnBlockFinalizedConsumer(consumer.OnFinalizedBlock)
+	d.FinalizationDistributor.AddOnBlockIncorporatedConsumer(consumer.OnBlockIncorporated)
 	d.ProposalViolationDistributor.AddProposalViolationConsumer(consumer)
 }
 

@@ -618,7 +618,8 @@ func main() {
 
 			notifier.AddParticipantConsumer(telemetryConsumer)
 			notifier.AddCommunicatorConsumer(telemetryConsumer)
-			notifier.AddFinalizationConsumer(telemetryConsumer)
+			notifier.AddOnBlockFinalizedConsumer(telemetryConsumer.OnFinalizedBlock)
+			notifier.AddOnBlockIncorporatedConsumer(telemetryConsumer.OnBlockIncorporated)
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
@@ -888,7 +889,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
-			followerDistributor.AddFinalizationConsumer(sync)
+			followerDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+			followerDistributor.AddOnBlockIncorporatedConsumer(sync.OnBlockIncorporated)
 
 			return sync, nil
 		}).

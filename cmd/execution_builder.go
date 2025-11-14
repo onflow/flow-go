@@ -1354,7 +1354,8 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 	}
-	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.syncEngine)
+	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.syncEngine.OnFinalizedBlock)
+	exeNode.followerDistributor.AddOnBlockIncorporatedConsumer(exeNode.syncEngine.OnBlockIncorporated)
 
 	return exeNode.syncEngine, nil
 }

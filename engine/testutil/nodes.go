@@ -830,7 +830,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
-	followerDistributor.AddFinalizationConsumer(syncEngine)
+	followerDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
+	followerDistributor.AddOnBlockIncorporatedConsumer(syncEngine.OnBlockIncorporated)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,

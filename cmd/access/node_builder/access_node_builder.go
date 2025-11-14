@@ -537,7 +537,8 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
-		builder.FollowerDistributor.AddFinalizationConsumer(sync)
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+		builder.FollowerDistributor.AddOnBlockIncorporatedConsumer(sync.OnBlockIncorporated)
 
 		return builder.SyncEng, nil
 	})
@@ -2343,7 +2344,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
-			builder.FollowerDistributor.AddFinalizationConsumer(syncRequestHandler)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(syncRequestHandler.OnFinalizedBlock)
+			builder.FollowerDistributor.AddOnBlockIncorporatedConsumer(syncRequestHandler.OnBlockIncorporated)
 
 			return syncRequestHandler, nil
 		})

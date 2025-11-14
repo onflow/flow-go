@@ -17,7 +17,6 @@ type OnBlockIncorporatedConsumer = func(block *model.Block)
 type FinalizationDistributor struct {
 	blockFinalizedConsumers    []OnBlockFinalizedConsumer
 	blockIncorporatedConsumers []OnBlockIncorporatedConsumer
-	consumers                  []hotstuff.FinalizationConsumer
 	lock                       sync.RWMutex
 }
 
@@ -40,20 +39,11 @@ func (d *FinalizationDistributor) AddOnBlockIncorporatedConsumer(consumer OnBloc
 	d.blockIncorporatedConsumers = append(d.blockIncorporatedConsumers, consumer)
 }
 
-func (d *FinalizationDistributor) AddFinalizationConsumer(consumer hotstuff.FinalizationConsumer) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	d.consumers = append(d.consumers, consumer)
-}
-
 func (d *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, consumer := range d.blockIncorporatedConsumers {
 		consumer(block)
-	}
-	for _, consumer := range d.consumers {
-		consumer.OnBlockIncorporated(block)
 	}
 }
 
@@ -62,8 +52,5 @@ func (d *FinalizationDistributor) OnFinalizedBlock(block *model.Block) {
 	defer d.lock.RUnlock()
 	for _, consumer := range d.blockFinalizedConsumers {
 		consumer(block)
-	}
-	for _, consumer := range d.consumers {
-		consumer.OnFinalizedBlock(block)
 	}
 }
