@@ -114,9 +114,9 @@ type API interface {
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected sentinel errors providing details to clients about failed requests:
-	//   - [access.DataNotFoundError]: when data required to process the request is not available.
-	//   - [access.OutOfRangeError]: - if the data for the requested height is outside the node's available range.
-	//   - [access.PreconditionFailedError]: - a block was found, but it is not finalized and is above the finalized height.
+	//   - [access.DataNotFoundError]: - When data required to process the request is not available.
+	//   - [access.OutOfRangeError]: - If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: - A block was found, but it is not finalized and is above the finalized height.
 	GetRegisterValues(ctx context.Context, registerIDs flow.RegisterIDs, height uint64, criteria optimistic_sync.Criteria) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error)
 	// SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
 	// a specific block ID with an optional status filter.
