@@ -360,14 +360,6 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
-	}
-
 	err = e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
 	if err != nil {
 		return fmt.Errorf("could not request collections for block: %w", err)

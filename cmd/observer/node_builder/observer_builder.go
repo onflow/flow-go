@@ -1998,6 +1998,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Transactions:          node.Storage.Transactions,
 			ExecutionReceipts:     node.Storage.Receipts,
 			ExecutionResults:      node.Storage.Results,
+			Seals:                 node.Storage.Seals,
 			ScheduledTransactions: builder.scheduledTransactions,
 			ChainID:               node.RootChainID,
 			AccessMetrics:         accessMetrics,
