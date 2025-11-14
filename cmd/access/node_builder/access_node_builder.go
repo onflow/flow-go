@@ -39,9 +39,13 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
+	"github.com/onflow/flow-go/engine/access/collection_sync/factory"
+	collection_syncfactory "github.com/onflow/flow-go/engine/access/collection_sync/factory"
+	collsyncindexer "github.com/onflow/flow-go/engine/access/collection_sync/indexer"
+	"github.com/onflow/flow-go/engine/access/finalized_indexer"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/ingestion"
-	"github.com/onflow/flow-go/engine/access/ingestion/collections"
+	"github.com/onflow/flow-go/engine/access/ingest_receipt"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -75,7 +79,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -315,6 +318,7 @@ type FlowAccessNodeBuilder struct {
 	RestMetrics                  *metrics.RestCollector
 	AccessMetrics                module.AccessMetrics
 	PingMetrics                  module.PingMetrics
+	CollectionSyncMetrics        module.CollectionSyncMetrics
 	Committee                    hotstuff.DynamicCommittee
 	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
 	Pending                      []*flow.ProposalHeader
@@ -323,13 +327,13 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataDownloader      execution_data.Downloader
 	PublicBlobService            network.BlobService
 	ExecutionDataRequester       state_synchronization.ExecutionDataRequester
+	ExecutionDataDistributor     *edrequester.ExecutionDataDistributor
 	ExecutionDataStore           execution_data.ExecutionDataStore
 	ExecutionDataBlobstore       blobs.Blobstore
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
-	CollectionIndexer            *collections.Indexer
-	CollectionSyncer             *collections.Syncer
+	blockCollectionIndexer       collection_sync.BlockCollectionIndexer
 	ScriptExecutor               *backend.ScriptExecutor
 	RegistersAsyncStore          *execution.RegistersAsyncStore
 	Reporter                     *index.Reporter
@@ -347,8 +351,6 @@ type FlowAccessNodeBuilder struct {
 	events                         storage.Events
 	lightTransactionResults        storage.LightTransactionResults
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
-	transactions                   storage.Transactions
-	collections                    storage.Collections
 	scheduledTransactions          storage.ScheduledTransactions
 
 	// The sync engine participants provider is the libp2p peer store for the access node
@@ -357,11 +359,13 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	IngestEng      *ingestion.Engine
-	RequestEng     *requester.Engine
-	FollowerEng    *followereng.ComplianceEngine
-	SyncEng        *synceng.Engine
-	StateStreamEng *statestreambackend.Engine
+	CollectionRequesterEngine *requester.Engine
+	FollowerEng               *followereng.ComplianceEngine
+	StateStreamEng            *statestreambackend.Engine
+
+	// for tx status deriver to know about the highest full block (a block with all collections synced)
+	// backed by either collection fetcher to execution data syncing
+	lastFullBlockHeight *factory.ProgressReader
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -372,7 +376,6 @@ type FlowAccessNodeBuilder struct {
 	nodeBackend        *backend.Backend
 
 	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
-	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
 	txResultErrorMessageProvider error_messages.Provider
 }
 
@@ -536,10 +539,9 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
-		builder.SyncEng = sync
 		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
-		return builder.SyncEng, nil
+		return sync, nil
 	})
 
 	return builder
@@ -575,14 +577,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
-		}).
-		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
-			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
-			collections := store.NewCollections(node.ProtocolDB, transactions)
-			builder.transactions = transactions
-			builder.collections = collections
-
-			return nil
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			var err error
@@ -732,6 +726,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
+			builder.ExecutionDataDistributor = execDataDistributor
 
 			// Execution Data cache with a downloader as the backend. This is used by the requester
 			// to download and cache execution data for each block. It shares a cache backend instance
@@ -946,13 +941,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.Storage.RegisterIndex),
 					notNil(builder.Storage.Headers),
 					notNil(builder.events),
-					notNil(builder.collections),
-					notNil(builder.transactions),
+					notNil(builder.Storage.Collections),
+					notNil(builder.Storage.Transactions),
 					notNil(builder.lightTransactionResults),
 					notNil(builder.scheduledTransactions),
 					builder.RootChainID,
 					indexerDerivedChainData,
-					notNil(builder.CollectionIndexer),
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
 				)
@@ -1679,7 +1673,8 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, notNil(builder.collections))
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads,
+			notNil(builder.Storage.Collections))
 	})
 
 	// if this is an access node that supports public followers, enqueue the public network
@@ -1719,20 +1714,15 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
-	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
-
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
 
-	ingestionDependable := module.NewProxiedReadyDoneAware()
-	builder.IndexerDependencies.Add(ingestionDependable)
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
 	stopControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(stopControlDependable)
-	var lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	var collectionIndexedHeight storage.ConsumerProgress
 
 	builder.
 		BuildConsensusFollower().
@@ -1861,7 +1851,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
-				builder.collections,
+				builder.Storage.Collections,
 				builder.Storage.Blocks,
 				builder.BlockTransactions,
 			)
@@ -1873,6 +1863,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
 			builder.PingMetrics = metrics.NewPingCollector()
+			return nil
+		}).
+		Module("collection sync metrics", func(node *cmd.NodeConfig) error {
+			builder.CollectionSyncMetrics = metrics.NewCollectionSyncCollector()
 			return nil
 		}).
 		Module("server certificate", func(node *cmd.NodeConfig) error {
@@ -1944,8 +1938,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 			return nil
 		}).
-		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedFinalizedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
+		Module("block collection indexer", func(node *cmd.NodeConfig) error {
+			builder.blockCollectionIndexer = collsyncindexer.NewBlockCollectionIndexer(
+				notNil(builder.collectionExecutedMetric),
+				node.StorageLockMgr,
+				builder.ProtocolDB,
+				notNil(builder.Storage.Collections),
+			)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -1956,10 +1955,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return err
 			}
 
-			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
+			lastProgress, err := progress.ProcessedIndex()
 			if err != nil {
-				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
+				return fmt.Errorf("failed to get last processed index for last full block height: %w", err)
 			}
+
+			// Create ProgressReader that aggregates progress from executionDataProcessor and collectionFetcher
+			builder.lastFullBlockHeight = factory.NewProgressReader(lastProgress)
+
+			collectionIndexedHeight = progress
 
 			return nil
 		}).
@@ -2122,8 +2126,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				HistoricalAccessNodes: notNil(builder.HistoricalAccessRPCs),
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
-				Collections:           notNil(builder.collections),
-				Transactions:          notNil(builder.transactions),
+				Collections:           node.Storage.Collections,
+				Transactions:          node.Storage.Transactions,
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
@@ -2151,7 +2155,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				EventsIndex:                notNil(builder.EventsIndex),
 				TxResultQueryMode:          txResultQueryMode,
 				TxResultsIndex:             notNil(builder.TxResultsIndex),
-				LastFullBlockHeight:        lastFullBlockHeight,
+				LastFullBlockHeight:        notNil(builder.lastFullBlockHeight),
 				IndexReporter:              indexReporter,
 				VersionControl:             notNil(builder.VersionControl),
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
@@ -2192,108 +2196,85 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
-		}).
-		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			requestEng, err := requester.New(
-				node.Logger.With().Str("entity", "collection").Logger(),
-				node.Metrics.Engine,
-				node.EngineRegistry,
-				node.Me,
+		})
+	if builder.executionDataSyncEnabled {
+		builder.Component("execution data processor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// ExecutionDataCache should already be created in BuildExecutionSyncComponents
+			if builder.ExecutionDataCache == nil {
+				return nil, fmt.Errorf("ExecutionDataCache must be created before execution data processor")
+			}
+
+			// Create execution data tracker for the processor
+			// This is similar to the one created in state stream engine but used for collection indexing
+			broadcaster := engine.NewBroadcaster()
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+
+			useIndex := builder.executionDataIndexingEnabled
+			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
+				builder.Logger,
 				node.State,
-				channels.RequestCollections,
-				filter.HasRole[flow.Identity](flow.RoleCollection),
-				func() flow.Entity { return new(flow.Collection) },
+				builder.executionDataConfig.InitialBlockHeight,
+				node.Storage.Headers,
+				broadcaster,
+				highestAvailableHeight,
+				builder.EventsIndex,
+				useIndex,
+			)
+
+			// Create execution data processor
+			executionDataProcessor, err := collection_syncfactory.CreateExecutionDataProcessor(
+				builder.Logger,
+				notNil(builder.ExecutionDataCache),
+				executionDataTracker,
+				collectionIndexedHeight,
+				notNil(builder.blockCollectionIndexer),
+				notNil(builder.CollectionSyncMetrics),
 			)
 			if err != nil {
-				return nil, fmt.Errorf("could not create requester engine: %w", err)
-			}
-			builder.RequestEng = requestEng
-
-			collectionIndexer, err := collections.NewIndexer(
-				node.Logger,
-				builder.ProtocolDB,
-				notNil(builder.collectionExecutedMetric),
-				node.State,
-				node.Storage.Blocks,
-				notNil(builder.collections),
-				lastFullBlockHeight,
-				node.StorageLockMgr,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create collection indexer: %w", err)
-			}
-			builder.CollectionIndexer = collectionIndexer
-
-			// the collection syncer has support for indexing collections from execution data if the
-			// syncer falls behind. This is only needed if the execution state indexing is disabled,
-			// since it will also index collections.
-			var executionDataSyncer *collections.ExecutionDataSyncer
-			if builder.executionDataSyncEnabled && !builder.executionDataIndexingEnabled {
-				executionDataSyncer = collections.NewExecutionDataSyncer(
-					node.Logger,
-					notNil(builder.ExecutionDataCache),
-					collectionIndexer,
-				)
+				return nil, fmt.Errorf("could not create execution data processor: %w", err)
 			}
 
-			collectionSyncer := collections.NewSyncer(
-				node.Logger,
-				builder.RequestEng,
-				node.State,
-				notNil(builder.collections),
-				lastFullBlockHeight,
-				collectionIndexer,
-				executionDataSyncer,
-			)
-			builder.CollectionSyncer = collectionSyncer
+			// Store and register with ProgressReader
+			builder.lastFullBlockHeight.SetExecutionDataProcessor(executionDataProcessor)
 
-			builder.RequestEng.WithHandle(collectionSyncer.OnCollectionDownloaded)
+			// Setup requester to notify processor when new execution data is received
+			if builder.ExecutionDataDistributor != nil {
+				builder.ExecutionDataDistributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
+					executionDataTracker.OnExecutionData(executionData)
+					executionDataProcessor.OnNewExectuionData()
+				})
+			}
 
-			return builder.RequestEng, nil
-		}).
-		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.storeTxResultErrorMessages {
-				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
+			return executionDataProcessor, nil
+		})
+	}
+
+	builder.Component("finalized block indexer", createFinalizedBlockIndexer(builder))
+	builder.Component("ingest receipt", createIngestReceiptEngine(builder))
+	createCollectionSyncFetcher(builder)
+
+	if builder.storeTxResultErrorMessages {
+		var txResultErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
+		var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
+		builder.
+			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+				txResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
 					notNil(builder.txResultErrorMessageProvider),
 					builder.transactionResultErrorMessages,
 					notNil(builder.ExecNodeIdentitiesProvider),
 					node.StorageLockMgr,
 				)
-			}
-
-			ingestEng, err := ingestion.New(
-				node.Logger,
-				node.EngineRegistry,
-				node.State,
-				node.Me,
-				node.Storage.Blocks,
-				node.Storage.Results,
-				node.Storage.Receipts,
-				processedFinalizedBlockHeight,
-				notNil(builder.CollectionSyncer),
-				notNil(builder.CollectionIndexer),
-				notNil(builder.collectionExecutedMetric),
-				notNil(builder.TxResultErrorMessagesCore),
-			)
-			if err != nil {
-				return nil, err
-			}
-			builder.IngestEng = ingestEng
-
-			ingestionDependable.Init(builder.IngestEng)
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
-
-			return builder.IngestEng, nil
-		})
-
-	if builder.storeTxResultErrorMessages {
-		builder.
+				return nil
+			}).
 			AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
 				return storageCommands.NewBackfillTxErrorMessagesCommand(
 					builder.Logger,
 					builder.State,
-					builder.TxResultErrorMessagesCore,
+					txResultErrorMessagesCore,
 				)
 			}).
 			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
@@ -2318,7 +2299,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					node.State,
 					node.Storage.Headers,
 					processedTxErrorMessagesBlockHeight,
-					builder.TxResultErrorMessagesCore,
+					txResultErrorMessagesCore,
 				)
 				if err != nil {
 					return nil, err
@@ -2519,6 +2500,101 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
+}
+
+func createFinalizedBlockIndexer(builder *FlowAccessNodeBuilder) func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	return func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		processedFinalizedBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
+
+		finalizedBlockProcessor, err := finalized_indexer.NewFinalizedBlockProcessor(
+			node.Logger,
+			node.State,
+			node.Storage.Blocks,
+			processedFinalizedBlockHeight,
+			builder.FollowerDistributor,
+			notNil(builder.collectionExecutedMetric),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create finalized block processor: %w", err)
+		}
+
+		return finalizedBlockProcessor, nil
+	}
+}
+
+func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
+	builder.
+		Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if builder.executionDataSyncEnabled {
+				// skip if execution data sync is enabled
+				// because the execution data contains the collections, so no need to fetch them separately.
+				// otherwise, if both fetching and syncing are enabled, they might slow down each other,
+				// because the database operation requires locking.
+				return &module.NoopReadyDoneAware{}, nil
+			}
+
+			// TODO (leo): switch to module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
+			// to implement hybrid sync mode in the future
+			// in the hybrid sync mode, the fetcher will store its progress under a different key,
+			// and and only active if either of the following condition is met:
+			// 1) execution data sync is disabled
+			// 2) execution data sync is enabled and exectuion data sync height is far behind
+			//    the latest finalized height and the execution data sync is not updating.
+
+			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight)
+
+			// skip if execution data sync is enabled
+			// Create fetcher and requesterEng
+			requesterEng, fetcher, err := factory.CreateFetcher(
+				node.Logger,
+				node.Metrics.Engine,
+				node.EngineRegistry,
+				node.State,
+				node.Me,
+				node.Storage.Blocks,
+				node.Storage.Collections,
+				node.Storage.Guarantees,
+				builder.ProtocolDB,
+				notNil(builder.blockCollectionIndexer),
+				fetchAndIndexedCollectionsBlockHeight,
+				builder.FollowerDistributor,
+				notNil(builder.collectionExecutedMetric),
+				notNil(builder.CollectionSyncMetrics),
+				collection_syncfactory.CreateFetcherConfig{
+					MaxProcessing:  10, // TODO: make configurable
+					MaxSearchAhead: 20, // TODO: make configurable
+				},
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create collection fetcher: %w", err)
+			}
+
+			builder.CollectionRequesterEngine = requesterEng
+
+			// Store and register with ProgressReader
+			builder.lastFullBlockHeight.SetCollectionFetcher(fetcher)
+
+			return fetcher, nil
+		}).
+		Component("collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if builder.executionDataSyncEnabled {
+				return &module.NoopReadyDoneAware{}, nil
+			}
+			return builder.CollectionRequesterEngine, nil
+		})
+
+}
+
+func createIngestReceiptEngine(builder *FlowAccessNodeBuilder) func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	return func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return ingest_receipt.New(
+			node.Logger,
+			node.EngineRegistry,
+			node.Storage.Receipts,
+			notNil(builder.collectionExecutedMetric),
+		)
+	}
 }
 
 // notNil ensures that the input is not nil and returns it

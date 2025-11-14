@@ -1,12 +1,13 @@
-package ingestion2
+package finalized_indexer
 
 import (
 	"fmt"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -43,14 +44,11 @@ const (
 // mappings, as well as requesting the associated collections.
 type FinalizedBlockProcessor struct {
 	log zerolog.Logger
+	component.Component
 
-	consumer         *jobqueue.ComponentConsumer
-	consumerNotifier engine.Notifier
-	blocks           storage.Blocks
+	consumer *jobqueue.ComponentConsumer
+	blocks   storage.Blocks
 
-	executionResults storage.ExecutionResults
-
-	collectionSyncer         *collections.Syncer
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
@@ -62,9 +60,8 @@ func NewFinalizedBlockProcessor(
 	log zerolog.Logger,
 	state protocol.State,
 	blocks storage.Blocks,
-	executionResults storage.ExecutionResults,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer,
-	syncer *collections.Syncer,
+	distributor hotstuff.Distributor,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*FinalizedBlockProcessor, error) {
 	reader := jobqueue.NewFinalizedBlockReader(state, blocks)
@@ -73,19 +70,16 @@ func NewFinalizedBlockProcessor(
 		return nil, fmt.Errorf("could not get finalized block header: %w", err)
 	}
 
-	consumerNotifier := engine.NewNotifier()
+	blockFinalizedNotifier := engine.NewNotifier()
 	processor := &FinalizedBlockProcessor{
 		log:                      log,
 		blocks:                   blocks,
-		executionResults:         executionResults,
-		consumerNotifier:         consumerNotifier,
-		collectionSyncer:         syncer,
 		collectionExecutedMetric: collectionExecutedMetric,
 	}
 
 	processor.consumer, err = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "ingestion_block_consumer").Logger(),
-		consumerNotifier.Channel(),
+		blockFinalizedNotifier.Channel(),
 		finalizedProcessedHeight,
 		reader,
 		finalizedBlock.Height,
@@ -97,16 +91,22 @@ func NewFinalizedBlockProcessor(
 		return nil, fmt.Errorf("error creating finalized block jobqueue: %w", err)
 	}
 
+	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
+		blockFinalizedNotifier.Notify()
+	})
+
+	// Build component manager with worker loop
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(processor.workerLoop).
+		Build()
+
+	processor.Component = cm
+
 	return processor, nil
 }
 
-// Notify notifies the processor that a new finalized block is available for processing.
-func (p *FinalizedBlockProcessor) Notify() {
-	p.consumerNotifier.Notify()
-}
-
 // StartWorkerLoop begins processing of finalized blocks and signals readiness when initialization is complete.
-func (p *FinalizedBlockProcessor) StartWorkerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (p *FinalizedBlockProcessor) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	p.consumer.Start(ctx)
 
 	err := util.WaitClosed(ctx, p.consumer.Ready())
@@ -123,13 +123,13 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 	job module.Job,
 	done func(),
 ) {
-	block, err := jobqueue.JobToBlock(job)
+	finalizedBlock, err := jobqueue.JobToBlock(job)
 	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
+		ctx.Throw(fmt.Errorf("failed to convert job to finalizedBlock: %w", err))
 		return
 	}
 
-	err = p.indexFinalizedBlock(block)
+	err = p.indexForFinalizedBlock(finalizedBlock)
 	if err != nil {
 		p.log.Error().Err(err).
 			Str("job_id", string(job.ID())).
@@ -141,27 +141,13 @@ func (p *FinalizedBlockProcessor) processFinalizedBlockJobCallback(
 	done()
 }
 
-// indexFinalizedBlock indexes the given finalized block’s collection guarantees and execution results,
-// and requests related collections from the syncer.
+// indexForFinalizedBlock indexes the given finalized block’s collection guarantees
 //
 // No errors are expected during normal operations.
-func (p *FinalizedBlockProcessor) indexFinalizedBlock(block *flow.Block) error {
+func (p *FinalizedBlockProcessor) indexForFinalizedBlock(block *flow.Block) error {
 	err := p.blocks.IndexBlockContainingCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
-	}
-
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := p.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
-	}
-
-	err = p.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
-	if err != nil {
-		return fmt.Errorf("could not request collections for block: %w", err)
 	}
 
 	p.collectionExecutedMetric.BlockFinalized(block)

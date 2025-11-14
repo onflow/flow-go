@@ -215,6 +215,13 @@ func New(
 		},
 	)
 
+	// TODO (leo): we don't have to keep the notification distributor, because if we add a new notification
+	// consumer, we would like to consume from the beginning instead of the last consumed height
+	// of the existing consumer.
+	// without the notification distributor, each notification consumer can also be
+	// simplified as a component with a signal channel as notification, and a worker loop to consume
+	// notifications and iterate all the way to the blockConsumer.LatestProcessedIndex().
+
 	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
 	// receives this event in consecutive block height order.
 	// It listens to events from `executionDataNotifier`, which is delivered when

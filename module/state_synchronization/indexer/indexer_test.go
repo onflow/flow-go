@@ -208,7 +208,6 @@ func TestIndexer_Success(t *testing.T) {
 			})
 
 		test.executionData.On("Get", blockID).Return(ed, true).Once()
-		test.indexTest.collectionIndexer.On("IndexCollections", ed.StandardCollections()).Return(nil).Once()
 		test.indexTest.registers.On("Store", flow.RegisterEntries{}, block.Height).Return(nil).Once()
 	}
 
@@ -256,7 +255,6 @@ func TestIndexer_Failure(t *testing.T) {
 			})
 
 		test.executionData.On("Get", blockID).Return(ed, true).Once()
-		test.indexTest.collectionIndexer.On("IndexCollections", ed.StandardCollections()).Return(nil).Once()
 
 		// return an error on the last block to trigger the error path
 		if block.Height == lastHeight {

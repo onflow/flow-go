@@ -20,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -59,8 +60,34 @@ func main() {
 	}
 	log = log.Level(lvl)
 
+	// Create context for metrics server
+	metricsCtx, metricsCancel := context.WithCancel(context.Background())
+
+	// Create SignalerContext and start metrics server
 	server := metrics.NewServer(log, *metricport)
+	signalerCtx, errChan := irrecoverable.WithSignaler(metricsCtx)
+	go func() {
+		select {
+		case err, ok := <-errChan:
+			if !ok {
+				// Channel was closed without an error (shouldn't happen, but handle gracefully)
+				return
+			}
+			if err != nil {
+				log.Fatal().Err(err).Msg("metrics server encountered irrecoverable error")
+			}
+		case <-metricsCtx.Done():
+			return
+		}
+	}()
+	server.Start(signalerCtx)
 	<-server.Ready()
+
+	// Ensure metrics server shuts down gracefully on exit
+	defer func() {
+		metricsCancel()
+		<-server.Done()
+	}()
 	loaderMetrics := metrics.NewLoaderCollector()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -88,6 +115,7 @@ func main() {
 	accessNodeAddrs := strings.Split(*accessNodes, ",")
 	clients := make([]access.Client, 0, len(accessNodeAddrs))
 	for _, addr := range accessNodeAddrs {
+		log.Info().Str("addr", addr).Msg("connecting to access node")
 		client, err := client.NewClient(
 			addr,
 			client.WithGRPCDialOptions(
@@ -101,6 +129,18 @@ func main() {
 		if err != nil {
 			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
 		}
+		log.Info().Str("addr", addr).Msg("successfully connected to access node")
+
+		// Test connectivity with a timeout
+		testCtx, testCancel := context.WithTimeout(ctx, 5*time.Second)
+		defer testCancel()
+		log.Info().Str("addr", addr).Msg("testing access node connectivity")
+		_, err = client.GetLatestBlockHeader(testCtx, true)
+		if err != nil {
+			log.Fatal().Str("addr", addr).Err(err).Msg("access node is not responding - is it running?")
+		}
+		log.Info().Str("addr", addr).Msg("access node is responding")
+
 		clients = append(clients, client)
 	}
 
@@ -119,6 +159,11 @@ func main() {
 	statsLogger := benchmark.NewPeriodicStatsLogger(context.TODO(), workerStatsTracker, log)
 	statsLogger.Start()
 	defer statsLogger.Stop()
+
+	log.Info().
+		Int("number_of_accounts", int(maxTPS)**accountMultiplierFlag).
+		Uint("max_tps", maxTPS).
+		Msg("initializing load generator (this may take a while if creating many accounts)")
 
 	lg, err := benchmark.New(
 		ctx,
@@ -145,6 +190,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
 	}
+	log.Info().Msg("load generator initialized successfully")
 	defer lg.Stop()
 
 	for i, c := range loadCases {
