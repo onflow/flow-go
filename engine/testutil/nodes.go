@@ -474,6 +474,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Seals,
 	)
 
+	notifier := pubsub.NewDistributor()
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
 		node.Tracer,
@@ -492,6 +493,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		assigner,
 		seals,
 		unittest.NewSealingConfigs(flow.DefaultRequiredApprovalsForSealConstruction),
+		notifier,
 	)
 	require.NoError(t, err)
 
@@ -522,6 +524,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		receiptsDB,
 		node.Index,
 		matchingCore,
+		notifier,
 	)
 	require.NoError(t, err)
 
@@ -802,6 +805,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Headers,
 		finalizedHeader,
 		core,
+		followerDistributor,
 		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
