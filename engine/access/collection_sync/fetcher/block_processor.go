@@ -87,11 +87,12 @@ func (bp *BlockProcessor) FetchCollections(
 		collectionIDs[i] = guarantee.CollectionID
 	}
 
-	// Enqueue missing collections with callback
+	// Enqueue missing collections with notifyJobCompletion
 	// When all collections are received and indexed, mark the job as done
-	callback := done
+	notifyJobCompletion := done
 
-	err = bp.mcq.EnqueueMissingCollections(blockHeight, collectionIDs, callback)
+	// the notifyJobCompletion callback will be returned in the OnReceiveCollection method
+	err = bp.mcq.EnqueueMissingCollections(blockHeight, collectionIDs, notifyJobCompletion)
 	if err != nil {
 		return fmt.Errorf("failed to enqueue missing collections for block height %d: %w", blockHeight, err)
 	}
@@ -141,8 +142,11 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 		return fmt.Errorf("failed to index collections for block height %d: %w", height, err)
 	}
 
-	// Mark the block as indexed (this invokes the callback)
-	bp.mcq.OnIndexedForBlock(height)
+	// Mark the block as indexed
+	notifyJobCompletion, ok := bp.mcq.OnIndexedForBlock(height)
+	if ok {
+		notifyJobCompletion()
+	}
 
 	return nil
 }

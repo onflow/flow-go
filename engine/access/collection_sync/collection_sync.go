@@ -11,7 +11,7 @@ import (
 // Tracks missing collections per height and invokes job callbacks when complete.
 type MissingCollectionQueue interface {
 	EnqueueMissingCollections(blockHeight uint64, ids []flow.Identifier, callback func()) error
-	OnIndexedForBlock(blockHeight uint64) bool // mark done (post‑indexing), returns true if height existed
+	OnIndexedForBlock(blockHeight uint64) (func(), bool)
 
 	// On receipt of a collection, MCQ updates internal state and, if a block
 	// just became complete, returns: (collections, height, true).

@@ -169,22 +169,24 @@ func (mcq *MissingCollectionQueue) IsHeightQueued(height uint64) bool {
 	return exists
 }
 
-// OnIndexedForBlock notifies the queue that a block height has been indexed.
-// This invokes the callback for that block height and removes it from tracking.
+// OnIndexedForBlock notifies the queue that a block height has been indexed,
+// removes that block height from tracking, and return the callback for caller to
+// invoke.
 //
-// Returns true if the height existed and was processed, false if the height was not tracked.
-func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) bool {
+// Returns:
+// (callback, true) if the height existed and was processed;
+// (nil, false) if the height was not tracked.
+//
+// Note, caller should invoke the returned callback if not nil.
+func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) (func(), bool) {
 	mcq.mu.Lock()
+	defer mcq.mu.Unlock()
 
 	jobState, exists := mcq.blockJobs[blockHeight]
 	if !exists {
-		// Block was not tracked or already completed (callback already called and job removed).
-		mcq.mu.Unlock()
-		return false
+		// Block was not tracked or already completed
+		return nil, false
 	}
-
-	// Get the callback before removing the job.
-	callback := jobState.callback
 
 	// Clean up all collection-to-height mappings for collections belonging to this block.
 	// Clean up from missing collections.
@@ -204,9 +206,5 @@ func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) bool {
 	// This ensures the height is removed from tracking once the callback is invoked.
 	delete(mcq.blockJobs, blockHeight)
 
-	// Release the lock before calling the callback to avoid holding it during callback execution.
-	mcq.mu.Unlock()
-	callback()
-	// Note: We manually unlocked above, so we don't use defer here to avoid double-unlock.
-	return true
+	return jobState.callback, true
 }
