@@ -64,9 +64,9 @@ func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Ident
 	return r0, r1, r2
 }
 
-// GetRegisterValues provides a mock function with given fields: registerIDs, height, criteria
-func (_m *API) GetRegisterValues(registerIDs flow.RegisterIDs, height uint64, criteria optimistic_sync.Criteria) ([]flow.RegisterValue, *access.ExecutorMetadata, error) {
-	ret := _m.Called(registerIDs, height, criteria)
+// GetRegisterValues provides a mock function with given fields: ctx, registerIDs, height, criteria
+func (_m *API) GetRegisterValues(ctx context.Context, registerIDs flow.RegisterIDs, height uint64, criteria optimistic_sync.Criteria) ([]flow.RegisterValue, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, registerIDs, height, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRegisterValues")
@@ -75,27 +75,27 @@ func (_m *API) GetRegisterValues(registerIDs flow.RegisterIDs, height uint64, cr
 	var r0 []flow.RegisterValue
 	var r1 *access.ExecutorMetadata
 	var r2 error
-	if rf, ok := ret.Get(0).(func(flow.RegisterIDs, uint64, optimistic_sync.Criteria) ([]flow.RegisterValue, *access.ExecutorMetadata, error)); ok {
-		return rf(registerIDs, height, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) ([]flow.RegisterValue, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, registerIDs, height, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(flow.RegisterIDs, uint64, optimistic_sync.Criteria) []flow.RegisterValue); ok {
-		r0 = rf(registerIDs, height, criteria)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) []flow.RegisterValue); ok {
+		r0 = rf(ctx, registerIDs, height, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.RegisterValue)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.RegisterIDs, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
-		r1 = rf(registerIDs, height, criteria)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, registerIDs, height, criteria)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(*access.ExecutorMetadata)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(flow.RegisterIDs, uint64, optimistic_sync.Criteria) error); ok {
-		r2 = rf(registerIDs, height, criteria)
+	if rf, ok := ret.Get(2).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, registerIDs, height, criteria)
 	} else {
 		r2 = ret.Error(2)
 	}
