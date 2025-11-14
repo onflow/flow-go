@@ -250,17 +250,14 @@ func New(
 		Build()
 
 	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(func(*model.Block) {
-		e.finalizationNotifier.Notify()
-	})
+	followerDistributor.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
 
 	return e, nil
 }
 
-// OnBlockFinalized is a no-op since callbacks are registered with the distributor in the constructor.
-// This method is kept for interface compatibility.
-func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
-	// no-op: callback is registered with distributor in constructor
+// onBlockFinalized accepts block finalization notifications from the FollowerDistributor
+func (e *executionDataRequester) onBlockFinalized(*model.Block) {
+	e.finalizationNotifier.Notify()
 }
 
 // HighestConsecutiveHeight returns the highest consecutive block height for which ExecutionData

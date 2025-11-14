@@ -159,20 +159,9 @@ func NewEngine(log zerolog.Logger,
 	}
 	e.core = core
 
-	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
-		e.finalizationEventsNotifier.Notify()
-	})
+	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
-	distributor.AddOnBlockIncorporatedConsumer(func(incorporatedBlock *model.Block) {
-		added := e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
-		if !added {
-			// Not being able to queue an incorporated block is a fatal edge case. It might happen, if the
-			// queue capacity is depleted. However, we cannot drop incorporated blocks, because there
-			// is no way that any contained incorporated result would be re-added later once dropped.
-			e.log.Fatal().Msgf("failed to queue incorporated block %v", incorporatedBlock.BlockID)
-		}
-		e.blockIncorporatedNotifier.Notify()
-	})
+	distributor.AddOnBlockIncorporatedConsumer(e.onIncorporatedBlock)
 
 	return e, nil
 }
@@ -448,6 +437,30 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	return nil
 }
 
+// onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// It informs sealing.Core about finalization of respective block.
+//
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) onFinalizedBlock(*model.Block) {
+	e.finalizationEventsNotifier.Notify()
+}
+
+// onBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
+// It processes all execution results that were incorporated in parent block payload.
+//
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) onBlockIncorporated(incorporatedBlock *model.Block) {
+	added := e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
+	if !added {
+		// Not being able to queue an incorporated block is a fatal edge case. It might happen, if the
+		// queue capacity is depleted. However, we cannot drop incorporated blocks, because there
+		// is no way that any contained incorporated result would be re-added later once dropped.
+		e.log.Fatal().Msgf("failed to queue incorporated block %v", incorporatedBlock.BlockID)
+	}
+	e.blockIncorporatedNotifier.Notify()
+}
 
 // processIncorporatedBlock selects receipts that were included into incorporated block and submits them
 // for further processing to sealing core. No errors expected during normal operations.

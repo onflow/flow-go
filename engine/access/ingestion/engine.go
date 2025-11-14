@@ -183,9 +183,7 @@ func New(
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
-	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
-		e.finalizedBlockNotifier.Notify()
-	})
+	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -338,6 +336,12 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.process(originID, event)
+}
+
+// onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
+func (e *Engine) onFinalizedBlock(*model.Block) {
+	e.finalizedBlockNotifier.Notify()
 }
 
 // processFinalizedBlock handles an incoming finalized block.

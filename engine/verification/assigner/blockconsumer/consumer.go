@@ -78,9 +78,7 @@ func NewBlockConsumer(log zerolog.Logger,
 	worker.withBlockConsumer(blockConsumer)
 
 	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(func(*model.Block) {
-		blockConsumer.unit.Launch(blockConsumer.consumer.Check)
-	})
+	followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.onFinalizedBlock)
 
 	return blockConsumer, defaultIndex, nil
 }
@@ -97,10 +95,14 @@ func (c *BlockConsumer) Size() uint {
 	return c.consumer.Size()
 }
 
-// OnFinalizedBlock is a no-op since callbacks are registered with the distributor in the constructor.
-// This method is kept for backward compatibility.
-func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
-	// no-op: callback is registered with distributor in constructor
+// onFinalizedBlock implements FinalizationConsumer, and is invoked by the follower engine whenever
+// a new block is finalized.
+// In this implementation for block consumer, invoking OnFinalizedBlock is enough to only notify the consumer
+// to check its internal queue and move its processing index ahead to the next height if there are workers available.
+// The consumer retrieves the new blocks from its block reader module, hence it does not need to use the parameter
+// of OnFinalizedBlock here.
+func (c *BlockConsumer) onFinalizedBlock(*model.Block) {
+	c.unit.Launch(c.consumer.Check)
 }
 
 func (c *BlockConsumer) Ready() <-chan struct{} {

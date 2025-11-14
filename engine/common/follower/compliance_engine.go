@@ -148,14 +148,7 @@ func NewComplianceLayer(
 	}
 	e.con = con
 
-	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
-		//  informs the compliance layer about finalization of a new block. It does not block
-		// and asynchronously executes the internal pruning logic. We accept inputs out of order, and only act
-		// on inputs with strictly monotonicly increasing views.
-		if e.finalizedBlockTracker.Track(block) {
-			e.finalizedBlockNotifier.Notify()
-		}
-	})
+	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	cmBuilder := component.NewComponentManagerBuilder().
 		AddWorker(e.finalizationProcessingLoop).
@@ -206,6 +199,19 @@ func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*flow.Proposal
 
 	if e.syncedBlocks.Push(blocks) {
 		e.blocksAvailableNotifier.Notify()
+	}
+}
+
+// onFinalizedBlock informs the compliance layer about finalization of a new block. It does not block
+// and asynchronously executes the internal pruning logic. We accept inputs out of order, and only act
+// on inputs with strictly monotonicly increasing views.
+//
+// Implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function.
+func (e *ComplianceEngine) onFinalizedBlock(block *model.Block) {
+	if e.finalizedBlockTracker.Track(block) {
+		e.finalizedBlockNotifier.Notify()
 	}
 }
 

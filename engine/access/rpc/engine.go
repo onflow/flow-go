@@ -149,7 +149,7 @@ func NewBuilder(
 	}
 
 	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(eng.OnFinalizedBlock)
+	followerDistributor.AddOnBlockFinalizedConsumer(eng.onFinalizedBlock)
 
 	return builder, nil
 }
@@ -179,8 +179,8 @@ func (e *Engine) shutdown() {
 	}
 }
 
-// OnFinalizedBlock responds to block finalization events.
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
+// onFinalizedBlock responds to block finalization events.
+func (e *Engine) onFinalizedBlock(block *model.Block) {
 	e.finalizedHeaderCacheActor.OnFinalizedBlock(block)
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }

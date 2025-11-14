@@ -99,14 +99,8 @@ func NewEngine(
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
-	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
-		e.finalizationEventsNotifier.Notify()
-	})
-
-	distributor.AddOnBlockIncorporatedConsumer(func(incorporatedBlock *model.Block) {
-		e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
-		e.blockIncorporatedNotifier.Notify()
-	})
+	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+	distributor.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
 
 	return e, nil
 }
@@ -141,6 +135,20 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.addReceiptToQueue(r)
 }
 
+// onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) onFinalizedBlock(*model.Block) {
+	e.finalizationEventsNotifier.Notify()
+}
+
+// OnBlockIncorporated implements the `OnBlockIncorporated` callback from the `hotstuff.FinalizationConsumer`
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) onBlockIncorporated(incorporatedBlock *model.Block) {
+	e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
+	e.blockIncorporatedNotifier.Notify()
+}
 
 // processIncorporatedBlock selects receipts that were included into incorporated block and submits them
 // to the matching core for further processing.

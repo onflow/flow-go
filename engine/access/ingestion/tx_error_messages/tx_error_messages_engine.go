@@ -121,9 +121,7 @@ func New(
 		Build()
 
 	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(func(*model.Block) {
-		e.txErrorMessagesNotifier.Notify()
-	})
+	followerDistributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -176,8 +174,8 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 
 // OnFinalizedBlock is a no-op since callbacks are registered with the distributor in the constructor.
 // This method is kept for backward compatibility.
-func (e *Engine) OnFinalizedBlock(*model.Block) {
-	// no-op: callback is registered with distributor in constructor
+func (e *Engine) onFinalizedBlock(*model.Block) {
+	e.txErrorMessagesNotifier.Notify()
 }
 
 // processErrorMessagesForBlock processes transaction result error messages for block.

@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	ingestioncollections "github.com/onflow/flow-go/engine/access/ingestion/collections"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -746,6 +747,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			nil,
 		)
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
@@ -759,6 +761,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
@@ -803,7 +806,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
-		ingestEng.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
+		followerDistributor.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
 
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
@@ -1005,6 +1008,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			nil,
 		)
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
@@ -1018,6 +1022,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
@@ -1041,7 +1046,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			executionReceipts := unittest.ReceiptsForBlockFixture(block, enNodeIDs)
 			// Ingest engine was notified by the follower engine about a new block.
 			// Follower engine --> Ingest engine
-			ingestEng.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
+			followerDistributor.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
 
 			// Syncer receives the requested collection and the ingestion engine processes the receipts
 			collectionSyncer.OnCollectionDownloaded(originID, collection)
@@ -1271,6 +1276,7 @@ func (suite *Suite) TestExecuteScript() {
 			nil,
 		)
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
@@ -1284,6 +1290,7 @@ func (suite *Suite) TestExecuteScript() {
 			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 

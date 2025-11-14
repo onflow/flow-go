@@ -259,13 +259,13 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			node.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
