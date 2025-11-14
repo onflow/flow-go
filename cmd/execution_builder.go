@@ -1267,12 +1267,12 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Storage.Headers,
 		node.LastFinalizedHeader,
 		core,
+		exeNode.followerDistributor,
 		node.ComplianceConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
 	}
-	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.followerEng.OnFinalizedBlock)
 
 	return exeNode.followerEng, nil
 }

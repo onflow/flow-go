@@ -520,14 +520,13 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			builder.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.
-			AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
@@ -1287,24 +1286,23 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				execDataCacheBackend,
 			)
 
-			r, err := edrequester.New(
-				builder.Logger,
-				metrics.NewExecutionDataRequesterCollector(),
-				builder.ExecutionDataDownloader,
-				executionDataCache,
-				processedBlockHeight,
-				processedNotifications,
-				builder.State,
-				builder.Storage.Headers,
-				builder.executionDataConfig,
-				execDataDistributor,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
-			}
-			builder.ExecutionDataRequester = r
-
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+		r, err := edrequester.New(
+			builder.Logger,
+			metrics.NewExecutionDataRequesterCollector(),
+			builder.ExecutionDataDownloader,
+			executionDataCache,
+			processedBlockHeight,
+			processedNotifications,
+			builder.State,
+			builder.Storage.Headers,
+			builder.executionDataConfig,
+			execDataDistributor,
+			builder.FollowerDistributor,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create execution data requester: %w", err)
+		}
+		builder.ExecutionDataRequester = r
 
 			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
 			// to wait for the requester to be ready before starting.
@@ -2063,6 +2061,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
 			indexReporter,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, err
@@ -2090,7 +2089,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
 	})
 

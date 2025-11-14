@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -151,6 +152,7 @@ func New(
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
 	distributor *ExecutionDataDistributor,
+	followerDistributor hotstuff.Distributor,
 ) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
@@ -247,12 +249,18 @@ func New(
 		AddWorker(e.runNotificationConsumer).
 		Build()
 
+	// register callback with distributor
+	followerDistributor.AddOnBlockFinalizedConsumer(func(*model.Block) {
+		e.finalizationNotifier.Notify()
+	})
+
 	return e, nil
 }
 
-// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
+// OnBlockFinalized is a no-op since callbacks are registered with the distributor in the constructor.
+// This method is kept for interface compatibility.
 func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
-	e.finalizationNotifier.Notify()
+	// no-op: callback is registered with distributor in constructor
 }
 
 // HighestConsecutiveHeight returns the highest consecutive block height for which ExecutionData

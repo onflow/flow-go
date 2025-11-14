@@ -755,13 +755,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.Storage.Headers,
 				builder.executionDataConfig,
 				execDataDistributor,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
 			}
 			builder.ExecutionDataRequester = r
-
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
 			// to wait for the requester to be ready before starting.
@@ -2177,6 +2176,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.stateStreamBackend),
 				builder.stateStreamConf,
 				indexReporter,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, err
@@ -2189,7 +2189,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
 		}).
@@ -2319,11 +2318,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					node.Storage.Headers,
 					processedTxErrorMessagesBlockHeight,
 					builder.TxResultErrorMessagesCore,
+					builder.FollowerDistributor,
 				)
 				if err != nil {
 					return nil, err
 				}
-				builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
 				return engine, nil
 			})
@@ -2339,12 +2338,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				node.Storage.Blocks,
 				builder.SyncCore,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(syncRequestHandler.OnFinalizedBlock)
-			builder.FollowerDistributor.AddOnBlockIncorporatedConsumer(syncRequestHandler.OnBlockIncorporated)
 
 			return syncRequestHandler, nil
 		})

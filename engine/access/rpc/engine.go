@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
@@ -96,6 +97,7 @@ func NewBuilder(
 	stateStreamBackend state_stream.API,
 	stateStreamConfig statestreambackend.Config,
 	indexReporter state_synchronization.IndexReporter,
+	followerDistributor hotstuff.Distributor,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -145,6 +147,9 @@ func NewBuilder(
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}
+
+	// register callback with distributor
+	followerDistributor.AddOnBlockFinalizedConsumer(eng.OnFinalizedBlock)
 
 	return builder, nil
 }

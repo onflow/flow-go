@@ -73,6 +73,7 @@ func NewRequestHandlerEngine(
 	state protocol.State,
 	blocks storage.Blocks,
 	core module.SyncCore,
+	followerDistributor hotstuff.Distributor,
 ) (*RequestHandlerEngine, error) {
 	e := &RequestHandlerEngine{}
 
@@ -101,6 +102,10 @@ func NewRequestHandlerEngine(
 		builder.AddWorker(e.requestHandler.requestProcessingWorker)
 	}
 	e.Component = builder.Build()
+
+	// register callbacks with distributor
+	followerDistributor.AddOnBlockFinalizedConsumer(finalizedHeaderCache.OnFinalizedBlock)
+	followerDistributor.AddOnBlockIncorporatedConsumer(finalizedHeaderCache.OnBlockIncorporated)
 
 	return e, nil
 }
