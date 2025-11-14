@@ -2235,7 +2235,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				executionDataTracker,
 				collectionIndexedHeight,
 				notNil(builder.blockCollectionIndexer),
-				builder.CollectionSyncMetrics,
+				notNil(builder.CollectionSyncMetrics),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create execution data processor: %w", err)
@@ -2563,7 +2563,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				notNil(builder.blockCollectionIndexer),
 				fetchAndIndexedCollectionsBlockHeight,
 				notNil(builder.collectionExecutedMetric),
-				builder.CollectionSyncMetrics,
+				notNil(builder.CollectionSyncMetrics),
 				collection_syncfactory.CreateFetcherConfig{
 					MaxProcessing:  10, // TODO: make configurable
 					MaxSearchAhead: 20, // TODO: make configurable
