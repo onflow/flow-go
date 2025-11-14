@@ -13,7 +13,7 @@ func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerW
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
 
-	// make sure constraints are satisfied, 2/3's of con and col nodes are internal
+	// make sure constraints are satisfied to create QCs locally: >2/3's of con and col nodes are internal
 	internalNodes := GenerateNodeInfos(3, 6, 2, 1, 1)
 	partnerNodes := GenerateNodeInfos(1, 1, 1, 1, 1)
 

@@ -15,8 +15,8 @@ func CanonicalClusterID(epoch uint64, participants flow.IdentifierList) flow.Cha
 
 // CanonicalRootBlock returns the canonical root block for the given
 // cluster in the given epoch. It contains an empty collection referencing
-func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) (*cluster.Block, error) {
-	chainID := CanonicalClusterID(epoch, participants.NodeIDs())
+func CanonicalRootBlock(epoch uint64, participants flow.IdentifierList) (*cluster.Block, error) {
+	chainID := CanonicalClusterID(epoch, participants)
 	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		ChainID:            chainID,
 		ParentID:           flow.ZeroID,
