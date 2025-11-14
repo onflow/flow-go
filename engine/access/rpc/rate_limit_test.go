@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -181,6 +182,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 
 	stateStreamConfig := statestreambackend.Config{}
+	followerDistributor := pubsub.NewFollowerDistributor()
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,
 		suite.state,
@@ -196,6 +198,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		nil,
 		stateStreamConfig,
 		nil,
+		followerDistributor,
 	)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
