@@ -73,6 +73,7 @@ func NewFetcher(
 			ctx.Throw(fmt.Errorf("could not convert job to block: %w", err))
 			return
 		}
+
 		err = jobProcessor.FetchCollections(ctx, block, done)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to process collection indexing job: %w", err))
@@ -109,8 +110,7 @@ func NewFetcher(
 	// Only update metrics when the processed height actually changes, since processedIndex
 	// only advances when consecutive jobs complete, not on every individual job completion.
 	consumer.SetPostNotifier(func(jobID module.JobID) {
-		height := f.ProcessedHeight()
-		metrics.CollectionFetchedHeight(height)
+		metrics.CollectionFetchedHeight(f.ProcessedHeight())
 	})
 
 	return f, nil

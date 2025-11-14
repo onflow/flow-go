@@ -5,6 +5,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/collection_sync/fetcher"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -61,6 +63,7 @@ func CreateFetcher(
 	db storage.DB,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
+	distributor hotstuff.Distributor,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	collectionSyncMetrics module.CollectionSyncMetrics,
 	config CreateFetcherConfig,
@@ -129,6 +132,10 @@ func CreateFetcher(
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create fetcher: %w", err)
 	}
+
+	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
+		collectionFetcher.OnFinalizedBlock()
+	})
 
 	return requestEng, collectionFetcher, nil
 }

@@ -2515,13 +2515,12 @@ func createFinalizedBlockIndexer(builder *FlowAccessNodeBuilder) func(node *cmd.
 			node.State,
 			node.Storage.Blocks,
 			processedFinalizedBlockHeight,
+			builder.FollowerDistributor,
 			notNil(builder.collectionExecutedMetric),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create finalized block processor: %w", err)
 		}
-
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(finalizedBlockProcessor.OnBlockFinalized)
 
 		return finalizedBlockProcessor, nil
 	}
@@ -2562,6 +2561,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				builder.ProtocolDB,
 				notNil(builder.blockCollectionIndexer),
 				fetchAndIndexedCollectionsBlockHeight,
+				builder.FollowerDistributor,
 				notNil(builder.collectionExecutedMetric),
 				notNil(builder.CollectionSyncMetrics),
 				collection_syncfactory.CreateFetcherConfig{

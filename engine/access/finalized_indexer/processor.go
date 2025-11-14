@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -45,9 +46,8 @@ type FinalizedBlockProcessor struct {
 	log zerolog.Logger
 	component.Component
 
-	consumer               *jobqueue.ComponentConsumer
-	blockFinalizedNotifier engine.Notifier
-	blocks                 storage.Blocks
+	consumer *jobqueue.ComponentConsumer
+	blocks   storage.Blocks
 
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
@@ -61,6 +61,7 @@ func NewFinalizedBlockProcessor(
 	state protocol.State,
 	blocks storage.Blocks,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer,
+	distributor hotstuff.Distributor,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*FinalizedBlockProcessor, error) {
 	reader := jobqueue.NewFinalizedBlockReader(state, blocks)
@@ -73,7 +74,6 @@ func NewFinalizedBlockProcessor(
 	processor := &FinalizedBlockProcessor{
 		log:                      log,
 		blocks:                   blocks,
-		blockFinalizedNotifier:   blockFinalizedNotifier,
 		collectionExecutedMetric: collectionExecutedMetric,
 	}
 
@@ -91,6 +91,10 @@ func NewFinalizedBlockProcessor(
 		return nil, fmt.Errorf("error creating finalized block jobqueue: %w", err)
 	}
 
+	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
+		blockFinalizedNotifier.Notify()
+	})
+
 	// Build component manager with worker loop
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(processor.workerLoop).
@@ -99,11 +103,6 @@ func NewFinalizedBlockProcessor(
 	processor.Component = cm
 
 	return processor, nil
-}
-
-// Notify notifies the processor that a new finalized block is available for processing.
-func (p *FinalizedBlockProcessor) OnBlockFinalized(_ *model.Block) {
-	p.blockFinalizedNotifier.Notify()
 }
 
 // StartWorkerLoop begins processing of finalized blocks and signals readiness when initialization is complete.
