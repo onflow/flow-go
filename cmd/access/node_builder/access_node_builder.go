@@ -42,7 +42,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/collection_sync/factory"
 	collection_syncfactory "github.com/onflow/flow-go/engine/access/collection_sync/factory"
-	"github.com/onflow/flow-go/engine/access/collection_sync/fetcher"
+	collsyncindexer "github.com/onflow/flow-go/engine/access/collection_sync/indexer"
 	"github.com/onflow/flow-go/engine/access/finalized_indexer"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingest_receipt"
@@ -1942,7 +1942,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("block collection indexer", func(node *cmd.NodeConfig) error {
-			builder.blockCollectionIndexer = fetcher.NewBlockCollectionIndexer(
+			builder.blockCollectionIndexer = collsyncindexer.NewBlockCollectionIndexer(
 				notNil(builder.collectionExecutedMetric),
 				node.StorageLockMgr,
 				builder.ProtocolDB,
