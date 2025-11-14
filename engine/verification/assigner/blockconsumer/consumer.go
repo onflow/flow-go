@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/assigner"
@@ -46,7 +47,8 @@ func NewBlockConsumer(log zerolog.Logger,
 	blocks storage.Blocks,
 	state protocol.State,
 	blockProcessor assigner.FinalizedBlockProcessor,
-	maxProcessing uint64) (*BlockConsumer, uint64, error) {
+	maxProcessing uint64,
+	followerDistributor hotstuff.Distributor) (*BlockConsumer, uint64, error) {
 
 	lg := log.With().Str("module", "block_consumer").Logger()
 
@@ -75,6 +77,11 @@ func NewBlockConsumer(log zerolog.Logger,
 	}
 	worker.withBlockConsumer(blockConsumer)
 
+	// register callback with distributor
+	followerDistributor.AddOnBlockFinalizedConsumer(func(*model.Block) {
+		blockConsumer.unit.Launch(blockConsumer.consumer.Check)
+	})
+
 	return blockConsumer, defaultIndex, nil
 }
 
@@ -90,14 +97,10 @@ func (c *BlockConsumer) Size() uint {
 	return c.consumer.Size()
 }
 
-// OnFinalizedBlock implements FinalizationConsumer, and is invoked by the follower engine whenever
-// a new block is finalized.
-// In this implementation for block consumer, invoking OnFinalizedBlock is enough to only notify the consumer
-// to check its internal queue and move its processing index ahead to the next height if there are workers available.
-// The consumer retrieves the new blocks from its block reader module, hence it does not need to use the parameter
-// of OnFinalizedBlock here.
+// OnFinalizedBlock is a no-op since callbacks are registered with the distributor in the constructor.
+// This method is kept for backward compatibility.
 func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
-	c.unit.Launch(c.consumer.Check)
+	// no-op: callback is registered with distributor in constructor
 }
 
 func (c *BlockConsumer) Ready() <-chan struct{} {

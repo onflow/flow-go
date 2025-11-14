@@ -1120,13 +1120,15 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.BlockConsumer == nil {
+		followerDistributor := pubsub.NewFollowerDistributor()
 		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
 			collector,
 			node.ProcessedBlockHeight,
 			node.Blocks,
 			node.State,
 			node.AssignerEngine,
-			blockconsumer.DefaultBlockWorkers)
+			blockconsumer.DefaultBlockWorkers,
+			followerDistributor)
 		require.NoError(t, err)
 
 		err = mempoolCollector.Register(metrics.ResourceBlockConsumer, node.BlockConsumer.Size)

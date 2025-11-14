@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
@@ -134,6 +135,7 @@ func withConsumer(
 			process: process,
 		}
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		consumer, _, err := blockconsumer.NewBlockConsumer(
 			unittest.Logger(),
 			collector,
@@ -141,7 +143,8 @@ func withConsumer(
 			s.Storage.Blocks,
 			s.State,
 			engine,
-			maxProcessing)
+			maxProcessing,
+			followerDistributor)
 		require.NoError(t, err)
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
