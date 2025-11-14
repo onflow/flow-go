@@ -30,6 +30,7 @@ type CollectionRequester interface {
 // BlockCollectionIndexer stores and indexes collections for a given block height.
 type BlockCollectionIndexer interface {
 	// IndexCollectionsForBlock stores and indexes collections for a given block height.
+	// No error is exepcted during normal operation.
 	IndexCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error
 }
 
@@ -54,10 +55,12 @@ type ExecutionDataProvider interface {
 	GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error)
 }
 
+// ExecutionDataProcessor processes execution data when new execution data is available.
 type ExecutionDataProcessor interface {
 	OnNewExectuionData()
 }
 
+// ProgressReader provides the current progress of collection fetching/indexing.
 type ProgressReader interface {
 	ProcessedHeight() uint64
 }

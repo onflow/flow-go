@@ -62,7 +62,7 @@ func CreateFetcher(
 	indexer collection_sync.BlockCollectionIndexer,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	collectionSyncMetrics module.CollectionSyncMetrics, // optional metrics collector
+	collectionSyncMetrics module.CollectionSyncMetrics,
 	config CreateFetcherConfig,
 ) (*requester.Engine, collection_sync.Fetcher, error) {
 	// Create requester engine for requesting collections

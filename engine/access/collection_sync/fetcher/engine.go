@@ -110,15 +110,7 @@ func NewFetcher(
 	// only advances when consecutive jobs complete, not on every individual job completion.
 	consumer.SetPostNotifier(func(jobID module.JobID) {
 		height := f.ProcessedHeight()
-
-		f.lastReportedMu.Lock()
-		if height > f.lastReportedHeight {
-			f.lastReportedHeight = height
-			f.lastReportedMu.Unlock()
-			metrics.CollectionFetchedHeight(height)
-		} else {
-			f.lastReportedMu.Unlock()
-		}
+		metrics.CollectionFetchedHeight(height)
 	})
 
 	return f, nil

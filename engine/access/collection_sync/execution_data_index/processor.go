@@ -18,9 +18,9 @@ type ExecutionDataProcessor struct {
 	newExecutionDataIndexed chan struct{}
 	provider                collection_sync.ExecutionDataProvider
 	indexer                 collection_sync.BlockCollectionIndexer
+	metrics                 module.CollectionSyncMetrics
 	// state
 	processedHeight *counters.PersistentStrictMonotonicCounter
-	metrics         module.CollectionSyncMetrics
 }
 
 var _ collection_sync.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
@@ -32,15 +32,15 @@ func NewExecutionDataProcessor(
 	provider collection_sync.ExecutionDataProvider,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedHeight *counters.PersistentStrictMonotonicCounter,
-	metrics module.CollectionSyncMetrics, // optional metrics collector
+	metrics module.CollectionSyncMetrics,
 ) *ExecutionDataProcessor {
 	edp := &ExecutionDataProcessor{
 		log:                     log.With().Str("component", "coll_sync_ed_processor").Logger(),
 		newExecutionDataIndexed: make(chan struct{}, 1),
 		provider:                provider,
 		indexer:                 indexer,
-		processedHeight:         processedHeight,
 		metrics:                 metrics,
+		processedHeight:         processedHeight,
 	}
 
 	// Initialize the channel so that even if no new execution data comes in,
@@ -97,7 +97,6 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 				// And make sure reading the collections's lowest height is cheap operation (only hitting RW lock)
 
 				err = edp.indexer.IndexCollectionsForBlock(height, collections)
-				// TODO: handle already exists
 				if err != nil {
 					ctx.Throw(fmt.Errorf("failed to index collections for block height %d: %w", height, err))
 					return
@@ -120,10 +119,7 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 					Uint64("total_to_process", highestAvailableHeight-lowestMissing+1).
 					Msg("indexed execution data progress")
 
-				// Update metrics if available
-				if edp.metrics != nil {
-					edp.metrics.CollectionSyncedHeight(height)
-				}
+				edp.metrics.CollectionSyncedHeight(height)
 			}
 		}
 	}
