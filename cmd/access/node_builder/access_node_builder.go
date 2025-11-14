@@ -2532,10 +2532,19 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 		Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if builder.executionDataSyncEnabled {
 				// skip if execution data sync is enabled
+				// because the execution data contains the collections, so no need to fetch them separately.
+				// otherwise, if both fetching and syncing are enabled, they might slow down each other,
+				// because the database operation requires locking.
 				return &module.NoopReadyDoneAware{}, nil
 			}
 
-			// fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
+			// TODO (leo): switch to module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
+			// to implement hybrid sync mode in the future
+			// in the hybrid sync mode, the fetcher will store its progress under a different key,
+			// and and only active if either of the following condition is met:
+			// 1) execution data sync is disabled
+			// 2) execution data sync is enabled and exectuion data sync height is far behind
+			//    the latest finalized height and the execution data sync is not updating.
 
 			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight)
 
