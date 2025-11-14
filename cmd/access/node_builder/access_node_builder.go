@@ -502,12 +502,12 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			node.ComplianceConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
