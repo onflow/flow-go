@@ -51,6 +51,7 @@ func NewEngine(
 	log zerolog.Logger,
 	me module.Local,
 	core *Core,
+	distributor hotstuff.Distributor,
 ) (*Engine, error) {
 
 	// Inbound FIFO queue for `flow.UntrustedProposal`s
@@ -77,6 +78,9 @@ func NewEngine(
 	}
 	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
 	eng.FinalizationConsumer = finalizationActor
+
+	distributor.AddOnBlockFinalizedConsumer(finalizationActor.OnFinalizedBlock)
+
 	// create the component manager and worker threads
 	eng.Component = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).

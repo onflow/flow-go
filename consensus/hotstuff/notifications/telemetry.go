@@ -47,12 +47,17 @@ var _ hotstuff.TimeoutCollectorConsumer = (*TelemetryConsumer)(nil)
 
 // NewTelemetryConsumer creates consumer that reports telemetry events using logger backend.
 // Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
-func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
+func NewTelemetryConsumer(log zerolog.Logger, distributor hotstuff.Distributor) *TelemetryConsumer {
 	pathHandler := NewPathHandler(log)
-	return &TelemetryConsumer{
+	t := &TelemetryConsumer{
 		pathHandler:  pathHandler,
 		noPathLogger: pathHandler.log,
 	}
+
+	distributor.AddOnBlockFinalizedConsumer(t.OnFinalizedBlock)
+	distributor.AddOnBlockIncorporatedConsumer(t.OnBlockIncorporated)
+
+	return t
 }
 
 func (t *TelemetryConsumer) OnStart(currentView uint64) {

@@ -602,7 +602,6 @@ func main() {
 			// create consensus logger
 			logger := createLogger(node.Logger, node.RootChainID)
 
-			telemetryConsumer := notifications.NewTelemetryConsumer(logger)
 			slashingViolationConsumer := notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger)
 			followerDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
 
@@ -612,11 +611,12 @@ func main() {
 				mainMetrics,
 			)
 
+			telemetryConsumer := notifications.NewTelemetryConsumer(logger, notifier)
+
+			// TODO(leo): move these to NewTelemetryConsumer
 			notifier.AddParticipantConsumer(telemetryConsumer)
 			notifier.AddCommunicatorConsumer(telemetryConsumer)
-			notifier.AddOnBlockFinalizedConsumer(telemetryConsumer.OnFinalizedBlock)
-			notifier.AddOnBlockIncorporatedConsumer(telemetryConsumer.OnBlockIncorporated)
-			notifier.AddFollowerConsumer(followerDistributor)
+			notifier.ProposalViolationDistributor.AddProposalViolationConsumer(followerDistributor)
 
 			// initialize the persister
 			persist, err := persister.New(node.ProtocolDB, node.RootChainID, node.StorageLockMgr)
@@ -708,12 +708,11 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not load liveness data: %w", err)
 			}
-			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
+			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView, hotstuffModules.Notifier)
 			if err != nil {
 				return nil, err
 			}
 			proposalDurProvider = ctl
-			hotstuffModules.Notifier.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
 			node.ProtocolEvents.AddConsumer(ctl)
 
 			// set up admin commands for dynamically updating configs
@@ -837,11 +836,11 @@ func main() {
 				logger,
 				node.Me,
 				complianceCore,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 
 			return comp, nil
 		}).
