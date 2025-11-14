@@ -3,6 +3,8 @@ package votecollector
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
+	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -31,8 +33,8 @@ func (c *NoopProcessor) Status() hotstuff.VoteCollectorStatus { return c.status 
 
 // EnsureVoteForBlock verifies that the vote is for the given block.
 // Returns nil on success and sentinel errors:
-//   - model.VoteForIncompatibleViewError if the vote is from a different view than block
-//   - model.VoteForIncompatibleBlockError if the vote is from the same view as block
+//   - [VoteForIncompatibleViewError] if the vote is from a different view than block
+//   - [VoteForIncompatibleBlockError] if the vote is from the same view as block
 //     but for a different blockID
 func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 	if vote.View != block.View {
@@ -42,4 +44,25 @@ func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 		return fmt.Errorf("expecting only votes for block %v, but vote %v is for block %v: %w ", block.BlockID, vote.ID(), vote.BlockID, VoteForIncompatibleBlockError)
 	}
 	return nil
+}
+
+type ConcurrentIdentifierSet struct {
+	set  map[flow.Identifier]struct{}
+	lock sync.RWMutex
+}
+
+func NewConcurrentIdentifierSet() *ConcurrentIdentifierSet {
+	return &ConcurrentIdentifierSet{
+		set: make(map[flow.Identifier]struct{}),
+	}
+}
+
+func (s *ConcurrentIdentifierSet) Add(identifier flow.Identifier) bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	_, exists := s.set[identifier]
+	if exists {
+		return false
+	}
+	return true
 }
