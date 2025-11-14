@@ -94,8 +94,7 @@ func newTransactionExecutor(
 		txnState,
 	)
 
-	rt := environment.NewRuntime(ctx.RuntimeParams)
-	rt.SetFvmEnvironment(env)
+	rt := env.Runtime
 
 	if ctx.EVMEnabled {
 		evm.SetupEnvironment(

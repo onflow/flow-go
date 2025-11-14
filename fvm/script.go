@@ -134,14 +134,19 @@ func newScriptExecutor(
 		txnState,
 	)
 
-	rt := environment.NewRuntime(ctx.RuntimeParams)
-	rt.SetFvmEnvironment(env)
+	rt := env.Runtime
 
 	if ctx.EVMEnabled {
+		chainID := ctx.Chain.ChainID()
 		evm.SetupEnvironment(
-			ctx.Chain.ChainID(),
+			chainID,
 			env,
 			rt.ScriptEnv,
+		)
+		evm.SetupEnvironment(
+			chainID,
+			env,
+			rt.TxEnv,
 		)
 	}
 

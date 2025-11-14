@@ -153,16 +153,13 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 	// service account.
 	service := common.Address(sc.ExecutionParametersAccount.Address)
 
-	// TODO: use existing, if available
-	rt := environment.NewRuntime(computer.ctx.RuntimeParams)
-
 	env := environment.NewScriptEnv(
 		context.Background(),
 		computer.ctx.TracerSpan,
 		computer.ctx.EnvironmentParams,
 		computer.txnState)
 
-	rt.SetFvmEnvironment(env)
+	rt := env.Runtime
 
 	overrides := derived.StateExecutionParameters{}
 
