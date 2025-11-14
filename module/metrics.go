@@ -1215,9 +1215,12 @@ type CollectionExecutedMetric interface {
 }
 
 type CollectionSyncMetrics interface {
-	// CollectionFetchedHeight reports the highest block height for which collections have been fetched
+	// CollectionFetchedHeight reports the highest consecutive block height for
+	// which collections have been fetched from collection nodes
 	CollectionFetchedHeight(height uint64)
-	// CollectionSyncedHeight reports the highest block height for which collections have been synced from execution data
+
+	// CollectionSyncedHeight reports the highest consecutive block height for
+	// which collections have been synced from execution data
 	CollectionSyncedHeight(height uint64)
 }
 
