@@ -49,14 +49,14 @@ func TestProduceConsume(t *testing.T) {
 			// hence from consumer perspective, it is blocking on each received block.
 		}
 
-		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, followerDistributor *pubsub.FollowerDistributor) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 
 			for i := 0; i < len(blocks); i++ {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
-				consumer.OnFinalizedBlock(&model.Block{})
+				followerDistributor.OnFinalizedBlock(&model.Block{})
 			}
 
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
@@ -87,7 +87,7 @@ func TestProduceConsume(t *testing.T) {
 			}()
 		}
 
-		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, followerDistributor *pubsub.FollowerDistributor) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 			processAll.Add(len(blocks))
 
@@ -95,7 +95,7 @@ func TestProduceConsume(t *testing.T) {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
-				consumer.OnFinalizedBlock(&model.Block{})
+				followerDistributor.OnFinalizedBlock(&model.Block{})
 			}
 
 			// waits until all blocks finish processing
@@ -117,7 +117,7 @@ func withConsumer(
 	blockCount int,
 	workerCount int,
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *pubsub.FollowerDistributor),
 ) {
 
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
@@ -170,7 +170,7 @@ func withConsumer(
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
 
-		withBlockConsumer(consumer, blocks)
+		withBlockConsumer(consumer, blocks, followerDistributor)
 	})
 }
 

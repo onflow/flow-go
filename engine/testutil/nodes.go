@@ -1134,6 +1134,7 @@ func VerificationNode(t testing.TB,
 			blockconsumer.DefaultBlockWorkers,
 			followerDistributor)
 		require.NoError(t, err)
+		node.FollowerDistributor = followerDistributor
 
 		err = mempoolCollector.Register(metrics.ResourceBlockConsumer, node.BlockConsumer.Size)
 		require.NoError(t, err)

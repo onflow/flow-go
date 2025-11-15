@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -309,6 +310,7 @@ type VerificationNode struct {
 	// block consumer for chunk consumer
 	ProcessedBlockHeight storage.ConsumerProgressInitializer
 	BlockConsumer        *blockconsumer.BlockConsumer
+	FollowerDistributor  *pubsub.FollowerDistributor
 
 	VerifierEngine  *verifier.Engine
 	AssignerEngine  *assigner.Engine

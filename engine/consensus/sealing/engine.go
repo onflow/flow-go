@@ -161,7 +161,7 @@ func NewEngine(log zerolog.Logger,
 
 	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
-	distributor.AddOnBlockIncorporatedConsumer(e.onIncorporatedBlock)
+	distributor.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
 
 	return e, nil
 }

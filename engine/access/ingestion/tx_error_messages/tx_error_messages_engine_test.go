@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -186,6 +187,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		s.lockManager,
 	)
 
+	followerDistributor := pubsub.NewFollowerDistributor()
 	eng, err := New(
 		s.log,
 		s.metrics,
@@ -193,8 +195,12 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		s.headers,
 		processedTxErrorMessagesBlockHeight,
 		txResultErrorMessagesCore,
+		followerDistributor,
 	)
 	require.NoError(s.T(), err)
+	
+	// Store distributor for use in tests
+	s.followerDistributor = followerDistributor
 
 	eng.ComponentManager.Start(ctx)
 	<-eng.Ready()
