@@ -67,7 +67,7 @@ func TestExtractExecutionState(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
 
-			err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			err := unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
 				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					// Store the state commitment for the block ID
 					return operation.IndexStateCommitment(lctx, rw, blockID, stateCommitment)
@@ -139,7 +139,7 @@ func TestExtractExecutionState(t *testing.T) {
 				// generate random block and map it to state commitment
 				blockID := unittest.IdentifierFixture()
 
-				err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+				err = unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
 					return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 						return operation.IndexStateCommitment(lctx, rw, blockID, flow.StateCommitment(stateCommitment))
 					})

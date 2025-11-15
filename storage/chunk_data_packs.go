@@ -41,7 +41,7 @@ type ChunkDataPacks interface {
 	//     to chunk data pack ID in the protocol database. This mapping persists that the Execution Node committed to the result
 	//     represented by this chunk data pack. This function returns [storage.ErrDataMismatch] when a _different_ chunk data pack
 	//     ID for the same chunk ID has already been stored (changing which result an execution Node committed to would be a
-	//     slashable protocol violation). The caller must acquire [storage.LockInsertChunkDataPack] and hold it until the database
+	//     slashable protocol violation). The caller must acquire [storage.LockIndexChunkDataPackByChunkID] and hold it until the database
 	//     write has been committed.
 	//   - error: No error should be returned during normal operation. Any error indicates a failure in the first phase.
 	Store(cs []*flow.ChunkDataPack) (func(lctx lockctx.Proof, protocolDBBatch ReaderBatchWriter) error, error)

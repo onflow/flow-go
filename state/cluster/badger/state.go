@@ -29,20 +29,6 @@ var _ cluster.State = (*State)(nil)
 // The genesis block must have height 0, a parent hash of 32 zero bytes,
 // and an empty collection as payload.
 func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot) (*State, error) {
-	lctx := lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertOrFinalizeClusterBlock` for inserting cluster block: %w", err)
-	}
-	err = lctx.AcquireLock(storage.LockInsertSafetyData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertSafetyData` for inserting safety data: %w", err)
-	}
-	err = lctx.AcquireLock(storage.LockInsertLivenessData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertLivenessData` for inserting liveness data: %w", err)
-	}
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -55,60 +41,59 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	genesis := stateRoot.Block()
 	rootQC := stateRoot.QC()
 
-	// bootstrap cluster state
-	err = state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		chainID := genesis.ChainID
-		// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
-		proposal, err := clustermodel.NewRootProposal(
-			clustermodel.UntrustedProposal{
-				Block:           *genesis,
-				ProposerSigData: nil,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("could not build root cluster proposal: %w", err)
-		}
-		err = operation.InsertClusterBlock(lctx, rw, proposal)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
-		}
-		// insert block height -> ID mapping
-		err = operation.IndexClusterBlockHeight(lctx, rw, chainID, genesis.Height, genesis.ID())
-		if err != nil {
-			return fmt.Errorf("failed to map genesis block height to block: %w", err)
-		}
-		// insert boundary
-		err = operation.BootstrapClusterFinalizedHeight(lctx, rw, chainID, genesis.Height)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis boundary: %w", err)
-		}
+	err = storage.WithLocks(lockManager, storage.LockGroupCollectionBootstrapClusterState, func(lctx lockctx.Context) error {
+		// bootstrap cluster state
+		return state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			chainID := genesis.ChainID
+			// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
+			proposal, err := clustermodel.NewRootProposal(
+				clustermodel.UntrustedProposal{
+					Block:           *genesis,
+					ProposerSigData: nil,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not build root cluster proposal: %w", err)
+			}
+			err = operation.InsertClusterBlock(lctx, rw, proposal)
+			if err != nil {
+				return fmt.Errorf("could not insert genesis block: %w", err)
+			}
+			// insert block height -> ID mapping for genesis block (finalized by protocol convention)
+			err = operation.IndexClusterBlockHeight(lctx, rw, chainID, genesis.Height, genesis.ID())
+			if err != nil {
+				return fmt.Errorf("failed to map genesis block height to block: %w", err)
+			}
+			// insert latest finalized height
+			err = operation.BootstrapClusterFinalizedHeight(lctx, rw, chainID, genesis.Height)
+			if err != nil {
+				return fmt.Errorf("could not insert genesis boundary: %w", err)
+			}
 
-		safetyData := &hotstuff.SafetyData{
-			LockedOneChainView:      genesis.View,
-			HighestAcknowledgedView: genesis.View,
-		}
+			// Initialize and persist safety and liveness data for cluster consensus
+			safetyData := &hotstuff.SafetyData{
+				LockedOneChainView:      genesis.View,
+				HighestAcknowledgedView: genesis.View,
+			}
+			livenessData := &hotstuff.LivenessData{
+				CurrentView: genesis.View + 1, // starting view for hotstuff
+				NewestQC:    rootQC,
+			}
+			err = operation.UpsertSafetyData(lctx, rw, chainID, safetyData)
+			if err != nil {
+				return fmt.Errorf("could not insert safety data: %w", err)
+			}
+			err = operation.UpsertLivenessData(lctx, rw, chainID, livenessData)
+			if err != nil {
+				return fmt.Errorf("could not insert liveness data: %w", err)
+			}
 
-		livenessData := &hotstuff.LivenessData{
-			CurrentView: genesis.View + 1, // starting view for hotstuff
-			NewestQC:    rootQC,
-		}
-		// insert safety data
-		err = operation.UpsertSafetyData(lctx, rw, chainID, safetyData)
-		if err != nil {
-			return fmt.Errorf("could not insert safety data: %w", err)
-		}
-		// insert liveness data
-		err = operation.UpsertLivenessData(lctx, rw, chainID, livenessData)
-		if err != nil {
-			return fmt.Errorf("could not insert liveness data: %w", err)
-		}
-
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
-
 	return state, nil
 }
 

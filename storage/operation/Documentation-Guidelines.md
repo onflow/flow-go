@@ -141,13 +141,13 @@ As an example for functions of type (ii.a), consider `operation.IndexStateCommit
 //
 // CAUTION:
 //   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
-//     The caller must acquire the [storage.LockInsertOwnReceipt] and hold it until the database write has been committed.
+//     The caller must acquire the [storage.LockIndexStateCommitment] and hold it until the database write has been committed.
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrDataMismatch] if a *different* state commitment is already indexed for the same block ID
 func IndexStateCommitment(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, commit flow.StateCommitment) error {
-	if !lctx.HoldsLock(storage.LockInsertOwnReceipt) {
-		return fmt.Errorf("cannot index state commitment without holding lock %s", storage.LockInsertOwnReceipt)
+	if !lctx.HoldsLock(storage.LockIndexStateCommitment) {
+		return fmt.Errorf("cannot index state commitment without holding lock %s", storage.LockIndexStateCommitment)
 	}
 
 	var existingCommit flow.StateCommitment

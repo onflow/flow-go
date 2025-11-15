@@ -32,10 +32,11 @@ func NewEventsStore(
 }
 
 // Persist adds events to the batch.
+// The caller must acquire [storage.LockInsertEvent] and hold it until the write batch is  committed.
 //
 // No error returns are expected during normal operations
-func (e *EventsStore) Persist(_ lockctx.Proof, batch storage.ReaderBatchWriter) error {
-	err := e.persistedEvents.BatchStore(e.blockID, []flow.EventsList{e.data}, batch)
+func (e *EventsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
+	err := e.persistedEvents.BatchStore(lctx, e.blockID, []flow.EventsList{e.data}, batch)
 	if err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			// CAUTION: here we assume that if something is already stored for our blockID, then the data is identical.

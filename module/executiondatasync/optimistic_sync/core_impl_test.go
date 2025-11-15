@@ -446,23 +446,30 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 		indexerData := core.workingData.indexerData
 		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil)
-		c.persistentEvents.On("BatchStore", blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(nil)
-		c.persistentCollections.On("BatchStoreAndIndexByTransaction",
-			mock.MatchedBy(func(lctx lockctx.Proof) bool {
-				return lctx.HoldsLock(storage.LockInsertCollection)
-			}),
-			mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		c.persistentEvents.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			blockID, []flow.EventsList{indexerData.Events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(nil)
+		for _, collection := range indexerData.Collections {
+			c.persistentCollections.On("BatchStoreAndIndexByTransaction",
+				mock.MatchedBy(func(lctx lockctx.Proof) bool {
+					return lctx.HoldsLock(storage.LockInsertCollection)
+				}),
+				collection, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(nil, nil).Once()
+		}
 		c.persistentResults.On("BatchStore",
 			mock.MatchedBy(func(lctx lockctx.Proof) bool {
 				return lctx.HoldsLock(storage.LockInsertLightTransactionResult)
 			}),
-			mock.Anything, blockID, indexerData.Results).Return(nil)
+			mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil }),
+			blockID, indexerData.Results).Return(nil)
 		c.persistentTxResultErrMsg.On("BatchStore",
 			mock.MatchedBy(func(lctx lockctx.Proof) bool {
 				return lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage)
 			}),
-			mock.Anything, blockID, core.workingData.txResultErrMsgsData).Return(nil)
-		c.latestPersistedSealedResult.On("BatchSet", tf.exeResult.ID(), tf.block.Height, mock.Anything).Return(nil)
+			mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil }),
+			blockID, core.workingData.txResultErrMsgsData).Return(nil)
+		c.latestPersistedSealedResult.On("BatchSet", tf.exeResult.ID(), tf.block.Height,
+			mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(nil)
 
 		err = core.Persist()
 		c.Require().NoError(err)
@@ -512,7 +519,9 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 		indexerData := core.workingData.indexerData
 		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil).Once()
-		c.persistentEvents.On("BatchStore", blockID, []flow.EventsList{indexerData.Events}, mock.Anything).Return(expectedErr).Once()
+		c.persistentEvents.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			blockID, []flow.EventsList{indexerData.Events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(expectedErr).Once()
 
 		err = core.Persist()
 		c.ErrorIs(err, expectedErr)

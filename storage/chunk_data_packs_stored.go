@@ -113,7 +113,7 @@ func (c StoredChunkDataPack) Equals(other StoredChunkDataPack) (equal bool, diff
 	return true, ""
 }
 
-// ID returns the identifier of the chunk data pack, which is derived from its contents.
+// ID returns the identifier of the chunk data pack, which is derived from its contents via a collision-resistant hash.
 // Note, StoredChunkDataPack.ID() is the same as ChunkDataPack.ID()
 func (c StoredChunkDataPack) ID() flow.Identifier {
 	return flow.NewChunkDataPackHeader(c.ChunkID, c.StartState, flow.MakeID(c.Proof), c.CollectionID, c.ExecutionDataRoot).ID()

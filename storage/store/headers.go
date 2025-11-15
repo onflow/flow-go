@@ -71,6 +71,19 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 	return h
 }
 
+// storeTx adds storage operations for the given block header and auxiliary signature data to the provided database batch.
+//
+// CAUTION:
+//   - The caller must ensure that `blockID` is a collision-resistant hash of the provided header!
+//     Otherwise, data corruption may occur.
+//   - The caller must acquire one (but not both) of the following locks and hold it until the database
+//     write has been committed: either [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock]
+//     (depending on whether this is the header of the main consensus or a cluster consensus).
+//
+// It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
+// This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
+// of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
+// No other errors are expected during normal operation.
 func (h *Headers) storeTx(
 	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,

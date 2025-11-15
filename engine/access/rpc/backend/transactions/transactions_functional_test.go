@@ -202,7 +202,11 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	})
 	s.Require().NoError(err)
 
-	err = s.blocks.IndexBlockContainingCollectionGuarantees(blockID, flow.GetIDs(block.Payload.Guarantees))
+	err = unittest.WithLock(s.T(), s.lockManager, storage.LockIndexBlockByPayloadGuarantees, func(lctx lockctx.Context) error {
+		return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return s.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, blockID, flow.GetIDs(block.Payload.Guarantees))
+		})
+	})
 	s.Require().NoError(err)
 
 	err = unittest.WithLocks(s.T(), s.lockManager, []string{
@@ -214,10 +218,6 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 				return err
 			}
 
-			if err := s.events.BatchStore(blockID, []flow.EventsList{s.tf.ExpectedEvents}, rw); err != nil {
-				return err
-			}
-
 			for txID, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
 				if err := s.scheduledTransactions.BatchIndex(lctx, blockID, txID, scheduledTxID, rw); err != nil {
 					return err
@@ -225,6 +225,13 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 			}
 
 			return nil
+		})
+	})
+	s.Require().NoError(err)
+
+	err = unittest.WithLock(s.T(), s.lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+		return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return s.events.BatchStore(lctx, blockID, []flow.EventsList{s.tf.ExpectedEvents}, rw)
 		})
 	})
 	s.Require().NoError(err)

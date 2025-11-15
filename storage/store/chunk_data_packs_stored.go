@@ -85,7 +85,11 @@ func (ch *StoredChunkDataPacks) batchRemove(chunkDataPackID flow.Identifier, rw 
 }
 
 // StoreChunkDataPacks stores multiple StoredChunkDataPacks cs in a batch.
-// It returns the chunk data pack IDs
+// It returns the chunk data pack IDs.
+//
+// The key (ChunkDataPack's ID) is derived from the value (full ChunkDataPack) via a collision-resistant hash function.
+// Hence, unchecked overwrites pose no risk of data corruption, because for the same key, we expect the same value.
+//
 // No error returns are expected during normal operation.
 func (ch *StoredChunkDataPacks) StoreChunkDataPacks(cs []*storage.StoredChunkDataPack) ([]flow.Identifier, error) {
 	if len(cs) == 0 {

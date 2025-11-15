@@ -63,7 +63,7 @@ const (
 	_                          = 51 // DEPRECATED: 51 was used for identity indexes before epochs
 	codePayloadGuarantees      = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals           = 53 // index mapping block ID to payload seals
-	codeCollectionBlock        = 54 // index mapping collection ID to block ID
+	codeGuaranteeBlock         = 54 // index mapping guarantee ID to block ID
 	codeOwnBlockReceipt        = 55 // index mapping block ID to execution receipt ID for execution nodes
 	_                          = 56 // DEPRECATED: 56 was used for block->epoch status prior to Dynamic Protocol State in Mainnet25
 	codePayloadReceipts        = 57 // index mapping block ID to payload receipts

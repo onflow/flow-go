@@ -49,9 +49,17 @@ func (c *Commits) retrieveTx(r storage.Reader, blockID flow.Identifier) (flow.St
 	return val, nil
 }
 
-// BatchStore stores Commit keyed by blockID in provided batch
-// No errors are expected during normal operation.
-// If the database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// BatchStore stores a state commitment keyed by the blockID whose execution results in that state.
+// The function ensures data integrity by first checking if a commitment already exists for the given block
+// and rejecting overwrites with different values. This function is idempotent, i.e. repeated calls with the
+// *initially* indexed value are no-ops.
+//
+// CAUTION:
+//   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
+//     The caller must acquire the [storage.LockIndexStateCommitment] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrDataMismatch] if a *different* state commitment is already indexed for the same block ID
 func (c *Commits) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, commit flow.StateCommitment, rw storage.ReaderBatchWriter) error {
 	// we can't cache while using batches, as it's unknown at this point when, and if
 	// the batch will be committed. Cache will be populated on read however.
