@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -40,10 +41,11 @@ type EngineSuite struct {
 	headers   *storage.Headers
 	core      *followermock.ComplianceCore
 
-	ctx    irrecoverable.SignalerContext
-	cancel context.CancelFunc
-	errs   <-chan error
-	engine *ComplianceEngine
+	ctx                irrecoverable.SignalerContext
+	cancel             context.CancelFunc
+	errs               <-chan error
+	engine             *ComplianceEngine
+	followerDistributor *pubsub.FollowerDistributor
 }
 
 func (s *EngineSuite) SetupTest() {
@@ -64,6 +66,7 @@ func (s *EngineSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	s.finalized = unittest.BlockHeaderFixture()
+	s.followerDistributor = pubsub.NewFollowerDistributor()
 	eng, err := NewComplianceLayer(
 		unittest.Logger(),
 		s.net,
@@ -72,6 +75,7 @@ func (s *EngineSuite) SetupTest() {
 		s.headers,
 		s.finalized,
 		s.core,
+		s.followerDistributor,
 		compliance.DefaultConfig())
 	require.NoError(s.T(), err)
 
@@ -203,7 +207,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}).Return(nil).Once()
 	s.headers.On("ByBlockID", newFinalizedBlock.ID()).Return(newFinalizedBlock, nil).Once()
 
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
+	s.followerDistributor.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 
 	// check if batch gets filtered out since it's lower than finalized view
