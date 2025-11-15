@@ -83,3 +83,28 @@ Running `transit push-transit-key` will perform the following actions:
    - `transit-key.priv.<id>`
 1. Upload the node's public files to the server
    - `transit-key.pub.<id>`
+
+## Root Block Signing Automation
+
+The root block voting is a critical and time-sensitive step of a network upgrade (spork). During this process, Consensus Node operators must download the root block, generate a vote for it using each of their Consensus Nodes, and upload those votes to the server (one vote per node).
+
+To ensure this step is completed reliably and without delays, operators running multiple Consensus Nodes are strongly encouraged to automate the root block voting process. The provided `root_block_voting.yml` Ansible playbook serves as an example for building such automation. It automates:
+
+- Pulling the root block and random beacon key
+- Generating the root block vote
+- Pushing the vote to the server
+
+Refer to this playbook as a reference for how to use the transit script in an automated environment.
+
+Example usage:
+
+```shell
+ansible-playbook -i inventories/mainnet/mainnet26.yml/ vote_on_root_block.yml \ 
+    -e "boot_tools_tar=https://storage.googleapis.com/flow-genesis-bootstrap/boot-tools.tar" \
+    -e "bootstrap_directory=/var/flow/bootstrap"
+    -e "genesis_bucket=flow-genesis-bootstrap" \
+    -e "network_version_token=mainnet-26" \
+    -e "output_directory=/var/flow/bootstrap" \
+    -e force_repull_transit=true \ 
+```
+
