@@ -172,8 +172,8 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 	<-e.txErrorMessagesConsumer.Done()
 }
 
-// OnFinalizedBlock is a no-op since callbacks are registered with the distributor in the constructor.
-// This method is kept for backward compatibility.
+// onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization distributor and forwards them to the txErrorMessagesConsumer.
 func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.txErrorMessagesNotifier.Notify()
 }
