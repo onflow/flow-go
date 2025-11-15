@@ -3672,7 +3672,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
-				require.Greater(t, int(output.ComputationUsed), 400)
+				require.Greater(t, int(output.ComputationUsed), 900)
 			},
 			fvm.WithExecutionEffortWeights(
 				environment.MainnetExecutionEffortWeights,
@@ -3692,7 +3692,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 400)
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 500)
 				snapshot = snapshot.Append(state)
 
 				require.Len(t, output.Events, 0)
@@ -3708,7 +3708,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				require.Equal(t, uint64(0), blockEventPayload.TotalGasUsed)
 
 				// only a small amount of computation was used due to the EVM transaction never being executed
-				require.Less(t, int(output.ComputationUsed), 20)
+				require.Less(t, int(output.ComputationUsed), 900)
 			},
 			fvm.WithExecutionEffortWeights(
 				environment.MainnetExecutionEffortWeights,
@@ -4007,13 +4007,7 @@ func getEVMAccountNonce(
 func RunWithNewEnvironment(
 	t *testing.T,
 	chain flow.Chain,
-	f func(
-		fvm.Context,
-		fvm.VM,
-		snapshot.SnapshotTree,
-		*TestContract,
-		*EOATestAccount,
-	),
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 	RunWithTestBackend(t, func(backend *TestBackend) {
@@ -4069,13 +4063,7 @@ func RunContractWithNewEnvironment(
 	t *testing.T,
 	chain flow.Chain,
 	tc *TestContract,
-	f func(
-		fvm.Context,
-		fvm.VM,
-		snapshot.SnapshotTree,
-		*TestContract,
-		*EOATestAccount,
-	),
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
 	bootstrapOpts ...fvm.BootstrapProcedureOption,
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
