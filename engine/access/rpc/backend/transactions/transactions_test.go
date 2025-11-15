@@ -84,7 +84,6 @@ type Suite struct {
 	systemCollection                     *flow.Collection
 	pendingExecutionEvents               []flow.Event
 	processScheduledTransactionEventType flow.EventType
-	scheduledTransactionsEnabled         bool
 
 	fixedExecutionNodeIDs     flow.IdentifierList
 	preferredExecutionNodeIDs flow.IdentifierList
@@ -130,8 +129,6 @@ func (suite *Suite) SetupTest() {
 	suite.Require().NoError(err)
 	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
-
-	suite.scheduledTransactionsEnabled = true
 
 	// this is the system collection with scheduled transactions used as block data
 	suite.pendingExecutionEvents = suite.g.PendingExecutionEvents().List(2)
@@ -224,21 +221,20 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		State:   suite.state,
 		ChainID: flow.Testnet,
 		// SystemCollection:             suite.defaultSystemCollection,
-		NodeCommunicator:             node_communicator.NewNodeCommunicator(false),
-		ConnFactory:                  suite.connectionFactory,
-		NodeProvider:                 nodeProvider,
-		Blocks:                       suite.blocks,
-		Collections:                  suite.collections,
-		Transactions:                 suite.transactions,
-		TxErrorMessageProvider:       suite.errorMessageProvider,
-		ScheduledTransactions:        suite.scheduledTransactions,
-		TxResultCache:                suite.txResultCache,
-		TxValidator:                  txValidator,
-		TxStatusDeriver:              txStatusDeriver,
-		EventsIndex:                  suite.eventsIndex,
-		TxResultsIndex:               suite.txResultsIndex,
-		ScheduledTransactionsEnabled: suite.scheduledTransactionsEnabled,
-		SystemCollections:            versionedSystemCollections,
+		NodeCommunicator:       node_communicator.NewNodeCommunicator(false),
+		ConnFactory:            suite.connectionFactory,
+		NodeProvider:           nodeProvider,
+		Blocks:                 suite.blocks,
+		Collections:            suite.collections,
+		Transactions:           suite.transactions,
+		TxErrorMessageProvider: suite.errorMessageProvider,
+		ScheduledTransactions:  suite.scheduledTransactions,
+		TxResultCache:          suite.txResultCache,
+		TxValidator:            txValidator,
+		TxStatusDeriver:        txStatusDeriver,
+		EventsIndex:            suite.eventsIndex,
+		TxResultsIndex:         suite.txResultsIndex,
+		SystemCollections:      versionedSystemCollections,
 	}
 }
 
@@ -2027,19 +2023,6 @@ func (suite *Suite) TestGetScheduledTransaction() {
 		suite.Require().Error(err) // specific error doen't matter since it's thrown
 		suite.Require().Nil(actual)
 	})
-
-	suite.Run("returns unimplemented error when scheduled transactions are not enabled", func() {
-		params := suite.defaultTransactionsParams()
-		params.ScheduledTransactions = nil
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetScheduledTransaction(context.Background(), 0)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.Unimplemented, status.Code(err))
-		suite.Require().Nil(res)
-	})
 }
 
 func (suite *Suite) TestGetScheduledTransactionResult() {
@@ -2206,19 +2189,6 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 
 		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
 		suite.Require().ErrorIs(err, expectedErr)
-		suite.Require().Nil(res)
-	})
-
-	suite.Run("returns unimplemented error when scheduled transactions are not enabled", func() {
-		params := suite.defaultTransactionsParams()
-		params.ScheduledTransactions = nil
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, err := txBackend.GetScheduledTransactionResult(context.Background(), scheduledTxID, encodingVersion)
-		suite.Require().Error(err)
-		suite.Require().Equal(codes.Unimplemented, status.Code(err))
 		suite.Require().Nil(res)
 	})
 }
