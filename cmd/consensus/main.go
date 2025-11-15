@@ -616,7 +616,7 @@ func main() {
 			// TODO(leo): move these to NewTelemetryConsumer
 			notifier.AddParticipantConsumer(telemetryConsumer)
 			notifier.AddCommunicatorConsumer(telemetryConsumer)
-			notifier.ProposalViolationDistributor.AddProposalViolationConsumer(followerDistributor)
+			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
 			persist, err := persister.New(node.ProtocolDB, node.RootChainID, node.StorageLockMgr)
