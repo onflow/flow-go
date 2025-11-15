@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -30,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"

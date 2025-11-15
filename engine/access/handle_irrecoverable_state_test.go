@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/crypto"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -29,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"

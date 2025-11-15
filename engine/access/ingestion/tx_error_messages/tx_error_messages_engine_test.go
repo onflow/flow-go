@@ -70,8 +70,8 @@ type TxErrorMessagesEngineSuite struct {
 	db    storage.DB
 	dbDir string
 
-	ctx                context.Context
-	cancel             context.CancelFunc
+	ctx                 context.Context
+	cancel              context.CancelFunc
 	followerDistributor *pubsub.FollowerDistributor
 }
 
@@ -199,7 +199,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		followerDistributor,
 	)
 	require.NoError(s.T(), err)
-	
+
 	// Store distributor for use in tests
 	s.followerDistributor = followerDistributor
 

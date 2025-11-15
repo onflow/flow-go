@@ -37,9 +37,9 @@ type MatchingEngineSuite struct {
 	state    *mockprotocol.State
 
 	// Matching Engine
-	engine     *Engine
+	engine      *Engine
 	distributor *pubsub.FollowerDistributor
-	cancel     context.CancelFunc
+	cancel      context.CancelFunc
 }
 
 func (s *MatchingEngineSuite) SetupTest() {

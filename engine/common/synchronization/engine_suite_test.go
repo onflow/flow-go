@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/id"

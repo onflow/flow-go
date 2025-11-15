@@ -41,10 +41,10 @@ type EngineSuite struct {
 	headers   *storage.Headers
 	core      *followermock.ComplianceCore
 
-	ctx                irrecoverable.SignalerContext
-	cancel             context.CancelFunc
-	errs               <-chan error
-	engine             *ComplianceEngine
+	ctx                 irrecoverable.SignalerContext
+	cancel              context.CancelFunc
+	errs                <-chan error
+	engine              *ComplianceEngine
 	followerDistributor *pubsub.FollowerDistributor
 }
 

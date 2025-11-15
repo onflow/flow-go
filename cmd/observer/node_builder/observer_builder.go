@@ -1286,23 +1286,23 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				execDataCacheBackend,
 			)
 
-		r, err := edrequester.New(
-			builder.Logger,
-			metrics.NewExecutionDataRequesterCollector(),
-			builder.ExecutionDataDownloader,
-			executionDataCache,
-			processedBlockHeight,
-			processedNotifications,
-			builder.State,
-			builder.Storage.Headers,
-			builder.executionDataConfig,
-			execDataDistributor,
-			builder.FollowerDistributor,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create execution data requester: %w", err)
-		}
-		builder.ExecutionDataRequester = r
+			r, err := edrequester.New(
+				builder.Logger,
+				metrics.NewExecutionDataRequesterCollector(),
+				builder.ExecutionDataDownloader,
+				executionDataCache,
+				processedBlockHeight,
+				processedNotifications,
+				builder.State,
+				builder.Storage.Headers,
+				builder.executionDataConfig,
+				execDataDistributor,
+				builder.FollowerDistributor,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
+			}
+			builder.ExecutionDataRequester = r
 
 			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
 			// to wait for the requester to be ready before starting.
