@@ -70,8 +70,9 @@ type TxErrorMessagesEngineSuite struct {
 	db    storage.DB
 	dbDir string
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx                context.Context
+	cancel             context.CancelFunc
+	followerDistributor *pubsub.FollowerDistributor
 }
 
 // TestTxErrorMessagesEngine runs the test suite for the transaction error messages engine.
@@ -267,9 +268,9 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 			}).Once()
 	}
 
-	eng := s.initEngine(irrecoverableCtx)
+	_ = s.initEngine(irrecoverableCtx)
 	// process the block through the finalized callback
-	eng.OnFinalizedBlock(&hotstuffBlock)
+	s.followerDistributor.OnFinalizedBlock(&hotstuffBlock)
 
 	// Verify that all transaction error messages were processed within the timeout.
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 2*time.Second, "expect to process new block before timeout")
