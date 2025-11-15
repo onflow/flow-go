@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -153,6 +154,7 @@ func (ss *SyncSuite) SetupTest() {
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	spamConfig, err := NewSpamDetectionConfig()
 	require.NoError(ss.T(), err, "could not create spam detection config")
+	followerDistributor := pubsub.NewFollowerDistributor()
 	e, err := New(log, ss.metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
@@ -161,7 +163,8 @@ func (ss *SyncSuite) SetupTest() {
 			),
 			idCache,
 		),
-		spamConfig)
+		spamConfig,
+		followerDistributor)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 	ss.e = e
 }

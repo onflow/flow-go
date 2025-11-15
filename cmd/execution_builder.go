@@ -1267,12 +1267,12 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Storage.Headers,
 		node.LastFinalizedHeader,
 		core,
+		exeNode.followerDistributor,
 		node.ComplianceConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
 	}
-	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.followerEng.OnFinalizedBlock)
 
 	return exeNode.followerEng, nil
 }
@@ -1350,11 +1350,11 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 		exeNode.syncCore,
 		node.SyncEngineIdentifierProvider,
 		spamConfig,
+		exeNode.followerDistributor,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 	}
-	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.syncEngine)
 
 	return exeNode.syncEngine, nil
 }

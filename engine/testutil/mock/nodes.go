@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
@@ -309,6 +310,7 @@ type VerificationNode struct {
 	// block consumer for chunk consumer
 	ProcessedBlockHeight storage.ConsumerProgressInitializer
 	BlockConsumer        *blockconsumer.BlockConsumer
+	FollowerDistributor  *pubsub.FollowerDistributor
 
 	VerifierEngine  *verifier.Engine
 	AssignerEngine  *assigner.Engine

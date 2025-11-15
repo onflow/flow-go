@@ -432,10 +432,9 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 			MaxRetryDelay:      cfg.maxRetryDelay,
 		},
 		suite.distributor,
+		followerDistributor,
 	)
 	require.NoError(suite.T(), err)
-
-	followerDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
 	return edr, followerDistributor
 }

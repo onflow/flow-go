@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -35,7 +36,8 @@ type EngineSuite struct {
 func (cs *EngineSuite) SetupTest() {
 	cs.CommonSuite.SetupTest()
 
-	e, err := NewEngine(unittest.Logger(), cs.me, cs.core)
+	distributor := pubsub.NewDistributor()
+	e, err := NewEngine(unittest.Logger(), cs.me, cs.core, distributor)
 	require.NoError(cs.T(), err)
 	cs.engine = e
 

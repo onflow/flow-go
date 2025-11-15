@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -36,8 +37,9 @@ type SealingEngineSuite struct {
 	myID    flow.Identifier
 
 	// Sealing Engine
-	engine *Engine
-	cancel context.CancelFunc
+	engine      *Engine
+	distributor *pubsub.FollowerDistributor
+	cancel      context.CancelFunc
 }
 
 func (s *SealingEngineSuite) SetupTest() {
@@ -79,6 +81,12 @@ func (s *SealingEngineSuite) SetupTest() {
 
 	// setup ComponentManager and start the engine
 	s.engine.Component = s.engine.buildComponentManager()
+
+	// register callbacks with distributor
+	s.distributor = pubsub.NewFollowerDistributor()
+	s.distributor.AddOnBlockFinalizedConsumer(s.engine.onFinalizedBlock)
+	s.distributor.AddOnBlockIncorporatedConsumer(s.engine.onBlockIncorporated)
+
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
 	s.cancel = cancel
 	s.engine.Start(ctx)
@@ -101,7 +109,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
+	s.distributor.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -137,7 +145,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	headers.On("ByBlockID", incorporatedBlockID).Return(incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
-	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
+	s.distributor.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

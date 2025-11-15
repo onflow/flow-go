@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -151,6 +152,7 @@ func New(
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
 	distributor *ExecutionDataDistributor,
+	followerDistributor hotstuff.Distributor,
 ) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
@@ -247,11 +249,14 @@ func New(
 		AddWorker(e.runNotificationConsumer).
 		Build()
 
+	// register callback with distributor
+	followerDistributor.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
+
 	return e, nil
 }
 
-// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
-func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
+// onBlockFinalized accepts block finalization notifications from the FollowerDistributor
+func (e *executionDataRequester) onBlockFinalized(*model.Block) {
 	e.finalizationNotifier.Notify()
 }
 

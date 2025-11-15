@@ -322,7 +322,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Blocks,
 				node.State,
 				assignerEngine,
-				v.verConf.blockWorkers)
+				v.verConf.blockWorkers,
+				followerDistributor)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
@@ -358,8 +359,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
-
-			followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
@@ -414,12 +413,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				node.LastFinalizedHeader,
 				core,
+				followerDistributor,
 				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
@@ -440,11 +439,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				syncCore,
 				node.SyncEngineIdentifierProvider,
 				spamConfig,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		})

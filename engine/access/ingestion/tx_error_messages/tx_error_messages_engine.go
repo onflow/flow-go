@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -73,6 +74,7 @@ func New(
 	headers storage.Headers,
 	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
 	txErrorMessagesCore *TxErrorMessagesCore,
+	followerDistributor hotstuff.Distributor,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                     log.With().Str("engine", "tx_error_messages_engine").Logger(),
@@ -117,6 +119,9 @@ func New(
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.runTxResultErrorMessagesConsumer).
 		Build()
+
+	// register callback with distributor
+	followerDistributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -167,9 +172,9 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 	<-e.txErrorMessagesConsumer.Done()
 }
 
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
 // Receives block finalized events from the finalization distributor and forwards them to the txErrorMessagesConsumer.
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.txErrorMessagesNotifier.Notify()
 }
 

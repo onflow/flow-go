@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -67,6 +68,7 @@ type Suite struct {
 	finalizedBlock *flow.Header
 	log            zerolog.Logger
 	blockMap       map[uint64]*flow.Block
+	distributor    *pubsub.FollowerDistributor
 	rootBlock      *flow.Block
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
@@ -203,6 +205,7 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 		nil,
 	)
 
+	s.distributor = pubsub.NewFollowerDistributor()
 	eng, err := New(
 		s.log,
 		s.net,
@@ -216,6 +219,7 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 		indexer,
 		s.collectionExecutedMetric,
 		nil,
+		s.distributor,
 	)
 	require.NoError(s.T(), err)
 
@@ -317,7 +321,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	s.request.On("Force").Return().Once()
 
 	// process the block through the finalized callback
-	eng.OnFinalizedBlock(&hotstuffBlock)
+	s.distributor.OnFinalizedBlock(&hotstuffBlock)
 
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process new block before timeout")
 
@@ -400,7 +404,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		}
 	}
 
-	eng.OnFinalizedBlock(&hotstuffBlock)
+	s.distributor.OnFinalizedBlock(&hotstuffBlock)
 
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process all blocks before timeout")
 
@@ -543,7 +547,7 @@ func (s *Suite) TestCollectionSyncing() {
 	s.proto.state.On("Final").Unset()
 	s.proto.state.On("Final").Return(newFinalSnapshot, nil)
 
-	eng.OnFinalizedBlock(&hotstuffBlock)
+	s.distributor.OnFinalizedBlock(&hotstuffBlock)
 
 	// wait until the finalized block jobqueue completes processing the block
 	require.Eventually(s.T(), func() bool {
