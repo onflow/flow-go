@@ -40,7 +40,6 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
-	"github.com/onflow/flow-go/engine/access/collection_sync/factory"
 	collection_syncfactory "github.com/onflow/flow-go/engine/access/collection_sync/factory"
 	collsyncindexer "github.com/onflow/flow-go/engine/access/collection_sync/indexer"
 	"github.com/onflow/flow-go/engine/access/finalized_indexer"
@@ -187,6 +186,8 @@ type AccessNodeConfig struct {
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
 	scheduledCallbacksEnabled            bool
+	collectionFetcherMaxProcessing       uint64
+	collectionFetcherMaxSearchAhead      uint64
 }
 
 type PublicNetworkConfig struct {
@@ -295,6 +296,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
 		scheduledCallbacksEnabled:            fvm.DefaultScheduledCallbacksEnabled,
+		collectionFetcherMaxProcessing:       10,
+		collectionFetcherMaxSearchAhead:      20,
 	}
 }
 
@@ -368,7 +371,7 @@ type FlowAccessNodeBuilder struct {
 
 	// for tx status deriver to know about the highest full block (a block with all collections synced)
 	// backed by either collection fetcher to execution data syncing
-	lastFullBlockHeight *factory.ProgressReader
+	lastFullBlockHeight *collection_syncfactory.ProgressReader
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -1203,6 +1206,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"",
 			defaultConfig.rpcConf.CollectionAddr,
 			"the address (of the collection node) to send transactions to")
+		flags.Uint64Var(&builder.collectionFetcherMaxProcessing,
+			"collection-fetcher-max-processing",
+			defaultConfig.collectionFetcherMaxProcessing,
+			"maximum number of collection fetcher requests to process concurrently")
+		flags.Uint64Var(&builder.collectionFetcherMaxSearchAhead,
+			"collection-fetcher-max-search-ahead",
+			defaultConfig.collectionFetcherMaxSearchAhead,
+			"maximum number of blocks to search ahead when fetching collections")
 		flags.StringVarP(&builder.ExecutionNodeAddress,
 			"script-addr",
 			"s",
@@ -1964,7 +1975,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 
 			// Create ProgressReader that aggregates progress from executionDataProcessor and collectionFetcher
-			builder.lastFullBlockHeight = factory.NewProgressReader(lastProgress)
+			builder.lastFullBlockHeight = collection_syncfactory.NewProgressReader(lastProgress)
 
 			collectionIndexedHeight = progress
 
@@ -2549,7 +2560,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 
 			// skip if execution data sync is enabled
 			// Create fetcher and requesterEng
-			requesterEng, fetcher, err := factory.CreateFetcher(
+			requesterEng, fetcher, err := collection_syncfactory.CreateFetcher(
 				node.Logger,
 				node.Metrics.Engine,
 				node.EngineRegistry,
@@ -2565,8 +2576,8 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				notNil(builder.collectionExecutedMetric),
 				notNil(builder.CollectionSyncMetrics),
 				collection_syncfactory.CreateFetcherConfig{
-					MaxProcessing:  10, // TODO: make configurable
-					MaxSearchAhead: 20, // TODO: make configurable
+					MaxProcessing:  builder.collectionFetcherMaxProcessing,
+					MaxSearchAhead: builder.collectionFetcherMaxSearchAhead,
 				},
 			)
 
