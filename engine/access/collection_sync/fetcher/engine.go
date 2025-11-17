@@ -2,7 +2,6 @@ package fetcher
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -21,12 +20,10 @@ import (
 type Fetcher struct {
 	component.Component
 
-	consumer           *jobqueue.ComponentConsumer
-	blockProcessor     collection_sync.BlockProcessor
-	workSignal         engine.Notifier
-	metrics            module.CollectionSyncMetrics
-	lastReportedMu     sync.Mutex
-	lastReportedHeight uint64
+	consumer       *jobqueue.ComponentConsumer
+	blockProcessor collection_sync.BlockProcessor
+	workSignal     engine.Notifier
+	metrics        module.CollectionSyncMetrics
 }
 
 var _ collection_sync.Fetcher = (*Fetcher)(nil)
