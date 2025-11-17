@@ -1222,6 +1222,9 @@ type CollectionSyncMetrics interface {
 	// CollectionSyncedHeight reports the highest consecutive block height for
 	// which collections have been synced from execution data
 	CollectionSyncedHeight(height uint64)
+
+	// MissingCollectionQueueSize reports the number of missing collections currently in the queue
+	MissingCollectionQueueSize(size uint)
 }
 
 type MachineAccountMetrics interface {

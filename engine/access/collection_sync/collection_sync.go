@@ -20,6 +20,9 @@ type MissingCollectionQueue interface {
 
 	// IsHeightQueued returns true if the given height is still being tracked (has not been indexed yet).
 	IsHeightQueued(height uint64) bool
+
+	// Size returns the number of missing collections currently in the queue.
+	Size() uint
 }
 
 // Requests collections by their IDs.
@@ -37,6 +40,8 @@ type BlockCollectionIndexer interface {
 // Implements the job lifecycle for a single block height.
 type BlockProcessor interface {
 	FetchCollections(ctx irrecoverable.SignalerContext, block *flow.Block, done func()) error
+	// MissingCollectionQueueSize returns the number of missing collections currently in the queue.
+	MissingCollectionQueueSize() uint
 }
 
 // Fetcher is a component that consumes finalized block jobs and processes them

@@ -177,3 +177,8 @@ func (bp *BlockProcessor) getMissingCollections(blockHeight uint64) ([]*flow.Col
 
 	return missingGuarantees, nil
 }
+
+// MissingCollectionQueueSize returns the number of missing collections currently in the queue.
+func (bp *BlockProcessor) MissingCollectionQueueSize() uint {
+	return bp.mcq.Size()
+}

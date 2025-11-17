@@ -22,7 +22,7 @@ type Fetcher struct {
 	component.Component
 
 	consumer           *jobqueue.ComponentConsumer
-	jobProcessor       collection_sync.BlockProcessor
+	blockProcessor     collection_sync.BlockProcessor
 	workSignal         engine.Notifier
 	metrics            module.CollectionSyncMetrics
 	lastReportedMu     sync.Mutex
@@ -37,7 +37,7 @@ var _ component.Component = (*Fetcher)(nil)
 //
 // Parameters:
 //   - log: Logger for the component
-//   - jobProcessor: BlockProcessor implementation for processing collection indexing jobs
+//   - blockProcessor: BlockProcessor implementation for processing collection indexing jobs
 //   - progressInitializer: Initializer for tracking processed block heights
 //   - state: Protocol state for reading finalized block information
 //   - blocks: Blocks storage for reading blocks by height
@@ -48,8 +48,7 @@ var _ component.Component = (*Fetcher)(nil)
 // No error returns are expected during normal operation.
 func NewFetcher(
 	log zerolog.Logger,
-	jobProcessor collection_sync.BlockProcessor,
-	progressInitializer storage.ConsumerProgressInitializer,
+	blockProcessor collection_sync.BlockProcessor, progressInitializer storage.ConsumerProgressInitializer,
 	state protocol.State,
 	blocks storage.Blocks,
 	maxProcessing uint64, // max number of blocks to fetch collections
@@ -74,7 +73,7 @@ func NewFetcher(
 			return
 		}
 
-		err = jobProcessor.FetchCollections(ctx, block, done)
+		err = blockProcessor.FetchCollections(ctx, block, done)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to process collection indexing job: %w", err))
 		}
@@ -95,11 +94,11 @@ func NewFetcher(
 	}
 
 	f := &Fetcher{
-		Component:    consumer,
-		consumer:     consumer,
-		jobProcessor: jobProcessor,
-		workSignal:   workSignal,
-		metrics:      metrics,
+		Component:      consumer,
+		consumer:       consumer,
+		blockProcessor: blockProcessor,
+		workSignal:     workSignal,
+		metrics:        metrics,
 	}
 
 	if metrics == nil {
@@ -111,6 +110,7 @@ func NewFetcher(
 	// only advances when consecutive jobs complete, not on every individual job completion.
 	consumer.SetPostNotifier(func(jobID module.JobID) {
 		metrics.CollectionFetchedHeight(f.ProcessedHeight())
+		metrics.MissingCollectionQueueSize(f.blockProcessor.MissingCollectionQueueSize())
 	})
 
 	return f, nil

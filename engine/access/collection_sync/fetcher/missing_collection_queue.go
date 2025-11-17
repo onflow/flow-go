@@ -208,3 +208,12 @@ func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) (func()
 
 	return jobState.callback, true
 }
+
+// Size returns the number of missing collections currently in the queue.
+// This is the total number of collections across all block heights that are still missing.
+func (mcq *MissingCollectionQueue) Size() uint {
+	mcq.mu.RLock()
+	defer mcq.mu.RUnlock()
+
+	return uint(len(mcq.collectionToHeight))
+}
