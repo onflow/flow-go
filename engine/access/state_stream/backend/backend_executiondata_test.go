@@ -191,7 +191,6 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.ID())
 
-
 	s.criteria = optimistic_sync.DefaultCriteria
 }
 

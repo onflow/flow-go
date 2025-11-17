@@ -24,7 +24,7 @@ import (
 // sendAndGetTransactionStatusesArguments contains the arguments required for sending a
 // transaction and subscribing to its transaction status updates.
 type sendAndGetTransactionStatusesArguments struct {
-    Transaction flow.TransactionBody // The transaction body to be sent and monitored.
+	Transaction flow.TransactionBody // The transaction body to be sent and monitored.
 }
 
 // SendAndGetTransactionStatusesDataProvider sends a transaction and streams its

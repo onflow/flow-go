@@ -167,7 +167,7 @@ func parseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error)
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
 
- // Parse 'block_status'
+	// Parse 'block_status'
 	rawBlockStatus, exists := arguments["block_status"]
 	if !exists {
 		return blocksArguments{}, fmt.Errorf("missing 'block_status' field")

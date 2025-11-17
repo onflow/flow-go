@@ -101,6 +101,10 @@ func (b *EventsProvider) getEventsFromExecutionData(
 	criteria optimistic_sync.Criteria,
 ) (*EventsResponse, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
+	if err != nil {
+		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+
 	result, err := b.execResultProvider.ExecutionResultInfo(
 		blockID,
 		criteria,

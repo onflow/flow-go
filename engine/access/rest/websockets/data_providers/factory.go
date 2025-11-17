@@ -29,13 +29,13 @@ const (
 // based on specified topics. The factory abstracts the creation process
 // and ensures consistent access to required APIs.
 type DataProviderFactory interface {
-    // NewDataProvider creates a new data provider based on the specified topic
-    // and configuration parameters.
-    //
-    // Expected errors:
-    //   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid
-    //     (applies to topics that validate arguments via shared helpers).
-    NewDataProvider(ctx context.Context, subID string, topic string, args wsmodels.Arguments, stream chan<- interface{}) (DataProvider, error)
+	// NewDataProvider creates a new data provider based on the specified topic
+	// and configuration parameters.
+	//
+	// Expected errors:
+	//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid
+	//     (applies to topics that validate arguments via shared helpers).
+	NewDataProvider(ctx context.Context, subID string, topic string, args wsmodels.Arguments, stream chan<- interface{}) (DataProvider, error)
 }
 
 var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)

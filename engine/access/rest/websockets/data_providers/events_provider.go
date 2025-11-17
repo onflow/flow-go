@@ -293,13 +293,13 @@ func parseEventsArguments(
 		return eventsArguments{}, fmt.Errorf("error creating event filter: %w", err)
 	}
 
- // Parse 'execution_state_query' as JSON object
- query, err := extractExecutionStateQueryFields(arguments, "execution_state_query", false)
- if err != nil {
-     return eventsArguments{},
-         fmt.Errorf("error extracting execution_state_query fields: %w", err)
- }
- args.ExecutionStateQuery = query
+	// Parse 'execution_state_query' as JSON object
+	query, err := extractExecutionStateQueryFields(arguments, "execution_state_query", false)
+	if err != nil {
+		return eventsArguments{},
+			fmt.Errorf("error extracting execution_state_query fields: %w", err)
+	}
+	args.ExecutionStateQuery = query
 
 	return args, nil
 }

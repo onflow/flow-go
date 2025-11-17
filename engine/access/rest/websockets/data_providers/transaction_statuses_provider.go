@@ -21,7 +21,7 @@ import (
 
 // transactionStatusesArguments contains the arguments required for subscribing to transaction statuses.
 type transactionStatusesArguments struct {
-    TxID flow.Identifier `json:"tx_id"` // ID of the transaction to monitor.
+	TxID flow.Identifier `json:"tx_id"` // ID of the transaction to monitor.
 }
 
 // TransactionStatusesDataProvider streams transaction status updates over a WebSocket subscription.
