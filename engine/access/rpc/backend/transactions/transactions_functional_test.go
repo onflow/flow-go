@@ -2,7 +2,9 @@ package transactions
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
@@ -21,13 +23,14 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/access"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -94,7 +97,7 @@ type TransactionsFunctionalSuite struct {
 
 	rootBlock        *flow.Block
 	tf               *testutil.TestFixture
-	systemCollection *system.SystemCollection
+	systemCollection *systemcollection.Versioned
 
 	mockState  *protocolmock.State
 	execClient *accessmock.ExecutionAPIClient
@@ -162,8 +165,10 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	)
 	s.Require().NoError(err)
 
-	// Generate fixture data
-	s.systemCollection, err = system.DefaultSystemCollection(s.g.ChainID(), true)
+	s.systemCollection, err = systemcollection.NewVersioned(
+		s.g.ChainID().Chain(),
+		systemcollection.Default(s.g.ChainID()),
+	)
 	s.Require().NoError(err)
 
 	s.rootBlock = s.state.Params().SporkRootBlock()
@@ -261,12 +266,12 @@ func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
 		Metrics:                      metrics.NewNoopCollector(),
 		ChainID:                      s.g.ChainID(),
 		State:                        s.state,
-		SystemCollection:             s.systemCollection,
 		NodeProvider:                 s.nodeProvider,
 		Blocks:                       s.blocks,
 		Collections:                  s.collections,
 		Transactions:                 s.transactions,
 		ScheduledTransactions:        s.scheduledTransactions,
+		SystemCollections:            s.systemCollection,
 		TxErrorMessageProvider:       s.txErrorMessageProvider,
 		TxValidator:                  txValidator,
 		TxStatusDeriver:              s.txStatusDeriver,
@@ -298,7 +303,6 @@ func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
 		s.txStatusDeriver,
 		s.systemCollection,
 		s.g.ChainID(),
-		true,
 	)
 
 	snapshot := protocolmock.NewSnapshot(s.T())
@@ -324,6 +328,30 @@ func eventsForTransaction(events flow.EventsList, txID flow.Identifier) flow.Eve
 		}
 	}
 	return filtered
+}
+
+func scheduledTransactionFromEvents(
+	chainID flow.ChainID,
+	blockHeight uint64,
+	events flow.EventsList,
+	txID flow.Identifier,
+) (*flow.TransactionBody, error) {
+	systemCollection, err := systemcollection.Default(chainID).
+		ByHeight(blockHeight).
+		SystemCollection(chainID.Chain(), access.StaticEventProvider(events))
+	if err != nil {
+		return nil, err
+	}
+
+	var expectedTransaction *flow.TransactionBody
+	ok := slices.ContainsFunc(systemCollection.Transactions, func(tx *flow.TransactionBody) bool {
+		expectedTransaction = tx
+		return tx.ID() == txID
+	})
+	if !ok {
+		return nil, fmt.Errorf("scheduled transaction not found in system collection")
+	}
+	return expectedTransaction, nil
 }
 
 func (s *TransactionsFunctionalSuite) expectedResultForIndex(index int, encodingVersion entities.EventEncodingVersion) *accessmodel.TransactionResult {
@@ -402,7 +430,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_Local() {
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
-		true,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -432,7 +459,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_Local() {
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
-		true,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -466,7 +492,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
-		true,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -486,7 +511,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 		expectedTransactions = append(expectedTransactions, collection.Transactions...)
 	}
 
-	systemCollection, err := blueprints.SystemCollection(s.g.ChainID().Chain(), s.tf.ExpectedEvents)
+	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
+	systemCollection, err := versionedSystemCollection.
+		ByHeight(block.Height).
+		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -501,10 +529,9 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 		s.eventsIndex,
 		s.txResultsIndex,
 		s.txErrorMessageProvider,
-		s.systemCollection,
+		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
-		true,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -517,9 +544,6 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 
 func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local() {
 	block := s.tf.Block
-
-	systemCollection, err := system.NewSystemCollection(s.g.ChainID(), s.tf.ExpectedEvents)
-	s.Require().NoError(err)
 
 	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
 	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
@@ -535,15 +559,14 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
-		true,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
 	for txID, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
-		expectedTransaction, ok := systemCollection.ByID(txID)
-		s.Require().True(ok)
+		expectedTransaction, err := scheduledTransactionFromEvents(s.g.ChainID(), block.Height, s.tf.ExpectedEvents, txID)
+		s.Require().NoError(err)
 
 		results, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
 		s.Require().NoError(err)
@@ -664,7 +687,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 		expectedTransactions = append(expectedTransactions, collection.Transactions...)
 	}
 
-	systemCollection, err := blueprints.SystemCollection(s.g.ChainID().Chain(), s.tf.ExpectedEvents)
+	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
+	systemCollection, err := versionedSystemCollection.
+		ByHeight(block.Height).
+		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -709,9 +735,6 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 	block := s.tf.Block
 	blockID := block.ID()
 
-	systemCollection, err := system.NewSystemCollection(s.g.ChainID(), s.tf.ExpectedEvents)
-	s.Require().NoError(err)
-
 	env := systemcontracts.SystemContractsForChain(s.g.ChainID()).AsTemplateEnv()
 	pendingExecuteEventType := blueprints.PendingExecutionEventType(env)
 
@@ -745,8 +768,8 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 	s.Require().NoError(err)
 
 	for txID, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
-		expectedTransaction, ok := systemCollection.ByID(txID)
-		s.Require().True(ok)
+		expectedTransaction, err := scheduledTransactionFromEvents(s.g.ChainID(), block.Height, s.tf.ExpectedEvents, txID)
+		s.Require().NoError(err)
 
 		results, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
 		s.Require().NoError(err)

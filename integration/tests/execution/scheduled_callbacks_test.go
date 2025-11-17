@@ -16,15 +16,15 @@ import (
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
-func TestScheduledCallbacks(t *testing.T) {
-	suite.Run(t, new(ScheduledCallbacksSuite))
+func TestScheduledTransactions(t *testing.T) {
+	suite.Run(t, new(ScheduledTransactionsSuite))
 }
 
-type ScheduledCallbacksSuite struct {
+type ScheduledTransactionsSuite struct {
 	Suite
 }
 
-func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
+func (s *ScheduledTransactionsSuite) TestScheduleCallback_DeployAndGetStatus() {
 	// wait for next height finalized (potentially first height)
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
@@ -33,7 +33,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	// Execute script to call getStatus(id: 10) on the contract
 	result, ok := s.getCallbackStatus(10)
 	s.T().Logf("result: %v, ok: %v", result, ok)
-	require.False(s.T(), ok, "getStatus(10) should return false for non-existent callback")
+	require.False(s.T(), ok, "getStatus(10) should return false for non-existent scheduled transaction")
 
 	// Wait for a block to be executed to ensure everything is processed
 	blockB := s.BlockState.WaitForHighestFinalizedProgress(s.T(), blockA.HeaderBody.Height)
@@ -41,7 +41,7 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_DeployAndGetStatus() {
 	s.T().Logf("got block result ID %v", erBlock.ExecutionResult.BlockID)
 }
 
-func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
+func (s *ScheduledTransactionsSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
 
 	// Wait for next height finalized (potentially first height)
@@ -50,36 +50,36 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
+	_, err := lib.DeployScheduledTransactionsTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// Wait for next height finalized before scheduling callback
+	// Wait for next height finalized before scheduling transaction
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
-	// Schedule a callback for 10 seconds in the future
+	// Schedule a transaction for 10 seconds in the future
 	scheduleDelta := int64(10)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 
-	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, s.AccessClient(), sc)
-	require.NoError(s.T(), err, "could not schedule callback transaction")
-	s.T().Logf("scheduled callback with ID: %d", callbackID)
+	s.T().Logf("scheduling transaction at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	transactionID, err := lib.ScheduleTransactionAtTimestamp(futureTimestamp, s.AccessClient(), sc)
+	require.NoError(s.T(), err, "could not schedule transaction")
+	s.T().Logf("scheduled transaction with ID: %d", transactionID)
 
 	const scheduledStatus = 1
 	const executedStatus = 2
 
-	// Check the status of the callback right after scheduling
-	status, ok := s.getCallbackStatus(callbackID)
-	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	// Check the status of the scheduled transaction right after scheduling
+	status, ok := s.getCallbackStatus(transactionID)
+	require.True(s.T(), ok, "scheduled transaction status should not be nil after scheduling")
 	require.Equal(s.T(), scheduledStatus, status, "status should be equal to scheduled")
-	s.T().Logf("callback status after scheduling: %v", status)
+	s.T().Logf("scheduled transaction status after scheduling: %v", status)
 
-	// Verify the callback is scheduled (not executed yet)
+	// Verify the transaction is scheduled (not executed yet)
 	executedCallbacks := s.getExecutedCallbacks()
-	require.NotContains(s.T(), executedCallbacks, callbackID, "callback should not be executed immediately")
+	require.NotContains(s.T(), executedCallbacks, transactionID, "scheduled transaction should not be executed immediately")
 
-	// Wait to ensure the callback has time to be executed
-	s.T().Log("waiting for callback execution...")
+	// Wait to ensure the scheduled transaction has time to be executed
+	s.T().Log("waiting for scheduled transaction execution...")
 	time.Sleep(time.Duration(scheduleDelta)*time.Second + 2)
 
 	// Wait for blocks to be processed after the callback execution time
@@ -88,18 +88,18 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduledAndExecuted() {
 	// s.T().Logf("got block result ID %v after waiting", erBlock.ExecutionResult.BlockID)
 
 	// Check the status again - it should still exist but be marked as executed
-	statusAfter, ok := s.getCallbackStatus(callbackID)
-	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	statusAfter, ok := s.getCallbackStatus(transactionID)
+	require.True(s.T(), ok, "scheduled transaction status should not be nil after execution")
 	require.Equal(s.T(), executedStatus, statusAfter, "status should be equal to executed")
 
-	// Verify the callback was executed by checking our test contract
+	// Verify the scheduled transaction was executed by checking our test contract
 	executedCallbacksAfter := s.getExecutedCallbacks()
-	s.T().Logf("executed callbacks: %v", executedCallbacksAfter)
-	require.Len(s.T(), executedCallbacksAfter, 1, "should have exactly one executed callback")
-	require.Contains(s.T(), executedCallbacksAfter, callbackID, "callback should have been executed")
+	s.T().Logf("executed scheduled transactions: %v", executedCallbacksAfter)
+	require.Len(s.T(), executedCallbacksAfter, 1, "should have exactly one executed scheduled transaction")
+	require.Contains(s.T(), executedCallbacksAfter, transactionID, "scheduled transaction should have been executed")
 }
 
-func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
+func (s *ScheduledTransactionsSuite) TestScheduleCallback_ScheduleAndCancelCallback() {
 	sc := systemcontracts.SystemContractsForChain(s.net.Root().HeaderBody.ChainID)
 
 	// Wait for next height finalized (potentially first height)
@@ -108,53 +108,53 @@ func (s *ScheduledCallbacksSuite) TestScheduleCallback_ScheduleAndCancelCallback
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
+	_, err := lib.DeployScheduledTransactionsTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// Wait for next height finalized before scheduling callback
+	// Wait for next height finalized before scheduling transaction
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), s.BlockState.HighestFinalizedHeight())
 
-	// Schedule a callback for 10 seconds in the future
+	// Schedule a transaction for 10 seconds in the future
 	scheduleDelta := int64(10)
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 
-	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, s.AccessClient(), sc)
-	require.NoError(s.T(), err, "could not schedule callback transaction")
-	s.T().Logf("scheduled callback with ID: %d", callbackID)
+	s.T().Logf("scheduling transaction at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	transactionID, err := lib.ScheduleTransactionAtTimestamp(futureTimestamp, s.AccessClient(), sc)
+	require.NoError(s.T(), err, "could not schedule transaction")
+	s.T().Logf("scheduled transaction with ID: %d", transactionID)
 
 	const scheduledStatus = 1
 	const canceledStatus = 3
 
 	// Wait fraction of the scheduled time
-	s.T().Log("waiting for callback execution...")
+	s.T().Log("waiting for scheduled transaction execution...")
 	time.Sleep(time.Second + 2)
 
-	// Check the status of the callback
-	status, ok := s.getCallbackStatus(callbackID)
-	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	// Check the status of the scheduled transaction
+	status, ok := s.getCallbackStatus(transactionID)
+	require.True(s.T(), ok, "scheduled transaction status should not be nil after scheduling")
 	require.Equal(s.T(), scheduledStatus, status, "status should be equal to scheduled")
-	s.T().Logf("callback status after scheduling: %v", status)
+	s.T().Logf("scheduled transaction status after scheduling: %v", status)
 
-	// Verify the callback is scheduled (not executed yet)
+	// Verify the transaction is scheduled (not executed yet)
 	executedCallbacks := s.getExecutedCallbacks()
-	require.NotContains(s.T(), executedCallbacks, callbackID, "callback should not be executed immediately")
+	require.NotContains(s.T(), executedCallbacks, transactionID, "scheduled transaction should not be executed immediately")
 
-	// Cancel the callback
-	canceledID, err := lib.CancelCallbackByID(callbackID, s.AccessClient(), sc)
-	require.NoError(s.T(), err, "could not cancel callback transaction")
-	require.Equal(s.T(), callbackID, canceledID, "canceled callback ID should be the same as scheduled")
+	// Cancel the scheduled transaction
+	canceledID, err := lib.CancelTransactionByID(transactionID, s.AccessClient(), sc)
+	require.NoError(s.T(), err, "could not cancel scheduled transaction")
+	require.Equal(s.T(), transactionID, canceledID, "canceled transaction ID should be the same as scheduled")
 
-	// Wait for callback scheduled time to make sure it was not executed
+	// Wait for scheduled time to make sure it was not executed
 	time.Sleep(time.Duration(scheduleDelta) * time.Second)
 
-	// Check the status of the callback
-	status, ok = s.getCallbackStatus(callbackID)
-	require.True(s.T(), ok, "callback status should not be nil after scheduling")
+	// Check the status of the scheduled transaction
+	status, ok = s.getCallbackStatus(transactionID)
+	require.True(s.T(), ok, "scheduled transaction status should not be nil after cancellation")
 	require.Equal(s.T(), canceledStatus, status, "status should be equal to canceled")
 }
 
-func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, bool) {
+func (s *ScheduledTransactionsSuite) getCallbackStatus(callbackID uint64) (int, bool) {
 	getStatusScript := dsl.Main{
 		Import: dsl.Import{
 			Address: s.AccessClient().SDKServiceAddress(),
@@ -187,14 +187,14 @@ func (s *ScheduledCallbacksSuite) getCallbackStatus(callbackID uint64) (int, boo
 	return int(val), true
 }
 
-func (s *ScheduledCallbacksSuite) getExecutedCallbacks() []uint64 {
+func (s *ScheduledTransactionsSuite) getExecutedCallbacks() []uint64 {
 	getExecutedScript := dsl.Main{
 		Import: dsl.Import{
 			Address: s.AccessClient().SDKServiceAddress(),
-			Names:   []string{"TestFlowCallbackHandler"},
+			Names:   []string{"TestFlowTransactionSchedulerHandler"},
 		},
 		ReturnType: "[UInt64]",
-		Code:       "return TestFlowCallbackHandler.getExecutedCallbacks()",
+		Code:       "return TestFlowTransactionSchedulerHandler.getExecutedTransactions()",
 	}
 
 	latest, err := s.AccessClient().GetLatestFinalizedBlockHeader(context.Background())

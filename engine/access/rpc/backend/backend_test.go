@@ -934,7 +934,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
-	block := unittest.BlockFixture()
+	block := unittest.BlockFixture(unittest.Block.WithHeight(1))
 	blockId := block.ID()
 	index := uint32(0)
 
@@ -968,6 +968,12 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.execClient.
 		On("GetTransactionResultByIndex", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
+
+	suite.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, mock.Anything).
+		Return(&execproto.GetEventsForBlockIDsResponse{
+			Results: []*execproto.GetEventsForBlockIDsResponse_Result{},
+		}, nil)
 
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
@@ -1020,7 +1026,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	}
 
 	exeEventResp := &execproto.GetTransactionResultsResponse{
-		TransactionResults:   []*execproto.GetTransactionResultResponse{{}},
+		TransactionResults:   []*execproto.GetTransactionResultResponse{{}, {}},
 		EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
 	}
 
@@ -1029,10 +1035,16 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.ScheduledCallbacksEnabled = true
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
+
+	suite.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, mock.Anything).
+		Return(&execproto.GetEventsForBlockIDsResponse{
+			Results: []*execproto.GetEventsForBlockIDsResponse_Result{},
+		}, nil).
+		Maybe()
 
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
@@ -1860,7 +1872,7 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
-	block := unittest.BlockFixture()
+	block := unittest.BlockFixture(unittest.Block.WithHeight(1))
 	blockId := block.ID()
 	index := uint32(0)
 
@@ -1883,6 +1895,14 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
+
+	// Mock GetEventsForBlockIDs for system collection construction
+	suite.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, mock.Anything).
+		Return(&execproto.GetEventsForBlockIDsResponse{
+			Results: []*execproto.GetEventsForBlockIDsResponse_Result{},
+		}, nil).
+		Maybe()
 
 	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
 	ccfEvents, jsoncdcEvents := generateEncodedEvents(suite.T(), 1)
@@ -1921,6 +1941,10 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultsByBlockID", version.String()), func() {
 			exeEventResp := &execproto.GetTransactionResultsResponse{
 				TransactionResults: []*execproto.GetTransactionResultResponse{
+					{
+						Events:               eventMessages,
+						EventEncodingVersion: exeNodeEventEncodingVersion,
+					},
 					{
 						Events:               eventMessages,
 						EventEncodingVersion: exeNodeEventEncodingVersion,
