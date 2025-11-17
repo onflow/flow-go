@@ -77,6 +77,8 @@ func NewFinalizedBlockProcessor(
 		collectionExecutedMetric: collectionExecutedMetric,
 	}
 
+	// TODO (leo): no need to use job queue consumer, instead, we could use a simple
+	// for loop to go through from next unprocessed height to the latest height.
 	processor.consumer, err = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "ingestion_block_consumer").Logger(),
 		blockFinalizedNotifier.Channel(),
