@@ -66,7 +66,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -183,7 +182,6 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
-	scheduledCallbacksEnabled            bool
 }
 
 type PublicNetworkConfig struct {
@@ -291,7 +289,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
-		scheduledCallbacksEnabled:            fvm.DefaultScheduledCallbacksEnabled,
 	}
 }
 
@@ -1324,10 +1321,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
-		flags.BoolVar(&builder.scheduledCallbacksEnabled,
-			"scheduled-callbacks-enabled",
-			defaultConfig.scheduledCallbacksEnabled,
-			"whether to include scheduled callback transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1516,6 +1509,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		var unusedRetryEnabled bool
 		flags.BoolVar(&unusedRetryEnabled, "retry-enabled", false, "[deprecated] whether to enable the retry mechanism at the access node level")
 		_ = flags.MarkDeprecated("retry-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
+
+		var unusedScheduledCallbacksEnabled bool
+		flags.BoolVar(&unusedScheduledCallbacksEnabled, "scheduled-callbacks-enabled", false, "[deprecated] whether to include scheduled callback transactions in system collections.")
+		_ = flags.MarkDeprecated("scheduled-callbacks-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -2160,7 +2157,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
 				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
-				ScheduledCallbacksEnabled:  builder.scheduledCallbacksEnabled,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
