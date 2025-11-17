@@ -27,7 +27,10 @@ type eventsArguments struct {
 	ExecutionStateQuery httpmodels.ExecutionStateQuery
 }
 
-// EventsDataProvider is responsible for providing events
+// EventsDataProvider streams events over a WebSocket subscription.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type EventsDataProvider struct {
 	*baseDataProvider
 
@@ -40,6 +43,9 @@ type EventsDataProvider struct {
 var _ DataProvider = (*EventsDataProvider)(nil)
 
 // NewEventsDataProvider creates a new instance of EventsDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
 func NewEventsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -88,7 +94,7 @@ func NewEventsDataProvider(
 // Run starts processing the subscription for events and handles responses.
 // Must be called once.
 //
-// No errors expected during normal operations
+// No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
@@ -204,6 +210,22 @@ func convertEvents(ccfEvents []flow.Event) ([]flow.Event, error) {
 }
 
 // parseEventsArguments validates and initializes the events arguments.
+//
+// Allowed fields:
+//   - start_block_id (string, optional)
+//   - start_block_height (string, optional; uint64 as decimal)
+//   - event_types (array of strings, optional)
+//   - addresses (array of strings, optional)
+//   - contracts (array of strings, optional)
+//   - heartbeat_interval (string, optional; uint64 as decimal)
+//   - execution_state_query (object, optional)
+//
+// Constraints:
+//   - Only one of start_block_id or start_block_height may be provided.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: An unexpected field is present, or a
+//     value fails validation.
 func parseEventsArguments(
 	arguments wsmodels.Arguments,
 	chain flow.Chain,
@@ -271,18 +293,13 @@ func parseEventsArguments(
 		return eventsArguments{}, fmt.Errorf("error creating event filter: %w", err)
 	}
 
-	// Parse 'execution_state_query' as JSON object
-	agreeingExecutorCount, requiredExecutorIDs, includeExecutorMetadata, err :=
-		extractExecutionStateQueryFields(arguments, "execution_state_query", false)
-	if err != nil {
-		return eventsArguments{},
-			fmt.Errorf("error extracting execution_state_query fields: %w", err)
-	}
-	args.ExecutionStateQuery = httpmodels.ExecutionStateQuery{
-		AgreeingExecutorsCount:  agreeingExecutorCount,
-		RequiredExecutorIDs:     requiredExecutorIDs,
-		IncludeExecutorMetadata: includeExecutorMetadata,
-	}
+ // Parse 'execution_state_query' as JSON object
+ query, err := extractExecutionStateQueryFields(arguments, "execution_state_query", false)
+ if err != nil {
+     return eventsArguments{},
+         fmt.Errorf("error extracting execution_state_query fields: %w", err)
+ }
+ args.ExecutionStateQuery = query
 
 	return args, nil
 }

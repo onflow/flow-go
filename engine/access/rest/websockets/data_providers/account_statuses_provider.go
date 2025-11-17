@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 )
 
-// accountStatusesArguments contains the arguments required for subscribing to account statuses
+// accountStatusesArguments contains the arguments required for subscribing to account statuses.
 type accountStatusesArguments struct {
 	StartBlockID        flow.Identifier                  // ID of the block to start subscription from
 	StartBlockHeight    uint64                           // Height of the block to start subscription from
@@ -26,6 +26,10 @@ type accountStatusesArguments struct {
 	ExecutionStateQuery httpmodels.ExecutionStateQuery
 }
 
+// AccountStatusesDataProvider streams account status updates over a WebSocket subscription.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type AccountStatusesDataProvider struct {
 	*baseDataProvider
 
@@ -38,6 +42,9 @@ type AccountStatusesDataProvider struct {
 var _ DataProvider = (*AccountStatusesDataProvider)(nil)
 
 // NewAccountStatusesDataProvider creates a new instance of AccountStatusesDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
 func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -83,10 +90,10 @@ func NewAccountStatusesDataProvider(
 	}, nil
 }
 
-// Run starts processing the subscription for events and handles responses.
+// Run starts processing the subscription for account statuses and handles responses.
 // Must be called once.
 //
-// No errors expected during normal operations.
+// No errors are expected during normal operations.
 func (p *AccountStatusesDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
@@ -187,6 +194,21 @@ func convertAccountStatusesResponse(resp *backend.AccountStatusesResponse) (*bac
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
+//
+// Allowed fields:
+//   - start_block_id (string, optional)
+//   - start_block_height (string, optional; uint64 as decimal)
+//   - event_types (array of strings, optional)
+//   - account_addresses (array of strings, optional)
+//   - heartbeat_interval (string, optional; uint64 as decimal)
+//   - execution_state_query (object, optional)
+//
+// Constraints:
+//   - Only one of start_block_id or start_block_height may be provided.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: An unexpected field is present, or a
+//     value fails validation (arrays/heartbeat/execution_state_query).
 func parseAccountStatusesArguments(
 	arguments wsmodels.Arguments,
 	chain flow.Chain,
@@ -247,19 +269,14 @@ func parseAccountStatusesArguments(
 	}
 
 	// Parse 'execution_state_query' as JSON object
-	agreeingExecutorCount, requiredExecutorIDs, includeExecutorMetadata, err :=
-		extractExecutionStateQueryFields(arguments, "execution_state_query", false)
+	query, err := extractExecutionStateQueryFields(arguments, "execution_state_query", false)
 	if err != nil {
 		return accountStatusesArguments{}, fmt.Errorf(
 			"error extracting execution_state_query fields: %w",
 			err,
 		)
 	}
-	args.ExecutionStateQuery = httpmodels.ExecutionStateQuery{
-		AgreeingExecutorsCount:  agreeingExecutorCount,
-		RequiredExecutorIDs:     requiredExecutorIDs,
-		IncludeExecutorMetadata: includeExecutorMetadata,
-	}
+	args.ExecutionStateQuery = query
 
 	return args, nil
 }

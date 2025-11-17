@@ -191,26 +191,6 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.ID())
 
-	s.executionDataSnapshot.
-		On("Events").
-		Return(s.events).
-		Maybe()
-
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil).
-		Maybe()
-
-	s.executionResultProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-			ids := unittest.IdentityListFixture(2)
-			return &optimistic_sync.ExecutionResultInfo{
-				ExecutionResultID: unittest.IdentifierFixture(),
-				ExecutionNodes:    ids.ToSkeleton(),
-			}, nil
-		}, nil).
-		Maybe()
 
 	s.criteria = optimistic_sync.DefaultCriteria
 }

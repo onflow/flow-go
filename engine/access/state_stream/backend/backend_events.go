@@ -27,13 +27,13 @@ var _ state_stream.EventsAPI = (*EventsBackend)(nil)
 
 func NewEventsBackend(
 	log zerolog.Logger,
-	subscriptionFactory subscription.Factory,
+	subscriptionFactory *subscription.Factory,
 	executionDataTracker tracker.ExecutionDataTracker,
 	eventsProvider *EventsProvider,
 ) EventsBackend {
 	return EventsBackend{
 		log:                  log,
-		subscriptionFactory:  &subscriptionFactory,
+		subscriptionFactory:  subscriptionFactory,
 		executionDataTracker: executionDataTracker,
 		eventsProvider:       eventsProvider,
 	}

@@ -101,15 +101,15 @@ func (b *EventsProvider) getEventsFromExecutionData(
 	criteria optimistic_sync.Criteria,
 ) (*EventsResponse, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
-	execResult, err := b.execResultProvider.ExecutionResultInfo(
+	result, err := b.execResultProvider.ExecutionResultInfo(
 		blockID,
 		criteria,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching execution execResult: %w", err)
+		return nil, fmt.Errorf("error fetching execution result: %w", err)
 	}
 
-	executionData, err := b.execDataProvider.ExecutionDataByExecutionResultID(ctx, height, execResult.ExecutionResultID)
+	executionData, err := b.execDataProvider.ExecutionDataByExecutionResultID(ctx, height, result.ExecutionResultID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}

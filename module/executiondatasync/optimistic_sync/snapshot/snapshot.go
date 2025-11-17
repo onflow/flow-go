@@ -1,15 +1,9 @@
 package snapshot
 
 import (
-	"errors"
-
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
 )
-
-// ErrAbandonedFork is returned when a fork for the current execution result has been
-// abandoned.
-var ErrAbandonedFork error = errors.New("current fork has been abandoned")
 
 type Mock struct {
 	events                         storage.EventsReader

@@ -29,18 +29,29 @@ const (
 // based on specified topics. The factory abstracts the creation process
 // and ensures consistent access to required APIs.
 type DataProviderFactory interface {
-	// NewDataProvider creates a new data provider based on the specified topic
-	// and configuration parameters.
-	//
-	// No errors are expected during normal operations.
-	NewDataProvider(ctx context.Context, subID string, topic string, args wsmodels.Arguments, stream chan<- interface{}) (DataProvider, error)
+    // NewDataProvider creates a new data provider based on the specified topic
+    // and configuration parameters.
+    //
+    // Expected errors:
+    //   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid
+    //     (applies to topics that validate arguments via shared helpers).
+    NewDataProvider(ctx context.Context, subID string, topic string, args wsmodels.Arguments, stream chan<- interface{}) (DataProvider, error)
 }
 
 var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)
 
 // DataProviderFactoryImpl is an implementation of the DataProviderFactory interface.
-// It is responsible for creating data providers based on the
-// requested topic. It manages access to logging and relevant APIs needed to retrieve data.
+// It is responsible for creating data providers based on the requested topic.
+// It manages access to logging and relevant APIs needed to retrieve data.
+//
+// Supported topics and their providers:
+//   - blocks: BlocksDataProvider
+//   - block_headers: BlockHeadersDataProvider
+//   - block_digests: BlockDigestsDataProvider
+//   - events: EventsDataProvider
+//   - account_statuses: AccountStatusesDataProvider
+//   - transaction_statuses: TransactionStatusesDataProvider
+//   - send_and_get_transaction_statuses: SendAndGetTransactionStatusesDataProvider
 type DataProviderFactoryImpl struct {
 	logger zerolog.Logger
 
@@ -90,7 +101,12 @@ func NewDataProviderFactory(
 // - arguments: Configuration arguments for the data provider.
 // - ch: Channel to which the data provider sends data.
 //
-// No errors are expected during normal operations.
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid
+//     (applies to topics that validate arguments via shared helpers).
+//
+// Other errors:
+//   - An error for unsupported topics.
 func (s *DataProviderFactoryImpl) NewDataProvider(ctx context.Context, subscriptionID string, topic string, arguments wsmodels.Arguments, ch chan<- interface{}) (DataProvider, error) {
 	switch topic {
 	case BlocksTopic:

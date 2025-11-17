@@ -64,10 +64,7 @@ func (e *Provider) ExecutionResultInfo(
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
 	if e.rootBlockID == blockID {
-		chosenExecutionNodes, err := e.executionNodeSelector.SelectExecutionNodes(
-			allExecutors,
-			criteria.RequiredExecutors,
-		)
+		chosenExecutionNodes, err := e.executionNodeSelector.SelectExecutionNodes(allExecutors, criteria.RequiredExecutors)
 		if err != nil {
 			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", e.rootBlockID, err)
 		}
@@ -105,8 +102,7 @@ func (e *Provider) ExecutionResultInfo(
 		// None of these are possible since there must be at least one AgreeingExecutorsCount. If the
 		// criteria is met, then there must be at least one acceptable executor. If this is not true,
 		// then the criteria check must fail.
-		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w",
-			resultID, blockID, err)
+		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", resultID, blockID, err)
 	}
 
 	return &optimistic_sync.ExecutionResultInfo{
@@ -135,9 +131,7 @@ func (p *Provider) findExecutionResultAndExecutors(
 	// Note: this will return an empty slice with no error if no receipts are found.
 	allReceiptsForBlock, err := p.executionReceipts.ByBlockID(blockID)
 	if err != nil {
-		return flow.ZeroID, nil,
-			fmt.Errorf("failed to retreive execution receipts for block ID %v: %w",
-				blockID, err)
+		return flow.ZeroID, nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}
 
 	// find all results that match the criteria and have at least one acceptable executor

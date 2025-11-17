@@ -24,7 +24,15 @@ type blocksArguments struct {
 	BlockStatus      flow.BlockStatus // Status of blocks to subscribe to
 }
 
-// BlocksDataProvider is responsible for providing blocks
+// BlocksDataProvider streams full blocks over a WebSocket subscription.
+//
+// Construction errors:
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type BlocksDataProvider struct {
 	*baseDataProvider
 
@@ -35,6 +43,11 @@ type BlocksDataProvider struct {
 var _ DataProvider = (*BlocksDataProvider)(nil)
 
 // NewBlocksDataProvider creates a new instance of BlocksDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
+//
+// All returned errors are wrapped with context in this constructor.
 func NewBlocksDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -70,7 +83,7 @@ func NewBlocksDataProvider(
 // Run starts processing the subscription for blocks and handles responses.
 // Must be called once.
 //
-// No errors expected during normal operations
+// No errors are expected during normal operations.
 func (p *BlocksDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
@@ -118,6 +131,21 @@ func (p *BlocksDataProvider) sendResponse(block *flow.Block) error {
 }
 
 // parseBlocksArguments validates and initializes the blocks arguments.
+//
+// Allowed fields:
+//   - start_block_id (string, optional)
+//   - start_block_height (string, optional; uint64 as decimal)
+//   - block_status (string, required)
+//
+// Constraints:
+//   - Only one of start_block_id or start_block_height may be provided.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: An unexpected field is present.
+//
+// Other errors:
+//   - Plain errors for malformed or missing values (e.g., bad block_status, non-string types,
+//     or invalid IDs/heights).
 func parseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error) {
 	allowedFields := map[string]struct{}{
 		"start_block_id":     {},
@@ -139,7 +167,7 @@ func parseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error)
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
 
-	// Parse 'block_status'
+ // Parse 'block_status'
 	rawBlockStatus, exists := arguments["block_status"]
 	if !exists {
 		return blocksArguments{}, fmt.Errorf("missing 'block_status' field")

@@ -21,11 +21,17 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-// sendAndGetTransactionStatusesArguments contains the arguments required for sending tx and subscribing to transaction statuses
+// sendAndGetTransactionStatusesArguments contains the arguments required for sending a
+// transaction and subscribing to its transaction status updates.
 type sendAndGetTransactionStatusesArguments struct {
-	Transaction flow.TransactionBody // The transaction body to be sent and monitored.
+    Transaction flow.TransactionBody // The transaction body to be sent and monitored.
 }
 
+// SendAndGetTransactionStatusesDataProvider sends a transaction and streams its
+// transaction status updates over a WebSocket subscription.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type SendAndGetTransactionStatusesDataProvider struct {
 	*baseDataProvider
 
@@ -36,6 +42,11 @@ type SendAndGetTransactionStatusesDataProvider struct {
 
 var _ DataProvider = (*SendAndGetTransactionStatusesDataProvider)(nil)
 
+// NewSendAndGetTransactionStatusesDataProvider creates a new instance of
+// SendAndGetTransactionStatusesDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided arguments are invalid.
 func NewSendAndGetTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -70,10 +81,10 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	}, nil
 }
 
-// Run starts processing the subscription for events and handles responses.
+// Run starts processing the subscription for transaction statuses and handles responses.
 // Must be called once.
 //
-// No errors are expected during normal operations
+// No errors are expected during normal operations.
 func (p *SendAndGetTransactionStatusesDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
@@ -109,7 +120,15 @@ func (p *SendAndGetTransactionStatusesDataProvider) createAndStartSubscription(
 	return p.api.SendAndSubscribeTransactionStatuses(ctx, &args.Transaction, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
-// parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.
+// parseSendAndGetTransactionStatusesArguments validates and initializes the arguments
+// required to send a transaction and subscribe to its status updates.
+//
+// Input shape: a JSON object that serializes a Flow transaction body; the function uses
+// the common transaction parser to validate and parse the transaction according to the
+// provided chain.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: Not used by this function (listed for consistency).
 func parseSendAndGetTransactionStatusesArguments(
 	arguments wsmodels.Arguments,
 	chain flow.Chain,

@@ -10,8 +10,8 @@ const (
 	defaultMaxNodesCnt = 3
 )
 
-// ExecutionNodeSelector encapsulates the policy for which execution nodes (ENs) to contact when you
-// need to fetch or verify an execution result. It applies three possible sources of constraints/preferences,
+// ExecutionNodeSelector defines the policy for selecting which execution nodes (ENs) to contact when
+// fetching or verifying an execution result. It applies three possible sources of constraints/preferences,
 // in this precedence order:
 //
 // User requirement (strongest)
@@ -19,13 +19,13 @@ const (
 // Rationale: the user might require data strictly from specific nodes (e.g., trust, regulatory, or auditing reasons).
 //
 // Operator-required nodes
-// If the user does not require nodes, but the operator configured requiredENIdentifiers in the selector,
+// If the user does not specify required nodes, but the operator has configured requiredENIdentifiers in the selector,
 // then the selector will only choose from that required list.
 // If preferredENIdentifiers is also set, preferred nodes are selected first, then other required nodes.
 //
 // Operator-preferred nodes
-// If there are no required lists (from user or operator) but there is an operator preferredENIdentifiers list,
-// the selector tries to pick from those first, and if that doesn’t fill the quota, it falls back to any other eligible executor.
+// If there are no required lists (from the user or operator) but the operator has defined a preferredENIdentifiers list,
+// the selector first tries to pick from those nodes, and if that doesn’t fill the quota, it falls back to any other eligible executor.
 //
 // No preferences
 // If none of the above apply, it returns all matching executor identities (up to the cap)

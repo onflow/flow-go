@@ -234,29 +234,30 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderRecogn
 	baseExecutionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
 	// fork 1
-	executionResult1 := unittest.ExecutionResultFixture()
-	executionResult1.PreviousResultID = baseExecutionResult.ID()
+	executionResult1 := unittest.ExecutionResultFixture(unittest.WithPreviousResultID(baseExecutionResult.ID()))
 
 	// fork 2
-	executionResult2 := unittest.ExecutionResultFixture()
-	executionResult2.PreviousResultID = baseExecutionResult.ID()
+	executionResult2 := unittest.ExecutionResultFixture(unittest.WithPreviousResultID(baseExecutionResult.ID()))
 
 	executors := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 	receipts := make(flow.ExecutionReceiptList, 2)
 
-	r1 := unittest.ReceiptForBlockFixture(block)
-	r1.ExecutorID = executors[0].NodeID
-	r1.ExecutionResult = *executionResult1
+	r1 := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(executionResult1),
+		unittest.WithExecutorID(executors[0].NodeID),
+	)
 	receipts[0] = r1
 
-	r2 := unittest.ReceiptForBlockFixture(block)
-	r2.ExecutorID = executors[1].NodeID
-	r2.ExecutionResult = *executionResult2
+	r2 := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(executionResult2),
+		unittest.WithExecutorID(executors[1].NodeID),
+	)
 	receipts[1] = r2
 
 	suite.receipts.
 		On("ByBlockID", block.ID()).
-		Return(receipts, nil)
+		Return(receipts, nil).
+		Twice()
 
 	// request execution result from the first executor
 	suite.snapshot.

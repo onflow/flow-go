@@ -15,7 +15,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BlockHeadersDataProvider is responsible for providing block headers
+// BlockHeadersDataProvider streams block headers over a WebSocket subscription.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type BlockHeadersDataProvider struct {
 	*baseDataProvider
 
@@ -25,6 +28,9 @@ type BlockHeadersDataProvider struct {
 var _ DataProvider = (*BlockHeadersDataProvider)(nil)
 
 // NewBlockHeadersDataProvider creates a new instance of BlockHeadersDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
 func NewBlockHeadersDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -58,7 +64,7 @@ func NewBlockHeadersDataProvider(
 // Run starts processing the subscription for block headers and handles responses.
 // Must be called once.
 //
-// No errors expected during normal operations
+// No errors are expected during normal operations.
 func (p *BlockHeadersDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),

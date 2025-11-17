@@ -123,6 +123,11 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"start_block_id":    s.rootBlock.ID().String(),
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
@@ -141,6 +146,11 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
@@ -158,6 +168,11 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 			arguments: wsmodels.Arguments{
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(

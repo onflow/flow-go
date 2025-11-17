@@ -19,12 +19,15 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-// transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
+// transactionStatusesArguments contains the arguments required for subscribing to transaction statuses.
 type transactionStatusesArguments struct {
-	TxID flow.Identifier `json:"tx_id"` // ID of the transaction to monitor.
+    TxID flow.Identifier `json:"tx_id"` // ID of the transaction to monitor.
 }
 
-// TransactionStatusesDataProvider is responsible for providing tx statuses
+// TransactionStatusesDataProvider streams transaction status updates over a WebSocket subscription.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type TransactionStatusesDataProvider struct {
 	*baseDataProvider
 
@@ -35,6 +38,10 @@ type TransactionStatusesDataProvider struct {
 
 var _ DataProvider = (*TransactionStatusesDataProvider)(nil)
 
+// NewTransactionStatusesDataProvider creates a new instance of TransactionStatusesDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
 func NewTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -67,10 +74,10 @@ func NewTransactionStatusesDataProvider(
 	}, nil
 }
 
-// Run starts processing the subscription for events and handles responses.
+// Run starts processing the subscription for transaction statuses and handles responses.
 // Must be called once.
 //
-// No errors are expected during normal operations
+// No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
@@ -106,7 +113,13 @@ func (p *TransactionStatusesDataProvider) createAndStartSubscription(
 	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
-// parseAccountStatusesArguments validates and initializes the account statuses arguments.
+// parseTransactionStatusesArguments validates and initializes the transaction statuses arguments.
+//
+// Allowed fields:
+//   - tx_id (string, required)
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: An unexpected field is present.
 func parseTransactionStatusesArguments(
 	arguments wsmodels.Arguments,
 ) (transactionStatusesArguments, error) {

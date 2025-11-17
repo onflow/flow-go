@@ -137,12 +137,12 @@ func New(
 		executionStateCache,
 	)
 
-	b.EventsBackend = EventsBackend{
-		log:                  logger,
-		subscriptionFactory:  subscriptionFactory,
-		executionDataTracker: executionDataTracker,
-		eventsProvider:       eventProvider,
-	}
+	b.EventsBackend = NewEventsBackend(
+		log,
+		subscriptionFactory,
+		executionDataTracker,
+		eventProvider,
+	)
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,

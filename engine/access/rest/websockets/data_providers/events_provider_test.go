@@ -98,6 +98,11 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
@@ -118,6 +123,11 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
@@ -137,6 +147,11 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
