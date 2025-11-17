@@ -878,14 +878,16 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
 	stats module.TransactionExecutionResultStats,
-	info module.TransactionExecutionResultInfo,
+	_ module.TransactionExecutionResultInfo,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionConflictRetries.Observe(float64(stats.NumberOfTxnConflictRetries))
 	ec.transactionComputationUsed.Observe(float64(stats.ComputationUsed))
-	ec.transactionNormalizedTimePerComputation.Observe(
-		flow.NormalizedExecutionTimePerComputationUnit(dur, stats.ComputationUsed))
+	if stats.ComputationUsed > 0 {
+		ec.transactionNormalizedTimePerComputation.Observe(
+			flow.NormalizedExecutionTimePerComputationUnit(dur, stats.ComputationUsed))
+	}
 	ec.transactionMemoryEstimate.Observe(float64(stats.MemoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(stats.EventCounts))
 	ec.transactionEventSize.Observe(float64(stats.EventSize))
@@ -900,7 +902,7 @@ func (ec *ExecutionCollector) ExecutionChunkDataPackGenerated(proofSize, numberO
 	ec.chunkDataPackCollectionSize.Observe(float64(numberOfTransactions))
 }
 
-// ScriptExecuted reports the time spent executing a single script
+// ExecutionScriptExecuted reports the time spent executing a single script
 func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimated uint64) {
 	ec.totalExecutedScriptsCounter.Inc()
 	ec.scriptExecutionTime.Observe(float64(dur.Milliseconds()))
