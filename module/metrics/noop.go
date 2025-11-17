@@ -401,6 +401,7 @@ var _ module.CollectionSyncMetrics = (*NoopCollector)(nil)
 
 func (nc *NoopCollector) CollectionFetchedHeight(height uint64) {}
 func (nc *NoopCollector) CollectionSyncedHeight(height uint64)  {}
+func (nc *NoopCollector) MissingCollectionQueueSize(size uint)  {}
 
 func (nc *NoopCollector) AccountBalance(bal float64)         {}
 func (nc *NoopCollector) RecommendedMinBalance(bal float64)  {}
