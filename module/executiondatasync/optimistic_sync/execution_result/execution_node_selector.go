@@ -10,9 +10,25 @@ const (
 	defaultMaxNodesCnt = 3
 )
 
-// ExecutionNodeSelector handles the selection of execution nodes based on preferences and requirements.
-// It encapsulates the logic for choosing execution nodes based on operator preferences, operator requirements,
-// and user requirements.
+// ExecutionNodeSelector defines the policy for selecting which execution nodes (ENs) to contact when
+// fetching or verifying an execution result. It applies three possible sources of constraints/preferences,
+// in this precedence order:
+//
+// User requirement (strongest)
+// If the user provides userRequiredExecutors (a list of node IDs), the selector will only choose from those nodes.
+// Rationale: the user might require data strictly from specific nodes (e.g., trust, regulatory, or auditing reasons).
+//
+// Operator-required nodes
+// If the user does not specify required nodes, but the operator has configured requiredENIdentifiers in the selector,
+// then the selector will only choose from that required list.
+// If preferredENIdentifiers is also set, preferred nodes are selected first, then other required nodes.
+//
+// Operator-preferred nodes
+// If there are no required lists (from the user or operator) but the operator has defined a preferredENIdentifiers list,
+// the selector first tries to pick from those nodes, and if that doesn’t fill the quota, it falls back to any other eligible executor.
+//
+// No preferences
+// If none of the above apply, it returns all matching executor identities (up to the cap)
 type ExecutionNodeSelector struct {
 	// preferredENIdentifiers are the execution nodes that the operator prefers to use
 	preferredENIdentifiers flow.IdentifierList

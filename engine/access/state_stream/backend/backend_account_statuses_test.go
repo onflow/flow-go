@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -347,7 +348,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlock
 	}, nil)
 
 	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
-		return s.backend.SubscribeAccountStatusesFromStartBlockID(ctx, startValue.(flow.Identifier), filter)
+		return s.backend.SubscribeAccountStatusesFromStartBlockID(ctx, startValue.(flow.Identifier), filter, s.criteria)
 	}
 
 	s.subscribeToAccountStatuses(call, s.subscribeFromStartBlockIdTestCases())
@@ -363,7 +364,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeigh
 	}, nil)
 
 	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
-		return s.backend.SubscribeAccountStatusesFromStartHeight(ctx, startValue.(uint64), filter)
+		return s.backend.SubscribeAccountStatusesFromStartHeight(ctx, startValue.(uint64), filter, s.criteria)
 	}
 
 	s.subscribeToAccountStatuses(call, s.subscribeFromStartHeightTestCases())
@@ -379,7 +380,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 	}, nil)
 
 	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
-		return s.backend.SubscribeAccountStatusesFromLatestBlock(ctx, filter)
+		return s.backend.SubscribeAccountStatusesFromLatestBlock(ctx, filter, s.criteria)
 	}
 
 	s.subscribeToAccountStatuses(call, s.subscribeFromLatestTestCases())
@@ -445,7 +446,12 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootB
 				return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
 			})
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Height, filter)
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(
+			subCtx,
+			s.rootBlock.Height,
+			filter,
+			optimistic_sync.DefaultCriteria,
+		)
 		assertSubscriptionResponses(sub, subCancel)
 	})
 
@@ -458,7 +464,12 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootB
 				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 			})
 
-		sub := s.backend.SubscribeAccountStatusesFromStartBlockID(subCtx, s.rootBlock.ID(), filter)
+		sub := s.backend.SubscribeAccountStatusesFromStartBlockID(
+			subCtx,
+			s.rootBlock.ID(),
+			filter,
+			optimistic_sync.DefaultCriteria,
+		)
 		assertSubscriptionResponses(sub, subCancel)
 	})
 
@@ -475,7 +486,11 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootB
 				return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
 			})
 
-		sub := s.backend.SubscribeAccountStatusesFromLatestBlock(subCtx, filter)
+		sub := s.backend.SubscribeAccountStatusesFromLatestBlock(
+			subCtx,
+			filter,
+			optimistic_sync.DefaultCriteria,
+		)
 		assertSubscriptionResponses(sub, subCancel)
 	})
 
@@ -498,7 +513,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartBlockID(subCtx, unittest.IdentifierFixture(), state_stream.AccountStatusFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartBlockID(
+			subCtx,
+			unittest.IdentifierFixture(),
+			state_stream.AccountStatusFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -513,7 +533,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Height-1, state_stream.AccountStatusFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(
+			subCtx,
+			s.rootBlock.Height-1,
+			state_stream.AccountStatusFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -524,7 +549,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Height+10, state_stream.AccountStatusFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(
+			subCtx,
+			s.blocks[len(s.blocks)-1].Height+10,
+			state_stream.AccountStatusFilter{},
+			s.criteria,
+		)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

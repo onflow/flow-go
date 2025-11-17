@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	httpmodels "github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -19,13 +20,17 @@ import (
 
 // eventsArguments contains the arguments a user passes to subscribe to events
 type eventsArguments struct {
-	StartBlockID      flow.Identifier          // ID of the block to start subscription from
-	StartBlockHeight  uint64                   // Height of the block to start subscription from
-	Filter            state_stream.EventFilter // Filter applied to events for a given subscription
-	HeartbeatInterval uint64                   // Maximum number of blocks message won't be sent
+	StartBlockID        flow.Identifier          // ID of the block to start subscription from
+	StartBlockHeight    uint64                   // Height of the block to start subscription from
+	Filter              state_stream.EventFilter // Filter applied to events for a given subscription
+	HeartbeatInterval   uint64                   // Maximum number of blocks message won't be sent
+	ExecutionStateQuery httpmodels.ExecutionStateQuery
 }
 
-// EventsDataProvider is responsible for providing events
+// EventsDataProvider streams events over a WebSocket subscription.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type EventsDataProvider struct {
 	*baseDataProvider
 
@@ -38,6 +43,9 @@ type EventsDataProvider struct {
 var _ DataProvider = (*EventsDataProvider)(nil)
 
 // NewEventsDataProvider creates a new instance of EventsDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
 func NewEventsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -54,7 +62,12 @@ func NewEventsDataProvider(
 		return nil, fmt.Errorf("this access node does not support streaming events")
 	}
 
-	args, err := parseEventsArguments(rawArguments, chain, eventFilterConfig, defaultHeartbeatInterval)
+	args, err := parseEventsArguments(
+		rawArguments,
+		chain,
+		eventFilterConfig,
+		defaultHeartbeatInterval,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
 	}
@@ -81,7 +94,7 @@ func NewEventsDataProvider(
 // Run starts processing the subscription for events and handles responses.
 // Must be called once.
 //
-// No errors expected during normal operations
+// No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
@@ -133,16 +146,30 @@ func (p *EventsDataProvider) sendResponse(eventsResponse *backend.EventsResponse
 }
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
-func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, args eventsArguments) subscription.Subscription {
+func (p *EventsDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args eventsArguments,
+) subscription.Subscription {
+	criteria := httpmodels.NewCriteria(args.ExecutionStateQuery)
 	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter)
+		return p.stateStreamApi.SubscribeEventsFromStartBlockID(
+			ctx,
+			args.StartBlockID,
+			args.Filter,
+			criteria,
+		)
 	}
 
 	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
+		return p.stateStreamApi.SubscribeEventsFromStartHeight(
+			ctx,
+			args.StartBlockHeight,
+			args.Filter,
+			criteria,
+		)
 	}
 
-	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
+	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter, criteria)
 }
 
 // convertEventsResponse converts events in the provided EventsResponse from CCF to JSON-CDC format.
@@ -183,6 +210,22 @@ func convertEvents(ccfEvents []flow.Event) ([]flow.Event, error) {
 }
 
 // parseEventsArguments validates and initializes the events arguments.
+//
+// Allowed fields:
+//   - start_block_id (string, optional)
+//   - start_block_height (string, optional; uint64 as decimal)
+//   - event_types (array of strings, optional)
+//   - addresses (array of strings, optional)
+//   - contracts (array of strings, optional)
+//   - heartbeat_interval (string, optional; uint64 as decimal)
+//   - execution_state_query (object, optional)
+//
+// Constraints:
+//   - Only one of start_block_id or start_block_height may be provided.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: An unexpected field is present, or a
+//     value fails validation.
 func parseEventsArguments(
 	arguments wsmodels.Arguments,
 	chain flow.Chain,
@@ -190,12 +233,13 @@ func parseEventsArguments(
 	defaultHeartbeatInterval uint64,
 ) (eventsArguments, error) {
 	allowedFields := map[string]struct{}{
-		"start_block_id":     {},
-		"start_block_height": {},
-		"event_types":        {},
-		"addresses":          {},
-		"contracts":          {},
-		"heartbeat_interval": {},
+		"start_block_id":        {},
+		"start_block_height":    {},
+		"event_types":           {},
+		"addresses":             {},
+		"contracts":             {},
+		"heartbeat_interval":    {},
+		"execution_state_query": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -238,10 +282,24 @@ func parseEventsArguments(
 	}
 
 	// Initialize the event filter with the parsed arguments
-	args.Filter, err = state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes, addresses, contracts)
+	args.Filter, err = state_stream.NewEventFilter(
+		eventFilterConfig,
+		chain,
+		eventTypes,
+		addresses,
+		contracts,
+	)
 	if err != nil {
 		return eventsArguments{}, fmt.Errorf("error creating event filter: %w", err)
 	}
+
+	// Parse 'execution_state_query' as JSON object
+	query, err := extractExecutionStateQueryFields(arguments, "execution_state_query", false)
+	if err != nil {
+		return eventsArguments{},
+			fmt.Errorf("error extracting execution_state_query fields: %w", err)
+	}
+	args.ExecutionStateQuery = query
 
 	return args, nil
 }

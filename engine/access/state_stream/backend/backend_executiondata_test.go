@@ -73,7 +73,7 @@ type BackendExecutionDataSuite struct {
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
 
-	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionResultProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache     *osyncmock.ExecutionStateCache
 	executionDataSnapshot   *osyncmock.Snapshot
 	criteria                optimistic_sync.Criteria
@@ -180,7 +180,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
 	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
-	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionResultProvider = osyncmock.NewExecutionResultInfoProvider(s.T())
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
 	s.criteria = optimistic_sync.Criteria{}
 
@@ -190,6 +190,8 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.highestBlockHeader = s.rootBlock.ToHeader()
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.ID())
+
+	s.criteria = optimistic_sync.DefaultCriteria
 }
 
 func (s *BackendExecutionDataSuite) SetupTestMocks() {
@@ -265,10 +267,9 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		s.eds,
 		s.execDataCache,
 		s.registersAsync,
-		s.eventsIndex,
 		useEventsIndex,
 		state_stream.DefaultRegisterIDsRequestLimit,
-		subscription.NewSubscriptionHandler(
+		subscription.NewSubscriptionFactory(
 			s.logger,
 			s.broadcaster,
 			subscription.DefaultSendTimeout,

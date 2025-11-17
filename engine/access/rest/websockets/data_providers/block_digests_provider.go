@@ -14,7 +14,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BlockDigestsDataProvider is responsible for providing block digests
+// BlockDigestsDataProvider streams block digests over a WebSocket subscription.
+//
+// Runtime:
+//   - Use Run to start the subscription; it should be called once.
 type BlockDigestsDataProvider struct {
 	*baseDataProvider
 
@@ -24,6 +27,9 @@ type BlockDigestsDataProvider struct {
 var _ DataProvider = (*BlockDigestsDataProvider)(nil)
 
 // NewBlockDigestsDataProvider creates a new instance of BlockDigestsDataProvider.
+//
+// Expected errors:
+//   - [data_providers.ErrInvalidArgument]: The provided subscription arguments are invalid.
 func NewBlockDigestsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
@@ -57,7 +63,7 @@ func NewBlockDigestsDataProvider(
 // Run starts processing the subscription for block digests and handles responses.
 // Must be called once.
 //
-// No errors expected during normal operations
+// No errors are expected during normal operations.
 func (p *BlockDigestsDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
