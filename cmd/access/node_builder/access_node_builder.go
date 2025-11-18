@@ -44,7 +44,6 @@ import (
 	collsyncindexer "github.com/onflow/flow-go/engine/access/collection_sync/indexer"
 	"github.com/onflow/flow-go/engine/access/finalized_indexer"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/ingest_receipt"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -2601,16 +2600,16 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 
 }
 
-func createIngestReceiptEngine(builder *FlowAccessNodeBuilder) func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-	return func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return ingest_receipt.New(
-			node.Logger,
-			node.EngineRegistry,
-			node.Storage.Receipts,
-			notNil(builder.collectionExecutedMetric),
-		)
-	}
-}
+// func createIngestReceiptEngine(builder *FlowAccessNodeBuilder) func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+// 	return func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+// 		return ingest_receipt.New(
+// 			node.Logger,
+// 			node.EngineRegistry,
+// 			node.Storage.Receipts,
+// 			notNil(builder.collectionExecutedMetric),
+// 		)
+// 	}
+// }
 
 // notNil ensures that the input is not nil and returns it
 // the usage is to ensure the dependencies are initialized before initializing a module.
