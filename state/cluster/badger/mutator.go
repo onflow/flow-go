@@ -129,11 +129,11 @@ func (m *MutableState) Extend(proposal *cluster.Proposal) error {
 	}
 
 	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
 	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
 	if err != nil {
 		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
 	}
-	defer lctx.Release()
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 	err = m.checkPayloadTransactions(lctx, extendCtx)
