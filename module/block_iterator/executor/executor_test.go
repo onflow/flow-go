@@ -47,7 +47,7 @@ func TestExecute(t *testing.T) {
 
 		// store the execution receipts to be pruned later
 		for _, receipt := range receipts {
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertMyReceipt, func(lctx lockctx.Context) error {
 				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
 				})
@@ -104,7 +104,7 @@ func TestExecuteCanBeResumed(t *testing.T) {
 
 		// store the execution receipts to be pruned later
 		for _, receipt := range receipts {
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertMyReceipt, func(lctx lockctx.Context) error {
 				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
 				})

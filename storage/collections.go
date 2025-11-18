@@ -58,15 +58,18 @@ type Collections interface {
 	// No errors are expected during normal operation.
 	StoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection) (*flow.LightCollection, error)
 
-	// BatchStoreAndIndexByTransaction stores the collection and indexes it by transaction within a batch.
+	// BatchStoreAndIndexByTransaction stores a collection and indexes it by transaction ID within a batch.
 	//
-	// CAUTION: current approach is NOT BFT and needs to be revised in the future.
-	// Honest clusters ensure a transaction can only belong to one collection. However, in rare
-	// cases, the collector clusters can exceed byzantine thresholds -- making it possible to
-	// produce multiple finalized collections (aka guaranteed collections) containing the same
-	// transaction repeatedly.
-	// TODO: eventually we need to handle Byzantine clusters
+	// CAUTION:
+	//   - The current approach is NOT BFT and needs to be revised in the future. Specifically, we assume that a transaction is only ever
+	//     included in a single guaranteed collection (non-BFT shortcut). However, in rare cases, due to sampling anomalies, a cluster can
+	//     exceed byzantine threshold (1/3 of cluster stake), making it possible to produce multiple finalized collections containing the
+	//     same transaction repeatedly.
+	//     TODO: the mature protocol needs to handle Byzantine clusters, which requires generalization (one-to-many mapping).
+	//   - At the moment, the information which collection a transaction belongs to should be persisted once and never changed. This is
+	//     enforced by the function (logging conflicting membership with the keyword [logging.KeySuspicious], but not overwriting it), for
+	//     which reason the caller must hold the [storage.LockInsertAndIndexTxResult] lock.
 	//
-	// This is used by access node storing collections for finalized blocks
+	// No errors are expected during normal operations
 	BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collection *flow.Collection, batch ReaderBatchWriter) (*flow.LightCollection, error)
 }

@@ -35,8 +35,6 @@ func NewPayloads(db storage.DB, index *Index, guarantees *Guarantees, seals *Sea
 }
 
 // storeTx stores the payloads and their components in the database.
-// it takes a map of storingResults to ensure the receipt to be stored contains a known result,
-// which is either already stored in the database or is going to be stored in the same batch.
 func (p *Payloads) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error:

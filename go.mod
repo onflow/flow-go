@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
-	github.com/ethereum/go-ethereum v1.16.5
+	github.com/ethereum/go-ethereum v1.16.7
 	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
@@ -47,13 +47,13 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.11.0
-	github.com/onflow/cadence v1.8.2
+	github.com/onflow/cadence v1.8.3
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.4.15
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.1
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.1
-	github.com/onflow/flow-go-sdk v1.9.1
-	github.com/onflow/flow/protobuf/go/flow v0.4.16
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.2
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.2
+	github.com/onflow/flow-go-sdk v1.9.2
+	github.com/onflow/flow/protobuf/go/flow v0.4.18
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.7.0
@@ -120,9 +120,10 @@ require (
 )
 
 require (
+	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/crate-crypto/go-eth-kzg v1.4.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.3 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.5 // indirect
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
 )
