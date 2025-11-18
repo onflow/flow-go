@@ -73,12 +73,12 @@ func NewAccountsBackend(
 
 // GetAccount returns the account details at the latest sealed block.
 // Alias for GetAccountAtLatestBlock
-func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
-	return a.GetAccountAtLatestBlock(ctx, address, userCriteria)
+func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return a.GetAccountAtLatestBlock(ctx, address, criteria)
 }
 
 // GetAccountAtLatestBlock returns the account details at the latest sealed block.
-func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	sealed, err := a.state.Sealed().Head()
 	if err != nil {
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
@@ -89,7 +89,7 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 	sealedBlockID := sealed.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedBlockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -109,7 +109,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -118,7 +118,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -134,7 +134,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 }
 
 // GetAccountBalanceAtLatestBlock returns the account balance at the latest sealed block.
-func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria,
+func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	sealed, err := a.state.Sealed().Head()
 	if err != nil {
@@ -146,7 +146,7 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 	sealedBlockID := sealed.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedBlockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -166,7 +166,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -175,7 +175,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -195,7 +195,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	sealed, err := a.state.Sealed().Head()
 	if err != nil {
@@ -207,7 +207,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 	sealedBlockID := sealed.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedBlockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -228,7 +228,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 	address flow.Address,
 	keyIndex uint32,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -237,7 +237,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -256,7 +256,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 func (a *Accounts) GetAccountKeysAtLatestBlock(
 	ctx context.Context,
 	address flow.Address,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	sealed, err := a.state.Sealed().Head()
 	if err != nil {
@@ -268,7 +268,7 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 	sealedBlockID := sealed.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedBlockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -288,7 +288,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -297,7 +297,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
