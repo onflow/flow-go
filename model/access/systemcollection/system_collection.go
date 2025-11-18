@@ -19,7 +19,7 @@ var ChainHeightVersions = map[flow.ChainID]access.HeightVersionMapper{
 	}),
 	flow.Mainnet: access.NewStaticHeightVersionMapper(map[uint64]access.Version{
 		0:         Version0,
-		133084444: Version1,
+		133408444: Version1, // Mainnet27 HCU 1, 20th Nov 2025, 8:15am
 	}),
 }
 
