@@ -153,7 +153,7 @@ func TestGetAccountErrors(t *testing.T) {
 					Once()
 			},
 			status: http.StatusInternalServerError,
-			out:    fmt.Sprintf(`{"code":500, "message":"internal error: internal server error"}`),
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
 		},
 		{
 			name: "GetAccountAtBlockHeight fails for valid height",

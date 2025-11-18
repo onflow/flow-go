@@ -149,7 +149,7 @@ func TestGetAccountByIndexErrors(t *testing.T) {
 					Once()
 			},
 			status: http.StatusInternalServerError,
-			out:    fmt.Sprintf(`{"code":500, "message":"internal error: internal server error"}`),
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
 		},
 		{
 			name: "GetAccountKeyAtBlockHeight fails for valid height",
@@ -289,7 +289,7 @@ func TestGetAccountKeysErrors(t *testing.T) {
 					Once()
 			},
 			status: http.StatusInternalServerError,
-			out:    fmt.Sprintf(`{"code":500, "message":"internal error: internal server error"}`),
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
 		},
 		{
 			name: "GetAccountKeysAtBlockHeight fails for valid height",

@@ -679,7 +679,7 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 //	output: typeName="header", errorStr="failed to find header by ID: could not lookup block id by height 1", ok=true
 func splitNotFoundError(original string) (string, string, bool) {
 	// Use the existing split helper
-	afterPrefix, found := splitOnPrefix(original, access.DataNotFountPrefix)
+	afterPrefix, found := splitOnPrefix(original, access.DataNotFoundPrefix)
 	if !found {
 		return "", "", false
 	}
@@ -698,7 +698,7 @@ func splitNotFoundError(original string) (string, string, bool) {
 	typeName := strings.TrimSuffix(fields[0], ":")
 
 	// Now use splitOnPrefix again with "prefix + typeName" to get sourceErrStr
-	fullPrefix := fmt.Sprintf("%s %s:", access.DataNotFountPrefix, typeName)
+	fullPrefix := fmt.Sprintf("%s %s:", access.DataNotFoundPrefix, typeName)
 	if errStr, ok2 := splitOnPrefix(original, fullPrefix); ok2 {
 		sourceErrStr := strings.TrimSpace(errStr)
 		return typeName, sourceErrStr, true

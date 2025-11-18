@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-var DataNotFountPrefix = "data not found for"
+var DataNotFoundPrefix = "data not found for"
 
 // RequireNoError returns nil if error is nil, otherwise throws an irrecoverable exception
 func RequireNoError(ctx context.Context, err error) error {
@@ -100,7 +100,7 @@ func NewDataNotFoundError(dataType string, err error) DataNotFoundError {
 }
 
 func (e DataNotFoundError) Error() string {
-	return fmt.Sprintf("%s %s: %v", DataNotFountPrefix, e.dataType, e.err)
+	return fmt.Sprintf("%s %s: %v", DataNotFoundPrefix, e.dataType, e.err)
 }
 
 func (e DataNotFoundError) Unwrap() error {
