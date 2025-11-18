@@ -92,6 +92,12 @@ var LockGroupExecutionBootstrap = []string{
 	LockIndexStateCommitment,
 }
 
+// deprecated (leo), only used by engine/access/ingestion/engine, which is deprecated
+var LockGroupAccessFinalizingBlock = []string{
+	LockIndexBlockByPayloadGuarantees,
+	LockIndexExecutionResult,
+}
+
 var LockGroupExecutionSaveExecutionResult = []string{
 	LockIndexChunkDataPackByChunkID,
 	LockInsertEvent,
@@ -149,6 +155,7 @@ func addLocks(builder lockctx.DAGPolicyBuilder, locks []string) {
 func makeLockPolicy() lockctx.Policy {
 	builder := lockctx.NewDAGPolicyBuilder()
 
+	addLocks(builder, LockGroupAccessFinalizingBlock) // deprecated (leo)
 	addLocks(builder, LockGroupAccessStateSyncIndexBlockData)
 	addLocks(builder, LockGroupAccessOptimisticSyncBlockPersist)
 	addLocks(builder, LockGroupExecutionBootstrap)
