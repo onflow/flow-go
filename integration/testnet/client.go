@@ -304,9 +304,9 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 	return c.waitForStatus(ctx, id, sdk.TransactionStatusSealed)
 }
 
-// WaitForExecuted waits for the transaction to be executed, then returns the result.
+// WaitForExecuted waits for the transaction to be executed or sealed, then returns the result.
 func (c *Client) WaitForExecuted(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
-	return c.waitForStatus(ctx, id, sdk.TransactionStatusExecuted)
+	return c.waitForStatuses(ctx, id, sdk.TransactionStatusExecuted, sdk.TransactionStatusSealed)
 }
 
 // WaitUntilIndexed blocks until the node has indexed the given height.
@@ -331,11 +331,32 @@ func (c *Client) waitForStatus(
 	id sdk.Identifier,
 	targetStatus sdk.TransactionStatus,
 ) (*sdk.TransactionResult, error) {
-	fmt.Printf("Waiting for transaction %s to be %v...\n", id, targetStatus)
+	return c.waitForStatuses(ctx, id, targetStatus)
+}
+
+// waitForStatuses waits for the transaction to be in one of the target statuses, then returns the result.
+func (c *Client) waitForStatuses(
+	ctx context.Context,
+	id sdk.Identifier,
+	targetStatuses ...sdk.TransactionStatus,
+) (*sdk.TransactionResult, error) {
+	statusSet := make(map[sdk.TransactionStatus]bool, len(targetStatuses))
+	for _, status := range targetStatuses {
+		statusSet[status] = true
+	}
+
+	var statusStr string
+	if len(targetStatuses) == 1 {
+		statusStr = targetStatuses[0].String()
+	} else {
+		statusStr = fmt.Sprintf("%v", targetStatuses)
+	}
+	fmt.Printf("Waiting for transaction %s to be %s...\n", id, statusStr)
+
 	errCount := 0
 	var result *sdk.TransactionResult
 	var err error
-	for result == nil || (result.Status != targetStatus) {
+	for result == nil || !statusSet[result.Status] {
 		childCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 		result, err = c.client.GetTransactionResult(childCtx, id)
 		cancel()
@@ -354,7 +375,7 @@ func (c *Client) waitForStatus(
 	}
 
 	fmt.Println()
-	fmt.Printf("(Wait for Seal) Transaction %s %s\n", id, targetStatus)
+	fmt.Printf("Transaction %s is %s\n", id, result.Status)
 
 	return result, err
 }
