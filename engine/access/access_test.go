@@ -548,6 +548,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.RunTest(func(handler *rpc.Handler, db storage.DB, all *store.All) {
+		lockManager := storage.NewTestingLockManager()
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -557,8 +558,15 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithExecutionResultBlockID(blockID),
 			unittest.WithServiceEvents(3))
 
-		require.NoError(suite.T(), all.Results.Store(er))
-		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
+		require.NoError(suite.T(), storage.WithLock(lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := all.Results.BatchStore(er, rw)
+				if err != nil {
+					return err
+				}
+				return all.Results.BatchIndex(lctx, rw, blockID, er.ID()) // requires storage.LockIndexExecutionResult
+			})
+		}))
 
 		// Create and store a seal for the block
 		seal := unittest.Seal.Fixture(
@@ -642,6 +650,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -767,6 +776,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
@@ -857,6 +868,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		originID := unittest.IdentifierFixture()
@@ -1027,6 +1039,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
@@ -1189,6 +1203,7 @@ func (suite *Suite) TestGetTransactionResult() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -1294,6 +1309,8 @@ func (suite *Suite) TestExecuteScript() {
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,

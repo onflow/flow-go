@@ -53,8 +53,12 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		headerID := unittest.IdentifierFixture()
 		collectionGuaranteeID := unittest.IdentifierFixture()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockContainingCollectionGuarantee(rw.Writer(), collectionGuaranteeID, headerID)
+		lockManager := storage.NewTestingLockManager()
+
+		err := unittest.WithLock(t, lockManager, storage.LockIndexBlockByPayloadGuarantees, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, headerID, []flow.Identifier{collectionGuaranteeID})
+			})
 		})
 		require.NoError(t, err)
 
