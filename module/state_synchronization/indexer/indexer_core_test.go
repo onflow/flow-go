@@ -127,6 +127,40 @@ func (i *indexCoreTest) useDefaultHeights() *indexCoreTest {
 	return i
 }
 
+func (i *indexCoreTest) setStoreRegisters(f func(t *testing.T, entries flow.RegisterEntries, height uint64) error) *indexCoreTest {
+	i.registers.
+		On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
+		Return(func(entries flow.RegisterEntries, height uint64) error {
+			return f(i.t, entries, height)
+		}).Once()
+	return i
+}
+
+func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flow.EventsList) error) *indexCoreTest {
+	i.events.
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
+		Return(func(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+			require.NotNil(i.t, batch)
+			return f(i.t, blockID, events)
+		})
+	return i
+}
+
+func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Identifier, []flow.LightTransactionResult) error) *indexCoreTest {
+	i.results.
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertLightTransactionResult) }),
+			mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
+		Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, blockID flow.Identifier, results []flow.LightTransactionResult) error {
+			require.True(i.t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
+			require.NotNil(i.t, batch)
+			return f(i.t, blockID, results)
+		})
+	return i
+}
+
 func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error)) *indexCoreTest {
 	i.registers.
 		On("Get", mock.AnythingOfType("flow.RegisterID"), mock.AnythingOfType("uint64")).
@@ -138,14 +172,18 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 
 func (i *indexCoreTest) useDefaultEvents() *indexCoreTest {
 	i.events.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
 		Return(nil)
 	return i
 }
 
 func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 	i.results.
-		On("BatchStore", mock.Anything, mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertLightTransactionResult) }),
+			mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
 		Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, _ flow.Identifier, _ []flow.LightTransactionResult) error {
 			require.True(i.t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
 			require.NotNil(i.t, batch)
@@ -230,13 +268,17 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index AllTheThings", func(t *testing.T) {
 		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
 
-		test.events.On("BatchStore", mock.Anything, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
-			Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+		test.events.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(func(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+				require.True(t, lctx.HoldsLock(storage.LockInsertEvent))
 				require.NotNil(t, batch)
-				// Events BatchStore doesn't require specific locks, but we validate the batch is provided
 				return nil
 			})
-		test.results.On("BatchStore", mock.Anything, mock.Anything, blockID, tf.ExpectedResults).
+		test.results.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertLightTransactionResult) }),
+			mock.Anything, blockID, tf.ExpectedResults).
 			Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, blockID flow.Identifier, results []flow.LightTransactionResult) error {
 				require.True(t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
 				require.NotNil(t, batch)
@@ -252,7 +294,9 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			Return(nil)
 		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
 		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
-			test.scheduledTransactions.On("BatchIndex", mock.Anything, blockID, txID, scheduledTxID, mock.Anything).
+			test.scheduledTransactions.On("BatchIndex",
+				mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockIndexScheduledTransaction) }),
+				blockID, txID, scheduledTxID, mock.Anything).
 				Return(func(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
 					require.True(t, lctx.HoldsLock(storage.LockIndexScheduledTransaction))
 					require.NotNil(t, batch)
