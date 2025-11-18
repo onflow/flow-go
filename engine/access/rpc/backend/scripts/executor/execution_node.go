@@ -113,7 +113,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 		case codes.InvalidArgument:
 			return nil, nil, access.NewInvalidRequestError(errToReturn)
 		case codes.NotFound:
-			return nil, nil, access.NewDataNotFoundError("block", err)
+			return nil, nil, access.NewDataNotFoundError("block", errToReturn)
 		case codes.Internal:
 			return nil, nil, access.NewInternalError(errToReturn)
 		case codes.Unavailable:

@@ -84,8 +84,8 @@ func NewAccountsBackend(
 //   - [access.RequestCanceledError] - if the request was canceled.
 //   - [access.RequestTimedOutError] - if the request timed out.
 //   - [access.InternalError] - for internal failures or index conversion errors.
-func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
-	return a.GetAccountAtLatestBlock(ctx, address, userCriteria)
+func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return a.GetAccountAtLatestBlock(ctx, address, criteria)
 }
 
 // GetAccountAtLatestBlock returns the account details at the latest sealed block.
@@ -99,7 +99,7 @@ func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, userCri
 //   - [access.RequestCanceledError] - if the request was canceled.
 //   - [access.RequestTimedOutError] - if the request timed out.
 //   - [access.InternalError] - for internal failures or index conversion errors.
-func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
@@ -110,7 +110,7 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedHeaderID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -148,7 +148,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -160,7 +160,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -194,7 +194,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 //   - [access.RequestCanceledError] - if the request was canceled.
 //   - [access.RequestTimedOutError] - if the request timed out.
 //   - [access.InternalError] - for internal failures or index conversion errors.
-func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, userCriteria optimistic_sync.Criteria,
+func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
@@ -206,7 +206,7 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedHeaderID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -244,7 +244,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -256,7 +256,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -294,7 +294,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
@@ -306,7 +306,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedHeaderID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -345,7 +345,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 	address flow.Address,
 	keyIndex uint32,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -357,7 +357,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -394,7 +394,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 func (a *Accounts) GetAccountKeysAtLatestBlock(
 	ctx context.Context,
 	address flow.Address,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	sealedHeader, err := a.state.Sealed().Head()
 	if err != nil {
@@ -406,7 +406,7 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 	sealedHeaderID := sealedHeader.ID()
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		sealedHeaderID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
@@ -444,7 +444,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
 	height uint64,
-	userCriteria optimistic_sync.Criteria,
+	criteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	blockID, err := a.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -456,7 +456,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 
 	executionResultInfo, err := a.executionResultProvider.ExecutionResultInfo(
 		blockID,
-		userCriteria,
+		criteria,
 	)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
