@@ -34,8 +34,8 @@ func (pr *ProgressReader) SetCollectionFetcher(backend collection_sync.ProgressR
 }
 
 // ProcessedHeight returns the maximum processed height from the available backends.
-// If both backends are available, it returns the maximum of their progress.
-// If only one backend is available, it returns that backend's progress.
+// If both backends are available, it returns the maximum of their progress and lastProgress.
+// If only one backend is available, it returns the maximum of that backend's progress and lastProgress.
 // If neither backend is available, it returns lastProgress.
 func (pr *ProgressReader) ProcessedHeight() uint64 {
 	hasExecutionData := pr.executionDataProcessor != nil
@@ -44,18 +44,30 @@ func (pr *ProgressReader) ProcessedHeight() uint64 {
 	if hasExecutionData && hasCollectionFetcher {
 		execHeight := pr.executionDataProcessor.ProcessedHeight()
 		collectionHeight := pr.collectionFetcher.ProcessedHeight()
-		if execHeight > collectionHeight {
-			return execHeight
+		max := execHeight
+		if collectionHeight > max {
+			max = collectionHeight
 		}
-		return collectionHeight
+		if pr.lastProgress > max {
+			max = pr.lastProgress
+		}
+		return max
 	}
 
 	if hasExecutionData {
-		return pr.executionDataProcessor.ProcessedHeight()
+		execHeight := pr.executionDataProcessor.ProcessedHeight()
+		if pr.lastProgress > execHeight {
+			return pr.lastProgress
+		}
+		return execHeight
 	}
 
 	if hasCollectionFetcher {
-		return pr.collectionFetcher.ProcessedHeight()
+		collectionHeight := pr.collectionFetcher.ProcessedHeight()
+		if pr.lastProgress > collectionHeight {
+			return pr.lastProgress
+		}
+		return collectionHeight
 	}
 
 	return pr.lastProgress
