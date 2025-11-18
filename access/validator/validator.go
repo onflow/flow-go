@@ -165,7 +165,7 @@ type TransactionValidator struct {
 	scriptExecutor               execution.ScriptExecutor
 	verifyPayerBalanceScript     []byte
 	transactionValidationMetrics module.TransactionValidationMetrics
-	registersAsyncStore          *execution.RegistersAsyncStore
+	registers                    *execution.RegistersAsyncStore
 
 	validationSteps []ValidationStep
 }
@@ -179,7 +179,7 @@ func NewTransactionValidator(
 	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
-	registersAsyncStore *execution.RegistersAsyncStore,
+	registers *execution.RegistersAsyncStore,
 ) (*TransactionValidator, error) {
 	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
@@ -196,7 +196,7 @@ func NewTransactionValidator(
 		scriptExecutor:               executor,
 		verifyPayerBalanceScript:     templates.GenerateVerifyPayerBalanceForTxExecution(env),
 		transactionValidationMetrics: transactionValidationMetrics,
-		registersAsyncStore:          registersAsyncStore,
+		registers:                    registers,
 	}
 
 	txValidator.initValidationSteps()
@@ -515,7 +515,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
 	}
 
-	registerSnapshotReader, err := v.registersAsyncStore.RegisterSnapshotReader()
+	registerSnapshotReader, err := v.registers.RegisterSnapshotReader()
 	if err != nil {
 		return fmt.Errorf("failed to get register snapshot reader: %w", err)
 	}

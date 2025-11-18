@@ -121,7 +121,7 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 	return result, metadata, nil
 }
 
-// convertScriptExecutionError converts errors to the script execution errors.
+// convertScriptExecutionError converts script executor and FVM errors to corresponding access-layer sentinel errors.
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
@@ -139,6 +139,10 @@ func convertScriptExecutionError(err error) error {
 		return access.NewOutOfRangeError(err)
 	case errors.Is(err, storage.ErrNotFound):
 		return access.NewDataNotFoundError("header", err)
+	case errors.Is(err, context.Canceled):
+		return access.NewRequestCanceledError(err)
+	case errors.Is(err, context.DeadlineExceeded):
+		return access.NewRequestTimedOutError(err)
 	}
 
 	var failure fvmerrors.CodedFailure
