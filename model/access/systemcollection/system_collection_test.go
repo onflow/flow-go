@@ -21,8 +21,8 @@ const (
 	// testTestnetV1Height is the height at which Testnet transitions to Version1.
 	testTestnetV1Height = 290050888
 
-	// testTestnetV1Height is the height at which Testnet transitions to Version1.
-	testMainnetV1Height = 133084444
+	// testMainnetV1Height is the height at which Mainnet transitions to Version1.
+	testMainnetV1Height = 133408444
 )
 
 func TestDefault(t *testing.T) {
