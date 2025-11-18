@@ -2264,7 +2264,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	}
 
 	builder.Component("finalized block indexer", createFinalizedBlockIndexer(builder))
-	builder.Component("ingest receipt", createIngestReceiptEngine(builder))
+	// leo: ingest receipt allows AN to store receipts sent from the EN,
+	// but this is unnecessary, because access node can get the receipts from sealed block
+	// builder.Component("ingest receipt", createIngestReceiptEngine(builder))
 	createCollectionSyncFetcher(builder)
 
 	if builder.storeTxResultErrorMessages {
