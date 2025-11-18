@@ -302,7 +302,7 @@ var (
 // </component_spec>
 //
 // All exported methods are safe for concurrent access. Internally, the mempool utilizes the
-// LevelledForrest.
+// LevelledForest.
 type ResultsForest struct {
 	log             zerolog.Logger
 	headers         storage.Headers
@@ -327,11 +327,11 @@ type ResultsForest struct {
 	// lastFinalizedView is the view of the last finalized block processed by the forest.
 	lastFinalizedView counters.StrictMonotonicCounter
 
-	// latestPersistedSealedResult tracks view and ID of the latest persisted sealed result.
-	// It is important to remember that information is solely from the perspective of the storage layer!
+	// latestPersistedSealedResult tracks view and ID of the latest persisted sealed result. It is
+	// important to remember that any returned information is solely from the perspective of the storage layer!
 	// As forest triggers persisting of processed result data, this quantity can be *ahead* of the forest's
 	// internal result 𝓹 with the smallest view. Nevertheless, conceptually `latestPersistedSealedResult`
-	// must always an execution result within the fork 𝓹 ← … ← 𝓼.
+	// must always pertain to an execution result within the fork 𝓹 ← … ← 𝓼.
 	latestPersistedSealedResult storage.LatestPersistedSealedResultReader
 
 	// maxViewDelta specifies the number of views past its lowest view that the forest will accept.
@@ -346,8 +346,8 @@ type ResultsForest struct {
 	mu sync.RWMutex
 }
 
-// NewResultsForest creates a new instance of ResultsForest, and adds the latest persisted sealed
-// result to the forest.
+// NewResultsForest instantiates a new ResultsForest and adds the latest persisted sealed
+// result to it.
 //
 // No errors are expected during normal operations.
 func NewResultsForest(
@@ -360,19 +360,19 @@ func NewResultsForest(
 ) (*ResultsForest, error) {
 	sealedResultID, sealedHeight := latestPersistedSealedResult.Latest()
 
-	// by protocol convention, the latest persisted sealed result and its executed block should always
-	// exist. They are initialized to the root block and result during bootstrapping.
+	// By protocol convention, the latest persisted sealed result and its executed block should always
+	// exist. During bootstrapping, they are initialized to the root block and root result.
 	sealedResult, err := results.ByID(sealedResultID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest persisted sealed result (%s): %w", sealedResultID, err)
 	}
-
 	sealedHeader, err := headers.ByHeight(sealedHeight)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block header for latest persisted sealed result (height: %d): %w", sealedHeight, err)
 	}
 
-	// insert the latest persisted sealed result into the forest.
+	// At time of construction, the 𝙡𝙤𝙬𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓹 and the 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 are both the same.
+	// We create an ExecutionResultContainer for it, and mark the result as sealed:
 	pipeline := pipelineFactory.NewCompletedPipeline(sealedResult)
 	latestSealedResultContainer, err := NewExecutionResultContainer(sealedResult, sealedHeader, pipeline)
 	if err != nil {
@@ -438,14 +438,14 @@ func (rf *ResultsForest) ResetLowestRejectedView() (uint64, bool) {
 // result later).
 //
 // In contrast, for results without a finalized seal, it depends on the clients how much trust they
-// are willing to place in the results correctness - potentially depending on how many ENs and/or
+// are willing to place in the result's correctness - potentially depending on how many ENs and/or
 // which ENs specifically produced the result. Therefore, unsealed results must be added using
 // the `AddReceipt` method.
 //
 // The method is idempotent. Repeated insertion of the same sealed result is a noop until the result
 // falls below the pruning horizon, at which point [ErrPrunedView] is returned.
 //
-// If ErrMaxViewDeltaExceeded is returned, the provided result was not added to the forest, and
+// If [ErrMaxViewDeltaExceeded] is returned, the provided result was not added to the forest, and
 // the caller must use `ResetLowestRejectedView` to perform the backfill process once the forest
 // has available capacity.
 //
@@ -623,11 +623,11 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 // Returns the container, and a boolean indicating if the container already existed.
 //
 // Expected error returns during normal operations:
-//   - [ErrPrunedView]: if the result's block view is below the lowest view
-//   - [ErrMaxViewDeltaExceeded]: if the result's block view is more than maxViewDelta views ahead
-//     of the oldes stored result (lowest view) *and* the given result is not
+//   - [ErrPrunedView]: if the result's block view is below the pruning horizon (lowest view in the forest)
+//   - [ErrMaxViewDeltaExceeded]: for results that are not direct children of the 𝙡𝙤𝙬𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓹,
+//     if their view is more than `maxViewDelta` ahead of 𝓹.Level
 func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*ExecutionResultContainer, bool, error) {
-	// First, try to get existing container - this will acquire read-lock only
+	// First, try to get existing container - acquires read-lock only
 	resultID := result.ID()
 	container, found := rf.GetContainer(resultID)
 	if found {
@@ -639,7 +639,7 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*Ex
 	// Note: we are not holding the lock atm! This is beneficial, because querying for the block header
 	// might fall back on a database read. Furthermore, heap allocations are more expensive operations.
 	// (see https: //go101.org/optimizations/0.3-memory-allocations.html). In comparison, lock
-	// allocations are assumed to be cheaper in a non-congested environment.
+	// allocations are assumed to be much cheaper in a non-congested environment.
 	executedBlock, err := rf.headers.ByBlockID(result.BlockID)
 	if err != nil {
 		// this is an exception since only results for certified blocks should be added to the forest
@@ -658,12 +658,12 @@ func (rf *ResultsForest) getOrCreateContainer(result *flow.ExecutionResult) (*Ex
 	// In the rare case that a container for the requested result was already added by another thread concurrently,
 	// the levelled forest will automatically discard it as a duplicate. Specifically, the LevelledForest considers
 	// two Vertices as equal if they have the same ID (here `resultID`), Level (here `executedBlock.View`), and
-	// Parent (here `result.PreviousResultID` & `executedBlock.ParentView`). In our case, all of those are guaranteed to
-	// be identical for all `ExecutionResultContainer` instances that we create for the same result.
-	// Though, it should be noted that different instances of the `ExecutionResultContainer` may differ in the content of
+	// Parent (here `result.PreviousResultID` & `executedBlock.ParentView`). In our case, all of those are guaranteed
+	// to be identical for all `ExecutionResultContainer` instances that we create for the same result.
+	// Though, it should be noted that different instances of the `ExecutionResultContainer` may differ in
 	// their `Pipeline` and `Receipts` fields (domain-specific aspects not covered by the LevelledForest).
-	// Hence, we have the IMPORTANT requirement: in case a container already exists, it takes precident over our
-	// optimistically constructed instance.
+	// Hence, we have the IMPORTANT requirement: in case a container already exists, it takes precedence over
+	// our optimistically constructed instance.
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
@@ -702,7 +702,7 @@ func (rf *ResultsForest) Size() uint {
 	return uint(rf.forest.GetSize())
 }
 
-// LowestView returns the lowest view where results are still stored in the mempool.
+// LowestView returns the lowest view, for which results & receipts are still accepted.
 func (rf *ResultsForest) LowestView() uint64 {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
@@ -726,14 +726,14 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 	return container.(*ExecutionResultContainer), true
 }
 
-// IterateChildren returns an iter.Seq that iterates over all children of the given result ID
+// IterateChildren returns an [iter.Seq] that iterates over all children of the given result ID
 func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
 	return rf.iterateChildren(resultID)
 }
 
-// iterateChildren returns an iter.Seq that iterates over all children of the given result ID
+// iterateChildren returns an [iter.Seq] that iterates over all children of the given result ID
 // NOT CONCURRENCY SAFE!
 func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
 	return func(yield func(*ExecutionResultContainer) bool) {
@@ -747,7 +747,7 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*Exe
 	}
 }
 
-// IterateView returns an iter.Seq that iterates over all containers whose executed block has the given view
+// IterateView returns an [iter.Seq] that iterates over all containers whose executed block has the given view
 func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
@@ -994,7 +994,7 @@ func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 // effectively prevents unbounded memory consumption on the happy path:
 //   - Assume that the forest is only fed with results for _known_ certified blocks. This has no
 //     performance implications in practise, but prevents flooding attacks by Execution Nodes
-//     [ENs], publishing results for made-up blocks. A simple limited-size LRU cache can be used
+//     [ENs], publishing results for made-up blocks. A simple small-sized LRU cache can be used
 //     to hold receipts in the rare case of blocks arriving late.
 //   - There are two classes of byzantine flooding attacks possible:
 //     1. Byzantine ENs publish results for made up blocks. This would only hit the LRU cache
@@ -1007,13 +1007,13 @@ func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
 // NOT CONCURRENCY SAFE!
 //
 // Expected error returns during normal operations:
-//   - [ErrPrunedView]: if the result's view is below the pruning horizon (lowest view in the )
-//   - [ErrMaxViewDeltaExceeded]: for results that are not direct children of the 𝙡𝙤𝙬𝙚𝙨𝙩
-//     𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓹, if their view is more than `maxViewDelta` ahead of 𝓹.Level
+//   - [ErrPrunedView]: if the result's view is below the pruning horizon (lowest view in the forest)
+//   - [ErrMaxViewDeltaExceeded]: for results that are not direct children of the 𝙡𝙤𝙬𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓹,
+//     if their view is more than `maxViewDelta` ahead of 𝓹.Level
 func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) error {
 	candidateView := candidate.BlockView()
 
-	// History cutoff - only results with views greater or equal are to this threshold are eligible for storage in ResultsForest
+	// History cutoff - only results with views greater or equal to this threshold are eligible for storage in ResultsForest
 	historyCutoffView := rf.latestSealedResult.BlockView()
 	if candidateView < historyCutoffView {
 		return ErrPrunedView
@@ -1033,7 +1033,7 @@ func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) e
 		return nil // candidate result satisfies criteria for storage in ResultsForest
 	}
 
-	// We reject results whose view above 𝓱 = 𝓹.Level + maxViewDelta
+	// We reject results whose view above 𝓱 = 𝓹.Level + maxViewDelta, unless parent is 𝓹
 	if candidateView > historyCutoffView+rf.maxViewDelta {
 		rf.rejectedResults = true
 		return ErrMaxViewDeltaExceeded

@@ -20,7 +20,7 @@ import (
 // (mathematical principle of vacuous truth) without the implementation needing to worry
 // about unsigned integer underflow.
 //
-// LevelledForest is NOT safe for concurrent use by multiple goroutines.
+// LevelledForest is NOT safe for CONCURRENT use by multiple goroutines.
 type LevelledForest struct {
 	vertices        VertexSet
 	verticesAtLevel map[uint64]VertexList
@@ -131,7 +131,7 @@ func (f *LevelledForest) GetSize() uint64 {
 	return f.size
 }
 
-// GetChildren returns a VertexIterator to iterate over the children
+// GetChildren returns a single-use VertexIterator to iterate over the children.
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id`.
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
 	// if vertex does not exist, container will be nil
@@ -153,7 +153,7 @@ func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
 	return num
 }
 
-// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified level.
+// GetVerticesAtLevel returns a single-use VertexIterator to iterate over the Vertices at the specified level.
 // An empty VertexIterator is returned, if no vertices are known at the specified level.
 // If `level` is already pruned, an empty VertexIterator is returned.
 func (f *LevelledForest) GetVerticesAtLevel(level uint64) VertexIterator {
