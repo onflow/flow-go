@@ -172,6 +172,7 @@ func (suite *Suite) RunTest(
 			Transactions:             all.Transactions,
 			ExecutionResults:         all.Results,
 			ExecutionReceipts:        all.Receipts,
+			Seals:                    all.Seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            suite.metrics,
 			MaxHeightRange:           events.DefaultMaxHeightRange,
@@ -298,6 +299,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
+		seals := store.NewSeals(metrics, db)
 
 		// create collection node cluster
 		count := 2
@@ -340,6 +342,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		bnd, err := backend.New(backend.Params{State: suite.state,
 			Collections:              collections,
 			Transactions:             transactions,
+			Seals:                    seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            metrics,
 			ConnFactory:              connFactory,
@@ -565,6 +568,18 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			})
 		}))
 
+		// Create and store a seal for the block
+		seal := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(blockID),
+			unittest.Seal.WithResult(er),
+		)
+		require.NoError(suite.T(), all.Seals.Store(seal))
+
+		// Index the seal by block ID so FinalizedSealForBlock can find it
+		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedSealByBlockID(rw.Writer(), blockID, seal.ID())
+		}))
+
 		assertResp := func(
 			resp *accessproto.ExecutionResultForBlockIDResponse,
 			err error,
@@ -696,6 +711,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -957,6 +973,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -1215,6 +1232,7 @@ func (suite *Suite) TestExecuteScript() {
 			Transactions:               all.Transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
