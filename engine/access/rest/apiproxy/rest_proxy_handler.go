@@ -198,19 +198,19 @@ func (r *RestProxyHandler) GetTransactionResult(
 	return convert.MessageToTransactionResult(transactionResultResponse)
 }
 
-// GetAccountAtBlockHeight returns account by account address and block height.
+// GetAccountAtBlockHeight returns the account by its address at a specific block height.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for getting account and
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
@@ -245,19 +245,19 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	return account, metadata, nil
 }
 
-// GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
+// GetAccountBalanceAtBlockHeight returns the account balance by its address at a specific block height.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for getting account balance and
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account balance and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
@@ -285,22 +285,21 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, a
 	}
 
 	return accountBalanceResponse.GetBalance(), metadata, nil
-
 }
 
-// GetAccountKeys returns account keys by account address and block height.
+// GetAccountKeys returns the account keys by address at a specific block height.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for getting account keys and
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account keys and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
@@ -328,7 +327,6 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 		if err != nil {
 			return nil, nil, err
 		}
-
 		accountKeys[i] = *accountKey
 	}
 
@@ -340,19 +338,19 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 	return accountKeys, metadata, nil
 }
 
-// GetAccountKeyByIndex returns account key by account address, key index and block height.
+// GetAccountKeyByIndex returns the account key by address, key index, and block height.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for getting account key and
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account key and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountKeyByIndex(
 	ctx context.Context,
 	address flow.Address,

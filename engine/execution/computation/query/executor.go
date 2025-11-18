@@ -263,7 +263,7 @@ func summarizeLog(log string, limit int) string {
 // GetAccount returns an account by address.
 //
 // Expected error returns during normal operation:
-//   - [fvmerrors.ErrCodeAccountNotFoundError] - if the account is not found by address.
+//   - [fvmerrors.ErrCodeAccountNotFoundError]: If the account is not found by address.
 func (e *QueryExecutor) GetAccount(
 	_ context.Context,
 	address flow.Address,
@@ -358,7 +358,7 @@ func (e *QueryExecutor) GetAccountAvailableBalance(
 // GetAccountKeys returns account public keys by the provided address.
 //
 // Expected error returns during normal operation:
-//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError] - a public keys not found for the given address.
+//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError]: If public keys not found for the given address.
 func (e *QueryExecutor) GetAccountKeys(
 	_ context.Context,
 	address flow.Address,
@@ -389,7 +389,7 @@ func (e *QueryExecutor) GetAccountKeys(
 // GetAccountKey returns account public key by the provided address and key index .
 //
 // Expected error returns during normal operation:
-//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError] - a public key not found for the given address and key index.
+//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError]: If the public key not found for the given address and key index.
 func (e *QueryExecutor) GetAccountKey(
 	_ context.Context,
 	address flow.Address,

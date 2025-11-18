@@ -514,17 +514,16 @@ func (h *Handler) GetTransactionResultByIndex(
 
 // GetAccount returns an account by address at the latest sealed block.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccount(
 	ctx context.Context,
 	req *accessproto.GetAccountRequest,
@@ -563,17 +562,16 @@ func (h *Handler) GetAccount(
 
 // GetAccountAtLatestBlock returns an account by address at the latest sealed block.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountAtLatestBlockRequest,
@@ -612,17 +610,16 @@ func (h *Handler) GetAccountAtLatestBlock(
 
 // GetAccountAtBlockHeight returns an account by address at the given block height.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountAtBlockHeightRequest,
@@ -661,17 +658,16 @@ func (h *Handler) GetAccountAtBlockHeight(
 
 // GetAccountBalanceAtLatestBlock returns an account balance by address at the latest sealed block.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account balance and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountBalanceAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountBalanceAtLatestBlockRequest,
@@ -705,17 +701,16 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 
 // GetAccountBalanceAtBlockHeight returns an account balance by address at the given block height.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account balance and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountBalanceAtBlockHeightRequest,
@@ -749,17 +744,16 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 
 // GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account key and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountKeyAtLatestBlockRequest,
@@ -798,17 +792,16 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 
 // GetAccountKeysAtLatestBlock returns an account public keys by address at the latest sealed block.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account keys and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeysAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountKeysAtLatestBlockRequest,
@@ -853,17 +846,16 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 
 // GetAccountKeyAtBlockHeight returns an account public keys by address and key index at the given block height.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account key and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountKeyAtBlockHeightRequest,
@@ -908,17 +900,16 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 
 // GetAccountKeysAtBlockHeight returns an account public keys by address at the given block height.
 //
-// Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the request was canceled.
-//   - [codes.DeadlineExceeded] - if the request timed out.
-//   - [codes.Unavailable] - if configured to use an external node for getting account keys and
-//     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountKeysAtBlockHeightRequest,

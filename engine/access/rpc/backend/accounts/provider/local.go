@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// LocalAccountProvider is a provider that read account data using only the local node's storage.
+// LocalAccountProvider is a provider that reads account data using only the local node's storage.
 type LocalAccountProvider struct {
 	log                 zerolog.Logger
 	state               protocol.State
@@ -48,14 +48,14 @@ func NewLocalAccountProvider(
 // GetAccountAtBlock returns a Flow account by the provided address and block height.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -94,14 +94,14 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 // GetAccountBalanceAtBlock returns the balance of a Flow account at the given block.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -142,14 +142,14 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 // by its key index and block height.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -191,14 +191,14 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 // at the given block height.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -238,13 +238,13 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 // convertAccountError maps script executor and FVM errors to corresponding access-layer sentinel errors.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data for the requested height was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If the data for the requested height is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func convertAccountError(err error) error {
 	switch {
 	case errors.Is(err, version.ErrOutOfRange),

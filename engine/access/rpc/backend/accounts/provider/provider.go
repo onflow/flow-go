@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
-// AccountProvider defines an abstraction for retrieving Flow account data from a specified block.
+// AccountProvider defines an abstraction for retrieving Flow account data from a specific block.
 //
 // Implementations may rely on local storage, execution nodes, or a failover strategy,
 // but must return standardized access-layer sentinel errors for consistency.
@@ -16,14 +16,14 @@ type AccountProvider interface {
 	// GetAccountAtBlock returns a Flow account for the given address and block height.
 	//
 	// Expected error returns during normal operation:
-	//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-	//   - [access.DataNotFoundError] - if data was not found.
-	//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-	//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-	//   - [access.RequestCanceledError] - if the request was canceled.
-	//   - [access.RequestTimedOutError] - if the request timed out.
-	//   - [access.InternalError] - for internal failures or index conversion errors.
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+	//   - [access.DataNotFoundError]: If the data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountAtBlock(
 		ctx context.Context,
 		address flow.Address,
@@ -36,14 +36,14 @@ type AccountProvider interface {
 	// at the given block height.
 	//
 	// Expected error returns during normal operation:
-	//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-	//   - [access.DataNotFoundError] - if data was not found.
-	//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-	//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-	//   - [access.RequestCanceledError] - if the request was canceled.
-	//   - [access.RequestTimedOutError] - if the request timed out.
-	//   - [access.InternalError] - for internal failures or index conversion errors.
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+	//   - [access.DataNotFoundError]: If the data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountBalanceAtBlock(
 		ctx context.Context,
 		address flow.Address,
@@ -56,14 +56,14 @@ type AccountProvider interface {
 	// by its key index and block height.
 	//
 	// Expected error returns during normal operation:
-	//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-	//   - [access.DataNotFoundError] - if data was not found.
-	//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-	//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-	//   - [access.RequestCanceledError] - if the request was canceled.
-	//   - [access.RequestTimedOutError] - if the request timed out.
-	//   - [access.InternalError] - for internal failures or index conversion errors.
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+	//   - [access.DataNotFoundError]: If the data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountKeyAtBlock(
 		ctx context.Context,
 		address flow.Address,
@@ -77,14 +77,14 @@ type AccountProvider interface {
 	// at the given block height.
 	//
 	// Expected error returns during normal operation:
-	//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-	//   - [access.DataNotFoundError] - if data was not found.
-	//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-	//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-	//   - [access.RequestCanceledError] - if the request was canceled.
-	//   - [access.RequestTimedOutError] - if the request timed out.
-	//   - [access.InternalError] - for internal failures or index conversion errors.
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+	//   - [access.DataNotFoundError]: If the data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountKeysAtBlock(
 		ctx context.Context,
 		address flow.Address,

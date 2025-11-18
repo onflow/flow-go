@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// ENAccountProvider is a provider that read account data using execution nodes.
+// ENAccountProvider is a provider that reads account data using execution nodes.
 type ENAccountProvider struct {
 	log                        zerolog.Logger
 	state                      protocol.State
@@ -53,16 +53,16 @@ func NewENAccountProvider(
 	}
 }
 
-// GetAccountAtBlock returns a Flow account for the given address and block height.
+// GetAccountAtBlock returns a Flow account for the given address and block ID.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - if an internal execution node failure occurs.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If the requested data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [access.InternalError]: For internal execution node failures.
 func (e *ENAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -95,12 +95,12 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 				Logger()
 
 			if err != nil {
-				lg.Err(err).Msg("failed to execute GetAccount")
+				lg.Err(err).Msg("Failed to execute GetAccount")
 				return err
 			}
 
-			// return if any execution node replied successfully
-			lg.Debug().Msg("Successfully got account info")
+			// return if any execution node replies successfully
+			lg.Debug().Msg("Successfully retrieved account info")
 			return nil
 		},
 		func(node *flow.IdentitySkeleton, err error) bool {
@@ -150,13 +150,13 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 // at the given block height.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - if an internal execution node failure occurs.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If the requested data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [access.InternalError]: For internal execution node failures.
 func (e *ENAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -176,13 +176,13 @@ func (e *ENAccountProvider) GetAccountBalanceAtBlock(
 // by its key index and block height.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - if an internal execution node failure occurs.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If the requested data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [access.InternalError]: For internal execution node failures.
 func (e *ENAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -210,13 +210,13 @@ func (e *ENAccountProvider) GetAccountKeyAtBlock(
 // at the given block height.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the request failed due to invalid arguments or runtime errors.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.RequestCanceledError] - if the request was canceled.
-//   - [access.RequestTimedOutError] - if the request timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - if an internal execution node failure occurs.
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If the requested data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [access.InternalError]: For internal execution node failures.
 func (e *ENAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -235,8 +235,8 @@ func (e *ENAccountProvider) GetAccountKeysAtBlock(
 // tryGetAccount attempts to get the account from the given execution node.
 //
 // Expected error returns during normal operation:
-//   - [codes.Unavailable] - if a connection to an execution node could not be established.
-//   - [status.Error] - if the execution node returned a gRPC error.
+//   - [codes.Unavailable]: If a connection to an execution node cannot be established.
+//   - [status.Error]: If the execution node returns a gRPC error.
 func (e *ENAccountProvider) tryGetAccount(
 	ctx context.Context,
 	executorAddress string,
