@@ -6,11 +6,12 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/runtime"
+	cadenceRuntime "github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -126,15 +127,55 @@ func newScriptExecutor(
 	// creating the executor
 	scriptInfo := environment.NewScriptInfoParams(proc.Script, proc.Arguments)
 	ctx.EnvironmentParams.SetScriptInfoParams(scriptInfo)
+
+	env := environment.NewScriptEnv(
+		proc.RequestContext,
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		txnState,
+	)
+
+	if ctx.EVMEnabled {
+		chainID := ctx.Chain.ChainID()
+
+		cadenceVMEnabled := ctx.CadenceVMEnabled
+
+		env.Runtime.ConfigureCadenceRuntime = func(
+			reusableCadenceRuntime *runtime.ReusableCadenceRuntime,
+			env environment.Environment,
+		) {
+			// Setup EVM environment in both script and transaction environments.
+			// We also need to set up the transaction environment,
+			// because it is used for nested contract invocations
+
+			var scriptRuntimeEnv, txRuntimeEnv cadenceRuntime.Environment
+			if cadenceVMEnabled {
+				scriptRuntimeEnv = reusableCadenceRuntime.VMScriptRuntimeEnv
+				txRuntimeEnv = reusableCadenceRuntime.VMTxRuntimeEnv
+			} else {
+				scriptRuntimeEnv = reusableCadenceRuntime.ScriptRuntimeEnv
+				txRuntimeEnv = reusableCadenceRuntime.TxRuntimeEnv
+			}
+
+			evm.SetupEnvironment(
+				chainID,
+				env,
+				scriptRuntimeEnv,
+			)
+
+			evm.SetupEnvironment(
+				chainID,
+				env,
+				txRuntimeEnv,
+			)
+		}
+	}
+
 	return &scriptExecutor{
 		ctx:      ctx,
 		proc:     proc,
 		txnState: txnState,
-		env: environment.NewScriptEnv(
-			proc.RequestContext,
-			ctx.TracerSpan,
-			ctx.EnvironmentParams,
-			txnState),
+		env:      env,
 	}
 }
 
@@ -200,36 +241,13 @@ func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
-	chainID := executor.ctx.Chain.ChainID()
-
-	cadenceVMEnabled := executor.ctx.CadenceVMEnabled
-
-	if executor.ctx.EVMEnabled {
-
-		var scriptRuntimeEnv runtime.Environment
-		if cadenceVMEnabled {
-			scriptRuntimeEnv = rt.VMScriptRuntimeEnv
-		} else {
-			scriptRuntimeEnv = rt.ScriptRuntimeEnv
-		}
-
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			scriptRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	value, err := rt.ExecuteScript(
-		runtime.Script{
+		cadenceRuntime.Script{
 			Source:    executor.proc.Script,
 			Arguments: executor.proc.Arguments,
 		},
 		common.ScriptLocation(executor.proc.ID),
-		cadenceVMEnabled,
+		executor.ctx.CadenceVMEnabled,
 	)
 	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
