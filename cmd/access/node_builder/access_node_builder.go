@@ -2520,9 +2520,11 @@ func createFinalizedBlockIndexer(builder *FlowAccessNodeBuilder) func(node *cmd.
 		finalizedBlockProcessor, err := finalized_indexer.NewFinalizedBlockProcessor(
 			node.Logger,
 			node.State,
+			node.StorageLockMgr,
+			node.ProtocolDB,
 			node.Storage.Blocks,
 			processedFinalizedBlockHeight,
-			builder.FollowerDistributor,
+			builder.FollowerDistributor.FinalizationDistributor,
 			notNil(builder.collectionExecutedMetric),
 		)
 		if err != nil {
