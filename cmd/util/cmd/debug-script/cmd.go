@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/debug"
 )
@@ -119,7 +120,11 @@ func run(*cobra.Command, []string) {
 
 	blockSnapshot := debug.NewCachingStorageSnapshot(remoteSnapshot)
 
-	debugger := debug.NewRemoteDebugger(chain, log.Logger, flagUseVM, flagUseVM)
+	debugger := debug.NewRemoteDebugger(
+		chain,
+		log.Logger,
+		fvm.WithCadenceVMEnabled(flagUseVM),
+	)
 
 	// TODO: add support for arguments
 	var arguments [][]byte

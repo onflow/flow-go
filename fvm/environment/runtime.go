@@ -8,6 +8,10 @@ import (
 
 type RuntimeParams struct {
 	runtime.ReusableCadenceRuntimePool
+	ConfigureCadenceRuntime func(
+		reusableCadenceRuntime *runtime.ReusableCadenceRuntime,
+		env Environment,
+	)
 }
 
 func DefaultRuntimeParams() RuntimeParams {
@@ -37,7 +41,16 @@ func (runtime *Runtime) SetEnvironment(env Environment) {
 }
 
 func (runtime *Runtime) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
-	return runtime.ReusableCadenceRuntimePool.Borrow(runtime.env)
+	env := runtime.env
+
+	reusableCadenceRuntime := runtime.ReusableCadenceRuntimePool.Borrow(env)
+
+	configure := runtime.ConfigureCadenceRuntime
+	if configure != nil {
+		configure(reusableCadenceRuntime, env)
+	}
+
+	return reusableCadenceRuntime
 }
 
 func (runtime *Runtime) ReturnCadenceRuntime(

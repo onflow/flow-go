@@ -3,7 +3,6 @@ package evm_test
 import (
 	"bytes"
 	"encoding/binary"
-	"flag"
 	"fmt"
 	"math"
 	"math/big"
@@ -35,18 +34,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-)
-
-var testWithVMTransactionExecution = flag.Bool(
-	"testWithVMTransactionExecution",
-	false,
-	"Run transactions in tests using the Cadence compiler/VM",
-)
-
-var testWithVMScriptExecution = flag.Bool(
-	"testWithVMScriptExecution",
-	false,
-	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func TestEVMRun(t *testing.T) {
@@ -3711,7 +3698,7 @@ func RunWithNewEnvironment(
 					block1.ToHeader(),
 				).Return(block1.ToHeader(), nil)
 
-				opts := []fvm.Option{
+				ctx := fvm.NewContext(
 					fvm.WithChain(chain),
 					fvm.WithBlockHeader(block1.ToHeader()),
 					fvm.WithAuthorizationChecksEnabled(false),
@@ -3720,10 +3707,7 @@ func RunWithNewEnvironment(
 					fvm.WithRandomSourceHistoryCallAllowed(true),
 					fvm.WithBlocks(blocks),
 					fvm.WithCadenceLogging(true),
-					fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
-					fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
-				}
-				ctx := fvm.NewContext(opts...)
+				)
 
 				vm := fvm.NewVirtualMachine()
 				snapshotTree := snapshot.NewSnapshotTree(backend)
