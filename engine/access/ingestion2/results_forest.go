@@ -58,17 +58,18 @@ var (
 //     result is its own ancestor of degree 0.
 //
 // # FORMAL REQUIREMENTS
-// Conceptually, the ResultsForest maintains the following three quantities:
+// Conceptually, the ResultsForest maintains the following quantities:
 //  1. 𝓹 tracks the 𝙡𝙤𝙬𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝘄𝗶𝘁𝗵𝗶𝗻 the ResultsForest. Specifically
 //     (i) the ResultsForest knows 𝓹 to be sealed and
-//     (ii) no results with a lower view exist in the forest.
+//     (ii) no results with a lower view exist in the forest. (After 𝓹 advances, results with
+//     lower view are quickly dropped; and new result with view lower than 𝓹 cannot be added.)
 //  2. 𝓼 is a local notion of the 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝘄𝗶𝘁𝗵𝗶𝗻 𝘁𝗵𝗲 𝗳𝗼𝗿𝗲𝘀𝘁. Specifically, we require all
 //     of the following attributes to hold:
-//     (i) The ResultsForest knows all acestor results of 𝓼 up to and including 𝓹 (by virtue of being sealed,
+//     (i) The ResultsForest knows all ancestor results of 𝓼 up to and including 𝓹 (by virtue of being sealed,
 //     we know that 𝓹 must be an ancestor of 𝓼). In other words, recursing the execution fork from 𝓼 backwards
 //     following the `PreviousResultID`, we eventually will reach 𝓹.
-//     (ii) The ResultsForest knows 𝓼 and all its acestor results up to and including 𝓹 to be sealed.
-//     (iii) No other result 𝒓 resists in the forest that satisfies (i) and (ii) but has a higher view than 𝓼.
+//     (ii) The ResultsForest knows 𝓼 and all its ancestor results up to and including 𝓹 to be sealed.
+//     (iii) No other result 𝒓 exists in the forest that satisfies (i) and (ii) but has a higher view than 𝓼.
 //     Note that this definition purposefully excludes results that have been sealed by the consensus nodes,
 //     but which the ResultsForest hasn't ingested yet or where some ancestor results are not yet available.
 //  3. 𝓱 is the ResultsForest's 𝙫𝙞𝙚𝙬 𝙝𝙤𝙧𝙞𝙯𝙤𝙣. The result forest must store any results with views in the closed
@@ -78,9 +79,10 @@ var (
 //     Nevertheless, for practical considerations, we have already introduced the axiom that within every window of
 //     `FinalizationSafetyThreshold` views (for details see [protocol.GetFinalizationSafetyThreshold] ), at least one
 //     block must be finalized. `FinalizationSafetyThreshold` is chosen such that a violation of this axiom has vanshing
-//     probability. The axiom implies that two blocks with ancestral degree 1 (i.e. parent and child) cannot be more than
-//     `FinalizationSafetyThreshold` views apart. Hence, as long as 𝓱 - 𝓹.Level ≥ `FinalizationSafetyThreshold`, the
-//     child of 𝓹 always falls into the [𝓹.Level, 𝓱].
+//     probability. A marginally stronger axiom, which we use here, is that two blocks with ancestral degree 1 (i.e.
+//     parent and child) cannot be more than `FinalizationSafetyThreshold` views apart (for details see notion doc
+//     https://www.notion.so/flowfoundation/Axiom-on-FinalizationSafetyThreshold-2af1aee1232480f994c4c1271e9bb1b9 ).
+//     Hence, as long as 𝓱 - 𝓹.Level ≥ `FinalizationSafetyThreshold`, the child of 𝓹 always falls into [𝓹.Level, 𝓱].
 //     ○ In case we choose `maxViewDelta` := 𝓱 - 𝓹.Level < `FinalizationSafetyThreshold`, we cannot guarantee that the
 //     child of 𝓹 will fall into the view range [𝓹.Level, 𝓱]. Therefore, we introduce an additional requirement that the
 //     ResultsForest must always store the immediate children of 𝓹, even if they have views greater than 𝓱. We emphasize
@@ -111,7 +113,7 @@ var (
 // continuation is not possible and the node should restart.
 // Lastly, we require that the ResultsForest eventually progresses up to 𝓼, without relying on any input
 // events from the consensus follower (`AddReceipt`, `OnBlockFinalized`, `AddSealed`). This requirement can
-// be satisifed by the ResultsForest on its own, since it already has the chain of results between 𝓹 (latest
+// be satisfied by the ResultsForest on its own, since it already has the chain of results between 𝓹 (latest
 // sealed result whose data was successfully ingested) and 𝓼 (newest sealed result, up to which data can be
 // ingested). Note that we are assuming liveness of the encapsulated [optimistic_sync.Pipeline] instances
 // for sealed blocks.
@@ -136,7 +138,7 @@ var (
 //     from the consensus follower.
 //     (ii) inform the forest about sealing of results that are being backfilled.
 //     This ensures that the forest is fully up to date with the higher-level business logic's view of the
-//     protocol's global state such that seals within any new OnFinalizedBlock event extend from the
+//     protocol's global state such that seals within any new `OnFinalizedBlock` event extend from the
 //     forest's latest sealed result 𝓼.
 //
 // # RECOVERY FROM CRASHES
@@ -182,34 +184,34 @@ var (
 //     Atomic state updates across different concurrent components are a major source of complexity. We reduce those
 //     complexities by designing the ResultsForest as an information-driven, eventually consistent system.
 //     Examples of Idempotent operations in the ResultsForest:
-//   - Pruning: telling the ResultsForest that all results with views smaller 70 can be pruned and later
+//     ○ Pruning: telling the ResultsForest that all results with views smaller 70 can be pruned and later
 //     informing the forest that results with views smaller 60 can be pruned should be acceptable. The forest
 //     may respond with a dedicated sentinel informing the caller that it already has pruned up to view 70.
 //     Nevertheless, from the perspective of the ResultsForest, it should not be treated as a critical exception,
 //     because the information that all blocks up to view 60 are allowed to be pruned is a subset of the information
 //     the forest got before when being told that all blocks up to view 70 can be pruned.
-//   - Repeated addition of the same result and/or receipt should be a no-op.
+//     ○ Repeated addition of the same result and/or receipt should be a no-op.
 //
 // # SAFETY AND LIVENESS
 // Safety here means that only results marked as sealed by the protocol will be considered sealed by the ResultsForest. This
-// is relatively straightforward to verify directly from the implementation. In the following formal agument, we focus on
-// liveness, which means that every result sealed by the protocol must eventually be considerd _processed_ by the ResultsForest.
+// is relatively straightforward to verify directly from the implementation. In the following formal argument, we focus on
+// liveness, which means that every result sealed by the protocol must eventually be considered _processed_ by the ResultsForest.
 //
 // As we require (specified above) that the data source delivers result in ancestor-first order, there are only two scenarios
 // where ancestry can be unknown from the ResultsForest's perspective:
 //
 //	 (a) The forest rejected a result in the ancestry.
 //	 (b) The parent result is below the pruning threshold. In this case, the result itself is orphaned if and only if
-//		 the result is different than 𝓹.
+//		 the result is different from 𝓹.
 //
 // Scenario I: The following argument proves that the ResultsForest will be live as long as it does not reject any results.
 //   - New results continue being delivered in an ancestor-first order with all ancestors being known (by induction, starting
 //     with the forest being properly repopulated at startup).
 //   - According its specification, the indexing process is guaranteed to be live up to 𝓼.
 //   - As long as the forest does not reject any results, the forest's 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼
-//     will continue to grow, because the forest is being fed with results in ancestor-first order.
+//     will continue to advance, because the forest is being fed with results in ancestor-first order.
 //
-// Scenario II: now we sketch the proof showing that the ResultsForest is also live after it rejected some result.
+// Scenario II: Now we sketch the proof showing that the ResultsForest is also live after it rejected some result.
 //   - Per contract, if the forest rejected results, the backfill process will eventually kick in and deliver sealed results
 //     starting from 𝓼.Level up to the latest sealed result known to the consensus follower.
 //   - In case the backfill process finished without driving the forest into rejecting results again:
@@ -232,15 +234,15 @@ var (
 // Specifically that means that when the consensus follower ingests block B, it has previously
 // incorporated block B.ParentID.
 //   - By induction, this means that all blocks that the consensus follower declares as
-//     "incorporated" (via OnBlockIncorporated notifications) descend from the root block the node
-//     was boostrapped with.
-//   - Furthermore, OnBlockIncorporated are delivered in an order-preserving manner. Meaning, a
+//     "incorporated" (via `OnBlockIncorporated` notifications) descend from the root block the
+//     node was bootstrapped with.
+//   - Furthermore, `OnBlockIncorporated` are delivered in an order-preserving manner. Meaning, a
 //     component subscribed to the OnBlockIncorporated notifications also hears about blocks in an
 //     ancestor-first order.
-//   - Unless the node crashes, OnBlockIncorporated notifications are delivered to the subscribers for
-//     every block that the consensus follower ingests.
-//   - Furthermore, consensus makes the following garantees for the blocks it produces, which carries
-//     over to the consensus follower observing the blocks:
+//   - Unless the node crashes, `OnBlockIncorporated` notifications are delivered to the subscribers
+//     for every block that the consensus follower ingests.
+//   - Furthermore, consensus makes the following guarantees for the blocks it certifies, which carries
+//     over to the consensus follower observing the certified blocks:
 //     ○ In block B, the proposer may only include results that pertain to ancestors of B.
 //     ○ Results are included into a fork in an ancestor-first ordering. Meaning, the proposer of
 //     block B may include a result R only if the result referenced by R.PreviousResultID was
@@ -250,20 +252,17 @@ var (
 // The ResultsForest mempool supports pruning by view:
 // only results descending from the latest sealed and finalized result are relevant.
 // By convention, the ResultsForest always contains the latest processed sealed result. Thereby, the
-// ResultsForest is able to determine whether results for a block still need to be processed or
-// can be orphaned (processing abandoned). Hence, we prune all results for blocks _below_ the
-// latest block with a finalized seal, once it has been persisted in the database.
+// ResultsForest is able to determine whether results for a block still need to be processed or can be
+// orphaned (processing abandoned). Hence, we prune all results for blocks _below_ the latest block with
+// a finalized seal, once it has been persisted in the database.
 // All results for views at or above the pruning threshold are retained, explicitly including results
 // from execution forks or orphaned blocks even if they conflict with the finalized seal. However, such
-// orphaned forks will eventually stop growing, because either (i) a conflicting fork of blocks is
-// finalized, which means that the orphaned forks can no longer be extended by new blocks or (ii) a
-// rogue execution node pursuing its own execution fork will eventually be slashed and can no longer
-// submit new results.
-// Nevertheless, to utilize resources efficiently, the ResultsForest tries to avoid processing execution
-// forks that conflict with the finalized seal.
+// orphaned forks will eventually stop growing (for detailed argument see below). To utilize resources
+// efficiently, the ResultsForest tries to avoid processing execution forks that conflict with the
+// finalized seal.
 //
 // Pruning and abandoning processing of results:
-//   - For liveness, the ResultsForest must guarantee that all sealed results it knows about are
+//   - For liveness, the ResultsForest must guarantee that all sealed results it knows are
 //     eventually marked as processable.
 //   - For results that are not yet sealed, only results descending from the latest sealed result 𝓼 should
 //     ideally be processed. The ResultsForest is allowed to process results optimistically (resources
@@ -292,12 +291,12 @@ var (
 //   - Results with views > 𝓼.Level are not guaranteed to form a chain from 𝓼. They may be added in
 //     any order. Therefore, the forest does not make any guarantees about the connectedness of
 //     finalized results.
-//   - Block finalization information is primarily delivered via the OnBlockFinalized event handler.
+//   - Block finalization information is primarily delivered via the `OnBlockFinalized` event handler.
 //     The forest tracks the highest finalized view for which it has received a notification. Any
 //     receipt received with the result status set to ResultForFinalizedBlock, whose view is greater than
 //     the forest's highest finalized view, will be not be marked finalized. Instead, the forest will
-//     wait until OnBlockFinalized receives the notification for that block.
-//   - This ensures that there are no results within the forest that are marked as finalized and whose
+//     wait until `OnBlockFinalized` receives the notification for that block.
+//   - This ensures that there are no results within the forest that are marked as finalized but whose
 //     ancestors are not also all marked as finalized or sealed.
 //
 // </component_spec>
