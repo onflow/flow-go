@@ -1,14 +1,12 @@
 package store
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -58,17 +56,6 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 		}
 		return &kvStore, nil
 	}
-	storeByStateID := func(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-		return operation.InsertProtocolKVStore(rw.Writer(), stateID, data)
-	}
-
-	storeByBlockID := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-		err := operation.IndexProtocolKVStore(rw.Writer(), blockID, stateID)
-		if err != nil {
-			return fmt.Errorf("could not index protocol state for block (%x): %w", blockID[:], err)
-		}
-		return nil
-	}
 
 	retrieveByBlockID := func(r storage.Reader, blockID flow.Identifier) (flow.Identifier, error) {
 		var stateID flow.Identifier
@@ -83,11 +70,11 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 		db: db,
 		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
-			withStore(storeByStateID),
+			withStore(operation.InsertProtocolKVStore),
 			withRetrieve(retrieveByStateID)),
 		byBlockIdCache: newCache(collector, metrics.ResourceProtocolKVStoreByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](kvStoreByBlockIDCacheSize),
-			withStore(storeByBlockID),
+			withStoreWithLock(operation.IndexProtocolKVStore),
 			withRetrieve(retrieveByBlockID)),
 	}
 }
@@ -96,72 +83,36 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // BatchStore is idempotent, i.e. it accepts repeated calls with the same pairs of (stateID, kvStore).
 // Here, the ID is expected to be a collision-resistant hash of the snapshot (including the
 // ProtocolStateVersion). Hence, for the same ID, BatchStore will reject changing the data.
-// Expected errors during normal operations:
-// - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
-func (s *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
-	}
-
-	existingData, err := s.ByID(stateID)
-	if err == nil {
-		if existingData.Equal(data) {
-			return nil
-		}
-
-		return fmt.Errorf("kv-store snapshot with id (%x) already exists but different, ([%v,%x] != [%v,%x]): %w", stateID[:],
-			data.Version, data.Data,
-			existingData.Version, existingData.Data,
-			storage.ErrDataMismatch)
-	}
-	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
-		return fmt.Errorf("unexpected error checking if kv-store snapshot %x exists: %w", stateID[:], irrecoverable.NewException(err))
-	}
-
+//
+// No error is expected during normal operations.
+func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return s.cache.PutTx(rw, stateID, data)
 	})
 }
 
-// BatchIndex appends the following operation to the provided write batch:
-// we extend the map from `blockID` to `stateID`, where `blockID` references the
-// block that _proposes_ updated key-value store.
-// BatchIndex is idempotent, i.e. it accepts repeated calls with the same pairs of (blockID , stateID).
-// Per protocol convention, the block references the `stateID`. As the `blockID` is a collision-resistant hash,
-// for the same `blockID`, BatchIndex will reject changing the data.
+// BatchIndex persists the specific map entry in the node's database.
+// In a nutshell, we want to maintain a map from `blockID` to `epochStateEntry`, where `blockID` references the
+// block that _proposes_ the referenced epoch protocol state entry.
 // Protocol convention:
-//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
-//     the KV store changes if we seal some execution results emitting specific service events.
-//   - For the key `blockID`, we use the identity of block B which _proposes_ this updated KV store.
-//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the child block,
+//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
+//     the protocol state changes if we seal some execution results emitting service events.
+//   - For the key `blockID`, we use the identity of block B which _proposes_ this Protocol State. As value,
+//     the hash of the resulting protocol state at the end of processing B is to be used.
+//   - IMPORTANT: The protocol state requires confirmation by a QC and will only become active at the child block,
 //     _after_ validating the QC.
 //
+// CAUTION:
+//   - The caller must acquire the lock [storage.LockInsertBlock] and hold it until the database write has been committed.
+//   - OVERWRITES existing data (potential for data corruption):
+//     The lock proof serves as a reminder that the CALLER is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere
+//     ATOMICALLY within this write operation. Currently it's done by operation.InsertHeader where it performs a check
+//     to ensure the blockID is new, therefore any data indexed by this blockID is new as well.
+//
 // Expected errors during normal operations:
-// - [storage.ErrDataMismatch] if a _different_ KV store for the given stateID has already been persisted
+// - [storage.ErrAlreadyExist] if a KV store for the given blockID has already been indexed.
 func (s *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
-	}
-
-	existingStateID, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
-	if err == nil {
-		// no-op if the *same* stateID is already indexed for the blockID
-		if existingStateID == stateID {
-			return nil
-		}
-
-		return fmt.Errorf("kv-store snapshot with block id (%x) already exists and different (%v != %v): %w",
-			blockID[:],
-			stateID, existingStateID,
-			storage.ErrDataMismatch)
-	}
-	if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
-		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], irrecoverable.NewException(err))
-	}
-
-	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return s.byBlockIdCache.PutTx(rw, blockID, stateID)
-	})
+	return s.byBlockIdCache.PutWithLockTx(lctx, rw, blockID, stateID)
 }
 
 // ByID retrieves the KV store snapshot with the given state ID.

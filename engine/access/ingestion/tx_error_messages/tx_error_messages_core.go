@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
@@ -24,6 +25,7 @@ type TxErrorMessagesCore struct {
 	txErrorMessageProvider         error_messages.Provider
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
 	execNodeIdentitiesProvider     *commonrpc.ExecutionNodeIdentitiesProvider
+	lockManager                    storage.LockManager
 }
 
 // NewTxErrorMessagesCore creates a new instance of TxErrorMessagesCore.
@@ -32,12 +34,14 @@ func NewTxErrorMessagesCore(
 	txErrorMessageProvider error_messages.Provider,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
+	lockManager storage.LockManager,
 ) *TxErrorMessagesCore {
 	return &TxErrorMessagesCore{
 		log:                            log.With().Str("module", "tx_error_messages_core").Logger(),
 		txErrorMessageProvider:         txErrorMessageProvider,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		execNodeIdentitiesProvider:     execNodeIdentitiesProvider,
+		lockManager:                    lockManager,
 	}
 }
 
@@ -62,6 +66,15 @@ func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID fl
 	return c.FetchErrorMessagesByENs(ctx, blockID, execNodes)
 }
 
+// FetchErrorMessagesByENs requests the transaction result error messages for the specified block ID from
+// any of the given execution nodes and persists them once retrieved. This function blocks until ingesting
+// the tx error messages is completed or failed.
+//
+// Note that transaction error messages are auxiliary data provided by the Execution Nodes on a goodwill basis and
+// not protected by the protocol. Execution Error messages might be non-deterministic, i.e. potentially different
+// for different execution nodes. Hence, we also persist which execution node (`execNode) provided the error message.
+//
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -71,7 +84,6 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	if err != nil {
 		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
 	}
-
 	if exists {
 		return nil
 	}
@@ -100,14 +112,10 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	return nil
 }
 
-// storeTransactionResultErrorMessages stores the transaction result error messages for a given block ID.
+// storeTransactionResultErrorMessages persists and indexes all transaction result error messages for the given blockID.
+// The caller must acquire [storage.LockInsertTransactionResultErrMessage] and hold it until the write batch has been committed.
 //
-// Parameters:
-// - blockID: The identifier of the block for which the error messages are to be stored.
-// - errorMessagesResponses: A slice of responses containing the error messages to be stored.
-// - execNode: The execution node associated with the error messages.
-//
-// No errors are expected during normal operation.
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (c *TxErrorMessagesCore) storeTransactionResultErrorMessages(
 	blockID flow.Identifier,
 	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,
@@ -124,7 +132,9 @@ func (c *TxErrorMessagesCore) storeTransactionResultErrorMessages(
 		errorMessages = append(errorMessages, errorMessage)
 	}
 
-	err := c.transactionResultErrorMessages.Store(blockID, errorMessages)
+	err := storage.WithLock(c.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+		return c.transactionResultErrorMessages.Store(lctx, blockID, errorMessages)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to store transaction error messages: %w", err)
 	}

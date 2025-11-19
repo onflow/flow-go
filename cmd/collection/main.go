@@ -636,6 +636,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.ProtocolDB,
+				node.StorageLockMgr,
 				node.State,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,

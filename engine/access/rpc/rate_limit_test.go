@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -64,6 +63,7 @@ type RateLimitTestSuite struct {
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
 	events       *storagemock.Events
+	seals        *storagemock.Seals
 
 	// test rate limit
 	rateLimit  int
@@ -82,7 +82,7 @@ type RateLimitTestSuite struct {
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -104,6 +104,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.collections = storagemock.NewCollections(suite.T())
 	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
+	suite.seals = storagemock.NewSeals(suite.T())
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -180,6 +181,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		Headers:                     suite.headers,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
+		Seals:                       suite.seals,
 		ChainID:                     suite.chainID,
 		AccessMetrics:               suite.metrics,
 		MaxHeightRange:              0,

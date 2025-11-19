@@ -4,12 +4,14 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendExecutionResults struct {
 	executionResults storage.ExecutionResults
+	seals            storage.Seals
 }
 
 // GetExecutionResultForBlockID gets an execution result by its block ID.
@@ -22,7 +24,14 @@ type backendExecutionResults struct {
 // Expected sentinel errors providing details to clients about failed requests:
 //   - access.DataNotFoundError - No execution result with the given block ID was found
 func (b *backendExecutionResults) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	result, err := b.executionResults.ByBlockID(blockID)
+	// Query seal by blockID
+	seal, err := b.seals.FinalizedSealForBlock(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	// Query result by seal.ResultID
+	result, err := b.executionResults.ByID(seal.ResultID)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		return nil, access.NewDataNotFoundError("execution result", err)

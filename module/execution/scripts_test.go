@@ -178,7 +178,7 @@ func (s *scriptTestSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	index, err := indexer.New(
+	index := indexer.New(
 		logger,
 		metrics.NewNoopCollector(),
 		nil,
@@ -188,12 +188,13 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		nil,
 		nil,
-		flow.Testnet.Chain(),
+		nil,
+		flow.Testnet,
 		derivedChainData,
+		nil,
 		nil,
 		lockManager,
 	)
-	s.Require().NoError(err)
 
 	s.scripts = NewScripts(
 		logger,

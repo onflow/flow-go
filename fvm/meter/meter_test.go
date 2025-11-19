@@ -671,6 +671,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 func TestMemoryWeights(t *testing.T) {
 	for kind := common.MemoryKindUnknown + 1; kind < common.MemoryKindLast; kind++ {
+
 		weight, ok := meter.DefaultMemoryWeights[kind]
 		if !assert.True(t, ok, fmt.Sprintf("missing weight for memory kind '%s'", kind.String())) {
 			continue
