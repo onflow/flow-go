@@ -39,6 +39,13 @@ func (d *FinalizationDistributor) AddOnBlockIncorporatedConsumer(consumer OnBloc
 	d.blockIncorporatedConsumers = append(d.blockIncorporatedConsumers, consumer)
 }
 
+func (d *FinalizationDistributor) AddFinalizationConsumer(consumer hotstuff.FinalizationConsumer) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.blockFinalizedConsumers = append(d.blockFinalizedConsumers, consumer.OnFinalizedBlock)
+	d.blockIncorporatedConsumers = append(d.blockIncorporatedConsumers, consumer.OnBlockIncorporated)
+}
+
 func (d *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
