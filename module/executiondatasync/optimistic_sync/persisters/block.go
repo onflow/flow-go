@@ -62,18 +62,36 @@ func (p *BlockPersister) Persist() error {
 	p.log.Debug().Msg("started to persist execution data")
 	start := time.Now()
 
+	needsLockInsertCollection := false
+	needsLockUpdateLatestPersistedSealedResult := false
+
+	for _, persister := range p.persisterStores {
+		switch persister.(type) {
+		case *stores.LightCollectionsStore:
+			needsLockInsertCollection = true
+		case *stores.LatestSealedResultStore:
+			needsLockUpdateLatestPersistedSealedResult = true
+		}
+	}
+
 	lctx := p.lockManager.NewContext()
-	err := lctx.AcquireLock(storage.LockInsertCollection)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
-	}
-	err = lctx.AcquireLock(storage.LockUpdateLatestPersistedSealedResult)
-	if err != nil {
-		return fmt.Errorf("could not acquire lock for updating latest persisted sealed result: %w", err)
-	}
 	defer lctx.Release()
 
-	err = p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+	if needsLockInsertCollection {
+		err := lctx.AcquireLock(storage.LockInsertCollection)
+		if err != nil {
+			return fmt.Errorf("could not acquire lock for inserting light collections: %w", err)
+		}
+	}
+
+	if needsLockUpdateLatestPersistedSealedResult {
+		err := lctx.AcquireLock(storage.LockUpdateLatestPersistedSealedResult)
+		if err != nil {
+			return fmt.Errorf("could not acquire lock for updating latest persisted sealed result: %w", err)
+		}
+	}
+
+	err := p.protocolDB.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 		for _, persister := range p.persisterStores {
 			if err := persister.Persist(lctx, batch); err != nil {
 				return err
