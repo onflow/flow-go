@@ -453,15 +453,6 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployRandomBeaconHistory(service, &env)
 
-	// deploy staking proxy contract to the service account
-	b.deployStakingProxyContract(service, &env)
-
-	// deploy locked tokens contract to the service account
-	b.deployLockedTokensContract(service, &env)
-
-	// deploy staking collection contract to the service account
-	b.deployStakingCollection(service, &env)
-
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
 	b.setupVMBridge(service, &env)
@@ -480,6 +471,15 @@ func (b *bootstrapExecutor) Execute() error {
 	if err != nil {
 		return err
 	}
+
+	// deploy staking proxy contract to the service account
+	b.deployStakingProxyContract(service, &env)
+
+	// deploy locked tokens contract to the service account
+	b.deployLockedTokensContract(service, &env)
+
+	// deploy staking collection contract to the service account
+	b.deployStakingCollection(service, &env)
 
 	b.registerNodes(service, fungibleToken, flowToken)
 
