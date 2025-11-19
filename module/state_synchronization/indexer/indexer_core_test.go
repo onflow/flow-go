@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	collectionsmock "github.com/onflow/flow-go/engine/access/ingestion/collections/mock"
@@ -31,6 +30,7 @@ import (
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type indexCoreTest struct {
@@ -80,7 +80,7 @@ func newIndexCoreTest(
 
 func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 	i.headers.
-		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
+		On("BlockIDByHeight", mock.AnythingOfType("uint64")).
 		Return(func(height uint64) (flow.Identifier, error) {
 			for _, b := range i.blocks {
 				if b.Height == height {
@@ -91,7 +91,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		})
 
 	i.headers.
-		On("ByHeight", mocks.AnythingOfType("uint64")).
+		On("ByHeight", mock.AnythingOfType("uint64")).
 		Return(func(height uint64) (*flow.Header, error) {
 			for _, b := range i.blocks {
 				if b.Height == height {
@@ -230,13 +230,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	t.Run("Index AllTheThings", func(t *testing.T) {
 		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
 
-		test.events.On("BatchStore", mock.Anything, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+		test.events.On("BatchStore", blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
 			Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
 				require.NotNil(t, batch)
 				// Events BatchStore doesn't require specific locks, but we validate the batch is provided
 				return nil
 			})
-		test.results.On("BatchStore", mock.Anything, mock.Anything, blockID, tf.ExpectedResults).
+		test.results.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertLightTransactionResult), mock.Anything, blockID, tf.ExpectedResults).
 			Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, blockID flow.Identifier, results []flow.LightTransactionResult) error {
 				require.True(t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
 				require.NotNil(t, batch)
@@ -252,7 +253,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			Return(nil)
 		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
 		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
-			test.scheduledTransactions.On("BatchIndex", mock.Anything, blockID, txID, scheduledTxID, mock.Anything).
+			test.scheduledTransactions.
+				On("BatchIndex", mocks.MatchLock(storage.LockIndexScheduledTransaction), blockID, txID, scheduledTxID, mock.Anything).
 				Return(func(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
 					require.True(t, lctx.HoldsLock(storage.LockIndexScheduledTransaction))
 					require.NotNil(t, batch)
@@ -299,6 +301,39 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 
+	// test that reindexing the last block does not return an error and does not write any data
+	t.Run("Reindexing last block", func(t *testing.T) {
+		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).
+			initIndexer().
+			setLastHeight(func(t *testing.T) uint64 {
+				return tf.Block.Height
+			})
+
+		// reset all mocks to avoid false positives
+		test.events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		test.results.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		test.scheduledTransactions.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		test.registers.On("Store", mock.Anything, mock.Anything).Unset()
+		test.collectionIndexer.On("IndexCollections", mock.Anything).Unset()
+
+		// setup mocks to behave as they would if the block was already indexed.
+		// tx results and scheduled transactions will not be called since events returned an error.
+		test.events.
+			On("BatchStore", blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(storage.ErrAlreadyExists).
+			Once()
+		test.collectionIndexer.
+			On("IndexCollections", tf.ExpectedCollections).
+			Return(nil).
+			Once()
+		test.registers.
+			On("Store", mock.Anything, tf.Block.Height).
+			Return(nil).
+			Once()
+
+		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())
+		assert.NoError(t, err)
+	})
 }
 
 func TestExecutionState_RegisterValues(t *testing.T) {
