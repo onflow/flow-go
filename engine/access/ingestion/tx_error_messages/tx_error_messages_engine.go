@@ -74,7 +74,7 @@ func New(
 	headers storage.Headers,
 	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
 	txErrorMessagesCore *TxErrorMessagesCore,
-	followerDistributor hotstuff.Distributor,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                     log.With().Str("engine", "tx_error_messages_engine").Logger(),
@@ -120,8 +120,8 @@ func New(
 		AddWorker(e.runTxResultErrorMessagesConsumer).
 		Build()
 
-	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -173,7 +173,7 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 }
 
 // onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the txErrorMessagesConsumer.
+// Receives block finalized events from the finalization registrar and forwards them to the txErrorMessagesConsumer.
 func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.txErrorMessagesNotifier.Notify()
 }

@@ -55,7 +55,7 @@ func NewEngine(
 	receipts storage.ExecutionReceipts,
 	index storage.Index,
 	core sealing.MatchingCore,
-	distributor hotstuff.Distributor,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 
 	// FIFO queue for execution receipts
@@ -99,8 +99,8 @@ func NewEngine(
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
-	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
-	distributor.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+	registrar.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
 
 	return e, nil
 }

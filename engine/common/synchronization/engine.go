@@ -77,7 +77,7 @@ func New(
 	core module.SyncCore,
 	participantsProvider module.IdentifierProvider,
 	spamDetectionConfig *SpamDetectionConfig,
-	distributor hotstuff.Distributor,
+	registrar hotstuff.FinalizationRegistrar,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -134,8 +134,8 @@ func New(
 		return nil, fmt.Errorf("could not setup message handler")
 	}
 
-	distributor.AddOnBlockFinalizedConsumer(finalizedHeaderCache.OnFinalizedBlock)
-	distributor.AddOnBlockIncorporatedConsumer(finalizedHeaderCache.OnBlockIncorporated)
+	registrar.AddOnBlockFinalizedConsumer(finalizedHeaderCache.OnFinalizedBlock)
+	registrar.AddOnBlockIncorporatedConsumer(finalizedHeaderCache.OnBlockIncorporated)
 
 	return e, nil
 }

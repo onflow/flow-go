@@ -48,7 +48,7 @@ func NewBlockConsumer(log zerolog.Logger,
 	state protocol.State,
 	blockProcessor assigner.FinalizedBlockProcessor,
 	maxProcessing uint64,
-	followerDistributor hotstuff.Distributor) (*BlockConsumer, uint64, error) {
+	finalizationRegistrar hotstuff.FinalizationRegistrar) (*BlockConsumer, uint64, error) {
 
 	lg := log.With().Str("module", "block_consumer").Logger()
 
@@ -77,8 +77,8 @@ func NewBlockConsumer(log zerolog.Logger,
 	}
 	worker.withBlockConsumer(blockConsumer)
 
-	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.onFinalizedBlock)
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(blockConsumer.onFinalizedBlock)
 
 	return blockConsumer, defaultIndex, nil
 }

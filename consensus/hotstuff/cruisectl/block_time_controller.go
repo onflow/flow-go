@@ -114,7 +114,7 @@ var _ protocol.Consumer = (*BlockTimeController)(nil)
 var _ component.Component = (*BlockTimeController)(nil)
 
 // NewBlockTimeController returns a new BlockTimeController.
-func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64, distributor hotstuff.Distributor) (*BlockTimeController, error) {
+func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64, registrar hotstuff.FinalizationRegistrar) (*BlockTimeController, error) {
 	// Initial error must be 0 unless we are making assumptions of the prior history of the proportional error `e[v]`
 	initProptlErr, initItgErr, initDrivErr := .0, .0, .0
 	proportionalErr, err := NewEwma(config.alpha(), initProptlErr)
@@ -156,7 +156,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 	ctl.metrics.ControllerOutput(0)
 	ctl.metrics.TargetProposalDuration(0)
 
-	distributor.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
+	registrar.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
 
 	return ctl, nil
 }

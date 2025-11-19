@@ -98,7 +98,7 @@ func NewComplianceLayer(
 	headers storage.Headers,
 	finalized *flow.Header,
 	core complianceCore,
-	distributor hotstuff.Distributor,
+	registrar hotstuff.FinalizationRegistrar,
 	config compliance.Config,
 	opts ...EngineOption,
 ) (*ComplianceEngine, error) {
@@ -148,7 +148,7 @@ func NewComplianceLayer(
 	}
 	e.con = con
 
-	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	cmBuilder := component.NewComponentManagerBuilder().
 		AddWorker(e.finalizationProcessingLoop).

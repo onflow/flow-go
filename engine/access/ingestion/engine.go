@@ -92,7 +92,7 @@ func New(
 	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
-	distributor hotstuff.Distributor,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -183,7 +183,7 @@ func New(
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
-	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -339,7 +339,7 @@ func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event int
 }
 
 // onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
+// Receives block finalized events from the finalization registrar and forwards them to the finalizedBlockConsumer.
 func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.finalizedBlockNotifier.Notify()
 }

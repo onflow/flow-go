@@ -17,7 +17,7 @@ type FinalizationRegistrar interface {
 	// and are considered immutable.
 	//
 	// The consumer function is called synchronously when OnFinalizedBlock is invoked
-	// on the distributor. Multiple consumers can be registered, and all will be notified
+	// on the registrar. Multiple consumers can be registered, and all will be notified
 	// in the order they were registered.
 	AddOnBlockFinalizedConsumer(consumer func(block *model.Block))
 
@@ -26,7 +26,7 @@ type FinalizationRegistrar interface {
 	// has been added to the chain but may not yet be finalized.
 	//
 	// The consumer function is called synchronously when OnBlockIncorporated is invoked
-	// on the distributor. Multiple consumers can be registered, and all will be notified
+	// on the registrar. Multiple consumers can be registered, and all will be notified
 	// in the order they were registered.
 	AddOnBlockIncorporatedConsumer(consumer func(block *model.Block))
 }

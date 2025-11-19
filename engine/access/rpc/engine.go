@@ -97,7 +97,7 @@ func NewBuilder(
 	stateStreamBackend state_stream.API,
 	stateStreamConfig statestreambackend.Config,
 	indexReporter state_synchronization.IndexReporter,
-	followerDistributor hotstuff.Distributor,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -148,8 +148,8 @@ func NewBuilder(
 		builder.WithMetrics()
 	}
 
-	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(eng.onFinalizedBlock)
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(eng.onFinalizedBlock)
 
 	return builder, nil
 }

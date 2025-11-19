@@ -45,7 +45,7 @@ import (
 //
 // The requester is made up of 3 subcomponents:
 //
-// * OnBlockFinalized:     receives block finalized events from the finalization distributor and
+// * OnBlockFinalized:     receives block finalized events from the finalization registrar and
 //                         forwards them to the blockConsumer.
 //
 // * blockConsumer:        is a jobqueue that receives block finalization events. On each event,
@@ -152,7 +152,7 @@ func New(
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
 	distributor *ExecutionDataDistributor,
-	followerDistributor hotstuff.Distributor,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
@@ -249,8 +249,8 @@ func New(
 		AddWorker(e.runNotificationConsumer).
 		Build()
 
-	// register callback with distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
 
 	return e, nil
 }

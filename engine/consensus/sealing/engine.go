@@ -106,7 +106,7 @@ func NewEngine(log zerolog.Logger,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
-	distributor hotstuff.Distributor,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	rootHeader := state.Params().FinalizedRoot()
 
@@ -159,9 +159,9 @@ func NewEngine(log zerolog.Logger,
 	}
 	e.core = core
 
-	distributor.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
-	distributor.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
+	registrar.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
 
 	return e, nil
 }

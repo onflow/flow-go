@@ -21,7 +21,7 @@ type FinalizationDistributor struct {
 }
 
 var _ hotstuff.FinalizationConsumer = (*FinalizationDistributor)(nil)
-var _ hotstuff.Distributor = (*FinalizationDistributor)(nil)
+var _ hotstuff.FinalizationRegistrar = (*FinalizationDistributor)(nil)
 
 func NewFinalizationDistributor() *FinalizationDistributor {
 	return &FinalizationDistributor{}
