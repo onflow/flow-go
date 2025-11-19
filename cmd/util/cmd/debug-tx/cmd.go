@@ -31,6 +31,7 @@ var (
 	flagBlockID             string
 	flagUseVM               bool
 	flagTracePath           string
+	flagLogTraces           bool
 	flagOnlyTraceCadence    bool
 )
 
@@ -66,6 +67,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagUseVM, "use-vm", false, "use the VM for transaction execution (default: false)")
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
+
+	Cmd.Flags().BoolVar(&flagLogTraces, "log-traces", false, "log traces")
 
 	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
 }
@@ -112,7 +115,9 @@ func run(_ *cobra.Command, args []string) {
 	var spanExporter otelTrace.SpanExporter
 	if traceFile != nil {
 		if flagOnlyTraceCadence {
-			cadenceSpanExporter := &debug.InterestingCadenceSpanExporter{}
+			cadenceSpanExporter := &debug.InterestingCadenceSpanExporter{
+				Log: flagLogTraces,
+			}
 			defer func() {
 				err = cadenceSpanExporter.WriteSpans(traceFile)
 				if err != nil {
@@ -169,6 +174,7 @@ func run(_ *cobra.Command, args []string) {
 			nil,
 			newSpanExporter,
 			flagComputeLimit,
+			nil,
 		)
 
 		if flagShowResult {
@@ -268,6 +274,7 @@ func RunSingleTransaction(
 		nil,
 		newSpanExporter,
 		computeLimit,
+		nil,
 	)
 
 	for i, blockTx := range blockTransactions {
@@ -359,6 +366,7 @@ func RunBlock(
 	wrapTxSnapshot func(blockTxID flow.Identifier, snapshot debug.UpdatableStorageSnapshot) debug.UpdatableStorageSnapshot,
 	newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter,
 	computeLimit uint64,
+	additionalFVMOptions []fvm.Option,
 ) (
 	results []debug.Result,
 ) {
@@ -390,6 +398,7 @@ func RunBlock(
 			useVM,
 			spanExporter,
 			computeLimit,
+			additionalFVMOptions,
 		)
 
 		updatedRegisters := result.Snapshot.UpdatedRegisters()
@@ -419,6 +428,7 @@ func RunTransaction(
 	useVM bool,
 	spanExporter otelTrace.SpanExporter,
 	computeLimit uint64,
+	additionalFVMOptions []fvm.Option,
 ) debug.Result {
 
 	log := log.With().
@@ -451,6 +461,8 @@ func RunTransaction(
 			fvm.WithSpan(span),
 		)
 	}
+
+	fvmOptions = append(fvmOptions, additionalFVMOptions...)
 
 	debugger := debug.NewRemoteDebugger(
 		chain,
