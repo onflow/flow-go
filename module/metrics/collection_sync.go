@@ -15,6 +15,9 @@ type CollectionSyncCollector struct {
 
 var _ module.CollectionSyncMetrics = (*CollectionSyncCollector)(nil)
 
+// to be used by test case, must be consistent with collectionSyncedHeight
+const MetricsCollectionSyncedHeight = "access_collection_sync_collection_synced_height"
+
 func NewCollectionSyncCollector() *CollectionSyncCollector {
 	return &CollectionSyncCollector{
 		collectionFetchedHeight: promauto.NewGauge(prometheus.GaugeOpts{
