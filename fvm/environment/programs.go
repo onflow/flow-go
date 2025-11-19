@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/xerrors"
 
 	"github.com/onflow/cadence"
@@ -91,7 +92,16 @@ func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
 	load func() (*runtime.Program, error),
 ) (*runtime.Program, error) {
-	defer programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram).End()
+	span := programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram)
+	defer func() {
+		if span.Tracer != nil {
+			span.SetAttributes(
+				attribute.String("location", location.ID()),
+			)
+		}
+		span.End()
+	}()
+
 	err := programs.meter.MeterComputation(
 		common.ComputationUsage{
 			Kind:      ComputationKindGetOrLoadProgram,

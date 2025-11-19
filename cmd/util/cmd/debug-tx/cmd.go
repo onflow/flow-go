@@ -31,7 +31,9 @@ var (
 	flagBlockID             string
 	flagUseVM               bool
 	flagTracePath           string
+	flagLogTraces           bool
 	flagOnlyTraceCadence    bool
+	flagEntropyProvider     string
 )
 
 var Cmd = &cobra.Command{
@@ -67,7 +69,11 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
 
+	Cmd.Flags().BoolVar(&flagLogTraces, "log-cadence-traces", false, "log Cadence traces. requires --trace and --only-trace-cadence to be set (default: false)")
+
 	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
+
+	Cmd.Flags().StringVar(&flagEntropyProvider, "entropy-provider", "none", "entropy provider to use (default: none; options: none, block-hash)")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -112,7 +118,9 @@ func run(_ *cobra.Command, args []string) {
 	var spanExporter otelTrace.SpanExporter
 	if traceFile != nil {
 		if flagOnlyTraceCadence {
-			cadenceSpanExporter := &debug.InterestingCadenceSpanExporter{}
+			cadenceSpanExporter := &debug.InterestingCadenceSpanExporter{
+				Log: flagLogTraces,
+			}
 			defer func() {
 				err = cadenceSpanExporter.WriteSpans(traceFile)
 				if err != nil {
@@ -169,6 +177,7 @@ func run(_ *cobra.Command, args []string) {
 			nil,
 			newSpanExporter,
 			flagComputeLimit,
+			fvmOptions(blockID),
 		)
 
 		if flagShowResult {
@@ -213,6 +222,22 @@ func run(_ *cobra.Command, args []string) {
 			}
 		}
 	}
+}
+
+func fvmOptions(blockID flow.Identifier) []fvm.Option {
+	var options []fvm.Option
+
+	switch flagEntropyProvider {
+	case "block-hash":
+		options = append(
+			options,
+			fvm.WithEntropyProvider(BlockHashEntropyProvider{
+				BlockHash: blockID,
+			}),
+		)
+	}
+
+	return options
 }
 
 func RunSingleTransaction(
@@ -268,6 +293,7 @@ func RunSingleTransaction(
 		nil,
 		newSpanExporter,
 		computeLimit,
+		fvmOptions(blockID),
 	)
 
 	for i, blockTx := range blockTransactions {
@@ -359,6 +385,7 @@ func RunBlock(
 	wrapTxSnapshot func(blockTxID flow.Identifier, snapshot debug.UpdatableStorageSnapshot) debug.UpdatableStorageSnapshot,
 	newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter,
 	computeLimit uint64,
+	additionalFVMOptions []fvm.Option,
 ) (
 	results []debug.Result,
 ) {
@@ -390,6 +417,7 @@ func RunBlock(
 			useVM,
 			spanExporter,
 			computeLimit,
+			additionalFVMOptions,
 		)
 
 		updatedRegisters := result.Snapshot.UpdatedRegisters()
@@ -419,6 +447,7 @@ func RunTransaction(
 	useVM bool,
 	spanExporter otelTrace.SpanExporter,
 	computeLimit uint64,
+	additionalFVMOptions []fvm.Option,
 ) debug.Result {
 
 	log := log.With().
@@ -452,6 +481,8 @@ func RunTransaction(
 		)
 	}
 
+	fvmOptions = append(fvmOptions, additionalFVMOptions...)
+
 	debugger := debug.NewRemoteDebugger(
 		chain,
 		log,
@@ -478,4 +509,15 @@ func RunTransaction(
 	}
 
 	return result
+}
+
+// BlockHashEntropyProvider implements environment.EntropyProvider
+// which provides a source of entropy to fvm context (required for Cadence's randomness),
+// by using the given block hash.
+type BlockHashEntropyProvider struct {
+	BlockHash flow.Identifier
+}
+
+func (p BlockHashEntropyProvider) RandomSource() ([]byte, error) {
+	return p.BlockHash[:], nil
 }

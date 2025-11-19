@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 
 type InterestingCadenceSpanExporter struct {
 	Spans []otelTrace.ReadOnlySpan
+	Log   bool
 }
 
 var _ otelTrace.SpanExporter = &InterestingCadenceSpanExporter{}
@@ -23,6 +25,7 @@ var interestingSpanNamePrefixes = []trace.SpanName{
 	trace.FVMEnvAllocateSlabIndex,
 	trace.FVMEnvGetValue,
 	trace.FVMEnvSetValue,
+	trace.FVMEnvGetOrLoadProgram,
 }
 
 var uninterestingSpanNames = []trace.SpanName{
@@ -40,6 +43,14 @@ func (s *InterestingCadenceSpanExporter) ExportSpans(_ context.Context, spans []
 				!slices.Contains(uninterestingSpanNames, trace.SpanName(name)) {
 
 				s.Spans = append(s.Spans, span)
+
+				if s.Log {
+					err := writeSpan(os.Stderr, span)
+					if err != nil {
+						return err
+					}
+				}
+
 				break
 			}
 		}
@@ -53,26 +64,34 @@ func (s *InterestingCadenceSpanExporter) Shutdown(_ context.Context) error {
 
 func (s *InterestingCadenceSpanExporter) WriteSpans(writer io.Writer) error {
 	for _, span := range s.Spans {
-		_, err := fmt.Fprintf(writer, "- %s: ", span.Name())
+		err := writeSpan(writer, span)
 		if err != nil {
 			return err
 		}
-		for i, attr := range span.Attributes() {
-			if i > 0 {
-				_, err = fmt.Fprintf(writer, ", ")
-				if err != nil {
-					return err
-				}
-			}
-			_, err = fmt.Fprintf(writer, "%s=%v", attr.Key, attr.Value.AsInterface())
+	}
+	return nil
+}
+
+func writeSpan(writer io.Writer, span otelTrace.ReadOnlySpan) error {
+	_, err := fmt.Fprintf(writer, "- %s: ", span.Name())
+	if err != nil {
+		return err
+	}
+	for i, attr := range span.Attributes() {
+		if i > 0 {
+			_, err = fmt.Fprintf(writer, ", ")
 			if err != nil {
 				return err
 			}
 		}
-		_, err = fmt.Fprintln(writer)
+		_, err = fmt.Fprintf(writer, "%s=%v", attr.Key, attr.Value.AsInterface())
 		if err != nil {
 			return err
 		}
+	}
+	_, err = fmt.Fprintln(writer)
+	if err != nil {
+		return err
 	}
 	return nil
 }
