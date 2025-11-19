@@ -69,7 +69,7 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
 
-	Cmd.Flags().BoolVar(&flagLogTraces, "log-traces", false, "log traces")
+	Cmd.Flags().BoolVar(&flagLogTraces, "log-cadence-traces", false, "log Cadence traces. requires --trace and --only-trace-cadence to be set (default: false)")
 
 	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
 
