@@ -2539,13 +2539,14 @@ func createFinalizedBlockIndexer(builder *FlowAccessNodeBuilder) func(node *cmd.
 func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 	builder.
 		Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.executionDataSyncEnabled {
-				// skip if execution data sync is enabled
-				// because the execution data contains the collections, so no need to fetch them separately.
-				// otherwise, if both fetching and syncing are enabled, they might slow down each other,
-				// because the database operation requires locking.
-				return &module.NoopReadyDoneAware{}, nil
-			}
+			// leo: temp removed for integration tests
+			// if builder.executionDataSyncEnabled {
+			// 	// skip if execution data sync is enabled
+			// 	// because the execution data contains the collections, so no need to fetch them separately.
+			// 	// otherwise, if both fetching and syncing are enabled, they might slow down each other,
+			// 	// because the database operation requires locking.
+			// 	return &module.NoopReadyDoneAware{}, nil
+			// }
 
 			// TODO (leo): switch to module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
 			// to implement hybrid sync mode in the future
