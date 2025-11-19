@@ -351,17 +351,13 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		test.results.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 		test.scheduledTransactions.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 		test.registers.On("Store", mock.Anything, mock.Anything).Unset()
-		test.collectionIndexer.On("IndexCollections", mock.Anything).Unset()
 
 		// setup mocks to behave as they would if the block was already indexed.
 		// tx results and scheduled transactions will not be called since events returned an error.
+		// The second goroutine that processes registers will still run and call Store.
 		test.events.
 			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
 			Return(storage.ErrAlreadyExists).
-			Once()
-		test.collectionIndexer.
-			On("IndexCollections", tf.ExpectedCollections).
-			Return(nil).
 			Once()
 		test.registers.
 			On("Store", mock.Anything, tf.Block.Height).
