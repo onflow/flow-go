@@ -54,8 +54,7 @@ func (s *AccessGRPCSuite) SetupTest() {
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel))
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
-	// need one dummy verification node (unused ghost)
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// need one controllable collection node
