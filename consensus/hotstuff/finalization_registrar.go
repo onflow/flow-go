@@ -7,8 +7,9 @@ import "github.com/onflow/flow-go/consensus/hotstuff/model"
 // when blocks are finalized or incorporated into the chain.
 //
 // Components which must be subscribed to finalization events for correct functionality should:
-//    - accept a FinalizationRegistrar argument in their constructor
-//    - register their event consumer functions within their constructor
+//   - accept a FinalizationRegistrar argument in their constructor
+//   - register their event consumer functions within their constructor
+//
 // Following this pattern of coupling construction with subscription prevents callers from forgetting
 // to register callbacks and provides a consistent way to handle consensus notifications.
 type FinalizationRegistrar interface {
