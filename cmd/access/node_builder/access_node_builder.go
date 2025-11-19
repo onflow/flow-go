@@ -2102,33 +2102,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			}
 
-			preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-			}
-
-			fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-			}
-
-			builder.ExecNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
-				node.Logger,
-				node.State,
-				node.Storage.Receipts,
-				preferredENIdentifiers,
-				fixedENIdentifiers,
-			)
+			// ExecNodeIdentitiesProvider is initialized in the "execution node identities provider" module
+			// to ensure it's available before modules that depend on it. Verify it's initialized here.
+			_ = notNil(builder.ExecNodeIdentitiesProvider)
 
 			nodeCommunicator := node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled)
-			builder.txResultErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
-				node.Logger,
-				builder.transactionResultErrorMessages, // might be nil
-				notNil(builder.TxResultsIndex),
-				connFactory,
-				nodeCommunicator,
-				notNil(builder.ExecNodeIdentitiesProvider),
-			)
+
+			// txResultErrorMessageProvider is initialized in the "transaction result error message provider" module
+			// to ensure it's available before modules that depend on it. Verify it's initialized here.
+			_ = notNil(builder.txResultErrorMessageProvider)
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
@@ -2268,15 +2250,95 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	// builder.Component("ingest receipt", createIngestReceiptEngine(builder))
 	createCollectionSyncFetcher(builder)
 
+	// Initialize ExecNodeIdentitiesProvider as a module so it's available before components run.
+	// This is needed because the "transaction result error messages storage" module depends on it.
+	builder.Module("execution node identities provider", func(node *cmd.NodeConfig) error {
+		backendConfig := builder.rpcConf.BackendConfig
+
+		preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		builder.ExecNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Receipts,
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
+		return nil
+	})
+
+	// Initialize txResultErrorMessageProvider as a module so it's available before components run.
+	// This is needed because the "transaction result error messages storage" module depends on it.
+	builder.Module("transaction result error message provider", func(node *cmd.NodeConfig) error {
+		backendConfig := builder.rpcConf.BackendConfig
+		accessMetrics := builder.AccessMetrics
+		cacheSize := int(backendConfig.ConnectionPoolSize)
+
+		var connBackendCache *rpcConnection.Cache
+		var err error
+		if cacheSize > 0 {
+			connBackendCache, err = rpcConnection.NewCache(node.Logger, accessMetrics, cacheSize)
+			if err != nil {
+				return fmt.Errorf("could not initialize connection cache: %w", err)
+			}
+		}
+
+		connFactory := &rpcConnection.ConnectionFactoryImpl{
+			AccessConfig:     backendConfig.AccessConfig,
+			CollectionConfig: backendConfig.CollectionConfig,
+			ExecutionConfig:  backendConfig.ExecutionConfig,
+			AccessMetrics:    accessMetrics,
+			Log:              node.Logger,
+			Manager: rpcConnection.NewManager(
+				node.Logger,
+				accessMetrics,
+				connBackendCache,
+				backendConfig.CircuitBreakerConfig,
+				builder.rpcConf.CompressorName,
+			),
+		}
+
+		nodeCommunicator := node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled)
+		builder.txResultErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
+			node.Logger,
+			builder.transactionResultErrorMessages, // might be nil
+			notNil(builder.TxResultsIndex),
+			connFactory,
+			nodeCommunicator,
+			notNil(builder.ExecNodeIdentitiesProvider),
+		)
+
+		return nil
+	})
+
 	if builder.storeTxResultErrorMessages {
 		var txResultErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 		var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 		builder.
+			// Initialize transactionResultErrorMessages storage first, as it's needed by the core
 			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(
+					node.Metrics.Cache,
+					node.ProtocolDB,
+					bstorage.DefaultCacheSize,
+				)
+				return nil
+			}).
+			// Create the core after storage is initialized
+			Module("transaction result error messages core", func(node *cmd.NodeConfig) error {
 				txResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
 					notNil(builder.txResultErrorMessageProvider),
-					builder.transactionResultErrorMessages,
+					notNil(builder.transactionResultErrorMessages),
 					notNil(builder.ExecNodeIdentitiesProvider),
 					node.StorageLockMgr,
 				)
@@ -2288,14 +2350,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.State,
 					txResultErrorMessagesCore,
 				)
-			}).
-			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(
-					node.Metrics.Cache,
-					node.ProtocolDB,
-					bstorage.DefaultCacheSize,
-				)
-				return nil
 			}).
 			Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
 				processedTxErrorMessagesBlockHeight = store.NewConsumerProgress(
@@ -2539,14 +2593,13 @@ func createFinalizedBlockIndexer(builder *FlowAccessNodeBuilder) func(node *cmd.
 func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 	builder.
 		Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// leo: temp removed for integration tests
-			// if builder.executionDataSyncEnabled {
-			// 	// skip if execution data sync is enabled
-			// 	// because the execution data contains the collections, so no need to fetch them separately.
-			// 	// otherwise, if both fetching and syncing are enabled, they might slow down each other,
-			// 	// because the database operation requires locking.
-			// 	return &module.NoopReadyDoneAware{}, nil
-			// }
+			if builder.executionDataSyncEnabled {
+				// skip if execution data sync is enabled
+				// because the execution data contains the collections, so no need to fetch them separately.
+				// otherwise, if both fetching and syncing are enabled, they might slow down each other,
+				// because the database operation requires locking.
+				return &module.NoopReadyDoneAware{}, nil
+			}
 
 			// TODO (leo): switch to module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
 			// to implement hybrid sync mode in the future

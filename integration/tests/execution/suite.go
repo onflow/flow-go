@@ -114,7 +114,17 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = nil
 	s.accessClient = nil
 
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess,
+		// this integration tests didn't include verification node, so
+		// no block will be sealed. Since AN only sync execution data for sealed block,
+		// the collection syncing which relys on execution data sync will not work.
+		// and the collection syncing is required to report the correct transaction results,
+		// which the integration test need on (WaitForExecuted), otherwise the tx will stuck
+		// on "Status: Pending"
+		// we disable execution data sync on AN so that AN will fetch collections from LN instead.
+		testnet.WithAdditionalFlag("--execution-data-sync-enabled=false"),
+	),
+	)
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
