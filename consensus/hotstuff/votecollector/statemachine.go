@@ -154,20 +154,6 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 				m.notifier.OnInvalidVoteDetected(*invalidVoteErr)
 				return nil
 			}
-			if doubleVoteErr, ok := model.AsDoubleVoteError(err); ok {
-				// This error is returned when votes equivocation has been detected. Such behavior can be detected
-				// in our concurrent implementation. When the block proposal for the view arrives:
-				//  (A1) `votesProcessor` transitions from [VoteCollectorStatusCaching] to [VoteCollectorStatusVerifying]
-				//  (A2) the cached votes are fed into the [VerifyingVoteProcessor]
-				// However, to increase concurrency, step (A1) and (A2) are _not_ atomically happening together.
-				// Therefore, the following event (B) might happen _in between_:
-				//  (B) A newly-arriving vote V is first cached and then processed by the [VerifyingVoteProcessor].
-				// In this scenario, vote V is already included in the [VerifyingVoteProcessor]. Nevertheless, step (A2)
-				// will attempt to add V again to the [VerifyingVoteProcessor], because the vote is in the cache and in case
-				// those votes are not identical then it's a proof of equivocation.
-				m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
-				return nil
-			}
 			if model.IsDuplicatedSignerError(err) {
 				// This error is returned for repetitions of exactly the same vote. Such repetitions can occur (as race
 				// condition) in our concurrent implementation. When the block proposal for the view arrives:

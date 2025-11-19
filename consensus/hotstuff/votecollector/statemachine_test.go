@@ -64,12 +64,20 @@ func (s *StateMachineTestSuite) SetupTest() {
 
 // prepareMockedProcessor prepares a mocked processor and stores it in map, later it will be used
 // to mock behavior of verifying vote processor.
+// Additionally, it setups mocks on the processor assuming the proposer vote will be passed into the processing pipeline.
 func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedProposal) *mocks.VerifyingVoteProcessor {
-	processor := &mocks.VerifyingVoteProcessor{}
+	processor := mocks.NewVerifyingVoteProcessor(s.T())
 	processor.On("Block").Return(func() *model.Block {
 		return proposal.Block
 	}).Maybe()
 	processor.On("Status").Return(hotstuff.VoteCollectorStatusVerifying)
+
+	proposerVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
+	processor.On("Process", proposerVote).Run(func(_ mock.Arguments) {
+		s.notifier.On("OnVoteProcessed", proposerVote).Once()
+	}).Return(nil).Maybe()
+
 	s.mockedProcessors[proposal.Block.BlockID] = processor
 	return processor
 }
@@ -219,6 +227,67 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 
 	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 	processor.AssertExpectations(s.T())
+}
+
+// Byzantine Leader might mount the following attacks:
+// 1. Vote-equivocation attack: send block proposal and equivocate by sending a different conflicting vote.
+// 2. Spamming attack: send a block proposal and (repeatedly) send the same vote again as an independent message.
+// 3. Leader might send multiple individual vote messages (repeated identical votes, or equivocating with different votes)
+// Attacks 1. and 2. are only available to the leader, because these attacks exploit the fact that stand-alone votes and
+// proposals are processed through different code paths: while stand-alone votes always hit the cache in the VoteCollector,
+// the vote embedded into the proposal is processed with priority (potentially concurrently to other incoming stand-alone votes).
+// Attack 3. can be mounted also by replicas
+// In next section we perform testing of those scenarios.
+
+// TestProcessBlock_ByzantineLeaderEquivocation_ProposalBeforeVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
+// Case (1.a): proposal arriving first, stand-alone vote arriving later:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_ProposalBeforeVote() {
+
+}
+
+// TestProcessBlock_ByzantineLeaderEquivocation_ProposalAfterVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
+// Case (1.b): stand-alone vote arriving first, proposal arriving second:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_ProposalAfterVote() {
+
+}
+
+// TestProcessBlock_ByzantineLeaderSpamming_ProposalBeforeVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 2. send block proposal and try to spam with the same vote. We test both orders of arrival:
+// Case (2.a): proposal arriving first, stand-alone vote arriving later:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalBeforeVote() {
+	proposal := makeSignedProposalWithView(s.view)
+	_ = s.prepareMockedProcessor(proposal)
+	proposalVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
+
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	err = s.collector.AddVote(proposalVote)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
+
+// TestProcessBlock_ByzantineLeaderSpamming_ProposalAfterVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 2. send block proposal and try to spam with the same vote. We test both orders of arrival:
+// Case (2.b): stand-alone vote arriving first, proposal arriving second:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalAfterVote() {
+	proposal := makeSignedProposalWithView(s.view)
+	_ = s.prepareMockedProcessor(proposal)
+	proposalVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
+
+	s.notifier.On("OnVoteProcessed", proposalVote).Once()
+	err = s.collector.AddVote(proposalVote)
+	require.NoError(s.T(), err)
+
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
 // TestProcessBlock_ErrorHandlingOfCachedVotes tests that all sentinel errors and exceptions are correctly handled when processing
