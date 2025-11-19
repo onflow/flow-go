@@ -2140,6 +2140,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:          node.Storage.Transactions,
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
+				Seals:                 node.Storage.Seals,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
 				ScheduledTransactions: builder.scheduledTransactions,          // might be nil
 				ChainID:               node.RootChainID,
