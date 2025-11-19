@@ -459,7 +459,7 @@ func (dr *CadenceValueDiffReporter) diffEquatable(
 		return true
 	}
 
-	if !oldValue.Equal(nil, interpreter.EmptyLocationRange, other) {
+	if !oldValue.Equal(nil, other) {
 		dr.reportWriter.Write(
 			difference{
 				Address:            dr.address.Hex(),
@@ -631,8 +631,8 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 
 	// Compare array elements
 	for i := 0; i < min(count, otherArray.Count()); i++ {
-		element := v.Get(vInterpreter, interpreter.EmptyLocationRange, i)
-		otherElement := otherArray.Get(otherInterpreter, interpreter.EmptyLocationRange, i)
+		element := v.Get(vInterpreter, i)
+		otherElement := otherArray.Get(otherInterpreter, i)
 
 		elementTrace := trace.Append(fmt.Sprintf("[%d]", i))
 		elementHasDifference := dr.diffValues(
@@ -724,16 +724,22 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 	}
 
 	oldFieldNames := make([]string, 0, v.FieldCount())
-	v.ForEachFieldName(func(fieldName string) bool {
-		oldFieldNames = append(oldFieldNames, fieldName)
-		return true
-	})
+	v.ForEachFieldName(
+		nil,
+		func(fieldName string) bool {
+			oldFieldNames = append(oldFieldNames, fieldName)
+			return true
+		},
+	)
 
 	newFieldNames := make([]string, 0, otherComposite.FieldCount())
-	otherComposite.ForEachFieldName(func(fieldName string) bool {
-		newFieldNames = append(newFieldNames, fieldName)
-		return true
-	})
+	otherComposite.ForEachFieldName(
+		nil,
+		func(fieldName string) bool {
+			newFieldNames = append(newFieldNames, fieldName)
+			return true
+		},
+	)
 
 	onlyOldFieldNames, onlyNewFieldNames, sharedFieldNames := diff(oldFieldNames, newFieldNames)
 
@@ -851,16 +857,22 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 	}
 
 	oldKeys := make([]interpreter.Value, 0, v.Count())
-	v.IterateKeys(vInterpreter, interpreter.EmptyLocationRange, func(key interpreter.Value) (resume bool) {
-		oldKeys = append(oldKeys, key)
-		return true
-	})
+	v.IterateKeys(
+		vInterpreter,
+		func(key interpreter.Value) (resume bool) {
+			oldKeys = append(oldKeys, key)
+			return true
+		},
+	)
 
 	newKeys := make([]interpreter.Value, 0, otherDictionary.Count())
-	otherDictionary.IterateKeys(otherInterpreter, interpreter.EmptyLocationRange, func(key interpreter.Value) (resume bool) {
-		newKeys = append(newKeys, key)
-		return true
-	})
+	otherDictionary.IterateKeys(
+		otherInterpreter,
+		func(key interpreter.Value) (resume bool) {
+			newKeys = append(newKeys, key)
+			return true
+		},
+	)
 
 	onlyOldKeys := make([]interpreter.Value, 0, len(oldKeys))
 
@@ -869,9 +881,9 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 	for _, key := range oldKeys {
 		valueTrace := trace.Append(fmt.Sprintf("[%v]", key))
 
-		oldValue, _ := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
+		oldValue, _ := v.Get(vInterpreter, key)
 
-		newValue, found := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
+		newValue, found := otherDictionary.Get(otherInterpreter, key)
 		if !found {
 			onlyOldKeys = append(onlyOldKeys, key)
 			continue
@@ -916,7 +928,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 
 		// find keys only present in new dict
 		for _, key := range newKeys {
-			found := v.ContainsKey(vInterpreter, interpreter.EmptyLocationRange, key)
+			found := v.ContainsKey(vInterpreter, key)
 			if !found {
 				onlyNewKeys = append(onlyNewKeys, key)
 			}
@@ -946,9 +958,9 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 func getStorageMapKeys(storageMap *interpreter.DomainStorageMap) []any {
 	keys := make([]any, 0, storageMap.Count())
 
-	iter := storageMap.Iterator(nil)
+	iter := storageMap.Iterator()
 	for {
-		key := iter.NextKey()
+		key := iter.NextKey(nil)
 		if key == nil {
 			break
 		}
@@ -994,7 +1006,7 @@ func diff[T comparable](old, new []T) (onlyOld, onlyNew, shared []T) {
 func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
 	ledger := &registers.ReadOnlyLedger{Registers: regs}
 	config := runtime.StorageConfig{}
-	return runtime.NewStorage(ledger, nil, config)
+	return runtime.NewStorage(ledger, nil, nil, config)
 }
 
 type readonlyStorageRuntime struct {

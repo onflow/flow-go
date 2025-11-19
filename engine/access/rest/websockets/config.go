@@ -64,3 +64,15 @@ func NewDefaultWebsocketConfig() Config {
 		InactivityTimeout:             DefaultInactivityTimeout,
 	}
 }
+
+type KeepaliveConfig struct {
+	PingPeriod time.Duration
+	PongWait   time.Duration
+}
+
+func DefaultKeepaliveConfig() KeepaliveConfig {
+	return KeepaliveConfig{
+		PingPeriod: PingPeriod,
+		PongWait:   PongWait,
+	}
+}

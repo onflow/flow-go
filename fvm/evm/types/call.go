@@ -54,6 +54,10 @@ type DirectCall struct {
 	Value    *big.Int
 	GasLimit uint64
 	Nonce    uint64
+
+	// Sets whether we skip or apply the EIP-7825 tx gas limit cap,
+	// introduced in `Osaka` hard-fork
+	skipTxGasLimitCheck bool
 }
 
 // DirectCallFromEncoded constructs a DirectCall from encoded data
@@ -97,12 +101,15 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		// AccessList:        tx.AccessList(),
 		// When SkipNonceChecks is true, the message nonce is
 		// not checked against the account nonce in state.
-		// When SkipFromEOACheck is true, it disables checking
-		// that the sender is an EOA.
-		// Since we use the direct calls for COAs, we set
-		// the nonce and the COA is an smart contract.
-		SkipNonceChecks:  true,
-		SkipFromEOACheck: true,
+		SkipNonceChecks: true,
+		// When SkipTransactionChecks is true, the message is not
+		// treated as a transaction, and certain transaction-specific
+		// checks are skipped:
+		// - From is not verified to be an EOA
+		// - GasLimit is not checked against the protocol defined tx gaslimit
+		// This is necessary for COA interactions, as a COA is a smart wallet,
+		// which has non-empty code, hence it would fail the EOA check.
+		SkipTransactionChecks: true,
 	}
 }
 
@@ -129,6 +136,37 @@ func (dc *DirectCall) Transaction() *gethTypes.Transaction {
 // EmptyToField returns true if `to` field contains an empty address
 func (dc *DirectCall) EmptyToField() bool {
 	return dc.To == EmptyAddress
+}
+
+// SkipTxGasLimitCheck disables the EIP-7825 transaction gas limit cap
+func (dc *DirectCall) SkipTxGasLimitCheck() {
+	dc.skipTxGasLimitCheck = true
+}
+
+// ValidEIP7825GasLimit checks whether the `GasLimit` of the direct call
+// is valid according to the given chain rules.
+func (dc *DirectCall) ValidEIP7825GasLimit(rules gethParams.Rules) bool {
+	// The EIP-7825 tx gas limit can be deliberately skipped for usage
+	// on `eth_estimateGas` & `eth_call` JSON-RPC endpoints.
+	// Regardless of whether `Osaka` is activated or not, we consider
+	// any `GasLimit` as valid.
+	if dc.skipTxGasLimitCheck {
+		return true
+	}
+
+	// If the `Osaka` hard-fork is not activated, then there's no need to
+	// check for EIP-7825 gas limit validity.
+	if !rules.IsOsaka {
+		return true
+	}
+
+	// After the `Osaka` hard-fork, direct calls have the same gas limit
+	// cap as native EVM transactions.
+	if dc.GasLimit > gethParams.MaxTxGas {
+		return false
+	}
+
+	return true
 }
 
 func (dc *DirectCall) to() *gethCommon.Address {

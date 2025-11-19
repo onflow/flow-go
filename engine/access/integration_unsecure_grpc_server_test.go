@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -96,7 +95,7 @@ type SameGRPCPortTestSuite struct {
 }
 
 func (suite *SameGRPCPortTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -196,6 +195,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		Headers:              suite.headers,
 		Collections:          suite.collections,
 		Transactions:         suite.transactions,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		AccessMetrics:        suite.metrics,
 		MaxHeightRange:       0,
@@ -315,6 +315,14 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 	// wait for the state stream engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Ready(), 2*time.Second)
+}
+
+func (suite *SameGRPCPortTestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Done(), 2*time.Second)
 }
 
 // TestEnginesOnTheSameGrpcPort verifies if both AccessAPI and ExecutionDataAPI client successfully connect and continue

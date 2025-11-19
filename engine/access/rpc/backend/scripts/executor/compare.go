@@ -31,7 +31,7 @@ func NewComparingScriptExecutor(
 	execNodeExecutor ScriptExecutor,
 ) *ComparingScriptExecutor {
 	return &ComparingScriptExecutor{
-		log:                   zerolog.New(log).With().Str("script_executor", "comparing").Logger(),
+		log:                   log.With().Str("script_executor", "comparing").Logger(),
 		metrics:               metrics,
 		scriptCache:           scriptCache,
 		localExecutor:         localExecutor,

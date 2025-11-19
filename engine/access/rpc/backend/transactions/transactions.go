@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
@@ -19,16 +18,16 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/retrier"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -43,90 +42,75 @@ type Transactions struct {
 	state   protocol.State
 	chainID flow.ChainID
 
-	systemTxID flow.Identifier
-
 	// RPC Clients & Network
 	collectionRPCClient         accessproto.AccessAPIClient // RPC client tied to a fixed collection node
 	historicalAccessNodeClients []accessproto.AccessAPIClient
 	nodeCommunicator            node_communicator.Communicator
 	connectionFactory           connection.ConnectionFactory
-	retrier                     retrier.Retrier
 
 	// Storages
-	blocks       storage.Blocks
-	collections  storage.Collections
-	transactions storage.Transactions
-	events       storage.Events
+	blocks                storage.Blocks
+	collections           storage.Collections
+	transactions          storage.Transactions
+	scheduledTransactions storage.ScheduledTransactionsReader
 
-	txResultCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
+	txValidator       *validator.TransactionValidator
+	txProvider        provider.TransactionProvider
+	txStatusDeriver   *txstatus.TxStatusDeriver
+	systemCollections *systemcollection.Versioned
+	txResultCache     TxResultCache
 
-	txValidator     *validator.TransactionValidator
-	txProvider      provider.TransactionProvider
-	txStatusDeriver *txstatus.TxStatusDeriver
-
-	scheduledCallbacksEnabled bool
+	scheduledTransactionsEnabled bool
 }
 
 var _ access.TransactionsAPI = (*Transactions)(nil)
 
 type Params struct {
-	Log                         zerolog.Logger
-	Metrics                     module.TransactionMetrics
-	State                       protocol.State
-	ChainID                     flow.ChainID
-	SystemTxID                  flow.Identifier
-	StaticCollectionRPCClient   accessproto.AccessAPIClient
-	HistoricalAccessNodeClients []accessproto.AccessAPIClient
-	NodeCommunicator            node_communicator.Communicator
-	ConnFactory                 connection.ConnectionFactory
-	EnableRetries               bool
-	NodeProvider                *rpc.ExecutionNodeIdentitiesProvider
-	Blocks                      storage.Blocks
-	Collections                 storage.Collections
-	Transactions                storage.Transactions
-	Events                      storage.Events
-	TxErrorMessageProvider      error_messages.Provider
-	TxResultCache               *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
-	TxProvider                  provider.TransactionProvider
-	TxValidator                 *validator.TransactionValidator
-	TxStatusDeriver             *txstatus.TxStatusDeriver
-	EventsIndex                 *index.EventsIndex
-	TxResultsIndex              *index.TransactionResultsIndex
-	ScheduledCallbacksEnabled   bool
+	Log                          zerolog.Logger
+	Metrics                      module.TransactionMetrics
+	State                        protocol.State
+	ChainID                      flow.ChainID
+	SystemCollections            *systemcollection.Versioned
+	StaticCollectionRPCClient    accessproto.AccessAPIClient
+	HistoricalAccessNodeClients  []accessproto.AccessAPIClient
+	NodeCommunicator             node_communicator.Communicator
+	ConnFactory                  connection.ConnectionFactory
+	EnableRetries                bool
+	NodeProvider                 *rpc.ExecutionNodeIdentitiesProvider
+	Blocks                       storage.Blocks
+	Collections                  storage.Collections
+	Transactions                 storage.Transactions
+	ScheduledTransactions        storage.ScheduledTransactionsReader
+	TxErrorMessageProvider       error_messages.Provider
+	TxResultCache                TxResultCache
+	TxProvider                   provider.TransactionProvider
+	TxValidator                  *validator.TransactionValidator
+	TxStatusDeriver              *txstatus.TxStatusDeriver
+	EventsIndex                  *index.EventsIndex
+	TxResultsIndex               *index.TransactionResultsIndex
+	ScheduledTransactionsEnabled bool
 }
 
 func NewTransactionsBackend(params Params) (*Transactions, error) {
 	txs := &Transactions{
-		log:                         params.Log,
-		metrics:                     params.Metrics,
-		state:                       params.State,
-		chainID:                     params.ChainID,
-		systemTxID:                  params.SystemTxID,
-		collectionRPCClient:         params.StaticCollectionRPCClient,
-		historicalAccessNodeClients: params.HistoricalAccessNodeClients,
-		nodeCommunicator:            params.NodeCommunicator,
-		connectionFactory:           params.ConnFactory,
-		blocks:                      params.Blocks,
-		collections:                 params.Collections,
-		transactions:                params.Transactions,
-		events:                      params.Events,
-		txResultCache:               params.TxResultCache,
-		txValidator:                 params.TxValidator,
-		txProvider:                  params.TxProvider,
-		txStatusDeriver:             params.TxStatusDeriver,
-		scheduledCallbacksEnabled:   params.ScheduledCallbacksEnabled,
-	}
-
-	if params.EnableRetries {
-		txs.retrier = retrier.NewRetrier(
-			params.Log,
-			params.Blocks,
-			params.Collections,
-			txs,
-			params.TxStatusDeriver,
-		)
-	} else {
-		txs.retrier = retrier.NewNoopRetrier()
+		log:                          params.Log,
+		metrics:                      params.Metrics,
+		state:                        params.State,
+		chainID:                      params.ChainID,
+		systemCollections:            params.SystemCollections,
+		collectionRPCClient:          params.StaticCollectionRPCClient,
+		historicalAccessNodeClients:  params.HistoricalAccessNodeClients,
+		nodeCommunicator:             params.NodeCommunicator,
+		connectionFactory:            params.ConnFactory,
+		blocks:                       params.Blocks,
+		collections:                  params.Collections,
+		transactions:                 params.Transactions,
+		scheduledTransactions:        params.ScheduledTransactions,
+		txResultCache:                params.TxResultCache,
+		txValidator:                  params.TxValidator,
+		txProvider:                   params.TxProvider,
+		txStatusDeriver:              params.TxStatusDeriver,
+		scheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
 	}
 
 	return txs, nil
@@ -134,7 +118,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 
 // SendTransaction forwards the transaction to the collection node
 func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	now := time.Now().UTC()
+	start := time.Now().UTC()
 
 	err := t.txValidator.Validate(ctx, tx)
 	if err != nil {
@@ -148,15 +132,13 @@ func (t *Transactions) SendTransaction(ctx context.Context, tx *flow.Transaction
 		return rpc.ConvertError(err, "failed to send transaction to a collection node", codes.Internal)
 	}
 
-	t.metrics.TransactionReceived(tx.ID(), now)
+	t.metrics.TransactionReceived(tx.ID(), start)
 
 	// store the transaction locally
 	err = t.transactions.Store(tx)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to store transaction: %v", err)
 	}
-
-	go t.registerTransactionForRetry(tx)
 
 	return nil
 }
@@ -174,28 +156,20 @@ func (t *Transactions) trySendTransaction(ctx context.Context, tx *flow.Transact
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
 
-	var sendError error
-	logAnyError := func() {
-		if sendError != nil {
-			t.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
-		}
-	}
-	defer logAnyError()
-
 	// try sending the transaction to one of the chosen collection nodes
-	sendError = t.nodeCommunicator.CallAvailableNode(
+	err = t.nodeCommunicator.CallAvailableNode(
 		collNodes,
 		func(node *flow.IdentitySkeleton) error {
-			err = t.sendTransactionToCollector(ctx, tx, node.Address)
-			if err != nil {
-				return err
-			}
-			return nil
+			return t.sendTransactionToCollector(ctx, tx, node.Address)
 		},
 		nil,
 	)
 
-	return sendError
+	if err != nil {
+		t.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
+	}
+
+	return err
 }
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
@@ -266,19 +240,76 @@ func (t *Transactions) SendRawTransaction(
 }
 
 func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
-	// look up transaction from storage
 	tx, err := t.transactions.ByID(txID)
-	txErr := rpc.ConvertStorageError(err)
-
-	if txErr != nil {
-		if status.Code(txErr) == codes.NotFound {
-			return t.getHistoricalTransaction(ctx, txID)
-		}
-		// Other Error trying to retrieve the transaction, return with err
-		return nil, txErr
+	if err == nil {
+		return tx, nil
 	}
 
-	return tx, nil
+	if !errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.Internal, "failed to lookup transaction: %v", err)
+	}
+
+	// check if it's one of the static system txs
+	if tx, ok := t.systemCollections.SearchAll(txID); ok {
+		return tx, nil
+	}
+
+	// check if it's a scheduled transaction
+	if t.scheduledTransactions != nil {
+		tx, isScheduledTx, err := t.lookupScheduledTransaction(ctx, txID)
+		if err != nil {
+			return nil, err
+		}
+		if isScheduledTx {
+			return tx, nil
+		}
+		// else, this is not a system collection tx. continue with the normal lookup
+	}
+
+	// otherwise, check if it's a historic transaction
+	return t.getHistoricalTransaction(ctx, txID)
+}
+
+// lookupScheduledTransaction looks up the transaction body for a scheduled transaction.
+// Returns false and no error if the transaction is not a known scheduled tx.
+//
+// Expected error returns during normal operation:
+//   - [codes.Internal]: if there was an error looking up the events
+func (t *Transactions) lookupScheduledTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, bool, error) {
+	blockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, status.Errorf(codes.Internal, "failed to get scheduled transaction block ID: %v", err)
+	}
+
+	header, err := t.state.AtBlockID(blockID).Head()
+	if err != nil {
+		// since the scheduled transaction is indexed at this block, it must exist in storage, otherwise
+		// the node is in an inconsistent state
+		err = fmt.Errorf("failed to get block header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, false, err
+	}
+
+	scheduledTxs, err := t.txProvider.ScheduledTransactionsByBlockID(ctx, header)
+	if err != nil {
+		return nil, false, rpc.ConvertError(err, "failed to get scheduled transactions", codes.Internal)
+	}
+
+	for _, tx := range scheduledTxs {
+		if tx.ID() == txID {
+			return tx, true, nil
+		}
+	}
+
+	// since the scheduled transaction is indexed in this block, it exist in the data generated using
+	// events from the block, otherwise the node is in an inconsistent state.
+	// TODO: not throwing an irrecoverable here since it's possible that we queried an Execution node
+	// for the events, and the EN provided incorrect data. This should be refactored so we handle the
+	// condition more precisely.
+	return nil, false, status.Errorf(codes.Internal, "scheduled transaction not found, but was indexed in block")
 }
 
 func (t *Transactions) GetTransactionsByBlockID(
@@ -299,174 +330,285 @@ func (t *Transactions) GetTransactionResult(
 	txID flow.Identifier,
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	// look up transaction from storage
+	encodingVersion entities.EventEncodingVersion,
+) (txResult *accessmodel.TransactionResult, err error) {
+	var scriptSize int
 	start := time.Now()
+	defer func() {
+		if err == nil {
+			// scriptSize will be 0 for system and scheduled txs. this is OK since the metrics uses
+			// size buckets and 0 equates to 1kb, which is about right.
+			t.metrics.TransactionResultFetched(time.Since(start), scriptSize)
+		}
+	}()
 
-	tx, err := t.transactions.ByID(txID)
+	txResult, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion)
 	if err != nil {
-		txErr := rpc.ConvertStorageError(err)
-		if status.Code(txErr) != codes.NotFound {
-			return nil, txErr
-		}
-
-		// Tx not found. If we have historical Sporks setup, lets look through those as well
-		if t.txResultCache != nil {
-			val, ok := t.txResultCache.Get(txID)
-			if ok {
-				return val, nil
-			}
-		}
-		historicalTxResult, err := t.getHistoricalTransactionResult(ctx, txID)
-		if err != nil {
-			// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
-			// and return status as unknown
-			txStatus := flow.TransactionStatusUnknown
-			result := &accessmodel.TransactionResult{
-				Status:     txStatus,
-				StatusCode: uint(txStatus),
-			}
-			if t.txResultCache != nil {
-				t.txResultCache.Add(txID, result)
-			}
-			return result, nil
-		}
-
-		if t.txResultCache != nil {
-			t.txResultCache.Add(txID, historicalTxResult)
-		}
-		return historicalTxResult, nil
+		return nil, err
+	}
+	if isSystemTx {
+		return txResult, nil
 	}
 
-	block, err := t.retrieveBlock(blockID, collectionID, txID)
-	// an error occurred looking up the block or the requested block or collection was not found.
-	// If looking up the block based solely on the txID returns not found, then no error is
-	// returned since the block may not be finalized yet.
+	// if the node is not indexing scheduled transactions, then fallback to the normal lookup. if the
+	// request was for a scheduled transaction, it will fail with a not found error.
+	if t.scheduledTransactions != nil {
+		txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, blockID, encodingVersion)
+		if err != nil {
+			return nil, err
+		}
+		if isScheduledTx {
+			return txResult, nil
+		}
+	}
+
+	txResult, tx, err := t.lookupSubmittedTransactionResult(ctx, txID, blockID, collectionID, encodingVersion)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, err
 	}
-
-	var blockHeight uint64
-	var txResult *accessmodel.TransactionResult
-	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
-	if block != nil {
-		txResult, err = t.lookupTransactionResult(ctx, txID, block.ToHeader(), requiredEventEncodingVersion)
-		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
-		}
-
-		// an additional check to ensure the correctness of the collection ID.
-		expectedCollectionID, err := t.lookupCollectionIDInBlock(block, txID)
-		if err != nil {
-			// if the collection has not been indexed yet, the lookup will return a not found error.
-			// if the request included a blockID or collectionID in its the search criteria, not found
-			// should result in an error because it's not possible to guarantee that the result found
-			// is the correct one.
-			if blockID != flow.ZeroID || collectionID != flow.ZeroID {
-				return nil, rpc.ConvertStorageError(err)
-			}
-		}
-
-		if collectionID == flow.ZeroID {
-			collectionID = expectedCollectionID
-		} else if collectionID != expectedCollectionID {
-			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
-		}
-
-		blockID = block.ID()
-		blockHeight = block.Height
+	if tx != nil {
+		scriptSize = len(tx.Script)
 	}
-
-	// If there is still no transaction result, provide one based on available information.
-	if txResult == nil {
-		var txStatus flow.TransactionStatus
-		// Derive the status of the transaction.
-		if block == nil {
-			txStatus, err = t.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
-		} else {
-			txStatus, err = t.txStatusDeriver.DeriveTransactionStatus(blockHeight, false)
-		}
-
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
-		}
-
-		txResult = &accessmodel.TransactionResult{
-			BlockID:       blockID,
-			BlockHeight:   blockHeight,
-			TransactionID: txID,
-			Status:        txStatus,
-			CollectionID:  collectionID,
-		}
-	} else {
-		txResult.CollectionID = collectionID
-	}
-
-	t.metrics.TransactionResultFetched(time.Since(start), len(tx.Script))
 
 	return txResult, nil
 }
 
-// lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
-// collections.
-func (t *Transactions) lookupCollectionIDInBlock(
-	block *flow.Block,
+// lookupSubmittedTransactionResult looks up the transaction result for a user transaction.
+// This function assumes that the queried transaction is not a system transaction or scheduled transaction.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the transaction is not found or not in the provided block or collection
+//   - [codes.Internal]: if there was an error looking up the block or collection
+func (t *Transactions) lookupSubmittedTransactionResult(
+	ctx context.Context,
 	txID flow.Identifier,
-) (flow.Identifier, error) {
-	for _, guarantee := range block.Payload.Guarantees {
-		collectionID := guarantee.CollectionID
-		collection, err := t.collections.LightByID(collectionID)
-		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", collectionID, err)
-		}
-		for _, collectionTxID := range collection.Transactions {
-			if collectionTxID == txID {
-				return collectionID, nil
-			}
-		}
-	}
-	return flow.ZeroID, ErrTransactionNotInBlock
-}
-
-// retrieveBlock function returns a block based on the input arguments.
-// The block ID lookup has the highest priority, followed by the collection ID lookup.
-// If both are missing, the default lookup by transaction ID is performed.
-//
-// If looking up the block based solely on the txID returns not found, then no error is returned.
-//
-// Expected errors:
-// - storage.ErrNotFound if the requested block or collection was not found.
-func (t *Transactions) retrieveBlock(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
+	encodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, *flow.TransactionBody, error) {
+	// 1. lookup the the collection that contains the transaction. if it is not found, then the
+	// collection is not yet indexed and the transaction is either unknown or pending.
+	//
+	// BFT corner case: Only the first finalized collection to contain the transaction is indexed.
+	// If the transaction is included in multiple collections in the same or different blocks, the
+	// first collection to be _indexed_ by the node is returned. This is not guaranteed to be the
+	// first collection in execution order!
+	lightCollection, err := t.collections.LightByTransactionID(txID)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, status.Errorf(codes.Internal, "failed to find collection for transaction: %v", err)
+		}
+		// we have already checked if this is a system or scheduled tx. at this point, the tx is either
+		// pending, unknown, or from a past spork.
+		result, err := t.getUnknownUserTransactionResult(ctx, txID, blockID, collectionID)
+		return result, nil, err
+	}
+	actualCollectionID := lightCollection.ID()
+	if collectionID == flow.ZeroID {
+		collectionID = actualCollectionID
+	} else if collectionID != actualCollectionID {
+		return nil, nil, status.Errorf(codes.NotFound, "transaction found in collection %s, but %s was provided", actualCollectionID, collectionID)
+	}
+
+	// 2. lookup the block containing the collection.
+	block, err := t.blocks.ByCollectionID(collectionID)
+	if err != nil {
+		// this is an exception. the block/collection index must exist if the collection/tx is indexed,
+		// otherwise the stored state is inconsistent.
+		err = fmt.Errorf("failed to find block for collection %v: %w", collectionID, err)
+		irrecoverable.Throw(ctx, err)
+		return nil, nil, err
+	}
+	actualBlockID := block.ID()
+	if blockID == flow.ZeroID {
+		blockID = actualBlockID
+	} else if blockID != actualBlockID {
+		return nil, nil, status.Errorf(codes.NotFound, "transaction found in block %s, but %s was provided", actualBlockID, blockID)
+	}
+
+	// 3. lookup the transaction and its result
+	tx, err := t.transactions.ByID(txID)
+	if err != nil {
+		// if we've gotten this far, the transaction must exist in storage otherwise the node is in
+		// an inconsistent state
+		err = fmt.Errorf("failed to get transaction from storage: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, nil, err
+	}
+
+	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+		case errors.Is(err, indexer.ErrIndexNotInitialized):
+		case errors.Is(err, storage.ErrHeightNotIndexed):
+		case status.Code(err) == codes.NotFound:
+		default:
+			return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+		}
+		// all expected errors fall through to be processed as a known unexecuted transaction.
+
+		// The transaction is not executed yet
+		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, false)
+		if err != nil {
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+			return nil, nil, err
+		}
+
+		return &accessmodel.TransactionResult{
+			BlockID:       blockID,
+			BlockHeight:   block.Height,
+			TransactionID: txID,
+			Status:        txStatus,
+			CollectionID:  collectionID,
+		}, tx, nil
+	}
+
+	return txResult, tx, nil
+}
+
+// lookupSystemTransactionResult looks up the transaction result for a system transaction.
+// Returns false and no error if the transaction is not a system tx.
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: if the block ID is not provided
+//   - [codes.Internal]: if there was an error looking up the block
+func (t *Transactions) lookupSystemTransactionResult(
+	ctx context.Context,
 	txID flow.Identifier,
-) (*flow.Block, error) {
+	blockID flow.Identifier,
+	encodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, bool, error) {
+	if _, ok := t.systemCollections.SearchAll(txID); !ok {
+		return nil, false, nil // tx is not a system tx
+	}
+
+	// block must be provided to get the correct system tx result
+	if blockID == flow.ZeroID {
+		return nil, false, status.Errorf(codes.InvalidArgument, "block ID is required for system transactions")
+	}
+
+	header, err := t.state.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, false, status.Errorf(codes.NotFound, "could not find block: %v", err)
+	}
+
+	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
+	return result, true, err
+}
+
+// lookupScheduledTransactionResult looks up the transaction result for a scheduled transaction.
+// Returns false and no error if the transaction is not a known scheduled tx.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the transaction was found in a different block than the provided block ID
+//   - [codes.Internal]: if there was an error looking up the block
+func (t *Transactions) lookupScheduledTransactionResult(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+	encodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, bool, error) {
+	scheduledTxBlockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, false, nil // tx is not a scheduled tx
+		}
+		return nil, false, status.Errorf(codes.Internal, "failed to get scheduled transaction block ID: %v", err)
+	}
+
+	if blockID != flow.ZeroID && scheduledTxBlockID != blockID {
+		return nil, false, status.Errorf(codes.NotFound, "scheduled transaction found in block %s, but %s was provided", scheduledTxBlockID, blockID)
+	}
+
+	header, err := t.state.AtBlockID(scheduledTxBlockID).Head()
+	if err != nil {
+		// the scheduled transaction is indexed at this block, so this block must exist in storage.
+		// otherwise the node is in an inconsistent state
+		err = fmt.Errorf("failed to get scheduled transaction's block from storage: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, false, err
+	}
+
+	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
+	return result, true, err
+}
+
+// getUnknownUserTransactionResult returns the transaction result for a transaction that is not yet
+// indexed in a finalized block.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the transaction is not found or is in the provided block or collection
+//   - [codes.Internal]: if there was an error looking up the transaction, block, or collection.
+func (t *Transactions) getUnknownUserTransactionResult(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
+) (*accessmodel.TransactionResult, error) {
+	tx, err := t.transactions.ByID(txID)
+	if err == nil {
+		// since the tx was not indexed, if it exists in storage that means it was submitted through
+		// this node.
+		txStatus, err := t.txStatusDeriver.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, status.Errorf(codes.NotFound, "transaction's reference block not found")
+			}
+			err = fmt.Errorf("failed to derive transaction status: %w", err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
+		}
+
+		return &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        txStatus,
+		}, nil
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.Internal, "failed to lookup unknown transaction: %v", err)
+	}
+
+	// The transaction does not exist locally, so check if the block or collection help identify its status.
+	// If we know the queried block or collection exist locally, then we can avoid querying historical Access Node.
 	if blockID != flow.ZeroID {
-		return t.blocks.ByID(blockID)
+		_, err := t.blocks.ByID(blockID)
+		if err == nil {
+			// the user's specified block exists locally, so assume the tx is not yet indexed
+			// but will be eventually
+			return &accessmodel.TransactionResult{
+				TransactionID: txID,
+				Status:        flow.TransactionStatusUnknown,
+			}, nil
+		}
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.Internal, "failed to get block from storage: %v", err)
+		}
+		// search historical access nodes
 	}
 
 	if collectionID != flow.ZeroID {
-		return t.blocks.ByCollectionID(collectionID)
+		_, err := t.collections.LightByID(collectionID)
+		if err == nil {
+			// the user's specified collection exists locally. since the tx is not indexed, this
+			// means the provided collection does not contain the tx
+			return nil, status.Errorf(codes.NotFound, "transaction not found in collection %s", collectionID)
+		}
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.Internal, "failed to get collection from storage: %v", err)
+		}
+		// search historical access nodes
 	}
 
-	// find the block for the transaction
-	block, err := t.lookupBlock(txID)
-
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, err
-	}
-
-	return block, nil
+	historicalTxResult := t.searchHistoricalAccessNodes(ctx, txID)
+	return historicalTxResult, nil
 }
 
 func (t *Transactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	encodingVersion entities.EventEncodingVersion,
 ) ([]*accessmodel.TransactionResult, error) {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := t.blocks.ByID(blockID)
@@ -474,7 +616,7 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.txProvider.TransactionResultsByBlockID(ctx, block, requiredEventEncodingVersion)
+	return t.txProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
 }
 
 // GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
@@ -483,91 +625,157 @@ func (t *Transactions) GetTransactionResultByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	index uint32,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.txProvider.TransactionResultByIndex(ctx, block, index, requiredEventEncodingVersion)
+	collectionID, err := t.lookupCollectionIDByBlockAndTxIndex(block, index)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "could not find collection for transaction result: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to lookup collection ID in block by index: %v", err)
+	}
+
+	return t.txProvider.TransactionResultByIndex(ctx, block, index, collectionID, encodingVersion)
 }
 
-// GetSystemTransaction returns system transaction
+// GetSystemTransaction returns a system transaction by ID.
+// If no transaction ID is provided, the last system transaction is queried.
+// Note: this function only returns privileged system transactions. It does NOT return user scheduled
+// transactions, which are also contained within the system collection.
 func (t *Transactions) GetSystemTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	block, err := t.blocks.ByID(blockID)
+	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
 	if txID == flow.ZeroID {
-		txID = t.systemTxID
+		systemChunkTx, err := t.systemCollections.
+			ByHeight(header.Height).
+			SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get system chunk transaction: %v", err)
+		}
+		txID = systemChunkTx.ID()
 	}
 
-	return t.txProvider.SystemTransaction(ctx, block, txID)
+	tx, ok := t.systemCollections.SearchAll(txID)
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "no system transaction with the provided ID found")
+	}
+
+	return tx, nil
 }
 
-// GetSystemTransactionResult returns system transaction result
+// GetSystemTransactionResult returns a system transaction result by ID.
+// If no transaction ID is provided, the last system transaction is queried.
+// Note: this function only returns privileged system transactions. It does NOT return user scheduled
+// transactions, which are also contained within the system collection.
 func (t *Transactions) GetSystemTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
+	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	block, err := t.blocks.ByID(blockID)
+	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
 	if txID == flow.ZeroID {
-		txID = t.systemTxID
-	}
-
-	return t.txProvider.SystemTransactionResult(ctx, block, txID, requiredEventEncodingVersion)
-}
-
-// Error returns:
-//   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
-//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
-func (t *Transactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
-	collection, err := t.collections.LightByTransactionID(txID)
-	if err != nil {
-		return nil, err
-	}
-
-	block, err := t.blocks.ByCollectionID(collection.ID())
-	if err != nil {
-		return nil, err
-	}
-
-	return block, nil
-}
-
-func (t *Transactions) lookupTransactionResult(
-	ctx context.Context,
-	txID flow.Identifier,
-	header *flow.Header,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
-	if err != nil {
-		// if either the storage or execution node reported no results or there were not enough execution results
-		if status.Code(err) == codes.NotFound {
-			// No result yet, indicate that it has not been executed
-			return nil, nil
+		systemChunkTx, err := t.systemCollections.
+			ByHeight(header.Height).
+			SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get system chunk transaction: %v", err)
 		}
-		// Other Error trying to retrieve the result, return with err
-		return nil, err
+		txID = systemChunkTx.ID()
 	}
 
-	// considered executed as long as some result is returned, even if it's an error message
+	txResult, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion)
+	if err != nil {
+		return nil, err
+	}
+	if !isSystemTx {
+		return nil, status.Errorf(codes.NotFound, "no system transaction with the provided ID found")
+	}
 	return txResult, nil
 }
 
+// GetScheduledTransaction returns the transaction body of the scheduled transaction by ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the scheduled transaction is not found
+func (t *Transactions) GetScheduledTransaction(ctx context.Context, scheduledTxID uint64) (*flow.TransactionBody, error) {
+	// The scheduled transactions index is only written if execution state indexing is enabled.
+	// Note: it's possible indexing is enabled and requests are still served from execution nodes.
+	if t.scheduledTransactions == nil {
+		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
+	}
+
+	txID, err := t.scheduledTransactions.TransactionIDByID(scheduledTxID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	tx, isScheduledTx, err := t.lookupScheduledTransaction(ctx, txID)
+	if err != nil {
+		return nil, err
+	}
+	if !isScheduledTx {
+		// since the scheduled transaction is indexed at this block, it must exist in storage, otherwise
+		// the node is in an inconsistent state
+		// TODO: not throwing an irrecoverable here since it's possible that we queried an Execution node
+		// for the events, and the EN provided incorrect data. This should be refactored so we handle the
+		// condition more precisely.
+		return nil, status.Errorf(codes.Internal, "scheduled transaction not found, but was indexed in block")
+	}
+	return tx, nil
+}
+
+// GetScheduledTransactionResult returns the transaction result of the scheduled transaction by ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the scheduled transaction is not found
+func (t *Transactions) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
+	// The scheduled transactions index is only written if execution state indexing is enabled.
+	// Note: it's possible indexing is enabled and requests are still served from execution nodes.
+	if t.scheduledTransactions == nil {
+		return nil, status.Errorf(codes.Unimplemented, "scheduled transactions endpoints require execution state indexing.")
+	}
+
+	txID, err := t.scheduledTransactions.TransactionIDByID(scheduledTxID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, flow.ZeroID, encodingVersion)
+	if err != nil {
+		return nil, err
+	}
+	if !isScheduledTx {
+		// since the scheduled transaction is indexed at this block, it must exist in storage, otherwise
+		// the node is in an inconsistent state
+		// TODO: not throwing an irrecoverable here since it's possible that we queried an Execution node
+		// for the events, and the EN provided incorrect data. This should be refactored so we handle the
+		// condition more precisely.
+		return nil, status.Errorf(codes.Internal, "scheduled transaction not found, but was indexed in block")
+	}
+	return txResult, nil
+}
+
+// getHistoricalTransaction searches the historical access nodes for the transaction body.
+//
+// All errors are benign and side-effect free for the node. They indicate an issue communicating with
+// external nodes.
 func (t *Transactions) getHistoricalTransaction(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -592,6 +800,39 @@ func (t *Transactions) getHistoricalTransaction(
 	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
 }
 
+// searchHistoricalAccessNodes searches the historical access nodes for the transaction result
+// and caches the result if enabled.
+func (t *Transactions) searchHistoricalAccessNodes(
+	ctx context.Context,
+	txID flow.Identifier,
+) *accessmodel.TransactionResult {
+	// if the tx is not known locally, search the historical access nodes
+	if result, ok := t.txResultCache.Get(txID); ok {
+		return result
+	}
+
+	historicalTxResult, err := t.getHistoricalTransactionResult(ctx, txID)
+	if err != nil {
+		// if tx not found on historic access nodes either, then assume that the tx was
+		// submitted to a different AN and return status as unknown
+		historicalTxResult = &accessmodel.TransactionResult{
+			TransactionID: txID,
+			Status:        flow.TransactionStatusUnknown,
+		}
+	}
+
+	// always cache the result even if it's an error to avoid unnecessary load on the nodes.
+	// the cache is limited so retries will happen eventually. users can also query the nodes
+	// directly for more precise results.
+	t.txResultCache.Add(txID, historicalTxResult)
+
+	return historicalTxResult
+}
+
+// getHistoricalTransactionResult searches the historical access nodes for the transaction result.
+//
+// All errors are benign and side-effect free for the node. They indicate an issue communicating with
+// external nodes.
 func (t *Transactions) getHistoricalTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -628,20 +869,31 @@ func (t *Transactions) getHistoricalTransactionResult(
 	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
 }
 
-func (t *Transactions) registerTransactionForRetry(tx *flow.TransactionBody) {
-	referenceBlock, err := t.state.AtBlockID(tx.ReferenceBlockID).Head()
-	if err != nil {
-		return
+// lookupCollectionIDByBlockAndTxIndex returns the collection ID that contains the transasction with
+// the provided transaction index.
+//
+// If the index is larger that the number of user transactions, flow.ZeroID is returned, indicating
+// that the transaction is a system transaction. The caller should verify that the index does in fact
+// correspond to a system transaction.
+//
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] - if any of the collections in the block cannot be found.
+func (t *Transactions) lookupCollectionIDByBlockAndTxIndex(block *flow.Block, index uint32) (flow.Identifier, error) {
+	txIndex := uint32(0)
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := t.collections.LightByID(guarantee.CollectionID)
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not find collection %s: %w", guarantee.CollectionID, err)
+		}
+
+		for range collection.Transactions {
+			if txIndex == index {
+				return guarantee.CollectionID, nil
+			}
+			txIndex++
+		}
 	}
 
-	t.retrier.RegisterTransaction(referenceBlock.Height, tx)
-}
-
-// ATTENTION: might be a source of problems in future. We run this code on finalization gorotuine,
-// potentially lagging finalization events if operations take long time.
-// We might need to move this logic on dedicated goroutine and provide a way to skip finalization events if they are delivered
-// too often for this engine. An example of similar approach - https://github.com/onflow/flow-go/blob/10b0fcbf7e2031674c00f3cdd280f27bd1b16c47/engine/common/follower/compliance_engine.go#L201..
-// No errors expected during normal operations.
-func (t *Transactions) ProcessFinalizedBlockHeight(height uint64) error {
-	return t.retrier.Retry(height)
+	// otherwise, assume it's a system transaction and return the ZeroID
+	return flow.ZeroID, nil
 }

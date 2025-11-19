@@ -32,6 +32,7 @@ type HotStuffFactory struct {
 	baseLogger     zerolog.Logger
 	me             module.Local
 	db             storage.DB
+	lockManager    storage.LockManager
 	protoState     protocol.State
 	engineMetrics  module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
@@ -43,6 +44,7 @@ func NewHotStuffFactory(
 	log zerolog.Logger,
 	me module.Local,
 	db storage.DB,
+	lockManager storage.LockManager,
 	protoState protocol.State,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
@@ -54,6 +56,7 @@ func NewHotStuffFactory(
 		baseLogger:     log,
 		me:             me,
 		db:             db,
+		lockManager:    lockManager,
 		protoState:     protoState,
 		engineMetrics:  engineMetrics,
 		mempoolMetrics: mempoolMetrics,
@@ -155,7 +158,7 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
-	persist, err := persister.New(f.db, cluster.ChainID())
+	persist, err := persister.New(f.db, cluster.ChainID(), f.lockManager)
 	if err != nil {
 		return nil, nil, err
 	}
