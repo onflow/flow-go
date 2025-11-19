@@ -186,7 +186,6 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages            bool
 	stopControlEnabled                    bool
 	registerDBPruneThreshold              uint64
-	scheduledCallbacksEnabled             bool
 	executionResultAgreeingExecutorsCount uint
 	executionResultRequiredExecutors      []string
 }
@@ -2409,14 +2408,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.State,
 					builder.TxResultErrorMessagesCore,
 				)
-			}).
-			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(
-					node.Metrics.Cache,
-					node.ProtocolDB,
-					bstorage.DefaultCacheSize,
-				)
-				return nil
 			}).
 			Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
 				processedTxErrorMessagesBlockHeight = store.NewConsumerProgress(
