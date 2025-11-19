@@ -33,6 +33,7 @@ var (
 	flagTracePath           string
 	flagLogTraces           bool
 	flagOnlyTraceCadence    bool
+	flagEntropyProvider     string
 )
 
 var Cmd = &cobra.Command{
@@ -71,6 +72,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagLogTraces, "log-traces", false, "log traces")
 
 	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
+
+	Cmd.Flags().StringVar(&flagEntropyProvider, "entropy-provider", "none", "entropy provider to use (default: none; options: none, block-hash)")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -174,7 +177,7 @@ func run(_ *cobra.Command, args []string) {
 			nil,
 			newSpanExporter,
 			flagComputeLimit,
-			nil,
+			fvmOptions(blockID),
 		)
 
 		if flagShowResult {
@@ -219,6 +222,22 @@ func run(_ *cobra.Command, args []string) {
 			}
 		}
 	}
+}
+
+func fvmOptions(blockID flow.Identifier) []fvm.Option {
+	var options []fvm.Option
+
+	switch flagEntropyProvider {
+	case "block-hash":
+		options = append(
+			options,
+			fvm.WithEntropyProvider(BlockHashEntropyProvider{
+				BlockHash: blockID,
+			}),
+		)
+	}
+
+	return options
 }
 
 func RunSingleTransaction(
@@ -274,7 +293,7 @@ func RunSingleTransaction(
 		nil,
 		newSpanExporter,
 		computeLimit,
-		nil,
+		fvmOptions(blockID),
 	)
 
 	for i, blockTx := range blockTransactions {
@@ -490,4 +509,15 @@ func RunTransaction(
 	}
 
 	return result
+}
+
+// BlockHashEntropyProvider implements environment.EntropyProvider
+// which provides a source of entropy to fvm context (required for Cadence's randomness),
+// by using the given block hash.
+type BlockHashEntropyProvider struct {
+	BlockHash flow.Identifier
+}
+
+func (p BlockHashEntropyProvider) RandomSource() ([]byte, error) {
+	return p.BlockHash[:], nil
 }

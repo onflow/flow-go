@@ -215,8 +215,8 @@ func compareBlock(
 	interBlockSnapshot := debug_tx.NewBlockSnapshot(remoteClient, header)
 
 	fvmOptions := []fvm.Option{
-		fvm.WithEntropyProvider(blockHashEntropyProvider{
-			blockHash: blockID,
+		fvm.WithEntropyProvider(debug_tx.BlockHashEntropyProvider{
+			BlockHash: blockID,
 		}),
 	}
 
@@ -492,15 +492,4 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 	}
 
 	return !mismatch
-}
-
-// `blockHashEntropyProvider implements `environment.EntropyProvider`
-// which provides a source of entropy to fvm context (required for Cadence's randomness),
-// by using the latest block hash.
-type blockHashEntropyProvider struct {
-	blockHash flow.Identifier
-}
-
-func (gen blockHashEntropyProvider) RandomSource() ([]byte, error) {
-	return gen.blockHash[:], nil
 }
