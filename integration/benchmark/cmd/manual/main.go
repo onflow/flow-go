@@ -161,7 +161,7 @@ func main() {
 	defer statsLogger.Stop()
 
 	log.Info().
-		Int("number_of_accounts", int(maxTPS)**accountMultiplierFlag).
+		Int("number_of_accounts", int(maxTPS)*(*accountMultiplierFlag)).
 		Uint("max_tps", maxTPS).
 		Msg("initializing load generator (this may take a while if creating many accounts)")
 
