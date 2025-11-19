@@ -12,11 +12,15 @@ scrape_configs:
   docker_sd_configs:
     - host: unix:///var/run/docker.sock
       refresh_interval: 5s
+      # leo: remove the following label, so that the logs from the containers
+      # created by the integration tests can also be forwarded to Loki, useful
+      # for debugging test failures.
+      #
       # Only keep containers that have a `com.dapperlabs.role` label.
-      filters:
-        - name: "label"
-          values:
-            - 'com.dapperlabs.role'
+      # filters:
+      #   - name: "label"
+      #     values:
+      #       - 'com.dapperlabs.role'
   relabel_configs:
     - regex: "__meta_docker_container_label_com_dapperlabs_(.+)"
       action: labelmap
