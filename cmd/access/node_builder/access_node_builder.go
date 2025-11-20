@@ -509,12 +509,12 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			node.ComplianceConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
@@ -539,11 +539,11 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
 			spamConfig,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
-		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return sync, nil
 	})
@@ -754,13 +754,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.Storage.Headers,
 				builder.executionDataConfig,
 				execDataDistributor,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
 			}
 			builder.ExecutionDataRequester = r
-
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
 			// to wait for the requester to be ready before starting.
@@ -2185,6 +2184,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.stateStreamBackend),
 				builder.stateStreamConf,
 				indexReporter,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, err
@@ -2197,10 +2197,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
 		})
+
 	builder.Component("execution data processor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		if builder.executionDataSyncEnabled && builder.collectionSync != "collection_only" {
 			node.Logger.Info().
@@ -2398,11 +2398,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					node.Storage.Headers,
 					processedTxErrorMessagesBlockHeight,
 					txResultErrorMessagesCore,
+					builder.FollowerDistributor,
 				)
 				if err != nil {
 					return nil, err
 				}
-				builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
 				return engine, nil
 			})
@@ -2418,11 +2418,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				node.Storage.Blocks,
 				builder.SyncCore,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
-			builder.FollowerDistributor.AddFinalizationConsumer(syncRequestHandler)
 
 			return syncRequestHandler, nil
 		})
