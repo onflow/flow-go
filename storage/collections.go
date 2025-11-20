@@ -54,6 +54,7 @@ type Collections interface {
 	// StoreAndIndexByTransaction stores the collection and indexes it by transaction.
 	// This is used by access node storing collections for finalized blocks.
 	//
+	// deprecated, only used by AN ingestion engine, which is deprecated
 	// CAUTION: current approach is NOT BFT and needs to be revised in the future.
 	// Honest clusters ensure a transaction can only belong to one collection. However, in rare
 	// cases, the collector clusters can exceed byzantine thresholds -- making it possible to

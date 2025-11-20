@@ -64,7 +64,13 @@ func (bp *BlockProcessor) FetchCollections(
 		return fmt.Errorf("failed to get missing collections for block height %d: %w", blockHeight, err)
 	}
 
-	// If no missing collections, block is complete
+	// If there are no missing collections, this block is considered complete.
+	// Caution: This relies on the assumption that:
+	// whenever a collection exists in storage, all of its transactions must have already been indexed.
+	// This assumption currently holds because transaction indexing by collection is always performed
+	// in the same batch that stores the collection (via collections.BatchStoreAndIndexByTransaction).
+	// Note: when we receives a collection, we need it in memory, and don't index until all collections
+	// of the block are received.
 	if len(missingGuarantees) == 0 {
 		done()
 		return nil

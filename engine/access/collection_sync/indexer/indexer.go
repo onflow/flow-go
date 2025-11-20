@@ -49,11 +49,11 @@ func NewBlockCollectionIndexer(
 //
 // No error returns are expected during normal operation.
 func (bci *blockCollectionIndexerImpl) IndexCollectionsForBlock(
-	blockHeight uint64,
+	_ uint64,
 	cols []*flow.Collection,
 ) error {
 	// Store and index collections
-	err := storage.WithLock(bci.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+	return storage.WithLock(bci.lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
 		return bci.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, collection := range cols {
 				// Store the collection, including constituent transactions, and index transactionID -> collectionID
@@ -68,15 +68,11 @@ func (bci *blockCollectionIndexerImpl) IndexCollectionsForBlock(
 			return nil
 		})
 	})
-	if err != nil {
-		return fmt.Errorf("failed to index collections for block height %d: %w", blockHeight, err)
-	}
-
-	return nil
 }
 
-// GetMissingCollections retrieves the block and returns collection guarantees that are missing.
-// Only collections that are not already in storage are returned.
+// GetMissingCollections retrieves the block and returns collection guarantees that whose collections
+// are missing in storage.
+// Only garantees whose collections that are not already in storage are returned.
 // No error returns are expected during normal operation.
 func (bci *blockCollectionIndexerImpl) GetMissingCollections(block *flow.Block) ([]*flow.CollectionGuarantee, error) {
 	var missingGuarantees []*flow.CollectionGuarantee
