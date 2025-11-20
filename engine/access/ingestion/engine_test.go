@@ -127,6 +127,7 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storagemock.ExecutionReceipts)
 	s.transactions = new(storagemock.Transactions)
 	s.results = new(storagemock.ExecutionResults)
+	s.results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	collectionsToMarkFinalized := stdmap.NewTimes(100)
 	collectionsToMarkExecuted := stdmap.NewTimes(100)
 	blocksToMarkExecuted := stdmap.NewTimes(100)
@@ -211,6 +212,8 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 		s.net,
 		s.proto.state,
 		s.me,
+		s.lockManager,
+		s.db,
 		s.blocks,
 		s.results,
 		s.receipts,
@@ -301,10 +304,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
-	for _, seal := range block.Payload.Seals {
-		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
-	}
+	s.blocks.On("BatchIndexBlockContainingCollectionGuarantees", mock.Anything, mock.Anything, block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 	missingCollectionCount := 4
 	wg := sync.WaitGroup{}
@@ -328,7 +328,6 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
-	s.results.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
 }
 
 // TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
@@ -388,7 +387,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
-		s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+		s.blocks.On("BatchIndexBlockContainingCollectionGuarantees", mock.Anything, mock.Anything, block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 		for _, cg := range block.Payload.Guarantees {
 			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -398,10 +397,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		}
 		// force should be called once
 		s.request.On("Force").Return().Once()
-
-		for _, seal := range block.Payload.Seals {
-			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
-		}
 	}
 
 	s.distributor.OnFinalizedBlock(&hotstuffBlock)
@@ -409,16 +404,13 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process all blocks before timeout")
 
 	expectedEntityByIDCalls := 0
-	expectedIndexCalls := 0
 	for _, block := range blocks {
 		expectedEntityByIDCalls += len(block.Payload.Guarantees)
-		expectedIndexCalls += len(block.Payload.Seals)
 	}
 
 	s.headers.AssertExpectations(s.T())
-	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockContainingCollectionGuarantees", newBlocksCount)
+	s.blocks.AssertNumberOfCalls(s.T(), "BatchIndexBlockContainingCollectionGuarantees", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
-	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
@@ -521,9 +513,9 @@ func (s *Suite) TestCollectionSyncing() {
 
 	// setup finalized block indexer mocks
 	guaranteeIDs := []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))
-	s.blocks.On("IndexBlockContainingCollectionGuarantees", block.ID(), guaranteeIDs).Return(nil).Once()
+	s.blocks.On("BatchIndexBlockContainingCollectionGuarantees", mock.Anything, mock.Anything, block.ID(), guaranteeIDs).Return(nil).Once()
 	for _, seal := range payload.Seals {
-		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
+		s.results.On("BatchIndex", mock.Anything, mock.Anything, seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
 
 	// initialize the engine using the initial finalized block

@@ -92,6 +92,7 @@ type Params struct {
 	Transactions             storage.Transactions
 	ExecutionReceipts        storage.ExecutionReceipts
 	ExecutionResults         storage.ExecutionResults
+	Seals                    storage.Seals
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
 	ScheduledTransactions    storage.ScheduledTransactionsReader
 	ChainID                  flow.ChainID
@@ -310,6 +311,7 @@ func New(params Params) (*Backend, error) {
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
+			seals:            params.Seals,
 		},
 		backendNetwork: backendNetwork{
 			state:                params.State,

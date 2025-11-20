@@ -196,6 +196,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		Headers:              suite.headers,
 		Collections:          suite.collections,
 		Transactions:         suite.transactions,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		AccessMetrics:        suite.metrics,
 		MaxHeightRange:       0,

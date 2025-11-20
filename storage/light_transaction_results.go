@@ -22,6 +22,7 @@ type LightTransactionResultsReader interface {
 
 	// ByBlockID gets all transaction results for a block, ordered by transaction index
 	// CAUTION: this function returns the empty list in case for block IDs without known results.
+	//
 	// No error returns are expected during normal operations.
 	ByBlockID(id flow.Identifier) ([]flow.LightTransactionResult, error)
 }
@@ -33,6 +34,8 @@ type LightTransactionResults interface {
 	// BatchStore persists and indexes all transaction results (light representation) for the given blockID
 	// as part of the provided batch. The caller must acquire [storage.LockInsertLightTransactionResult] and
 	// hold it until the write batch has been committed.
-	// It returns [storage.ErrAlreadyExists] if light transaction results for the block already exist.
+	//
+	// Expected error returns during normal operation:
+	//   - [storage.ErrAlreadyExists] if light transaction results for the block already exist.
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.LightTransactionResult) error
 }

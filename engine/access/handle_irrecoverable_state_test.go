@@ -67,6 +67,7 @@ type IrrecoverableStateTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+	seals        *storagemock.Seals
 
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
@@ -91,6 +92,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.transactions = storagemock.NewTransactions(suite.T())
 	suite.collections = storagemock.NewCollections(suite.T())
 	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
+	suite.seals = storagemock.NewSeals(suite.T())
 
 	suite.collClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.execClient = accessmock.NewExecutionAPIClient(suite.T())
@@ -153,6 +155,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		Headers:              suite.headers,
 		Collections:          suite.collections,
 		Transactions:         suite.transactions,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		AccessMetrics:        suite.metrics,
 		MaxHeightRange:       0,

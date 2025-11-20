@@ -2125,6 +2125,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:          notNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
+				Seals:                 node.Storage.Seals,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
 				ScheduledTransactions: builder.scheduledTransactions,          // might be nil
 				ChainID:               node.RootChainID,
@@ -2266,6 +2267,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.EngineRegistry,
 				node.State,
 				node.Me,
+				node.StorageLockMgr,
+				node.ProtocolDB,
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
