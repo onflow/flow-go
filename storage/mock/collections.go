@@ -76,6 +76,34 @@ func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	return r0, r1
 }
 
+// ExistByID provides a mock function with given fields: collID
+func (_m *Collections) ExistByID(collID flow.Identifier) (bool, error) {
+	ret := _m.Called(collID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExistByID")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (bool, error)); ok {
+		return rf(collID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(collID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // LightByID provides a mock function with given fields: collID
 func (_m *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, error) {
 	ret := _m.Called(collID)

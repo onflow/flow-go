@@ -74,3 +74,26 @@ func (bci *blockCollectionIndexerImpl) IndexCollectionsForBlock(
 
 	return nil
 }
+
+// GetMissingCollections retrieves the block and returns collection guarantees that are missing.
+// Only collections that are not already in storage are returned.
+// No error returns are expected during normal operation.
+func (bci *blockCollectionIndexerImpl) GetMissingCollections(block *flow.Block) ([]*flow.CollectionGuarantee, error) {
+	var missingGuarantees []*flow.CollectionGuarantee
+	for _, guarantee := range block.Payload.Guarantees {
+		// Check if collection already exists in storage
+		exists, err := bci.collections.ExistByID(guarantee.CollectionID)
+		if err != nil {
+			// Unexpected error
+			return nil, fmt.Errorf("failed to check if collection %v exists: %w", guarantee.CollectionID, err)
+		}
+
+		if !exists {
+			// Collection is missing
+			missingGuarantees = append(missingGuarantees, guarantee)
+		}
+		// If collection exists, skip it
+	}
+
+	return missingGuarantees, nil
+}

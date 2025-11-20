@@ -35,6 +35,10 @@ type BlockCollectionIndexer interface {
 	// IndexCollectionsForBlock stores and indexes collections for a given block height.
 	// No error is exepcted during normal operation.
 	IndexCollectionsForBlock(blockHeight uint64, cols []*flow.Collection) error
+
+	// GetMissingCollections retrieves the block and returns collection guarantees that are missing.
+	// Only collections that are not already in storage are returned.
+	GetMissingCollections(block *flow.Block) ([]*flow.CollectionGuarantee, error)
 }
 
 // Implements the job lifecycle for a single block height.

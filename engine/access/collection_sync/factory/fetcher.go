@@ -40,7 +40,6 @@ type CreateFetcherConfig struct {
 //   - state: Protocol state
 //   - me: Local node identity
 //   - blocks: Blocks storage
-//   - collections: Collections storage
 //   - guarantees: Guarantees storage
 //   - db: Database for storage operations
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
@@ -58,7 +57,6 @@ func CreateFetcher(
 	state protocol.State,
 	me module.Local,
 	blocks storage.Blocks,
-	collStore storage.Collections,
 	guarantees storage.Guarantees,
 	db storage.DB,
 	indexer collection_sync.BlockCollectionIndexer,
@@ -99,8 +97,6 @@ func CreateFetcher(
 		mcq,
 		indexer,
 		collectionRequester,
-		blocks,
-		collStore,
 	)
 
 	// Register handler for received collections

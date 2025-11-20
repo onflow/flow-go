@@ -2667,7 +2667,6 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				node.State,
 				node.Me,
 				node.Storage.Blocks,
-				node.Storage.Collections,
 				node.Storage.Guarantees,
 				builder.ProtocolDB,
 				notNil(builder.blockCollectionIndexer),

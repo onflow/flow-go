@@ -8,18 +8,15 @@ import (
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/storage"
 )
 
 // BlockProcessor implements the job lifecycle for collection indexing.
 // It orchestrates the flow: request → receive → index → complete.
 type BlockProcessor struct {
-	log         zerolog.Logger
-	mcq         collection_sync.MissingCollectionQueue
-	indexer     collection_sync.BlockCollectionIndexer
-	requester   collection_sync.CollectionRequester
-	blocks      storage.Blocks
-	collections storage.CollectionsReader
+	log       zerolog.Logger
+	mcq       collection_sync.MissingCollectionQueue
+	indexer   collection_sync.BlockCollectionIndexer
+	requester collection_sync.CollectionRequester
 }
 
 var _ collection_sync.BlockProcessor = (*BlockProcessor)(nil)
@@ -31,9 +28,6 @@ var _ collection_sync.BlockProcessor = (*BlockProcessor)(nil)
 //   - mcq: MissingCollectionQueue for tracking missing collections and callbacks
 //   - indexer: BlockCollectionIndexer for storing and indexing collections
 //   - requester: CollectionRequester for requesting collections from the network
-//   - blocks: Blocks storage for retrieving block data
-//   - collections: Collections storage reader for checking if collections already exist
-//     Set to a very large value to effectively disable fetching and rely only on EDI.
 //
 // No error returns are expected during normal operation.
 func NewBlockProcessor(
@@ -41,16 +35,12 @@ func NewBlockProcessor(
 	mcq collection_sync.MissingCollectionQueue,
 	indexer collection_sync.BlockCollectionIndexer,
 	requester collection_sync.CollectionRequester,
-	blocks storage.Blocks,
-	collections storage.CollectionsReader,
 ) *BlockProcessor {
 	return &BlockProcessor{
-		log:         log.With().Str("component", "coll_fetcher").Logger(),
-		mcq:         mcq,
-		indexer:     indexer,
-		requester:   requester,
-		blocks:      blocks,
-		collections: collections,
+		log:       log.With().Str("component", "coll_fetcher").Logger(),
+		mcq:       mcq,
+		indexer:   indexer,
+		requester: requester,
 	}
 }
 
@@ -69,7 +59,7 @@ func (bp *BlockProcessor) FetchCollections(
 		Msg("processing collection fetching job for finalized block")
 
 	// Get missing collections for this block
-	missingGuarantees, err := bp.getMissingCollections(block)
+	missingGuarantees, err := bp.indexer.GetMissingCollections(block)
 	if err != nil {
 		return fmt.Errorf("failed to get missing collections for block height %d: %w", blockHeight, err)
 	}
@@ -148,28 +138,6 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 	}
 
 	return nil
-}
-
-// getMissingCollections retrieves the block and returns collection guarantees that are missing.
-// Only collections that are not already in storage are returned.
-func (bp *BlockProcessor) getMissingCollections(block *flow.Block) ([]*flow.CollectionGuarantee, error) {
-	var missingGuarantees []*flow.CollectionGuarantee
-	for _, guarantee := range block.Payload.Guarantees {
-		// Check if collection already exists in storage
-		exists, err := bp.collections.ExistByID(guarantee.CollectionID)
-		if err != nil {
-			// Unexpected error
-			return nil, fmt.Errorf("failed to check if collection %v exists: %w", guarantee.CollectionID, err)
-		}
-
-		if !exists {
-			// Collection is missing
-			missingGuarantees = append(missingGuarantees, guarantee)
-		}
-		// If collection exists, skip it
-	}
-
-	return missingGuarantees, nil
 }
 
 // MissingCollectionQueueSize returns the number of missing collections currently in the queue.
