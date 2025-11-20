@@ -75,6 +75,11 @@ func NewAccountsBackend(
 // GetAccount returns the account details at the latest sealed block.
 // Alias for GetAccountAtLatestBlock
 //
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
 //   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
@@ -89,6 +94,11 @@ func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, criteri
 }
 
 // GetAccountAtLatestBlock returns the account details at the latest sealed block.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -134,6 +144,11 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 }
 
 // GetAccountAtBlockHeight returns the account details at the given block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -185,6 +200,11 @@ func (a *Accounts) GetAccountAtBlockHeight(
 
 // GetAccountBalanceAtLatestBlock returns the account balance at the latest sealed block.
 //
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
 //   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
@@ -230,6 +250,11 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 }
 
 // GetAccountBalanceAtBlockHeight returns the account balance at the given block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -281,6 +306,11 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 
 // GetAccountKeyAtLatestBlock returns the account public key at the latest sealed block.
 //
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
 //   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
@@ -330,6 +360,11 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 }
 
 // GetAccountKeyAtBlockHeight returns the account public key by key index at the given block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -382,6 +417,11 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 
 // GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
 //
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
 //   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
@@ -430,6 +470,11 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 }
 
 // GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
