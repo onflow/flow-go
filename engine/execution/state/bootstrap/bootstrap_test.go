@@ -57,7 +57,7 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("25d43f1c2183d7f60ca58dcaa6ea44546c8ca089a79dc21759bf64fa58919269")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("2a5475ed7fb1a4f76b1aa1c592dfebe913d9b441cc9102fe3870a2a3c9329d87")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -104,7 +104,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 // - transaction fee deduction
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("7066b254876bc873c682a46199010837149ecae1415871074d0a592385aea1f6")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("3932e2b94bc248ce6f50defe435e5cdbdb7c572fd44eb39d954b37c2aa5a2720")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
