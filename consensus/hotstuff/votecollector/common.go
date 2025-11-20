@@ -46,21 +46,27 @@ func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 	return nil
 }
 
+// ConcurrentIdentifierSet implements a simple set for tracking unique entries by identifier.
+// Concurrency safe.
 type ConcurrentIdentifierSet struct {
 	set  map[flow.Identifier]struct{}
 	lock sync.RWMutex
 }
 
+// NewConcurrentIdentifierSet creates new instance of identifier set.
 func NewConcurrentIdentifierSet() *ConcurrentIdentifierSet {
 	return &ConcurrentIdentifierSet{
 		set: make(map[flow.Identifier]struct{}),
 	}
 }
 
+// Add adds identifier to the internal set, returns true when added, otherwise returns false.
 func (s *ConcurrentIdentifierSet) Add(identifier flow.Identifier) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	_, exists := s.set[identifier]
-	s.set[identifier] = struct{}{}
+	if !exists {
+		s.set[identifier] = struct{}{}
+	}
 	return !exists
 }
