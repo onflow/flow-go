@@ -61,5 +61,6 @@ func (s *ConcurrentIdentifierSet) Add(identifier flow.Identifier) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	_, exists := s.set[identifier]
+	s.set[identifier] = struct{}{}
 	return !exists
 }

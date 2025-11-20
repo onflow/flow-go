@@ -1118,9 +1118,9 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	leaderDifferentVote, err := stakingSigner.CreateVote(block)
 	require.NoError(t, err)
 
-	// construct a double vote, same view, but different block ID
+	// construct an equivocating vote, same view, but different block ID
 	otherBlock := helper.MakeBlock(helper.WithBlockView(block.View))
-	leaderDoubleVote, err := rbSigner.CreateVote(otherBlock)
+	leaderDifferentBlockVote, err := rbSigner.CreateVote(otherBlock)
 	require.NoError(t, err)
 
 	onQCCreated := func(qc *flow.QuorumCertificate) {
@@ -1149,14 +1149,13 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	})
 	t.Run("vote for different block", func(t *testing.T) {
 		// process the double vote, this has to result in an error.
-		err = voteProcessor.Process(leaderDifferentVote)
-		require.Error(t, err)
-		require.True(t, model.IsDoubleVoteError(err))
+		err = voteProcessor.Process(leaderDifferentBlockVote)
+		require.ErrorAs(t, err, &VoteForIncompatibleBlockError)
 	})
 	t.Run("vote for same block with different signature scheme", func(t *testing.T) {
 		// process the double vote, this has to result in an error.
-		err = voteProcessor.Process(leaderDoubleVote)
+		err = voteProcessor.Process(leaderDifferentVote)
 		require.Error(t, err)
-		require.True(t, model.IsDoubleVoteError(err))
+		require.True(t, model.IsDuplicatedSignerError(err))
 	})
 }
