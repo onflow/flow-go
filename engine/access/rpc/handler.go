@@ -824,7 +824,19 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 	}, nil
 }
 
-// ExecuteScriptAtLatestBlock executes a script at a the latest block.
+// ExecuteScriptAtLatestBlock executes a script at the latest block.
+//
+// Expected error returns during normal operations:
+//   - [codes.InvalidArgument] - if the request had invalid arguments.
+//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [codes.NotFound] - if data required to process the request is not available.
+//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
+//   - [codes.FailedPrecondition] - if data for block is not available.
+//   - [codes.Canceled] - if the script execution was canceled.
+//   - [codes.DeadlineExceeded] - if the script execution timed out.
+//   - [codes.Unavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [codes.Internal] - for internal failures or index conversion errors.
 func (h *Handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.ExecuteScriptAtLatestBlockRequest,
@@ -836,10 +848,20 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 
 	script := req.GetScript()
 	arguments := req.GetArguments()
+	executionState := req.GetExecutionStateQuery()
 
-	value, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
+	value, executorMetadata, err := h.api.ExecuteScriptAtLatestBlock(
+		ctx,
+		script,
+		arguments,
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
@@ -849,6 +871,18 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 }
 
 // ExecuteScriptAtBlockHeight executes a script at a specific block height.
+//
+// Expected error returns during normal operations:
+//   - [codes.InvalidArgument] - if the request had invalid arguments.
+//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [codes.NotFound] - if data required to process the request is not available.
+//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
+//   - [codes.FailedPrecondition] - if data for block is not available.
+//   - [codes.Canceled] - if the script execution was canceled.
+//   - [codes.DeadlineExceeded] - if the script execution timed out.
+//   - [codes.Unavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [codes.Internal] - for internal failures or index conversion errors.
 func (h *Handler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.ExecuteScriptAtBlockHeightRequest,
@@ -861,10 +895,21 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
+	executionState := req.GetExecutionStateQuery()
 
-	value, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
+	value, executorMetadata, err := h.api.ExecuteScriptAtBlockHeight(
+		ctx,
+		blockHeight,
+		script,
+		arguments,
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
@@ -874,6 +919,18 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 }
 
 // ExecuteScriptAtBlockID executes a script at a specific block ID.
+//
+// Expected error returns during normal operations:
+//   - [codes.InvalidArgument] - if the request had invalid arguments.
+//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [codes.NotFound] - if data required to process the request is not available.
+//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
+//   - [codes.FailedPrecondition] - if data for block is not available.
+//   - [codes.Canceled] - if the script execution was canceled.
+//   - [codes.DeadlineExceeded] - if the script execution timed out.
+//   - [codes.Unavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [codes.Internal] - for internal failures or index conversion errors.
 func (h *Handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *accessproto.ExecuteScriptAtBlockIDRequest,
@@ -885,10 +942,21 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
+	executionState := req.GetExecutionStateQuery()
 
-	value, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+	value, executorMetadata, err := h.api.ExecuteScriptAtBlockID(
+		ctx,
+		blockID,
+		script,
+		arguments,
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.ExecuteScriptResponse{
@@ -1531,9 +1599,10 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 }
 
 // buildMetadataResponse builds and returns the metadata response object.
+//
 // Expected error returns during normal operation:
-//   - [codes.NotFound]: Result cannot be provided by storage due to the absence of data.
-//   - [storage.ErrHeightNotIndexed]: Data is unavailable.
+//   - [codes.NotFound] - if result cannot be provided by storage due to the absence of data.
+//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
 func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()

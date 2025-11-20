@@ -1282,7 +1282,10 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		err = unittest.WithLocks(suite.T(), suite.lockManager, []string{storage.LockInsertBlock, storage.LockFinalizeBlock}, func(ctx lockctx.Context) error {
+		err = unittest.WithLocks(suite.T(), suite.lockManager, []string{
+			storage.LockInsertBlock,
+			storage.LockFinalizeBlock,
+		}, func(ctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := all.Blocks.BatchStore(ctx, rw, unittest.ProposalFromBlock(prevBlock))
 				if err != nil {
@@ -1345,6 +1348,9 @@ func (suite *Suite) TestExecuteScript() {
 				On("AtBlockID", lastBlock.ID()).
 				Return(suite.sealedSnapshot, nil)
 
+			suite.executionResultInfoProvider.On("ExecutionResultInfo", lastBlock.ID(), mock.Anything).
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
+
 			expectedResp := setupExecClientMock(lastBlock.ID())
 			req := accessproto.ExecuteScriptAtLatestBlockRequest{
 				Script: script,
@@ -1354,14 +1360,16 @@ func (suite *Suite) TestExecuteScript() {
 		})
 
 		suite.Run("execute script at block id", func() {
+			blockID := prevBlock.ID()
 			suite.state.
-				On("AtBlockID", prevBlock.ID()).
+				On("AtBlockID", blockID).
 				Return(suite.sealedSnapshot, nil)
+			suite.executionResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
 
-			expectedResp := setupExecClientMock(prevBlock.ID())
-			id := prevBlock.ID()
+			expectedResp := setupExecClientMock(blockID)
 			req := accessproto.ExecuteScriptAtBlockIDRequest{
-				BlockId: id[:],
+				BlockId: blockID[:],
 				Script:  script,
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockID(ctx, &req)
@@ -1369,11 +1377,15 @@ func (suite *Suite) TestExecuteScript() {
 		})
 
 		suite.Run("execute script at block height", func() {
+			blockID := prevBlock.ID()
 			suite.state.
-				On("AtBlockID", prevBlock.ID()).
+				On("AtBlockID", blockID).
 				Return(suite.sealedSnapshot, nil)
 
-			expectedResp := setupExecClientMock(prevBlock.ID())
+			suite.executionResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
+
+			expectedResp := setupExecClientMock(blockID)
 			req := accessproto.ExecuteScriptAtBlockHeightRequest{
 				BlockHeight: prevBlock.Height,
 				Script:      script,
