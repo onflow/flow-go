@@ -84,7 +84,7 @@ func NewStateMachine(
 
 // AddVote adds a vote to current vote collector
 // All expected errors are handled via callbacks to notifier.
-// Under normal execution only exceptions are propagated to caller.
+// No errors are expected during normal operation.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
 	unique, err := m.ensureVoteUnique(vote)
@@ -103,6 +103,17 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	return nil
 }
 
+// ensureVoteUnique caches the vote in the votesCache. Additionally, it's responsible for reporting byzantine behavior when
+// byzantine leader or replica has provided an equivocating vote. All votes that are different from the original one(by same signer)
+// are reported as equivocation attempt.
+// ATTENTION: In order to guarantee that all equivocation attempts will be caught this function needs to be called before
+// processing individual votes and block proposals.
+// Possible return values:
+//   - (true, nil) - provided vote was first from given signer ID
+//   - (false, nil) - there is another vote in the cache that was previously added by given signer ID
+//   - (false, error) - exception during processing.
+//
+// No errors are expected during normal operations.
 func (m *VoteCollector) ensureVoteUnique(vote *model.Vote) (bool, error) {
 	err := m.votesCache.AddVote(vote)
 	if err != nil {
