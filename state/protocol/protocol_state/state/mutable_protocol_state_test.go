@@ -109,7 +109,7 @@ func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultin
 	// expect calls to prepare a deferred update for indexing and storing the resulting state:
 	// as state has not changed, we expect the parent blocks protocol state ID
 	if stateChangeExpected {
-		s.protocolKVStoreDB.On("BatchStore", mock.Anything, rw, expectedResultingStateID, &s.evolvingState).Return(nil).Once()
+		s.protocolKVStoreDB.On("BatchStore", rw, expectedResultingStateID, &s.evolvingState).Return(nil).Once()
 	}
 
 	deferredDBOps := deferred.NewDeferredBlockPersist()
@@ -553,7 +553,7 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 
 	rw := storagemock.NewReaderBatchWriter(s.T())
 	s.protocolKVStoreDB.On("BatchIndex", mock.Anything, mock.Anything, s.candidate.ID(), expectedResultingStateID).Return(nil).Once()
-	s.protocolKVStoreDB.On("BatchStore", mock.Anything, mock.Anything, expectedResultingStateID, &s.evolvingState).Return(exception).Once()
+	s.protocolKVStoreDB.On("BatchStore", mock.Anything, expectedResultingStateID, &s.evolvingState).Return(exception).Once()
 
 	deferredDBOps := deferred.NewDeferredBlockPersist()
 	_, err := s.mutableState.EvolveState(deferredDBOps, s.candidate.ParentID, s.candidate.View, []*flow.Seal{})

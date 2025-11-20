@@ -85,10 +85,14 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 	}
 }
 
+// ExecutionDataFetchStarted records an in-progress download
 func (ec *ExecutionDataRequesterCollector) ExecutionDataFetchStarted() {
 	ec.downloadsInProgress.Inc()
 }
 
+// ExecutionDataFetchFinished records a completed download
+// Pass the highest consecutive height to ensure the metrics reflect the height up to which the
+// requester has completed downloads. This allows us to easily see when downloading gets stuck.
 func (ec *ExecutionDataRequesterCollector) ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64) {
 	ec.downloadsInProgress.Dec()
 	ec.fetchDuration.Observe(float64(duration.Milliseconds()))
@@ -100,11 +104,13 @@ func (ec *ExecutionDataRequesterCollector) ExecutionDataFetchFinished(duration t
 	}
 }
 
+// NotificationSent records that ExecutionData received notifications were sent for a block height
 func (ec *ExecutionDataRequesterCollector) NotificationSent(height uint64) {
 	ec.outstandingNotifications.Dec()
 	ec.highestNotificationHeight.Set(float64(height))
 }
 
+// FetchRetried records that a download retry was processed
 func (ec *ExecutionDataRequesterCollector) FetchRetried() {
 	ec.downloadRetries.Inc()
 }

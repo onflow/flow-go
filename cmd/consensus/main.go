@@ -396,6 +396,7 @@ func main() {
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
 				node.ProtocolDB,
+				node.StorageLockMgr,
 				node.Logger,
 			)
 			if err != nil {
@@ -621,7 +622,7 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist, err := persister.New(node.ProtocolDB, node.RootChainID)
+			persist, err := persister.New(node.ProtocolDB, node.RootChainID, node.StorageLockMgr)
 			if err != nil {
 				return nil, err
 			}

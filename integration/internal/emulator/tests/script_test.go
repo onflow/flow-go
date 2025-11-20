@@ -237,7 +237,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 
 		t.Parallel()
 
-		const limit = 19000
+		const limit = 25000
 		b, err := emulator.New(
 			emulator.WithScriptGasLimit(limit),
 		)

@@ -254,9 +254,12 @@ func (bs *BuilderSuite) SetupTest() {
 
 	lockManager := storage.NewTestingLockManager()
 
-	// insert finalized height and root height
+	// Insert finalized height and root height:
+	// Currently, we need locks [storage.LockInsertInstanceParams] and [storage.LockFinalizeBlock]. However, the lock policy only permits the locking
+	// order [storage.LockInsertInstanceParams] → [storage.LockIndexExecutionResult] → [storage.LockInsertBlock] → [storage.LockFinalizeBlock]. Hence,
+	// we acquire all 4 locks in that order.
 	db := bs.db
-	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockFinalizeBlock, storage.LockBootstrapping}, func(lctx lockctx.Context) error {
+	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockInsertInstanceParams, storage.LockIndexExecutionResult, storage.LockInsertBlock, storage.LockFinalizeBlock}, func(lctx lockctx.Context) error {
 		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			enc, err := datastore.NewVersionedInstanceParams(
 				datastore.DefaultInstanceParamsVersion,

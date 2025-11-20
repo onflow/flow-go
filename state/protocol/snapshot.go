@@ -111,6 +111,10 @@ type Snapshot interface {
 	// The IDs are ordered such that parents are included before their children.
 	// Since all blocks are fully validated before being inserted to the state,
 	// all returned blocks are validated.
+	//
+	// CAUTION: the list of descendants is constructed for each call via database reads,
+	// and may be expensive to compute, especially if the reference block is older.
+	//
 	// No errors are expected under normal operation.
 	Descendants() ([]flow.Identifier, error)
 

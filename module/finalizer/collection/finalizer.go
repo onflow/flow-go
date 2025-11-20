@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
@@ -120,7 +119,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			step := steps[i]
 			var payload cluster.Payload
 			// This does not require a lock, as a block's payload once set never changes.
-			err = procedure.RetrieveClusterPayload(rw.GlobalReader(), clusterBlockID, &payload)
+			err = operation.RetrieveClusterPayload(rw.GlobalReader(), clusterBlockID, &payload)
 			if err != nil {
 				return fmt.Errorf("could not retrieve payload for cluster block (id=%x): %w", clusterBlockID, err)
 			}
@@ -133,7 +132,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// finalize the block in cluster state
-			err = procedure.FinalizeClusterBlock(lctx, rw, clusterBlockID)
+			err = operation.FinalizeClusterBlock(lctx, rw, clusterBlockID)
 			if err != nil {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}

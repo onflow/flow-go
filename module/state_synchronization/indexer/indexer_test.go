@@ -3,26 +3,27 @@ package indexer
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	mempoolmock "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
-const testTimeout = 300 * time.Millisecond
+const testTimeout = 2 * time.Second
 
 type indexerTest struct {
 	blocks        []*flow.Block
@@ -30,15 +31,14 @@ type indexerTest struct {
 	registers     *storagemock.RegisterIndex
 	indexTest     *indexCoreTest
 	worker        *Indexer
-	executionData *mempool.Mempool[flow.Identifier, *execution_data.BlockExecutionDataEntity]
+	executionData *mempoolmock.Mempool[flow.Identifier, *execution_data.BlockExecutionDataEntity]
 	t             *testing.T
 }
 
 // newIndexerTest set up a jobqueue integration test with the worker.
 // It will create blocks fixtures with the length provided as availableBlocks, and it will set heights already
 // indexed to lastIndexedIndex value. Using run it should index all the remaining blocks up to all available blocks.
-func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *indexerTest {
-	blocks := unittest.BlockchainFixture(availableBlocks)
+func newIndexerTest(t *testing.T, g *fixtures.GeneratorSuite, blocks []*flow.Block, lastIndexedIndex int) *indexerTest {
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[lastIndexedIndex].Height
 	progress := newMockProgress()
@@ -47,7 +47,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 
 	registers := storagemock.NewRegisterIndex(t)
 
-	indexerCoreTest := newIndexCoreTest(t, blocks, nil).
+	indexerCoreTest := newIndexCoreTest(t, g, blocks, nil).
 		setLastHeight(func(t *testing.T) uint64 {
 			i, err := progress.ProcessedIndex()
 			require.NoError(t, err)
@@ -59,7 +59,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		useDefaultTransactionResults().
 		initIndexer()
 
-	executionData := &mempool.Mempool[flow.Identifier, *execution_data.BlockExecutionDataEntity]{}
+	executionData := mempoolmock.NewMempool[flow.Identifier, *execution_data.BlockExecutionDataEntity](t)
 	exeCache := cache.NewExecutionDataCache(
 		mock.NewExecutionDataStore(t),
 		indexerCoreTest.indexer.headers,
@@ -90,12 +90,6 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	return test
 }
 
-func (w *indexerTest) setBlockDataGet(f func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)) {
-	w.executionData.
-		On("Get", mocks.AnythingOfType("flow.Identifier")).
-		Return(f)
-}
-
 func (w *indexerTest) latestHeight() (uint64, error) {
 	return w.last().Height, nil
 }
@@ -115,9 +109,12 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 
 	w.worker.OnExecutionData(nil)
 
-	// wait for end to be reached
-	<-w.progress.WaitForIndex(reachHeight)
-	cancel()
+	select {
+	case <-ctx.Done():
+		return
+	case <-w.progress.WaitForIndex(reachHeight):
+		cancel()
+	}
 
 	unittest.RequireCloseBefore(w.t, w.worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
 }
@@ -177,87 +174,103 @@ func (w *mockProgress) WaitForIndex(n uint64) <-chan struct{} {
 }
 
 func TestIndexer_Success(t *testing.T) {
+	g := fixtures.NewGeneratorSuite()
+	blocks := g.Blocks().List(10)
+
+	systemCollections, err := systemcollection.NewVersioned(g.ChainID().Chain(), systemcollection.Default(g.ChainID()))
+	require.NoError(t, err)
+
+	systemCollection, err := systemCollections.
+		ByHeight(math.MaxUint64). // use the latest version
+		SystemCollection(g.ChainID().Chain(), nil)
+	require.NoError(t, err)
+
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
-	blocks := 10
 	lastIndexedIndex := 5
-	test := newIndexerTest(t, blocks, lastIndexedIndex)
+	test := newIndexerTest(t, g, blocks, lastIndexedIndex)
 
-	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
-		collection := unittest.CollectionFixture(0)
-		ed := &execution_data.BlockExecutionData{
-			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
-				Collection: &collection,
-				TrieUpdate: trie,
-			}},
-		}
+	for _, block := range blocks[lastIndexedIndex+1:] {
+		blockID := block.ID()
+		collection := g.Collections().Fixture()
+		ed := execution_data.NewBlockExecutionDataEntity(g.Identifiers().Fixture(),
+			&execution_data.BlockExecutionData{
+				BlockID: blockID,
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection:         collection,
+						TransactionResults: g.LightTransactionResults().ForTransactions(collection.Transactions),
+					},
+					{
+						Collection:         systemCollection,
+						TransactionResults: g.LightTransactionResults().ForTransactions(systemCollection.Transactions),
+					},
+				},
+			})
 
-		// create this to capture the closure of the creation of block execution data, so we can for each returned
-		// block execution data make sure the store of registers will match what the execution data returned and
-		// also that the height was correct
-		test.indexTest.setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-			var blockHeight uint64
-			for _, b := range test.blocks {
-				if b.ID() == ID {
-					blockHeight = b.Height
-				}
-			}
-
-			assert.Equal(t, blockHeight, height)
-			trieRegistersPayloadComparer(t, trie.Payloads, entries)
-			return nil
-		})
-
-		return execution_data.NewBlockExecutionDataEntity(ID, ed), true
-	})
+		test.executionData.On("Get", blockID).Return(ed, true).Once()
+		test.indexTest.collectionIndexer.On("IndexCollections", ed.StandardCollections()).Return(nil).Once()
+		test.indexTest.registers.On("Store", flow.RegisterEntries{}, block.Height).Return(nil).Once()
+	}
 
 	signalerCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
 	lastHeight := test.blocks[len(test.blocks)-1].Height
 	test.run(signalerCtx, lastHeight, cancel)
-
-	// make sure store was called correct number of times
-	test.indexTest.registers.AssertNumberOfCalls(t, "Store", blocks-lastIndexedIndex-1)
 }
 
 func TestIndexer_Failure(t *testing.T) {
+	g := fixtures.NewGeneratorSuite()
+	blocks := g.Blocks().List(10)
+
+	systemCollections, err := systemcollection.NewVersioned(g.ChainID().Chain(), systemcollection.Default(g.ChainID()))
+	require.NoError(t, err)
+
+	systemCollection, err := systemCollections.
+		ByHeight(math.MaxUint64). // use the latest version
+		SystemCollection(g.ChainID().Chain(), nil)
+	require.NoError(t, err)
+
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
-	blocks := 10
 	lastIndexedIndex := 5
-	test := newIndexerTest(t, blocks, lastIndexedIndex)
-
-	test.setBlockDataGet(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
-		collection := unittest.CollectionFixture(0)
-		ed := &execution_data.BlockExecutionData{
-			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
-				Collection: &collection,
-				TrieUpdate: trie,
-			}},
-		}
-
-		// fail when trying to persist registers
-		test.indexTest.setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-			return fmt.Errorf("error persisting data")
-		})
-
-		return execution_data.NewBlockExecutionDataEntity(ID, ed), true
-	})
+	test := newIndexerTest(t, g, blocks, lastIndexedIndex)
 
 	// make sure the error returned is as expected
-	expectedErr := fmt.Errorf(
-		"failed to index block data at height %d: %w",
-		test.blocks[lastIndexedIndex].Height+1,
-		fmt.Errorf(
-			"could not index register payloads at height %d: %w", test.blocks[lastIndexedIndex].Height+1, fmt.Errorf("error persisting data")),
-	)
+	expectedErr := fmt.Errorf("error persisting data")
 
-	_, cancel := context.WithCancel(context.Background())
-	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr)
-	lastHeight := test.blocks[lastIndexedIndex].Height
+	lastHeight := blocks[len(blocks)-1].Height
+	for _, block := range blocks[lastIndexedIndex+1:] {
+		blockID := block.ID()
+		collection := g.Collections().Fixture()
+		ed := execution_data.NewBlockExecutionDataEntity(g.Identifiers().Fixture(),
+			&execution_data.BlockExecutionData{
+				BlockID: blockID,
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection:         collection,
+						TransactionResults: g.LightTransactionResults().ForTransactions(collection.Transactions),
+					},
+					{
+						Collection:         systemCollection,
+						TransactionResults: g.LightTransactionResults().ForTransactions(systemCollection.Transactions),
+					},
+				},
+			})
+
+		test.executionData.On("Get", blockID).Return(ed, true).Once()
+		test.indexTest.collectionIndexer.On("IndexCollections", ed.StandardCollections()).Return(nil).Once()
+
+		// return an error on the last block to trigger the error path
+		if block.Height == lastHeight {
+			test.indexTest.registers.On("Store", flow.RegisterEntries{}, block.Height).Return(expectedErr).Once()
+		} else {
+			test.indexTest.registers.On("Store", flow.RegisterEntries{}, block.Height).Return(nil).Once()
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContextWithCallback(t, ctx, func(err error) {
+		// the indexer will never reach the last height, so cancel the context to avoid hanging
+		cancel()
+		require.ErrorIs(t, err, expectedErr)
+	})
 	test.run(signalerCtx, lastHeight, cancel)
-
-	// make sure store was called correct number of times
-	test.indexTest.registers.AssertNumberOfCalls(t, "Store", 1) // it fails after first run
 }

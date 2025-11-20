@@ -29,7 +29,6 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 	// On the happy path, where the input `kvState` encodes its state successfully, the wrapped store
 	// should be called to persist the version-encoded snapshot.
 	t.Run("happy path", func(t *testing.T) {
-		lockManager := storage.NewTestingLockManager()
 		expectedVersion := uint64(13)
 		encData := unittest.RandomBytes(117)
 		versionedSnapshot := &flow.PSKeyValueStoreData{
@@ -38,32 +37,26 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		}
 		kvState.On("VersionedEncode").Return(expectedVersion, encData, nil).Once()
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			rw := storagemock.NewReaderBatchWriter(t)
-			llStorage.On("BatchStore", lctx, rw, kvStateID, versionedSnapshot).Return(nil).Once()
+		rw := storagemock.NewReaderBatchWriter(t)
+		llStorage.On("BatchStore", rw, kvStateID, versionedSnapshot).Return(nil).Once()
 
-			// TODO: potentially update - we might be bringing back a functor here, because we acquire a lock  as explained in slack thread https://flow-foundation.slack.com/archives/C071612SJJE/p1754600182033289?thread_ts=1752912083.194619&cid=C071612SJJE
-			// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
-			// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
-			// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
-			// and verify that the deferred database operation returned by the lower-level is actually reached.
-			return store.BatchStore(lctx, rw, kvStateID, kvState)
-		})
+		// Calling `BatchStore` should return the output of the wrapped low-level storage, which is a deferred database
+		// update. Conceptually, it is possible that `ProtocolKVStore` wraps the deferred database operation in faulty
+		// code, such that it cannot be executed. Therefore, we execute the top-level deferred database update below
+		// and verify that the deferred database operation returned by the lower-level is actually reached.
+		err := store.BatchStore(rw, kvStateID, kvState)
 		require.NoError(t, err)
 	})
 
 	// On the unhappy path, i.e. when the encoding of input `kvState` failed, `ProtocolKVStore` should produce
 	// a deferred database update that always returns the encoding error.
 	t.Run("encoding fails", func(t *testing.T) {
-		lockManager := storage.NewTestingLockManager()
 		encodingError := errors.New("encoding error")
 
 		kvState.On("VersionedEncode").Return(uint64(0), nil, encodingError).Once()
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
-			rw := storagemock.NewReaderBatchWriter(t)
-			return store.BatchStore(lctx, rw, kvStateID, kvState)
-		})
+		rw := storagemock.NewReaderBatchWriter(t)
+		err := store.BatchStore(rw, kvStateID, kvState)
 		require.ErrorIs(t, err, encodingError)
 	})
 }

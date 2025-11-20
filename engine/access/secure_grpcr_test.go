@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -62,6 +61,7 @@ type SecureGRPCTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+	seals        *storagemock.Seals
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -75,7 +75,7 @@ type SecureGRPCTestSuite struct {
 }
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -96,6 +96,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.seals = new(storagemock.Seals)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -160,6 +161,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		Headers:                     suite.headers,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
+		Seals:                       suite.seals,
 		ChainID:                     suite.chainID,
 		AccessMetrics:               suite.metrics,
 		MaxHeightRange:              0,

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -18,18 +19,30 @@ import (
 func TestChunkDataPackPruner(t *testing.T) {
 
 	unittest.RunWithPebbleDB(t, func(pebbleDB *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		m := metrics.NewNoopCollector()
 		db := pebbleimpl.ToDB(pebbleDB)
 		results := store.NewExecutionResults(m, db)
 		transactions := store.NewTransactions(m, db)
 		collections := store.NewCollections(db, transactions)
 		byChunkIDCacheSize := uint(10)
-		chunks := store.NewChunkDataPacks(m, db, collections, byChunkIDCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(m, db, byChunkIDCacheSize)
+		chunks := store.NewChunkDataPacks(m, db, storedChunkDataPacks, collections, byChunkIDCacheSize)
 
 		// store the chunks
 		cdp1, result1 := unittest.ChunkDataPacksFixtureAndResult()
-		require.NoError(t, results.Store(result1))
-		require.NoError(t, chunks.Store(cdp1))
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return results.BatchStore(result1, rw)
+		}))
+		require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
+			storeFunc, err := chunks.Store(cdp1)
+			if err != nil {
+				return err
+			}
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return storeFunc(lctx, rw)
+			})
+		}))
 
 		pruner := NewChunkDataPackPruner(chunks, results)
 

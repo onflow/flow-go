@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +14,8 @@ import (
 )
 
 func TestLogProgress40(t *testing.T) {
+	t.Parallel()
+
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
 	total := 40
@@ -28,16 +31,16 @@ func TestLogProgress40(t *testing.T) {
 	}
 
 	expectedLogs := []string{
-		`test progress 1/40 (2.5%)`,
-		`test progress 5/40 (12.5%)`,
-		`test progress 9/40 (22.5%)`,
-		`test progress 13/40 (32.5%)`,
-		`test progress 17/40 (42.5%)`,
-		`test progress 21/40 (52.5%)`,
-		`test progress 25/40 (62.5%)`,
-		`test progress 29/40 (72.5%)`,
-		`test progress 33/40 (82.5%)`,
-		`test progress 37/40 (92.5%)`,
+		`test progress 0/40 (0.0%)`,
+		`test progress 4/40 (10.0%)`,
+		`test progress 8/40 (20.0%)`,
+		`test progress 12/40 (30.0%)`,
+		`test progress 16/40 (40.0%)`,
+		`test progress 20/40 (50.0%)`,
+		`test progress 24/40 (60.0%)`,
+		`test progress 28/40 (70.0%)`,
+		`test progress 32/40 (80.0%)`,
+		`test progress 36/40 (90.0%)`,
 		`test progress 40/40 (100.0%)`,
 	}
 
@@ -46,7 +49,149 @@ func TestLogProgress40(t *testing.T) {
 	}
 }
 
+func TestLogProgress40By3(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	total := 40
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			total,
+		),
+	)
+	for i := 0; i < total/3; i++ {
+		logger(3)
+	}
+	logger(1)
+
+	expectedLogs := []string{
+		`test progress 0/40 (0.0%)`,
+		`test progress 4/40 (10.0%)`,
+		`test progress 8/40 (20.0%)`,
+		`test progress 12/40 (30.0%)`,
+		`test progress 16/40 (40.0%)`,
+		`test progress 20/40 (50.0%)`,
+		`test progress 24/40 (60.0%)`,
+		`test progress 28/40 (70.0%)`,
+		`test progress 32/40 (80.0%)`,
+		`test progress 36/40 (90.0%)`,
+		`test progress 40/40 (100.0%)`,
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, total)
+	}
+}
+
+func TestLogProgress43B(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	total := 43
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			total,
+		),
+	)
+	for i := 0; i < total; i++ {
+		logger(1)
+	}
+
+	expectedLogs := []string{
+		`test progress 0/43 (0.0%)`,
+		`test progress 7/43`,
+		`test progress 11/43`,
+		`test progress 15/43`,
+		`test progress 19/43`,
+		`test progress 23/43`,
+		`test progress 27/43`,
+		`test progress 31/43`,
+		`test progress 35/43`,
+		`test progress 39/43`,
+		`test progress 43/43 (100.0%)`,
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, total)
+	}
+}
+
+func TestLogProgress43By3(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	total := 43
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			total,
+		),
+	)
+	for i := 0; i < total/3; i++ {
+		logger(3)
+	}
+	logger(1)
+
+	expectedLogs := []string{
+		`test progress 0/43 (0.0%)`,
+		`test progress 7/43`,
+		`test progress 11/43`,
+		`test progress 15/43`,
+		`test progress 19/43`,
+		`test progress 23/43`,
+		`test progress 27/43`,
+		`test progress 31/43`,
+		`test progress 35/43`,
+		`test progress 39/43`,
+		`test progress 43/43 (100.0%)`,
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, total)
+	}
+}
+
+func TestLog100WhenOvershooting(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	total := 100
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			total,
+		),
+	)
+	for i := 0; i < total/3+1; i++ {
+		logger(3)
+	}
+
+	expectedLogs := []string{
+		`test progress 0/100 (0.0%)`,
+		`test progress 100/100 (100.0%)`,
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, total)
+	}
+	lines := strings.Count(buf.String(), "\n")
+	// every 10% + 1 for the final log
+	require.Equal(t, 11, lines)
+}
+
 func TestLogProgress1000(t *testing.T) {
+	t.Parallel()
+
 	for total := 11; total < 1000; total++ {
 		buf := bytes.NewBufferString("")
 		lg := zerolog.New(buf)
@@ -63,7 +208,7 @@ func TestLogProgress1000(t *testing.T) {
 		}
 
 		expectedLogs := []string{
-			fmt.Sprintf(`test progress 1/%d`, total),
+			fmt.Sprintf(`test progress 0/%d`, total),
 			fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
 		}
 
@@ -73,7 +218,140 @@ func TestLogProgress1000(t *testing.T) {
 	}
 }
 
+func TestLogProgressWhenTotalIs0(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			0,
+		),
+	)
+
+	for i := 0; i < 10; i++ {
+		logger(1)
+	}
+
+	expectedLogs := []string{
+		fmt.Sprintf(`test progress %d/%d (100.0%%)`, 0, 0),
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, 0)
+	}
+
+	lines := strings.Count(buf.String(), "\n")
+	// log only once
+	require.Equal(t, 1, lines)
+}
+
+func TestLogProgressMoreTicksThenTotal(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			5,
+		),
+	)
+
+	for i := 0; i < 5; i++ {
+		logger(1)
+	}
+
+	expectedLogs := []string{
+		fmt.Sprintf(`test progress %d/%d (100.0%%)`, 5, 5),
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, 0)
+	}
+
+	lines := strings.Count(buf.String(), "\n")
+	// log only once
+	require.Equal(t, 6, lines)
+}
+
+func TestLogProgressContinueLoggingAfter100(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	logger := LogProgress(
+		lg,
+		DefaultLogProgressConfig(
+			"test",
+			100,
+		),
+	)
+
+	for i := 0; i < 15; i++ {
+		logger(10)
+	}
+
+	expectedLogs := []string{
+		fmt.Sprintf(`test progress %d/%d (100.0%%)`, 100, 100),
+		fmt.Sprintf(`test progress %d/%d (110.0%%)`, 110, 100),
+		fmt.Sprintf(`test progress %d/%d (150.0%%)`, 150, 100),
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, 0)
+	}
+
+	lines := strings.Count(buf.String(), "\n")
+	// log only once
+	require.Equal(t, 16, lines)
+}
+
+func TestLogProgressNoDataForAWhile(t *testing.T) {
+	t.Parallel()
+
+	total := 1000
+
+	buf := bytes.NewBufferString("")
+	lg := zerolog.New(buf)
+	logger := LogProgress(
+		lg,
+		NewLogProgressConfig[uint64](
+			"test",
+			uint64(total),
+			1*time.Millisecond,
+			10,
+		),
+	)
+
+	for i := 0; i < total; i++ {
+		// somewhere in the middle pause for a bit
+		if i == 13 {
+			<-time.After(3 * time.Millisecond)
+		}
+
+		logger(1)
+	}
+
+	expectedLogs := []string{
+		fmt.Sprintf(`test progress 0/%d`, total),
+		fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
+	}
+
+	for _, log := range expectedLogs {
+		require.Contains(t, buf.String(), log, total)
+	}
+	lines := strings.Count(buf.String(), "\n")
+	// every 10% + 1 for the final log + 1 for the "no data in a while" log
+	require.Equal(t, 12, lines)
+}
+
 func TestLogProgressMultipleGoroutines(t *testing.T) {
+	t.Parallel()
+
 	total := 1000
 
 	buf := bytes.NewBufferString("")
@@ -100,7 +378,7 @@ func TestLogProgressMultipleGoroutines(t *testing.T) {
 	wg.Wait()
 
 	expectedLogs := []string{
-		fmt.Sprintf(`test progress 1/%d`, total),
+		fmt.Sprintf(`test progress 0/%d`, total),
 		fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
 	}
 
@@ -113,44 +391,9 @@ func TestLogProgressMultipleGoroutines(t *testing.T) {
 	}
 }
 
-func TestLogProgressCustomSampler(t *testing.T) {
-	total := 1000
-
-	nth := uint32(total / 10) // sample every 10% by default
-	if nth == 0 {
-		nth = 1
-	}
-	sampler := newProgressLogsSampler(nth, 10*time.Millisecond)
-
-	buf := bytes.NewBufferString("")
-	lg := zerolog.New(buf)
-	logger := LogProgress(
-		lg,
-		NewLogProgressConfig(
-			"test",
-			total,
-			sampler,
-		),
-	)
-
-	for i := 0; i < total; i++ {
-		if i == 7 || i == 77 || i == 777 {
-			// s
-			time.Sleep(20 * time.Millisecond)
-		}
-		logger(1)
-	}
-
-	expectedLogs := []string{
-		fmt.Sprintf(`test progress 1/%d`, total),
-		fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
-	}
-
-	lines := strings.Count(buf.String(), "\n")
-	// every 10% + 1 for the final log + 3 for the custom sampler
-	require.Equal(t, 14, lines)
-
-	for _, log := range expectedLogs {
-		require.Contains(t, buf.String(), log, total)
+func BenchmarkLogProgress(b *testing.B) {
+	l := LogProgress(zerolog.New(io.Discard), DefaultLogProgressConfig("test", b.N))
+	for i := 0; i < b.N; i++ {
+		l(1)
 	}
 }

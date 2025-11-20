@@ -30,6 +30,8 @@ type FlowAccessAPIRouter struct {
 	useIndex bool
 }
 
+var _ access.AccessAPIServer = (*FlowAccessAPIRouter)(nil)
+
 type Params struct {
 	Log      zerolog.Logger
 	Metrics  *metrics.ObserverCollector
@@ -211,6 +213,30 @@ func (h *FlowAccessAPIRouter) GetSystemTransaction(ctx context.Context, req *acc
 func (h *FlowAccessAPIRouter) GetSystemTransactionResult(ctx context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
 	res, err := h.upstream.GetSystemTransactionResult(ctx, req)
 	h.log(UpstreamApiService, "GetSystemTransactionResult", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetScheduledTransaction(ctx context.Context, req *access.GetScheduledTransactionRequest) (*access.TransactionResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetScheduledTransaction(ctx, req)
+		h.log(LocalApiService, "GetScheduledTransaction", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetScheduledTransaction(ctx, req)
+	h.log(UpstreamApiService, "GetScheduledTransaction", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetScheduledTransactionResult(ctx context.Context, req *access.GetScheduledTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetScheduledTransactionResult(ctx, req)
+		h.log(LocalApiService, "GetScheduledTransactionResult", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetScheduledTransactionResult(ctx, req)
+	h.log(UpstreamApiService, "GetScheduledTransactionResult", err)
 	return res, err
 }
 
@@ -482,6 +508,8 @@ type FlowAccessAPIForwarder struct {
 	*forwarder.Forwarder
 }
 
+var _ access.AccessAPIServer = (*FlowAccessAPIForwarder)(nil)
+
 func NewFlowAccessAPIForwarder(identities flow.IdentitySkeletonList, connectionFactory connection.ConnectionFactory) (*FlowAccessAPIForwarder, error) {
 	forwarder, err := forwarder.NewForwarder(identities, connectionFactory)
 	if err != nil {
@@ -633,6 +661,26 @@ func (h *FlowAccessAPIForwarder) GetSystemTransaction(ctx context.Context, req *
 	}
 	defer closer.Close()
 	return upstream.GetSystemTransaction(ctx, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetScheduledTransaction(ctx context.Context, req *access.GetScheduledTransactionRequest) (*access.TransactionResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetScheduledTransaction(ctx, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetScheduledTransactionResult(ctx context.Context, req *access.GetScheduledTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetScheduledTransactionResult(ctx, req)
 }
 
 func (h *FlowAccessAPIForwarder) GetSystemTransactionResult(ctx context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
@@ -834,6 +882,26 @@ func (h *FlowAccessAPIForwarder) GetLatestProtocolStateSnapshot(ctx context.Cont
 	return upstream.GetLatestProtocolStateSnapshot(ctx, req)
 }
 
+func (h *FlowAccessAPIForwarder) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetProtocolStateSnapshotByBlockID(ctx, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetProtocolStateSnapshotByHeight(ctx context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetProtocolStateSnapshotByHeight(ctx, req)
+}
+
 func (h *FlowAccessAPIForwarder) GetExecutionResultForBlockID(ctx context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
 	// This is a passthrough request
 	upstream, closer, err := h.FaultTolerantClient()
@@ -852,4 +920,44 @@ func (h *FlowAccessAPIForwarder) GetExecutionResultByID(ctx context.Context, req
 	}
 	defer closer.Close()
 	return upstream.GetExecutionResultByID(ctx, req)
+}
+
+func (h *FlowAccessAPIForwarder) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
+	return status.Errorf(codes.Unimplemented, "method SendAndSubscribeTransactionStatuses not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlockDigestsFromLatest(req *access.SubscribeBlockDigestsFromLatestRequest, server access.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromLatest not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlockDigestsFromStartBlockID(req *access.SubscribeBlockDigestsFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromStartBlockID not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlockDigestsFromStartHeight(req *access.SubscribeBlockDigestsFromStartHeightRequest, server access.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromStartHeight not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlockHeadersFromLatest(req *access.SubscribeBlockHeadersFromLatestRequest, server access.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromLatest not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlockHeadersFromStartBlockID(req *access.SubscribeBlockHeadersFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromStartBlockID not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlockHeadersFromStartHeight(req *access.SubscribeBlockHeadersFromStartHeightRequest, server access.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromStartHeight not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlocksFromLatest(req *access.SubscribeBlocksFromLatestRequest, server access.AccessAPI_SubscribeBlocksFromLatestServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromLatest not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlocksFromStartBlockID(req *access.SubscribeBlocksFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromStartBlockID not implemented")
+}
+
+func (h *FlowAccessAPIForwarder) SubscribeBlocksFromStartHeight(req *access.SubscribeBlocksFromStartHeightRequest, server access.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromStartHeight not implemented")
 }

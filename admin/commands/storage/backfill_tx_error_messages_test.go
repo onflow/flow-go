@@ -77,6 +77,7 @@ func TestBackfillTxErrorMessages(t *testing.T) {
 func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
 
+	lockManager := storage.NewTestingLockManager()
 	suite.state = new(protocolmock.State)
 	suite.headers = new(storagemock.Headers)
 	suite.receipts = new(storagemock.ExecutionReceipts)
@@ -160,9 +161,11 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		errorMessageProvider,
 		suite.txErrorMessages,
 		executionNodeIdentitiesProvider,
+		lockManager,
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(
+		suite.log,
 		suite.state,
 		suite.txResultErrorMessagesCore,
 	)
@@ -237,7 +240,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1),         // raw json parses to float64
 				"end-height":         float64(endHeight), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].NodeID.String()},
+				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.Error(err)
@@ -290,7 +293,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(4), // raw json parses to float64
-				"execution-node-ids": []string{invalidENID.String()},
+				"execution-node-ids": []any{invalidENID.String()},
 			},
 		})
 		suite.Error(err)
@@ -321,7 +324,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(3), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].NodeID.String()},
+				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
 			},
 		})
 		suite.NoError(err)
@@ -389,7 +392,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64
 				"end-height":         float64(endHeight),   // raw json parses to float64
-				"execution-node-ids": []string{executorID.String()},
+				"execution-node-ids": []any{executorID.String()},
 			},
 		}
 		suite.Require().NoError(suite.command.Validator(req))
@@ -432,6 +435,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 	suite.Run("error when txErrorMessagesCore is nil", func() {
 		req := &admin.CommandRequest{Data: map[string]interface{}{}}
 		command := NewBackfillTxErrorMessagesCommand(
+			suite.log,
 			suite.state,
 			nil,
 		)
@@ -530,7 +534,7 @@ func (suite *BackfillTxErrorMessagesSuite) mockStoreTxErrorMessages(
 		}
 	}
 
-	suite.txErrorMessages.On("Store", blockID, txErrorMessages).Return(nil).Once()
+	suite.txErrorMessages.On("Store", mock.Anything, blockID, txErrorMessages).Return(nil).Once()
 }
 
 // assertAllExpectations asserts that all the expectations set on various mocks are met,

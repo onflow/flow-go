@@ -14,13 +14,13 @@ type CollectionMetrics struct {
 	mock.Mock
 }
 
-// ClusterBlockFinalized provides a mock function with given fields: block
-func (_m *CollectionMetrics) ClusterBlockFinalized(block *cluster.Block) {
-	_m.Called(block)
+// ClusterBlockCreated provides a mock function with given fields: block, priorityTxnsCount
+func (_m *CollectionMetrics) ClusterBlockCreated(block *cluster.Block, priorityTxnsCount uint) {
+	_m.Called(block, priorityTxnsCount)
 }
 
-// ClusterBlockProposed provides a mock function with given fields: block
-func (_m *CollectionMetrics) ClusterBlockProposed(block *cluster.Block) {
+// ClusterBlockFinalized provides a mock function with given fields: block
+func (_m *CollectionMetrics) ClusterBlockFinalized(block *cluster.Block) {
 	_m.Called(block)
 }
 

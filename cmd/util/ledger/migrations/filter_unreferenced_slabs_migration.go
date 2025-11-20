@@ -92,6 +92,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 			Registers: accountRegisters,
 		},
 		nil,
+		nil,
 		runtime.StorageConfig{},
 	)
 

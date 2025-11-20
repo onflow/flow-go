@@ -136,6 +136,8 @@ type Controller struct {
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
 	limiter             *rate.Limiter
+
+	keepaliveConfig KeepaliveConfig
 }
 
 func NewWebSocketController(
@@ -158,6 +160,7 @@ func NewWebSocketController(
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
 		limiter:             limiter,
+		keepaliveConfig:     DefaultKeepaliveConfig(),
 	}
 }
 
@@ -213,13 +216,13 @@ func (c *Controller) configureKeepalive() error {
 	// The Pong handler itself only resets the read deadline after receiving a Pong.
 	// It doesn't set an initial deadline. The initial read deadline is crucial to prevent the server from waiting
 	// forever if the client doesn't send Pongs.
-	if err := c.conn.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.keepaliveConfig.PongWait)); err != nil {
 		return fmt.Errorf("failed to set the initial read deadline: %w", err)
 	}
 
 	// Establish a Pong handler which sets the handler for pong messages received from the peer.
 	c.conn.SetPongHandler(func(string) error {
-		return c.conn.SetReadDeadline(time.Now().Add(PongWait))
+		return c.conn.SetReadDeadline(time.Now().Add(c.keepaliveConfig.PongWait))
 	})
 
 	return nil
@@ -235,7 +238,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 		}
 	}()
 
-	pingTicker := time.NewTicker(PingPeriod)
+	pingTicker := time.NewTicker(c.keepaliveConfig.PingPeriod)
 	defer pingTicker.Stop()
 
 	for {

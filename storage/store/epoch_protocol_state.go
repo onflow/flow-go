@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -81,8 +83,9 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 		return result, nil
 	}
 
-	storeByBlockID := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
-		err := operation.IndexEpochProtocolState(rw.Writer(), blockID, epochProtocolStateEntryID)
+	storeByBlockID := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
+		// CAUTION: requires [storage.LockInsertBlock] and for the caller to ensure that they are not overwriting existing data.
+		err := operation.IndexEpochProtocolState(lctx, rw.Writer(), blockID, epochProtocolStateEntryID)
 		if err != nil {
 			return fmt.Errorf("could not index EpochProtocolState for block (%x): %w", blockID[:], err)
 		}
@@ -106,20 +109,21 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 			withRetrieve(retrieveByEntryID)),
 		byBlockIdCache: newCache(collector, metrics.ResourceProtocolStateByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
-			withStore(storeByBlockID),
+			withStoreWithLock(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
 }
 
 // BatchStore persists the given epoch protocol state entry as part of a DB batch. Per convention, the identities in
-// the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present),
-// otherwise an exception is returned.
+// the flow.MinEpochStateEntry must be in canonical order for the current and next epoch (if present), otherwise an
+// exception is returned.
+//
+// CAUTION: The caller must ensure `epochProtocolStateID` is a collision-resistant hash of the provided
+// `epochProtocolStateEntry`! This method silently overrides existing data, which is safe only if for the same
+// key, we always write the same value.
+//
 // No errors are expected during normal operation.
-func (s *EpochProtocolStateEntries) BatchStore(
-	w storage.Writer,
-	epochProtocolStateEntryID flow.Identifier,
-	epochStateEntry *flow.MinEpochStateEntry,
-) error {
+func (s *EpochProtocolStateEntries) BatchStore(w storage.Writer, epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.MinEpochStateEntry) error {
 	// sanity checks:
 	if !epochStateEntry.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
 		return fmt.Errorf("sanity check failed: identities are not sorted")
@@ -144,8 +148,8 @@ func (s *EpochProtocolStateEntries) BatchStore(
 //     _after_ validating the QC.
 //
 // No errors are expected during normal operation.
-func (s *EpochProtocolStateEntries) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
-	return s.byBlockIdCache.PutTx(rw, blockID, epochProtocolStateEntryID)
+func (s *EpochProtocolStateEntries) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
+	return s.byBlockIdCache.PutWithLockTx(lctx, rw, blockID, epochProtocolStateEntryID)
 }
 
 // ByID returns the epoch protocol state entry by its ID.

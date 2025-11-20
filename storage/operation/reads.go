@@ -131,7 +131,7 @@ func KeyExists(r storage.Reader, key []byte) (exist bool, errToReturn error) {
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
 // Error returns:
-//   - storage.ErrNotFound if the key does not exist in the database
+//   - [storage.ErrNotFound] if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func RetrieveByKey(r storage.Reader, key []byte, entity any) (errToReturn error) {

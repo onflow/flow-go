@@ -1022,6 +1022,66 @@ func (_m *Client) GetSystemTransactionResult(ctx context.Context, blockID flow.I
 	return r0, r1
 }
 
+// GetSystemTransactionResultWithID provides a mock function with given fields: ctx, blockID, systemTxID
+func (_m *Client) GetSystemTransactionResultWithID(ctx context.Context, blockID flow.Identifier, systemTxID flow.Identifier) (*flow.TransactionResult, error) {
+	ret := _m.Called(ctx, blockID, systemTxID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSystemTransactionResultWithID")
+	}
+
+	var r0 *flow.TransactionResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) (*flow.TransactionResult, error)); ok {
+		return rf(ctx, blockID, systemTxID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) *flow.TransactionResult); ok {
+		r0 = rf(ctx, blockID, systemTxID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.TransactionResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier) error); ok {
+		r1 = rf(ctx, blockID, systemTxID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetSystemTransactionWithID provides a mock function with given fields: ctx, blockID, systemTxID
+func (_m *Client) GetSystemTransactionWithID(ctx context.Context, blockID flow.Identifier, systemTxID flow.Identifier) (*flow.Transaction, error) {
+	ret := _m.Called(ctx, blockID, systemTxID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSystemTransactionWithID")
+	}
+
+	var r0 *flow.Transaction
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) (*flow.Transaction, error)); ok {
+		return rf(ctx, blockID, systemTxID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier) *flow.Transaction); ok {
+		r0 = rf(ctx, blockID, systemTxID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Transaction)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier) error); ok {
+		r1 = rf(ctx, blockID, systemTxID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransaction provides a mock function with given fields: ctx, txID
 func (_m *Client) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.Transaction, error) {
 	ret := _m.Called(ctx, txID)

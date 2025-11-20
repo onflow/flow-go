@@ -194,9 +194,7 @@ func (p *PipelineImpl) loop(ctx context.Context) error {
 					return fmt.Errorf("could not process waiting persist state: %w", err)
 				}
 			case optimistic_sync.StateAbandoned:
-				if err := p.core.Abandon(); err != nil {
-					return fmt.Errorf("could not process abandonded state: %w", err)
-				}
+				p.core.Abandon()
 				return nil
 			case optimistic_sync.StateComplete:
 				return nil // terminate
@@ -231,7 +229,7 @@ func (p *PipelineImpl) onStartProcessing() error {
 }
 
 // onProcessing performs the state transitions when the pipeline is in the Processing state.
-// When data has been successfully indexed, we can transition to optimistic_sync.StateWaitingPersist.
+// When data has been successfully indexed, we can transition to StateWaitingPersist.
 // No errors are expected during normal operations.
 func (p *PipelineImpl) onProcessing() error {
 	if p.isIndexed.Load() {
@@ -241,8 +239,8 @@ func (p *PipelineImpl) onProcessing() error {
 }
 
 // onPersistChanges performs the state transitions when the pipeline is in the WaitingPersist state.
-// When the execution result has been sealed and the parent has already transitioned to optimistic_sync.StateComplete then
-// we can persist the data and transition to optimistic_sync.StateComplete.
+// When the execution result has been sealed and the parent has already transitioned to StateComplete then
+// we can persist the data and transition to StateComplete.
 // No errors are expected during normal operations.
 func (p *PipelineImpl) onPersistChanges() error {
 	if p.isSealed.Load() && p.parentState() == optimistic_sync.StateComplete {
@@ -277,7 +275,7 @@ func (p *PipelineImpl) parentState() optimistic_sync.State {
 }
 
 // SetSealed marks the execution result as sealed.
-// This will cause the pipeline to eventually transition to the optimistic_sync.StateComplete state when the parent finishes processing.
+// This will cause the pipeline to eventually transition to the StateComplete state when the parent finishes processing.
 func (p *PipelineImpl) SetSealed() {
 	// Note: do not use a mutex here to avoid blocking the results forest.
 	if p.isSealed.CompareAndSwap(false, true) {

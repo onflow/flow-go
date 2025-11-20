@@ -58,6 +58,12 @@ func (g *RandomGenerator) Uint16n(n uint16) uint16 {
 	return uint16(g.Int31n(int32(n)))
 }
 
+// Uint8n generates a random uint8 strictly less than `n`.
+// Uses rand.Int31n to generate a random int32 and then casts it to uint8. n MUST be > 0.
+func (g *RandomGenerator) Uint8n(n uint8) uint8 {
+	return uint8(g.Int31n(int32(n)))
+}
+
 // Uintn generates a random uint strictly less than `n`.
 // Uses rand.Int63n to generate a random int64 and then casts it to uint. n MUST be > 0.
 func (g *RandomGenerator) Uintn(n uint) uint {

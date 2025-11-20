@@ -59,7 +59,6 @@ type ExecutionConfig struct {
 	importCheckpointWorkerCount           int
 	transactionExecutionMetricsEnabled    bool
 	transactionExecutionMetricsBufferSize uint
-	executionDataDBMode                   string
 	scheduleCallbacksEnabled              bool
 
 	computationConfig        computation.ComputationConfig
@@ -136,15 +135,17 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.importCheckpointWorkerCount, "import-checkpoint-worker-count", 10, "number of workers to import checkpoint file during bootstrap")
 	flags.BoolVar(&exeConf.transactionExecutionMetricsEnabled, "tx-execution-metrics", true, "enable collection of transaction execution metrics")
 	flags.UintVar(&exeConf.transactionExecutionMetricsBufferSize, "tx-execution-metrics-buffer-size", 200, "buffer size for transaction execution metrics. The buffer size is the number of blocks that are kept in memory by the metrics provider engine")
-	flags.StringVar(&exeConf.executionDataDBMode,
+
+	var exeConfExecutionDataDBMode string
+	flags.StringVar(&exeConfExecutionDataDBMode,
 		"execution-data-db",
 		execution_data.ExecutionDataDBModePebble.String(),
-		"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+		"[deprecated] the DB type for execution datastore. it's been deprecated")
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
-	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledCallbacksEnabled, "enable execution of scheduled callbacks")
+	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable execution of scheduled transactions")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
 	var deprecatedEnableNewIngestionEngine bool
 	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")

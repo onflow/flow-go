@@ -10,10 +10,11 @@ import (
 	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/cluster/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/procedure"
 )
 
 type State struct {
@@ -22,16 +23,12 @@ type State struct {
 	epoch     uint64       // the operating epoch for the cluster
 }
 
+var _ cluster.State = (*State)(nil)
+
 // Bootstrap initializes the persistent cluster state with a genesis block.
 // The genesis block must have height 0, a parent hash of 32 zero bytes,
 // and an empty collection as payload.
 func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot) (*State, error) {
-	lctx := lockManager.NewContext()
-	defer lctx.Release()
-	err := lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock `storage.LockInsertOrFinalizeClusterBlock` for inserting cluster block: %w", err)
-	}
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -44,61 +41,59 @@ func Bootstrap(db storage.DB, lockManager lockctx.Manager, stateRoot *StateRoot)
 	genesis := stateRoot.Block()
 	rootQC := stateRoot.QC()
 
-	// bootstrap cluster state
-	err = state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		chainID := genesis.ChainID
-		// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
-		proposal, err := clustermodel.NewRootProposal(
-			clustermodel.UntrustedProposal{
-				Block:           *genesis,
-				ProposerSigData: nil,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("could not build root cluster proposal: %w", err)
-		}
-		err = procedure.InsertClusterBlock(lctx, rw, proposal)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
-		}
-		// insert block height -> ID mapping
-		err = operation.IndexClusterBlockHeight(lctx, rw.Writer(), chainID, genesis.Height, genesis.ID())
-		if err != nil {
-			return fmt.Errorf("failed to map genesis block height to block: %w", err)
-		}
-		// insert boundary
-		err = operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), chainID, genesis.Height)
-		// insert started view for hotstuff
-		if err != nil {
-			return fmt.Errorf("could not insert genesis boundary: %w", err)
-		}
+	err = storage.WithLocks(lockManager, storage.LockGroupCollectionBootstrapClusterState, func(lctx lockctx.Context) error {
+		// bootstrap cluster state
+		return state.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			chainID := genesis.ChainID
+			// insert the block - by protocol convention, the genesis block does not have a proposer signature, which must be handled by the implementation
+			proposal, err := clustermodel.NewRootProposal(
+				clustermodel.UntrustedProposal{
+					Block:           *genesis,
+					ProposerSigData: nil,
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("could not build root cluster proposal: %w", err)
+			}
+			err = operation.InsertClusterBlock(lctx, rw, proposal)
+			if err != nil {
+				return fmt.Errorf("could not insert genesis block: %w", err)
+			}
+			// insert block height -> ID mapping for genesis block (finalized by protocol convention)
+			err = operation.IndexClusterBlockHeight(lctx, rw, chainID, genesis.Height, genesis.ID())
+			if err != nil {
+				return fmt.Errorf("failed to map genesis block height to block: %w", err)
+			}
+			// insert latest finalized height
+			err = operation.BootstrapClusterFinalizedHeight(lctx, rw, chainID, genesis.Height)
+			if err != nil {
+				return fmt.Errorf("could not insert genesis boundary: %w", err)
+			}
 
-		safetyData := &hotstuff.SafetyData{
-			LockedOneChainView:      genesis.View,
-			HighestAcknowledgedView: genesis.View,
-		}
+			// Initialize and persist safety and liveness data for cluster consensus
+			safetyData := &hotstuff.SafetyData{
+				LockedOneChainView:      genesis.View,
+				HighestAcknowledgedView: genesis.View,
+			}
+			livenessData := &hotstuff.LivenessData{
+				CurrentView: genesis.View + 1, // starting view for hotstuff
+				NewestQC:    rootQC,
+			}
+			err = operation.UpsertSafetyData(lctx, rw, chainID, safetyData)
+			if err != nil {
+				return fmt.Errorf("could not insert safety data: %w", err)
+			}
+			err = operation.UpsertLivenessData(lctx, rw, chainID, livenessData)
+			if err != nil {
+				return fmt.Errorf("could not insert liveness data: %w", err)
+			}
 
-		livenessData := &hotstuff.LivenessData{
-			CurrentView: genesis.View + 1,
-			NewestQC:    rootQC,
-		}
-		// insert safety data
-		err = operation.UpsertSafetyData(rw.Writer(), chainID, safetyData)
-		if err != nil {
-			return fmt.Errorf("could not insert safety data: %w", err)
-		}
-		// insert liveness data
-		err = operation.UpsertLivenessData(rw.Writer(), chainID, livenessData)
-		if err != nil {
-			return fmt.Errorf("could not insert liveness data: %w", err)
-		}
-
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
-
 	return state, nil
 }
 
@@ -131,42 +126,38 @@ func (s *State) Params() cluster.Params {
 }
 
 func (s *State) Final() cluster.Snapshot {
-	// get the finalized block ID
-	var blockID flow.Identifier
-	err := (func(r storage.Reader) error {
-		var boundary uint64
-		err := operation.RetrieveClusterFinalizedHeight(r, s.clusterID, &boundary)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized boundary: %w", err)
-		}
-
-		err = operation.LookupClusterBlockHeight(r, s.clusterID, boundary, &blockID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized ID: %w", err)
-		}
-
-		return nil
-	})(s.db.Reader())
-
+	// get height of latest finalized collection and then the ID of the collection with the corresponding height
+	r := s.db.Reader()
+	var latestFinalizedClusterHeight uint64
+	err := operation.RetrieveClusterFinalizedHeight(r, s.clusterID, &latestFinalizedClusterHeight)
 	if err != nil {
-		return &Snapshot{
-			err: err,
-		}
+		return invalid.NewSnapshotf("could not retrieve finalized boundary: %w", err)
 	}
 
-	snapshot := &Snapshot{
-		state:   s,
-		blockID: blockID,
+	var blockID flow.Identifier
+	err = operation.LookupClusterBlockHeight(r, s.clusterID, latestFinalizedClusterHeight, &blockID)
+	if err != nil {
+		return invalid.NewSnapshotf("could not retrieve finalized ID: %w", err)
 	}
-	return snapshot
+
+	return newSnapshot(s, blockID)
 }
 
+// AtBlockID returns the snapshot of the persistent cluster at the given
+// block ID. It is available for any block that was introduced into the
+// cluster state, and can thus represent an ambiguous state that was or
+// will never be finalized.
+// If the block is unknown, it returns an invalid snapshot, which returns
+// state.ErrUnknownSnapshotReference for all methods
 func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
-	snapshot := &Snapshot{
-		state:   s,
-		blockID: blockID,
+	exists, err := operation.BlockExists(s.db.Reader(), blockID)
+	if err != nil {
+		return invalid.NewSnapshotf("could not check existence of reference block: %w", err)
 	}
-	return snapshot
+	if !exists {
+		return invalid.NewSnapshotf("unknown block %x: %w", blockID, state.ErrUnknownSnapshotReference)
+	}
+	return newSnapshot(s, blockID)
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state.

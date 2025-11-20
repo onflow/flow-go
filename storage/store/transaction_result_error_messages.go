@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -71,17 +73,16 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db storage
 	}
 }
 
-// Store will store transaction result error messages for the given block ID.
-//
-// No errors are expected during normal operation.
-func (t *TransactionResultErrorMessages) Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+// Store persists and indexes all transaction result error messages for the given blockID. The caller must
+// acquire [storage.LockInsertTransactionResultErrMessage] and hold it until the write batch has been committed.
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
+func (t *TransactionResultErrorMessages) Store(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
 	return t.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return t.BatchStore(blockID, transactionResultErrorMessages, rw)
+		return t.BatchStore(lctx, rw, blockID, transactionResultErrorMessages)
 	})
 }
 
 // Exists returns true if transaction result error messages for the given ID have been stored.
-//
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, error) {
 	// if the block is in the cache, return true
@@ -98,28 +99,23 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 	return exists, nil
 }
 
-// BatchStore inserts a batch of transaction result error messages into a batch
-//
-// No errors are expected during normal operation.
+// BatchStore persists and indexes all transaction result error messages for the given blockID as part
+// of the provided batch. The caller must acquire [storage.LockInsertTransactionResultErrMessage] and
+// hold it until the write batch has been committed.
+// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (t *TransactionResultErrorMessages) BatchStore(
+	lctx lockctx.Proof,
+	rw storage.ReaderBatchWriter,
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
-	batch storage.ReaderBatchWriter,
 ) error {
-	writer := batch.Writer()
-	for _, result := range transactionResultErrorMessages {
-		err := operation.BatchInsertTransactionResultErrorMessage(writer, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert tx result error message: %w", err)
-		}
-
-		err = operation.BatchIndexTransactionResultErrorMessage(writer, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch index tx result error message: %w", err)
-		}
+	// requires [storage.LockInsertTransactionResultErrMessage]
+	err := operation.InsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, transactionResultErrorMessages)
+	if err != nil {
+		return err
 	}
 
-	storage.OnCommitSucceed(batch, func() {
+	storage.OnCommitSucceed(rw, func() {
 		for _, result := range transactionResultErrorMessages {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve

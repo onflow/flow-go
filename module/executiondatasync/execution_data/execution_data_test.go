@@ -7,7 +7,41 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
+
+func TestBlockExecutionDataHelpers(t *testing.T) {
+	g := fixtures.NewGeneratorSuite()
+	chunkDatas := g.ChunkExecutionDatas().List(5)
+	blockData := g.BlockExecutionDatas().Fixture(
+		fixtures.BlockExecutionData.WithChunkExecutionDatas(chunkDatas...),
+	)
+
+	expectedStardardChunks := chunkDatas[:len(chunkDatas)-1]
+	expectedStandardCollections := make([]*flow.Collection, len(expectedStardardChunks))
+	for i, chunk := range expectedStardardChunks {
+		expectedStandardCollections[i] = chunk.Collection
+	}
+
+	expectedSystemChunk := chunkDatas[len(chunkDatas)-1]
+	expectedSystemCollection := expectedSystemChunk.Collection
+
+	t.Run("StandardChunks", func(t *testing.T) {
+		assert.Equal(t, expectedStardardChunks, blockData.StandardChunks())
+	})
+
+	t.Run("StandardCollections", func(t *testing.T) {
+		assert.Equal(t, expectedStandardCollections, blockData.StandardCollections())
+	})
+
+	t.Run("SystemChunk", func(t *testing.T) {
+		assert.Equal(t, expectedSystemChunk, blockData.SystemChunk())
+	})
+
+	t.Run("SystemCollection", func(t *testing.T) {
+		assert.Equal(t, expectedSystemCollection, blockData.SystemCollection())
+	})
+}
 
 func TestConvertTransactionResults(t *testing.T) {
 	t.Parallel()

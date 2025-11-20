@@ -366,7 +366,7 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 
 	ledger := &registers.ReadOnlyLedger{Registers: accountRegisters}
 	var config runtime.StorageConfig
-	storage := runtime.NewStorage(ledger, nil, config)
+	storage := runtime.NewStorage(ledger, nil, nil, config)
 
 	// Check account format against specified flags.
 	err = checkAccountFormat(

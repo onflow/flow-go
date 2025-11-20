@@ -20,6 +20,8 @@ type ExecutionDataCache struct {
 	cache   mempool.ExecutionData
 }
 
+var _ execution_data.ExecutionDataCache = (*ExecutionDataCache)(nil)
+
 // NewExecutionDataCache returns a new ExecutionDataCache.
 func NewExecutionDataCache(
 	backend execution_data.ExecutionDataGetter,
@@ -39,10 +41,10 @@ func NewExecutionDataCache(
 
 // ByID returns the execution data for the given ExecutionDataID.
 //
-// Expected errors during normal operations:
-// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
-// - MalformedDataError if some level of the blob tree cannot be properly deserialized
-// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
+// Expected error returns during normal operation:
+//   - [execution_data.BlobNotFoundError]: if some CID in the blob tree could not be found from the blobstore
+//   - [execution_data.MalformedDataError]: if some level of the blob tree cannot be properly deserialized
+//   - [execution_data.BlobSizeLimitExceededError]: if some blob in the blob tree exceeds the maximum allowed size
 func (c *ExecutionDataCache) ByID(ctx context.Context, executionDataID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
 	execData, err := c.backend.Get(ctx, executionDataID)
 	if err != nil {
@@ -54,11 +56,11 @@ func (c *ExecutionDataCache) ByID(ctx context.Context, executionDataID flow.Iden
 
 // ByBlockID returns the execution data for the given block ID.
 //
-// Expected errors during normal operations:
-// - storage.ErrNotFound if a seal or execution result is not available for the block
-// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
-// - MalformedDataError if some level of the blob tree cannot be properly deserialized
-// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if a seal or execution result is not available for the block
+//   - [execution_data.BlobNotFoundError]: if some CID in the blob tree could not be found from the blobstore
+//   - [execution_data.MalformedDataError]: if some level of the blob tree cannot be properly deserialized
+//   - [execution_data.BlobSizeLimitExceededError]: if some blob in the blob tree exceeds the maximum allowed size
 func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
 	if execData, ok := c.cache.Get(blockID); ok {
 		return execData, nil
@@ -83,11 +85,11 @@ func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identif
 
 // ByHeight returns the execution data for the given block height.
 //
-// Expected errors during normal operations:
-// - storage.ErrNotFound if a seal or execution result is not available for the block
-// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
-// - MalformedDataError if some level of the blob tree cannot be properly deserialized
-// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if the block, seal, or execution result is not available for the height.
+//   - [execution_data.BlobNotFoundError]: if some CID in the blob tree could not be found from the blobstore
+//   - [execution_data.MalformedDataError]: if some level of the blob tree cannot be properly deserialized
+//   - [execution_data.BlobSizeLimitExceededError]: if some blob in the blob tree exceeds the maximum allowed size
 func (c *ExecutionDataCache) ByHeight(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
 	blockID, err := c.headers.BlockIDByHeight(height)
 	if err != nil {
@@ -99,8 +101,8 @@ func (c *ExecutionDataCache) ByHeight(ctx context.Context, height uint64) (*exec
 
 // LookupID returns the ExecutionDataID for the given block ID.
 //
-// Expected errors during normal operations:
-// - storage.ErrNotFound if a seal or execution result is not available for the block
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if a seal or execution result is not available for the block
 func (c *ExecutionDataCache) LookupID(blockID flow.Identifier) (flow.Identifier, error) {
 	seal, err := c.seals.FinalizedSealForBlock(blockID)
 	if err != nil {

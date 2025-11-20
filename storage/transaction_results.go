@@ -1,6 +1,10 @@
 package storage
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/jordanschalm/lockctx"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 type TransactionResultsReader interface {
 	// ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
@@ -17,9 +21,12 @@ type TransactionResultsReader interface {
 type TransactionResults interface {
 	TransactionResultsReader
 
-	// BatchStore inserts a batch of transaction result into a batch
-	BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch ReaderBatchWriter) error
+	// BatchStore inserts a batch of transaction result into a batch.
+	// Conceptually, for a block this data should be written once and never changed. This is enforced by the
+	// implementation, for which reason the caller must hold the [storage.LockInsertAndIndexTxResult] lock.
+	// It returns [storage.ErrAlreadyExists] if transaction results for the block already exist.
+	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error
 
-	// RemoveByBlockID removes all transaction results for a block
+	// BatchRemoveByBlockID removes all transaction results for a block
 	BatchRemoveByBlockID(id flow.Identifier, batch ReaderBatchWriter) error
 }

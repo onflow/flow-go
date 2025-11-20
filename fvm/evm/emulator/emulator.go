@@ -2,6 +2,7 @@ package emulator
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -118,6 +119,22 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 
 	// Set the nonce for the call (needed for some operations like deployment)
 	call.Nonce = proc.state.GetNonce(call.From.ToCommon())
+
+	if !call.ValidEIP7825GasLimit(proc.config.ChainRules()) {
+		res := &types.Result{
+			TxType: call.Type,
+			TxHash: call.Hash(),
+		}
+		res.SetValidationError(
+			fmt.Errorf(
+				"%w (cap: %d, tx: %d)",
+				gethCore.ErrGasLimitTooHigh,
+				gethParams.MaxTxGas,
+				call.GasLimit,
+			),
+		)
+		return res, nil
+	}
 
 	// Call tx tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
@@ -304,9 +321,9 @@ func (bl *BlockView) DryRunTransaction(
 
 	// use the from as the signer
 	msg.From = from
-	// we need to skip nonce/eoa check for dry run
+	// we need to skip nonce/transaction checks for dry run
 	msg.SkipNonceChecks = true
-	msg.SkipFromEOACheck = true
+	msg.SkipTransactionChecks = true
 
 	// run and return without committing the state changes
 	return proc.run(msg, tx.Hash(), tx.Type())
@@ -595,7 +612,7 @@ func (proc *procedure) deployAt(
 	res.DeployedContractAddress = &call.To
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
-	proc.state.SetCode(addr, ret)
+	proc.state.SetCode(addr, ret, gethTracing.CodeChangeContractCreation)
 	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }
@@ -675,7 +692,7 @@ func (proc *procedure) run(
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
-		res.GasRefund = proc.state.GetRefund()
+		res.MaxGasConsumed = execResult.MaxUsedGas
 		res.Index = uint16(txIndex)
 		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
 		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()

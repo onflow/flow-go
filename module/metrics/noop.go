@@ -125,9 +125,9 @@ func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)    
 func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)               {}
 func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)                     {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                       {}
-func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                            {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                           {}
 func (nc *NoopCollector) CollectionMaxSize(uint)                                         {}
+func (nc *NoopCollector) ClusterBlockCreated(*cluster.Block, uint)                       {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)        {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)       {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                       {}
@@ -181,7 +181,7 @@ func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ module.
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                              {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64)      {}
-func (nc *NoopCollector) ExecutionCallbacksExecuted(int, uint64, uint64)                        {}
+func (nc *NoopCollector) ExecutionScheduledTransactionsExecuted(int, uint64, uint64)            {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                                   {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                     {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                      {}
@@ -376,6 +376,13 @@ var _ module.ExecutionStateIndexerMetrics = (*NoopCollector)(nil)
 func (nc *NoopCollector) BlockIndexed(uint64, time.Duration, int, int, int) {}
 func (nc *NoopCollector) BlockReindexed()                                   {}
 func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}
+
+var _ module.TransactionErrorMessagesMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) TxErrorsInitialHeight(uint64)                      {}
+func (nc *NoopCollector) TxErrorsFetchStarted()                             {}
+func (nc *NoopCollector) TxErrorsFetchFinished(time.Duration, bool, uint64) {}
+func (nc *NoopCollector) TxErrorsFetchRetried()                             {}
 
 var _ module.GossipSubScoringRegistryMetrics = (*NoopCollector)(nil)
 
