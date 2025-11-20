@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -117,42 +118,47 @@ func NewStateMachine(
 // Under normal execution, only exceptions are propagated to caller.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
-	err := m.votesCache.AddVote(vote)
+	unique, err := m.ensureVoteUnique(vote)
 	if err != nil {
-		if errors.Is(err, RepeatedVoteErr) {
-			return nil
-		}
-		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
-			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
-			return nil
-		}
-		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
-			vote.ID(), vote.BlockID, err)
+		return err
+	}
+	if !unique {
+		return nil
 	}
 
 	err = m.processVote(vote) // handles all byzantine edge cases internally
 	if err != nil {
-		if errors.Is(err, VoteForIncompatibleBlockError) {
-			// For honest nodes, there should be only a single proposal per view and all votes should
-			// be for this proposal. However, byzantine nodes might deviate from this happy path:
-			// * A malicious leader might create multiple (individually valid) conflicting proposals for the
-			//   same view. Honest replicas will send correct votes for whatever proposal they see first.
-			//   We only accept the first valid block and reject any other conflicting blocks that show up later.
-			// * Alternatively, malicious replicas might send votes with the expected view, but for blocks that
-			//   don't exist.
-			// In either case, receiving votes for the same view but for different block IDs is a symptom
-			// of malicious consensus participants. Hence, we log it here as a warning:
-			m.log.Warn().
-				Str(logging.KeySuspicious, "true").
-				Err(err).
-				Msg("received vote for incompatible block")
-
-			return nil
-		}
 		return fmt.Errorf("internal error processing vote %v for block %v: %w",
 			vote.ID(), vote.BlockID, err)
 	}
 	return nil
+}
+
+// ensureVoteUnique caches the vote in the votesCache. Additionally, it's responsible for reporting byzantine behavior when
+// byzantine leader or replica has provided an equivocating vote. All votes that are different from the original one(by same signer)
+// are reported as equivocation attempt.
+// ATTENTION: In order to guarantee that all equivocation attempts will be caught this function needs to be called before
+// processing individual votes and block proposals.
+// Possible return values:
+//   - (true, nil) - provided vote was first from given signer ID
+//   - (false, nil) - there is another vote in the cache that was previously added by given signer ID
+//   - (false, error) - exception during processing.
+//
+// No errors are expected during normal operations.
+func (m *VoteCollector) ensureVoteUnique(vote *model.Vote) (bool, error) {
+	err := m.votesCache.AddVote(vote)
+	if err != nil {
+		if errors.Is(err, RepeatedVoteErr) {
+			return false, nil
+		}
+		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
+			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
+			return false, nil
+		}
+		return false, fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
+			vote.ID(), vote.BlockID, err)
+	}
+	return true, nil
 }
 
 // processVote uses compare-and-repeat pattern to process vote with underlying vote processor.
@@ -179,23 +185,6 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 				m.notifier.OnInvalidVoteDetected(*invalidVoteErr)
 				return nil
 			}
-			if doubleVoteErr, ok := model.AsDoubleVoteError(err); ok {
-				// This error is returned when vote equivocation has been detected. The first layer of defence is the
-				// `votesCache`, which rejects all but the first vote from a node. However, a block proposal, which carries
-				// the proposer's vote for their own block, are processed through a different code path. Hence, only for the
-				// proposer it is possible that a repeated or equivocating vote might not be caught by the `votesCache`:
-				//  (A1) When the block proposal for the view arrives, the `votesProcessor` transitions from
-				//       [VoteCollectorStatusCaching] to [VoteCollectorStatusVerifying].
-				//  (A2) All cached votes are fed into the [VerifyingVoteProcessor].
-				// However, to increase concurrency, step (A1) and (A2) are _not_ atomically happening together.
-				// Therefore, the following event (B) might happen _in between_:
-				//  (B) A newly-arriving vote V is first cached and then processed by the [VerifyingVoteProcessor].
-				// In this scenario, vote V is already included in the [VerifyingVoteProcessor]. Nevertheless, step (A2)
-				// will attempt to add V again to the [VerifyingVoteProcessor], because the vote is in the cache and in case
-				// those votes are not identical then it's a proof of equivocation.
-				m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
-				return nil
-			}
 			if model.IsDuplicatedSignerError(err) {
 				// This error is returned for repetitions of exactly the same vote. Such repetitions can occur (as race
 				// condition) in our concurrent implementation. When the block proposal for the view arrives:
@@ -209,7 +198,24 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 				m.log.Debug().Msgf("duplicated signer %x", vote.SignerID)
 				return nil
 			}
-			return err
+			if errors.Is(err, VoteForIncompatibleBlockError) {
+				// For honest nodes, there should be only a single proposal per view and all votes should
+				// be for this proposal. However, byzantine nodes might deviate from this happy path:
+				// * A malicious leader might create multiple (individually valid) conflicting proposals for the
+				//   same view. Honest replicas will send correct votes for whatever proposal they see first.
+				//   We only accept the first valid block and reject any other conflicting blocks that show up later.
+				// * Alternatively, malicious replicas might send votes with the expected view, but for blocks that
+				//   don't exist.
+				// In either case, receiving votes for the same view but for different block IDs is a symptom
+				// of malicious consensus participants.  Hence, we log it here as a warning:
+				m.log.Warn().
+					Str(logging.KeySuspicious, "true").
+					Err(err).
+					Msg("received vote for incompatible block")
+
+				return nil
+			}
+			return irrecoverable.NewException(err)
 		}
 
 		// ATTENTION: repeating the processing if the processor changed concurrently is REQUIRED for LIVENESS on the
@@ -279,6 +285,15 @@ func (m *VoteCollector) View() uint64 {
 //	CachingVotes   → Invalid
 //	VerifyingVotes → Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
+	proposerVote, err := proposal.ProposerVote()
+	if err != nil {
+		return model.NewInvalidProposalErrorf(proposal, "invalid proposer vote")
+	}
+	_, err = m.ensureVoteUnique(proposerVote)
+	if err != nil {
+		return err
+	}
+
 	if proposal.Block.View != m.View() {
 		return fmt.Errorf("this VoteCollector requires a proposal for view %d but received block %v with view %d",
 			m.votesCache.View(), proposal.Block.BlockID, proposal.Block.View)

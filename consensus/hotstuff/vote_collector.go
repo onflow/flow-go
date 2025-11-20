@@ -95,8 +95,6 @@ type VoteProcessor interface {
 	//   - [VoteForIncompatibleViewError] if vote is for incompatible view
 	//   - [model.InvalidVoteError] if vote has invalid signature
 	//   - [model.DuplicatedSignerError] if the same vote from the same signer has been already added
-	//   - [model.DoubleVoteError] indicates that the voter has equivocated and submitted different votes for the same block.
-	//     (i.e. using different voting schemas for the same block).
 	//
 	// All other errors should be treated as exceptions.
 	Process(vote *model.Vote) error

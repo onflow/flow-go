@@ -98,7 +98,7 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 		onQCCreated:       s.onQCCreated,
 		packer:            s.packer,
 		minRequiredWeight: s.minRequiredWeight,
-		votesCache:        NewVotesCache(s.proposal.Block.View),
+		votesCache:        NewConcurrentIdentifierSet(),
 		done:              *atomic.NewBool(false),
 	}
 }
@@ -297,7 +297,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 			onQCCreated:       s.onQCCreated,
 			packer:            packer,
 			minRequiredWeight: s.minRequiredWeight,
-			votesCache:        NewVotesCache(s.proposal.Block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 	}
@@ -615,7 +615,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			votesCache:        NewVotesCache(block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 
@@ -716,7 +716,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 		onQCCreated:       func(qc *flow.QuorumCertificate) { /* no op */ },
 		packer:            packer,
 		minRequiredWeight: 70,
-		votesCache:        NewVotesCache(block.View),
+		votesCache:        NewConcurrentIdentifierSet(),
 		done:              *atomic.NewBool(false),
 	}
 
@@ -857,7 +857,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			votesCache:        NewVotesCache(block.View),
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 
@@ -1063,6 +1063,12 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 // key only and the other one is signed with the random beacon key.
 // This is a form of vote equivocation where a node sends a different vote from the one it has submitted previously.
 // CombinedVoteProcessorV3 has to detect that the vote from given participant has been already processed and return a respective error.
+//
+// There are two conceptually different attack scenarios we are testing here:
+//   - Leader-based attacks:
+//     (a) The leader might send block proposal and equivocate by sending a different conflicting vote.
+//     (b) The leader might send a block proposal and (repeatedly) send the same vote again as an independent message.
+//   - Any byzantine node (replicas and leader alike) might send multiple individual vote messages (repeated identical votes, or equivocating with different votes).
 func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	proposerView := uint64(20)
 
@@ -1112,9 +1118,9 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	leaderDifferentVote, err := stakingSigner.CreateVote(block)
 	require.NoError(t, err)
 
-	// construct a double vote, same view, but different block ID
+	// construct an equivocating vote, same view, but different block ID
 	otherBlock := helper.MakeBlock(helper.WithBlockView(block.View))
-	leaderDoubleVote, err := rbSigner.CreateVote(otherBlock)
+	leaderDifferentBlockVote, err := rbSigner.CreateVote(otherBlock)
 	require.NoError(t, err)
 
 	onQCCreated := func(qc *flow.QuorumCertificate) {
@@ -1141,16 +1147,15 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, model.IsDuplicatedSignerError(err))
 	})
-	t.Run("different-vote", func(t *testing.T) {
+	t.Run("vote for different block", func(t *testing.T) {
+		// process the double vote, this has to result in an error.
+		err = voteProcessor.Process(leaderDifferentBlockVote)
+		require.ErrorAs(t, err, &VoteForIncompatibleBlockError)
+	})
+	t.Run("vote for same block with different signature scheme", func(t *testing.T) {
 		// process the double vote, this has to result in an error.
 		err = voteProcessor.Process(leaderDifferentVote)
 		require.Error(t, err)
-		require.True(t, model.IsDoubleVoteError(err))
-	})
-	t.Run("double-vote", func(t *testing.T) {
-		// process the double vote, this has to result in an error.
-		err = voteProcessor.Process(leaderDoubleVote)
-		require.Error(t, err)
-		require.True(t, model.IsDoubleVoteError(err))
+		require.True(t, model.IsDuplicatedSignerError(err))
 	})
 }

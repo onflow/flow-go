@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -42,7 +43,7 @@ func (s *StateMachineTestSuite) TearDownTest() {
 	// Without this line we are risking running into weird situations where one test has finished but there are active workers
 	// that are executing some work on the shared pool. Need to ensure that all pending work has been executed before
 	// starting next test.
-	s.workerPool.StopWait()
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
 func (s *StateMachineTestSuite) SetupTest() {
@@ -63,12 +64,20 @@ func (s *StateMachineTestSuite) SetupTest() {
 
 // prepareMockedProcessor prepares a mocked processor and stores it in map, later it will be used
 // to mock behavior of verifying vote processor.
+// Additionally, it setups mocks on the processor assuming the proposer vote will be passed into the processing pipeline.
 func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedProposal) *mocks.VerifyingVoteProcessor {
-	processor := &mocks.VerifyingVoteProcessor{}
+	processor := mocks.NewVerifyingVoteProcessor(s.T())
 	processor.On("Block").Return(func() *model.Block {
 		return proposal.Block
 	}).Maybe()
 	processor.On("Status").Return(hotstuff.VoteCollectorStatusVerifying)
+
+	proposerVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
+	processor.On("Process", proposerVote).Run(func(_ mock.Arguments) {
+		s.notifier.On("OnVoteProcessed", proposerVote).Once()
+	}).Return(nil).Maybe()
+
 	s.mockedProcessors[proposal.Block.BlockID] = processor
 	return processor
 }
@@ -151,7 +160,8 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 		processor.On("Process", vote).Return(model.NewInvalidVoteErrorf(vote, "")).Once()
 		s.notifier.On("OnInvalidVoteDetected", mock.Anything).Run(func(args mock.Arguments) {
-			invalidVoteErr := args.Get(0).(model.InvalidVoteError)
+			invalidVoteErr, ok := model.AsInvalidVoteError(args.Get(0).(error))
+			require.True(s.T(), ok)
 			require.Equal(s.T(), vote, invalidVoteErr.Vote)
 		}).Return(nil).Once()
 		err := s.collector.AddVote(vote)
@@ -193,7 +203,7 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 		processor.On("Process", vote).Return(unexpectedError).Once()
 		err := s.collector.AddVote(vote)
-		require.ErrorIs(t, err, unexpectedError)
+		require.ErrorAs(t, err, &unexpectedError)
 	})
 }
 
@@ -216,74 +226,198 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
-	s.workerPool.StopWait()
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 	processor.AssertExpectations(s.T())
 }
 
-// TestProcessBlock_ErrorHandlingOfCachedVotes tests that all sentinel errors and exceptions are correctly handled when processing
-// cached votes.
-func (s *StateMachineTestSuite) TestProcessBlock_ErrorHandlingOfCachedVotes() {
+// Byzantine Leader might mount the following attacks:
+// 1. Vote-equivocation attack: send block proposal and equivocate by sending a different conflicting vote.
+// 2. Spamming attack: send a block proposal and (repeatedly) send the same vote again as an independent message.
+// 3. Leader might send multiple individual vote messages (repeated identical votes, or equivocating with different votes)
+// Attacks 1. and 2. are only available to the leader, because these attacks exploit the fact that stand-alone votes and
+// proposals are processed through different code paths: while stand-alone votes always hit the cache in the VoteCollector,
+// the vote embedded into the proposal is processed with priority (potentially concurrently to other incoming stand-alone votes).
+// Attack 3. can be mounted also by replicas
+// In next section we perform testing of those scenarios.
+
+// TestProcessBlock_ByzantineLeaderEquivocation_ProposalBeforeVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
+// Case (1.a): proposal arriving first, stand-alone vote arriving later:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_ProposalBeforeVote() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
+	proposalVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
+	_ = s.prepareMockedProcessor(proposal)
+
+	equivocatingVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(proposalVote.SignerID))
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	s.notifier.On("OnDoubleVotingDetected", proposalVote, equivocatingVote).Once()
+	err = s.collector.AddVote(equivocatingVote)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
+
+// TestProcessBlock_ByzantineLeaderEquivocation_ProposalAfterVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
+// Case (1.b): stand-alone vote arriving first, proposal arriving second:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_ProposalAfterVote() {
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	// in this case proposer vote comes in second and acts as equivocated vote
+	equivocatingVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
 	processor := s.prepareMockedProcessor(proposal)
+
+	firstVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(equivocatingVote.SignerID))
+	s.notifier.On("OnVoteProcessed", firstVote).Twice()
+	err = s.collector.AddVote(firstVote)
+	require.NoError(s.T(), err)
+
+	processor.On("Process", firstVote).Return(nil).Once()
+	s.notifier.On("OnDoubleVotingDetected", firstVote, equivocatingVote).Once()
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
+
+// TestProcessBlock_ByzantineLeaderSpamming_ProposalBeforeVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 2. send block proposal and try to spam with the same vote. We test both orders of arrival:
+// Case (2.a): proposal arriving first, stand-alone vote arriving later:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalBeforeVote() {
+	proposal := makeSignedProposalWithView(s.view)
+	_ = s.prepareMockedProcessor(proposal)
 	proposalVote, err := proposal.ProposerVote()
 	require.NoError(s.T(), err)
 
-	// Byzantine Leader might mount the following attacks:
-	// 1. Vote-equivocation attack: send block proposal and equivocate by sending a different conflicting vote.
-	// 2. Spamming attack: send a block proposal and (repeatedly) send the same vote again as an independent message.
-	// 3. Leader might send multiple individual vote messages (repeated identical votes, or equivocating with different votes)
-	// Attacks 1. and 2. are only available to the leader, because these attacks exploit the fact that stand-alone votes and
-	// proposals are processed through different code paths: while stand-alone votes always hit the cache in the VoteCollector,
-	// the vote embedded into the proposal is processed with priority (potentially concurrently to other incoming stand-alone votes).
-	// Attack 3. can be mounted also by replicas
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
 
-	// Attach 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
-	// Case (1.a): proposal arriving first, stand-alone vote arriving later:
-	//<configure mock processor>
-	require.NoError(s.T(), s.collector.ProcessBlock(proposal))
-	doubleVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(proposalVote.SignerID))
-	processor.On("Process", doubleVote).Return(model.NewDoubleVoteErrorf(proposalVote, doubleVote, "")).Once()
-	s.notifier.On("OnDoubleVotingDetected", proposalVote, doubleVote).Once() // expect notification about equivocating votes
-	// Notification [VoteCollectorConsumer.OnVoteProcessed] should NOT be emitted, because the vote is right away detected as byzantine
-	require.NoError(s.T(), s.collector.AddVote(doubleVote))
+	err = s.collector.AddVote(proposalVote)
+	require.NoError(s.T(), err)
 
-	// Case (1.b): stand-alone vote arriving first, proposal arriving second:
-	// Notification [VoteCollectorConsumer.OnVoteProcessed] should NOT be emitted, because the vote is first cached (proposal still unknown)
-	require.NoError(s.T(), s.collector.AddVote(doubleVote))
-	//<configure mock processor>
-	processor.On("Process", doubleVote).Return(model.NewDoubleVoteErrorf(proposalVote, doubleVote, "")).Once()
-	s.notifier.On("OnDoubleVotingDetected", proposalVote, doubleVote).Once() // expect notification about equivocating votes
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
 
-	require.NoError(s.T(), s.collector.ProcessBlock(proposal))
+// TestProcessBlock_ByzantineLeaderSpamming_ProposalAfterVote tests a specific attack scenario mounted by byzantine leader:
+// Attack 2. send block proposal and try to spam with the same vote. We test both orders of arrival:
+// Case (2.b): stand-alone vote arriving first, proposal arriving second:
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalAfterVote() {
+	proposal := makeSignedProposalWithView(s.view)
+	_ = s.prepareMockedProcessor(proposal)
+	proposalVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
 
-	doubleVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(proposalVote.SignerID))
-	s.notifier.On("OnVoteProcessed", doubleVote).Once()
-	processor.On("Process", doubleVote).Return(model.NewDoubleVoteErrorf(firstVote, doubleVote, "")).Once()
-	// expect delivery to the notifier
-	s.notifier.On("OnDoubleVotingDetected", firstVote, doubleVote).Once()
-	require.NoError(s.T(), s.collector.AddVote(doubleVote))
+	s.notifier.On("OnVoteProcessed", proposalVote).Once()
+	err = s.collector.AddVote(proposalVote)
+	require.NoError(s.T(), err)
 
-	// test repeated vote, we ignore same vote and do nothing
-	repeatedVote := unittest.VoteForBlockFixture(block)
-	s.notifier.On("OnVoteProcessed", repeatedVote).Once()
-	processor.On("Process", repeatedVote).Return(model.NewDuplicatedSignerErrorf("")).Once()
-	require.NoError(s.T(), s.collector.AddVote(repeatedVote))
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
 
-	// test invalid vote, this is byzantine behavior and needs to be reported to the respective consumer
-	invalidVote := unittest.VoteForBlockFixture(block)
-	s.notifier.On("OnVoteProcessed", invalidVote).Once()
-	invalidVoteErr := model.NewInvalidVoteErrorf(invalidVote, "")
-	processor.On("Process", invalidVote).Return(invalidVoteErr).Once()
-	// expect delivery to the notifier
-	s.notifier.On("OnInvalidVoteDetected", invalidVoteErr).Once()
-	require.NoError(s.T(), s.collector.AddVote(invalidVote))
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
 
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.a): equivocation: both votes arrive before receiving a proposal.
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal() {
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	processor := s.prepareMockedProcessor(proposal)
+
+	vote := unittest.VoteForBlockFixture(block)
+	equivocatingVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(vote.SignerID))
+
+	processor.On("Process", vote).Return(nil).Once()
+	s.notifier.On("OnVoteProcessed", vote).Twice()
+	err := s.collector.AddVote(vote)
+	require.NoError(s.T(), err)
+
+	s.notifier.On("OnDoubleVotingDetected", vote, equivocatingVote).Once()
+	err = s.collector.AddVote(equivocatingVote)
+	require.NoError(s.T(), err)
+
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
+
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.b): equivocation: both votes arrive after receiving a proposal.
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_AfterProposal() {
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	processor := s.prepareMockedProcessor(proposal)
+
+	vote := unittest.VoteForBlockFixture(block)
+	equivocatingVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(vote.SignerID))
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
-	s.workerPool.StopWait()
-	processor.AssertExpectations(s.T())
+	processor.On("Process", vote).Return(nil).Once()
+	s.notifier.On("OnVoteProcessed", vote).Once()
+	err = s.collector.AddVote(vote)
+	require.NoError(s.T(), err)
+
+	s.notifier.On("OnDoubleVotingDetected", vote, equivocatingVote).Once()
+	err = s.collector.AddVote(equivocatingVote)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
+
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.c): spamming: both votes arrive before receiving a proposal.
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_BeforeProposal() {
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	processor := s.prepareMockedProcessor(proposal)
+
+	vote := unittest.VoteForBlockFixture(block)
+
+	processor.On("Process", vote).Return(nil).Once()
+	s.notifier.On("OnVoteProcessed", vote).Twice()
+	err := s.collector.AddVote(vote)
+	require.NoError(s.T(), err)
+
+	err = s.collector.AddVote(vote)
+	require.NoError(s.T(), err)
+
+	err = s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
+}
+
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.d): spamming: both votes arrive after receiving a proposal.
+func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_AfterProposal() {
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	processor := s.prepareMockedProcessor(proposal)
+
+	vote := unittest.VoteForBlockFixture(block)
+	err := s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	processor.On("Process", vote).Return(nil).Once()
+	s.notifier.On("OnVoteProcessed", vote).Once()
+	err = s.collector.AddVote(vote)
+	require.NoError(s.T(), err)
+
+	err = s.collector.AddVote(vote)
+	require.NoError(s.T(), err)
+
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
 // Test_VoteProcessorErrorPropagation verifies that unexpected errors from the `VoteProcessor`
@@ -293,15 +427,14 @@ func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 	block := proposal.Block
 	processor := s.prepareMockedProcessor(proposal)
 
-	err := s.collector.ProcessBlock(helper.MakeSignedProposal(
-		helper.WithProposal(helper.MakeProposal(helper.WithBlock(block)))))
+	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
 	unexpectedError := errors.New("some unexpected error")
 	vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 	processor.On("Process", vote).Return(unexpectedError).Once()
 	err = s.collector.AddVote(vote)
-	require.ErrorIs(s.T(), err, unexpectedError)
+	require.ErrorAs(s.T(), err, &unexpectedError)
 }
 
 // RegisterVoteConsumer verifies that after registering vote consumer we are receiving all new and past votes

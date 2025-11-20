@@ -100,7 +100,7 @@ type CombinedVoteProcessorV2 struct {
 	rbRector          hotstuff.RandomBeaconReconstructor
 	onQCCreated       hotstuff.OnQCCreated
 	packer            hotstuff.Packer
-	votesCache        *VotesCache
+	votesCache        *ConcurrentIdentifierSet
 	minRequiredWeight uint64
 	done              atomic.Bool
 }
@@ -122,7 +122,7 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 		rbRector:          rbRector,
 		onQCCreated:       onQCCreated,
 		packer:            packer,
-		votesCache:        NewVotesCache(block.View),
+		votesCache:        NewConcurrentIdentifierSet(),
 		minRequiredWeight: minRequiredWeight,
 		done:              *atomic.NewBool(false),
 	}
@@ -153,8 +153,6 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 //   - [VoteForIncompatibleViewError] if vote is for incompatible view
 //   - [model.InvalidVoteError] if vote has invalid signature
 //   - [model.DuplicatedSignerError] if the same vote from the same signer has been already added
-//   - [model.DoubleVoteError] indicates that the voter has equivocated and submitted different votes for the same block.
-//     (i.e. using different voting schemas for the same block).
 //
 // All other errors should be treated as exceptions.
 //
@@ -165,16 +163,32 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 // Additionally, all votes before being counted by the aggregator are first deduplicated using a dedicated [VotesCache]
 // which detects double voting and stops further processing of the vote.
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
-	if err := p.votesCache.AddVote(vote); err != nil {
-		if errors.Is(err, RepeatedVoteErr) {
-			return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
-		}
-		return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
-	}
-
-	err := EnsureVoteForBlock(vote, p.block) // checks that blockID and view match; errors with [VoteForIncompatibleViewError] or [VoteForIncompatibleBlockError] otherwise
+	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
 		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
+	}
+
+	// Add vote to a local cache to track repeated and double votes before processing them by specific aggregators.
+	// Consensus committee member can provide vote in two forms: a staking signature and a random beacon signature.
+	// Therefore, we might receive two votes from one node, where the first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
+	// Since each of the aggregators tracks votes by signer ID, they cannot detect duplicated or repeated votes if they were provided
+	// only one to each aggregator. It's impossible to deduplicate votes without relying on external components to do the job.
+	// To increase modularity and BFT resilience of this component we are introducing a votesCache which tracks votes by signer ID.
+	// Using votesCache we can guarantee that we will process at most one vote per signer, which guarantees correctness of the QCs we produce without relying on
+	// external conditions.
+	//
+	// The way votesCache is used introduces some weak consistency between cache and aggregators, on happy path it's completely
+	// straightforward approach. Adding a vote to the votesCache acts like a trapdoor for competing threads, only single competing
+	// thread will pass through it and succeed in adding the vote to the aggregator.
+	// It gets more interesting when any of the operations fail after we add the vote to the cache. The way this logic is structured
+	// it results in the following rule: _only the very first vote that was added to the votesCache from the same signer will be processed by the component_.
+	// It means that if the vote was invalid by any reason from the point of view of the aggregator the second vote won't be processed at all
+	// even if it might be correct from the pointer of view of the aggregator.
+	// Since all honest replicas must provide valid votes at all times then this behavior of producing one invalid and one valid vote
+	// is accounted for byzantine behavior and affects the liveness threshold _f_ of the consensus algorithm.
+	// If this component receives _f+1_ invalid votes then we won't be able to produce a QC for this particular view.
+	if !p.votesCache.Add(vote.SignerID) {
+		return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
 	}
 
 	// Vote Processing state machine
