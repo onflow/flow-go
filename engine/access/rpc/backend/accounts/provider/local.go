@@ -55,7 +55,6 @@ func NewLocalAccountProvider(
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
 //   - [access.RequestCanceledError]: If the request is canceled.
 //   - [access.RequestTimedOutError]: If the request times out.
-//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -101,7 +100,6 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
 //   - [access.RequestCanceledError]: If the request is canceled.
 //   - [access.RequestTimedOutError]: If the request times out.
-//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -149,7 +147,6 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
 //   - [access.RequestCanceledError]: If the request is canceled.
 //   - [access.RequestTimedOutError]: If the request times out.
-//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -198,7 +195,6 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
 //   - [access.RequestCanceledError]: If the request is canceled.
 //   - [access.RequestTimedOutError]: If the request times out.
-//   - [access.InternalError]: For internal failures or index conversion errors.
 func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
@@ -244,7 +240,6 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.RequestCanceledError]: If the request is canceled.
 //   - [access.RequestTimedOutError]: If the request times out.
-//   - [access.InternalError]: For internal failures or index conversion errors.
 func convertAccountError(err error) error {
 	switch {
 	case errors.Is(err, version.ErrOutOfRange),
@@ -257,11 +252,6 @@ func convertAccountError(err error) error {
 		return access.NewRequestCanceledError(err)
 	case errors.Is(err, context.DeadlineExceeded):
 		return access.NewRequestTimedOutError(err)
-	}
-
-	var failure fvmerrors.CodedFailure
-	if fvmerrors.As(err, &failure) {
-		return access.NewInternalError(err)
 	}
 
 	// general FVM/ledger errors
