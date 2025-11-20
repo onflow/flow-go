@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -27,7 +26,8 @@ func (b *backendExecutionResults) GetExecutionResultForBlockID(ctx context.Conte
 	// Query seal by blockID
 	seal, err := b.seals.FinalizedSealForBlock(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, access.NewDataNotFoundError("seal", err)
 	}
 
 	// Query result by seal.ResultID
