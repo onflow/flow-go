@@ -160,12 +160,10 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 //
 // All other errors should be treated as exceptions.
 //
-// CAUTION: implementation is NOT (yet) BFT
-// Explanation: for correctness, we require that no voter can be counted repeatedly. However,
-// CombinedVoteProcessorV3 relies on the `VoteCollector`'s `votesCache` filter out all votes but the first for
-// every signerID. However, we have the edge case, where we still feed the proposers vote twice into the
-// `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
-// by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
+// Impossibility of vote double-counting: All votes before being counted by the aggregator are first deduplicated using a dedicated votesCache
+// which tracks votes by signerID this ensures that at most one vote will be processed from given signer.
+// This means that [CombinedVoteProcessorV3] guarantees to process at most one vote per signer, everything else will be discarded
+// as duplicate. We rely on the external components to detect and slash equivocation cases.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -174,11 +172,11 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 
 	// Add vote to a local cache to track repeated and double votes before processing them by specific aggregators.
 	// Consensus committee member can provide vote in two forms: a staking signature and a random beacon signature.
-	// Therefore we might receive two votes from one node, where the first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
+	// Therefore, we might receive two votes from one node, where the first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
 	// Since each of the aggregators tracks votes by signer ID, they cannot detect duplicated or repeated votes if they were provided
 	// only one to each aggregator. It's impossible to deduplicate votes without relying on external components to do the job.
-	// To increase modularity and BFT resilience of this component we are introducing a votesCache which tracks repeated and
-	// double votes for a particular view. Using a votesCache inherently guarantees correctness of the QCs we produce without relying on
+	// To increase modularity and BFT resilience of this component we are introducing a votesCache which tracks votes by signer ID.
+	// Using votesCache we can guarantee that we will process at most one vote per signer, which guarantees correctness of the QCs we produce without relying on
 	// external conditions.
 	//
 	// The way votesCache is used introduces some weak consistency between cache and aggregators, on happy path it's completely
@@ -194,10 +192,6 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	if !p.votesCache.Add(vote.SignerID) {
 		return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
 	}
-
-	// in order to catch all cases of vote equivocation we are first adding the vote to the cache and only after
-	// we ensure that indeed the vote is for designated vote processor, otherwise we won't be able to track equivocation
-	// cases where replica voted for two different block IDs in the same view.
 
 	// Vote Processing state machine
 	if p.done.Load() {
