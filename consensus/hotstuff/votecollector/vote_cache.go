@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	// RepeatedVoteErr is emitted, when we receive a vote for the same block
+	// RepeatedVoteErr is emitted, when we receive the _same_ vote for the same block
 	// from the same voter multiple times. This error does _not_ indicate
 	// equivocation.
 	RepeatedVoteErr = errors.New("duplicated vote")
@@ -41,7 +41,13 @@ type voteContainer struct {
 //     replica is voting for different blocks at the same view or using different signing information.
 //     We reject `v1` with a [model.DoubleVoteError].
 type VotesCache struct {
-	lock          sync.RWMutex
+	// CAUTION: In the VoteCollector's liveness proof, we utilized that reading the `VotesCache` happens before writing to it. It is important to
+	// emphasize that only locks are agnostic to the performed operation being a read or a write. In contrast, atomic variables only establish a
+	// 'happens before' relation when a preceding write is observed by a subsequent read. However, the VoteProcessor first reads and then writes.
+	// For atomic variables, this order of operations does not induce any synchronization guarantees according to Go Memory Model
+	// ( https://go.dev/ref/mem ). Hence, the VotesCache utilizing locks is critical for the correctness of the `VoteCollector`.
+	lock sync.RWMutex
+
 	view          uint64
 	votes         map[flow.Identifier]voteContainer // signerID -> first vote
 	voteConsumers []hotstuff.VoteConsumer
@@ -60,24 +66,24 @@ func (vc *VotesCache) View() uint64 { return vc.view }
 // AddVote stores a vote in the cache. The method returns `nil`, if the vote was
 // successfully stored. When AddVote returns an error, the vote is _not_ stored.
 // Expected error returns during normal operations:
-//   - [VoteForIncompatibleViewError] - is returned if the vote is for a different view.
-//   - [model.DoubleVoteError] - indicates that the voter has emitted inconsistent
+//   - [VoteForIncompatibleViewError] is returned if the vote is for a different view.
+//   - [model.DoubleVoteError] indicates that the voter has emitted inconsistent
 //     votes within the same view. We consider two votes as inconsistent, if they
 //     are from the same signer for the same view, but have different IDs. Potential
 //     causes could be:
-//   - The signer voted for different blocks in the same view.
-//   - The signer emitted votes for the same block, but included different
+//     (i) The signer voted for different blocks in the same view.
+//     (ii) The signer emitted votes for the same block, but included different
 //     signatures. This is only relevant for voting schemes where the signer has
 //     different options how to sign (e.g. sign with staking key and/or random
 //     beacon key). For such voting schemes, byzantine replicas could try to
-//     submit different votes for the same block, to exhaust the primary's
+//     submit different votes for the same block, to exhaust the vote collector's
 //     resources or have multiple of their votes counted to undermine consensus
 //     safety (aka double-counting attack).
-//     Both are protocol violations and belong to the family of equivocation attacks.
-//     As part of the error, we return the internally-cached vote, which is conflicting
-//     with the input `vote`.
+//     Both (i) and (ii) are protocol violations and belong to the family of equivocation
+//     attacks. As part of the error, we return the internally-cached vote, which is
+//     conflicting with the input `vote`.
 //   - [RepeatedVoteErr] is returned when adding a vote that is _identical_ (same ID)
-//     to a previously added vote.
+//     to a previously added vote. This is not a slashable protocol violation.
 func (vc *VotesCache) AddVote(vote *model.Vote) error {
 	if vote.View != vc.view {
 		return fmt.Errorf("expected vote for view %d but vote's view is %d: %w", vc.view, vote.View, VoteForIncompatibleViewError)

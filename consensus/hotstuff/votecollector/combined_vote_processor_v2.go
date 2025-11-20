@@ -142,11 +142,17 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 // called by multiple goroutines at the same time. Supports processing of both staking and random beacon signatures.
 // Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
+//
+// IMPORTANT: The VerifyingVoteProcessor provides the final defense against any vote-equivocation attacks
+// for its specific block. These attacks typically aim at multiple votes from the same node being counted
+// towards the supermajority threshold. This must cover attacks by the leader concurrently utilizing
+// stand-alone votes and votes embedded into the proposal.
+//
 // Expected error returns during normal operations:
-//   - [VoteForIncompatibleBlockError] - submitted vote for incompatible block
-//   - [VoteForIncompatibleViewError] - submitted vote for incompatible view
-//   - [model.InvalidVoteError] - submitted vote with invalid signature
-//   - [model.DuplicatedSignerError] if the signer has been already added
+//   - [VoteForIncompatibleBlockError] if vote is for incompatible block
+//   - [VoteForIncompatibleViewError] if vote is for incompatible view
+//   - [model.InvalidVoteError] if vote has invalid signature
+//   - [model.DuplicatedSignerError] if the same vote from the same signer has been already added
 //
 // All other errors should be treated as exceptions.
 //

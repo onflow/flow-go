@@ -3,7 +3,6 @@ package votecollector
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -12,16 +11,22 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 var (
 	ErrDifferentCollectorState = errors.New("different state")
 )
 
-// VerifyingVoteProcessorFactory generates hotstuff.VerifyingVoteCollector instances
+// VerifyingVoteProcessorFactory generates [hotstuff.VerifyingVoteProcessor] instances
 type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.SignedProposal) (hotstuff.VerifyingVoteProcessor, error)
 
-// VoteCollector implements a state machine for transition between different states of vote collector
+// VoteCollector implements a state machine for transition between different states of vote processor.
+// It ingests *all* votes for a specified view and consolidates the handling of all byzantine edge cases
+// related to voting (including byzantine leaders publishing conflicting proposals and/or votes).
+// On the happy path, the VoteCollector generates a QC when enough votes have been ingested.
+// We internally delegate the vote-format specific processing to the VoteProcessor.
 type VoteCollector struct {
 	sync.Mutex
 	log                      zerolog.Logger
@@ -29,6 +34,30 @@ type VoteCollector struct {
 	notifier                 hotstuff.VoteAggregationConsumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
+	// Byzantine nodes might mount the following attacks on the vote-processing logic:
+	//  1. The leader might send block proposal and equivocate by sending a different conflicting vote.
+	//  2. The leader might send a block proposal and (repeatedly) send the same vote again as an independent message.
+	//  3. Any byzantine replica might send multiple individual vote messages (repeated identical votes, or equivocating with different votes).
+	// These are resource exhaustion attacks (if frequent), but can also be attempts by byzantine nodes to have their votes repeatedly
+	// counted (producing an invalid QC if repeatedly counted and thereby disrupting the certification and finalization process).
+	//
+	// Replicas that are not the leader might also attempt to submit proposals, but these are already caught earlier by the compliance layer.
+	// Hence, attacks 1. and 2. are only available to the leader, because these attacks specifically utilize the fact that the leader signs
+	// their proposal, with the signature authenticating the proposal as well as serving as the leader's vote. Attack 3. can be mounted by
+	// replicas and the leader alike.
+	//
+	// ATTENTION: Detecting vote equivocation is a collaborative effort of the VoteCollector's `votesCache` and the `VoteProcessor`.
+	//  * Stand-alone votes always hit the `votesCache`, which checks the vote against all previously cached votes for
+	//    equivocation (protocol violation) or exact duplicates (non-slashable, potential spamming). This mitigates attack 3.
+	//  * In the current implementation, the `votesCache` does not catch leader attacks 1. and 2., which exploit the fact that stand-alone
+	//    votes and votes embedded in proposals are processed concurrently through different code paths. We emphasize that attack vectors
+	//    1. and 2. are only available to a byzantine leader as long as the leader has not (yet) equivocated for the current view. Once
+	//    the VoteCollector notices that the leader equivocates, it immediately stops accepting proposals for the view, thereby closing
+	//    attack vectors 1. and 2. Hence, it is sufficient for the [VerifyingVoteProcessor] to catch _all_ equivocation attacks,
+	//    including attacks 1. and 2.
+	//
+	// The VoteProcessor provides the final defense against any double-counting attacks, because this attack vector is only open as long
+	// as we are ingesting votes with the goal of producing a QC, in other words as along as we are still following the happy path.
 	votesCache     VotesCache
 	votesProcessor atomic.Value
 }
@@ -82,9 +111,11 @@ func NewStateMachine(
 	return sm
 }
 
-// AddVote adds a vote to current vote collector
-// All expected errors are handled via callbacks to notifier.
-// No errors are expected during normal operation.
+// AddVote adds a vote to current vote collector. The vote must be for the `VoteCollector`'s view (otherwise,
+// an exception is returned). When enough votes have been added to produce a QC, the QC will be created
+// asynchronously, and passed to EventLoop through a callback.
+// All byzantine edge cases are handled internally via callbacks to notifier.
+// Under normal execution, only exceptions are propagated to caller.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
 	unique, err := m.ensureVoteUnique(vote)
@@ -95,7 +126,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 		return nil
 	}
 
-	err = m.processVote(vote)
+	err = m.processVote(vote) // handles all byzantine edge cases internally
 	if err != nil {
 		return fmt.Errorf("internal error processing vote %v for block %v: %w",
 			vote.ID(), vote.BlockID, err)
@@ -131,14 +162,18 @@ func (m *VoteCollector) ensureVoteUnique(vote *model.Vote) (bool, error) {
 }
 
 // processVote uses compare-and-repeat pattern to process vote with underlying vote processor.
-// All expected errors are handled internally. Under normal execution only exceptions are
-// propagated to caller.
+// This compare-and-repeat pattern is crucial to ensure all valid votes make it to the
+// [hotstuff.VerifyingVoteProcessor], i.e. liveness, despite the vote processor possibly being
+// swapped concurrently when the block is arriving (see implementation for detailed reasoning).
 //
 // PREREQUISITE: This method should only be called for votes that were successfully added to
 // `votesCache` (identical duplicates are ok). Therefore, we don't have to deal here with
 // equivocation (same replica voting for different blocks) or inconsistent votes (replica
 // emitting votes with inconsistent signatures for the same block), because such votes were
 // already filtered out by the cache.
+//
+// All byzantine edge cases are handled internally  via callbacks to notifier. Under normal
+// execution, only exceptions are propagated to caller.
 func (m *VoteCollector) processVote(vote *model.Vote) error {
 	for {
 		processor := m.atomicLoadProcessor()
@@ -174,6 +209,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 				// In either case, receiving votes for the same view but for different block IDs is a symptom
 				// of malicious consensus participants.  Hence, we log it here as a warning:
 				m.log.Warn().
+					Str(logging.KeySuspicious, "true").
 					Err(err).
 					Msg("received vote for incompatible block")
 
@@ -182,6 +218,41 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 			return irrecoverable.NewException(err)
 		}
 
+		// ATTENTION: repeating the processing if the processor changed concurrently is REQUIRED for LIVENESS on the
+		// happy path (honest proposer and a supermajority of votes arriving in time).
+		// Liveness Proof for the happy path (utilizing the Go Memory Model https://go.dev/ref/mem, 'happens before' relation):
+		//  * We only care about the Vote Processor's state transition `CachingVotes` → `VerifyingVotes`, because all other state transitions
+		//    are leaving the happy path. The state transition is effectively an atomic write to the variable `votesProcessor` (see method
+		//    `VoteCollector.ProcessBlock` below for details).
+		//  * Case (a): `currentState` = [VoteCollectorStatusVerifying] = `m.Status()`
+		//    Then, the `vote` is added directly to the [VerifyingVoteProcessor]. Informally, the state transition has happened before we retrieved
+		//    the Vote Processor via `m.atomicLoadProcessor()` above.
+		//  * Case (b): `currentState` = [VoteCollectorStatusCaching] = `m.Status()`
+		//    We note the following happens-before relations (i) and (ii), which are guaranteed by sequential execution _within_ a goroutine:
+		//    In goroutine A1 performing the state transition, (i) we write to `votesProcessor` before we read all cached votes from `votesCache`
+		//    (acquiring `votesCache`s lock). In goroutine A2, (ii) we have added the vote to the `votesCache` (also acquiring `votesCache`s lock)
+		//    before we read `votesProcessor`s status below and confirm its status still being [VoteCollectorStatusCaching].
+		//       We prove by contradiction that it is impossible for thread A1 to read the cached votes before thread A2 adds its vote to `votesCache`
+		//    (if that was possible, the verifying vote processor would not see the vote). By the time A1 reads the `votesCache`, it has already
+		//    completed updating the status of the `votesProcessor` to [VoteCollectorStatusVerifying] (per (i)). We assumed that A1 reading the
+		//    `votesCache` happens before A2 writing to it (`votesCache` uses locks, which establish a happens before relation). With (ii), we infer
+		//    that the `votesProcessor` reaching status [VoteCollectorStatusVerifying] happens before A2 reading the `votesProcessor` status below.
+		//    Therefore, A2 would read the status [VoteCollectorStatusVerifying], which contradicts our assumption.
+		//       Hence, we conclude that thread A2 always caches its vote before A1 reads the `votesCache`. As A1 is the thread that performs the
+		//    state transition, it will include A1's vote when feeding the cached votes into the [VerifyingVoteProcessor].
+		//    Informally, the state transition will happen _after_ we cached the vote.
+		//  * Case (c): `currentState` = [VoteCollectorStatusCaching] while `m.Status()` = [VoteCollectorStatusVerifying].
+		//    In this scenario, the vote is being fed into the [NoopProcessor] first, before we realize that the state has changed. However,
+		//    since the status has changed, the check below will trigger a repeat of the processing, which will then enter case (a)
+		//    (or leave the happy path by transitioning to [VoteCollectorStatusInvalid], implying we are dealing with a byzantine proposer, in which
+		//    case we may drop all votes anyway).
+		// We have shown that all votes will reach the [VerifyingVoteProcessor] on the happy path.
+		//
+		// CAUTION: In the proof, we utilized that reading the `votesCache` happens before writing to it (case b). It is important to emphasize that
+		// only locks are agnostic to the performed operation being a read or a write. In contrast, atomic variables only establish a 'happens before'
+		// relation when a preceding write is observed by a subsequent read. However, in our case, we first read and then write - an order of operation
+		// which does not induce any synchronization guarantees according to Go Memory Model. Hence, the `votesCache` utilizing locks is
+		// critical for the correctness of the `VoteCollector`.
 		if currentState != m.Status() {
 			continue
 		}
@@ -210,9 +281,9 @@ func (m *VoteCollector) View() uint64 {
 // the state transition is only executed if VoteCollector's internal state is
 // equal to `expectedValue`. The implementation only allows the transitions
 //
-//	CachingVotes   -> VerifyingVotes
-//	CachingVotes   -> Invalid
-//	VerifyingVotes -> Invalid
+//	CachingVotes   → VerifyingVotes
+//	CachingVotes   → Invalid
+//	VerifyingVotes → Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
 	proposerVote, err := proposal.ProposerVote()
 	if err != nil {
@@ -284,7 +355,7 @@ func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 	m.votesCache.RegisterVoteConsumer(consumer)
 }
 
-// caching2Verifying ensures that the VoteProcessor is currently in state `VoteCollectorStatusCaching`
+// caching2Verifying ensures that the VoteProcessor is currently in state [VoteCollectorStatusCaching]
 // and replaces it by a newly-created VerifyingVoteProcessor.
 // Error returns:
 // * ErrDifferentCollectorState if the VoteCollector's state is _not_ `CachingVotes`
