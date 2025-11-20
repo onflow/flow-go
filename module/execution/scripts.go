@@ -87,6 +87,7 @@ func NewScripts(
 //   - [fvmerrors.ErrCodeScriptExecutionTimedOutError]: If script execution timed out.
 //   - [fvmerrors.ErrCodeComputationLimitExceededError]: If script execution computation limit is exceeded.
 //   - [fvmerrors.ErrCodeMemoryLimitExceededError]: If script execution memory limit is exceeded.
+//   - [fvmerrors.FailureCodeLedgerFailure]: If the script execution fails due to ledger errors.
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,

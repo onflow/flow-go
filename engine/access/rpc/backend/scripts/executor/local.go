@@ -59,7 +59,6 @@ func NewLocalScriptExecutor(
 //   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.InternalError] - for internal failures or index conversion errors.
 func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	execStartTime := time.Now()
@@ -130,7 +129,6 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 //   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
 //   - [access.RequestCanceledError] - if the script execution was canceled.
 //   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.InternalError] - for internal failures or index conversion errors.
 func convertScriptExecutionError(err error) error {
 	switch {
 	case errors.Is(err, version.ErrOutOfRange),
@@ -143,11 +141,6 @@ func convertScriptExecutionError(err error) error {
 		return access.NewRequestCanceledError(err)
 	case errors.Is(err, context.DeadlineExceeded):
 		return access.NewRequestTimedOutError(err)
-	}
-
-	var failure fvmerrors.CodedFailure
-	if fvmerrors.As(err, &failure) {
-		return access.NewInternalError(err)
 	}
 
 	// general FVM/ledger errors

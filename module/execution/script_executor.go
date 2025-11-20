@@ -21,7 +21,7 @@ type ScriptExecutor interface {
 	//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError]: If script execution timed out.
 	//   - [fvmerrors.ErrCodeComputationLimitExceededError]: If script execution exceeded the computation limit.
 	//   - [fvmerrors.ErrCodeMemoryLimitExceededError]: If script execution exceeded the memory limit.
-	// TODO(#7650): Add GoDoc on fvmerrors.CodedError, which represents any non-fatal user FVM error.
+	//   - [fvmerrors.FailureCodeLedgerFailure] - if the script execution fails due to ledger errors.
 	ExecuteAtBlockHeight(
 		ctx context.Context,
 		script []byte,
