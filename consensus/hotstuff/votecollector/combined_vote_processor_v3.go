@@ -173,10 +173,10 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	}
 
 	// Add vote to a local cache to track repeated and double votes before processing them by specific aggregators.
-	// Since consensus committee member can provide vote in two forms: a staking signature and a random beacon signature
-	// this leads to a situation where we first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
-	// While each of the aggregators tracks votes by signer ID, then cannot detect duplicated or repeated votes if they were provided
-	// only ones to each aggregator. It's impossible to deduplicate votes without relying on external components to do the job.
+	// Consensus committee member can provide vote in two forms: a staking signature and a random beacon signature.
+	// Therefore we might receive two votes from one node, where the first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
+	// Since each of the aggregators tracks votes by signer ID, they cannot detect duplicated or repeated votes if they were provided
+	// only one to each aggregator. It's impossible to deduplicate votes without relying on external components to do the job.
 	// To increase modularity and BFT resilience of this component we are introducing a votesCache which tracks repeated and
 	// double votes for a particular view. Using a votesCache inherently guarantees correctness of the QCs we produce without relying on
 	// external conditions.
