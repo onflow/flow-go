@@ -185,7 +185,7 @@ type AccessNodeConfig struct {
 	registerDBPruneThreshold             uint64
 	collectionFetcherMaxProcessing       uint64
 	collectionFetcherMaxSearchAhead      uint64
-	collectionFetch                      string
+	collectionSync                       string
 }
 
 type PublicNetworkConfig struct {
@@ -295,7 +295,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerDBPruneThreshold:             0,
 		collectionFetcherMaxProcessing:       10,
 		collectionFetcherMaxSearchAhead:      20,
-		collectionFetch:                      "default",
+		collectionSync:                       "execution_and_collection",
 	}
 }
 
@@ -1336,10 +1336,12 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"public-network-execution-data-sync-enabled",
 			defaultConfig.publicNetworkExecutionDataEnabled,
 			"[experimental] whether to enable the execution data sync protocol on public network")
-		flags.StringVar(&builder.collectionFetch,
-			"collection-fetch",
-			defaultConfig.collectionFetch,
-			"collection fetch mode: 'default' (normal behavior), 'always_on' (always create fetcher even with execution data sync), 'fetch_only' (create fetcher but skip execution data processor)")
+		flags.StringVar(&builder.collectionSync,
+			"collection-sync",
+			defaultConfig.collectionSync,
+			"collection sync mode: 'execution_first' (only fetch from execution nodes if execution data syncing is on, "+
+				"otherwise fetch from collection nodes), 'execution_and_collection' (fetch from both collection nodes and execution nodes), "+
+				"'collection_only' (only fetch from collection nodes)")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight,
 			"execution-data-start-height",
@@ -1528,8 +1530,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
 		}
-		if builder.collectionFetch != "default" && builder.collectionFetch != "always_on" && builder.collectionFetch != "fetch_only" {
-			return fmt.Errorf("collection-fetch must be one of [default, always_on, fetch_only], got: %s", builder.collectionFetch)
+		if builder.collectionSync != "execution_first" && builder.collectionSync != "execution_and_collection" && builder.collectionSync != "collection_only" {
+			return fmt.Errorf("collection-sync must be one of [execution_first, execution_and_collection, collection_only], got: %s", builder.collectionSync)
 		}
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -2200,9 +2202,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return builder.RpcEng, nil
 		})
 	builder.Component("execution data processor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		if builder.executionDataSyncEnabled && builder.collectionFetch != "fetch_only" {
+		if builder.executionDataSyncEnabled && builder.collectionSync != "collection_only" {
 			node.Logger.Info().
-				Str("collection_fetch_mode", builder.collectionFetch).
+				Str("collection_sync_mode", builder.collectionSync).
 				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
 				Msg("creating execution data processor")
 
@@ -2261,14 +2263,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		// Log when execution data processor is not created
 		if !builder.executionDataSyncEnabled {
 			node.Logger.Info().
-				Str("collection_fetch_mode", builder.collectionFetch).
+				Str("collection_sync_mode", builder.collectionSync).
 				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
 				Msg("execution data processor not created: execution data sync is disabled")
-		} else if builder.collectionFetch == "fetch_only" {
+		} else if builder.collectionSync == "collection_only" {
 			node.Logger.Info().
-				Str("collection_fetch_mode", builder.collectionFetch).
+				Str("collection_sync_mode", builder.collectionSync).
 				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
-				Msg("execution data processor not created: collection fetch mode is 'fetch_only'")
+				Msg("execution data processor not created: collection sync mode is 'collection_only'")
 		}
 
 		return &module.NoopReadyDoneAware{}, nil
@@ -2624,27 +2626,27 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 	builder.
 		Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Create fetcher if:
-			// 1. collectionFetch is "always_on" (always create, even with execution data sync)
-			// 2. collectionFetch is "fetch_only" (always create)
-			// 3. collectionFetch is "default" and execution data sync is disabled
-			shouldCreateFetcher := builder.collectionFetch == "always_on" ||
-				builder.collectionFetch == "fetch_only" ||
-				(builder.collectionFetch == "default" && !builder.executionDataSyncEnabled)
+			// 1. collectionSync is "execution_and_collection" (always create, even with execution data sync)
+			// 2. collectionSync is "collection_only" (always create)
+			// 3. collectionSync is "execution_first" and execution data sync is disabled
+			shouldCreateFetcher := builder.collectionSync == "execution_and_collection" ||
+				builder.collectionSync == "collection_only" ||
+				(builder.collectionSync == "execution_first" && !builder.executionDataSyncEnabled)
 
 			if !shouldCreateFetcher {
-				// skip if execution data sync is enabled and not in always_on or fetch_only mode
+				// skip if execution data sync is enabled and not in execution_and_collection or collection_only mode
 				// because the execution data contains the collections, so no need to fetch them separately.
 				// otherwise, if both fetching and syncing are enabled, they might slow down each other,
 				// because the database operation requires locking.
 				node.Logger.Info().
-					Str("collection_fetch_mode", builder.collectionFetch).
+					Str("collection_sync_mode", builder.collectionSync).
 					Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
-					Msg("collection sync fetcher not created: execution data sync is enabled and collection fetch mode is not 'always_on' or 'fetch_only'")
+					Msg("collection sync fetcher not created: execution data sync is enabled and collection sync mode is not 'execution_and_collection' or 'collection_only'")
 				return &module.NoopReadyDoneAware{}, nil
 			}
 
 			node.Logger.Info().
-				Str("collection_fetch_mode", builder.collectionFetch).
+				Str("collection_sync_mode", builder.collectionSync).
 				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
 				Msg("creating collection sync fetcher")
 
@@ -2693,9 +2695,9 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 		}).
 		Component("collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Create requester if fetcher was created (same conditions as fetcher)
-			shouldCreateRequester := builder.collectionFetch == "always_on" ||
-				builder.collectionFetch == "fetch_only" ||
-				(builder.collectionFetch == "default" && !builder.executionDataSyncEnabled)
+			shouldCreateRequester := builder.collectionSync == "execution_and_collection" ||
+				builder.collectionSync == "collection_only" ||
+				(builder.collectionSync == "execution_first" && !builder.executionDataSyncEnabled)
 
 			if !shouldCreateRequester {
 				return &module.NoopReadyDoneAware{}, nil
