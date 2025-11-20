@@ -3,11 +3,11 @@ package votecollector
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
@@ -61,8 +61,5 @@ func (s *ConcurrentIdentifierSet) Add(identifier flow.Identifier) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	_, exists := s.set[identifier]
-	if exists {
-		return false
-	}
-	return true
+	return !exists
 }
