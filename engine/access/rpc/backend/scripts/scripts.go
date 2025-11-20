@@ -118,6 +118,11 @@ func NewScriptsBackend(
 
 // ExecuteScriptAtLatestBlock executes provided script at the latest sealed block.
 //
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
@@ -174,6 +179,11 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 
 // ExecuteScriptAtBlockID executes provided script at the provided block ID.
 //
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
@@ -229,6 +239,11 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 }
 
 // ExecuteScriptAtBlockHeight executes provided script at the provided block height.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
