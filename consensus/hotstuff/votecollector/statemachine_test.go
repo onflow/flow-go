@@ -203,7 +203,7 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 		processor.On("Process", vote).Return(unexpectedError).Once()
 		err := s.collector.AddVote(vote)
-		require.ErrorIs(t, err, unexpectedError)
+		require.ErrorAs(t, err, &unexpectedError)
 	})
 }
 
@@ -434,7 +434,7 @@ func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 	vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 	processor.On("Process", vote).Return(unexpectedError).Once()
 	err = s.collector.AddVote(vote)
-	require.ErrorIs(s.T(), err, unexpectedError)
+	require.ErrorAs(s.T(), err, &unexpectedError)
 }
 
 // RegisterVoteConsumer verifies that after registering vote consumer we are receiving all new and past votes

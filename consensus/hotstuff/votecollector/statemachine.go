@@ -3,6 +3,7 @@ package votecollector
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -96,22 +97,6 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 
 	err = m.processVote(vote)
 	if err != nil {
-		if errors.Is(err, VoteForIncompatibleBlockError) {
-			// For honest nodes, there should be only a single proposal per view and all votes should
-			// be for this proposal. However, byzantine nodes might deviate from this happy path:
-			// * A malicious leader might create multiple (individually valid) conflicting proposals for the
-			//   same view. Honest replicas will send correct votes for whatever proposal they see first.
-			//   We only accept the first valid block and reject any other conflicting blocks that show up later.
-			// * Alternatively, malicious replicas might send votes with the expected view, but for blocks that
-			//   don't exist.
-			// In either case, receiving votes for the same view but for different block IDs is a symptom
-			// of malicious consensus participants.  Hence, we log it here as a warning:
-			m.log.Warn().
-				Err(err).
-				Msg("received vote for incompatible block")
-
-			return nil
-		}
 		return fmt.Errorf("internal error processing vote %v for block %v: %w",
 			vote.ID(), vote.BlockID, err)
 	}
@@ -167,7 +152,23 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 				m.log.Debug().Msgf("duplicated signer %x", vote.SignerID)
 				return nil
 			}
-			return err
+			if errors.Is(err, VoteForIncompatibleBlockError) {
+				// For honest nodes, there should be only a single proposal per view and all votes should
+				// be for this proposal. However, byzantine nodes might deviate from this happy path:
+				// * A malicious leader might create multiple (individually valid) conflicting proposals for the
+				//   same view. Honest replicas will send correct votes for whatever proposal they see first.
+				//   We only accept the first valid block and reject any other conflicting blocks that show up later.
+				// * Alternatively, malicious replicas might send votes with the expected view, but for blocks that
+				//   don't exist.
+				// In either case, receiving votes for the same view but for different block IDs is a symptom
+				// of malicious consensus participants.  Hence, we log it here as a warning:
+				m.log.Warn().
+					Err(err).
+					Msg("received vote for incompatible block")
+
+				return nil
+			}
+			return irrecoverable.NewException(err)
 		}
 
 		if currentState != m.Status() {
