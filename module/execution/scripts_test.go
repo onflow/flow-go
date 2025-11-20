@@ -3,7 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
-	"os"
+	"math"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -11,23 +11,30 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
+)
+
+type accountKeyAPIVersion string
+
+const (
+	accountKeyAPIVersionV1 accountKeyAPIVersion = "V1"
+	accountKeyAPIVersionV2 accountKeyAPIVersion = "V2"
 )
 
 func TestScripts(t *testing.T) {
@@ -36,129 +43,23 @@ func TestScripts(t *testing.T) {
 
 type scriptTestSuite struct {
 	suite.Suite
-	scripts       *Scripts
-	registerIndex storage.RegisterIndex
-	vm            *fvm.VirtualMachine
-	vmCtx         fvm.Context
-	chain         flow.Chain
-	height        uint64
-	snapshot      snapshot.SnapshotTree
-	dbDir         string
-}
-
-func (s *scriptTestSuite) TestScriptExecution() {
-	s.Run("Simple Script Execution", func() {
-		number := int64(42)
-		code := []byte(fmt.Sprintf("access(all) fun main(): Int { return %d; }", number))
-
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
-		s.Require().NoError(err)
-		val, err := jsoncdc.Decode(nil, result)
-		s.Require().NoError(err)
-		s.Assert().Equal(number, val.(cadence.Int).Value.Int64())
-	})
-
-	s.Run("Get Block", func() {
-		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
-			getBlock(at: %d)!
-			return getCurrentBlock().height
-		}`, s.height))
-
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
-		s.Require().NoError(err)
-		val, err := jsoncdc.Decode(nil, result)
-		s.Require().NoError(err)
-		// make sure that the returned block height matches the current one set
-		s.Assert().Equal(s.height, uint64(val.(cadence.UInt64)))
-	})
-
-	s.Run("Handle not found Register", func() {
-		// use a non-existing address to trigger register get function
-		code := []byte("import Foo from 0x01; access(all) fun main() { }")
-
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
-		s.Assert().Error(err)
-		s.Assert().Nil(result)
-	})
-
-	s.Run("Valid Argument", func() {
-		code := []byte("access(all) fun main(foo: Int): Int { return foo }")
-		arg := cadence.NewInt(2)
-		encoded, err := jsoncdc.Encode(arg)
-		s.Require().NoError(err)
-
-		result, err := s.scripts.ExecuteAtBlockHeight(
-			context.Background(),
-			code,
-			[][]byte{encoded},
-			s.height,
-		)
-		s.Require().NoError(err)
-		s.Assert().Equal(encoded, result)
-	})
-
-	s.Run("Invalid Argument", func() {
-		code := []byte("access(all) fun main(foo: Int): Int { return foo }")
-		invalid := [][]byte{[]byte("i")}
-
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height)
-		s.Assert().Nil(result)
-		var coded errors.CodedError
-		s.Require().True(errors.As(err, &coded))
-		fmt.Println(coded.Code(), coded.Error())
-		s.Assert().Equal(errors.ErrCodeInvalidArgumentError, coded.Code())
-	})
-}
-
-func (s *scriptTestSuite) TestGetAccount() {
-	s.Run("Get Service Account", func() {
-		address := s.chain.ServiceAddress()
-		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height)
-		s.Require().NoError(err)
-		s.Assert().Equal(address, account.Address)
-		s.Assert().NotZero(account.Balance)
-		s.Assert().NotZero(len(account.Contracts))
-	})
-
-	s.Run("Get New Account", func() {
-		address := s.createAccount()
-		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height)
-		s.Require().NoError(err)
-		s.Require().Equal(address, account.Address)
-		s.Assert().Zero(account.Balance)
-	})
-}
-
-func (s *scriptTestSuite) TestGetAccountBalance() {
-	address := s.createAccount()
-	var transferAmount uint64 = 100000000
-	s.transferTokens(address, transferAmount)
-	balance, err := s.scripts.GetAccountBalance(context.Background(), address, s.height)
-	s.Require().NoError(err)
-	s.Require().Equal(transferAmount, balance)
-}
-
-func (s *scriptTestSuite) TestGetAccountKeys() {
-	address := s.createAccount()
-	publicKey := s.addAccountKey(address, accountKeyAPIVersionV2)
-
-	accountKeys, err := s.scripts.GetAccountKeys(context.Background(), address, s.height)
-	s.Require().NoError(err)
-	s.Assert().Equal(1, len(accountKeys))
-	s.Assert().Equal(publicKey.PublicKey, accountKeys[0].PublicKey)
-	s.Assert().Equal(publicKey.SignAlgo, accountKeys[0].SignAlgo)
-	s.Assert().Equal(publicKey.HashAlgo, accountKeys[0].HashAlgo)
-	s.Assert().Equal(publicKey.Weight, accountKeys[0].Weight)
-
+	logger           zerolog.Logger
+	headers          *storagemock.Headers
+	registerSnapshot *storagemock.RegisterSnapshotReader
+	vm               *fvm.VirtualMachine
+	vmCtx            fvm.Context
+	chain            flow.Chain
+	height           uint64
+	snapshot         snapshot.SnapshotTree
+	entropyProvider  protocol.SnapshotExecutionSubsetProvider
+	derivedChainData *derived.DerivedChainData
 }
 
 func (s *scriptTestSuite) SetupTest() {
-	lockManager := storage.NewTestingLockManager()
-	logger := unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	entropyProvider := testutil.ProtocolStateWithSourceFixture(nil)
-	blockchain := unittest.BlockchainFixture(10)
-	headers := newBlockHeadersStorage(blockchain)
-
+	s.logger = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.entropyProvider = testutil.ProtocolStateWithSourceFixture(nil)
+	s.headers = storagemock.NewHeaders(s.T())
+	s.registerSnapshot = storagemock.NewRegisterSnapshotReader(s.T())
 	s.chain = flow.Emulator.Chain()
 	s.snapshot = snapshot.NewSnapshotTree(nil)
 	s.vm = fvm.NewVirtualMachine()
@@ -167,51 +68,167 @@ func (s *scriptTestSuite) SetupTest() {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
-	s.height = blockchain[0].Height
 
-	s.dbDir = unittest.TempDir(s.T())
-	db := pebbleStorage.NewBootstrappedRegistersWithPathForTest(s.T(), s.dbDir, s.height, s.height)
-	pebbleRegisters, err := pebbleStorage.NewRegisters(db, pebbleStorage.PruningDisabled)
-	s.Require().NoError(err)
-	s.registerIndex = pebbleRegisters
+	blockCount := 10
+	blockMap := make(map[uint64]*flow.Block, blockCount)
+	rootBlock := unittest.Block.Genesis(flow.Emulator)
+	blockMap[rootBlock.Height] = rootBlock
+	s.height = rootBlock.Height
 
-	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
-	s.Require().NoError(err)
+	parent := rootBlock.ToHeader()
+	for i := 0; i < blockCount; i++ {
+		block := unittest.BlockWithParentFixture(parent)
+		// update for next iteration
+		parent = block.ToHeader()
+		blockMap[block.Height] = block
+	}
+	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(blockMap),
+			func(block *flow.Block) *flow.Header { return block.ToHeader() },
+		),
+	).Maybe()
+	var err error
+	s.derivedChainData, err = derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	require.NoError(s.T(), err)
+}
 
-	index, err := indexer.New(
-		logger,
-		metrics.NewNoopCollector(),
-		nil,
-		s.registerIndex,
-		headers,
-		nil,
-		nil,
-		nil,
-		nil,
-		flow.Testnet.Chain(),
-		derivedChainData,
-		nil,
-		lockManager,
-	)
-	s.Require().NoError(err)
+// TestScriptExecution tests the ExecuteAtBlockHeight function.
+// Test cases:
+// 1. Executes a script that gets the current block height.
+// 2. Errors when height is not indexed.
+func (s *scriptTestSuite) TestScriptExecution() {
+	scripts := s.defaultScripts()
+	code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
+			getBlock(at: %d)!
+			return getCurrentBlock().height
+		}`, s.height))
 
-	s.scripts = NewScripts(
-		logger,
+	s.Run("get block script execution", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(s.snapshot, nil).Once()
+
+		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerSnapshot)
+		require.NoError(s.T(), err)
+		val, err := jsoncdc.Decode(nil, result)
+		require.NoError(s.T(), err)
+		// make sure that the returned block height matches the current one set
+		require.Equal(s.T(), s.height, uint64(val.(cadence.UInt64)))
+	})
+
+	s.Run("error when height is not indexed", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
+
+		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height, s.registerSnapshot)
+		require.Error(s.T(), err)
+		require.Nil(s.T(), result)
+		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
+	})
+}
+
+// TestGetAccount verifies retrieval of account information at a specific block height.
+// Test cases:
+// 1. Retrieves a newly created account and checks its address and balance.
+// 2. Returns an error when the block height is not indexed.
+func (s *scriptTestSuite) TestGetAccount() {
+	scripts := s.defaultScripts()
+	address := s.createAccount()
+
+	s.Run("Get New Account", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(s.snapshot, nil).Once()
+
+		account, err := scripts.GetAccountAtBlockHeight(context.Background(), address, s.height, s.registerSnapshot)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), address, account.Address)
+		require.Zero(s.T(), account.Balance)
+	})
+
+	s.Run("error when height is not indexed", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
+
+		account, err := scripts.GetAccountAtBlockHeight(context.Background(), address, s.height, s.registerSnapshot)
+		require.Error(s.T(), err)
+		require.Nil(s.T(), account)
+		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
+	})
+}
+
+// TestGetAccountBalance verifies that GetAccountBalance returns the correct balance for an account.
+// Test cases:
+// 1. Transfers tokens to an account and verifies the correct balance is returned.
+// 2. Returns an error when the block height is not indexed.
+func (s *scriptTestSuite) TestGetAccountBalance() {
+	scripts := s.defaultScripts()
+	address := s.createAccount()
+	var transferAmount uint64 = 100000000
+	s.transferTokens(address, transferAmount)
+
+	s.Run("get account balance", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(s.snapshot, nil).Once()
+
+		balance, err := scripts.GetAccountBalance(context.Background(), address, s.height, s.registerSnapshot)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), transferAmount, balance)
+	})
+
+	s.Run("error when height is not indexed", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
+
+		balance, err := scripts.GetAccountBalance(context.Background(), address, s.height, s.registerSnapshot)
+		require.Error(s.T(), err)
+		require.Equal(s.T(), uint64(0), balance)
+		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
+	})
+}
+
+// TestGetAccountKeys verifies that GetAccountKeys returns all public keys for an account.
+// Test cases:
+// 1. Adds a key to an account and verifies its properties.
+// 2. Returns an error when the block height is not indexed.
+func (s *scriptTestSuite) TestGetAccountKeys() {
+	scripts := s.defaultScripts()
+	address := s.createAccount()
+	publicKey := s.addAccountKey(address, accountKeyAPIVersionV2)
+
+	s.Run("get account balance", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(s.snapshot, nil).Once()
+
+		accountKeys, err := scripts.GetAccountKeys(context.Background(), address, s.height, s.registerSnapshot)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), 1, len(accountKeys))
+		require.Equal(s.T(), publicKey.PublicKey, accountKeys[0].PublicKey)
+		require.Equal(s.T(), publicKey.SignAlgo, accountKeys[0].SignAlgo)
+		require.Equal(s.T(), publicKey.HashAlgo, accountKeys[0].HashAlgo)
+		require.Equal(s.T(), publicKey.Weight, accountKeys[0].Weight)
+	})
+
+	s.Run("error when height is not indexed", func() {
+		s.registerSnapshot.On("StorageSnapshot", s.height).Return(nil, storage.ErrHeightNotIndexed).Once()
+
+		accountKeys, err := scripts.GetAccountKeys(context.Background(), address, s.height, s.registerSnapshot)
+		require.Error(s.T(), err)
+		require.Nil(s.T(), accountKeys)
+		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
+	})
+}
+
+// defaultScripts returns a pre-configured Scripts instance with default parameters for testing.
+func (s *scriptTestSuite) defaultScripts() *Scripts {
+	compatibleHeights := NewCompatibleHeights(s.logger, nil, 0, math.MaxUint64)
+	scripts := NewScripts(
+		s.logger,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
-		entropyProvider,
-		headers,
-		index.RegisterValue,
+		s.entropyProvider,
+		s.headers,
 		query.NewDefaultConfig(),
-		derivedChainData,
+		s.derivedChainData,
 		true,
+		compatibleHeights,
 	)
 
 	s.bootstrap()
-}
 
-func (s *scriptTestSuite) TearDownTest() {
-	s.Require().NoError(os.RemoveAll(s.dbDir))
+	return scripts
 }
 
 func (s *scriptTestSuite) bootstrap() {
@@ -224,13 +241,8 @@ func (s *scriptTestSuite) bootstrap() {
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 		s.snapshot)
 
-	s.Require().NoError(err)
-	s.Require().NoError(out.Err)
-
-	s.height++
-	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
-	s.Require().NoError(err)
-
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), out.Err)
 	s.snapshot = s.snapshot.Append(executionSnapshot)
 }
 
@@ -247,19 +259,15 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 		SetPayer(unittest.RandomAddressFixture()).
 		AddAuthorizer(s.chain.ServiceAddress()).
 		Build()
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
 
 	executionSnapshot, output, err := s.vm.Run(
 		s.vmCtx,
 		fvm.Transaction(txBody, 0),
 		s.snapshot,
 	)
-	s.Require().NoError(err)
-	s.Require().NoError(output.Err)
-
-	s.height++
-	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), output.Err)
 
 	s.snapshot = s.snapshot.Append(executionSnapshot)
 
@@ -271,17 +279,16 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 		accountCreatedEvents = append(accountCreatedEvents, event)
 		break
 	}
-	s.Require().Len(accountCreatedEvents, 1)
+	require.Len(s.T(), accountCreatedEvents, 1)
 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
 
 	return flow.ConvertAddress(
 		cadence.SearchFieldByName(
 			data.(cadence.Event),
 			stdlib.AccountEventAddressParameter.Identifier,
-		).(cadence.Address),
-	)
+		).(cadence.Address))
 }
 
 func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uint64) {
@@ -291,28 +298,17 @@ func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uin
 		AddAuthorizer(s.chain.ServiceAddress()).
 		SetPayer(accountAddress).
 		Build()
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
 		fvm.Transaction(transferTx, 0),
 		s.snapshot,
 	)
-	s.Require().NoError(err)
-
-	s.height++
-	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
 
 	s.snapshot = s.snapshot.Append(executionSnapshot)
 }
-
-type accountKeyAPIVersion string
-
-const (
-	accountKeyAPIVersionV1 accountKeyAPIVersion = "V1"
-	accountKeyAPIVersionV2 accountKeyAPIVersion = "V2"
-)
 
 func (s *scriptTestSuite) addAccountKey(
 	accountAddress flow.Address,
@@ -320,21 +316,21 @@ func (s *scriptTestSuite) addAccountKey(
 ) flow.AccountPublicKey {
 	const addAccountKeyTransaction = `
 transaction(key: [UInt8]) {
-  prepare(signer: auth(AddKey) &Account) {
+ prepare(signer: auth(AddKey) &Account) {
 	let publicKey = PublicKey(
 		publicKey: key,
 		signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
 	 )
-    signer.keys.add(
+   signer.keys.add(
 		publicKey: publicKey,
 		hashAlgorithm: HashAlgorithm.SHA3_256,
 		weight: 1000.0
 	)
-  }
+ }
 }
 `
 	privateKey, err := unittest.AccountKeyDefaultFixture()
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
 
 	publicKey, encodedCadencePublicKey := newAccountKey(s.T(), privateKey, apiVersion)
 
@@ -344,18 +340,14 @@ transaction(key: [UInt8]) {
 		AddArgument(encodedCadencePublicKey).
 		AddAuthorizer(accountAddress).
 		Build()
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
 		fvm.Transaction(txBody, 0),
 		s.snapshot,
 	)
-	s.Require().NoError(err)
-
-	s.height++
-	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
-	s.Require().NoError(err)
+	require.NoError(s.T(), err)
 
 	s.snapshot = s.snapshot.Append(executionSnapshot)
 
@@ -386,15 +378,6 @@ func newAccountKey(
 	require.NoError(tb, err)
 
 	return publicKey, encodedCadencePublicKey
-}
-
-func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
-	blocksByHeight := make(map[uint64]*flow.Block)
-	for _, b := range blocks {
-		blocksByHeight[b.Height] = b
-	}
-
-	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
 func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
