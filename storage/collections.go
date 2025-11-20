@@ -22,6 +22,12 @@ type CollectionsReader interface {
 	//   - `storage.ErrNotFound` if no light collection was found.
 	LightByID(collID flow.Identifier) (*flow.LightCollection, error)
 
+	// ExistByID checks whether a collection with the given ID exists in storage.
+	// Returns (true, nil) if it exists,
+	// Returns (false, nil) if it does not exist.
+	// No errors are expected during normal operation.
+	ExistByID(collID flow.Identifier) (bool, error)
+
 	// LightByTransactionID returns a reduced representation of the collection
 	// holding the given transaction ID. The reduced collection references the
 	// constituent transactions by their hashes.

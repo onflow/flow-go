@@ -1,7 +1,6 @@
 package fetcher
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -70,7 +69,7 @@ func (bp *BlockProcessor) FetchCollections(
 		Msg("processing collection fetching job for finalized block")
 
 	// Get missing collections for this block
-	missingGuarantees, err := bp.getMissingCollections(blockHeight)
+	missingGuarantees, err := bp.getMissingCollections(block)
 	if err != nil {
 		return fmt.Errorf("failed to get missing collections for block height %d: %w", blockHeight, err)
 	}
@@ -153,24 +152,19 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 
 // getMissingCollections retrieves the block and returns collection guarantees that are missing.
 // Only collections that are not already in storage are returned.
-func (bp *BlockProcessor) getMissingCollections(blockHeight uint64) ([]*flow.CollectionGuarantee, error) {
-	block, err := bp.blocks.ByHeight(blockHeight)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve block at height %d: %w", blockHeight, err)
-	}
-
+func (bp *BlockProcessor) getMissingCollections(block *flow.Block) ([]*flow.CollectionGuarantee, error) {
 	var missingGuarantees []*flow.CollectionGuarantee
 	for _, guarantee := range block.Payload.Guarantees {
 		// Check if collection already exists in storage
-		_, err := bp.collections.LightByID(guarantee.CollectionID)
+		exists, err := bp.collections.ExistByID(guarantee.CollectionID)
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				// Collection is missing
-				missingGuarantees = append(missingGuarantees, guarantee)
-			} else {
-				// Unexpected error
-				return nil, fmt.Errorf("failed to check if collection %v exists: %w", guarantee.CollectionID, err)
-			}
+			// Unexpected error
+			return nil, fmt.Errorf("failed to check if collection %v exists: %w", guarantee.CollectionID, err)
+		}
+
+		if !exists {
+			// Collection is missing
+			missingGuarantees = append(missingGuarantees, guarantee)
 		}
 		// If collection exists, skip it
 	}

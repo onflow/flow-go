@@ -109,6 +109,14 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 	return &collection, nil
 }
 
+// ExistByID checks whether a collection with the given ID exists in storage.
+// Returns (true, nil) if it exists,
+// Returns (false, nil) if it does not exist.
+// No errors are expected during normal operation.
+func (c *Collections) ExistByID(colID flow.Identifier) (bool, error) {
+	return operation.CollectionExists(c.db.Reader(), colID)
+}
+
 // Remove removes a collection from the database, including all constituent transactions and
 // indices inserted by Store.
 // Remove does not error if the collection does not exist
