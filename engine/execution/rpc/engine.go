@@ -193,6 +193,14 @@ func (h *handler) Ping(
 	return &execution.PingResponse{}, nil
 }
 
+// ExecuteScriptAtBlockID executes a ready-only Cadence script against the
+// execution state at the block with the given ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument] - if the script or arguments exceed the maximum allowed size,
+//     or if the engine fails to execute the script.
+//   - [codes.NotFound] - if the requested block has not been executed or has been pruned.
+//   - [codes.Internal] - if the block state commitment cannot be retrieved due to internal errors.
 func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,

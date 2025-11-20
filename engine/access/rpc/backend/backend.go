@@ -94,6 +94,7 @@ type Params struct {
 	ExecutionReceipts        storage.ExecutionReceipts
 	ExecutionResults         storage.ExecutionResults
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
+	RegistersAsyncStore      *execution.RegistersAsyncStore
 	ChainID                  flow.ChainID
 	AccessMetrics            module.AccessMetrics
 	ConnFactory              connection.ConnectionFactory
@@ -158,6 +159,7 @@ func New(params Params) (*Backend, error) {
 		params.ScriptExecutionMode,
 		params.ScriptExecutor,
 		params.ExecNodeIdentitiesProvider,
+		params.RegistersAsyncStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounts: %w", err)
@@ -192,6 +194,8 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		loggedScripts,
 		params.MaxScriptAndArgumentSize,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scripts: %w", err)
@@ -213,6 +217,7 @@ func New(params Params) (*Backend, error) {
 			CheckPayerBalanceMode:        params.CheckPayerBalanceMode,
 		},
 		params.ScriptExecutor,
+		params.RegistersAsyncStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)

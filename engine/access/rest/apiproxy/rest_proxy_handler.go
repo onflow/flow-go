@@ -92,7 +92,8 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError if the collection is not found.
+//   - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
+//   - [access.DataNotFoundError] - if the collection is not found.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -303,71 +304,137 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flo
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
-func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError] - if the request had invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError] - for internal failures or index conversion errors.
+func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	executeScriptAtLatestBlockRequest := &accessproto.ExecuteScriptAtLatestBlockRequest{
-		Script:    script,
-		Arguments: arguments,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(ctx, executeScriptAtLatestBlockRequest)
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
-	return executeScriptAtLatestBlockResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtLatestBlockResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtLatestBlockResponse.Value, metadata, nil
 }
 
-// ExecuteScriptAtBlockHeight executes script at the given block height .
-func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
+// ExecuteScriptAtBlockHeight executes script at the given block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError] - if the request had invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError] - for internal failures or index conversion errors.
+func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
+	ctx context.Context,
+	blockHeight uint64,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	executeScriptAtBlockHeightRequest := &accessproto.ExecuteScriptAtBlockHeightRequest{
-		BlockHeight: blockHeight,
-		Script:      script,
-		Arguments:   arguments,
+		BlockHeight:         blockHeight,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(ctx, executeScriptAtBlockHeightRequest)
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
-	return executeScriptAtBlockHeightResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockHeightResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtBlockHeightResponse.Value, metadata, nil
 }
 
-// ExecuteScriptAtBlockID executes script at the given block id .
-func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
+// ExecuteScriptAtBlockID executes script at the given block id.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError] - if the request had invalid arguments.
+//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
+//   - [access.DataNotFoundError] - if data required to process the request is not available.
+//   - [access.OutOfRangeError] - if the requested data is outside the available range.
+//   - [access.PreconditionFailedError] - if data for block is not available.
+//   - [access.RequestCanceledError] - if the script execution was canceled.
+//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError] - for internal failures or index conversion errors.
+func (r *RestProxyHandler) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	executeScriptAtBlockIDRequest := &accessproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments,
+		BlockId:             blockID[:],
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(ctx, executeScriptAtBlockIDRequest)
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err, "register")
 	}
 
-	return executeScriptAtBlockIDResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockIDResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtBlockIDResponse.Value, metadata, nil
 }
 
 // GetEventsForHeightRange returns events by their name in the specified blocks heights.
@@ -389,11 +456,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery: &entities.ExecutionStateQuery{
-			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
-			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: true,
-		},
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
@@ -434,11 +497,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		Type:                 eventType,
 		BlockIds:             blockIds,
 		EventEncodingVersion: requiredEventEncodingVersion,
-		ExecutionStateQuery: &entities.ExecutionStateQuery{
-			AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
-			RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
-			IncludeExecutorMetadata: true,
-		},
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
@@ -503,6 +562,12 @@ func convertError(ctx context.Context, err error, typeName string) error {
 		}
 		// it's possible that this came from the client side, so wrap the original error directly.
 		return access.NewServiceUnavailable(err)
+	case codes.ResourceExhausted:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "resource exhausted error: "); ok {
+			return access.NewResourceExhausted(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewResourceExhausted(err)
 	}
 
 	// all methods MUST return an access sentinel error. if we couldn't successfully convert the error,
@@ -516,4 +581,16 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 		return parts[1], true
 	}
 	return "", false
+}
+
+// executionStateQuery constructs an ExecutionStateQuery protobuf message from
+// the provided optimistic sync Criteria.
+// The IncludeExecutorMetadata field is set to true, allowing metadata to be included
+// in the response if needed.
+func executionStateQuery(criteria optimistic_sync.Criteria) *entities.ExecutionStateQuery {
+	return &entities.ExecutionStateQuery{
+		AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+		RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+		IncludeExecutorMetadata: true,
+	}
 }
