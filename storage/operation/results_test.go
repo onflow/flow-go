@@ -18,7 +18,7 @@ func TestResults_InsertRetrieve(t *testing.T) {
 		expected := unittest.ExecutionResultFixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertExecutionResult(rw.Writer(), expected)
+			return operation.InsertExecutionResult(rw.Writer(), expected.ID(), expected)
 		})
 		require.Nil(t, err)
 

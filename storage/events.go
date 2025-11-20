@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,13 +24,10 @@ type EventsReader interface {
 type Events interface {
 	EventsReader
 
-	// Store will store events for the given block ID
-	// TODO: error documentation
-	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
-
-	// BatchStore will store events for the given block ID in a given batch
-	// TODO: error documentation
-	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error
+	// BatchStore will store events for the given block ID in a given batch.
+	// It requires the caller to hold [storage.LockInsertEvent].
+	// It returns [storage.ErrAlreadyExists] if events for the block already exist.
+	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error
 
 	// BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
@@ -37,10 +36,10 @@ type Events interface {
 }
 
 type ServiceEvents interface {
-	// BatchStore stores service events keyed by a blockID in provided batch
-	// No errors are expected during normal operation, even if no entries are matched.
-	// If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchStore(blockID flow.Identifier, events []flow.Event, batch ReaderBatchWriter) error
+	// BatchStore stores service events keyed by a blockID in provided batch.
+	// It requires the caller to hold [storage.LockInsertServiceEvent].
+	// It returns [storage.ErrAlreadyExists] if any service events for the block already exist.
+	BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.Event, batch ReaderBatchWriter) error
 
 	// ByBlockID returns the events for the given block ID
 	ByBlockID(blockID flow.Identifier) ([]flow.Event, error)

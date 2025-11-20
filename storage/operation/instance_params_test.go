@@ -18,9 +18,9 @@ import (
 // structure.
 // Test cases:
 //  1. InstanceParams can be inserted and retrieved successfully.
-//  2. Overwrite attempts return storage.ErrAlreadyExists and do not change the
+//  2. Overwrite attempts return [storage.ErrAlreadyExists] and do not change the
 //     persisted value.
-//  3. Writes without holding LockBootstrapping are denied.
+//  3. Writes without holding [storage.LockInsertInstanceParams] are denied.
 func TestInstanceParams_InsertRetrieve(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	enc, err := datastore.NewVersionedInstanceParams(
@@ -34,7 +34,7 @@ func TestInstanceParams_InsertRetrieve(t *testing.T) {
 	t.Run("happy path: insert and retrieve", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockBootstrapping))
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertInstanceParams))
 			defer lctx.Release()
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -52,7 +52,7 @@ func TestInstanceParams_InsertRetrieve(t *testing.T) {
 	t.Run("overwrite returns ErrAlreadyExists", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			lctx := lockManager.NewContext()
-			require.NoError(t, lctx.AcquireLock(storage.LockBootstrapping))
+			require.NoError(t, lctx.AcquireLock(storage.LockInsertInstanceParams))
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertInstanceParams(lctx, rw, *enc)
@@ -70,7 +70,7 @@ func TestInstanceParams_InsertRetrieve(t *testing.T) {
 			require.NoError(t, err)
 
 			lctx2 := lockManager.NewContext()
-			require.NoError(t, lctx2.AcquireLock(storage.LockBootstrapping))
+			require.NoError(t, lctx2.AcquireLock(storage.LockInsertInstanceParams))
 			defer lctx2.Release()
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -94,7 +94,7 @@ func TestInstanceParams_InsertRetrieve(t *testing.T) {
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertInstanceParams(lctx, rw, *enc)
 			})
-			require.ErrorContains(t, err, storage.LockBootstrapping)
+			require.ErrorContains(t, err, storage.LockInsertInstanceParams)
 		})
 	})
 }

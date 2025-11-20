@@ -5,13 +5,14 @@ go 1.25.0
 require (
 	cloud.google.com/go/bigquery v1.69.0
 	github.com/VividCortex/ewma v1.2.0
+	github.com/antihax/optional v1.0.0
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/cockroachdb/pebble/v2 v2.0.6
 	github.com/coreos/go-semver v0.3.0
 	github.com/dapperlabs/testingdock v0.4.5-0.20231020233342-a2853fe18724
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/ethereum/go-ethereum v1.16.5
+	github.com/ethereum/go-ethereum v1.16.7
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/websocket v1.5.3
@@ -22,12 +23,13 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.8.3
 	github.com/onflow/crypto v0.25.3
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.1
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.1
+	github.com/onflow/flow v0.4.15
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.2
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.2
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
 	github.com/onflow/flow-go-sdk v1.9.2
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.16
+	github.com/onflow/flow/protobuf/go/flow v0.4.18
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.61.0
@@ -61,6 +63,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 // indirect
 	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
 	github.com/SaveTheRbtz/mph v0.1.1-0.20240117162131-4166ec7869bc // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
@@ -126,7 +129,7 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.3 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.5 // indirect
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
