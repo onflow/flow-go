@@ -231,7 +231,8 @@ type API interface {
 	//   - [access.DataNotFoundError] - no block with the given ID was found.
 	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
 
-	// GetCollectionByID returns a light collection by its ID.
+	// GetCollectionByID returns a light collection by its ID. The light collection contains only
+	// transaction IDs, not the full transaction bodies.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
@@ -242,10 +243,10 @@ type API interface {
 	//   - [access.DataNotFoundError] if the collection is not found.
 	GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error)
 
-	// GetFullCollectionByID returns a full collection by its ID.
+	// GetFullCollectionByID returns a full collection by its ID. The full collection contains the
+	// complete transaction bodies for all transactions in the collection.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
 	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
 	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//

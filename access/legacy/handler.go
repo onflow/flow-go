@@ -146,6 +146,9 @@ func (h *Handler) GetBlockByID(
 }
 
 // GetCollectionByID gets a collection by ID.
+//
+// Expected error returns during normal operation:
+//   - [access.DataNotFoundError]: If the collection is not found.
 func (h *Handler) GetCollectionByID(
 	ctx context.Context,
 	req *accessproto.GetCollectionByIDRequest,
