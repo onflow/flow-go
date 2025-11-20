@@ -322,6 +322,9 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_Proposa
 	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.a): equivocation: both votes arrive before receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -345,6 +348,9 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_Be
 	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.b): equivocation: both votes arrive after receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_AfterProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -367,6 +373,9 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_Af
 	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.c): spamming: both votes arrive before receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_BeforeProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -388,6 +397,9 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_Before
 	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
+// TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
+// Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
+// Case (3.d): spamming: both votes arrive after receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_AfterProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
