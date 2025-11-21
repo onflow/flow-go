@@ -123,8 +123,17 @@ func TestIndexCollectionsForBlock(t *testing.T) {
 		collectionMetrics.AssertExpectations(t)
 
 		// Step 4: Idempotency Check - Indexing again is idempotent and should not error
+		// Set up expectations for the second call (metrics are still called even if collections already exist)
+		for _, collection := range collectionList {
+			light := collection.Light()
+			collectionMetrics.On("CollectionFinalized", light).Once()
+			collectionMetrics.On("CollectionExecuted", light).Once()
+		}
+
 		err = indexer.IndexCollectionsForBlock(height, collectionList)
 		require.NoError(t, err)
+
+		collectionMetrics.AssertExpectations(t)
 
 		// Step 4 (continued): After second indexing, GetMissingCollections should still return empty
 		missing, err = indexer.GetMissingCollections(block)
