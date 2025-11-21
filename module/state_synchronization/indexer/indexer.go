@@ -69,7 +69,7 @@ func NewIndexer(
 	registers storage.RegisterIndex,
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
-	executionDataLatestHeight func() (uint64, error),
+	executionDataLatestHeight func() uint64,
 	processedHeightInitializer storage.ConsumerProgressInitializer,
 ) (*Indexer, error) {
 	r := &Indexer{

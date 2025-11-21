@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/engine/access/collection_sync"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/state_synchronization"
 )
 
 var _ collection_sync.ExecutionDataProvider = (*executionDataProvider)(nil)
@@ -14,14 +14,14 @@ var _ collection_sync.ExecutionDataProvider = (*executionDataProvider)(nil)
 // executionDataProvider implements ExecutionDataProvider by querying ExecutionDataCache.
 type executionDataProvider struct {
 	cache                      execution_data.ExecutionDataCache
-	highestExectuionDataHeight tracker.ExecutionDataTracker
+	highestExectuionDataHeight state_synchronization.ExecutionDataIndexedHeight
 }
 
 // NewExecutionDataProvider creates a new ExecutionDataProvider that reads from the given ExecutionDataCache.
 // The headers storage is used to determine the search range for finding available heights.
 func NewExecutionDataProvider(
 	cache execution_data.ExecutionDataCache,
-	highestExectuionDataHeight tracker.ExecutionDataTracker,
+	highestExectuionDataHeight state_synchronization.ExecutionDataIndexedHeight,
 ) *executionDataProvider {
 	return &executionDataProvider{
 		cache:                      cache,
@@ -31,7 +31,7 @@ func NewExecutionDataProvider(
 
 // HighestIndexedHeight returns the highest block height for which execution data is available.
 func (p *executionDataProvider) HighestIndexedHeight() uint64 {
-	return p.highestExectuionDataHeight.GetHighestHeight()
+	return p.highestExectuionDataHeight.HighestConsecutiveHeight()
 }
 
 // GetExecutionDataByHeight returns the execution data for the given block height.

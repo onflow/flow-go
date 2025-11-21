@@ -90,8 +90,8 @@ func newIndexerTest(t *testing.T, g *fixtures.GeneratorSuite, blocks []*flow.Blo
 	return test
 }
 
-func (w *indexerTest) latestHeight() (uint64, error) {
-	return w.last().Height, nil
+func (w *indexerTest) latestHeight() uint64 {
+	return w.last().Height
 }
 
 func (w *indexerTest) last() *flow.Block {

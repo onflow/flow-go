@@ -212,8 +212,8 @@ func New(
 		// here by the notification job consumer to discover new jobs.
 		// Note: we don't want to notify notificationConsumer for a block if it has not downloaded
 		// execution data yet.
-		func() (uint64, error) {
-			return e.blockConsumer.LastProcessedIndex(), nil
+		func() uint64 {
+			return e.blockConsumer.LastProcessedIndex()
 		},
 	)
 
@@ -270,15 +270,8 @@ func (e *executionDataRequester) onBlockFinalized(*model.Block) {
 // HighestConsecutiveHeight returns the highest consecutive block height for which ExecutionData
 // has been received.
 // This method must only be called after the component is Ready. If it is called early, an error is returned.
-func (e *executionDataRequester) HighestConsecutiveHeight() (uint64, error) {
-	select {
-	case <-e.blockConsumer.Ready():
-	default:
-		// LastProcessedIndex is not meaningful until the component has completed startup
-		return 0, fmt.Errorf("HighestConsecutiveHeight must not be called before the component is ready")
-	}
-
-	return e.blockConsumer.LastProcessedIndex(), nil
+func (e *executionDataRequester) HighestConsecutiveHeight() uint64 {
+	return e.blockConsumer.LastProcessedIndex()
 }
 
 // runBlockConsumer runs the blockConsumer component
