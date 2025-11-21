@@ -61,7 +61,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
-	"github.com/onflow/flow-go/engine/common/requester"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -185,7 +184,7 @@ type AccessNodeConfig struct {
 	registerDBPruneThreshold             uint64
 	collectionFetcherMaxProcessing       uint64
 	collectionFetcherMaxSearchAhead      uint64
-	collectionSync                       string
+	collectionSync                       collection_syncfactory.CollectionSyncMode
 }
 
 type PublicNetworkConfig struct {
@@ -295,7 +294,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerDBPruneThreshold:             0,
 		collectionFetcherMaxProcessing:       10,
 		collectionFetcherMaxSearchAhead:      20,
-		collectionSync:                       "execution_and_collection",
+		collectionSync:                       collection_syncfactory.CollectionSyncModeExecutionAndCollection,
 	}
 }
 
@@ -363,9 +362,8 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	CollectionRequesterEngine *requester.Engine
-	FollowerEng               *followereng.ComplianceEngine
-	StateStreamEng            *statestreambackend.Engine
+	FollowerEng    *followereng.ComplianceEngine
+	StateStreamEng *statestreambackend.Engine
 
 	// for tx status deriver to know about the highest full block (a block with all collections synced)
 	// backed by either collection fetcher to execution data syncing
@@ -1148,6 +1146,7 @@ func (builder *FlowAccessNodeBuilder) ParseFlags() error {
 }
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {
+	var collectionSyncStr string
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultAccessNodeConfig()
 
@@ -1331,9 +1330,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"public-network-execution-data-sync-enabled",
 			defaultConfig.publicNetworkExecutionDataEnabled,
 			"[experimental] whether to enable the execution data sync protocol on public network")
-		flags.StringVar(&builder.collectionSync,
+		flags.StringVar(&collectionSyncStr,
 			"collection-sync",
-			defaultConfig.collectionSync,
+			defaultConfig.collectionSync.String(),
 			"collection sync mode: 'execution_first' (only fetch from execution nodes if execution data syncing is on, "+
 				"otherwise fetch from collection nodes), 'execution_and_collection' (fetch from both collection nodes and execution nodes), "+
 				"'collection_only' (only fetch from collection nodes)")
@@ -1525,9 +1524,12 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
 		}
-		if builder.collectionSync != "execution_first" && builder.collectionSync != "execution_and_collection" && builder.collectionSync != "collection_only" {
-			return fmt.Errorf("collection-sync must be one of [execution_first, execution_and_collection, collection_only], got: %s", builder.collectionSync)
+		// Parse collection sync mode from string flag
+		collectionSyncMode, err := collection_syncfactory.ParseCollectionSyncMode(collectionSyncStr)
+		if err != nil {
+			return err
 		}
+		builder.collectionSync = collectionSyncMode
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
 				return errors.New("execution-data-fetch-timeout must be greater than 0")
@@ -1964,74 +1966,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
-			rootBlockHeight := node.State.Params().FinalizedRoot().Height
-
-			// Initialize ConsumeProgressLastFullBlockHeight
-			progress, err := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
+			result, err := collection_syncfactory.CreateProcessedLastFullBlockHeightModule(
+				node.Logger,
+				node.State,
+				builder.ProtocolDB,
+			)
 			if err != nil {
 				return err
 			}
-
-			lastProgress, err := progress.ProcessedIndex()
-			if err != nil {
-				return fmt.Errorf("failed to get last processed index for last full block height: %w", err)
-			}
-
-			// Sync ConsumeProgressLastFullBlockHeight and ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
-			// by taking the max value of each and updating both
-			fetchAndIndexedTracker := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
-			fetchAndIndexed, err := fetchAndIndexedTracker.Initialize(rootBlockHeight)
-			if err != nil {
-				return fmt.Errorf("failed to initialize fetch and indexed collections block height tracker: %w", err)
-			}
-			fetchAndIndexedValue, err := fetchAndIndexed.ProcessedIndex()
-			if err != nil {
-				return fmt.Errorf("failed to get fetch and indexed collections block height: %w", err)
-			}
-
-			// Take the max of both values
-			maxValue := max(lastProgress, fetchAndIndexedValue)
-
-			// Update both trackers if needed
-			if lastProgress < maxValue {
-				if err := progress.SetProcessedIndex(maxValue); err != nil {
-					return fmt.Errorf("failed to update last full block height: %w", err)
-				}
-				node.Logger.Info().
-					Uint64("old_value", lastProgress).
-					Uint64("new_value", maxValue).
-					Str("tracker", module.ConsumeProgressLastFullBlockHeight).
-					Msg("synced collection sync progress tracker")
-			}
-
-			if fetchAndIndexedValue < maxValue {
-				if err := fetchAndIndexed.SetProcessedIndex(maxValue); err != nil {
-					return fmt.Errorf("failed to update fetch and indexed collections block height: %w", err)
-				}
-				node.Logger.Info().
-					Uint64("old_value", fetchAndIndexedValue).
-					Uint64("new_value", maxValue).
-					Str("tracker", module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight).
-					Msg("synced collection sync progress tracker")
-			}
-
-			if lastProgress == maxValue && fetchAndIndexedValue == maxValue {
-				node.Logger.Info().
-					Uint64("value", maxValue).
-					Msg("collection sync progress trackers already in sync")
-			}
-
-			// Get the final synced value for ProgressReader
-			finalProgress, err := progress.ProcessedIndex()
-			if err != nil {
-				return fmt.Errorf("failed to get final synced progress: %w", err)
-			}
-
-			// Create ProgressReader that aggregates progress from executionDataProcessor and collectionFetcher
-			builder.lastFullBlockHeight = collection_syncfactory.NewProgressReader(finalProgress)
-
-			collectionIndexedHeight = progress
-
+			builder.lastFullBlockHeight = result.LastFullBlockHeight
+			collectionIndexedHeight = result.CollectionIndexedHeight
 			return nil
 		}).
 		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -2249,55 +2193,22 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		})
 
 	builder.Component("execution data processor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		if builder.executionDataSyncEnabled && builder.collectionSync != "collection_only" {
-			node.Logger.Info().
-				Str("collection_sync_mode", builder.collectionSync).
-				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
-				Msg("creating execution data processor")
-
-			// ExecutionDataCache should already be created in BuildExecutionSyncComponents
-			if builder.ExecutionDataCache == nil {
-				return nil, fmt.Errorf("ExecutionDataCache must be created before execution data processor")
-			}
-
-			// Create execution data processor
-			executionDataProcessor, err := collection_syncfactory.CreateExecutionDataProcessor(
-				builder.Logger,
-				notNil(builder.ExecutionDataCache),
-				notNil(builder.ExecutionDataRequester),
-				collectionIndexedHeight,
-				notNil(builder.blockCollectionIndexer),
-				notNil(builder.CollectionSyncMetrics),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create execution data processor: %w", err)
-			}
-
-			// Store and register with ProgressReader
-			builder.lastFullBlockHeight.SetExecutionDataProcessor(executionDataProcessor)
-
-			// Setup requester to notify processor when new execution data is received
-			builder.ExecutionDataDistributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
-				executionDataProcessor.OnNewExectuionData()
-			})
-
-			return executionDataProcessor, nil
+		processor, err := collection_syncfactory.CreateExecutionDataProcessorComponent(
+			builder.Logger,
+			builder.executionDataSyncEnabled,
+			builder.collectionSync,
+			notNil(builder.ExecutionDataCache),
+			notNil(builder.ExecutionDataRequester),
+			notNil(collectionIndexedHeight),
+			notNil(builder.blockCollectionIndexer),
+			notNil(builder.CollectionSyncMetrics),
+			notNil(builder.lastFullBlockHeight),
+			notNil(builder.ExecutionDataDistributor),
+		)
+		if err != nil {
+			return nil, err
 		}
-
-		// Log when execution data processor is not created
-		if !builder.executionDataSyncEnabled {
-			node.Logger.Info().
-				Str("collection_sync_mode", builder.collectionSync).
-				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
-				Msg("execution data processor not created: execution data sync is disabled")
-		} else if builder.collectionSync == "collection_only" {
-			node.Logger.Info().
-				Str("collection_sync_mode", builder.collectionSync).
-				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
-				Msg("execution data processor not created: collection sync mode is 'collection_only'")
-		}
-
-		return &module.NoopReadyDoneAware{}, nil
+		return processor, nil
 	})
 
 	builder.Component("finalized block indexer", createFinalizedBlockIndexer(builder))
@@ -2647,40 +2558,13 @@ func createFinalizedBlockIndexer(builder *FlowAccessNodeBuilder) func(node *cmd.
 }
 
 func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
+	var requesterEng module.ReadyDoneAware
 	builder.
 		Component("collection_sync fetcher", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// Create fetcher if:
-			// 1. collectionSync is "execution_and_collection" (always create, even with execution data sync)
-			// 2. collectionSync is "collection_only" (always create)
-			// 3. collectionSync is "execution_first" and execution data sync is disabled
-			shouldCreateFetcher := builder.collectionSync == "execution_and_collection" ||
-				builder.collectionSync == "collection_only" ||
-				(builder.collectionSync == "execution_first" && !builder.executionDataSyncEnabled)
-
-			if !shouldCreateFetcher {
-				// skip if execution data sync is enabled and not in execution_and_collection or collection_only mode
-				// because the execution data contains the collections, so no need to fetch them separately.
-				// otherwise, if both fetching and syncing are enabled, they might slow down each other,
-				// because the database operation requires locking.
-				node.Logger.Info().
-					Str("collection_sync_mode", builder.collectionSync).
-					Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
-					Msg("collection sync fetcher not created: execution data sync is enabled and collection sync mode is not 'execution_and_collection' or 'collection_only'")
-				return &module.NoopReadyDoneAware{}, nil
-			}
-
-			node.Logger.Info().
-				Str("collection_sync_mode", builder.collectionSync).
-				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
-				Msg("creating collection sync fetcher")
-
-			// Fetcher always uses ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
-			// to avoid contention with execution data processor which uses ConsumeProgressLastFullBlockHeight
-			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
-
-			// Create fetcher and requesterEng
-			requesterEng, fetcher, err := collection_syncfactory.CreateFetcher(
+			result, err := collection_syncfactory.CreateCollectionSyncFetcherComponent(
 				node.Logger,
+				builder.executionDataSyncEnabled,
+				builder.collectionSync,
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.State,
@@ -2689,39 +2573,22 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				node.Storage.Guarantees,
 				builder.ProtocolDB,
 				notNil(builder.blockCollectionIndexer),
-				fetchAndIndexedCollectionsBlockHeight,
 				builder.FollowerDistributor,
 				notNil(builder.collectionExecutedMetric),
 				notNil(builder.CollectionSyncMetrics),
-				collection_syncfactory.CreateFetcherConfig{
-					MaxProcessing:  builder.collectionFetcherMaxProcessing,
-					MaxSearchAhead: builder.collectionFetcherMaxSearchAhead,
-				},
+				builder.collectionFetcherMaxProcessing,
+				builder.collectionFetcherMaxSearchAhead,
+				notNil(builder.lastFullBlockHeight),
 			)
-
 			if err != nil {
-				return nil, fmt.Errorf("could not create collection fetcher: %w", err)
+				return nil, err
 			}
-
-			builder.CollectionRequesterEngine = requesterEng
-
-			// Store and register with ProgressReader
-			builder.lastFullBlockHeight.SetCollectionFetcher(fetcher)
-
-			return fetcher, nil
+			requesterEng = result.Requester
+			return result.Fetcher, nil
 		}).
-		Component("collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// Create requester if fetcher was created (same conditions as fetcher)
-			shouldCreateRequester := builder.collectionSync == "execution_and_collection" ||
-				builder.collectionSync == "collection_only" ||
-				(builder.collectionSync == "execution_first" && !builder.executionDataSyncEnabled)
-
-			if !shouldCreateRequester {
-				return &module.NoopReadyDoneAware{}, nil
-			}
-			return builder.CollectionRequesterEngine, nil
+		Component("collection_sync collection requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return requesterEng, nil
 		})
-
 }
 
 // func createIngestReceiptEngine(builder *FlowAccessNodeBuilder) func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

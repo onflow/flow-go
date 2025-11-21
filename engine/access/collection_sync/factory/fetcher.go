@@ -27,7 +27,7 @@ type CreateFetcherConfig struct {
 	MaxSearchAhead uint64
 }
 
-// CreateFetcher creates a new Fetcher component with all its dependencies.
+// createFetcher creates a new Fetcher component with all its dependencies.
 // This function is in the collections package to avoid import cycles:
 // - collections package already imports collection_sync (for interfaces)
 // - CreateFetcher needs to create concrete types from collections package
@@ -50,7 +50,7 @@ type CreateFetcherConfig struct {
 // Returns both the Fetcher and BlockProcessor so they can be reused in other components.
 //
 // No error returns are expected during normal operation.
-func CreateFetcher(
+func createFetcher(
 	log zerolog.Logger,
 	engineMetrics module.EngineMetrics,
 	engineRegistry network.EngineRegistry,

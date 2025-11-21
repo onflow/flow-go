@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// CreateExecutionDataProcessor creates a new ExecutionDataProcessor with the provided dependencies.
+// createExecutionDataProcessor creates a new ExecutionDataProcessor with the provided dependencies.
 //
 // Parameters:
 //   - log: Logger for the component
@@ -29,7 +29,7 @@ import (
 //   - error: An error if the processor could not be created
 //
 // No errors are expected during normal operation.
-func CreateExecutionDataProcessor(
+func createExecutionDataProcessor(
 	log zerolog.Logger,
 	cache execution_data.ExecutionDataCache,
 	executionDataIndexedHeight state_synchronization.ExecutionDataIndexedHeight,
