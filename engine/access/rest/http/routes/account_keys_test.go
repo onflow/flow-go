@@ -123,6 +123,8 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 //  1. A request with an invalid account address returns http.StatusBadRequest.
 //  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
 //  3. A request where GetAccountKeyAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+
+// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
 func TestGetAccountByIndexErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
@@ -263,6 +265,8 @@ func TestGetAccountKeys(t *testing.T) {
 //  1. A request with an invalid account address returns http.StatusBadRequest.
 //  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
 //  3. A request where GetAccountKeysAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+//
+// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
 func TestGetAccountKeysErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
@@ -450,7 +454,7 @@ func expectedAccountKeysResponse(account *flow.Account, metadata *accessmodel.Ex
 				"hashing_algorithm": "SHA3_256",
 				"sequence_number": "0",
 				"weight": "1000",
-				"revoked": false%s
+				"revoked": false
 			},
 			{
 				"index": "1",
@@ -459,12 +463,11 @@ func expectedAccountKeysResponse(account *flow.Account, metadata *accessmodel.Ex
 				"hashing_algorithm": "SHA3_256",
 				"sequence_number": "0",
 				"weight": "500",
-				"revoked": false%s
+				"revoked": false
 			}
-		]
+		]%s
 	}`,
 		account.Keys[0].PublicKey.String(),
-		metadataSection,
 		account.Keys[1].PublicKey.String(),
 		metadataSection,
 	)

@@ -34,7 +34,7 @@ func NewAccount(
 	}
 
 	if expand[expandableKeys] {
-		account.Keys = NewAccountKeys(flowAccount.Keys, metadata, shouldIncludeMetadata)
+		account.Keys = NewAccountKeys(flowAccount.Keys)
 	} else {
 		account.Expandable.Keys = expandableKeys
 	}
@@ -90,12 +90,10 @@ type AccountKeys []AccountPublicKey
 // NewAccountKeys creates an array of AccountPublicKey models.
 func NewAccountKeys(
 	accountKeys []flow.AccountPublicKey,
-	metadata *access.ExecutorMetadata,
-	shouldIncludeMetadata bool,
 ) AccountKeys {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
-		keys[i] = NewAccountPublicKey(k, metadata, shouldIncludeMetadata)
+		keys[i] = NewAccountPublicKey(k, nil, false)
 	}
 
 	return keys
@@ -110,11 +108,17 @@ func NewAccountPublicKeys(
 ) AccountPublicKeys {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
-		keys[i] = NewAccountPublicKey(k, metadata, shouldIncludeMetadata)
+		keys[i] = NewAccountPublicKey(k, nil, false)
+	}
+
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
 	}
 
 	return AccountPublicKeys{
-		Keys: keys,
+		Keys:     keys,
+		Metadata: meta,
 	}
 }
 

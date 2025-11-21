@@ -116,9 +116,9 @@ func TestGetAccountBalance(t *testing.T) {
 // correctly returns appropriate HTTP error codes and messages in various failure scenarios.
 //
 // Test cases:
-// 1. A request with an invalid account address returns http.StatusBadRequest.
-// 2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
-// 3. A request where GetAccountBalanceAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+//  1. A request with an invalid account address returns http.StatusBadRequest.
+//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
+//  3. A request where GetAccountBalanceAtBlockHeight fails for a valid block height returns http.StatusNotFound.
 func TestGetAccountBalanceErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
