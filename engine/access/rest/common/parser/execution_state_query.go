@@ -9,14 +9,14 @@ import (
 )
 
 func NewExecutionStateQuery(
-	agreeingExecutorCount string,
+	agreeingExecutorsCount string,
 	requiredExecutorIds []string,
 	includeExecutorMetadata string,
 ) (*models.ExecutionStateQuery, error) {
 	var executorCount uint64
 	var err error
-	if len(agreeingExecutorCount) > 0 {
-		executorCount, err = strconv.ParseUint(agreeingExecutorCount, 10, 64)
+	if len(agreeingExecutorsCount) > 0 {
+		executorCount, err = strconv.ParseUint(agreeingExecutorsCount, 10, 64)
 		// executorCount can't be set to 0 explicitly
 		if err != nil || executorCount == 0 {
 			return nil, fmt.Errorf("invalid agreeingExecutorCount: %w", err)
