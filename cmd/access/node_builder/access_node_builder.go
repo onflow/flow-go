@@ -1966,6 +1966,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
 			rootBlockHeight := node.State.Params().FinalizedRoot().Height
 
+			// Initialize ConsumeProgressLastFullBlockHeight
 			progress, err := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
 			if err != nil {
 				return err
@@ -1976,8 +1977,58 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return fmt.Errorf("failed to get last processed index for last full block height: %w", err)
 			}
 
+			// Sync ConsumeProgressLastFullBlockHeight and ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
+			// by taking the max value of each and updating both
+			fetchAndIndexedTracker := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
+			fetchAndIndexed, err := fetchAndIndexedTracker.Initialize(rootBlockHeight)
+			if err != nil {
+				return fmt.Errorf("failed to initialize fetch and indexed collections block height tracker: %w", err)
+			}
+			fetchAndIndexedValue, err := fetchAndIndexed.ProcessedIndex()
+			if err != nil {
+				return fmt.Errorf("failed to get fetch and indexed collections block height: %w", err)
+			}
+
+			// Take the max of both values
+			maxValue := max(lastProgress, fetchAndIndexedValue)
+
+			// Update both trackers if needed
+			if lastProgress < maxValue {
+				if err := progress.SetProcessedIndex(maxValue); err != nil {
+					return fmt.Errorf("failed to update last full block height: %w", err)
+				}
+				node.Logger.Info().
+					Uint64("old_value", lastProgress).
+					Uint64("new_value", maxValue).
+					Str("tracker", module.ConsumeProgressLastFullBlockHeight).
+					Msg("synced collection sync progress tracker")
+			}
+
+			if fetchAndIndexedValue < maxValue {
+				if err := fetchAndIndexed.SetProcessedIndex(maxValue); err != nil {
+					return fmt.Errorf("failed to update fetch and indexed collections block height: %w", err)
+				}
+				node.Logger.Info().
+					Uint64("old_value", fetchAndIndexedValue).
+					Uint64("new_value", maxValue).
+					Str("tracker", module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight).
+					Msg("synced collection sync progress tracker")
+			}
+
+			if lastProgress == maxValue && fetchAndIndexedValue == maxValue {
+				node.Logger.Info().
+					Uint64("value", maxValue).
+					Msg("collection sync progress trackers already in sync")
+			}
+
+			// Get the final synced value for ProgressReader
+			finalProgress, err := progress.ProcessedIndex()
+			if err != nil {
+				return fmt.Errorf("failed to get final synced progress: %w", err)
+			}
+
 			// Create ProgressReader that aggregates progress from executionDataProcessor and collectionFetcher
-			builder.lastFullBlockHeight = collection_syncfactory.NewProgressReader(lastProgress)
+			builder.lastFullBlockHeight = collection_syncfactory.NewProgressReader(finalProgress)
 
 			collectionIndexedHeight = progress
 
@@ -2623,17 +2674,10 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
 				Msg("creating collection sync fetcher")
 
-				// if execution data sync is disabled, or collection sync mode is "collection_only",
-				// then the fetcher is the only component updating the last full block height,
-				// so it can use the module.ConsumeProgressLastFullBlockHeight as the progress tracker.
-				// TODO(leo): if both execution data sync and collection fetcher are enabled,
-				// then the fetcher should use a different progress tracker to avoid contention.
-				// use ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight to track progress in that case.
-				// but before using that, make sure the progress is synced with the execution data
-				// processor.(module.ConsumeProgressLastFullBlockHeight)
-			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight)
+			// Fetcher always uses ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
+			// to avoid contention with execution data processor which uses ConsumeProgressLastFullBlockHeight
+			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight)
 
-			// skip if execution data sync is enabled
 			// Create fetcher and requesterEng
 			requesterEng, fetcher, err := collection_syncfactory.CreateFetcher(
 				node.Logger,
