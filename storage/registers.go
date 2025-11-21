@@ -11,9 +11,10 @@ type RegisterIndexReader interface {
 	//
 	// If the register at the given height was not indexed, returns the highest
 	// height the register was indexed at.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
-	// - storage.ErrNotFound if the given height is indexed, but the register does not exist.
+	//
+	// Expected error returns during normal operation:
+	//   - [storage.ErrHeightNotIndexed]: If the given height was not indexed yet or lower than the first indexed height.
+	//   - [storage.ErrNotFound]: If the given height is indexed, but the register does not exist.
 	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
 	// LatestHeight returns the latest indexed height.
@@ -50,6 +51,6 @@ type RegisterSnapshotReader interface {
 	// performed before constructing the snapshot.
 	//
 	// Expected error returns during normal operation:
-	//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+	//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
 	StorageSnapshot(height uint64) (snapshot.StorageSnapshot, error)
 }

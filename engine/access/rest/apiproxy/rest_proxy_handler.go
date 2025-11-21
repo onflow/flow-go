@@ -92,8 +92,8 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
-//   - [access.DataNotFoundError] - if the collection is not found.
+//   - [access.ServiceUnavailable]: If the configured upstream access client failed to respond.
+//   - [access.DataNotFoundError]: If the collection is not found.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -349,16 +349,16 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 // ExecuteScriptAtLatestBlock executes script at latest block.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -389,16 +389,16 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 // ExecuteScriptAtBlockHeight executes script at the given block height.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -436,16 +436,16 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 // ExecuteScriptAtBlockID executes script at the given block id.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,

@@ -10,6 +10,6 @@ type ExecutionStateCache interface {
 	// The result may be sealed or unsealed. Only data for finalized blocks is available.
 	//
 	// Expected error returns during normal operation:
-	//   - [storage.ErrNotFound] - result is not available, not ready for querying, or does not descend from the latest sealed result.
+	//   - [storage.ErrNotFound]: Result is not available, not ready for querying, or does not descend from the latest sealed result.
 	Snapshot(executionResultID flow.Identifier) (Snapshot, error)
 }
