@@ -351,7 +351,7 @@ func New(params Params) (*Backend, error) {
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.ServiceUnavailable]: if the configured static collection node does not respond to ping.
+//   - [access.ServiceUnavailable]: If the configured static collection node does not respond to ping.
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
@@ -400,48 +400,4 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVers
 	}
 
 	return nodeInfo, nil
-}
-
-// GetCollectionByID returns a light collection by its ID. The light collection contains only
-// transaction IDs, not the full transaction bodies.
-//
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-// As documented in the [access.API], which we partially implement with this function:
-//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
-//
-// Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError if the collection is not found.
-func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
-	col, err := b.collections.LightByID(colID)
-	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
-		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
-	}
-
-	return col, nil
-}
-
-// GetFullCollectionByID returns a full collection by its ID. The full collection contains the
-// complete transaction bodies for all transactions in the collection.
-//
-// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-// As documented in the [access.API], which we partially implement with this function:
-//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
-//
-// Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError if the collection is not found.
-func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
-	col, err := b.collections.ByID(colID)
-	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
-		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
-	}
-
-	return col, nil
 }

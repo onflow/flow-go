@@ -28,7 +28,7 @@ func NewCollectionsBackend(collections storage.Collections) *Collections {
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.DataNotFoundError]: if the collection is not found.
+//   - [access.DataNotFoundError]: If the collection is not found.
 func (c *Collections) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
 	col, err := c.collections.LightByID(colID)
 	if err != nil {
@@ -49,7 +49,7 @@ func (c *Collections) GetCollectionByID(ctx context.Context, colID flow.Identifi
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.DataNotFoundError]: if the collection is not found.
+//   - [access.DataNotFoundError]: If the collection is not found.
 func (c *Collections) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
 	col, err := c.collections.ByID(colID)
 	if err != nil {
