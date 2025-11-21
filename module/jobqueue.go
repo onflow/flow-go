@@ -22,9 +22,6 @@ const (
 	// (new)the highest block height that has indexed collections from fetching missing collections from LN
 	ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight = "ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight"
 
-	// (new)the highest block height that has indexed collections from syncing execution data from EN
-	ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight = "ConsumeProgressAccessSyncAndIndexedCollectionsBlockHeight"
-
 	// on finalized block, fetch tx error message from EN
 	ConsumeProgressEngineTxErrorMessagesBlockHeight = "ConsumeProgressEngineTxErrorMessagesBlockHeight"
 

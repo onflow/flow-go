@@ -2226,11 +2226,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.lastFullBlockHeight.SetExecutionDataProcessor(executionDataProcessor)
 
 			// Setup requester to notify processor when new execution data is received
-			if builder.ExecutionDataDistributor != nil {
-				builder.ExecutionDataDistributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
-					executionDataProcessor.OnNewExectuionData()
-				})
-			}
+			builder.ExecutionDataDistributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
+				executionDataProcessor.OnNewExectuionData()
+			})
 
 			return executionDataProcessor, nil
 		}
@@ -2625,14 +2623,14 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				Bool("execution_data_sync_enabled", builder.executionDataSyncEnabled).
 				Msg("creating collection sync fetcher")
 
-			// TODO (leo): switch to module.ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight
-			// to implement hybrid sync mode in the future
-			// in the hybrid sync mode, the fetcher will store its progress under a different key,
-			// and and only active if either of the following condition is met:
-			// 1) execution data sync is disabled
-			// 2) execution data sync is enabled and exectuion data sync height is far behind
-			//    the latest finalized height and the execution data sync is not updating.
-
+				// if execution data sync is disabled, or collection sync mode is "collection_only",
+				// then the fetcher is the only component updating the last full block height,
+				// so it can use the module.ConsumeProgressLastFullBlockHeight as the progress tracker.
+				// TODO(leo): if both execution data sync and collection fetcher are enabled,
+				// then the fetcher should use a different progress tracker to avoid contention.
+				// use ConsumeProgressAccessFetchAndIndexedCollectionsBlockHeight to track progress in that case.
+				// but before using that, make sure the progress is synced with the execution data
+				// processor.(module.ConsumeProgressLastFullBlockHeight)
 			fetchAndIndexedCollectionsBlockHeight := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight)
 
 			// skip if execution data sync is enabled
