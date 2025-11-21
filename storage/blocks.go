@@ -92,6 +92,19 @@ type Blocks interface {
 	//     to decode an existing database value
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
+	// BlockIDByCollectionID returns the block ID for the given [flow.CollectionGuarantee] ID.
+	// This method is only available for collections included in finalized blocks.
+	// While consensus nodes verify that collections are not repeated within the same fork,
+	// each different fork can contain a recent collection once. Therefore, we must wait for
+	// finality.
+	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
+	//
+	// Error returns:
+	//   - storage.ErrNotFound if the collection ID was not found
+	//   - generic error in case of unexpected failure from the database layer, or failure
+	//     to decode an existing database value
+	BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error)
+
 	// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
 	// The caller must acquire [storage.LockIndexBlockByPayloadGuarantees] and hold it until the database write has been committed.
 	//
