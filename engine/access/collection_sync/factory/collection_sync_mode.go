@@ -56,4 +56,3 @@ func (m CollectionSyncMode) ShouldCreateFetcher(executionDataSyncEnabled bool) b
 func (m CollectionSyncMode) ShouldCreateExecutionDataProcessor(executionDataSyncEnabled bool) bool {
 	return executionDataSyncEnabled && m != CollectionSyncModeCollectionOnly
 }
-
