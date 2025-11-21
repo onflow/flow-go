@@ -153,7 +153,7 @@ func (p *FinalizedBlockProcessor) workerLoop(ctx irrecoverable.SignalerContext, 
 				}
 
 				// Log progress for each height with all relevant information
-				p.log.Info().
+				p.log.Debug().
 					Uint64("indexed", height).
 					Uint64("lowest_missing", lowestMissing).
 					Uint64("highest_available", highestAvailableHeight).
