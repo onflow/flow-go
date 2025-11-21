@@ -19,7 +19,7 @@ func GetAccount(r *common.Request, backend access.API, link commonmodels.LinkGen
 	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.Height = header.Height
 	}
@@ -27,7 +27,7 @@ func GetAccount(r *common.Request, backend access.API, link commonmodels.LinkGen
 	executionState := req.ExecutionState
 	account, executorMetadata, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height, models.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	return models.NewAccount(account, link, r.ExpandFields, executorMetadata, executionState.IncludeExecutorMetadata)

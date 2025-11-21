@@ -203,7 +203,7 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
 
-	suite.startServers(suite.T(), irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
+	suite.startServers(suite.T(), irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err))
 
 	conn, err := grpc.NewClient(
 		suite.unsecureGrpcServer.GRPCAddress().String(),

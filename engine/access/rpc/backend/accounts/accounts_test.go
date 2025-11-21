@@ -13,7 +13,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	access "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/access"
+	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -34,6 +35,8 @@ import (
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
+var systemErr = fmt.Errorf("system error")
+
 type AccountsSuite struct {
 	suite.Suite
 
@@ -50,7 +53,7 @@ type AccountsSuite struct {
 	chainID           flow.ChainID
 
 	executionNodes flow.IdentityList
-	execClient     *access.ExecutionAPIClient
+	execClient     *accessmock.ExecutionAPIClient
 
 	block               *flow.Block
 	account             *flow.Account
@@ -82,7 +85,7 @@ func (s *AccountsSuite) SetupTest() {
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
 	s.chainID = flow.Testnet
 
-	s.execClient = access.NewExecutionAPIClient(s.T())
+	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 	s.block = unittest.BlockFixture()
 	s.executionResult = unittest.ExecutionResultFixture()
@@ -119,7 +122,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testGetAccount(ctx, backend, codes.OK)
+		s.testGetAccount(ctx, backend, nil)
 	})
 
 	s.Run("GetAccountAtLatestBlock - happy path", func() {
@@ -129,7 +132,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testGetAccountAtLatestBlock(ctx, backend, codes.OK)
+		s.testGetAccountAtLatestBlock(ctx, backend, nil)
 	})
 
 	s.Run("GetAccountAtBlockHeight - happy path", func() {
@@ -139,7 +142,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 			Once()
 		s.setupENSuccessResponse(s.block.ID())
 
-		s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
+		s.testGetAccountAtBlockHeight(ctx, backend, nil)
 	})
 }
 
@@ -147,8 +150,9 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	ctx := context.Background()
 	// use a status code that's not used in the API to make sure it's passed through
-	statusCode := codes.FailedPrecondition
+	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
+	expectedErr := access.NewInvalidRequestError(errToReturn)
 
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeExecutionNodesOnly)
 
@@ -159,7 +163,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testGetAccount(ctx, backend, statusCode)
+		s.testGetAccount(ctx, backend, expectedErr)
 	})
 
 	s.Run("GetAccountAtLatestBlock - fails with backend err", func() {
@@ -169,7 +173,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testGetAccountAtLatestBlock(ctx, backend, statusCode)
+		s.testGetAccountAtLatestBlock(ctx, backend, expectedErr)
 	})
 
 	s.Run("GetAccountAtBlockHeight - fails with backend err", func() {
@@ -179,7 +183,7 @@ func (s *AccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testGetAccountAtBlockHeight(ctx, backend, statusCode)
+		s.testGetAccountAtBlockHeight(ctx, backend, expectedErr)
 	})
 }
 
@@ -205,7 +209,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_HappyPath() {
 			Return(s.account, nil).
 			Once()
 
-		s.testGetAccount(ctx, backend, codes.OK)
+		s.testGetAccount(ctx, backend, nil)
 	})
 
 	s.Run("GetAccountAtLatestBlock - happy path", func() {
@@ -225,7 +229,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_HappyPath() {
 			Return(s.account, nil).
 			Once()
 
-		s.testGetAccountAtLatestBlock(ctx, backend, codes.OK)
+		s.testGetAccountAtLatestBlock(ctx, backend, nil)
 	})
 
 	s.Run("GetAccountAtBlockHeight - happy path", func() {
@@ -245,7 +249,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_HappyPath() {
 			Return(s.account, nil).
 			Once()
 
-		s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
+		s.testGetAccountAtBlockHeight(ctx, backend, nil)
 	})
 }
 
@@ -256,20 +260,27 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeLocalOnly)
 
 	testCases := []struct {
-		err        error
-		statusCode codes.Code
+		ctx           func() context.Context
+		err           error
+		expectedError error
 	}{
 		{
-			err:        storage.ErrHeightNotIndexed,
-			statusCode: codes.OutOfRange,
+			ctx:           func() context.Context { return ctx },
+			err:           storage.ErrHeightNotIndexed,
+			expectedError: access.NewOutOfRangeError(storage.ErrHeightNotIndexed),
 		},
 		{
-			err:        storage.ErrNotFound,
-			statusCode: codes.NotFound,
+			ctx:           func() context.Context { return ctx },
+			err:           storage.ErrNotFound,
+			expectedError: access.NewDataNotFoundError("header", storage.ErrNotFound),
 		},
 		{
-			err:        fmt.Errorf("system error"),
-			statusCode: codes.Internal,
+			ctx: func() context.Context {
+				return irrecoverable.WithSignalerContext(context.Background(),
+					irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), systemErr))
+			},
+			err:           systemErr,
+			expectedError: irrecoverable.NewException(systemErr),
 		},
 	}
 
@@ -293,7 +304,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 			// used in error conversion, when local provider fails
 			s.mockGetAccountErrorConversionFromStorage(tt.err)
 
-			s.testGetAccount(ctx, backend, tt.statusCode)
+			s.testGetAccount(tt.ctx(), backend, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", tt.err), func() {
@@ -315,7 +326,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 			// used in error conversion, when local provider fails
 			s.mockGetAccountErrorConversionFromStorage(tt.err)
 
-			s.testGetAccountAtLatestBlock(ctx, backend, tt.statusCode)
+			s.testGetAccountAtLatestBlock(tt.ctx(), backend, tt.expectedError)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", tt.err), func() {
@@ -337,7 +348,7 @@ func (s *AccountsSuite) TestGetAccountFromStorage_Fails() {
 			// used in error conversion, when local provider fails
 			s.mockGetAccountErrorConversionFromStorage(tt.err)
 
-			s.testGetAccountAtBlockHeight(ctx, backend, tt.statusCode)
+			s.testGetAccountAtBlockHeight(tt.ctx(), backend, tt.expectedError)
 		})
 	}
 }
@@ -378,7 +389,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 			s.mockGetAccountErrorConversionFromStorage(errToReturn)
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testGetAccount(ctx, backend, codes.OK)
+			s.testGetAccount(ctx, backend, nil)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtLatestBlock - happy path - recovers %v", errToReturn), func() {
@@ -401,7 +412,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 			s.mockGetAccountErrorConversionFromStorage(errToReturn)
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testGetAccountAtLatestBlock(ctx, backend, codes.OK)
+			s.testGetAccountAtLatestBlock(ctx, backend, nil)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - happy path - recovers %v", errToReturn), func() {
@@ -424,7 +435,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_HappyPath() {
 			s.mockGetAccountErrorConversionFromStorage(errToReturn)
 			s.setupENSuccessResponse(s.block.ID())
 
-			s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
+			s.testGetAccountAtBlockHeight(ctx, backend, nil)
 		})
 	}
 }
@@ -435,9 +446,9 @@ func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	ctx := context.Background()
 	backend := s.defaultAccountsBackend(query_mode.IndexQueryModeFailover)
 
-	// use a status code that's not used in the API to make sure it's passed through
-	statusCode := codes.FailedPrecondition
+	statusCode := codes.InvalidArgument
 	errToReturn := status.Error(statusCode, "random error")
+	expectedErr := access.NewInvalidRequestError(errToReturn)
 
 	// used in error conversion
 	s.state.On("Params").Return(s.params)
@@ -460,7 +471,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testGetAccount(ctx, backend, statusCode)
+		s.testGetAccount(ctx, backend, expectedErr)
 	})
 
 	s.Run("GetAccountAtLatestBlock - fails with backend err", func() {
@@ -481,7 +492,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testGetAccountAtLatestBlock(ctx, backend, statusCode)
+		s.testGetAccountAtLatestBlock(ctx, backend, expectedErr)
 	})
 
 	s.Run("GetAccountAtBlockHeight - fails with backend err", func() {
@@ -502,7 +513,7 @@ func (s *AccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 			Once()
 		s.setupENFailingResponse(s.block.ID(), errToReturn)
 
-		s.testGetAccountAtBlockHeight(ctx, backend, statusCode)
+		s.testGetAccountAtBlockHeight(ctx, backend, expectedErr)
 	})
 }
 
@@ -517,10 +528,10 @@ func (s *AccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState
 		err := fmt.Errorf("inconsistent node state")
 		s.snapshot.On("Head").Return(nil, err).Once()
 
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
 
-		actual, metadata, err := backend.GetAccountAtLatestBlock(signalerCtx, s.failingAddress, s.criteria)
+		actual, metadata, err := backend.GetAccountAtLatestBlock(signalerCtx, s.account.Address, s.criteria)
 		s.Require().Error(err)
 		s.Require().Nil(actual)
 		s.Require().Nil(metadata)
@@ -916,11 +927,11 @@ func (s *AccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	}
 }
 
-func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, expectedError error) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
-	if statusCode == codes.OK {
+	if expectedError == nil {
 		actual, metadata, err := backend.GetAccount(ctx, s.account.Address, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(s.account, actual)
@@ -928,17 +939,17 @@ func (s *AccountsSuite) testGetAccount(ctx context.Context, backend *Accounts, s
 	} else {
 		actual, metadata, err := backend.GetAccount(ctx, s.failingAddress, s.criteria)
 		s.Require().Error(err)
-		s.Require().Equal(statusCode, status.Code(err))
+		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
 		s.Require().Nil(metadata)
 	}
 }
 
-func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend *Accounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend *Accounts, expectedError error) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.ToHeader(), nil).Once()
 
-	if statusCode == codes.OK {
+	if expectedError == nil {
 		actual, metadata, err := backend.GetAccountAtLatestBlock(ctx, s.account.Address, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(s.account, actual)
@@ -946,17 +957,17 @@ func (s *AccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, backend
 	} else {
 		actual, metadata, err := backend.GetAccountAtLatestBlock(ctx, s.failingAddress, s.criteria)
 		s.Require().Error(err)
-		s.Require().Equal(statusCode, status.Code(err))
+		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
 		s.Require().Nil(metadata)
 	}
 }
 
-func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *Accounts, statusCode codes.Code) {
+func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *Accounts, expectedError error) {
 	height := s.block.Height
 	s.headers.On("BlockIDByHeight", height).Return(s.block.ID(), nil).Once()
 
-	if statusCode == codes.OK {
+	if expectedError == nil {
 		actual, metadata, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height, s.criteria)
 		s.Require().NoError(err)
 		s.Require().Equal(s.account, actual)
@@ -964,7 +975,7 @@ func (s *AccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend
 	} else {
 		actual, metadata, err := backend.GetAccountAtBlockHeight(ctx, s.failingAddress, height, s.criteria)
 		s.Require().Error(err)
-		s.Require().Equal(statusCode, status.Code(err))
+		s.Require().ErrorIs(err, expectedError, "error mismatch: expected %v, got %v", expectedError, err)
 		s.Require().Nil(actual)
 		s.Require().Nil(metadata)
 	}
