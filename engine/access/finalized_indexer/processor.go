@@ -16,19 +16,22 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// FinalizedBlockProcessor handles processing of finalized blocks,
-// including indexing and syncing of related collections and execution results.
+// FinalizedBlockProcessor processes finalized blocks and builds a collection-to-finalized-block index.
 //
-// FinalizedBlockProcessor is designed to handle the ingestion of finalized Flow blocks
-// in a scalable and decoupled manner. It uses a worker loop with a for loop to iterate
-// through heights sequentially, processing each finalized block. This design enables
-// the processor to handle high-throughput block finalization events without blocking
-// other parts of the system.
+// The processor iterates through each finalized block sequentially and indexes which finalized block
+// contains each collection. This index is necessary because while a collection can belong to multiple
+// unfinalized blocks, each collection belongs to exactly one finalized block. This uniqueness property
+// enables efficient transaction result lookups.
 //
-// The processor relies on the distributor to signal when a new finalized
-// block is available, which triggers the worker loop to process any unprocessed blocks.
-// The actual processing involves indexing block-to-collection and block-to-execution-result
-// mappings, as well as requesting the associated collections.
+// The collection-to-block index is used by the GetTransactionResult API to locate the block containing
+// a transaction. The lookup process is: transaction -> collection (via collection sync indexer) ->
+// finalized block (via this indexer). The transaction-to-collection index is built by the collection
+// sync indexer, which indexes either sealed or finalized blocks. When indexing finalized blocks, the
+// transaction-to-collection mapping is also unique.
+//
+// The processor uses a worker loop that processes blocks sequentially by height, triggered by the
+// distributor when new blocks are finalized. This design enables high-throughput block finalization
+// handling without blocking other system components.
 type FinalizedBlockProcessor struct {
 	log zerolog.Logger
 	component.Component
