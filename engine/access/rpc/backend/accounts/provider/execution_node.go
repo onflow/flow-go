@@ -128,7 +128,7 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 		case codes.Unavailable:
 			return nil, nil, access.NewServiceUnavailable(errToReturn)
 		default:
-			return nil, nil, errToReturn
+			return nil, nil, access.NewInternalError(errToReturn)
 		}
 	}
 
