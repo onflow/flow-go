@@ -35,7 +35,7 @@ func NewRegisterSnapshotReader(registers storage.RegisterIndexReader) *RegisterS
 // StorageSnapshot returns a snapshot of register values at the given block height.
 //
 // Expected error returns during normal operation:
-//   - [storage.ErrHeightNotIndexed] - if the requested height is outside the range of indexed blocks.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
 func (r *RegisterSnapshotReader) StorageSnapshot(height uint64) (snapshot.StorageSnapshot, error) {
 	if height < r.RegisterIndexReader.FirstHeight() {
 		return nil, storage.ErrHeightNotIndexed

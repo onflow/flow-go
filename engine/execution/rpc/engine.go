@@ -197,10 +197,10 @@ func (h *handler) Ping(
 // execution state at the block with the given ID.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument] - if the script or arguments exceed the maximum allowed size,
+//   - [codes.InvalidArgument]: If the script or arguments exceed the maximum allowed size,
 //     or if the engine fails to execute the script.
-//   - [codes.NotFound] - if the requested block has not been executed or has been pruned.
-//   - [codes.Internal] - if the block state commitment cannot be retrieved due to internal errors.
+//   - [codes.NotFound]: If the requested block has not been executed or has been pruned.
+//   - [codes.Internal]: If the block state commitment cannot be retrieved due to internal errors.
 func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,
