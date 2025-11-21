@@ -5,7 +5,9 @@ import (
 
 	"github.com/rs/zerolog"
 
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -37,14 +39,14 @@ func (f *FailoverAccountProvider) GetAccountAtBlock(
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
-) (*flow.Account, error) {
-	localAccount, localErr := f.localRequester.GetAccountAtBlock(ctx, address, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	localAccount, localMetadata, localErr := f.localRequester.GetAccountAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localAccount, nil
+		return localAccount, localMetadata, nil
 	}
 
-	execNodeAccount, execNodeErr := f.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
-	return execNodeAccount, execNodeErr
+	return f.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height, executionResultInfo)
 }
 
 func (f *FailoverAccountProvider) GetAccountBalanceAtBlock(
@@ -52,18 +54,14 @@ func (f *FailoverAccountProvider) GetAccountBalanceAtBlock(
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
-) (uint64, error) {
-	localBalance, localErr := f.localRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
+	localBalance, localMetadata, localErr := f.localRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localBalance, nil
+		return localBalance, localMetadata, nil
 	}
 
-	execNodeBalance, execNodeErr := f.execNodeRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
-	if execNodeErr != nil {
-		return 0, execNodeErr
-	}
-
-	return execNodeBalance, nil
+	return f.execNodeRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height, executionResultInfo)
 }
 
 func (f *FailoverAccountProvider) GetAccountKeyAtBlock(
@@ -72,18 +70,14 @@ func (f *FailoverAccountProvider) GetAccountKeyAtBlock(
 	keyIndex uint32,
 	blockID flow.Identifier,
 	height uint64,
-) (*flow.AccountPublicKey, error) {
-	localKey, localErr := f.localRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	localKey, localMetadata, localErr := f.localRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localKey, nil
+		return localKey, localMetadata, nil
 	}
 
-	execNodeKey, execNodeErr := f.execNodeRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
-	if execNodeErr != nil {
-		return nil, execNodeErr
-	}
-
-	return execNodeKey, nil
+	return f.execNodeRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height, executionResultInfo)
 }
 
 func (f *FailoverAccountProvider) GetAccountKeysAtBlock(
@@ -91,16 +85,12 @@ func (f *FailoverAccountProvider) GetAccountKeysAtBlock(
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
-) ([]flow.AccountPublicKey, error) {
-	localKeys, localErr := f.localRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	localKeys, localMetadata, localErr := f.localRequester.GetAccountKeysAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localKeys, nil
+		return localKeys, localMetadata, nil
 	}
 
-	execNodeKeys, execNodeErr := f.execNodeRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
-	if execNodeErr != nil {
-		return nil, execNodeErr
-	}
-
-	return execNodeKeys, nil
+	return f.execNodeRequester.GetAccountKeysAtBlock(ctx, address, blockID, height, executionResultInfo)
 }

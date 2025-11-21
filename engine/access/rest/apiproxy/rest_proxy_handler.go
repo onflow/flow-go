@@ -200,107 +200,150 @@ func (r *RestProxyHandler) GetTransactionResult(
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
-func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	getAccountAtBlockHeightRequest := &accessproto.GetAccountAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountResponse, err := upstream.GetAccountAtBlockHeight(ctx, getAccountAtBlockHeightRequest)
 	r.log("upstream", "GetAccountAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessageToAccount(accountResponse.Account)
+	account, err := convert.MessageToAccount(accountResponse.Account)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return account, metadata, nil
 }
 
 // GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
-func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	defer closer.Close()
 
 	getAccountBalanceAtBlockHeightRequest := &accessproto.GetAccountBalanceAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(ctx, getAccountBalanceAtBlockHeightRequest)
 	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
 
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
-	return accountBalanceResponse.GetBalance(), nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountBalanceResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountBalanceResponse.GetBalance(), metadata, nil
 
 }
 
 // GetAccountKeys returns account keys by account address and block height.
-func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	getAccountKeysAtBlockHeightRequest := &accessproto.GetAccountKeysAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountKeyResponse, err := upstream.GetAccountKeysAtBlockHeight(ctx, getAccountKeysAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
 	for i, key := range accountKeyResponse.GetAccountKeys() {
 		accountKey, err := convert.MessageToAccountKey(key)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		accountKeys[i] = *accountKey
 	}
 
-	return accountKeys, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountKeyResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountKeys, metadata, nil
 }
 
 // GetAccountKeyByIndex returns account key by account address, key index and block height.
-func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
+func (r *RestProxyHandler) GetAccountKeyByIndex(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex uint32,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	getAccountKeyAtBlockHeightRequest := &accessproto.GetAccountKeyAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		Index:       keyIndex,
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		Index:               keyIndex,
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(ctx, getAccountKeyAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessageToAccountKey(accountKeyResponse.AccountKey)
+	accountKey, err := convert.MessageToAccountKey(accountKeyResponse.GetAccountKey())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountKeyResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountKey, metadata, nil
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
