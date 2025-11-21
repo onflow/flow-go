@@ -53,18 +53,6 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	var batch [][]string
 	lastSend := time.Now()
-	ticker := time.NewTicker(*batchDelay)
-	defer ticker.Stop()
-
-	// Channel to signal when we have data to send
-	sendChan := make(chan bool, 1)
-
-	// Goroutine to handle periodic sends
-	go func() {
-		for range ticker.C {
-			sendChan <- true
-		}
-	}()
 
 	// Function to send batch
 	sendBatch := func() {
@@ -117,15 +105,12 @@ func main() {
 		// Send if batch is full
 		if len(batch) >= *batchSize {
 			sendBatch()
+			continue
 		}
 
-		// Check if we should send due to time
-		select {
-		case <-sendChan:
-			if time.Since(lastSend) >= *batchDelay {
-				sendBatch()
-			}
-		default:
+		// Send if enough time has passed since last send and we have data
+		if len(batch) > 0 && time.Since(lastSend) >= *batchDelay {
+			sendBatch()
 		}
 	}
 
