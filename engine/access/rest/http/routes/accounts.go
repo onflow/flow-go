@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -21,8 +19,7 @@ func GetAccount(r *common.Request, backend access.API, link commonmodels.LinkGen
 	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
 		if err != nil {
-			err := fmt.Errorf("block with height: %d does not exist", req.Height)
-			return nil, common.NewNotFoundError(err.Error(), err)
+			return nil, err
 		}
 		req.Height = header.Height
 	}
@@ -30,8 +27,7 @@ func GetAccount(r *common.Request, backend access.API, link commonmodels.LinkGen
 	executionState := req.ExecutionState
 	account, executorMetadata, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height, models.NewCriteria(executionState))
 	if err != nil {
-		err = fmt.Errorf("failed to get account, reason: %w", err)
-		return nil, common.NewNotFoundError(err.Error(), err)
+		return nil, err
 	}
 
 	return models.NewAccount(account, link, r.ExpandFields, executorMetadata, executionState.IncludeExecutorMetadata)

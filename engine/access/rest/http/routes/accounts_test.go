@@ -12,7 +12,6 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -125,8 +124,10 @@ func TestAccessGetAccount(t *testing.T) {
 //
 // Test cases:
 //  1. A request with an invalid account address returns http.StatusBadRequest.
-//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusNotFound.
-//  3. A request where GetAccountAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
+//  3. A request where GetAccountAtBlockHeight fails for a valid block height returns http.StatusInternalServerError.
+//
+// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
 func TestGetAccountErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
@@ -152,8 +153,8 @@ func TestGetAccountErrors(t *testing.T) {
 					Return(nil, flow.BlockStatusUnknown, fmt.Errorf("latest block header error")).
 					Once()
 			},
-			status: http.StatusNotFound,
-			out:    fmt.Sprintf(`{"code":404, "message":"block with height: %d does not exist"}`, request.SealedHeight),
+			status: http.StatusInternalServerError,
+			out:    `{"code":500, "message":"internal server error"}`,
 		},
 		{
 			name: "GetAccountAtBlockHeight fails for valid height",
@@ -163,8 +164,8 @@ func TestGetAccountErrors(t *testing.T) {
 					Return(nil, nil, fmt.Errorf("database error")).
 					Once()
 			},
-			status: http.StatusNotFound,
-			out:    `{"code":404, "message":"failed to get account, reason: database error"}`,
+			status: http.StatusInternalServerError,
+			out:    `{"code":500, "message":"internal server error"}`,
 		},
 	}
 

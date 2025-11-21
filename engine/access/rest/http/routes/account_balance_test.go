@@ -119,6 +119,8 @@ func TestGetAccountBalance(t *testing.T) {
 //  1. A request with an invalid account address return http.StatusBadRequest.
 //  2. A request where GetLatestBlockHeader fails for the "sealed" height return http.StatusNotFound.
 //  3. A request where GetAccountBalanceAtBlockHeight fails for a valid block height return http.StatusNotFound.
+//
+// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
 func TestGetAccountBalanceErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
