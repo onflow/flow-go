@@ -67,6 +67,17 @@ var _ types.HotView = &DeltaView{}
 
 // NewDeltaView constructs a new delta view
 func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
+	refund := parent.GetRefund()
+	// The root node will be of type `BaseView`, so we should
+	// check if we are dealing with `DeltaView`, for parent
+	// skipping
+	dt, ok := parent.(*DeltaView)
+	if ok && !dt.HasData() {
+		// If my parent doesn't have any writes, I can just
+		// delegate "upstream" queries to its parent
+		parent = dt.parent
+	}
+
 	return &DeltaView{
 		parent: parent,
 
@@ -83,7 +94,7 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 		slots: make(map[types.SlotAddress]gethCommon.Hash),
 
 		// for refund we just copy the data
-		refund: parent.GetRefund(),
+		refund: refund,
 	}
 }
 
@@ -583,4 +594,53 @@ func (d *DeltaView) DirtySlots() map[types.SlotAddress]struct{} {
 		dirtySlots[sk] = struct{}{}
 	}
 	return dirtySlots
+}
+
+// HasData returns whether any state modifications are recorded in this view
+func (d *DeltaView) HasData() bool {
+	if len(d.dirtyAddresses) > 0 {
+		return true
+	}
+
+	if len(d.created) > 0 {
+		return true
+	}
+
+	if len(d.newContract) > 0 {
+		return true
+	}
+
+	if len(d.toBeDestructed) > 0 {
+		return true
+	}
+
+	if len(d.recreated) > 0 {
+		return true
+	}
+
+	if len(d.balances) > 0 {
+		return true
+	}
+
+	if len(d.nonces) > 0 {
+		return true
+	}
+
+	if len(d.codes) > 0 {
+		return true
+	}
+
+	if len(d.codeHashes) > 0 {
+		return true
+	}
+
+	if len(d.slots) > 0 {
+		return true
+	}
+
+	if len(d.transient) > 0 {
+		return true
+	}
+
+	return false
 }
