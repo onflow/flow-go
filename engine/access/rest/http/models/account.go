@@ -2,24 +2,41 @@ package models
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const expandableKeys = "keys"
 const expandableContracts = "contracts"
 
-func (a *Account) Build(flowAccount *flow.Account, link models.LinkGenerator, expand map[string]bool) error {
-	a.Address = flowAccount.Address.String()
-	a.Balance = util.FromUint(flowAccount.Balance)
-	a.Expandable = &AccountExpandable{}
+// NewAccount builds the REST API response model for GetAccount.
+//
+// No errors are expected during normal operation.
+func NewAccount(
+	flowAccount *flow.Account,
+	link models.LinkGenerator,
+	expand map[string]bool,
+	metadata *access.ExecutorMetadata,
+	shouldIncludeMetadata bool,
+) (*Account, error) {
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
+	}
+
+	account := &Account{
+		Address:    flowAccount.Address.String(),
+		Balance:    util.FromUint(flowAccount.Balance),
+		Expandable: &AccountExpandable{},
+		Metadata:   meta,
+	}
 
 	if expand[expandableKeys] {
-		var keys AccountKeys
-		keys.Build(flowAccount.Keys)
-		a.Keys = keys
+		account.Keys = NewAccountKeys(flowAccount.Keys)
 	} else {
-		a.Expandable.Keys = expandableKeys
+		account.Expandable.Keys = expandableKeys
 	}
 
 	if expand[expandableContracts] {
@@ -27,60 +44,97 @@ func (a *Account) Build(flowAccount *flow.Account, link models.LinkGenerator, ex
 		for name, code := range flowAccount.Contracts {
 			contracts[name] = util.ToBase64(code)
 		}
-		a.Contracts = contracts
+		account.Contracts = contracts
 	} else {
-		a.Expandable.Contracts = expandableContracts
+		account.Expandable.Contracts = expandableContracts
 	}
 
 	var self models.Links
-	err := self.Build(link.AccountLink(a.Address))
+	err := self.Build(link.AccountLink(account.Address))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	a.Links = &self
+	account.Links = &self
 
-	return nil
+	return account, nil
 }
 
-func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
+// NewAccountPublicKey builds the REST API response model for GetAccountKey.
+func NewAccountPublicKey(
+	k flow.AccountPublicKey,
+	metadata *access.ExecutorMetadata,
+	shouldIncludeMetadata bool,
+) AccountPublicKey {
 	sigAlgo := SigningAlgorithm(k.SignAlgo.String())
 	hashAlgo := HashingAlgorithm(k.HashAlgo.String())
 
-	a.Index = util.FromUint(k.Index)
-	a.PublicKey = k.PublicKey.String()
-	a.SigningAlgorithm = &sigAlgo
-	a.HashingAlgorithm = &hashAlgo
-	a.SequenceNumber = util.FromUint(k.SeqNumber)
-	a.Weight = util.FromUint(uint64(k.Weight))
-	a.Revoked = k.Revoked
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
+	}
+
+	return AccountPublicKey{
+		Index:            util.FromUint(k.Index),
+		PublicKey:        k.PublicKey.String(),
+		SigningAlgorithm: &sigAlgo,
+		HashingAlgorithm: &hashAlgo,
+		SequenceNumber:   util.FromUint(k.SeqNumber),
+		Weight:           util.FromUint(uint64(k.Weight)),
+		Revoked:          k.Revoked,
+		Metadata:         meta,
+	}
 }
 
 type AccountKeys []AccountPublicKey
 
-func (a *AccountKeys) Build(accountKeys []flow.AccountPublicKey) {
+// NewAccountKeys creates an array of AccountPublicKey models.
+func NewAccountKeys(
+	accountKeys []flow.AccountPublicKey,
+) AccountKeys {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
-		var key AccountPublicKey
-		key.Build(k)
-		keys[i] = key
+		keys[i] = NewAccountPublicKey(k, nil, false)
 	}
 
-	*a = keys
+	return keys
 }
 
-// Build function use model AccountPublicKeys type for GetAccountKeys call
+// NewAccountPublicKeys function use model AccountPublicKeys type for GetAccountKeys call
 // AccountPublicKeys is an auto-generated type from the openapi spec
-func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
+func NewAccountPublicKeys(
+	accountKeys []flow.AccountPublicKey,
+	metadata *access.ExecutorMetadata,
+	shouldIncludeMetadata bool,
+) AccountPublicKeys {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
-		var key AccountPublicKey
-		key.Build(k)
-		keys[i] = key
+		keys[i] = NewAccountPublicKey(k, nil, false)
 	}
 
-	a.Keys = keys
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
+	}
+
+	return AccountPublicKeys{
+		Keys:     keys,
+		Metadata: meta,
+	}
 }
 
-func (b *AccountBalance) Build(balance uint64) {
-	b.Balance = util.FromUint(balance)
+// NewAccountBalance builds the REST API response model for GetAccountBalance.
+func NewAccountBalance(
+	balance uint64,
+	metadata *access.ExecutorMetadata,
+	shouldIncludeMetadata bool,
+) AccountBalance {
+	var meta *commonmodels.Metadata
+	if shouldIncludeMetadata {
+		meta = commonmodels.NewMetadata(metadata)
+	}
+
+	return AccountBalance{
+		Balance:  util.FromUint(balance),
+		Metadata: meta,
+	}
 }

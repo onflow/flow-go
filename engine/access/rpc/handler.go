@@ -537,7 +537,9 @@ func (h *Handler) GetAccount(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccount(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccount(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -545,6 +547,10 @@ func (h *Handler) GetAccount(
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.GetAccountResponse{
@@ -568,7 +574,9 @@ func (h *Handler) GetAccountAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccountAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -576,6 +584,10 @@ func (h *Handler) GetAccountAtLatestBlock(
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountResponse{
@@ -599,7 +611,9 @@ func (h *Handler) GetAccountAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -607,6 +621,10 @@ func (h *Handler) GetAccountAtBlockHeight(
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountResponse{
@@ -633,9 +651,15 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	accountBalance, executorMetadata, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountBalanceResponse{
@@ -662,9 +686,15 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	accountBalance, executorMetadata, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountBalanceResponse{
@@ -691,7 +721,9 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	keyByIndex, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, req.GetIndex())
+	executionState := req.GetExecutionStateQuery()
+
+	keyByIndex, executorMetadata, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, req.GetIndex(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -699,6 +731,10 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountKeyResponse{
@@ -726,7 +762,9 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountKeys, err := h.api.GetAccountKeysAtLatestBlock(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	accountKeys, executorMetadata, err := h.api.GetAccountKeysAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -740,6 +778,10 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 		}
 
 		publicKeys = append(publicKeys, accountKey)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountKeysResponse{
@@ -767,7 +809,15 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	keyByIndex, err := h.api.GetAccountKeyAtBlockHeight(ctx, address, req.GetIndex(), req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	keyByIndex, executorMetadata, err := h.api.GetAccountKeyAtBlockHeight(
+		ctx,
+		address,
+		req.GetIndex(),
+		req.GetBlockHeight(),
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -775,6 +825,10 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountKeyResponse{
@@ -802,7 +856,9 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountKeys, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	accountKeys, executorMetadata, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, err
 	}
@@ -816,6 +872,10 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 		}
 
 		publicKeys = append(publicKeys, accountKey)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountKeysResponse{
