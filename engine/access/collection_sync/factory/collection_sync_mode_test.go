@@ -42,9 +42,9 @@ func TestCollectionSyncMode_String(t *testing.T) {
 // TestParseCollectionSyncMode_Valid tests the ParseCollectionSyncMode function with valid inputs.
 func TestParseCollectionSyncMode_Valid(t *testing.T) {
 	tests := map[string]CollectionSyncMode{
-		"execution_first":            CollectionSyncModeExecutionFirst,
-		"execution_and_collection":   CollectionSyncModeExecutionAndCollection,
-		"collection_only":            CollectionSyncModeCollectionOnly,
+		"execution_first":          CollectionSyncModeExecutionFirst,
+		"execution_and_collection": CollectionSyncModeExecutionAndCollection,
+		"collection_only":          CollectionSyncModeCollectionOnly,
 	}
 
 	for input, expectedMode := range tests {
@@ -62,9 +62,9 @@ func TestParseCollectionSyncMode_Invalid(t *testing.T) {
 		"",
 		"unknown",
 		"invalid",
-		"execution-first",      // wrong separator
-		"executionFirst",       // wrong format
-		"EXECUTION_FIRST",      // wrong case
+		"execution-first",                // wrong separator
+		"executionFirst",                 // wrong format
+		"EXECUTION_FIRST",                // wrong case
 		"execution_and_collection_extra", // extra suffix
 	}
 
@@ -83,17 +83,17 @@ func TestParseCollectionSyncMode_Invalid(t *testing.T) {
 // of modes and execution data sync enabled/disabled.
 func TestCollectionSyncMode_ShouldCreateFetcher(t *testing.T) {
 	tests := []struct {
-		name                      string
-		mode                      CollectionSyncMode
-		executionDataSyncEnabled  bool
-		expectedShouldCreate      bool
-		description               string
+		name                     string
+		mode                     CollectionSyncMode
+		executionDataSyncEnabled bool
+		expectedShouldCreate     bool
+		description              string
 	}{
 		{
 			name:                     "execution_first_with_execution_data_sync_enabled",
 			mode:                     CollectionSyncModeExecutionFirst,
 			executionDataSyncEnabled: true,
-			expectedShouldCreate:      false,
+			expectedShouldCreate:     false,
 			description:              "should not create fetcher when execution data sync is enabled",
 		},
 		{
@@ -145,11 +145,11 @@ func TestCollectionSyncMode_ShouldCreateFetcher(t *testing.T) {
 // with all combinations of modes and execution data sync enabled/disabled.
 func TestCollectionSyncMode_ShouldCreateExecutionDataProcessor(t *testing.T) {
 	tests := []struct {
-		name                      string
-		mode                      CollectionSyncMode
-		executionDataSyncEnabled  bool
-		expectedShouldCreate      bool
-		description               string
+		name                     string
+		mode                     CollectionSyncMode
+		executionDataSyncEnabled bool
+		expectedShouldCreate     bool
+		description              string
 	}{
 		{
 			name:                     "execution_first_with_execution_data_sync_enabled",
@@ -162,7 +162,7 @@ func TestCollectionSyncMode_ShouldCreateExecutionDataProcessor(t *testing.T) {
 			name:                     "execution_first_with_execution_data_sync_disabled",
 			mode:                     CollectionSyncModeExecutionFirst,
 			executionDataSyncEnabled: false,
-			expectedShouldCreate:    false,
+			expectedShouldCreate:     false,
 			description:              "should not create processor when execution data sync is disabled",
 		},
 		{
@@ -202,4 +202,3 @@ func TestCollectionSyncMode_ShouldCreateExecutionDataProcessor(t *testing.T) {
 		})
 	}
 }
-
