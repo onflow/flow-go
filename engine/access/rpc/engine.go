@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
@@ -96,6 +97,7 @@ func NewBuilder(
 	stateStreamBackend state_stream.API,
 	stateStreamConfig statestreambackend.Config,
 	indexReporter state_synchronization.IndexReporter,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -146,6 +148,9 @@ func NewBuilder(
 		builder.WithMetrics()
 	}
 
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(eng.onFinalizedBlock)
+
 	return builder, nil
 }
 
@@ -174,8 +179,8 @@ func (e *Engine) shutdown() {
 	}
 }
 
-// OnFinalizedBlock responds to block finalization events.
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
+// onFinalizedBlock responds to block finalization events.
+func (e *Engine) onFinalizedBlock(block *model.Block) {
 	e.finalizedHeaderCacheActor.OnFinalizedBlock(block)
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
