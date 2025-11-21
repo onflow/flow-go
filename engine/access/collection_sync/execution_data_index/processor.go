@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -15,7 +16,7 @@ import (
 type ExecutionDataProcessor struct {
 	component.Component
 	log                     zerolog.Logger
-	newExecutionDataIndexed chan struct{}
+	newExecutionDataIndexed engine.Notifier
 	provider                collection_sync.ExecutionDataProvider
 	indexer                 collection_sync.BlockCollectionIndexer
 	metrics                 module.CollectionSyncMetrics
@@ -36,16 +37,16 @@ func NewExecutionDataProcessor(
 ) *ExecutionDataProcessor {
 	edp := &ExecutionDataProcessor{
 		log:                     log.With().Str("component", "coll_sync_ed_processor").Logger(),
-		newExecutionDataIndexed: make(chan struct{}, 1),
+		newExecutionDataIndexed: engine.NewNotifier(),
 		provider:                provider,
 		indexer:                 indexer,
 		metrics:                 metrics,
 		processedHeight:         processedHeight,
 	}
 
-	// Initialize the channel so that even if no new execution data comes in,
+	// Initialize the notifier so that even if no new execution data comes in,
 	// the worker loop can still be triggered to process any existing data.
-	edp.newExecutionDataIndexed <- struct{}{}
+	edp.newExecutionDataIndexed.Notify()
 
 	// Build component manager with worker loop
 	cm := component.NewComponentManagerBuilder().
@@ -58,13 +59,7 @@ func NewExecutionDataProcessor(
 }
 
 func (edp *ExecutionDataProcessor) OnNewExectuionData() {
-	select {
-	case edp.newExecutionDataIndexed <- struct{}{}:
-	default:
-		// if the channel is full, no need to block, just return.
-		// once the worker loop processes the buffered signal, it will
-		// process the next height all the way to the highest available height.
-	}
+	edp.newExecutionDataIndexed.Notify()
 }
 
 func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -77,7 +72,7 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 		select {
 		case <-ctx.Done():
 			return
-		case <-edp.newExecutionDataIndexed:
+		case <-edp.newExecutionDataIndexed.Channel():
 			highestAvailableHeight := edp.provider.HighestIndexedHeight()
 			lowestMissing := edp.processedHeight.Value() + 1
 

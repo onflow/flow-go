@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -36,7 +37,7 @@ type FinalizedBlockProcessor struct {
 	log zerolog.Logger
 	component.Component
 
-	newBlockFinalized chan struct{}
+	newBlockFinalized engine.Notifier
 	state             protocol.State
 	blocks            storage.Blocks
 	db                storage.DB
@@ -73,7 +74,7 @@ func NewFinalizedBlockProcessor(
 
 	processor := &FinalizedBlockProcessor{
 		log:                      log.With().Str("component", "finalized_block_processor").Logger(),
-		newBlockFinalized:        make(chan struct{}, 1),
+		newBlockFinalized:        engine.NewNotifier(),
 		state:                    state,
 		db:                       db,
 		lockManager:              lockManager,
@@ -82,18 +83,12 @@ func NewFinalizedBlockProcessor(
 		collectionExecutedMetric: collectionExecutedMetric,
 	}
 
-	// Initialize the channel so that even if no new blocks are finalized,
+	// Initialize the notifier so that even if no new blocks are finalized,
 	// the worker loop can still be triggered to process any existing blocks.
-	processor.newBlockFinalized <- struct{}{}
+	processor.newBlockFinalized.Notify()
 
 	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
-		select {
-		case processor.newBlockFinalized <- struct{}{}:
-		default:
-			// if the channel is full, no need to block, just return.
-			// once the worker loop processes the buffered signal, it will
-			// process the next height all the way to the highest available height.
-		}
+		processor.newBlockFinalized.Notify()
 	})
 
 	// Build component manager with worker loop
@@ -117,7 +112,7 @@ func (p *FinalizedBlockProcessor) workerLoop(ctx irrecoverable.SignalerContext, 
 		select {
 		case <-ctx.Done():
 			return
-		case <-p.newBlockFinalized:
+		case <-p.newBlockFinalized.Channel():
 			finalizedHeader, err := p.state.Final().Head()
 			if err != nil {
 				ctx.Throw(fmt.Errorf("failed to get finalized block header: %w", err))
