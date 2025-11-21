@@ -9,22 +9,16 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
 const (
-	workersCount = 1 // how many workers will concurrently process the tasks in the jobqueue
-	searchAhead  = 1 // how many block heights ahead of the current will be requested and tasked for jobqueue
-
 	// fetchTimeout is the timeout for retrieving execution data from the datastore
 	// This is required by the execution data reader, but in practice, this isn't needed
 	// here since the data is in a local db.
@@ -42,8 +36,8 @@ var _ execution_data.ProcessedHeightRecorder = (*Indexer)(nil)
 
 // Indexer handles ingestion of new execution data available and uses the execution data indexer module
 // to index the data.
-// The processing of new available data is done by creating a jobqueue that uses the execution data reader to
-// obtain new jobs. The worker also implements the `highestConsecutiveHeight` method which is used by the execution
+// The processing of new available data is done using a worker loop that processes execution data
+// from the execution data reader. The worker also implements the `highestConsecutiveHeight` method which is used by the execution
 // data reader, so it doesn't surpass the highest sealed block height when fetching the data.
 // The execution state worker has a callback that is used by the upstream queues which download new execution data to
 // notify new data is available and kick off indexing.
@@ -58,7 +52,6 @@ type Indexer struct {
 	// lastProcessedHeight the last handled block height
 	lastProcessedHeight *atomic.Uint64
 	indexer             *IndexerCore
-	jobConsumer         *jobqueue.ComponentConsumer
 	registers           storage.RegisterIndex
 }
 
@@ -69,7 +62,7 @@ func NewIndexer(
 	registers storage.RegisterIndex,
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
-	executionDataLatestHeight func() (uint64, error),
+	executionDataLatestHeight func() uint64,
 	processedHeightInitializer storage.ConsumerProgressInitializer,
 ) (*Indexer, error) {
 	r := &Indexer{
@@ -84,49 +77,69 @@ func NewIndexer(
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
 
-	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
-	// signal new work, which is being triggered on the `OnExecutionData` handler.
-	jobConsumer, err := jobqueue.NewComponentConsumer(
-		r.log,
-		r.exeDataNotifier.Channel(),
-		processedHeightInitializer,
-		r.exeDataReader,
-		initHeight,
-		r.processExecutionData,
-		workersCount,
-		searchAhead,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating execution data jobqueue: %w", err)
-	}
-
-	r.jobConsumer = jobConsumer
-
-	// SetPostNotifier will notify blockIndexedNotifier AFTER e.jobConsumer.LastProcessedIndex is updated.
-	r.jobConsumer.SetPostNotifier(func(module.JobID) {
-		r.blockIndexedNotifier.Notify()
-	})
+	// Initialize the notifier so that even if no new execution data comes in,
+	// the worker loop can still be triggered to process any existing data.
+	r.exeDataNotifier.Notify()
 
 	cm := component.NewComponentManagerBuilder()
-	cm.AddWorker(r.runExecutionDataConsumer)
+	cm.AddWorker(r.workerLoop)
 	cm.AddWorker(r.processBlockIndexed)
 	r.Component = cm.Build()
 
 	return r, nil
 }
 
-// runExecutionDataConsumer runs the jobConsumer component
-//
-// No errors are expected during normal operations.
-func (i *Indexer) runExecutionDataConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	i.log.Info().Msg("starting execution data jobqueue")
-	i.jobConsumer.Start(ctx)
-	err := util.WaitClosed(ctx, i.jobConsumer.Ready())
-	if err == nil {
-		ready()
-	}
+// workerLoop processes execution data in a single-threaded loop.
+// It processes each height sequentially from the last processed height to the highest available height.
+func (i *Indexer) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 
-	<-i.jobConsumer.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-i.exeDataNotifier.Channel():
+			highestAvailableHeight, err := i.exeDataReader.Head()
+			if err != nil {
+				ctx.Throw(fmt.Errorf("failed to get highest available height: %w", err))
+				return
+			}
+
+			lowestMissing := i.lastProcessedHeight.Load() + 1
+
+			for height := lowestMissing; height <= highestAvailableHeight; height++ {
+				job, err := i.exeDataReader.AtIndex(height)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						// Height not available yet, break and wait for next notification
+						break
+					}
+					ctx.Throw(fmt.Errorf("failed to get execution data for height %d: %w", height, err))
+					return
+				}
+
+				entry, err := jobs.JobToBlockEntry(job)
+				if err != nil {
+					i.log.Error().Err(err).Uint64("height", height).Msg("error converting execution data job")
+					ctx.Throw(fmt.Errorf("error converting execution data job for height %d: %w", height, err))
+					return
+				}
+
+				err = i.indexer.IndexBlockData(entry.ExecutionData)
+				if err != nil {
+					i.log.Error().Err(err).Uint64("height", height).Msg("error during execution data index processing")
+					ctx.Throw(fmt.Errorf("error during execution data index processing for height %d: %w", height, err))
+					return
+				}
+
+				// Update last processed height after successful indexing
+				i.lastProcessedHeight.Store(height)
+
+				// Notify that a block has been indexed
+				i.blockIndexedNotifier.Notify()
+			}
+		}
+	}
 }
 
 // processBlockIndexed is a worker that processes indexed blocks.
@@ -155,28 +168,20 @@ func (i *Indexer) processBlockIndexed(
 //   - storage.ErrNotFound:  if no finalized block header is known at given height
 func (i *Indexer) onBlockIndexed() error {
 	lastProcessedHeight := i.lastProcessedHeight.Load()
-	highestIndexedHeight := i.jobConsumer.LastProcessedIndex()
 
-	if lastProcessedHeight < highestIndexedHeight {
-		// we need loop here because it's possible for a height to be missed here,
-		// we should guarantee all heights are processed
-		for height := lastProcessedHeight + 1; height <= highestIndexedHeight; height++ {
-			header, err := i.indexer.headers.ByHeight(height)
-			if err != nil {
-				// if the execution data is available, the block must be locally finalized
-				i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
-				return fmt.Errorf("could not get header for height %d: %w", height, err)
-			}
-
-			i.OnBlockProcessed(header.Height)
-		}
-		i.lastProcessedHeight.Store(highestIndexedHeight)
+	header, err := i.indexer.headers.ByHeight(lastProcessedHeight)
+	if err != nil {
+		// if the execution data is available, the block must be locally finalized
+		i.log.Error().Err(err).Msgf("could not get header for height %d:", lastProcessedHeight)
+		return fmt.Errorf("could not get header for height %d: %w", lastProcessedHeight, err)
 	}
+
+	i.OnBlockProcessed(header.Height)
 
 	return nil
 }
 
-// Start the worker jobqueue to consume the available data.
+// Start starts the worker loop to process available execution data.
 func (i *Indexer) Start(ctx irrecoverable.SignalerContext) {
 	i.exeDataReader.AddContext(ctx)
 	i.Component.Start(ctx)
@@ -192,38 +197,13 @@ func (i *Indexer) LowestIndexedHeight() (uint64, error) {
 
 // HighestIndexedHeight returns the highest height indexed by the execution indexer.
 func (i *Indexer) HighestIndexedHeight() (uint64, error) {
-	select {
-	case <-i.jobConsumer.Ready():
-	default:
-		// LastProcessedIndex is not meaningful until the component has completed startup
-		return 0, fmt.Errorf("HighestIndexedHeight must not be called before the component is ready")
-	}
-
-	// The jobqueue maintains its own highest indexed height value, separate from the register db.
-	// Since jobs are only marked complete when ALL data is indexed, the lastProcessedIndex must
+	// The lastProcessedHeight tracks the highest indexed height.
+	// Since indexing is only marked complete when ALL data is indexed, the lastProcessedHeight must
 	// be strictly less than or equal to the register db's LatestHeight.
-	return i.jobConsumer.LastProcessedIndex(), nil
+	return i.lastProcessedHeight.Load(), nil
 }
 
-// OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
-func (i *Indexer) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
+// OnExecutionData is used to notify when new execution data is downloaded by the execution data requester.
+func (i *Indexer) OnExecutionData() {
 	i.exeDataNotifier.Notify()
-}
-
-// processExecutionData is a worker method that is being called by the jobqueue when processing a new job.
-// The job data contains execution data which we provide to the execution indexer to index it.
-func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
-	entry, err := jobs.JobToBlockEntry(job)
-	if err != nil {
-		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error converting execution data job")
-		ctx.Throw(err)
-	}
-
-	err = i.indexer.IndexBlockData(entry.ExecutionData)
-	if err != nil {
-		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
-		ctx.Throw(err)
-	}
-
-	done()
 }

@@ -99,9 +99,7 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	suite.reader = NewExecutionDataReader(
 		cache,
 		suite.fetchTimeout,
-		func() (uint64, error) {
-			return suite.highestAvailableHeight(), nil
-		},
+		suite.highestAvailableHeight,
 	)
 }
 
@@ -194,6 +192,8 @@ func (suite *ExecutionDataReaderSuite) TestHead() {
 		suite.highestAvailableHeight = func() uint64 {
 			return expectedIndex
 		}
+		// Recreate the reader with the updated function
+		suite.reset()
 		index, err := suite.reader.Head()
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), expectedIndex, index)

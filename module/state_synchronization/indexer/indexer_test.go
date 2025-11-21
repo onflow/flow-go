@@ -82,7 +82,11 @@ func newIndexerTest(t *testing.T, g *fixtures.GeneratorSuite, blocks []*flow.Blo
 		registers,
 		indexerCoreTest.indexer,
 		exeCache,
-		test.latestHeight,
+		func() uint64 {
+			height, err := test.latestHeight()
+			require.NoError(t, err)
+			return height
+		},
 		&mockProgressInitializer{progress: progress},
 	)
 	require.NoError(t, err)
@@ -107,7 +111,7 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 
 	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker)
 
-	w.worker.OnExecutionData(nil)
+	w.worker.OnExecutionData()
 
 	select {
 	case <-ctx.Done():

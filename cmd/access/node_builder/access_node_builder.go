@@ -973,6 +973,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				}
 
 				// setup requester to notify indexer when new execution data is received
+				// TODO (leo): pass the execDataDistributor to indexer.NewIndexer as parameter
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
 				// create script execution module, this depends on the indexer being initialized and the
@@ -1028,10 +1029,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
 			broadcaster := engine.NewBroadcaster()
 
 			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
@@ -1050,7 +1047,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
 				broadcaster,
-				highestAvailableHeight,
+				notNil(builder.ExecutionDataRequester),
 				builder.EventsIndex,
 				useIndex,
 			)
@@ -2213,31 +2210,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("ExecutionDataCache must be created before execution data processor")
 			}
 
-			// Create execution data tracker for the processor
-			// This is similar to the one created in state stream engine but used for collection indexing
-			broadcaster := engine.NewBroadcaster()
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-
-			useIndex := builder.executionDataIndexingEnabled
-			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
-				builder.Logger,
-				node.State,
-				builder.executionDataConfig.InitialBlockHeight,
-				node.Storage.Headers,
-				broadcaster,
-				highestAvailableHeight,
-				builder.EventsIndex,
-				useIndex,
-			)
-
 			// Create execution data processor
 			executionDataProcessor, err := collection_syncfactory.CreateExecutionDataProcessor(
 				builder.Logger,
 				notNil(builder.ExecutionDataCache),
-				executionDataTracker,
+				notNil(builder.ExecutionDataRequester),
 				collectionIndexedHeight,
 				notNil(builder.blockCollectionIndexer),
 				notNil(builder.CollectionSyncMetrics),
@@ -2251,10 +2228,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			// Setup requester to notify processor when new execution data is received
 			if builder.ExecutionDataDistributor != nil {
-				builder.ExecutionDataDistributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
-					executionDataTracker.OnExecutionData(executionData)
-					executionDataProcessor.OnNewExectuionData()
-				})
+				builder.ExecutionDataDistributor.AddOnExecutionDataReceivedConsumer(executionDataProcessor.OnNewExectuionData)
 			}
 
 			return executionDataProcessor, nil

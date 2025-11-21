@@ -3,7 +3,6 @@ package requester
 import (
 	"sync"
 
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/state_synchronization"
 )
 
@@ -27,11 +26,11 @@ func (p *ExecutionDataDistributor) AddOnExecutionDataReceivedConsumer(consumer s
 }
 
 // OnExecutionDataReceived is called when new execution data is received
-func (p *ExecutionDataDistributor) OnExecutionDataReceived(executionData *execution_data.BlockExecutionDataEntity) {
+func (p *ExecutionDataDistributor) OnExecutionDataReceived() {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	for _, consumer := range p.consumers {
-		consumer(executionData)
+		consumer()
 	}
 }

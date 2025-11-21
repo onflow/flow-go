@@ -45,6 +45,7 @@ type ExecutionDataRequesterSuite struct {
 	db          *pebble.DB
 	downloader  *exedatamock.Downloader
 	distributor *ExecutionDataDistributor
+	edCache     *cache.ExecutionDataCache
 
 	run edTestRun
 
@@ -409,7 +410,8 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	suite.distributor = NewExecutionDataDistributor()
 
 	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metricsCollector)
-	edCache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
+	suite.edCache = cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
+	edCache := suite.edCache
 
 	followerDistributor := pubsub.NewFollowerDistributor()
 	processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
@@ -450,7 +452,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchr
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(edr, cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -477,7 +479,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(edr, cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -515,7 +517,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(edr, cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -533,24 +535,47 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	return fetchedExecutionData
 }
 
-func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg *fetchTestRun, done func(), fetchedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData) func(ed *execution_data.BlockExecutionDataEntity) {
-	return func(ed *execution_data.BlockExecutionDataEntity) {
-		if _, has := fetchedExecutionData[ed.BlockID]; has {
-			suite.T().Errorf("duplicate execution data for block %s", ed.BlockID)
-			return
+func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(edr state_synchronization.ExecutionDataRequester, cfg *fetchTestRun, done func(), fetchedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData) state_synchronization.OnExecutionDataReceivedConsumer {
+	lastProcessedHeight := cfg.startHeight - 1
+	var mu sync.Mutex
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		
+		// Get the highest consecutive height with execution data available
+		highestHeight := edr.HighestConsecutiveHeight()
+		
+		// Process any new heights that have become available
+		for height := lastProcessedHeight + 1; height <= highestHeight; height++ {
+			block, ok := cfg.blocksByHeight[height]
+			if !ok {
+				continue
+			}
+			
+			// Check if we've already processed this block
+			if _, has := fetchedExecutionData[block.ID()]; has {
+				continue
+			}
+			
+			// Query the cache for execution data
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			execData, err := suite.edCache.ByBlockID(ctx, block.ID())
+			cancel()
+			
+			if err != nil {
+				// Execution data not available yet, skip for now
+				continue
+			}
+			
+			fetchedExecutionData[block.ID()] = execData.BlockExecutionData
+			suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", block.ID(), height, len(fetchedExecutionData), cfg.sealedCount)
+			
+			if cfg.IsLastSeal(block.ID()) {
+				done()
+			}
 		}
-
-		fetchedExecutionData[ed.BlockID] = ed.BlockExecutionData
-		if _, ok := cfg.blocksByID[ed.BlockID]; !ok {
-			suite.T().Errorf("unknown execution data for block %s", ed.BlockID)
-			return
-		}
-
-		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Height, len(fetchedExecutionData), cfg.sealedCount)
-
-		if cfg.IsLastSeal(ed.BlockID) {
-			done()
-		}
+		
+		lastProcessedHeight = highestHeight
 	}
 }
 

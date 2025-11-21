@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	"github.com/onflow/flow-go/model/flow"
+	state_syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -67,6 +68,7 @@ type BackendExecutionDataSuite struct {
 	executionDataTracker     *trackermock.ExecutionDataTracker
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
+	executionDataIndexedHeight *state_syncmock.ExecutionDataIndexedHeight
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -161,6 +163,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 	s.executionDataTracker = trackermock.NewExecutionDataTracker(s.T())
+	s.executionDataIndexedHeight = state_syncmock.NewExecutionDataIndexedHeight(s.T())
 
 	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
 	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
@@ -265,13 +268,14 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 	require.NoError(s.T(), err)
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
+	s.executionDataIndexedHeight.On("HighestConsecutiveHeight").Return(s.rootBlock.Height).Maybe()
 	s.executionDataTrackerReal = tracker.NewExecutionDataTracker(
 		s.logger,
 		s.state,
 		s.rootBlock.Height,
 		s.headers,
 		s.broadcaster,
-		s.rootBlock.Height,
+		s.executionDataIndexedHeight,
 		s.eventsIndex,
 		useEventsIndex,
 	)
