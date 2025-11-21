@@ -38,7 +38,8 @@ var _ forest.Vertex = (*ExecutionResultContainer)(nil)
 
 // NewExecutionResultContainer creates a new instance of ExecutionResultContainer. Conceptually,
 // this is a set of execution receipts all committing to the *same* execution `result` for the
-// specified block.
+// specified block. The set of receipts can be empty, which is useful to represent sealed results
+// for example, where we don't care anymore with Execution Node published the result.
 //
 // No error returns are expected during normal operation.
 func NewExecutionResultContainer(
