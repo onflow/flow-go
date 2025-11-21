@@ -450,7 +450,7 @@ func expectedAccountKeysResponse(account *flow.Account, metadata *access.Executo
 				"hashing_algorithm": "SHA3_256",
 				"sequence_number": "0",
 				"weight": "1000",
-				"revoked": false%s
+				"revoked": false
 			},
 			{
 				"index": "1",
@@ -459,12 +459,11 @@ func expectedAccountKeysResponse(account *flow.Account, metadata *access.Executo
 				"hashing_algorithm": "SHA3_256",
 				"sequence_number": "0",
 				"weight": "500",
-				"revoked": false%s
+				"revoked": false
 			}
-		]
+		]%s
 	}`,
 		account.Keys[0].PublicKey.String(),
-		metadataSection,
 		account.Keys[1].PublicKey.String(),
 		metadataSection,
 	)
