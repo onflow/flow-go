@@ -4,15 +4,19 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/flow-go/utils/slices"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/utils/slices"
 )
 
 var allStatuses = []ResultStatus{
+	// valid
 	ResultForCertifiedBlock,
 	ResultForFinalizedBlock,
 	ResultSealed,
 	ResultOrphaned,
+
+	// invalid (but permitted by the underlying `uint64` type
 	ResultStatus(0),
 	ResultStatus(ResultOrphaned + 1),
 }
@@ -91,15 +95,13 @@ func transitionTests() []transitionTestCase {
 		{
 			from: ResultSealed,
 			valid: []ResultStatus{
-				ResultSealed,
-				// Sealed results cannot be orphaned
+				ResultSealed, // terminal state - sealed results cannot be orphaned
 			},
 		},
 		{
 			from: ResultOrphaned,
 			valid: []ResultStatus{
-				ResultOrphaned,
-				// cannot transition out of orphaned
+				ResultOrphaned, // terminal state - cannot transition out of orphaned
 			},
 		},
 	}

@@ -187,8 +187,9 @@ func (s *ResultsForestSuite) TestResetLowestRejectedView() {
 		// start with the latest persisted sealed result already inserted
 		forest := s.createForest()
 
-		// insert the first result that extends the latest persisted sealed result and is not rejected
-		pipeline := s.createPipeline(s.results[0], true)
+		// insert the first result that extends the latest persisted sealed result;
+		// this should never be rejected irrespective of its view, because it is the direct child of the
+		pipeline := s.createPipeline(s.results[0])
 		pipeline.On("SetSealed").Return().Once()
 
 		err := forest.AddSealedResult(s.results[0])
@@ -200,7 +201,7 @@ func (s *ResultsForestSuite) TestResetLowestRejectedView() {
 
 		// pipeline optimistically created even when it's not added to the forest, but since it's not
 		// added, SetSealed is not called
-		_ = s.createPipeline(futureResult, true)
+		_ = s.createPipeline(futureResult)
 
 		err = forest.AddSealedResult(futureResult)
 		s.Require().ErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
@@ -227,24 +228,28 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		forest := s.createForest()
 
 		// insert chain of sealed results in order
-		for _, result := range s.results {
-			pipeline := s.createPipeline(result, true)
+		for i, result := range s.results {
+			executedBlock := s.blocks[i]
+			pipeline := s.createPipeline(result)
 			pipeline.On("SetSealed").Return().Once()
 
 			err := forest.AddSealedResult(result)
 			s.Require().NoError(err)
 
 			s.assertContainer(forest, result.ID(), ingestion2.ResultSealed)
+			latestSealedView, latestSealedResult := forest.GetSealingProgress()
+			s.Require().Equal(result, latestSealedResult)
+			s.Require().Equal(executedBlock.View, latestSealedView)
 		}
 
 		// all results plus the latest persisted sealed result should be in the forest
 		s.Equal(uint(len(s.results)+1), forest.Size())
 	})
 
-	s.Run("adding result multiple times is idempotent", func() {
+	s.Run("adding sealed result multiple times is idempotent", func() {
 		forest := s.createForest()
 
-		pipeline := s.createPipeline(s.results[0], true)
+		pipeline := s.createPipeline(s.results[0])
 		pipeline.On("SetSealed").Return().Once()
 
 		err := forest.AddSealedResult(s.results[0])
@@ -259,14 +264,14 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		s.Equal(uint(2), forest.Size())
 	})
 
-	s.Run("adding result with view lower than the latest persisted sealed result is noop", func() {
+	s.Run("adding sealed result with view lower than the forest's internal pruning threshold results in dedicated sentinel error", func() {
 		forest := s.createForest()
 
 		// create a result with view that's lower than the latest persisted sealed result
 		view := s.initialSealedHeader.View - 1
 		lowResult := resultGen.Fixture(resultGen.WithBlock(s.blockWithView(view)))
 
-		_ = s.createPipeline(lowResult, true)
+		_ = s.createPipeline(lowResult) // allow forest to (optimistically) construct a processing pipeline
 
 		err := forest.AddSealedResult(lowResult)
 		s.ErrorIs(err, ingestion2.ErrPrunedView)
@@ -288,7 +293,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		)
 
 		// add it to the forest as an unsealed result
-		conflictingPipeline := s.createPipeline(conflictingResult, false)
+		conflictingPipeline := s.createPipeline(conflictingResult)
 
 		added, err := forest.AddReceipt(conflictingReceipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
@@ -299,7 +304,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		s.Equal(uint(2), forest.Size())
 
 		// now, add the sealed result for the same block
-		sealedPipeline := s.createPipeline(s.results[0], true)
+		sealedPipeline := s.createPipeline(s.results[0])
 		sealedPipeline.On("SetSealed").Return().Once()
 
 		// the conflicting pipeline should be marked abandoned once the sealed result is added
@@ -318,7 +323,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		forest := s.createForest()
 
 		// this will be rejected, so SetSealed is not called
-		_ = s.createPipeline(s.results[1], true)
+		_ = s.createPipeline(s.results[1])
 
 		err := forest.AddSealedResult(s.results[1])
 		s.Require().ErrorContains(err, "does not extend last sealed result")
@@ -336,7 +341,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 			resultGen.WithPreviousResultID(s.initialSealedResult.ID()),
 		)
 
-		_ = s.createPipeline(highResult, true)
+		_ = s.createPipeline(highResult)
 
 		err := forest.AddSealedResult(highResult)
 		s.Require().ErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
@@ -365,7 +370,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 			resultGen.WithPreviousResultID(s.initialSealedResult.ID()),
 		)
 
-		pipeline := s.createPipeline(highResult, true)
+		pipeline := s.createPipeline(highResult)
 		pipeline.On("SetSealed").Return().Once()
 
 		// result should be added to the forest
@@ -400,14 +405,14 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		)
 
 		// first add a result that extends the latest persisted sealed result
-		pipeline := s.createPipeline(sealedResult, true)
+		pipeline := s.createPipeline(sealedResult)
 		pipeline.On("SetSealed").Return().Once()
 
 		err := forest.AddSealedResult(sealedResult)
 		s.Require().NoError(err)
 
 		// next, add a result with the same parent, but different parent view
-		_ = s.createPipeline(incorrectResult, true)
+		_ = s.createPipeline(incorrectResult)
 
 		err = forest.AddSealedResult(incorrectResult)
 		s.Error(err)
@@ -439,7 +444,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 	sealedResults := s.executionFork(blocks, s.initialSealedResult.ID())
 	conflictingReceipts := make([]*flow.ExecutionReceipt, 0)
 	for i, result := range sealedResults {
-		sealedPipeline := s.createPipeline(result, true)
+		sealedPipeline := s.createPipeline(result)
 		sealedPipeline.On("SetSealed").Return().Once()
 		sealedPipeline.On("GetState").Return(optimistic_sync.StatePending).Maybe()
 
@@ -448,12 +453,12 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 		forkResults := s.executionFork(forkBlocks, result.PreviousResultID)
 
 		// preconfigure the pipelines and results so insertions happen concurrently
-		for _, result := range forkResults {
+		for _, r := range forkResults {
 			// pipelines should return pending until they are abandoned. they will all be abandoned
 			// on insertion since they are either siblings of the sealed results, or descend from an
 			// abandoned parent.
 			isAbandoned := atomic.NewBool(false)
-			forkPipeline := s.createPipeline(result, false)
+			forkPipeline := s.createPipeline(r)
 			forkPipeline.On("GetState").Return(func() optimistic_sync.State {
 				if isAbandoned.Load() {
 					return optimistic_sync.StateAbandoned
@@ -531,7 +536,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := s.results[0]
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		pipeline := s.createPipeline(result, true)
+		pipeline := s.createPipeline(result)
 		pipeline.On("SetSealed").Return().Once()
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultSealed)
@@ -548,7 +553,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := s.results[1]
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		_ = s.createPipeline(result, false)
+		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
@@ -565,7 +570,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		receipt1 := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 		receipt2 := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		_ = s.createPipeline(result, false)
+		_ = s.createPipeline(result)
 
 		// add the first receipt
 		added, err := forest.AddReceipt(receipt1, ingestion2.ResultForCertifiedBlock)
@@ -592,7 +597,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		err := forest.OnBlockFinalized(s.blocks[0])
 		s.Require().NoError(err)
 
-		_ = s.createPipeline(result, false)
+		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForFinalizedBlock)
 		s.Require().NoError(err)
@@ -608,7 +613,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := s.results[0]
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		_ = s.createPipeline(result, false)
+		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForFinalizedBlock)
 		s.Require().NoError(err)
@@ -624,7 +629,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := s.results[0]
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		_ = s.createPipeline(result, false)
+		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
@@ -646,7 +651,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := resultGen.Fixture(resultGen.WithBlock(s.blockWithView(view)))
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		_ = s.createPipeline(result, false)
+		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.ErrorIs(err, ingestion2.ErrPrunedView)
@@ -660,7 +665,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		abandonedResult := s.results[0]
 		abandonedReceipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*abandonedResult))
 
-		abandonedPipeline := s.createPipeline(abandonedResult, false)
+		abandonedPipeline := s.createPipeline(abandonedResult)
 
 		added, err := forest.AddReceipt(abandonedReceipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
@@ -669,7 +674,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := s.results[1]
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		pipeline := s.createPipeline(result, false)
+		pipeline := s.createPipeline(result)
 		pipeline.On("Abandon").Return().Once()
 
 		// simulate the parent already being abandoned
@@ -699,7 +704,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		// 1. add the second result. since its parent does not exist yet, it will be added and
 		// NOT abandoned.
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*conflictingFork[1]))
-		conflictingPipeline1 := s.createPipeline(conflictingFork[1], false)
+		conflictingPipeline1 := s.createPipeline(conflictingFork[1])
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
@@ -707,7 +712,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		// 2. add a descendant result which will also be abandoned
 		receipt = receiptGen.Fixture(receiptGen.WithExecutionResult(*conflictingFork[2]))
-		conflictingPipeline2 := s.createPipeline(conflictingFork[2], false)
+		conflictingPipeline2 := s.createPipeline(conflictingFork[2])
 
 		// this is called by isAbandonedFork when adding the descendant result
 		// no results should be abandoned yet.
@@ -719,7 +724,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		// 3. add a sealed result which will be a sibling to the first conflicting result
 		// No results should be abandoned yet.
-		sealedPipeline := s.createPipeline(s.results[0], true)
+		sealedPipeline := s.createPipeline(s.results[0])
 		sealedPipeline.On("SetSealed").Return().Once()
 
 		err = forest.AddSealedResult(s.results[0])
@@ -727,7 +732,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 
 		// 4. the first conflicting result. It and all of its descendants should be abandoned
 		receipt = receiptGen.Fixture(receiptGen.WithExecutionResult(*conflictingFork[0]))
-		conflictingPipeline0 := s.createPipeline(conflictingFork[0], false)
+		conflictingPipeline0 := s.createPipeline(conflictingFork[0])
 
 		conflictingPipeline0.On("Abandon").Return().Once()
 		conflictingPipeline1.On("Abandon").Return().Once()
@@ -745,7 +750,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := s.results[1]
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		_ = s.createPipeline(result, true)
+		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultSealed)
 		s.ErrorContains(err, "does not extend last sealed result")
@@ -760,7 +765,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		result := resultGen.Fixture(resultGen.WithBlock(s.blockWithView(view)))
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
-		_ = s.createPipeline(result, false)
+		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 		s.ErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
@@ -793,14 +798,14 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		incorrectReceipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*incorrectResult))
 
 		// first add a result that extends the latest persisted sealed result
-		pipeline := s.createPipeline(sealedResult, true)
+		pipeline := s.createPipeline(sealedResult)
 		pipeline.On("SetSealed").Return().Once()
 
 		err := forest.AddSealedResult(sealedResult)
 		s.Require().NoError(err)
 
 		// next, add a result with the same parent, but different parent view
-		_ = s.createPipeline(incorrectResult, false)
+		_ = s.createPipeline(incorrectResult)
 
 		added, err := forest.AddReceipt(incorrectReceipt, ingestion2.ResultForCertifiedBlock)
 		s.Error(err)
@@ -833,7 +838,7 @@ func (s *ResultsForestSuite) TestAddReceipt_ConcurrentInserts() {
 		pipeline := opsyncmock.NewPipeline(s.T())
 		pipeline.On("GetState").Return(optimistic_sync.StatePending).Maybe()
 		s.pipelineFactory.
-			On("NewPipeline", result, false).
+			On("NewPipeline", result).
 			Return(pipeline)
 	}
 
@@ -887,7 +892,7 @@ func (s *ResultsForestSuite) TestHasReceipt() {
 	has := forest.HasReceipt(receipt)
 	s.False(has)
 
-	_ = s.createPipeline(result, false)
+	_ = s.createPipeline(result)
 	added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
 	s.Require().NoError(err)
 	s.True(added)
@@ -916,7 +921,7 @@ func (s *ResultsForestSuite) TestOnBlockFinalized() {
 	// create forest and insert a sealed result
 	setupForest := func() *ingestion2.ResultsForest {
 		forest := s.createForest()
-		sealedPipeline := s.createPipeline(lastSealedResult, true)
+		sealedPipeline := s.createPipeline(lastSealedResult)
 		sealedPipeline.On("SetSealed").Return().Once()
 		sealedPipeline.On("GetState").Return(optimistic_sync.StatePending).Maybe()
 		err := forest.AddSealedResult(lastSealedResult)
@@ -1086,7 +1091,7 @@ func (s *ResultsForestSuite) TestOnBlockFinalized_CornerCases() {
 		_ = s.addToForest(forest, s.results...)
 
 		// the forest will reject the result and set the rejectedResults flag
-		_ = s.createPipeline(rejectedResult, false)
+		_ = s.createPipeline(rejectedResult)
 		added, err := forest.AddReceipt(rejectedReceipt, ingestion2.ResultForCertifiedBlock)
 		s.ErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
 		s.False(added)
@@ -1168,7 +1173,7 @@ func (s *ResultsForestSuite) TestOnBlockFinalized_CornerCases() {
 		forest := s.createForest()
 
 		// add the result[0] as sealed. this will set the lastSealedView to block[0]
-		sealedPipeline := s.createPipeline(s.results[0], true)
+		sealedPipeline := s.createPipeline(s.results[0])
 		sealedPipeline.On("SetSealed").Return().Once()
 		sealedPipeline.On("GetState").Return(optimistic_sync.StatePending).Maybe()
 		err := forest.AddSealedResult(s.results[0])
@@ -1210,7 +1215,7 @@ func (s *ResultsForestSuite) TestOnStateUpdated() {
 	)
 
 	// add parent result
-	parentPipeline := s.createPipeline(parentResult, true)
+	parentPipeline := s.createPipeline(parentResult)
 	parentPipeline.On("SetSealed").Return().Once()
 
 	err := forest.AddSealedResult(parentResult)
@@ -1219,7 +1224,7 @@ func (s *ResultsForestSuite) TestOnStateUpdated() {
 	// add children
 	childPipelines := make([]*opsyncmock.Pipeline, len(children))
 	for i, result := range children {
-		childPipelines[i] = s.createPipeline(result, false)
+		childPipelines[i] = s.createPipeline(result)
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
 
 		// called by isAbandonedFork when adding the child result
@@ -1286,7 +1291,7 @@ func (s *ResultsForestSuite) TestOnStateUpdated_ConcurrentUpdates() {
 
 	// insert the results into the forest
 	for _, result := range allResults {
-		pipeline := s.createPipeline(result, false)
+		pipeline := s.createPipeline(result)
 		pipeline.On("GetState").Return(optimistic_sync.StatePending).Maybe()
 		pipeline.On("OnParentStateUpdated", mock.AnythingOfType("optimistic_sync.State")).Maybe()
 
@@ -1365,10 +1370,10 @@ func (s *ResultsForestSuite) assertContainer(
 }
 
 // createPipeline creates a new pipeline for the given result, and configures the pipeline factory to return it.
-func (s *ResultsForestSuite) createPipeline(result *flow.ExecutionResult, isSealed bool) *opsyncmock.Pipeline {
+func (s *ResultsForestSuite) createPipeline(result *flow.ExecutionResult) *opsyncmock.Pipeline {
 	pipeline := opsyncmock.NewPipeline(s.T())
 	s.pipelineFactory.
-		On("NewPipeline", result, isSealed).
+		On("NewPipeline", result).
 		Return(pipeline).
 		Once()
 
@@ -1525,7 +1530,7 @@ func (s *ResultsForestSuite) addToForest(forest *ingestion2.ResultsForest, resul
 
 	pipelines := make([]*opsyncmock.Pipeline, len(results))
 	for i, result := range results {
-		pipelines[i] = s.createPipeline(result, false)
+		pipelines[i] = s.createPipeline(result)
 		pipelines[i].On("GetState").Return(optimistic_sync.StatePending).Maybe()
 
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))

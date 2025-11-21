@@ -626,6 +626,21 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 	return nil
 }
 
+// GetSealingProgress returns details on how far the forest has followed the protocol's sealing process.
+// Specifically, we return the forest's 𝙡𝙖𝙩𝙚𝙨𝙩 𝘀𝗲𝗮𝗹𝗲𝗱 𝗿𝗲𝘀𝘂𝗹𝘁 𝓼 plus the view of the respective executed block.
+// This information always exist in the forest. Per specification:
+//   - (i) The forest knows 𝓼 and all its ancestors (back to the history pruning horizon)
+//   - (ii) 𝓼 and its ancestors have the status [ResultSealed] in the forest
+//   - (iii) no other result s' exists in the forest that satisfies (i) and (iii)
+//
+// ATTENTION: the return values represent the forest's LOCAL NOTION and may lag behind the consensus
+// follower's knowledge of sealing progress.
+func (rf *ResultsForest) GetSealingProgress() (uint64, *flow.ExecutionResult) {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	return rf.latestSealedResult.BlockView(), rf.latestSealedResult.result
+}
+
 // getOrCreateContainer retrieves or creates the container for the given result within the forest.
 // This method is optimized for the case of many concurrent reads compared to relatively few writes,
 // and rarely repeated calls.
