@@ -150,3 +150,12 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 func (bp *BlockProcessor) MissingCollectionQueueSize() uint {
 	return bp.mcq.Size()
 }
+
+// PruneUpToHeight removes all tracked heights up to and including the given height.
+func (bp *BlockProcessor) PruneUpToHeight(height uint64) {
+	callbacks := bp.mcq.PruneUpToHeight(height)
+	// notify job completion
+	for _, cb := range callbacks {
+		cb()
+	}
+}

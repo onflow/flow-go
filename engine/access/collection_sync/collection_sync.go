@@ -10,13 +10,19 @@ import (
 
 // Tracks missing collections per height and invokes job callbacks when complete.
 type MissingCollectionQueue interface {
+	// EnqueueMissingCollections tracks the given missing collection IDs for the given block height.
 	EnqueueMissingCollections(blockHeight uint64, ids []flow.Identifier, callback func()) error
+
+	// OnIndexedForBlock returns the callback function for the given block height
 	OnIndexedForBlock(blockHeight uint64) (func(), bool)
 
 	// On receipt of a collection, MCQ updates internal state and, if a block
 	// just became complete, returns: (collections, height, true).
 	// Otherwise, returns (nil, 0, false).
 	OnReceivedCollection(collection *flow.Collection) ([]*flow.Collection, uint64, bool)
+
+	// PruneUpToHeight removes all tracked heights up to and including the given height.
+	PruneUpToHeight(height uint64) (callbacks []func())
 
 	// IsHeightQueued returns true if the given height is still being tracked (has not been indexed yet).
 	IsHeightQueued(height uint64) bool
@@ -42,11 +48,14 @@ type BlockCollectionIndexer interface {
 	GetMissingCollections(block *flow.Block) ([]*flow.CollectionGuarantee, error)
 }
 
-// Implements the job lifecycle for a single block height.
+// BlockProcessor processes blocks to fetch and index their collections.
 type BlockProcessor interface {
+	// RequestCollectionsForBlock requests all missing collections for the given block.
 	FetchCollections(ctx irrecoverable.SignalerContext, block *flow.Block, done func()) error
 	// MissingCollectionQueueSize returns the number of missing collections currently in the queue.
 	MissingCollectionQueueSize() uint
+	// PruneUpToHeight removes all tracked heights up to and including the given height.
+	PruneUpToHeight(height uint64)
 }
 
 // Fetcher is a component that consumes finalized block jobs and processes them
