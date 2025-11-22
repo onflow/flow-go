@@ -351,7 +351,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		_ = s.createPipeline(s.results[1])
 
 		err := forest.AddSealedResult(s.results[1])
-		//s.Require().ErrorContains(err, "does not extend last sealed result")
+		s.Require().ErrorContains(err, "does not extend last sealed result")
 		s.Require().Error(err)
 		s.Require().NotErrorIs(err, ingestion2.ErrPrunedView)
 		s.Require().NotErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
