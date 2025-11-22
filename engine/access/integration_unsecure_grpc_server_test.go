@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -48,6 +49,17 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// mockExecutionDataIndexedHeight is a simple implementation of ExecutionDataIndexedHeight for testing
+type mockExecutionDataIndexedHeight struct {
+	height uint64
+}
+
+func (m *mockExecutionDataIndexedHeight) HighestConsecutiveHeight() uint64 {
+	return m.height
+}
+
+var _ state_synchronization.ExecutionDataIndexedHeight = (*mockExecutionDataIndexedHeight)(nil)
 
 // SameGRPCPortTestSuite verifies both AccessAPI and ExecutionDataAPI client continue to work when configured
 // on the same port
@@ -264,13 +276,14 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)
 
+	highestHeight := &mockExecutionDataIndexedHeight{height: rootBlock.Height}
 	suite.executionDataTracker = tracker.NewExecutionDataTracker(
 		suite.log,
 		suite.state,
 		rootBlock.Height,
 		suite.headers,
 		nil,
-		rootBlock.Height,
+		highestHeight,
 		eventIndexer,
 		false,
 	)
