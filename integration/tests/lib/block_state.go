@@ -166,11 +166,6 @@ func (bs *BlockState) processAncestors(t *testing.T, b *flow.Block, confirmsHeig
 				if finalized.Height > bs.highestFinalized { // updates highestFinalized height
 					bs.highestFinalized = finalized.Height
 				}
-				t.Logf("%v height %d finalized %d, highest finalized %d \n",
-					time.Now().UTC(),
-					b.Height,
-					finalized.Height,
-					bs.highestFinalized)
 				// update last sealed height
 				for _, seal := range finalized.Payload.Seals {
 					sealed, ok := bs.blocksByID[seal.BlockID]
@@ -183,6 +178,16 @@ func (bs *BlockState) processAncestors(t *testing.T, b *flow.Block, confirmsHeig
 						bs.highestSealed = sealed
 					}
 				}
+				sealedHeight := uint64(0)
+				if bs.highestSealed != nil {
+					sealedHeight = bs.highestSealed.Height
+				}
+				t.Logf("%v height %d finalized %d, highest finalized %d, sealed %d \n",
+					time.Now().UTC(),
+					b.Height,
+					finalized.Height,
+					bs.highestFinalized,
+					sealedHeight)
 			} else {
 				t.Logf("%v fork detected: view distance (%d) between received block and ancestor is not same as their height distance (%d)\n",
 					time.Now().UTC(), viewDistance, heightDistance)
