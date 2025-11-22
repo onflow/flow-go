@@ -82,7 +82,11 @@ func (we *WrappedEnvironment) ComputationAvailable(usage common.ComputationUsage
 	return we.env.ComputationAvailable(usage)
 }
 
-// MeterMemory meters the memory usage of a new operation.
+// ComputationRemaining returns the remaining computation for the given kind.
+func (we *WrappedEnvironment) ComputationRemaining(kind common.ComputationKind) uint64 {
+	return we.env.ComputationRemaining(kind)
+}
+
 func (we *WrappedEnvironment) MeterMemory(usage common.MemoryUsage) error {
 	err := we.env.MeterMemory(usage)
 	return handleEnvironmentError(err)

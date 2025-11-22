@@ -53,6 +53,24 @@ func (_m *Meter) ComputationIntensities() meter.MeteredComputationIntensities {
 	return r0
 }
 
+// ComputationRemaining provides a mock function with given fields: kind
+func (_m *Meter) ComputationRemaining(kind common.ComputationKind) uint64 {
+	ret := _m.Called(kind)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ComputationRemaining")
+	}
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(common.ComputationKind) uint64); ok {
+		r0 = rf(kind)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 // ComputationUsed provides a mock function with no fields
 func (_m *Meter) ComputationUsed() (uint64, error) {
 	ret := _m.Called()
