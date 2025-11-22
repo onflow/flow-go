@@ -62,7 +62,7 @@ func NewMissingCollectionQueue() *MissingCollectionQueue {
 // The caller is responsible for checking if collections are already in storage before calling this method.
 // Only collections that are actually missing should be passed in collectionIDs.
 //
-// If the same block height is enqueued multiple times, the previous callback is replaced.
+// Returns an error if the block height is already enqueued to prevent overwriting existing jobs.
 func (mcq *MissingCollectionQueue) EnqueueMissingCollections(
 	blockHeight uint64,
 	collectionIDs []flow.Identifier,
@@ -70,6 +70,14 @@ func (mcq *MissingCollectionQueue) EnqueueMissingCollections(
 ) error {
 	mcq.mu.Lock()
 	defer mcq.mu.Unlock()
+
+	// Check if block height is already enqueued to prevent overwriting.
+	if _, exists := mcq.blockJobs[blockHeight]; exists {
+		return fmt.Errorf(
+			"block height %d is already enqueued, cannot overwrite existing job",
+			blockHeight,
+		)
+	}
 
 	// Create the job state with all collections marked as missing.
 	// The caller has already verified these collections are not in storage.
@@ -178,35 +186,59 @@ func (mcq *MissingCollectionQueue) IsHeightQueued(height uint64) bool {
 // (nil, false) if the height was not tracked.
 //
 // Note, caller should invoke the returned callback if not nil.
+//
+// Behavior: OnIndexedForBlock can return the callback even before the block is
+// complete (i.e., before all collections have been received). This allows the caller
+// to index a block with partial collections if needed. After indexing:
+//   - The block is removed from tracking (IsHeightQueued returns false)
+//   - All collection-to-height mappings for this block are cleaned up
+//   - Any remaining missing collections are removed from tracking
+//   - Subsequent OnReceivedCollection calls for collections belonging to this block
+//     will return (nil, 0, false) because the block has been removed
 func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) (func(), bool) {
 	mcq.mu.Lock()
 	defer mcq.mu.Unlock()
 
-	jobState, exists := mcq.blockJobs[blockHeight]
+	// Clean up all collection-to-height mappings and remove the block job.
+	// This ensures the height is removed from tracking once the callback is invoked.
+	jobState, exists := mcq.cleanupCollectionMappingsForHeight(blockHeight)
 	if !exists {
 		// Block was not tracked or already completed
 		return nil, false
 	}
 
-	// Clean up all collection-to-height mappings for collections belonging to this block.
+	// Get the callback from the job state.
+	return jobState.callback, true
+}
+
+// cleanupCollectionMappingsForHeight removes all collection-to-height mappings for collections
+// belonging to the specified block height and removes the block job from tracking.
+// This includes both missing and received collections.
+//
+// Returns the job state and a bool indicating if the block height existed.
+//
+// This method must be called while holding the write lock (mcq.mu.Lock()).
+func (mcq *MissingCollectionQueue) cleanupCollectionMappingsForHeight(
+	blockHeight uint64,
+) (*blockJobState, bool) {
+	jobState, exists := mcq.blockJobs[blockHeight]
+	if !exists {
+		return nil, false
+	}
+
 	// Clean up from missing collections.
 	for collectionID := range jobState.missingCollections {
-		if height, ok := mcq.collectionToHeight[collectionID]; ok && height == blockHeight {
-			delete(mcq.collectionToHeight, collectionID)
-		}
+		delete(mcq.collectionToHeight, collectionID)
 	}
 	// Clean up from received collections.
 	for collectionID := range jobState.receivedCollections {
-		if height, ok := mcq.collectionToHeight[collectionID]; ok && height == blockHeight {
-			delete(mcq.collectionToHeight, collectionID)
-		}
+		delete(mcq.collectionToHeight, collectionID)
 	}
 
-	// Remove the job state from the queue before calling the callback.
-	// This ensures the height is removed from tracking once the callback is invoked.
+	// Remove the job state from the queue.
 	delete(mcq.blockJobs, blockHeight)
 
-	return jobState.callback, true
+	return jobState, true
 }
 
 // Size returns the number of missing collections currently in the queue.
