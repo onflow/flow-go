@@ -3,9 +3,11 @@ package factory
 import "github.com/onflow/flow-go/engine/access/collection_sync"
 
 // ProgressReader aggregates progress from multiple backends and returns the maximum
-// processed height. It can be initialized with an optional lastProgress value and
+// processed height. It can be initialized with an readonly lastProgress value and
 // two optional backends: executionDataProcessor and collectionFetcher.
 type ProgressReader struct {
+	// this is a readonly value set at initialization so that if ProcessedHeight was
+	// called before any backend was set, it can still return a meaningful value
 	lastProgress           uint64
 	executionDataProcessor collection_sync.ProgressReader
 	collectionFetcher      collection_sync.ProgressReader
@@ -44,14 +46,7 @@ func (pr *ProgressReader) ProcessedHeight() uint64 {
 	if hasExecutionData && hasCollectionFetcher {
 		execHeight := pr.executionDataProcessor.ProcessedHeight()
 		collectionHeight := pr.collectionFetcher.ProcessedHeight()
-		max := execHeight
-		if collectionHeight > max {
-			max = collectionHeight
-		}
-		if pr.lastProgress > max {
-			max = pr.lastProgress
-		}
-		return max
+		return max(execHeight, collectionHeight, pr.lastProgress)
 	}
 
 	if hasExecutionData {
