@@ -110,6 +110,7 @@ func (v *View) DryCall(
 	from gethCommon.Address,
 	to gethCommon.Address,
 	data []byte,
+	authList []gethTypes.SetCodeAuthorization,
 	value *big.Int,
 	gasLimit uint64,
 	opts ...DryCallOption,
@@ -160,6 +161,13 @@ func (v *View) DryCall(
 	// not apply. These endpoints don't mutate the state, they
 	// simply read the state.
 	call.SkipTxGasLimitCheck()
+
+	// If we are given a non-empty list of SetCode authorizations,
+	// we need to set them, so that gas estimation works properly.
+	if len(authList) > 0 {
+		call.SetCodeAuthorizations(authList)
+	}
+
 	res, err := bv.DirectCall(call)
 	if err != nil {
 		return nil, err
