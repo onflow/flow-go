@@ -8,17 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// blockJobState tracks the state of a job for a specific block height.
-type blockJobState struct {
-	// missingCollections is a set of collection IDs that are still missing for this block height.
-	missingCollections map[flow.Identifier]struct{}
-	// receivedCollections stores the collections that have been received so far, keyed by collection ID.
-	// This allows us to return all collections when the block becomes complete.
-	receivedCollections map[flow.Identifier]*flow.Collection
-	// callback is invoked when all collections for this block height have been received and indexed.
-	callback func()
-}
-
 // MissingCollectionQueue helps the job processor to keep track of the jobs and their callbacks.
 // Note, it DOES NOT index collections directly, instead, it only keeps track of which collections are missing
 // for each block height, and when all collections for a block height have been received, it returns the
@@ -42,6 +31,38 @@ type MissingCollectionQueue struct {
 	// This enforces a 1:1 relationship: each collection belongs to exactly one block.
 	// This allows efficient lookup when a collection is received.
 	collectionToHeight map[flow.Identifier]uint64
+
+	// pruner keeps track of the lowest and highest missing heights for pruning.
+	// it is updated whenever a new height is added or removed from blockJobs.
+	// this is useful because:
+	// 1. it prevents memory leak by allowing us to prune old heights that are no longer needed.
+	// 2. if missing collections has been indexed by the execution data index processor, then
+	//    we don't need to fetcher to fetch them, and we can prune the jobs up to that height.
+	pruner *pruner
+}
+
+// blockJobState tracks the state of a job for a specific block height.
+type blockJobState struct {
+	// missingCollections is a set of collection IDs that are still missing for this block height.
+	missingCollections map[flow.Identifier]struct{}
+	// receivedCollections stores the collections that have been received so far, keyed by collection ID.
+	// This allows us to return all collections when the block becomes complete.
+	receivedCollections map[flow.Identifier]*flow.Collection
+	// callback is invoked when all collections for this block height have been received and indexed.
+	callback func()
+}
+
+// pruner keeps track of the lowest and highest missing heights to decide
+// what range can be pruned.
+type pruner struct {
+	lowest  uint64 // lowest missing height
+	highest uint64 // highest missing height
+}
+
+// pruneRange represents a range of heights to prune, inclusive.
+type pruneRange struct {
+	from uint64
+	to   uint64
 }
 
 var _ collection_sync.MissingCollectionQueue = (*MissingCollectionQueue)(nil)
@@ -53,6 +74,7 @@ func NewMissingCollectionQueue() *MissingCollectionQueue {
 	return &MissingCollectionQueue{
 		blockJobs:          make(map[uint64]*blockJobState),
 		collectionToHeight: make(map[flow.Identifier]uint64),
+		pruner:             &pruner{lowest: 0, highest: 0},
 	}
 }
 
@@ -93,6 +115,7 @@ func (mcq *MissingCollectionQueue) EnqueueMissingCollections(
 	}
 
 	mcq.blockJobs[blockHeight] = jobState
+	mcq.pruner.AddHeight(blockHeight)
 
 	// Update the collection-to-height mapping, enforcing 1:1 relationship.
 	for _, collectionID := range collectionIDs {
@@ -100,7 +123,7 @@ func (mcq *MissingCollectionQueue) EnqueueMissingCollections(
 		if exists && existingHeight != blockHeight {
 			// Collection is already assigned to a different block - this violates the 1:1 constraint.
 			return fmt.Errorf(
-				"collection %v is already assigned to block height %d, cannot assign to height %d",
+				"fatal: collection %v is already assigned to block height %d, cannot assign to height %d",
 				collectionID, existingHeight, blockHeight,
 			)
 		}
@@ -199,6 +222,7 @@ func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) (func()
 	mcq.mu.Lock()
 	defer mcq.mu.Unlock()
 
+	mcq.pruner.RemoveHeight(blockHeight)
 	// Clean up all collection-to-height mappings and remove the block job.
 	// This ensures the height is removed from tracking once the callback is invoked.
 	jobState, exists := mcq.cleanupCollectionMappingsForHeight(blockHeight)
@@ -237,8 +261,39 @@ func (mcq *MissingCollectionQueue) cleanupCollectionMappingsForHeight(
 
 	// Remove the job state from the queue.
 	delete(mcq.blockJobs, blockHeight)
+	mcq.pruner.RemoveHeight(blockHeight)
 
 	return jobState, true
+}
+
+// PruneUpToHeight removes all block jobs up to and including the specified height
+// and returns their callbacks. The pruner ensures that heights are only pruned once.
+//
+// Returns a slice of callbacks for all pruned block heights. Callers should invoke
+// these callbacks to notify that the blocks have been pruned.
+func (mcq *MissingCollectionQueue) PruneUpToHeight(height uint64) []func() {
+	mcq.mu.Lock()
+	defer mcq.mu.Unlock()
+
+	// Use pruner to determine the range to prune.
+	pruneRange, shouldPrune := mcq.pruner.RemoveUpToHeight(height)
+	if !shouldPrune {
+		return nil
+	}
+
+	// Calculate the maximum number of callbacks (upper bound: all heights in range may have jobs).
+	capacity := max(0, int(pruneRange.to-pruneRange.from+1))
+
+	// Collect callbacks for all heights in the prune range.
+	callbacks := make([]func(), 0, capacity)
+	for h := pruneRange.from; h <= pruneRange.to; h++ {
+		jobState, exists := mcq.cleanupCollectionMappingsForHeight(h)
+		if exists {
+			callbacks = append(callbacks, jobState.callback)
+		}
+	}
+
+	return callbacks
 }
 
 // Size returns the number of missing collections currently in the queue.
@@ -248,4 +303,38 @@ func (mcq *MissingCollectionQueue) Size() uint {
 	defer mcq.mu.RUnlock()
 
 	return uint(len(mcq.collectionToHeight))
+}
+
+// AddHeight updates the pruner with a new height.
+func (pc *pruner) AddHeight(height uint64) {
+	pc.lowest = min(height, pc.lowest)
+	pc.highest = max(height, pc.highest)
+}
+
+// RemoveHeight removes a single height from tracking and
+// advances the lowest height if needed.
+func (pc *pruner) RemoveHeight(height uint64) {
+	if height == pc.lowest &&
+		pc.lowest < pc.highest { // only advance if there are higher heights
+		pc.lowest++
+	}
+}
+
+// RemoveUpToHeight removes all heights up to and including the specified height
+// and returns the range that was pruned.
+func (pc *pruner) RemoveUpToHeight(highestConsecutiveCompletedHeight uint64) (pruneRange, bool) {
+	if highestConsecutiveCompletedHeight <= pc.lowest {
+		// No update needed
+		return pruneRange{}, false
+	}
+
+	pruneFrom := pc.lowest
+	pruneTo := highestConsecutiveCompletedHeight
+
+	pc.lowest = highestConsecutiveCompletedHeight + 1
+	if highestConsecutiveCompletedHeight > pc.highest {
+		pc.highest = highestConsecutiveCompletedHeight
+	}
+
+	return pruneRange{from: pruneFrom, to: pruneTo}, true
 }
