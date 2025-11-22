@@ -17,24 +17,11 @@ var (
 	flagNodesConsensus    int
 	flagNodesExecution    int
 	flagNodesVerification int
-	// Deprecated: use flagWeight instead
-	deprecatedFlagStake uint64
-	flagWeight          uint64
+	flagWeight            uint64
 )
 
 // genconfigCmdRun generates the node-config.json file
 func genconfigCmdRun(_ *cobra.Command, _ []string) {
-
-	// maintain backward compatibility with old flag name
-	if deprecatedFlagStake != 0 {
-		log.Warn().Msg("using deprecated flag --stake (use --weight instead)")
-		if flagWeight == 0 {
-			flagWeight = deprecatedFlagStake
-		} else {
-			log.Fatal().Msg("cannot use both --stake and --weight flags (use only --weight)")
-		}
-	}
-
 	if flagWeight != flow.DefaultInitialWeight {
 		log.Warn().Msgf("using non-standard initial weight %d!=%d - make sure this is desired", flagWeight, flow.DefaultInitialWeight)
 	}
@@ -85,7 +72,6 @@ func init() {
 	genconfigCmd.Flags().IntVar(&flagNodesExecution, "execution", 2, "number of execution nodes")
 	genconfigCmd.Flags().IntVar(&flagNodesVerification, "verification", 1, "number of verification nodes")
 	genconfigCmd.Flags().Uint64Var(&flagWeight, "weight", flow.DefaultInitialWeight, "weight for all nodes")
-	genconfigCmd.Flags().Uint64Var(&deprecatedFlagStake, "stake", 0, "deprecated: use --weight")
 }
 
 func createConf(r flow.Role, i int) model.NodeConfig {

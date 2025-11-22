@@ -94,7 +94,7 @@ bootstrap-ci:
 # Creates a version of localnet configured with short epochs
 .PHONY: bootstrap-short-epochs
 bootstrap-short-epochs:
-	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=5 DKGLEN=50 FINALIZATIONSAFETYTHRESHOLD=20 bootstrap
+	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=5 DKGLEN=50 FINALIZATION_SAFETY_THRESHOLD=20 bootstrap
 
 # Starts the network - must have been bootstrapped first. Builds fresh images.
 .PHONY: start
