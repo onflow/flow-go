@@ -276,11 +276,9 @@ func CreateCollectionSyncFetcherComponent(
 		me,
 		blocks,
 		guarantees,
-		db,
 		blockCollectionIndexer,
 		fetchAndIndexedCollectionsBlockHeight,
 		followerDistributor,
-		collectionExecutedMetric,
 		collectionSyncMetrics,
 		CreateFetcherConfig{
 			MaxProcessing:  maxProcessing,

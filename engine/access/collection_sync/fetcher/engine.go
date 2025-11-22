@@ -62,6 +62,15 @@ func NewFetcher(
 	jobs := jobqueue.NewFinalizedBlockReader(state, blocks)
 
 	// Create an adapter function that wraps the BlockProcessor interface
+	// For each finalized block, a worker is responsible for fetching all collections for that block.
+	// Since a block may contain multiple collections and fetching is asynchronous, tracking which
+	// collections have been received requires stateful management. The blockProcessor handles this
+	// by fetching collections and maintaining state about which collections are still missing.
+	// It also invokes the done callback to notify the job consumer when the worker has completed
+	// processing all collections for the block.
+	//
+	// The processor function translates a job (finalized block) and passes it to the blockProcessor
+	// to fetch and index the associated collections.
 	processorFunc := func(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
 		// Convert job to block
 		block, err := jobs.ConvertJobToBlock(job)
@@ -96,10 +105,6 @@ func NewFetcher(
 		blockProcessor: blockProcessor,
 		workSignal:     workSignal,
 		metrics:        metrics,
-	}
-
-	if metrics == nil {
-		return nil, fmt.Errorf("collection sync metrics not provided")
 	}
 
 	// Set up post-notifier to update metrics when a job is done

@@ -41,9 +41,7 @@ type CreateFetcherConfig struct {
 //   - me: Local node identity
 //   - blocks: Blocks storage
 //   - guarantees: Guarantees storage
-//   - db: Database for storage operations
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
-//   - collectionExecutedMetric: Metrics collector for tracking collection indexing
 //   - collectionSyncMetrics: Optional metrics collector for tracking collection sync progress
 //   - config: Configuration for the fetcher
 //
@@ -58,11 +56,9 @@ func createFetcher(
 	me module.Local,
 	blocks storage.Blocks,
 	guarantees storage.Guarantees,
-	db storage.DB,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	distributor hotstuff.Distributor,
-	collectionExecutedMetric module.CollectionExecutedMetric,
 	collectionSyncMetrics module.CollectionSyncMetrics,
 	config CreateFetcherConfig,
 ) (*requester.Engine, collection_sync.Fetcher, error) {
