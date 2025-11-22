@@ -1082,31 +1082,46 @@ func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) e
 	}
 
 	// children of 𝓹, aka `lowestSealedResult`, must always be accepted by the forest
-	parentID, parentView := candidate.Parent()
-	if rf.lowestSealedResult.ResultID() == parentID {
-		// Note: theoretically, we do not need to check that the view is consistent for the parent, because the LevelledForest already does
-		// this. Specifically, the LevelledForest inspects the parent-child relationship based on IDs and then confirms that the view matches.
-		// Otherwise, the LevelledForest errors when attempting to add the child vertex. Therefore, if the LevelledForest accepts the child,
-		// we can be sure that the view is consistent with its parent. Nevertheless, by also checking here, our function `safeForestInsert`
-		// is self-contained and does not rely on other components for its correctness, while repeating the check has negligible cost.
-		if rf.latestSealedResult.BlockView() != parentView {
-			return fmt.Errorf("candidate reports view %d of its parent %v, while parent itself declares its view to be %d", parentView, parentID, rf.latestSealedResult.BlockView())
-		}
-		// continue, because candidate result satisfies criteria for storage in ResultsForest
+	childOfP, err := rf.isChildLowestSealedResult(candidate)
+	if err != nil {
+		return err
 	}
 
-	// We reject results whose view above 𝓱 = 𝓹.Level + maxViewDelta, unless parent is 𝓹
-	if candidateView > historyCutoffView+rf.maxViewDelta {
+	// We reject results whose view above 𝓱 = 𝓹.Level + maxViewDelta, *unless* the result is a direct child of 𝓹
+	if (candidateView > historyCutoffView+rf.maxViewDelta) && (!childOfP) {
 		rf.rejectedResults = true
 		return ErrMaxViewDeltaExceeded
 	}
 
 	// verify and add to forest
-	err := rf.forest.VerifyVertex(candidate)
+	err = rf.forest.VerifyVertex(candidate)
 	if err != nil {
 		return fmt.Errorf("failed to store result's container: %w", err)
 	}
 	rf.forest.AddVertex(candidate)
-
 	return nil
+}
+
+// isChildLowestSealedResult returns true if and only if the parent of the candidate result matches the forest's
+// `lowestSealedResult` aka 𝓹, aka.
+//
+// NOT CONCURRENCY SAFE!
+//
+// No errors expected during normal operations. Only data-inconsistencies should produce errors.
+func (rf *ResultsForest) isChildLowestSealedResult(candidate *ExecutionResultContainer) (bool, error) {
+	parentID, parentView := candidate.Parent()
+	if rf.lowestSealedResult.ResultID() != parentID {
+		return false, nil
+	}
+
+	// Note: theoretically, we do not need to check that the view is consistent for the parent, because the LevelledForest already does
+	// this. Specifically, the LevelledForest inspects the parent-child relationship based on IDs and then confirms that the view matches.
+	// Otherwise, the LevelledForest errors when attempting to add the child vertex. Therefore, if the LevelledForest accepts the child,
+	// we can be sure that the view is consistent with its parent. Nevertheless, by also checking here, our function `safeForestInsert`
+	// is self-contained and does not rely on other components for its correctness, while repeating the check has negligible cost.
+	if rf.lowestSealedResult.BlockView() != parentView {
+		return false, fmt.Errorf("candidate reports view %d of its parent %v, while parent itself declares its view to be %d", parentView, parentID, rf.latestSealedResult.BlockView())
+	}
+
+	return true, nil
 }
