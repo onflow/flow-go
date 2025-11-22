@@ -124,6 +124,9 @@ func (s *ResultsForestSuite) TestNewResultsForest() {
 
 		s.NotNil(forest)
 		s.Equal(s.initialSealedHeader.View, forest.LowestView())
+		latestSealedView, latestSealedResult := forest.GetSealingProgress()
+		s.Require().Equal(s.initialSealedResult, latestSealedResult)
+		s.Require().Equal(s.initialSealedHeader.View, latestSealedView)
 	})
 
 	s.Run("result retrieval fails", func() {
@@ -172,6 +175,7 @@ func (s *ResultsForestSuite) TestNewResultsForest() {
 // and verifies that the correct values for the last sealed view and rejected status are returned.
 func (s *ResultsForestSuite) TestResetLowestRejectedView() {
 	resultGen := s.g.ExecutionResults()
+	blockGen := s.g.Blocks()
 
 	s.Run("returns last sealed view and false when no results rejected", func() {
 		// start with the latest persisted sealed result already inserted
@@ -181,6 +185,9 @@ func (s *ResultsForestSuite) TestResetLowestRejectedView() {
 
 		s.False(rejected)
 		s.Equal(s.initialSealedHeader.View, view)
+		latestSealedView, latestSealedResult := forest.GetSealingProgress()
+		s.Require().Equal(s.initialSealedResult, latestSealedResult)
+		s.Require().Equal(s.initialSealedHeader.View, latestSealedView)
 	})
 
 	s.Run("returns true when results have been rejected", func() {
@@ -189,15 +196,20 @@ func (s *ResultsForestSuite) TestResetLowestRejectedView() {
 
 		// insert the first result that extends the latest persisted sealed result;
 		// this should never be rejected irrespective of its view, because it is the direct child of the
-		pipeline := s.createPipeline(s.results[0])
+		pipeline := s.createPipeline(s.results[0]) // mock creating of processing pipeline
 		pipeline.On("SetSealed").Return().Once()
 
 		err := forest.AddSealedResult(s.results[0])
 		s.Require().NoError(err)
+		latestSealedView, latestSealedResult := forest.GetSealingProgress()
+		s.Require().Equal(s.results[0], latestSealedResult)
+		s.Require().Equal(s.blocks[0].View, latestSealedView)
 
 		// Add a result that exceeds maxViewDelta to trigger rejection
 		futureView := s.initialSealedHeader.View + s.maxViewDelta + 1
-		futureResult := resultGen.Fixture(resultGen.WithBlock(s.blockWithView(futureView)))
+		block := blockGen.Fixture(blockGen.WithParentHeader(s.blocks[0].ToHeader()), blockGen.WithView(futureView))
+		s.allBlocks[block.ID()] = block
+		futureResult := resultGen.Fixture(resultGen.WithBlock(block), resultGen.WithPreviousResult(s.results[0]))
 
 		// pipeline optimistically created even when it's not added to the forest, but since it's not
 		// added, SetSealed is not called
@@ -205,6 +217,9 @@ func (s *ResultsForestSuite) TestResetLowestRejectedView() {
 
 		err = forest.AddSealedResult(futureResult)
 		s.Require().ErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
+		latestSealedView, latestSealedResult = forest.GetSealingProgress()
+		s.Require().Equal(s.results[0], latestSealedResult)
+		s.Require().Equal(s.blocks[0].View, latestSealedView)
 
 		// Now reset should return true for rejected
 		view, rejected := forest.ResetLowestRejectedView()
@@ -215,6 +230,9 @@ func (s *ResultsForestSuite) TestResetLowestRejectedView() {
 		view, rejected = forest.ResetLowestRejectedView()
 		s.Equal(s.blocks[0].View, view)
 		s.False(rejected)
+		latestSealedView, latestSealedResult = forest.GetSealingProgress()
+		s.Require().Equal(s.results[0], latestSealedResult)
+		s.Require().Equal(s.blocks[0].View, latestSealedView)
 	})
 }
 
@@ -261,6 +279,9 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		err = forest.AddSealedResult(s.results[0])
 		s.Require().NoError(err)
 
+		latestSealedView, latestSealedResult := forest.GetSealingProgress()
+		s.Require().Equal(s.results[0], latestSealedResult)
+		s.Require().Equal(s.blocks[0].View, latestSealedView)
 		s.Equal(uint(2), forest.Size())
 	})
 
@@ -278,6 +299,9 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 
 		// only the latest persisted sealed result should be in the forest
 		s.Equal(uint(1), forest.Size())
+		latestSealedView, latestSealedResult := forest.GetSealingProgress()
+		s.Require().Equal(s.initialSealedResult, latestSealedResult)
+		s.Require().Equal(s.initialSealedHeader.View, latestSealedView)
 	})
 
 	s.Run("adding result causes siblings to be abandoned", func() {
@@ -293,8 +317,7 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		)
 
 		// add it to the forest as an unsealed result
-		conflictingPipeline := s.createPipeline(conflictingResult)
-
+		conflictingPipeline := s.createPipeline(conflictingResult) // mock creating of processing pipeline
 		added, err := forest.AddReceipt(conflictingReceipt, ingestion2.ResultForCertifiedBlock)
 		s.Require().NoError(err)
 		s.True(added)
@@ -304,18 +327,20 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		s.Equal(uint(2), forest.Size())
 
 		// now, add the sealed result for the same block
-		sealedPipeline := s.createPipeline(s.results[0])
+		sealedPipeline := s.createPipeline(s.results[0]) // mock creating of processing pipeline
 		sealedPipeline.On("SetSealed").Return().Once()
 
 		// the conflicting pipeline should be marked abandoned once the sealed result is added
 		conflictingPipeline.On("Abandon").Return().Once()
-
 		err = forest.AddSealedResult(s.results[0])
 		s.Require().NoError(err)
 
 		// the forest should now contain the new sealed result, and the unsealed result should be abandoned
+		latestSealedView, latestSealedResult := forest.GetSealingProgress()
+		s.Require().Equal(s.results[0], latestSealedResult)
+		s.Require().Equal(s.blocks[0].View, latestSealedView)
 		s.assertContainer(forest, s.results[0].ID(), ingestion2.ResultSealed)
-		s.assertContainer(forest, conflictingResult.ID(), ingestion2.ResultForCertifiedBlock)
+		s.assertContainer(forest, conflictingResult.ID(), ingestion2.ResultOrphaned)
 		s.Equal(uint(3), forest.Size())
 	})
 
@@ -326,9 +351,18 @@ func (s *ResultsForestSuite) TestAddSealedResult() {
 		_ = s.createPipeline(s.results[1])
 
 		err := forest.AddSealedResult(s.results[1])
-		s.Require().ErrorContains(err, "does not extend last sealed result")
+		//s.Require().ErrorContains(err, "does not extend last sealed result")
+		s.Require().Error(err)
+		s.Require().NotErrorIs(err, ingestion2.ErrPrunedView)
+		s.Require().NotErrorIs(err, ingestion2.ErrMaxViewDeltaExceeded)
+
+		_, has := forest.GetContainer(s.results[1].ID())
+		s.Require().False(has)
 
 		s.Equal(uint(1), forest.Size())
+		latestSealedView, latestSealedResult := forest.GetSealingProgress()
+		s.Require().Equal(s.results[0], latestSealedResult)
+		s.Require().Equal(s.blocks[0].View, latestSealedView)
 	})
 
 	s.Run("rejects result with view higher than the view horizon", func() {

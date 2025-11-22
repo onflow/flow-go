@@ -1076,7 +1076,7 @@ func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) e
 	candidateView := candidate.BlockView()
 
 	// History cutoff - only results with views greater or equal to this threshold are eligible for storage in ResultsForest
-	historyCutoffView := rf.latestSealedResult.BlockView()
+	historyCutoffView := rf.lowestSealedResult.BlockView()
 	if candidateView < historyCutoffView {
 		return ErrPrunedView
 	}
@@ -1092,7 +1092,7 @@ func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) e
 		if rf.latestSealedResult.BlockView() != parentView {
 			return fmt.Errorf("candidate reports view %d of its parent %v, while parent itself declares its view to be %d", parentView, parentID, rf.latestSealedResult.BlockView())
 		}
-		return nil // candidate result satisfies criteria for storage in ResultsForest
+		// continue, because candidate result satisfies criteria for storage in ResultsForest
 	}
 
 	// We reject results whose view above 𝓱 = 𝓹.Level + maxViewDelta, unless parent is 𝓹
