@@ -41,5 +41,8 @@ func (p *executionDataProvider) GetExecutionDataByHeight(ctx context.Context, he
 		return nil, err
 	}
 
+	// TODO: to support processing data from unsealed blocks, we should check here that the collections
+	// returned match the guarantees in the block.
+
 	return blockExecutionData.StandardCollections(), nil
 }

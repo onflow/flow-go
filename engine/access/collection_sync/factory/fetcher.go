@@ -28,10 +28,6 @@ type CreateFetcherConfig struct {
 }
 
 // createFetcher creates a new Fetcher component with all its dependencies.
-// This function is in the collections package to avoid import cycles:
-// - collections package already imports collection_sync (for interfaces)
-// - CreateFetcher needs to create concrete types from collections package
-// - Placing it in collection_sync would create: collection_sync -> collections -> collection_sync (cycle)
 //
 // Parameters:
 //   - log: Logger for the component

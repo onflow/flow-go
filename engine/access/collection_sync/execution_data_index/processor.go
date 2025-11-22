@@ -77,20 +77,18 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 			lowestMissing := edp.processedHeight.Value() + 1
 
 			for height := lowestMissing; height <= highestAvailableHeight; height++ {
+				// TODO: This logic supports ingesting execution data from sealed blocks. Once support is
+				// added for syncing execution data for unsealed results, this logic will need to be updated
+				// to account for execution forks.
 				collections, err := edp.provider.GetExecutionDataByHeight(ctx, height)
 				if err != nil {
 					ctx.Throw(fmt.Errorf("failed to get execution data for height %d: %w", height, err))
 					return
 				}
 
-				// TODO: since both collections and execution data processor are the data source of
-				// collections, before indexing the collections, double check if it was indexed
-				// by the collections already by simply comparing the missing height with the
-				// collections's lowest height.
-				// if collections's lowest height is higher than the missing height, it means the collections
-				// has been indexed by the collections already, no need to index again.
-				// And make sure reading the collections's lowest height is cheap operation (only hitting RW lock)
-
+				// Note: the collections might have been indexed by fetcher engine already,
+				// but IndexCollectionsForBlock will handle deduplication by first check if the collections already exist,
+				// if so, it will skip indexing them again.
 				err = edp.indexer.IndexCollectionsForBlock(height, collections)
 				if err != nil {
 					ctx.Throw(fmt.Errorf("failed to index collections for block height %d: %w", height, err))
@@ -105,7 +103,7 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 				}
 
 				// Log progress for each height with all relevant information
-				edp.log.Info().
+				edp.log.Debug().
 					Uint64("indexed", height).
 					Uint64("lowest_missing", lowestMissing).
 					Uint64("highest_available", highestAvailableHeight).
@@ -120,6 +118,8 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 	}
 }
 
+// ProcessedHeight returns the highest consecutive height for which execution data has been processed,
+// meaning the collections for that height have been indexed.
 func (edp *ExecutionDataProcessor) ProcessedHeight() uint64 {
 	return edp.processedHeight.Value()
 }
