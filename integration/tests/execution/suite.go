@@ -144,10 +144,12 @@ func (s *Suite) SetupTest() {
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
-	// add the verification node config
+	// add the verification node config as ghost
+	// note: no block will be sealed without verification node
 	s.ghostID = unittest.IdentifierFixture()
 	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.ghostID),
+		testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
