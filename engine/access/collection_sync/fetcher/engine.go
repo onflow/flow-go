@@ -54,8 +54,8 @@ func NewFetcher(
 ) (*Fetcher, error) {
 	workSignal := engine.NewNotifier()
 
-	// Read the default index from the finalized root height
-	defaultIndex := state.Params().FinalizedRoot().Height
+	// Read the default index from the sealed root height
+	defaultIndex := state.Params().SealedRoot().Height
 
 	// Create a Jobs instance that reads finalized blocks by height
 	// each job is a finalized block
