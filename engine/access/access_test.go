@@ -690,6 +690,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
+		scheduledTransactions := store.NewScheduledTransactions(metrics, db, 128)
 		collectionsToMarkFinalized := stdmap.NewTimes(100)
 		collectionsToMarkExecuted := stdmap.NewTimes(100)
 		blocksToMarkExecuted := stdmap.NewTimes(100)
@@ -710,6 +711,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Headers:                    all.Headers,
 			Collections:                collections,
 			Transactions:               transactions,
+			ScheduledTransactions:      scheduledTransactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
 			Seals:                      all.Seals,
@@ -974,6 +976,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			Headers:                    all.Headers,
 			Collections:                collections,
 			Transactions:               transactions,
+			ScheduledTransactions:      scheduledTransactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
 			Seals:                      all.Seals,

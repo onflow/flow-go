@@ -93,7 +93,6 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vmCtx := fvm.NewContext(
 		fvm.WithChain(testChain.Chain()),
-		fvm.WithScheduledTransactionsEnabled(true),
 	)
 	vmMock := fvmmock.NewVM(s.T())
 

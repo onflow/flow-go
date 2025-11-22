@@ -19,7 +19,7 @@ func NewTransactionBasedMigration(
 ) RegistersMigration {
 	return func(registersByAccount *registers.ByAccount) error {
 
-		options := computation.DefaultFVMOptions(chainID, false, false)
+		options := computation.DefaultFVMOptions(chainID, false)
 		options = append(options,
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithContractRemovalRestricted(false),
