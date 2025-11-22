@@ -92,15 +92,16 @@ type Blocks interface {
 	//     to decode an existing database value
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
-	// BlockIDByCollectionID returns the block ID for the given [flow.CollectionGuarantee] ID.
-	// This method is only available for collections included in finalized blocks.
+	// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the given collection
+	// (the collection guarantee such that `CollectionGuarantee.CollectionID == collID`).
+	// NOTE: This method is only available for collections included in finalized blocks.
 	// While consensus nodes verify that collections are not repeated within the same fork,
 	// each different fork can contain a recent collection once. Therefore, we must wait for
 	// finality.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 	//
 	// Error returns:
-	//   - storage.ErrNotFound if the collection ID was not found
+	//   - storage.ErrNotFound if no FINALIZED block exists containing the expected collection guarantee
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
 	BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error)
