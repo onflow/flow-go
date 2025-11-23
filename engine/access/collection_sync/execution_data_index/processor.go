@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -19,9 +18,9 @@ type ExecutionDataProcessor struct {
 	newExecutionDataIndexed engine.Notifier
 	provider                collection_sync.ExecutionDataProvider
 	indexer                 collection_sync.BlockCollectionIndexer
-	metrics                 module.CollectionSyncMetrics
 	// state
-	processedHeight *counters.PersistentStrictMonotonicCounter
+	processedHeight   *counters.PersistentStrictMonotonicCounter
+	onIndexedCallback func(uint64)
 }
 
 var _ collection_sync.ExecutionDataProcessor = (*ExecutionDataProcessor)(nil)
@@ -33,15 +32,15 @@ func NewExecutionDataProcessor(
 	provider collection_sync.ExecutionDataProvider,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedHeight *counters.PersistentStrictMonotonicCounter,
-	metrics module.CollectionSyncMetrics,
+	onIndexedCallback func(uint64),
 ) *ExecutionDataProcessor {
 	edp := &ExecutionDataProcessor{
-		log:                     log.With().Str("component", "coll_sync_ed_processor").Logger(),
+		log:                     log.With().Str("coll_sync", "data_processor").Logger(),
 		newExecutionDataIndexed: engine.NewNotifier(),
 		provider:                provider,
 		indexer:                 indexer,
-		metrics:                 metrics,
 		processedHeight:         processedHeight,
+		onIndexedCallback:       onIndexedCallback,
 	}
 
 	// Initialize the notifier so that even if no new execution data comes in,
@@ -112,7 +111,7 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 					Uint64("total_to_process", highestAvailableHeight-lowestMissing+1).
 					Msg("indexed execution data progress")
 
-				edp.metrics.CollectionSyncedHeight(height)
+				edp.onIndexedCallback(height)
 			}
 		}
 	}

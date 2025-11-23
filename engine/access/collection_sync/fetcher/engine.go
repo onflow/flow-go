@@ -86,7 +86,7 @@ func NewFetcher(
 	}
 
 	consumer, err := jobqueue.NewComponentConsumer(
-		log.With().Str("component", "collection-syncing").Logger(),
+		log.With().Str("coll_sync", "fetcher").Logger(),
 		workSignal.Channel(),
 		progressInitializer,
 		jobs,

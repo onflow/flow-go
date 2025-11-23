@@ -37,7 +37,7 @@ func NewBlockProcessor(
 	requester collection_sync.CollectionRequester,
 ) *BlockProcessor {
 	return &BlockProcessor{
-		log:       log.With().Str("component", "coll_fetcher").Logger(),
+		log:       log.With().Str("coll_sync", "fetcher_processor").Logger(),
 		mcq:       mcq,
 		indexer:   indexer,
 		requester: requester,

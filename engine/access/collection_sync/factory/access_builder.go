@@ -172,7 +172,9 @@ func CreateExecutionDataProcessorComponent(
 		executionDataRequester,
 		collectionIndexedHeight,
 		blockCollectionIndexer,
-		collectionSyncMetrics,
+		func(indexedHeight uint64) {
+			collectionSyncMetrics.CollectionSyncedHeight(indexedHeight)
+		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create execution data processor: %w", err)

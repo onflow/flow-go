@@ -85,7 +85,7 @@ func createFetcher(
 
 	// Create BlockProcessor
 	blockProcessor := fetcher.NewBlockProcessor(
-		log.With().Str("component", "coll_sync_fetcher").Logger(),
+		log,
 		mcq,
 		indexer,
 		collectionRequester,
