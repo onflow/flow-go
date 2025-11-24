@@ -3,12 +3,20 @@ package cohort4
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -21,11 +29,12 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-func TestGrpcBlocksStream(t *testing.T) {
-	suite.Run(t, new(GrpcBlocksStreamSuite))
+func TestStreamingAPIs(t *testing.T) {
+	suite.Run(t, new(StreamingSuite))
 }
 
-type GrpcBlocksStreamSuite struct {
+// StreamingSuite tests both gRPC block streaming and REST event streaming APIs.
+type StreamingSuite struct {
 	suite.Suite
 	lib.TestnetStateTracker
 
@@ -43,14 +52,32 @@ type GrpcBlocksStreamSuite struct {
 	ghostID flow.Identifier
 }
 
-func (s *GrpcBlocksStreamSuite) TearDownTest() {
+func (s *StreamingSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
-func (s *GrpcBlocksStreamSuite) SetupTest() {
+// SetupTest initializes the test suite with a network configuration for testing both GRPC block streaming and REST event streaming APIs.
+//
+// Network Configuration:
+//   - 1 Access node with execution data indexing and streaming support:
+//     * execution-data-sync-enabled, execution-data-indexing-enabled
+//     * event-query-mode=local-only, supports-observer=true
+//     * public-network-execution-data-sync-enabled=true
+//   - 1 Ghost Access node (lightweight, for tracking block state)
+//   - 1 Observer node with execution data indexing (event-query-mode=execution-nodes-only)
+//   - 2 Collection nodes (standard configuration)
+//   - 3 Consensus nodes (with custom timing: 100ms proposal duration, reduced seal approvals)
+//   - 2 Execution nodes (standard configuration)
+//   - 1 Verification node (standard configuration)
+//
+// This unified setup supports testing both GRPC block streaming APIs (SubscribeBlocksFromLatest,
+// SubscribeBlocksFromStartBlockID, SubscribeBlocksFromStartHeight) and REST event streaming via websockets.
+// The access node and observer both index execution data, allowing verification that streaming APIs
+// return consistent results from both nodes.
+func (s *StreamingSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
@@ -72,6 +99,7 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.FatalLevel),
@@ -111,7 +139,7 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 		},
 	}}
 
-	conf := testnet.NewNetworkConfig("access_blocks_streaming_test", nodeConfigs, testnet.WithObservers(observers...))
+	conf := testnet.NewNetworkConfig("streaming_test", nodeConfigs, testnet.WithObservers(observers...))
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
@@ -124,14 +152,20 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 	s.Track(s.T(), s.ctx, s.Ghost())
 }
 
-func (s *GrpcBlocksStreamSuite) Ghost() *client.GhostClient {
+func (s *StreamingSuite) Ghost() *client.GhostClient {
 	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
 
-// TestRestEventStreaming tests gRPC event streaming
-func (s *GrpcBlocksStreamSuite) TestHappyPath() {
+// TestAllStreamingAPIs runs all streaming API tests with a shared network setup.
+func (s *StreamingSuite) TestAllStreamingAPIs() {
+	s.testGrpcBlocksStreaming()
+	s.testRestEventStreaming()
+}
+
+// testGrpcBlocksStreaming tests gRPC block streaming APIs.
+func (s *StreamingSuite) testGrpcBlocksStreaming() {
 	accessUrl := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort))
 	accessClient, err := common.GetAccessAPIClient(accessUrl)
 	s.Require().NoError(err)
@@ -193,6 +227,53 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	}
 }
 
+// testRestEventStreaming tests REST event streaming via WebSocket.
+func (s *StreamingSuite) testRestEventStreaming() {
+	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+
+	s.T().Run("subscribe events", func(t *testing.T) {
+		startBlockId := flow.ZeroID
+		startHeight := uint64(0)
+		url := getSubscribeEventsRequest(restAddr, startBlockId, startHeight, nil, nil, nil)
+
+		client, err := common.GetWSClient(s.ctx, url)
+		require.NoError(t, err)
+
+		var receivedEventsResponse []*backend.EventsResponse
+
+		go func() {
+			time.Sleep(10 * time.Second)
+			// close connection after 10 seconds
+			client.Close()
+		}()
+
+		eventChan := make(chan *backend.EventsResponse)
+		go func() {
+			for {
+				resp := &backend.EventsResponse{}
+				err := client.ReadJSON(resp)
+				if err != nil {
+					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+						s.T().Logf("unexpected close error: %v", err)
+						require.NoError(s.T(), err)
+					}
+					close(eventChan) // Close the event channel when the client connection is closed
+					return
+				}
+				eventChan <- resp
+			}
+		}()
+
+		// collect received events during 10 seconds
+		for eventResponse := range eventChan {
+			receivedEventsResponse = append(receivedEventsResponse, eventResponse)
+		}
+
+		// check events
+		s.requireEvents(receivedEventsResponse)
+	})
+}
+
 // addObserverBlock adds a block received from the observer node to the response tracker
 // and increments the transaction count for that node.
 //
@@ -201,7 +282,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 //   - responseTracker: The response tracker to which the block should be added.
 //   - rpcCallName: The name of the rpc subscription call which is testing.
 //   - txCount: A pointer to an integer that tracks the number of transactions received from the node.
-func (s *GrpcBlocksStreamSuite) addObserverBlock(
+func (s *StreamingSuite) addObserverBlock(
 	block *flow.Block,
 	responseTracker *ResponseTracker[*flow.Block],
 	rpcCallName string,
@@ -218,6 +299,65 @@ func (s *GrpcBlocksStreamSuite) addObserverBlock(
 
 	responseTracker.Add(s.T(), block.Height, "observer", block)
 	*txCount++
+}
+
+// requireEvents is a helper function that encapsulates logic for comparing received events from rest state streaming and
+// events which received from grpc api
+func (s *StreamingSuite) requireEvents(receivedEventsResponse []*backend.EventsResponse) {
+	// make sure there are received events
+	require.GreaterOrEqual(s.T(), len(receivedEventsResponse), 1, "expect received events")
+
+	grpcCtx, grpcCancel := context.WithCancel(s.ctx)
+	defer grpcCancel()
+
+	grpcAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
+
+	grpcConn, err := grpc.DialContext(grpcCtx, grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(s.T(), err, "failed to connect to access node")
+	defer grpcConn.Close()
+
+	grpcClient := accessproto.NewAccessAPIClient(grpcConn)
+
+	// Variable to keep track of non-empty event response count
+	nonEmptyResponseCount := 0
+	for _, receivedEventResponse := range receivedEventsResponse {
+		// Create a map where key is EventType and value is list of events with this EventType
+		receivedEventMap := make(map[flow.EventType][]flow.Event)
+		for _, event := range receivedEventResponse.Events {
+			eventType := event.Type
+			receivedEventMap[eventType] = append(receivedEventMap[eventType], event)
+		}
+
+		for eventType, receivedEventList := range receivedEventMap {
+			// get events by block id and event type
+			response, err := MakeApiRequest(
+				grpcClient.GetEventsForBlockIDs,
+				grpcCtx,
+				&accessproto.GetEventsForBlockIDsRequest{
+					BlockIds: [][]byte{convert.IdentifierToMessage(receivedEventResponse.BlockID)},
+					Type:     string(eventType),
+				},
+			)
+			require.NoError(s.T(), err)
+			require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
+
+			expectedEventsResult := response.Results[0]
+			require.Equal(s.T(), expectedEventsResult.BlockHeight, receivedEventResponse.Height, "expect the same block height")
+			require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events: want: %+v, got: %+v", expectedEventsResult.Events, receivedEventList)
+
+			for i, event := range receivedEventList {
+				require.Equal(s.T(), expectedEventsResult.Events[i].EventIndex, event.EventIndex, "expect the same event index")
+				require.Equal(s.T(), convert.MessageToIdentifier(expectedEventsResult.Events[i].TransactionId), event.TransactionID, "expect the same transaction id")
+			}
+
+			// Check if the current response has non-empty events
+			if len(receivedEventResponse.Events) > 0 {
+				nonEmptyResponseCount++
+			}
+		}
+	}
+	// Ensure that at least one response had non-empty events
+	require.GreaterOrEqual(s.T(), nonEmptyResponseCount, 1, "expect at least one response with non-empty events")
 }
 
 func blockResponseHandler(msg *accessproto.SubscribeBlocksResponse) (*flow.Block, error) {
@@ -241,12 +381,39 @@ func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Bl
 	require.Equal(t, accessBlock.Payload.Hash(), observerBlock.Payload.Hash())
 }
 
+// getSubscribeEventsRequest is a helper function that creates SubscribeEventsRequest
+func getSubscribeEventsRequest(accessAddr string, startBlockId flow.Identifier, startHeight uint64, eventTypes []string, addresses []string, contracts []string) string {
+	u, _ := url.Parse("http://" + accessAddr + "/v1/subscribe_events")
+	q := u.Query()
+
+	if startBlockId != flow.ZeroID {
+		q.Add("start_block_id", startBlockId.String())
+	}
+
+	if startHeight != request.EmptyHeight {
+		q.Add("start_height", fmt.Sprintf("%d", startHeight))
+	}
+
+	if len(eventTypes) > 0 {
+		q.Add("event_types", strings.Join(eventTypes, ","))
+	}
+	if len(addresses) > 0 {
+		q.Add("addresses", strings.Join(addresses, ","))
+	}
+	if len(contracts) > 0 {
+		q.Add("contracts", strings.Join(contracts, ","))
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
 type subscribeBlocksRPCTest struct {
 	name string
 	call func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) func() (*accessproto.SubscribeBlocksResponse, error)
 }
 
-func (s *GrpcBlocksStreamSuite) getRPCs() []subscribeBlocksRPCTest {
+func (s *StreamingSuite) getRPCs() []subscribeBlocksRPCTest {
 	return []subscribeBlocksRPCTest{
 		{
 			name: "SubscribeBlocksFromLatest",

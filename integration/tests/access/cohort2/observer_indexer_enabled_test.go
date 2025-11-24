@@ -44,6 +44,11 @@ type ObserverIndexerEnabledSuite struct {
 	ObserverSuite
 }
 
+func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexerEnabled() {
+	s.testObserverIndexedRPCsHappyPath()
+	s.testAllObserverIndexedRPCsHappyPath()
+}
+
 // SetupTest sets up the test suite by starting the network and preparing the observers client.
 // By overriding this function, we can ensure that the observers are started with correct parameters and select
 // the RPCs and REST endpoints that are tested.
@@ -141,10 +146,10 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 	s.net.Start(ctx)
 }
 
-// TestObserverIndexedRPCsHappyPath tests RPCs that are handled by the observer by using a dedicated indexer for the events.
+// testObserverIndexedRPCsHappyPath tests RPCs that are handled by the observer by using a dedicated indexer for the events.
 // To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
 // returns success for valid requests and errors for invalid ones.
-func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
+func (s *ObserverIndexerEnabledSuite) testObserverIndexedRPCsHappyPath() {
 	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -271,7 +276,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	require.True(t, found)
 }
 
-// TestAllObserverIndexedRPCsHappyPath tests the observer with the indexer enabled,
+// testAllObserverIndexedRPCsHappyPath tests the observer with the indexer enabled,
 // observer configured to proxy requests to an access node and access node itself. All responses are compared
 // to ensure all of the endpoints are working as expected.
 // For now the observer only supports the following RPCs:
@@ -288,7 +293,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 // -GetTransaction
 // -GetTransactionResult
 // -GetTransactionResultByIndex
-func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
+func (s *ObserverIndexerEnabledSuite) testAllObserverIndexedRPCsHappyPath() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

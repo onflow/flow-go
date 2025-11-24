@@ -16,6 +16,7 @@ type PebbleExecutionStateSync struct {
 	ExecutionStateSyncSuite
 }
 
+// SetupTest inherits the network configuration from ExecutionStateSyncSuite
 func (s *PebbleExecutionStateSync) SetupTest() {
 	s.setup(execution_data.ExecutionDataDBModePebble)
 }

@@ -44,6 +44,11 @@ type AccessStoreTxErrorMessagesSuite struct {
 	accessContainerName string
 }
 
+func (s *AccessStoreTxErrorMessagesSuite) TestAllAccessStoreTxErrorMessages() {
+	s.testAccessStoreTxErrorMessages()
+	s.testBackfillTxErrorMessages()
+}
+
 func (s *AccessStoreTxErrorMessagesSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
@@ -51,8 +56,21 @@ func (s *AccessStoreTxErrorMessagesSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
-// SetupTest sets up the test suite by starting the network.
-// The access are started with correct parameters and store transaction error messages.
+// SetupTest initializes the test suite with a network configuration for testing transaction error message storage.
+//
+// Network Configuration:
+//   - 2 Access nodes:
+//     * defaultAccess (access_1): Standard access node without error message storage
+//     * storeTxAccess (access_2): Access node with --store-tx-result-error-messages=true and metrics server
+//   - 2 Collection nodes (standard configuration)
+//   - 3 Consensus nodes (with slower timing: 250ms proposal duration to slow block rate, reduced seal approvals)
+//   - 2 Execution nodes (standard configuration)
+//   - 1 Verification node (standard configuration)
+//   - NO Observer node
+//
+// The slower consensus timing (250ms vs typical 100ms) is intentional to compensate for faster BLS
+// operations in the crypto module, ensuring sufficient time for error message processing. The test
+// validates that transaction error messages are correctly stored in the database and can be backfilled.
 func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	defaultAccess := testnet.NewNodeConfig(
 		flow.RoleAccess,
@@ -101,10 +119,10 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	s.net.Start(s.ctx)
 }
 
-// TestAccessStoreTxErrorMessages verifies that transaction result error messages
+// testAccessStoreTxErrorMessages verifies that transaction result error messages
 // are stored correctly in the database by sending a transaction, generating an error,
 // and checking if the error message is properly stored and retrieved from the database.
-func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
+func (s *AccessStoreTxErrorMessagesSuite) testAccessStoreTxErrorMessages() {
 	// Create and send a transaction that will result in an error.
 	txResult := s.createAndSendTxWithTxError()
 
@@ -122,10 +140,10 @@ func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
 	s.verifyTxErrorMessage(txResults, txErrorMessages)
 }
 
-// TestBackfillTxErrorMessages verifies that transaction error messages are backfilled correctly
+// testBackfillTxErrorMessages verifies that transaction error messages are backfilled correctly
 // by creating a transaction that results in an error, running the backfill command, and checking
 // if the error message is stored and retrieved from the database.
-func (s *AccessStoreTxErrorMessagesSuite) TestBackfillTxErrorMessages() {
+func (s *AccessStoreTxErrorMessagesSuite) testBackfillTxErrorMessages() {
 	// Create and send a transactions that will result in an error.
 	transactionCount := 5
 	txResults := make([]*sdk.TransactionResult, transactionCount)

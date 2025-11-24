@@ -71,6 +71,22 @@ func (s *GrpcStateStreamSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
+// SetupTest initializes the test suite with a network configuration for testing GRPC event streaming APIs.
+//
+// Network Configuration:
+//   - 2 Access nodes with different event query modes:
+//     * testAN (access_1): event-query-mode=local-only, with execution data indexing
+//     * controlAN (access_2): event-query-mode=execution-nodes-only, with execution data indexing
+//     Both have supports-observer=true and public-network-execution-data-sync-enabled=true
+//   - 1 Ghost Access node (lightweight, for tracking block state)
+//   - 1 Observer node (with execution data indexing: event-query-mode=execution-nodes-only)
+//   - 2 Collection nodes (standard configuration)
+//   - 3 Consensus nodes (reduced seal approvals for faster testing)
+//   - 2 Execution nodes (standard configuration)
+//   - 1 Verification node (standard configuration)
+//
+// This setup allows testing event streaming APIs with different query modes to verify that events can be
+// retrieved from both local indexing and from execution nodes directly, and that results are consistent.
 func (s *GrpcStateStreamSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
