@@ -42,12 +42,14 @@ func (w *WintermuteTestSuite) TestWintermuteAttack() {
 
 	// waits for at least 2 approvals for all chunks of corrupted result from corrupted verification nodes.
 	for i := 0; i < len(corruptedResult.Chunks); i++ {
+		w.T().Logf("waiting for at least 2 approvals from corrupted verification nodes for chunk-%d of corrupted result %x\n", i, corruptedResult.ID())
 		w.ApprovalState.WaitForTotalApprovalsFrom(w.T(),
 			w.corruptedVnIds,
 			corruptedResult.ID(),
 			uint64(i),
 			2)
 	}
+	w.T().Logf("witnessed at least 2 approvals from corrupted verification nodes for all chunks of corrupted result %x\n", corruptedResult.ID())
 
 	// waits until we seal a height equal to the victim block height
 	w.BlockState.WaitForSealedHeight(w.T(), victimBlock.Height)
