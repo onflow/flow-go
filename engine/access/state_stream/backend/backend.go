@@ -193,9 +193,10 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
 //   - [access.DataNotFoundError]: When data required to process the request is not available.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
-//   - [access.PreconditionFailedError]: A block was found, but it is not finalized and is above the finalized height.
+//   - [access.PreconditionFailedError]: When the register's database isn't initialized yet.
 func (b *StateStreamBackend) GetRegisterValues(
 	ctx context.Context,
 	ids flow.RegisterIDs,
@@ -203,7 +204,7 @@ func (b *StateStreamBackend) GetRegisterValues(
 	criteria optimistic_sync.Criteria,
 ) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error) {
 	if len(ids) > b.registerRequestLimit {
-		return nil, nil, access.NewPreconditionFailedError(
+		return nil, nil, access.NewInvalidRequestError(
 			fmt.Errorf("number of register IDs exceeds limit of %d", b.registerRequestLimit))
 	}
 

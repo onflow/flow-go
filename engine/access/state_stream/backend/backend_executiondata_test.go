@@ -406,13 +406,13 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	})
 
 	s.Run("execution result info returns unexpected error", func() {
-		expectedErr := fmt.Errorf("failed to get execution result info for block: %w", storage.ErrDataMismatch)
+		exception := fmt.Errorf("failed to get execution result info for block: %w", storage.ErrDataMismatch)
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(nil, storage.ErrDataMismatch).
 			Once()
 
-		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedErr)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
 		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
@@ -451,13 +451,13 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			}, nil).
 			Once()
 
-		expectedError := fmt.Errorf("unexpected error")
+		exception := fmt.Errorf("unexpected error")
 		s.executionStateCache.
 			On("Snapshot", result.ID()).
-			Return(nil, expectedError).
+			Return(nil, exception).
 			Once()
 
-		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedError)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
 		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
@@ -522,8 +522,8 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 			Return(nil, storage.ErrDataMismatch).
 			Once()
 
-		expectedError := fmt.Errorf("unexpected error getting execution data: %w", storage.ErrDataMismatch)
-		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedError)
+		exception := fmt.Errorf("unexpected error getting execution data: %w", storage.ErrDataMismatch)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
 		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
@@ -946,7 +946,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.Nil(s.T(), res)
 		require.Nil(s.T(), metadata)
 		require.Error(s.T(), err)
-		require.True(s.T(), access.IsPreconditionFailedError(err))
+		require.True(s.T(), access.IsInvalidRequestError(err))
 	})
 
 	s.Run("returns error if failed to get execution result info for block - insufficient receipts", func() {
@@ -974,13 +974,13 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	})
 
 	s.Run("execution result info returns unexpected error", func() {
-		expectedErr := fmt.Errorf("failed to get execution result info for block: %w", storage.ErrDataMismatch)
+		exception := fmt.Errorf("failed to get execution result info for block: %w", storage.ErrDataMismatch)
 
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(nil, storage.ErrDataMismatch).Once()
 
-		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedErr)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
 		res, metadata, err := s.backend.GetRegisterValues(ctxIrr, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
@@ -1017,13 +1017,13 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 				ExecutionNodes:    executionNodes.ToSkeleton(),
 			}, nil).Once()
 
-		expectedError := fmt.Errorf("unexpected error")
+		exception := fmt.Errorf("unexpected error")
 		s.executionStateCache.
 			On("Snapshot", result.ID()).
-			Return(nil, expectedError).
+			Return(nil, exception).
 			Once()
 
-		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedError)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
 		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
@@ -1067,10 +1067,10 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Return(s.executionDataSnapshot, nil).
 			Once()
 
-		expectedError := fmt.Errorf("unexpected error")
-		s.executionDataSnapshot.On("Registers").Return(nil, expectedError).Once()
+		exception := fmt.Errorf("unexpected error")
+		s.executionDataSnapshot.On("Registers").Return(nil, exception).Once()
 
-		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedError)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
 		res, metadata, err := s.backend.GetRegisterValues(ctxIrr, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
@@ -1164,8 +1164,8 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
 
-		expectedErr := fmt.Errorf("failed to get register by the register ID at a given block height: %w", storage.ErrDataMismatch)
-		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedErr)
+		exception := fmt.Errorf("failed to get register by the register ID at a given block height: %w", storage.ErrDataMismatch)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
 		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrDataMismatch).Once()
