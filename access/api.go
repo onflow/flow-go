@@ -16,9 +16,8 @@ type AccountsAPI interface {
 	// Alias for GetAccountAtLatestBlock.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -50,9 +49,8 @@ type AccountsAPI interface {
 	// GetAccountAtBlockHeight returns the account details at the given block height.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -67,9 +65,8 @@ type AccountsAPI interface {
 	// GetAccountBalanceAtLatestBlock returns the account balance at the latest sealed block.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -84,9 +81,8 @@ type AccountsAPI interface {
 	// GetAccountBalanceAtBlockHeight returns the account balance at the given block height.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -102,9 +98,8 @@ type AccountsAPI interface {
 	// GetAccountKeyAtLatestBlock returns the account public key at the latest sealed block.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -119,9 +114,8 @@ type AccountsAPI interface {
 	// GetAccountKeyAtBlockHeight returns the account public key by key index at the given block height.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -136,9 +130,8 @@ type AccountsAPI interface {
 	// GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
@@ -153,9 +146,8 @@ type AccountsAPI interface {
 	// GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-	// As documented in the [access.API], which we partially implement with this function
-	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
-	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.

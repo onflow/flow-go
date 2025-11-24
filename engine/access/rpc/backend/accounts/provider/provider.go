@@ -32,8 +32,7 @@ type AccountProvider interface {
 		executionResultInfo *optimistic_sync.ExecutionResultInfo,
 	) (*flow.Account, *accessmodel.ExecutorMetadata, error)
 
-	// GetAccountBalanceAtBlock returns the balance of a Flow account
-	// at the given block height.
+	// GetAccountBalanceAtBlock returns the balance of a Flow account at the given block height.
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
