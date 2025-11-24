@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/runtime"
+	cadenceRuntime "github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -70,8 +70,8 @@ type transactionExecutor struct {
 	// writes to any of those registers
 	executionStateRead *snapshot.ExecutionSnapshot
 
-	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
-	txnBodyExecutor runtime.Executor
+	cadenceRuntime  *runtime.ReusableCadenceRuntime
+	txnBodyExecutor cadenceRuntime.Executor
 
 	output ProcedureOutput
 }
@@ -92,6 +92,30 @@ func newTransactionExecutor(
 		span,
 		ctx.EnvironmentParams,
 		txnState)
+
+	if ctx.EVMEnabled {
+		chainID := ctx.Chain.ChainID()
+
+		cadenceVMEnabled := ctx.CadenceVMEnabled
+
+		env.Runtime.ConfigureCadenceRuntime = func(
+			reusableCadenceRuntime *runtime.ReusableCadenceRuntime,
+			env environment.Environment,
+		) {
+			var txRuntimeEnv cadenceRuntime.Environment
+			if cadenceVMEnabled {
+				txRuntimeEnv = reusableCadenceRuntime.VMTxRuntimeEnv
+			} else {
+				txRuntimeEnv = reusableCadenceRuntime.TxRuntimeEnv
+			}
+
+			evm.SetupEnvironment(
+				chainID,
+				env,
+				txRuntimeEnv,
+			)
+		}
+	}
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
@@ -186,28 +210,8 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
-	chainID := executor.ctx.Chain.ChainID()
 
 	// setup EVM
-	if executor.ctx.EVMEnabled {
-
-		var txRuntimeEnv runtime.Environment
-		if executor.ctx.VMTransactionExecutionEnabled {
-			txRuntimeEnv = executor.cadenceRuntime.VMTxRuntimeEnv
-		} else {
-			txRuntimeEnv = executor.cadenceRuntime.TxRuntimeEnv
-		}
-
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			txRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	// get meter parameters
 	executionParameters, executionStateRead, err := getExecutionParameters(
 		executor.env.Logger(),
@@ -236,12 +240,12 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	executor.nestedTxnId = txnId
 
 	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
-		runtime.Script{
+		cadenceRuntime.Script{
 			Source:    executor.proc.Transaction.Script,
 			Arguments: executor.proc.Transaction.Arguments,
 		},
 		common.TransactionLocation(executor.proc.ID),
-		executor.ctx.VMTransactionExecutionEnabled,
+		executor.ctx.CadenceVMEnabled,
 	)
 
 	// This initializes various cadence variables and parses the programs used
@@ -265,27 +269,6 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	chainID := executor.ctx.Chain.ChainID()
-
-	// setup EVM
-	if executor.ctx.EVMEnabled {
-
-		var txRuntimeEnv runtime.Environment
-		if executor.ctx.VMTransactionExecutionEnabled {
-			txRuntimeEnv = executor.cadenceRuntime.VMTxRuntimeEnv
-		} else {
-			txRuntimeEnv = executor.cadenceRuntime.TxRuntimeEnv
-		}
-
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			txRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
-	}
 
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {

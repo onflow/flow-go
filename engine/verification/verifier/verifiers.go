@@ -40,9 +40,7 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (
 	totalStats BlockVerificationStats,
 	err error,
@@ -53,9 +51,7 @@ func VerifyLastKHeight(
 		protocolDataDir,
 		chunkDataPackDir,
 		transactionFeesDisabled,
-		scheduledCallbacksEnabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
+		scheduledTransactionsEnabled,
 	)
 	if err != nil {
 		return BlockVerificationStats{}, fmt.Errorf("could not init storages: %w", err)
@@ -126,9 +122,7 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (
 	totalStats BlockVerificationStats,
 	err error,
@@ -139,9 +133,7 @@ func VerifyRange(
 		protocolDataDir,
 		chunkDataPackDir,
 		transactionFeesDisabled,
-		scheduledCallbacksEnabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
+		scheduledTransactionsEnabled,
 	)
 	if err != nil {
 		return BlockVerificationStats{}, fmt.Errorf("could not init storages: %w", err)
@@ -194,14 +186,14 @@ func verifyConcurrently(
 	state protocol.State,
 	verifier module.ChunkVerifier,
 	verifyHeight func(
-		height uint64,
-		headers storage.Headers,
-		chunkDataPacks storage.ChunkDataPacks,
-		results storage.ExecutionResults,
-		state protocol.State,
-		verifier module.ChunkVerifier,
-		stopOnMismatch bool,
-	) (BlockVerificationStats, error),
+	height uint64,
+	headers storage.Headers,
+	chunkDataPacks storage.ChunkDataPacks,
+	results storage.ExecutionResults,
+	state protocol.State,
+	verifier module.ChunkVerifier,
+	stopOnMismatch bool,
+) (BlockVerificationStats, error),
 ) (BlockVerificationStats, error) {
 
 	tasks := make(chan uint64, int(nWorker))
@@ -316,9 +308,7 @@ func initStorages(
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (
 	func() error,
 	*store.All,
@@ -353,9 +343,7 @@ func initStorages(
 		chainID,
 		storages.Headers,
 		transactionFeesDisabled,
-		scheduledCallbacksEnabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
+		scheduledTransactionsEnabled,
 	)
 
 	closer := func() error {
@@ -466,9 +454,7 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
-	vmScriptExecutionEnabled bool,
-	vmTransactionExecutionEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -476,8 +462,6 @@ func makeVerifier(
 		chainID,
 		headers,
 		transactionFeesDisabled,
-		vmScriptExecutionEnabled,
-		vmTransactionExecutionEnabled,
 	)
 	fvmOptions = append(
 		[]fvm.Option{fvm.WithLogger(logger)},
@@ -490,7 +474,7 @@ func makeVerifier(
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			scheduledCallbacksEnabled,
+			scheduledTransactionsEnabled,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)

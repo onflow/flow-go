@@ -191,7 +191,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.ReadStored(
-		common.MustBytesToAddress(service.Bytes()),
+		common.Address(service),
 		blueprints.IsContractDeploymentRestrictedPath)
 	if err != nil {
 		impl.logger.
@@ -238,7 +238,7 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.ReadStored(
-		common.MustBytesToAddress(service.Bytes()),
+		common.Address(service),
 		path)
 
 	const warningMsg = "failed to read contract authorized accounts from " +

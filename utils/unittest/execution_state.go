@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -23,7 +24,10 @@ const ServiceAccountPrivateKeySignAlgo = crypto.ECDSAP256
 const ServiceAccountPrivateKeyHashAlgo = hash.SHA2_256
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "002ec8b7ddc16a5f057539433ab9e4190806a231a0ca00a1c666745c44104121"
+var GenesisStateCommitmentHex = ifCompile(
+	"8a96fa1630db32bafd997262ddf5baf10cbc7745b6bc4f544970fcbc4675c6cd",
+	"28ca2e49830b66557f7e8f958175440b327842d82c9e9b7d628cf50e8115be66",
+)
 
 var GenesisStateCommitment flow.StateCommitment
 
@@ -82,15 +86,28 @@ func GenesisStateCommitmentByChainID(chainID flow.ChainID) flow.StateCommitment 
 	return commit
 }
 
+func ifCompile[T any](a, b T) T {
+	if cadence_vm.DefaultEnabled {
+		return a
+	}
+	return b
+}
+
 func genesisCommitHexByChainID(chainID flow.ChainID) string {
 	if chainID == flow.Mainnet {
 		return GenesisStateCommitmentHex
 	}
 	if chainID == flow.Testnet {
-		return "475d23a46aed725c9663bf77e8b41ab569d57bd52529840b38e730d031d662bf"
+		return ifCompile(
+			"f5ba39ea58aa8cd335d221d8e12083430a6a39f541ef34cb5a874f1af172f1b3",
+			"ce1b1add628be251200777a38df34b29b2855f7784985cf47866ccace909dacc",
+		)
 	}
 	if chainID == flow.Sandboxnet {
 		return "e1c08b17f9e5896f03fe28dd37ca396c19b26628161506924fbf785834646ea1"
 	}
-	return "6a3bc6034668d0a8ce4e95e61482d9c729d8075b96e378d4583cf4398b3f3863"
+	return ifCompile(
+		"a6005c6798453f229a5ecaeb2205dc7dfa118535cd86ddbd8130a48fc70c651d",
+		"b0efa167268bf3857e328cd1f6a3ef1de4cce986c2d6bbd771245c8448353732",
+	)
 }

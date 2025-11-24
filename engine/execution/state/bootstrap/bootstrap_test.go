@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"testing"
 
@@ -13,24 +12,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
-)
-
-var testWithVMTransactionExecution = flag.Bool(
-	"testWithVMTransactionExecution",
-	false,
-	"Run transactions in tests using the Cadence compiler/VM",
-)
-
-var testWithVMScriptExecution = flag.Bool(
-	"testWithVMScriptExecution",
-	false,
-	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func TestBootstrapLedger(t *testing.T) {
@@ -70,7 +58,10 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("bec4478e1b3aa1fd822c796411e69bd85ef9529b9ef93e231d4b02470d49b4f0")
+	expectedStateCommitmentBytes, _ := hex.DecodeString(ifCompile(
+		"114c3c6747c0ecdb6f1aaba9278e261e2883d40c0ec917aacc53a6bfaca4c28f",
+		"d04e95da9811e985c5bf6a8f956ab3571ebf7bd4f15bf36098875b0e51e72906",
+	))
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -106,6 +97,13 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 	})
 }
 
+func ifCompile[T any](a, b T) T {
+	if cadence_vm.DefaultEnabled {
+		return a
+	}
+	return b
+}
+
 // TestBootstrapLedger_EmptyTransaction bootstraps a ledger with:
 // - transaction fees
 // - storage fees
@@ -117,7 +115,12 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 // - transaction fee deduction
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("b21c4cea6518d92c34d2eeff1a02f7e1b7b75f9c0e0e52069905bb728361d039")
+	expectedStateCommitmentBytes, _ := hex.DecodeString(
+		ifCompile(
+			"26c1eb39af9ba9708b49d1149d9fb7ee2a5ab870793c67da0b4bd7c48f0cca33",
+			"88d0c00ff69668ef8e049f811b13750d4cd75cda2be6ecd3e6dcf3685e28c4e4",
+		),
+	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -157,8 +160,6 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
-			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		)
 
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())

@@ -40,7 +40,7 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 		vm:             vm,
 		vmCtx:          vmCtx,
 		systemChunkCtx: computer.SystemChunkContext(vmCtx, metrics.NewNoopCollector()),
-		callbackCtx:    computer.CallbackContext(vmCtx, metrics.NewNoopCollector()),
+		callbackCtx:    computer.ScheduledTransactionContext(vmCtx, metrics.NewNoopCollector()),
 		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
@@ -248,7 +248,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		// For system chunks with callbacks:
 		// - Process callback transaction and callback executions use callbackCtx
 		// - System transaction (last one) uses the original system chunk context
-		if systemChunk && context.ScheduleCallbacksEnabled && i < len(transactions)-1 {
+		if systemChunk && context.ScheduledTransactionsEnabled && i < len(transactions)-1 {
 			ctx = callbackCtx
 		}
 
@@ -436,17 +436,17 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 }
 
 // createSystemChunk recreates the system chunk transactions and executes the
-// process callback transaction if scheduled callbacks are enabled.
+// process scheduled transactions if scheduled transactions are enabled.
 //
 // Returns system transaction list, which contains the system chunk transaction
-// and if the scheduled callbacks are enabled it also includes process / execute
-// callback transactions, and if callbacks enabled it returns the result of the
-// process callback transaction. No errors are expected during normal operation.
+// and if the scheduled transactions are enabled it also includes process / execute
+// scheduled transactions, and if enabled it returns the result of the
+// process scheduled transactions. No errors are expected during normal operation.
 //
-// If scheduled callbacks are dissabled it will only contain the system transaction.
-// If scheduled callbacks are enabled we need to do the following actions:
-// 1. add and execute the process callback transaction that returns events for execute callbacks
-// 2. add one transaction for each callback event
+// If scheduled transactions are disabled it will only contain the system transaction.
+// If scheduled transactions are enabled we need to do the following actions:
+// 1. add and execute the process scheduled transaction that returns events for execute transactions
+// 2. add one transaction for each scheduled transaction event
 // 3. add the system transaction as last transaction
 func (fcv *ChunkVerifier) createSystemChunk(
 	callbackCtx fvm.Context,
@@ -461,8 +461,8 @@ func (fcv *ChunkVerifier) createSystemChunk(
 ) ([]*fvm.TransactionProcedure, *flow.LightTransactionResult, error) {
 	txIndex := transactionOffset
 
-	// If scheduled callbacks are dissabled we only have the system transaction in the chunk
-	if !fcv.vmCtx.ScheduleCallbacksEnabled {
+	// If scheduled transactions are disabled we only have the system transaction in the chunk
+	if !fcv.vmCtx.ScheduledTransactionsEnabled {
 		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not get system chunk transaction: %w", err)

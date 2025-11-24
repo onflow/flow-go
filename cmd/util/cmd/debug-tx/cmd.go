@@ -425,7 +425,9 @@ func RunTransaction(
 		Str("tx", tx.ID().String()).
 		Logger()
 
-	var fvmOptions []fvm.Option
+	fvmOptions := []fvm.Option{
+		fvm.WithCadenceVMEnabled(useVM),
+	}
 
 	if spanExporter != nil {
 
@@ -455,8 +457,6 @@ func RunTransaction(
 	debugger := debug.NewRemoteDebugger(
 		chain,
 		log,
-		useVM,
-		useVM,
 		fvmOptions...,
 	)
 

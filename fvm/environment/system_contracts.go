@@ -15,8 +15,8 @@ import (
 // SystemContracts provides methods for invoking system contract functions as
 // service account.
 type SystemContracts struct {
-	chain flow.Chain
-
+	chain   flow.Chain
+	useVM   bool
 	tracer  tracing.TracerSpan
 	logger  *ProgramLogger
 	runtime *Runtime
@@ -24,12 +24,14 @@ type SystemContracts struct {
 
 func NewSystemContracts(
 	chain flow.Chain,
+	useVM bool,
 	tracer tracing.TracerSpan,
 	logger *ProgramLogger,
 	runtime *Runtime,
 ) *SystemContracts {
 	return &SystemContracts{
 		chain:   chain,
+		useVM:   useVM,
 		tracer:  tracer,
 		logger:  logger,
 		runtime: runtime,
@@ -44,9 +46,8 @@ func (sys *SystemContracts) Invoke(
 	error,
 ) {
 	contractLocation := common.AddressLocation{
-		Address: common.MustBytesToAddress(
-			spec.AddressFromChain(sys.chain).Bytes()),
-		Name: spec.LocationName,
+		Address: common.Address(spec.AddressFromChain(sys.chain)),
+		Name:    spec.LocationName,
 	}
 
 	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)
@@ -64,7 +65,7 @@ func (sys *SystemContracts) Invoke(
 		spec.FunctionName,
 		arguments,
 		spec.ArgumentTypes,
-		spec.UseVM,
+		sys.useVM,
 	)
 	if err != nil {
 		log := sys.logger.Logger()
@@ -104,7 +105,6 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
-	UseVM: true,
 }
 
 // CheckPayerBalanceAndGetMaxTxFees executes the verifyPayersBalanceForTransactionExecution
@@ -121,7 +121,7 @@ func (sys *SystemContracts) CheckPayerBalanceAndGetMaxTxFees(
 	return sys.Invoke(
 		verifyPayersBalanceForTransactionExecutionSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(payer.Bytes()),
+			cadence.Address(payer),
 			cadence.UFix64(inclusionEffort),
 			cadence.UFix64(maxExecutionEffort),
 		},
@@ -146,7 +146,6 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
-	UseVM: true,
 }
 
 // DeductTransactionFees executes the fee deduction function
@@ -159,7 +158,7 @@ func (sys *SystemContracts) DeductTransactionFees(
 	return sys.Invoke(
 		deductTransactionFeeSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(payer.Bytes()),
+			cadence.Address(payer),
 			cadence.UFix64(inclusionEffort),
 			cadence.UFix64(executionEffort),
 		},
@@ -206,8 +205,8 @@ func (sys *SystemContracts) SetupNewAccount(
 	return sys.Invoke(
 		setupNewAccountSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(flowAddress.Bytes()),
-			cadence.BytesToAddress(payer.Bytes()),
+			cadence.Address(flowAddress),
+			cadence.Address(payer),
 		},
 	)
 }
@@ -229,7 +228,7 @@ func (sys *SystemContracts) AccountAvailableBalance(
 	return sys.Invoke(
 		accountAvailableBalanceSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
+			cadence.Address(address),
 		},
 	)
 }
@@ -255,7 +254,7 @@ func (sys *SystemContracts) AccountBalance(
 	return sys.Invoke(
 		accountBalanceSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
+			cadence.Address(address),
 		},
 	)
 }
@@ -277,7 +276,7 @@ func (sys *SystemContracts) AccountStorageCapacity(
 	return sys.Invoke(
 		accountStorageCapacitySpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
+			cadence.Address(address),
 		},
 	)
 }
@@ -290,7 +289,7 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
 	for i, address := range addresses {
-		arrayValues[i] = cadence.BytesToAddress(address.Bytes())
+		arrayValues[i] = cadence.Address(address)
 	}
 
 	return sys.Invoke(
@@ -307,11 +306,10 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 				sema.TheAddressType,
 				sema.UFix64Type,
 			},
-			UseVM: true,
 		},
 		[]cadence.Value{
 			cadence.NewArray(arrayValues),
-			cadence.BytesToAddress(payer.Bytes()),
+			cadence.Address(payer),
 			cadence.UFix64(maxTxFees),
 		},
 	)

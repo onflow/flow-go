@@ -300,7 +300,7 @@ func (s *BackendBlocksSuite) setupBlockStatusesForTestCases(baseTests []testType
 // Parameters:
 //   - blockStatus: The status of the blocks being tracked (Sealed or Finalized).
 //   - highestHeader: The highest header that the block tracker should report.
-func (s *BackendBlocksSuite) setupBlockTrackerMock(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
+func (s *BackendBlocksSuite) setupBlockTrackerMock(highestHeader *flow.Header) {
 	s.snapshot.On("Head").Unset()
 	s.snapshot.On("Head").Return(highestHeader, nil)
 	err := s.blockTracker.ProcessOnFinalizedBlock()
@@ -377,7 +377,7 @@ func (s *BackendBlocksSuite) subscribe(
 				// add "backfill" block - blocks that are already in the database before the test starts
 				// this simulates a subscription on a past block
 				if test.highestBackfill > 0 {
-					s.setupBlockTrackerMock(test.blockStatus, s.blocksArray[test.highestBackfill].ToHeader())
+					s.setupBlockTrackerMock(s.blocksArray[test.highestBackfill].ToHeader())
 				}
 
 				subCtx, subCancel := context.WithCancel(context.Background())
@@ -395,7 +395,7 @@ func (s *BackendBlocksSuite) subscribe(
 					// simulate new block received.
 					// all blocks with index <= highestBackfill were already received
 					if i > test.highestBackfill {
-						s.setupBlockTrackerMock(test.blockStatus, b.ToHeader())
+						s.setupBlockTrackerMock(b.ToHeader())
 
 						broadcaster.Publish()
 					}

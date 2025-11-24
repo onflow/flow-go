@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -91,6 +92,8 @@ type EnvironmentParams struct {
 	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
 	ServiceAccountEnabled bool
 
+	CadenceVMEnabled bool
+
 	RuntimeParams
 
 	ProgramLoggerParams
@@ -112,6 +115,7 @@ func DefaultEnvironmentParams() EnvironmentParams {
 	return EnvironmentParams{
 		Chain:                    chainID.Chain(),
 		ServiceAccountEnabled:    true,
+		CadenceVMEnabled:         cadence_vm.DefaultEnabled,
 		RuntimeParams:            DefaultRuntimeParams(),
 		ProgramLoggerParams:      DefaultProgramLoggerParams(),
 		EventEmitterParams:       DefaultEventEmitterParams(),
