@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -678,7 +679,7 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 //	input:  "code = NotFound desc = data not found for header: failed to find header by ID: could not lookup block id by height 1"
 //	output: typeName="header", errorStr="failed to find header by ID: could not lookup block id by height 1", ok=true
 func splitNotFoundError(original string) (string, string, bool) {
-	// Use the existing split helper
+	// isolate everything after the DataNotFoundPrefix.
 	afterPrefix, found := splitOnPrefix(original, access.DataNotFoundPrefix)
 	if !found {
 		return "", "", false
@@ -689,22 +690,24 @@ func splitNotFoundError(original string) (string, string, bool) {
 		return "", "", false
 	}
 
-	// Extract the first word (type name)
-	fields := strings.Fields(remaining)
-	if len(fields) == 0 {
+	// Regex to capture:
+	//   1. Type name: any characters until a colon
+	//   2. The rest of the error message after the colon
+	re := regexp.MustCompile(`^(.+?):\s*(.*)$`)
+
+	matches := re.FindStringSubmatch(remaining)
+	if len(matches) != 3 {
 		return "", "", false
 	}
 
-	typeName := strings.TrimSuffix(fields[0], ":")
+	typeName := strings.TrimSpace(matches[1])
+	errStr := strings.TrimSpace(matches[2])
 
-	// Now use splitOnPrefix again with "prefix + typeName" to get sourceErrStr
-	fullPrefix := fmt.Sprintf("%s %s:", access.DataNotFoundPrefix, typeName)
-	if errStr, ok2 := splitOnPrefix(original, fullPrefix); ok2 {
-		sourceErrStr := strings.TrimSpace(errStr)
-		return typeName, sourceErrStr, true
+	if typeName == "" || errStr == "" {
+		return "", "", false
 	}
 
-	return "", "", false
+	return typeName, errStr, true
 }
 
 // executionStateQuery constructs an ExecutionStateQuery protobuf message from

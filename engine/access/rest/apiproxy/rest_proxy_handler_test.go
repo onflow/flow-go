@@ -169,3 +169,113 @@ func TestConvertError_Irrecoverable(t *testing.T) {
 		})
 	}
 }
+
+// TestSplitNotFoundError tests the splitNotFoundError function, which extracts
+// the type name and the cleaned error message from an error string that starts
+// with a defined access.DataNotFoundPrefix.
+//
+// Test cases:
+// Happy cases (ok=true):
+//
+//  1. Single-word type:
+//     Input:  "data not found for header: failed to load header"
+//     Output: typeName="header", errorStr="failed to load header", ok=true
+//
+//  2. Multi-word type:
+//     Input:  "data not found for execution result snapshot: missing root hash"
+//     Output: typeName="execution result snapshot", errorStr="missing root hash", ok=true
+//
+//  3. Hyphenated type:
+//     Input:  "data not found for block-header info: no header at height 10"
+//     Output: typeName="block-header info", errorStr="no header at height 10", ok=true
+//
+//  4. Nested colons in error message:
+//     Input:  "data not found for account data: failed: could not parse: invalid"
+//     Output: typeName="account data", errorStr="failed: could not parse: invalid", ok=true
+//
+//  5. Whitespace trimming:
+//     Input:  "data not found for   header   :   some error  "
+//     Output: typeName="header value", errorStr="some error", ok=true
+//
+// Error cases (ok=false):
+//
+//  1. Missing prefix:
+//     Input:  "some prefix"
+//     Output: ok=false
+//
+//  2. Prefix but no colon:
+//     Input:  "data not found for header missing colon"
+//     Output: ok=false
+//
+//  3. Only prefix:
+//     Input:  "data not found for "
+//     Output: ok=false
+func TestSplitNotFoundError(t *testing.T) {
+	// Happy cases (ok=true)
+	t.Run("single word type", func(t *testing.T) {
+		input := "data not found for header: failed to load header"
+		typ, errStr, ok := splitNotFoundError(input)
+
+		require.True(t, ok)
+		require.Equal(t, "header", typ)
+		require.Equal(t, "failed to load header", errStr)
+	})
+
+	t.Run("multi-word type", func(t *testing.T) {
+		input := "data not found for execution result snapshot: missing root hash"
+		typ, errStr, ok := splitNotFoundError(input)
+
+		require.True(t, ok)
+		require.Equal(t, "execution result snapshot", typ)
+		require.Equal(t, "missing root hash", errStr)
+	})
+
+	t.Run("hyphenated type", func(t *testing.T) {
+		input := "data not found for block-header info: no header at height 10"
+		typ, errStr, ok := splitNotFoundError(input)
+
+		require.True(t, ok)
+		require.Equal(t, "block-header info", typ)
+		require.Equal(t, "no header at height 10", errStr)
+	})
+
+	t.Run("nested colons in error message", func(t *testing.T) {
+		input := "data not found for account data: failed: could not parse: invalid"
+		typ, errStr, ok := splitNotFoundError(input)
+
+		require.True(t, ok)
+		require.Equal(t, "account data", typ)
+		require.Equal(t, "failed: could not parse: invalid", errStr)
+	})
+
+	t.Run("whitespace trimming", func(t *testing.T) {
+		input := "data not found for   header   :   some error  "
+		typ, errStr, ok := splitNotFoundError(input)
+
+		require.True(t, ok)
+		require.Equal(t, "header", typ)
+		require.Equal(t, "some error", errStr)
+	})
+
+	// Error cases (ok=false)
+	t.Run("missing prefix", func(t *testing.T) {
+		input := "some prefix"
+		_, _, ok := splitNotFoundError(input)
+
+		require.False(t, ok)
+	})
+
+	t.Run("prefix but no colon", func(t *testing.T) {
+		input := "data not found for header missing colon"
+		_, _, ok := splitNotFoundError(input)
+
+		require.False(t, ok)
+	})
+
+	t.Run("only prefix", func(t *testing.T) {
+		input := "data not found for "
+		_, _, ok := splitNotFoundError(input)
+
+		require.False(t, ok)
+	})
+}
