@@ -621,7 +621,7 @@ func TestGetRegisterValues(t *testing.T) {
 			BlockHeight: testHeight + 1,
 		}
 
-		reps, err := h.GetRegisterValues(ctx, req)
+		resp, err := h.GetRegisterValues(ctx, req)
 		require.Nil(t, resp)
 		require.Equal(t, codes.OutOfRange, status.Code(err))
 	})

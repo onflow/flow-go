@@ -204,13 +204,6 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(s.rootBlock.Height).Maybe()
 	s.registers.On("FirstHeight").Return(s.rootBlock.Height).Maybe()
-	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
-		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-			if id == s.registerID {
-				return flow.RegisterValue{}, nil
-			}
-			return nil, storage.ErrNotFound
-		}).Maybe()
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Maybe()
@@ -932,12 +925,16 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
 
+		expectedRegister := flow.RegisterValue("value0")
+		s.registers.On("Get", s.registerID, block.Height).Return(expectedRegister, nil).Once()
+
 		res, resMetadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
 
 		require.NotEmpty(s.T(), res)
 		require.NotEmpty(s.T(), resMetadata)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), metadata, resMetadata)
+		require.Equal(s.T(), []flow.RegisterValue{expectedRegister}, res)
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
@@ -1024,7 +1021,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Once()
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
-		s.registers.On("Get", s.registerID, block.Height).Unset()
+
 		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrHeightNotIndexed).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
@@ -1047,7 +1044,6 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Once()
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
-		s.registers.On("Get", s.registerID, block.Height).Unset()
 		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrNotFound).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
