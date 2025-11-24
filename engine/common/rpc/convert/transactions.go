@@ -10,10 +10,21 @@ import (
 
 // TransactionToMessage converts a flow.TransactionBody to a protobuf message
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
-	proposalKeyMessage := &entities.Transaction_ProposalKey{
-		Address:        tb.ProposalKey.Address.Bytes(),
-		KeyId:          uint32(tb.ProposalKey.KeyIndex),
-		SequenceNumber: tb.ProposalKey.SequenceNumber,
+	// Note: system and scheduled transactions have nil/empty values for some fields. This method
+	// intentionally uses unset values for these fields to ensure that encoding and decoding a system
+	// or scheduled transaction results in the same transaction body.
+	var proposalKeyMessage *entities.Transaction_ProposalKey
+	if tb.ProposalKey.Address != flow.EmptyAddress {
+		proposalKeyMessage = &entities.Transaction_ProposalKey{
+			Address:        tb.ProposalKey.Address.Bytes(),
+			KeyId:          uint32(tb.ProposalKey.KeyIndex),
+			SequenceNumber: tb.ProposalKey.SequenceNumber,
+		}
+	}
+
+	var payer []byte
+	if tb.Payer != flow.EmptyAddress {
+		payer = tb.Payer.Bytes()
 	}
 
 	authMessages := make([][]byte, len(tb.Authorizers))
@@ -22,7 +33,6 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 
 	payloadSigMessages := make([]*entities.Transaction_Signature, len(tb.PayloadSignatures))
-
 	for i, sig := range tb.PayloadSignatures {
 		payloadSigMessages[i] = &entities.Transaction_Signature{
 			Address:       sig.Address.Bytes(),
@@ -33,7 +43,6 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 
 	envelopeSigMessages := make([]*entities.Transaction_Signature, len(tb.EnvelopeSignatures))
-
 	for i, sig := range tb.EnvelopeSignatures {
 		envelopeSigMessages[i] = &entities.Transaction_Signature{
 			Address:       sig.Address.Bytes(),
@@ -49,7 +58,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 		ReferenceBlockId:   tb.ReferenceBlockID[:],
 		GasLimit:           tb.GasLimit,
 		ProposalKey:        proposalKeyMessage,
-		Payer:              tb.Payer.Bytes(),
+		Payer:              payer,
 		Authorizers:        authMessages,
 		PayloadSignatures:  payloadSigMessages,
 		EnvelopeSignatures: envelopeSigMessages,
@@ -68,43 +77,43 @@ func MessageToTransaction(
 	tb := flow.NewTransactionBodyBuilder()
 
 	proposalKey := m.GetProposalKey()
-	if proposalKey != nil {
+	if proposalKey != nil && IsNonEmptyAddress(proposalKey.GetAddress()) {
 		proposalAddress, err := Address(proposalKey.GetAddress(), chain)
 		if err != nil {
-			return t, err
+			return t, fmt.Errorf("could not convert proposer address: %w", err)
 		}
 		tb.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
-	if payer != nil {
+	if payer != nil && IsNonEmptyAddress(payer) {
 		payerAddress, err := Address(payer, chain)
 		if err != nil {
-			return t, err
+			return t, fmt.Errorf("could not convert payer address: %w", err)
 		}
 		tb.SetPayer(payerAddress)
 	}
 
-	for _, authorizer := range m.GetAuthorizers() {
+	for i, authorizer := range m.GetAuthorizers() {
 		authorizerAddress, err := Address(authorizer, chain)
 		if err != nil {
-			return t, err
+			return t, fmt.Errorf("could not convert authorizer %d address: %w", i, err)
 		}
 		tb.AddAuthorizer(authorizerAddress)
 	}
 
-	for _, sig := range m.GetPayloadSignatures() {
+	for i, sig := range m.GetPayloadSignatures() {
 		addr, err := Address(sig.GetAddress(), chain)
 		if err != nil {
-			return t, err
+			return t, fmt.Errorf("could not convert payload signature %d address: %w", i, err)
 		}
 		tb.AddPayloadSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}
 
-	for _, sig := range m.GetEnvelopeSignatures() {
+	for i, sig := range m.GetEnvelopeSignatures() {
 		addr, err := Address(sig.GetAddress(), chain)
 		if err != nil {
-			return t, err
+			return t, fmt.Errorf("could not convert envelope signature %d address: %w", i, err)
 		}
 		tb.AddEnvelopeSignatureWithExtensionData(addr, sig.GetKeyId(), sig.GetSignature(), sig.GetExtensionData())
 	}

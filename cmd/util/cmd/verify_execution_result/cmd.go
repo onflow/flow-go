@@ -16,15 +16,15 @@ import (
 )
 
 var (
-	flagLastK                     uint64
-	flagDatadir                   string
-	flagChunkDataPackDir          string
-	flagChain                     string
-	flagFromTo                    string
-	flagWorkerCount               uint // number of workers to verify the blocks concurrently
-	flagStopOnMismatch            bool
-	flagTransactionFeesDisabled   bool
-	flagScheduledCallbacksEnabled bool
+	flagLastK                        uint64
+	flagDatadir                      string
+	flagChunkDataPackDir             string
+	flagChain                        string
+	flagFromTo                       string
+	flagWorkerCount                  uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch               bool
+	flagTransactionFeesDisabled      bool
+	flagScheduledTransactionsEnabled bool
 )
 
 // # verify the last 100 sealed blocks
@@ -60,7 +60,7 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
-	Cmd.Flags().BoolVar(&flagScheduledCallbacksEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledCallbacksEnabled, "enable scheduled callbacks")
+	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
 }
 
 func run(*cobra.Command, []string) {
@@ -106,7 +106,7 @@ func run(*cobra.Command, []string) {
 			flagWorkerCount,
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
-			flagScheduledCallbacksEnabled,
+			flagScheduledTransactionsEnabled,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
@@ -123,7 +123,7 @@ func run(*cobra.Command, []string) {
 			flagWorkerCount,
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
-			flagScheduledCallbacksEnabled,
+			flagScheduledTransactionsEnabled,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")

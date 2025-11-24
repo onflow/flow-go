@@ -15,13 +15,13 @@ import (
 //   - This function is intended to be called exactly once during bootstrapping.
 //     Overwrites are prevented by an explicit existence check; if data is already present, error is returned.
 //   - To guarantee atomicity of existence-check plus database write, we require the caller to acquire
-//     the [storage.LockBootstrapping] lock and hold it until the database write has been committed.
+//     the [storage.LockInsertInstanceParams] lock and hold it until the database write has been committed.
 //
 // Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if instance params have already been stored.
 func InsertInstanceParams(lctx lockctx.Proof, rw storage.ReaderBatchWriter, params flow.VersionedInstanceParams) error {
-	if !lctx.HoldsLock(storage.LockBootstrapping) {
-		return fmt.Errorf("missing required lock: %s", storage.LockBootstrapping)
+	if !lctx.HoldsLock(storage.LockInsertInstanceParams) {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertInstanceParams)
 	}
 	key := MakePrefix(codeInstanceParams)
 	exist, err := KeyExists(rw.GlobalReader(), key)

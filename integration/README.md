@@ -49,6 +49,59 @@ Into:
 nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(conID))
 ```
 
+### Debugging a single integration test with Loki
+
+When debugging a specific test case, you can forward test logs to Loki for querying and analysis in Grafana. This allows you to search, filter, and analyze logs more effectively than scrolling through terminal output.
+
+**Prerequisites:**
+- Docker must be running
+- Loki and Grafana services (see step 3 below)
+
+**Steps:**
+
+1. **Build the ghost image** (only needed once):
+   ```bash
+   make docker-native-build-ghost
+   ```
+
+2. **Build the flow images** (required whenever node code changes):
+   ```bash
+   make docker-native-build-flow
+   ```
+   Note: You can rebuild only specific node types if needed (e.g., `make docker-native-build-consensus`).
+
+3. **Start the local metrics server** to enable log querying through Loki:
+   ```bash
+   cd integration/localnet
+   make start-metrics
+   ```
+   This starts Loki, Grafana, Prometheus, and other observability services. Access Grafana at http://localhost:3000.
+
+4. **Run a specific test case** with logs forwarded to Loki:
+   ```bash
+   cd integration
+   go test -failfast ./tests/verification/ --run=TestHappyPath/TestSealingAndVerificationHappyPath -v | ./scripts/send-to-loki.sh
+   ```
+   Replace the test path and name with your specific test. The `send-to-loki.sh` script pipes test output to Loki while still displaying it in your terminal.
+
+   **Note:** You can rerun integration tests without rebuilding images (step 2), but you must clean up containers (step 5) before rerunning tests.
+
+5. **View logs in Grafana:**
+   - Open http://localhost:3000
+   - Go to Explore (compass icon in left sidebar)
+   - Select "Loki" as the data source
+   - Query logs: `{job="go-test"}` or filter by test name: `{job="go-test", test="TestName"}`
+
+6. **Clean up and stop all containers** before rerunning tests:
+   ```bash
+   docker ps -aq | xargs -r docker stop | xargs -r docker rm
+   ```
+   Alternatively, you can use `cd integration/localnet && make stop` to stop the localnet containers.
+
+**Tips:**
+- To change access node log level, modify the test file's `SetupTest()` or `SetupSuite()` method and change `testnet.WithLogLevel(zerolog.FatalLevel)` to `testnet.WithLogLevel(zerolog.InfoLevel)` for the access node configuration.
+- See `integration/scripts/README-loki.md` and `integration/scripts/LOKI-FILTERING.md` for more details on using Loki and filtering logs.
+
 ### Ghost node
 You might notice that we introduced a node type called Ghost node in the integration tests.
 

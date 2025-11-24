@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
@@ -34,7 +35,7 @@ func TestView(t *testing.T) {
 						blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
 						require.NoError(t, err)
 
-						maxCallGasLimit := uint64(5_000_000)
+						maxCallGasLimit := params.MaxTxGas + 10_000_000
 						view := query.NewView(
 							chainID,
 							rootAddr,
@@ -120,7 +121,20 @@ func TestView(t *testing.T) {
 						require.NoError(t, res.ValidationError)
 						require.NoError(t, res.VMError)
 
-						// test max gas limit
+						// test we can go above the EIP-7825 max tx gas
+						_, err = view.DryCall(
+							testAccount.Address().ToCommon(),
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t,
+								"store",
+								big.NewInt(2),
+							),
+							big.NewInt(0),
+							params.MaxTxGas+1_000,
+						)
+						require.NoError(t, err)
+
+						// test we cannot go above the configured `maxCallGasLimit`
 						_, err = view.DryCall(
 							testAccount.Address().ToCommon(),
 							testContract.DeployedAt.ToCommon(),
@@ -135,7 +149,7 @@ func TestView(t *testing.T) {
 						require.ErrorContains(
 							t,
 							err,
-							"gas limit is bigger than max gas limit allowed 5000001 > 5000000",
+							"gas limit is bigger than max gas limit allowed 26777217 > 26777216",
 						)
 					})
 				})

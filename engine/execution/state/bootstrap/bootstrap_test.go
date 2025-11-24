@@ -59,8 +59,8 @@ func TestBootstrapLedger(t *testing.T) {
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 	expectedStateCommitmentBytes, _ := hex.DecodeString(ifCompile(
-		"3ee915c0ecaf1399d00cc6a768517aa074139ca07045d4e63a1745fc81e1bdf0",
-		"bec4478e1b3aa1fd822c796411e69bd85ef9529b9ef93e231d4b02470d49b4f0",
+		"114c3c6747c0ecdb6f1aaba9278e261e2883d40c0ec917aacc53a6bfaca4c28f",
+		"d04e95da9811e985c5bf6a8f956ab3571ebf7bd4f15bf36098875b0e51e72906",
 	))
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
@@ -117,8 +117,8 @@ func ifCompile[T any](a, b T) T {
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 	expectedStateCommitmentBytes, _ := hex.DecodeString(
 		ifCompile(
-			"505aa62b494f262df6830b4ace90ee35d5e4574155db4361eff5e97ae4377d31",
-			"b21c4cea6518d92c34d2eeff1a02f7e1b7b75f9c0e0e52069905bb728361d039",
+			"26c1eb39af9ba9708b49d1149d9fb7ee2a5ab870793c67da0b4bd7c48f0cca33",
+			"88d0c00ff69668ef8e049f811b13750d4cd75cda2be6ecd3e6dcf3685e28c4e4",
 		),
 	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)

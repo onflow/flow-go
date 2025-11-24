@@ -135,7 +135,8 @@ const (
 )
 
 func init() {
-	testingdock.Verbose = true
+	// Set to true to turn on logs from docker containers (logs will be prefixed with "DOCK:")
+	testingdock.Verbose = false
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.

@@ -101,15 +101,14 @@ func paddedDomainTag(s string) [DomainTagLength]byte {
 }
 
 // EstimatedComputationPerMillisecond is the approximate number of computation units that can be performed in a millisecond.
-// this was calibrated during the Variable Transaction Fees: Execution Effort FLIP https://github.com/onflow/flow/pull/753.
-// Updated after the FLIP:
-// https://github.com/onflow/flips/blob/14c5ec4/governance/20240508-computation-limit-hike.md#flip-267-increasing-the-transaction-computation-limit
-const EstimatedComputationPerMillisecond = 9999.0 / 1000.0
+// this was calibrated during the FLIP 346: Variable Transaction Fees - Execution Effort II. https://github.com/onflow/flips/pull/347.
+const EstimatedComputationPerMillisecond = 9999.0 / 333.4118
 
 // NormalizedExecutionTimePerComputationUnit returns the normalized time per computation unit
-// If the computation estimation is correct (as per the FLIP https://github.com/onflow/flow/pull/753) the value should be 1.
+// If the computation estimation is correct (as per the FLIP https://github.com/onflow/flips/pull/347) the value should be 1.
 // If the value is greater than 1, the computation estimation is too low; we are underestimating transaction complexity (and thus undercharging).
 // If the value is less than 1, the computation estimation is too high; we are overestimating transaction complexity (and thus overcharging).
+// This is only used for metrics reporting
 func NormalizedExecutionTimePerComputationUnit(execTime time.Duration, computationUsed uint64) float64 {
 	if computationUsed == 0 {
 		return 0

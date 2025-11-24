@@ -16,6 +16,7 @@ type TransactionProvider interface {
 		ctx context.Context,
 		header *flow.Header,
 		txID flow.Identifier,
+		collectionID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.TransactionResult, error)
 
@@ -23,6 +24,7 @@ type TransactionProvider interface {
 		ctx context.Context,
 		block *flow.Block,
 		index uint32,
+		collectionID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.TransactionResult, error)
 
@@ -37,16 +39,8 @@ type TransactionProvider interface {
 		block *flow.Block,
 	) ([]*flow.TransactionBody, error)
 
-	SystemTransaction(
+	ScheduledTransactionsByBlockID(
 		ctx context.Context,
-		block *flow.Block,
-		txID flow.Identifier,
-	) (*flow.TransactionBody, error)
-
-	SystemTransactionResult(
-		ctx context.Context,
-		block *flow.Block,
-		txID flow.Identifier,
-		requiredEventEncodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
+		header *flow.Header,
+	) ([]*flow.TransactionBody, error)
 }

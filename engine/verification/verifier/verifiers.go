@@ -40,7 +40,7 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
 		lockManager,
@@ -48,7 +48,7 @@ func VerifyLastKHeight(
 		protocolDataDir,
 		chunkDataPackDir,
 		transactionFeesDisabled,
-		scheduledCallbacksEnabled,
+		scheduledTransactionsEnabled,
 	)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
@@ -104,7 +104,7 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
 		lockManager,
@@ -112,7 +112,7 @@ func VerifyRange(
 		protocolDataDir,
 		chunkDataPackDir,
 		transactionFeesDisabled,
-		scheduledCallbacksEnabled,
+		scheduledTransactionsEnabled,
 	)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
@@ -242,7 +242,7 @@ func initStorages(
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (
 	func() error,
 	*store.All,
@@ -277,7 +277,7 @@ func initStorages(
 		chainID,
 		storages.Headers,
 		transactionFeesDisabled,
-		scheduledCallbacksEnabled,
+		scheduledTransactionsEnabled,
 	)
 
 	closer := func() error {
@@ -357,7 +357,7 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -377,7 +377,7 @@ func makeVerifier(
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			scheduledCallbacksEnabled,
+			scheduledTransactionsEnabled,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)
