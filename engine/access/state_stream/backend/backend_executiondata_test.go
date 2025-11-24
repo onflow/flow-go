@@ -958,7 +958,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.Nil(s.T(), res)
 		require.Nil(s.T(), metadata)
 		require.Error(s.T(), err)
-		require.True(s.T(), common.IsInsufficientExecutionReceipts(err))
+		require.True(s.T(), access.IsDataNotFoundError(err))
 	})
 
 	s.Run("returns error if failed to get execution result info for block - not found", func() {
@@ -1140,7 +1140,6 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Once()
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
-		s.registers.On("Get", s.registerID, block.Height).Unset()
 		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrNotFound).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
@@ -1169,7 +1168,6 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedErr)
 		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
 
-		s.registers.On("Get", s.registerID, block.Height).Unset()
 		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrDataMismatch).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(ctxIrr, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)

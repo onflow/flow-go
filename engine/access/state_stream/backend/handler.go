@@ -447,6 +447,10 @@ func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid register IDs provided.
+// - codes.Internal - if failed to get register values data.
 func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
 	// Convert data
 	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds(), h.chain)
@@ -457,7 +461,6 @@ func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.
 	executionState := request.GetExecutionStateQuery()
 
 	// get payload from store
-
 	values, executorMetadata, err := h.api.GetRegisterValues(ctx, registerIDs, request.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, rpc.ConvertError(err, "could not get register values", codes.Internal)
