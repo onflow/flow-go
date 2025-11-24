@@ -115,6 +115,9 @@ func NewFetcher(
 		metrics.MissingCollectionQueueSize(f.blockProcessor.MissingCollectionQueueSize())
 	})
 
+	// report the initial metrics, otherwise it creates spikes in dashboard
+	metrics.CollectionFetchedHeight(f.ProcessedHeight())
+
 	return f, nil
 }
 

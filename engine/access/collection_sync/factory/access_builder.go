@@ -183,6 +183,9 @@ func CreateExecutionDataProcessorComponent(
 	// Register with ProgressReader
 	lastFullBlockHeight.SetExecutionDataProcessor(executionDataProcessor)
 
+	// Initialize collection synced height metric to avoid spikes in dashboard
+	collectionSyncMetrics.CollectionSyncedHeight(executionDataProcessor.ProcessedHeight())
+
 	distributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
 		executionDataProcessor.OnNewExectuionData()
 	})
