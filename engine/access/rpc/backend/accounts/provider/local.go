@@ -49,7 +49,6 @@ func NewLocalAccountProvider(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -94,7 +93,6 @@ func (l *LocalAccountProvider) GetAccountAtBlock(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -141,7 +139,6 @@ func (l *LocalAccountProvider) GetAccountBalanceAtBlock(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -189,7 +186,6 @@ func (l *LocalAccountProvider) GetAccountKeyAtBlock(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -235,7 +231,6 @@ func (l *LocalAccountProvider) GetAccountKeysAtBlock(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data for the requested height is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.RequestCanceledError]: If the request is canceled.
@@ -262,8 +257,6 @@ func convertAccountError(err error) error {
 			return access.NewDataNotFoundError("account", err)
 		case fvmerrors.ErrCodeAccountPublicKeyNotFoundError:
 			return access.NewDataNotFoundError("account public key", err)
-		case fvmerrors.ErrCodeComputationLimitExceededError:
-			return access.NewResourceExhausted(err)
 		default:
 			// runtime errors
 			return access.NewInvalidRequestError(err)

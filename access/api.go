@@ -21,7 +21,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -38,7 +37,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -54,7 +52,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -70,7 +67,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -86,7 +82,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -103,7 +98,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -119,7 +113,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -135,7 +128,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -151,7 +143,6 @@ type AccountsAPI interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-	//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 	//   - [access.DataNotFoundError]: If data is not found.
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.

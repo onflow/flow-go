@@ -526,7 +526,6 @@ func (h *Handler) GetTransactionResultByIndex(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -574,7 +573,6 @@ func (h *Handler) GetAccount(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -622,7 +620,6 @@ func (h *Handler) GetAccountAtLatestBlock(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -670,7 +667,6 @@ func (h *Handler) GetAccountAtBlockHeight(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -713,7 +709,6 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -756,7 +751,6 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -804,7 +798,6 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -858,7 +851,6 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
@@ -912,7 +904,6 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 //
 // Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If the request contains invalid arguments.
-//   - [codes.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [codes.NotFound]: If the requested data is not available.
 //   - [codes.OutOfRange]: If the requested data is outside the available range.
 //   - [codes.FailedPrecondition]: If data for the requested block is not yet available.

@@ -203,7 +203,6 @@ func (r *RestProxyHandler) GetTransactionResult(
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError]: If the request contains invalid arguments.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
 //   - [access.OutOfRangeError]: If the requested data is outside the available range.
 //   - [access.PreconditionFailedError]: If the data for the block is unavailable.
@@ -250,7 +249,6 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError]: If the request contains invalid arguments.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
 //   - [access.OutOfRangeError]: If the requested data is outside the available range.
 //   - [access.PreconditionFailedError]: If the data for the block is unavailable.
@@ -292,7 +290,6 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, a
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError]: If the request contains invalid arguments.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
 //   - [access.OutOfRangeError]: If the requested data is outside the available range.
 //   - [access.PreconditionFailedError]: If the data for the block is unavailable.
@@ -343,7 +340,6 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError]: If the request contains invalid arguments.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
 //   - [access.OutOfRangeError]: If the requested data is outside the available range.
 //   - [access.PreconditionFailedError]: If the data for the block is unavailable.
@@ -396,7 +392,6 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError]: If the request had invalid arguments.
-//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
 //   - [access.DataNotFoundError]: If data required to process the request is not available.
 //   - [access.OutOfRangeError]: If the requested data is outside the available range.
 //   - [access.PreconditionFailedError]: If data for block is not available.

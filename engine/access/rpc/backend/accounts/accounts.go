@@ -82,7 +82,6 @@ func NewAccountsBackend(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -102,7 +101,6 @@ func (a *Accounts) GetAccount(ctx context.Context, address flow.Address, criteri
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -152,7 +150,6 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -207,7 +204,6 @@ func (a *Accounts) GetAccountAtBlockHeight(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -258,7 +254,6 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -313,7 +308,6 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -368,7 +362,6 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -424,7 +417,6 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
@@ -478,7 +470,6 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 //
 // Expected error returns during normal operation:
 //   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
 //   - [access.DataNotFoundError]: If data is not found.
 //   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 //   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
