@@ -58,12 +58,12 @@ func NewENScriptExecutor(
 // Execute executes the provided script at the requested block.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [access.DataNotFoundError] - if the requested block has not been executed or has been pruned by the node.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - if an internal execution node failure occurs.
+//   - [access.InvalidRequestError]: If the script execution failed due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If the requested block has not been executed or has been pruned by the node.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError]: If an internal execution node failure occurs.
 func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	var result []byte
@@ -113,7 +113,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 		case codes.InvalidArgument:
 			return nil, nil, access.NewInvalidRequestError(errToReturn)
 		case codes.NotFound:
-			return nil, nil, access.NewDataNotFoundError("block", err)
+			return nil, nil, access.NewDataNotFoundError("block", errToReturn)
 		case codes.Internal:
 			return nil, nil, access.NewInternalError(errToReturn)
 		case codes.Unavailable:
@@ -134,8 +134,8 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
 //
 // Expected error returns during normal operation:
-//   - [codes.Unavailable] - if a connection to an execution node could not be established.
-//   - [status.Error] - if the execution node returned a gRPC error.
+//   - [codes.Unavailable]: If a connection to an execution node could not be established.
+//   - [status.Error]: If the execution node returned a gRPC error.
 func (e *ENScriptExecutor) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,

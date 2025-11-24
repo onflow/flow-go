@@ -61,7 +61,7 @@ func (s *Mock) TransactionResultErrorMessages() storage.TransactionResultErrorMe
 // Registers returns a reader for querying register data.
 //
 // Expected error returns during normal operation:
-//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
+//   - [indexer.ErrIndexNotInitialized]: If the storage is still bootstrapping.
 func (s *Mock) Registers() (storage.RegisterSnapshotReader, error) {
 	return s.registersAsyncStore.RegisterSnapshotReader()
 }

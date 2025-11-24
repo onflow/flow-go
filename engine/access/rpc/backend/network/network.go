@@ -1,4 +1,4 @@
-package backend
+package network
 
 import (
 	"context"
@@ -13,17 +13,33 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type backendNetwork struct {
+// Network provides network-related information and protocol state snapshots.
+type Network struct {
 	state                protocol.State
 	chainID              flow.ChainID
 	headers              storage.Headers
 	snapshotHistoryLimit int
 }
 
+// NewNetwork creates a new Network instance.
+func NewNetwork(
+	state protocol.State,
+	chainID flow.ChainID,
+	headers storage.Headers,
+	snapshotHistoryLimit int,
+) *Network {
+	return &Network{
+		state:                state,
+		chainID:              chainID,
+		headers:              headers,
+		snapshotHistoryLimit: snapshotHistoryLimit,
+	}
+}
+
 // GetNetworkParameters returns the network parameters for the current network.
-func (b *backendNetwork) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
+func (n *Network) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
 	return accessmodel.NetworkParameters{
-		ChainID: b.chainID,
+		ChainID: n.chainID,
 	}
 }
 
@@ -33,8 +49,8 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) accessmodel.Net
 // As documented in the [access.API], which we partially implement with this function
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
-func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error) {
-	snapshot := b.state.Final()
+func (n *Network) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error) {
+	snapshot := n.state.Final()
 	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, protocol.ErrSealingSegmentBelowRootBlock, protocol.NewUnfinalizedSealingSegmentErrorf(""))
@@ -53,11 +69,11 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError - No block with the given ID was found
-//   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
-//   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
-func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
-	snapshot := b.state.AtBlockID(blockID)
+//   - [access.DataNotFoundError]: No block with the given ID was found.
+//   - [access.InvalidRequestError]: Block ID is for an orphaned block and will never have a valid snapshot.
+//   - [access.PreconditionFailedError]: A block was found, but it is not finalized and is above the finalized height.
+func (n *Network) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
+	snapshot := n.state.AtBlockID(blockID)
 	snapshotHeadByBlockId, err := snapshot.Head()
 	if err != nil {
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
@@ -69,7 +85,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 	// Because there is no index from block ID to finalized height, we separately look up the finalized
 	// block ID by the height of the queried block, then compare the queried ID to the finalized ID.
 	// If they match, then the queried block must be finalized.
-	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(snapshotHeadByBlockId.Height)
+	blockIDFinalizedAtHeight, err := n.headers.BlockIDByHeight(snapshotHeadByBlockId.Height)
 	if err != nil {
 		// assert that the error is storage.ErrNotFound. we can ignore the actual error since it is rewritten below
 		_ = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
@@ -104,9 +120,9 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - access.DataNotFoundError - No finalized block with the given height was found.
-func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error) {
-	snapshot := b.state.AtHeight(blockHeight)
+//   - [access.DataNotFoundError]: No finalized block with the given height was found.
+func (n *Network) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error) {
+	snapshot := n.state.AtHeight(blockHeight)
 	_, err := snapshot.Head()
 	if err != nil {
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist

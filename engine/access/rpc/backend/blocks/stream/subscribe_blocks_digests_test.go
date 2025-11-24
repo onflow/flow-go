@@ -1,4 +1,4 @@
-package backend
+package stream_test
 
 import (
 	"context"
@@ -85,8 +85,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	backend, err := New(s.backendParams(engine.NewBroadcaster()))
-	s.Require().NoError(err)
+	backend := s.createSubscribeBlocks(engine.NewBroadcaster())
 
 	s.Run("returns error if unknown start block id is provided", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
