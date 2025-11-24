@@ -63,8 +63,8 @@ func (c *CompatibleHeights) SetMaxCompatibleHeight(height uint64) {
 // 2. If version control is enabled, ensures the height is compatible with the node's version beacon.
 //
 // Expected error returns during normal operation:
-//   - [version.ErrOutOfRange] - if incoming block height is higher that last handled block height.
-//   - [execution.ErrIncompatibleNodeVersion] - if the block height is not compatible with the node version.
+//   - [version.ErrOutOfRange]: If incoming block height is higher that last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
 func (c *CompatibleHeights) Check(height uint64) error {
 	if height > c.maxCompatibleHeight.Load() || height < c.minCompatibleHeight.Load() {
 		return ErrIncompatibleNodeVersion

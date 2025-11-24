@@ -52,13 +52,13 @@ func NewLocalScriptExecutor(
 // Execute executes the provided script at the requested block.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.PreconditionFailedError] - if the registers storage is still bootstrapping.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.InvalidRequestError]: If the script execution failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data was not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
 func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	execStartTime := time.Now()
@@ -123,12 +123,12 @@ func (l *LocalScriptExecutor) Execute(ctx context.Context, r *Request, execution
 // convertScriptExecutionError converts script executor and FVM errors to corresponding access-layer sentinel errors.
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - if the script execution failed due to invalid arguments or runtime errors.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data for the requested height was not found.
-//   - [access.OutOfRangeError] - if the data for the requested height is outside the node's available range.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
+//   - [access.InvalidRequestError]: If the script execution failed due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data for the requested height was not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
 func convertScriptExecutionError(err error) error {
 	switch {
 	case errors.Is(err, version.ErrOutOfRange),
