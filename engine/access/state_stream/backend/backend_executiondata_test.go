@@ -931,10 +931,10 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		res, resMetadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
 
 		require.NotEmpty(s.T(), res)
-		require.NotEmpty(s.T(), resMetadata)
-		require.NoError(s.T(), err)
-		require.Equal(s.T(), metadata, resMetadata)
 		require.Equal(s.T(), []flow.RegisterValue{expectedRegister}, res)
+		require.NotEmpty(s.T(), resMetadata)
+		require.Equal(s.T(), metadata, resMetadata)
+		require.NoError(s.T(), err)
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
@@ -945,7 +945,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 
-	s.Run("returns error if failed to get execution result info for block", func() {
+	s.Run("returns error if failed to get execution result info for block - insufficient receipts", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(nil, common.NewInsufficientExecutionReceipts(block.ID(), 0)).Once()
@@ -956,7 +956,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
-	s.Run("returns error if failed to get execution result info for block", func() {
+	s.Run("returns error if failed to get execution result info for block - not found", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(nil, storage.ErrNotFound).Once()
