@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -53,7 +54,9 @@ func NewEngine(
 	state protocol.State,
 	receipts storage.ExecutionReceipts,
 	index storage.Index,
-	core sealing.MatchingCore) (*Engine, error) {
+	core sealing.MatchingCore,
+	registrar hotstuff.FinalizationRegistrar,
+) (*Engine, error) {
 
 	// FIFO queue for execution receipts
 	receiptsQueue, err := fifoqueue.NewFifoQueue(
@@ -96,6 +99,9 @@ func NewEngine(
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+	registrar.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
+
 	return e, nil
 }
 
@@ -129,17 +135,17 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.addReceiptToQueue(r)
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
 // OnBlockIncorporated implements the `OnBlockIncorporated` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
+func (e *Engine) onBlockIncorporated(incorporatedBlock *model.Block) {
 	e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
 	e.blockIncorporatedNotifier.Notify()
 }

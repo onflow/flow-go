@@ -6,6 +6,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -105,6 +106,7 @@ func NewEngine(log zerolog.Logger,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	rootHeader := state.Params().FinalizedRoot()
 
@@ -156,6 +158,10 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not repopulate assignment collectors tree: %w", err)
 	}
 	e.core = core
+
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+
+	registrar.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
 
 	return e, nil
 }
@@ -431,21 +437,21 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	return nil
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // It informs sealing.Core about finalization of respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
-// OnBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
+// onBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
 // It processes all execution results that were incorporated in parent block payload.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
+func (e *Engine) onBlockIncorporated(incorporatedBlock *model.Block) {
 	added := e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
 	if !added {
 		// Not being able to queue an incorporated block is a fatal edge case. It might happen, if the

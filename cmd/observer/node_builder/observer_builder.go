@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -69,6 +70,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -518,14 +520,13 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			builder.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.
-			AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
@@ -551,12 +552,12 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
 			spamConfig,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
-		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return builder.SyncEng, nil
 	})
@@ -1296,13 +1297,12 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Headers,
 				builder.executionDataConfig,
 				execDataDistributor,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
 			}
 			builder.ExecutionDataRequester = r
-
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
 			// to wait for the requester to be ready before starting.
@@ -1438,7 +1438,32 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, fmt.Errorf("could not create derived chain data: %w", err)
 			}
 
+			rootBlockHeight := node.State.Params().FinalizedRoot().Height
+			progress, err := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not create last full block height consumer progress: %w", err)
+			}
+
+			lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
+			if err != nil {
+				return nil, fmt.Errorf("could not create last full block height counter: %w", err)
+			}
+
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
+			collectionIndexer, err := collections.NewIndexer(
+				builder.Logger,
+				builder.ProtocolDB,
+				collectionExecutedMetric,
+				builder.State,
+				builder.Storage.Blocks,
+				builder.Storage.Collections,
+				lastFullBlockHeight,
+				builder.StorageLockMgr,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create collection indexer: %w", err)
+			}
+
 			builder.ExecutionIndexerCore = indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
@@ -1452,6 +1477,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.scheduledTransactions,
 				builder.RootChainID,
 				indexerDerivedChainData,
+				collectionIndexer,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
 			)
@@ -1970,11 +1996,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Transactions:          node.Storage.Transactions,
 			ExecutionReceipts:     node.Storage.Receipts,
 			ExecutionResults:      node.Storage.Results,
+			Seals:                 node.Storage.Seals,
 			ScheduledTransactions: builder.scheduledTransactions,
 			ChainID:               node.RootChainID,
 			AccessMetrics:         accessMetrics,
 			ConnFactory:           connFactory,
-			RetryEnabled:          false,
 			MaxHeightRange:        backendConfig.MaxHeightRange,
 			Log:                   node.Logger,
 			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
@@ -2036,6 +2062,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
 			indexReporter,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, err
@@ -2063,7 +2090,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
 	})
 

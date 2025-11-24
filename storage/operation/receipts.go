@@ -1,6 +1,11 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -10,31 +15,47 @@ import (
 // CAUTION: The caller must ensure receiptID is a collision-resistant hash of the provided
 // [flow.ExecutionReceiptMeta]! This method silently overrides existing data, which is safe only if
 // for the same key, we always write the same value.
+//
+// No error returns are expected during normal operation.
 func InsertExecutionReceiptStub(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return UpsertByKey(w, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
 // RetrieveExecutionReceiptStub retrieves a [flow.ExecutionReceiptStub] by its ID.
 //
-// Expected errors during normal operations:
+// Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if no receipt stub with the specified ID is known.
 func RetrieveExecutionReceiptStub(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return RetrieveByKey(r, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// IndexOwnExecutionReceipt indexes the Execution Node's OWN execution receipt by the executed block ID.
+// IndexMyExecutionReceipt indexes the Execution Node's OWN execution receipt by the executed block ID.
 //
-// CAUTION:
-//   - OVERWRITES existing data (potential for data corruption):
-//     This method silently overrides existing data without any sanity checks whether data for the same key already exits.
-//     Note that the Flow protocol mandates that for a previously persisted key, the data is never changed to a different
-//     value. Changing data could cause the node to publish inconsistent data and to be slashed, or the protocol to be
-//     compromised as a whole. This method does not contain any safeguards to prevent such data corruption. The caller
-//     is responsible to ensure that the DEDUPLICATION CHECK is done elsewhere ATOMICALLY with this write operation.
+// CAUTION: Persisting the receipt if and only if none is already stored for the block, requires an atomic database read and write.
+// Therefore, the caller must acquire [storage.LockInsertMyReceipt] and hold it until the database write has been committed.
 //
-// No errors are expected during normal operation.
-func IndexOwnExecutionReceipt(w storage.Writer, blockID flow.Identifier, receiptID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeOwnBlockReceipt, blockID), receiptID)
+// Error returns:
+//   - [storage.ErrDataMismatch] if a *different* receipt has already been indexed for the same block
+func IndexMyExecutionReceipt(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, receiptID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertMyReceipt) {
+		return fmt.Errorf("cannot index own execution receipt without holding lock %s", storage.LockInsertMyReceipt)
+	}
+
+	key := MakePrefix(codeOwnBlockReceipt, blockID)
+
+	var existing flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		if existing != receiptID {
+			return fmt.Errorf("own execution receipt for block %v already exists with different value, (existing: %v, new: %v), %w", blockID, existing, receiptID, storage.ErrDataMismatch)
+		}
+		return nil // The receipt already exists, no need to index again
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not check existing own execution receipt: %w", err)
+	}
+
+	return UpsertByKey(rw.Writer(), key, receiptID)
 }
 
 // LookupOwnExecutionReceipt retrieves the Execution Node's OWN execution receipt ID for the specified block.

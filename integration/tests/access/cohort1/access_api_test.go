@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/integration/utils"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1175,27 +1176,27 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 	rpcClient := s.an2Client.RPCClient()
 
 	// Deploy the test contract first
-	deployTxID, err := lib.DeployScheduledCallbackTestContract(accessClient, sc)
+	deployTxID, err := lib.DeployScheduledTransactionsTestContract(accessClient, sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
-	// wait for the tx to be sealed before attempting to schedule the callback. this helps make sure
+	// wait for the tx to be sealed before attempting to schedule the transaction. this helps make sure
 	// the proposer's sequence number is updated.
 	_, err = accessClient.WaitForSealed(s.ctx, deployTxID)
 	s.Require().NoError(err)
 
-	// Schedule a callback for 10 seconds in the future. Use a larger wait time to ensure that there
+	// Schedule a transaction for 10 seconds in the future. Use a larger wait time to ensure that there
 	// is enough time to submit the tx even on slower CI machines.
 	futureTimestamp := time.Now().Unix() + int64(10)
 
-	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, accessClient, sc)
-	require.NoError(s.T(), err, "could not schedule callback transaction")
-	s.T().Logf("scheduled callback with ID: %d", callbackID)
+	s.T().Logf("scheduling transaction at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
+	transactionID, err := lib.ScheduleTransactionAtTimestamp(futureTimestamp, accessClient, sc)
+	require.NoError(s.T(), err, "could not schedule transaction")
+	s.T().Logf("scheduled transaction with ID: %d", transactionID)
 
-	// construct the pending execution event using the parameters used by ScheduleCallbackAtTimestamp
+	// construct the pending execution event using the parameters used by ScheduleTransactionAtTimestamp
 	g := fixtures.NewGeneratorSuite()
 	expectedPendingExecutionEvent := g.PendingExecutionEvents().Fixture(
-		fixtures.PendingExecutionEvent.WithID(callbackID),
+		fixtures.PendingExecutionEvent.WithID(transactionID),
 		fixtures.PendingExecutionEvent.WithPriority(0), // high priority
 		fixtures.PendingExecutionEvent.WithExecutionEffort(1000),
 	)
@@ -1207,24 +1208,24 @@ func (s *AccessAPISuite) TestScheduledTransactions() {
 
 	// Block until the API returns the scheduled transaction.
 	require.Eventually(s.T(), func() bool {
-		_, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: callbackID})
+		_, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: transactionID})
 		return err == nil
 	}, 30*time.Second, 500*time.Millisecond)
 
 	// test gRPC endpoints
-	scheduledTxResult := s.testScheduledTransactionsGrpc(callbackID, expectedTx)
+	scheduledTxResult := s.testScheduledTransactionsGrpc(transactionID, expectedTx)
 
 	// test REST endpoints
-	s.testScheduledTransactionsRest(callbackID, expectedTx, scheduledTxResult)
+	s.testScheduledTransactionsRest(transactionID, expectedTx, scheduledTxResult)
 }
 
-func (s *AccessAPISuite) testScheduledTransactionsGrpc(callbackID uint64, expectedTx *flow.TransactionBody) *accessmodel.TransactionResult {
+func (s *AccessAPISuite) testScheduledTransactionsGrpc(transactionID uint64, expectedTx *flow.TransactionBody) *accessmodel.TransactionResult {
 	expectedTxID := expectedTx.ID()
 	rpcClient := s.an2Client.RPCClient()
 
 	// Verify the results of the scheduled transaction and its result.
 	s.Run("GetScheduledTransaction", func() {
-		scheduledTxResponse, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: callbackID})
+		scheduledTxResponse, err := rpcClient.GetScheduledTransaction(s.ctx, &accessproto.GetScheduledTransactionRequest{Id: transactionID})
 		s.Require().NoError(err)
 
 		actual, err := convert.MessageToTransaction(scheduledTxResponse.GetTransaction(), s.net.Root().ChainID.Chain())
@@ -1234,7 +1235,7 @@ func (s *AccessAPISuite) testScheduledTransactionsGrpc(callbackID uint64, expect
 
 	var scheduledTxResult *accessmodel.TransactionResult
 	s.Run("GetScheduledTransactionResult", func() {
-		scheduledTxResultResponse, err := rpcClient.GetScheduledTransactionResult(s.ctx, &accessproto.GetScheduledTransactionResultRequest{Id: callbackID})
+		scheduledTxResultResponse, err := rpcClient.GetScheduledTransactionResult(s.ctx, &accessproto.GetScheduledTransactionResultRequest{Id: transactionID})
 		s.Require().NoError(err)
 
 		actual, err := convert.MessageToTransactionResult(scheduledTxResultResponse)
@@ -1272,7 +1273,7 @@ func (s *AccessAPISuite) testScheduledTransactionsGrpc(callbackID uint64, expect
 	return scheduledTxResult
 }
 
-func (s *AccessAPISuite) testScheduledTransactionsRest(callbackID uint64, expectedTx *flow.TransactionBody, scheduledTxResult *accessmodel.TransactionResult) {
+func (s *AccessAPISuite) testScheduledTransactionsRest(transactionID uint64, expectedTx *flow.TransactionBody, scheduledTxResult *accessmodel.TransactionResult) {
 	expectedTxID := expectedTx.ID()
 
 	restClient := s.RestClient("access_2")
@@ -1304,7 +1305,7 @@ func (s *AccessAPISuite) testScheduledTransactionsRest(callbackID uint64, expect
 	})
 
 	s.Run("REST /v1/transactions/{scheduledTxID} without result", func() {
-		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, fmt.Sprint(callbackID), nil)
+		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, fmt.Sprint(transactionID), nil)
 		s.Require().NoError(err)
 
 		var expected commonmodels.Transaction
@@ -1314,7 +1315,7 @@ func (s *AccessAPISuite) testScheduledTransactionsRest(callbackID uint64, expect
 	})
 
 	s.Run("REST /v1/transactions/{scheduledTxID} with result", func() {
-		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, fmt.Sprint(callbackID), &restclient.TransactionsApiTransactionsIdGetOpts{
+		txResponse, _, err := restClient.TransactionsApi.TransactionsIdGet(s.ctx, fmt.Sprint(transactionID), &restclient.TransactionsApiTransactionsIdGetOpts{
 			Expand: optional.NewInterface("result"),
 		})
 		s.Require().NoError(err)
@@ -1336,7 +1337,7 @@ func (s *AccessAPISuite) testScheduledTransactionsRest(callbackID uint64, expect
 	})
 
 	s.Run("REST /v1/transaction_results/{scheduledTxID}", func() {
-		txResultResponse, _, err := restClient.TransactionsApi.TransactionResultsTransactionIdGet(s.ctx, fmt.Sprint(callbackID), nil)
+		txResultResponse, _, err := restClient.TransactionsApi.TransactionResultsTransactionIdGet(s.ctx, fmt.Sprint(transactionID), nil)
 		s.Require().NoError(err)
 
 		var expected commonmodels.TransactionResult
@@ -1360,17 +1361,21 @@ func (s *AccessAPISuite) TestSystemTransactions() {
 
 	// block until a few blocks have executed to ensure there are blocks with system transactions
 	var blockID flow.Identifier
+	var header *flow.Header
 	require.Eventually(s.T(), func() bool {
-		header, err := rpcClient.GetBlockHeaderByHeight(s.ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: 5})
+		rpcHeader, err := rpcClient.GetBlockHeaderByHeight(s.ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: 5})
 		if err == nil {
-			blockID = convert.MessageToIdentifier(header.GetBlock().GetId())
+			blockID = convert.MessageToIdentifier(rpcHeader.GetBlock().GetId())
+			header, err = convert.MessageToBlockHeader(rpcHeader.GetBlock())
+			s.Require().NoError(err)
 			return true
 		}
 		return false
 	}, 30*time.Second, 500*time.Millisecond)
 
-	// construct the expected system collection
-	systemCollection, err := blueprints.SystemCollection(s.net.Root().ChainID.Chain(), nil)
+	systemCollection, err := systemcollection.Default(s.net.Root().ChainID).
+		ByHeight(header.Height).
+		SystemCollection(s.net.Root().ChainID.Chain(), nil)
 	s.Require().NoError(err)
 	s.Require().Len(systemCollection.Transactions, 2)
 

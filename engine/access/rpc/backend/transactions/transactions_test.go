@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -22,12 +23,11 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	providermock "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider/mock"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
@@ -81,7 +81,6 @@ type Suite struct {
 	errorMessageProvider error_messages.Provider
 
 	chainID                              flow.ChainID
-	defaultSystemCollection              *system.SystemCollection
 	systemCollection                     *flow.Collection
 	pendingExecutionEvents               []flow.Event
 	processScheduledTransactionEventType flow.EventType
@@ -132,14 +131,17 @@ func (suite *Suite) SetupTest() {
 	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
 
-	// this is the system collection with no scheduled transactions used within the backend
-	suite.defaultSystemCollection, err = system.DefaultSystemCollection(suite.chainID, true)
-	suite.Require().NoError(err)
 	suite.scheduledTransactionsEnabled = true
 
 	// this is the system collection with scheduled transactions used as block data
 	suite.pendingExecutionEvents = suite.g.PendingExecutionEvents().List(2)
-	suite.systemCollection, err = blueprints.SystemCollection(suite.chainID.Chain(), suite.pendingExecutionEvents)
+	systemCollections, err := systemcollection.NewVersioned(suite.chainID.Chain(), systemcollection.Default(suite.chainID))
+	suite.Require().NoError(err)
+	suite.systemCollection, err = systemCollections.
+		ByHeight(math.MaxUint64). // use the latest version
+		SystemCollection(suite.chainID.Chain(), func() (flow.EventsList, error) {
+			return suite.pendingExecutionEvents, nil
+		})
 	suite.Require().NoError(err)
 	suite.processScheduledTransactionEventType = suite.pendingExecutionEvents[0].Type
 
@@ -210,12 +212,18 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	)
 	suite.Require().NoError(err)
 
+	versionedSystemCollections, err := systemcollection.NewVersioned(
+		suite.chainID.Chain(),
+		systemcollection.Default(suite.chainID),
+	)
+	suite.Require().NoError(err)
+
 	return Params{
-		Log:                          suite.log,
-		Metrics:                      metrics.NewNoopCollector(),
-		State:                        suite.state,
-		ChainID:                      flow.Testnet,
-		SystemCollection:             suite.defaultSystemCollection,
+		Log:     suite.log,
+		Metrics: metrics.NewNoopCollector(),
+		State:   suite.state,
+		ChainID: flow.Testnet,
+		// SystemCollection:             suite.defaultSystemCollection,
 		NodeCommunicator:             node_communicator.NewNodeCommunicator(false),
 		ConnFactory:                  suite.connectionFactory,
 		NodeProvider:                 nodeProvider,
@@ -230,6 +238,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 		EventsIndex:                  suite.eventsIndex,
 		TxResultsIndex:               suite.txResultsIndex,
 		ScheduledTransactionsEnabled: suite.scheduledTransactionsEnabled,
+		SystemCollections:            versionedSystemCollections,
 	}
 }
 
@@ -1591,7 +1600,7 @@ func (suite *Suite) TestGetSystemTransaction() {
 		txID := tx.ID()
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
@@ -1654,6 +1663,13 @@ func (suite *Suite) TestGetSystemTransaction() {
 		tx := suite.g.Transactions().Fixture()
 		txID := tx.ID()
 
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
 		res, err := txBackend.GetSystemTransaction(context.Background(), txID, blockID)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
@@ -1680,17 +1696,18 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 
 	suite.Run("happy path", func() {
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Times(2)
 
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
+			Times(2)
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
 			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(expectedResult, nil)
+			Return(expectedResult, nil).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -1708,17 +1725,18 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 		systemTxID := systemTx.ID()
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Times(2)
 
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
+			Times(2)
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
 			On("TransactionResult", mock.Anything, block.ToHeader(), systemTxID, flow.ZeroID, encodingVersion).
-			Return(expectedResult, nil)
+			Return(expectedResult, nil).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -1734,6 +1752,14 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 	suite.Run("returns not found when tx is not a system tx", func() {
 		tx := suite.g.Transactions().Fixture()
 		txID := tx.ID()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
@@ -1751,17 +1777,18 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 		expectedErr := status.Errorf(codes.Internal, "some other error")
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(block.ToHeader(), nil)
+		snapshot.On("Head").Return(block.ToHeader(), nil).Times(2)
 
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
+			Times(2)
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
 			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(nil, expectedErr)
+			Return(nil, expectedErr).
+			Once()
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -1797,6 +1824,14 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 	})
 
 	suite.Run("block not provided", func() {
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil).Once()
+
+		suite.state.
+			On("AtBlockID", flow.ZeroID).
+			Return(snapshot, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 

@@ -453,18 +453,6 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployRandomBeaconHistory(service, &env)
 
-	// deploy staking proxy contract to the service account
-	b.deployStakingProxyContract(service, &env)
-
-	// deploy locked tokens contract to the service account
-	b.deployLockedTokensContract(service, &env)
-
-	// deploy staking collection contract to the service account
-	b.deployStakingCollection(service, &env)
-
-	// deploy flow transaction scheduler contract to the service account
-	b.deployFlowTransactionScheduler(service, &env)
-
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
 	b.setupVMBridge(service, &env)
@@ -475,6 +463,23 @@ func (b *bootstrapExecutor) Execute() error {
 	if err != nil {
 		return err
 	}
+
+	// deploy flow transaction scheduler contract to the service account
+	b.deployFlowTransactionScheduler(service, &env)
+
+	err = expectAccounts(systemcontracts.ScheduledTransactionExecutorAccountIndex)
+	if err != nil {
+		return err
+	}
+
+	// deploy staking proxy contract to the service account
+	b.deployStakingProxyContract(service, &env)
+
+	// deploy locked tokens contract to the service account
+	b.deployLockedTokensContract(service, &env)
+
+	// deploy staking collection contract to the service account
+	b.deployStakingCollection(service, &env)
 
 	b.registerNodes(service, fungibleToken, flowToken)
 
@@ -827,6 +832,21 @@ func (b *bootstrapExecutor) deployFlowTransactionScheduler(deployTo flow.Address
 
 	env.FlowTransactionSchedulerUtilsAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowTransactionSchedulerUtils contract: %s", txError, err)
+
+	// scheduled transactions wont work on newly bootstrapped non-transient networks
+	// TODO: JanezP this could be controlled by a flag instead of a hidden check here
+	if b.ctx.Chain.ChainID().Transient() {
+		sc := systemcontracts.SystemContractsForChain(b.ctx.Chain.ChainID())
+		txBody, err = blueprints.IssueScheduledTransactionExecutorTransaction(b.ctx.Chain, sc.ScheduledTransactionExecutor.Address)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create scheduled transaction executor transaction: %s", err))
+		}
+		txError, err = b.invokeMetaTransaction(
+			b.ctx,
+			Transaction(txBody, 0),
+		)
+		panicOnMetaInvokeErrf("failed to create scheduled transaction executor: %s", txError, err)
+	}
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(
