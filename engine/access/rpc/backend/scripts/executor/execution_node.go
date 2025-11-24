@@ -118,6 +118,10 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request, execut
 			return nil, nil, access.NewInternalError(errToReturn)
 		case codes.Unavailable:
 			return nil, nil, access.NewServiceUnavailable(errToReturn)
+		case codes.Canceled:
+			return nil, nil, access.NewRequestCanceledError(errToReturn)
+		case codes.DeadlineExceeded:
+			return nil, nil, access.NewRequestTimedOutError(errToReturn)
 		default:
 			return nil, nil, access.NewInternalError(errToReturn)
 		}

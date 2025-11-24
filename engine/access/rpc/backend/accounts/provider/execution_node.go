@@ -95,11 +95,11 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 				Logger()
 
 			if err != nil {
-				lg.Err(err).Msg("Failed to execute GetAccount")
+				lg.Err(err).Msg("failed to execute GetAccount")
 				return err
 			}
 
-			// return if any execution node replies successfully
+			// return if any execution node replied successfully
 			lg.Debug().Msg("Successfully retrieved account info")
 			return nil
 		},
@@ -127,6 +127,10 @@ func (e *ENAccountProvider) GetAccountAtBlock(
 			return nil, nil, access.NewInternalError(errToReturn)
 		case codes.Unavailable:
 			return nil, nil, access.NewServiceUnavailable(errToReturn)
+		case codes.Canceled:
+			return nil, nil, access.NewRequestCanceledError(errToReturn)
+		case codes.DeadlineExceeded:
+			return nil, nil, access.NewRequestTimedOutError(errToReturn)
 		default:
 			return nil, nil, access.NewInternalError(errToReturn)
 		}

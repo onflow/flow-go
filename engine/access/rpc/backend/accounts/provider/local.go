@@ -249,7 +249,7 @@ func convertAccountError(err error) error {
 		return access.NewRequestTimedOutError(err)
 	}
 
-	// general FVM/ledger errors
+	// general FVM errors
 	var coded fvmerrors.CodedError
 	if fvmerrors.As(err, &coded) {
 		switch coded.Code() {
