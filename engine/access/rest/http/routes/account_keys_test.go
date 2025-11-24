@@ -121,10 +121,10 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 //
 // Test cases:
 //  1. A request with an invalid account address returns http.StatusBadRequest.
-//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
-//  3. A request where GetAccountKeyAtBlockHeight fails for a valid block height returns http.StatusNotFound.
-
-// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
+//  2. Simulated failure when fetching the latest block header for a "sealed" height
+//     to ensure that any propagated errors are correctly returned as http.StatusInternalServerError.
+//
+// 3. A request where GetAccountKeyAtBlockHeight fails for a valid block height returns http.StatusNotFound.
 func TestGetAccountByIndexErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
@@ -263,10 +263,10 @@ func TestGetAccountKeys(t *testing.T) {
 //
 // Test cases:
 //  1. A request with an invalid account address returns http.StatusBadRequest.
-//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
-//  3. A request where GetAccountKeysAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+//  2. Simulated failure when fetching the latest block header for a "sealed" height
+//     to ensure that any propagated errors are correctly returned as http.StatusInternalServerError.
 //
-// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
+// 3. A request where GetAccountKeysAtBlockHeight fails for a valid block height returns http.StatusNotFound.
 func TestGetAccountKeysErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
