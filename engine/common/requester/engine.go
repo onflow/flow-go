@@ -153,7 +153,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(channels.Channel(channel), e)
+	con, err := net.Register(channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -335,7 +335,7 @@ func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 	for {
 		select {
 		case <-e.ShutdownSignal():
-			return nil
+			return
 
 		case <-ticker.C:
 			if e.forcedDispatchOngoing.Load() {
