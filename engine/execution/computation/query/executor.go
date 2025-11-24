@@ -51,8 +51,6 @@ type Executor interface {
 	// GetAccount returns an account by address.
 	//
 	// Expected error returns during normal operation:
-	//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-	//   - [context.Canceled]: If the context was canceled during the request.
 	//   - [fvmerrors.CodedError]: If the FVM failed to get a Flow account by address.
 	GetAccount(
 		ctx context.Context,
@@ -67,8 +65,6 @@ type Executor interface {
 	// GetAccountBalance returns the balance of a Flow account at the given block height by address.
 	//
 	// Expected error returns during normal operation:
-	//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-	//   - [context.Canceled]: If the context was canceled during the request.
 	//   - [fvmerrors.CodedError]: If the FVM failed to get balance of a Flow account at the given block height.
 	GetAccountBalance(
 		ctx context.Context,
@@ -83,8 +79,6 @@ type Executor interface {
 	// GetAccountAvailableBalance returns an account available balance by address.
 	//
 	// Expected error returns during normal operation:
-	//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-	//   - [context.Canceled]: If the context was canceled during the request.
 	//   - [fvmerrors.CodedError]: If the FVM failed to get available balance of a Flow account by address.
 	GetAccountAvailableBalance(
 		ctx context.Context,
@@ -99,8 +93,6 @@ type Executor interface {
 	// GetAccountKeys returns account public keys by the provided address.
 	//
 	// Expected error returns during normal operation:
-	//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-	//   - [context.Canceled]: If the context was canceled during the request.
 	//   - [fvmerrors.CodedError]: If the FVM failed to get account keys.
 	GetAccountKeys(
 		ctx context.Context,
@@ -115,8 +107,6 @@ type Executor interface {
 	// GetAccountKey returns account public key by the provided address and key index .
 	//
 	// Expected error returns during normal operation:
-	//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-	//   - [context.Canceled]: If the context was canceled during the request.
 	//   - [fvmerrors.CodedError]: If the FVM failed to get account key for the given address and key index.
 	GetAccountKey(
 		ctx context.Context,
@@ -305,8 +295,6 @@ func summarizeLog(log string, limit int) string {
 // GetAccount returns an account by address.
 //
 // Expected error returns during normal operation:
-//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-//   - [context.Canceled]: If the context was canceled during the request.
 //   - [fvmerrors.CodedError]: If the FVM failed to get a Flow account by address.
 func (e *QueryExecutor) GetAccount(
 	_ context.Context,
@@ -342,8 +330,6 @@ func (e *QueryExecutor) GetAccount(
 // GetAccountBalance returns the balance of a Flow account at the given block height by address.
 //
 // Expected error returns during normal operation:
-//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-//   - [context.Canceled]: If the context was canceled during the request.
 //   - [fvmerrors.CodedError]: If the FVM failed to get balance of a Flow account at the given block height.
 func (e *QueryExecutor) GetAccountBalance(
 	_ context.Context,
@@ -378,8 +364,6 @@ func (e *QueryExecutor) GetAccountBalance(
 // GetAccountAvailableBalance returns an account available balance by address.
 //
 // Expected error returns during normal operation:
-//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-//   - [context.Canceled]: If the context was canceled during the request.
 //   - [fvmerrors.CodedError]: If the FVM failed to get available balance of a Flow account by address.
 func (e *QueryExecutor) GetAccountAvailableBalance(
 	_ context.Context,
@@ -414,8 +398,6 @@ func (e *QueryExecutor) GetAccountAvailableBalance(
 // GetAccountKeys returns account public keys by the provided address.
 //
 // Expected error returns during normal operation:
-//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-//   - [context.Canceled]: If the context was canceled during the request.
 //   - [fvmerrors.CodedError]: If the FVM failed to get account keys.
 func (e *QueryExecutor) GetAccountKeys(
 	_ context.Context,
@@ -447,8 +429,6 @@ func (e *QueryExecutor) GetAccountKeys(
 // GetAccountKey returns account public key by the provided address and key index .
 //
 // Expected error returns during normal operation:
-//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
-//   - [context.Canceled]: If the context was canceled during the request.
 //   - [fvmerrors.CodedError]: If the FVM failed to get account key for the given address and key index.
 func (e *QueryExecutor) GetAccountKey(
 	_ context.Context,
