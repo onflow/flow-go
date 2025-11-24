@@ -225,7 +225,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
 // Error returns:
-	//   - storage.ErrNotFound if no FINALIZED block exists containing the expected collection guarantee
+//   - storage.ErrNotFound if no FINALIZED block exists containing the expected collection guarantee
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error) {
