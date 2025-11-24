@@ -61,9 +61,9 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert block ID: %v", err)
 	}
 
-	query := request.GetExecutionStateQuery()
+	executionState := request.GetExecutionStateQuery()
 
-	execData, executorMetadata, err := h.api.GetExecutionDataByBlockID(ctx, blockID, convert.NewCriteria(query))
+	execData, executorMetadata, err := h.api.GetExecutionDataByBlockID(ctx, blockID, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, rpc.ErrorToStatus(err)
 	}
@@ -82,7 +82,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		BlockExecutionData: message,
 	}
 
-	if query.GetIncludeExecutorMetadata() {
+	if executionState.GetIncludeExecutorMetadata() {
 		response.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
