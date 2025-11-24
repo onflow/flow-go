@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	ingestioncollections "github.com/onflow/flow-go/engine/access/ingestion/collections"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -172,6 +173,7 @@ func (suite *Suite) RunTest(
 			Transactions:             all.Transactions,
 			ExecutionResults:         all.Results,
 			ExecutionReceipts:        all.Receipts,
+			Seals:                    all.Seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            suite.metrics,
 			MaxHeightRange:           events.DefaultMaxHeightRange,
@@ -298,6 +300,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
+		seals := store.NewSeals(metrics, db)
 
 		// create collection node cluster
 		count := 2
@@ -340,6 +343,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		bnd, err := backend.New(backend.Params{State: suite.state,
 			Collections:              collections,
 			Transactions:             transactions,
+			Seals:                    seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            metrics,
 			ConnFactory:              connFactory,
@@ -545,6 +549,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.RunTest(func(handler *rpc.Handler, db storage.DB, all *store.All) {
+		lockManager := storage.NewTestingLockManager()
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -554,8 +559,27 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithExecutionResultBlockID(blockID),
 			unittest.WithServiceEvents(3))
 
-		require.NoError(suite.T(), all.Results.Store(er))
-		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
+		require.NoError(suite.T(), storage.WithLock(lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := all.Results.BatchStore(er, rw)
+				if err != nil {
+					return err
+				}
+				return all.Results.BatchIndex(lctx, rw, blockID, er.ID()) // requires storage.LockIndexExecutionResult
+			})
+		}))
+
+		// Create and store a seal for the block
+		seal := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(blockID),
+			unittest.Seal.WithResult(er),
+		)
+		require.NoError(suite.T(), all.Seals.Store(seal))
+
+		// Index the seal by block ID so FinalizedSealForBlock can find it
+		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedSealByBlockID(rw.Writer(), blockID, seal.ID())
+		}))
 
 		assertResp := func(
 			resp *accessproto.ExecutionResultForBlockIDResponse,
@@ -627,6 +651,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -687,6 +712,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -746,11 +772,14 @@ func (suite *Suite) TestGetSealedTransaction() {
 			nil,
 		)
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
@@ -759,6 +788,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
@@ -803,7 +833,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
-		ingestEng.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
+		followerDistributor.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
 
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
@@ -841,6 +871,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		originID := unittest.IdentifierFixture()
@@ -945,6 +976,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -1005,11 +1037,14 @@ func (suite *Suite) TestGetTransactionResult() {
 			nil,
 		)
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
@@ -1018,6 +1053,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
@@ -1041,7 +1077,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			executionReceipts := unittest.ReceiptsForBlockFixture(block, enNodeIDs)
 			// Ingest engine was notified by the follower engine about a new block.
 			// Follower engine --> Ingest engine
-			ingestEng.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
+			followerDistributor.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
 
 			// Syncer receives the requested collection and the ingestion engine processes the receipts
 			collectionSyncer.OnCollectionDownloaded(originID, collection)
@@ -1172,6 +1208,7 @@ func (suite *Suite) TestGetTransactionResult() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -1200,6 +1237,7 @@ func (suite *Suite) TestExecuteScript() {
 			Transactions:               all.Transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -1271,11 +1309,14 @@ func (suite *Suite) TestExecuteScript() {
 			nil,
 		)
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
@@ -1284,6 +1325,7 @@ func (suite *Suite) TestExecuteScript() {
 			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
