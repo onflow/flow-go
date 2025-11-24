@@ -62,10 +62,7 @@ func (s *StreamingSuite) TearDownTest() {
 // SetupTest initializes the test suite with a network configuration for testing both GRPC block streaming and REST event streaming APIs.
 //
 // Network Configuration:
-//   - 1 Access node with execution data indexing and streaming support:
-//     * execution-data-sync-enabled, execution-data-indexing-enabled
-//     * event-query-mode=local-only, supports-observer=true
-//     * public-network-execution-data-sync-enabled=true
+//   - 1 Access node (with execution data indexing and streaming support)
 //   - 1 Ghost Access node (lightweight, for tracking block state)
 //   - 1 Observer node with execution data indexing (event-query-mode=execution-nodes-only)
 //   - 2 Collection nodes (standard configuration)

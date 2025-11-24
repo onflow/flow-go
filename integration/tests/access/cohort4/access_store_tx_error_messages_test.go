@@ -60,8 +60,8 @@ func (s *AccessStoreTxErrorMessagesSuite) TearDownTest() {
 //
 // Network Configuration:
 //   - 2 Access nodes:
-//     * defaultAccess (access_1): Standard access node without error message storage
-//     * storeTxAccess (access_2): Access node with --store-tx-result-error-messages=true and metrics server
+//     defaultAccess (access_1): Standard access node without error message storage
+//     storeTxAccess (access_2): Access node with --store-tx-result-error-messages=true and metrics server
 //   - 2 Collection nodes (standard configuration)
 //   - 3 Consensus nodes (with slower timing: 250ms proposal duration to slow block rate, reduced seal approvals)
 //   - 2 Execution nodes (standard configuration)

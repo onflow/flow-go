@@ -70,11 +70,11 @@ func (s *WebsocketSubscriptionSuite) TearDownTest() {
 // SetupTest initializes the test suite with a network configuration for testing websocket subscriptions.
 //
 // Network Configuration:
-//   - 1 Bridge Access node with websocket-specific configuration:
-//     * execution-data-sync-enabled, execution-data-indexing-enabled
-//     * websocket-inactivity-timeout (configurable timeout for inactive connections)
-//     * websocket-max-subscriptions-per-connection (limits subscriptions per client)
-//     * Includes metrics server for monitoring websocket connection stats
+//   - 1 Bridge Access node (with websocket-specific configuration:
+//     execution-data-sync-enabled, execution-data-indexing-enabled,
+//     websocket-inactivity-timeout (configurable timeout for inactive connections),
+//     websocket-max-subscriptions-per-connection (limits subscriptions per client),
+//     includes metrics server for monitoring websocket connection stats)
 //   - 1 Ghost Access node (lightweight, for tracking block state)
 //   - 2 Collection nodes (standard configuration)
 //   - 3 Consensus nodes (with custom timing: 100ms proposal duration, reduced seal approvals)

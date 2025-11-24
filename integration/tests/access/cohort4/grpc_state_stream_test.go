@@ -75,8 +75,8 @@ func (s *GrpcStateStreamSuite) TearDownTest() {
 //
 // Network Configuration:
 //   - 2 Access nodes with different event query modes:
-//     * testAN (access_1): event-query-mode=local-only, with execution data indexing
-//     * controlAN (access_2): event-query-mode=execution-nodes-only, with execution data indexing
+//     testAN (access_1): event-query-mode=local-only, with execution data indexing
+//     controlAN (access_2): event-query-mode=execution-nodes-only, with execution data indexing
 //     Both have supports-observer=true and public-network-execution-data-sync-enabled=true
 //   - 1 Ghost Access node (lightweight, for tracking block state)
 //   - 1 Observer node (with execution data indexing: event-query-mode=execution-nodes-only)
