@@ -58,7 +58,7 @@ func TestMissingCollectionQueue_CompleteBlockLifecycle(t *testing.T) {
 	assert.True(t, mcq.IsHeightQueued(blockHeight), "height should still be queued after receiving one collection")
 
 	// Step 5: Receiving all collections completes the block, IsHeightQueued still returns true (not yet indexed)
-	collectionsReturned, heightReturned, complete = mcq.OnReceivedCollection(collections[1])
+	collectionsReturned, _, complete = mcq.OnReceivedCollection(collections[1])
 	assert.Nil(t, collectionsReturned, "should not return collections when block is not complete")
 	assert.False(t, complete, "block should not be complete with only two collections")
 	assert.True(t, mcq.IsHeightQueued(blockHeight), "height should still be queued")
@@ -117,6 +117,7 @@ func TestMissingCollectionQueue_IndexBeforeBlockCompletion(t *testing.T) {
 	// Receive only one collection (block is not complete)
 	collectionsReturned, heightReturned, complete := mcq.OnReceivedCollection(collections[0])
 	assert.Nil(t, collectionsReturned, "should not return collections when block is not complete")
+	assert.Equal(t, uint64(0), heightReturned, "should not return height when block is not complete")
 	assert.False(t, complete, "block should not be complete with only one collection")
 	assert.True(t, mcq.IsHeightQueued(blockHeight), "height should still be queued")
 
@@ -135,7 +136,7 @@ func TestMissingCollectionQueue_IndexBeforeBlockCompletion(t *testing.T) {
 	assert.Equal(t, uint64(0), heightReturned, "should not return height for removed block")
 	assert.False(t, complete, "should not indicate completion for removed block")
 
-	collectionsReturned, heightReturned, complete = mcq.OnReceivedCollection(collections[2])
+	collectionsReturned, _, complete = mcq.OnReceivedCollection(collections[2])
 	assert.Nil(t, collectionsReturned, "should not return collections for removed block")
 	assert.False(t, complete, "should not indicate completion for removed block")
 
@@ -143,4 +144,3 @@ func TestMissingCollectionQueue_IndexBeforeBlockCompletion(t *testing.T) {
 	returnedCallback()
 	assert.True(t, callbackInvoked, "callback should be invoked")
 }
-
