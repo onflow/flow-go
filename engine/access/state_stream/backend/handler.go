@@ -454,10 +454,10 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert register IDs: %v", err)
 	}
 
-	query := request.GetExecutionStateQuery()
+	executionState := request.GetExecutionStateQuery()
 
 	// get payload from store
-	values, executorMetadata, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight(), convert.NewCriteria(query))
+	values, executorMetadata, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, rpc.ConvertError(err, "could not get register values", codes.Internal)
 	}
@@ -466,7 +466,7 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 		Values: values,
 	}
 
-	if query.GetIncludeExecutorMetadata() {
+	if executionState.GetIncludeExecutorMetadata() {
 		response.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 

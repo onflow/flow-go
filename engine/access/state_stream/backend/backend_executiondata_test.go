@@ -901,6 +901,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	})
 }
 
+// TestGetRegisterValues tests that GetRegisterValues correctly returns register data
+// in normal conditions and propagates appropriate errors for all failure scenarios.
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	block := s.blocks[0]
 	seal := s.sealMap[block.ID()]
@@ -910,7 +912,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.highestBlockHeader = block.ToHeader()
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 
-	s.Run("normal case", func() {
+	s.Run("happy case", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(&optimistic_sync.ExecutionResultInfo{
@@ -968,7 +970,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
-	s.Run("returns error if result is not available, not ready for querying, or does not descend from the latest sealed result", func() {
+	s.Run("returns error when snapshot is not found", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(&optimistic_sync.ExecutionResultInfo{
