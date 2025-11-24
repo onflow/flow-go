@@ -31,9 +31,9 @@ type MissingCollectionQueue interface {
 	Size() uint
 }
 
-// Requests collections by their IDs.
+// Requests collections by their guarantees.
 type CollectionRequester interface {
-	RequestCollections(ids []flow.Identifier) error
+	RequestCollectionsByGuarantees(guarantees []*flow.CollectionGuarantee) error
 }
 
 // BlockCollectionIndexer stores and indexes collections for a given block height.

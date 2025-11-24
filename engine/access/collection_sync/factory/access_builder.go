@@ -207,7 +207,6 @@ type CollectionSyncFetcherComponentResult struct {
 //   - state: Protocol state
 //   - me: Local node identity
 //   - blocks: Blocks storage
-//   - guarantees: Guarantees storage
 //   - db: Database for storage operations
 //   - blockCollectionIndexer: Block collection indexer
 //   - followerDistributor: Follower distributor
@@ -229,7 +228,6 @@ func CreateCollectionSyncFetcherComponent(
 	state protocol.State,
 	me module.Local,
 	blocks storage.Blocks,
-	guarantees storage.Guarantees,
 	db storage.DB,
 	blockCollectionIndexer collection_sync.BlockCollectionIndexer,
 	followerDistributor hotstuff.Distributor,
@@ -277,7 +275,6 @@ func CreateCollectionSyncFetcherComponent(
 		state,
 		me,
 		blocks,
-		guarantees,
 		blockCollectionIndexer,
 		fetchAndIndexedCollectionsBlockHeight,
 		followerDistributor,

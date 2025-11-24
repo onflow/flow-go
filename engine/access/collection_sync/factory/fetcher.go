@@ -36,7 +36,6 @@ type CreateFetcherConfig struct {
 //   - state: Protocol state
 //   - me: Local node identity
 //   - blocks: Blocks storage
-//   - guarantees: Guarantees storage
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
 //   - collectionSyncMetrics: Optional metrics collector for tracking collection sync progress
 //   - config: Configuration for the fetcher
@@ -51,7 +50,6 @@ func createFetcher(
 	state protocol.State,
 	me module.Local,
 	blocks storage.Blocks,
-	guarantees storage.Guarantees,
 	indexer collection_sync.BlockCollectionIndexer,
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	distributor hotstuff.Distributor,
@@ -80,7 +78,6 @@ func createFetcher(
 	collectionRequester := fetcher.NewCollectionRequester(
 		requestEng,
 		state,
-		guarantees,
 	)
 
 	// Create BlockProcessor

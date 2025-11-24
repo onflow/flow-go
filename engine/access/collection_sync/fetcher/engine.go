@@ -48,7 +48,7 @@ func NewFetcher(
 	blockProcessor collection_sync.BlockProcessor, progressInitializer storage.ConsumerProgressInitializer,
 	state protocol.State,
 	blocks storage.Blocks,
-	maxProcessing uint64, // max number of blocks to fetch collections
+	maxProcessing uint64, // max number of blocks to fetch collections concurrently
 	maxSearchAhead uint64, // max number of blocks beyond the next unfullfilled height to fetch collections for
 	metrics module.CollectionSyncMetrics, // optional metrics collector
 ) (*Fetcher, error) {

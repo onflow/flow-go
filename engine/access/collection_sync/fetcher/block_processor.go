@@ -76,7 +76,7 @@ func (bp *BlockProcessor) FetchCollections(
 		return nil
 	}
 
-	// Extract collection IDs
+	// Extract collection IDs for enqueueing
 	collectionIDs := make([]flow.Identifier, len(missingGuarantees))
 	for i, guarantee := range missingGuarantees {
 		collectionIDs[i] = guarantee.CollectionID
@@ -93,7 +93,7 @@ func (bp *BlockProcessor) FetchCollections(
 	}
 
 	// Request collections from collection nodes
-	err = bp.requester.RequestCollections(collectionIDs)
+	err = bp.requester.RequestCollectionsByGuarantees(missingGuarantees)
 	if err != nil {
 		return fmt.Errorf("failed to request collections for block height %d: %w", blockHeight, err)
 	}
