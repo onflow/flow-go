@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/utils/debug"
@@ -31,6 +32,7 @@ var (
 	flagUseExecutionDataAPI bool
 	flagBlockIDs            string
 	flagBlockCount          int
+	flagLogTraces           bool
 	flagWriteTraces         bool
 	flagParallel            int
 )
@@ -64,6 +66,8 @@ func init() {
 	_ = Cmd.MarkFlagRequired("block-id")
 
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1). if > 1, provide a single block ID with --block-ids")
+
+	Cmd.Flags().BoolVar(&flagLogTraces, "log-traces", false, "log traces")
 
 	Cmd.Flags().BoolVar(&flagWriteTraces, "write-traces", false, "write traces for mismatched transactions")
 
@@ -210,6 +214,12 @@ func compareBlock(
 
 	interBlockSnapshot := debug_tx.NewBlockSnapshot(remoteClient, header)
 
+	fvmOptions := []fvm.Option{
+		fvm.WithEntropyProvider(debug_tx.BlockHashEntropyProvider{
+			BlockHash: blockID,
+		}),
+	}
+
 	var (
 		interSpanExporters []*debug.InterestingCadenceSpanExporter
 		interTxSnapshots   []*debug.CapturingStorageSnapshot
@@ -228,11 +238,14 @@ func compareBlock(
 			return txSnapshot
 		},
 		func(_ flow.Identifier) otelTrace.SpanExporter {
-			exporter := &debug.InterestingCadenceSpanExporter{}
+			exporter := &debug.InterestingCadenceSpanExporter{
+				Log: flagLogTraces,
+			}
 			interSpanExporters = append(interSpanExporters, exporter)
 			return exporter
 		},
 		flagComputeLimit,
+		fvmOptions,
 	)
 
 	log.Info().Msg("Running with VM ...")
@@ -257,11 +270,14 @@ func compareBlock(
 			return txSnapshot
 		},
 		func(_ flow.Identifier) otelTrace.SpanExporter {
-			exporter := &debug.InterestingCadenceSpanExporter{}
+			exporter := &debug.InterestingCadenceSpanExporter{
+				Log: flagLogTraces,
+			}
 			vmSpanExporters = append(vmSpanExporters, exporter)
 			return exporter
 		},
 		flagComputeLimit,
+		fvmOptions,
 	)
 
 	var mismatch bool
