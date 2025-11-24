@@ -12,7 +12,7 @@ import (
 
 // GetAccountBalance handler retrieves an account balance by address and block height and returns the response
 func GetAccountBalance(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.GetAccountBalanceRequest(r)
+	req, err := request.NewGetAccountBalanceRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -30,13 +30,13 @@ func GetAccountBalance(r *common.Request, backend access.API, _ commonmodels.Lin
 		req.Height = header.Height
 	}
 
-	balance, err := backend.GetAccountBalanceAtBlockHeight(r.Context(), req.Address, req.Height)
+	executionState := req.ExecutionState
+	balance, executorMetadata, err := backend.GetAccountBalanceAtBlockHeight(r.Context(), req.Address, req.Height, models.NewCriteria(executionState))
 	if err != nil {
 		err = fmt.Errorf("failed to get account balance, reason: %w", err)
 		return nil, common.NewNotFoundError(err.Error(), err)
 	}
 
-	var response models.AccountBalance
-	response.Build(balance)
+	response := models.NewAccountBalance(balance, executorMetadata, executionState.IncludeExecutorMetadata)
 	return response, nil
 }

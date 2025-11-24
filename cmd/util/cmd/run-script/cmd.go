@@ -357,36 +357,42 @@ func (*api) GetSystemTransactionResult(
 	return nil, errors.New("unimplemented")
 }
 
-func (*api) GetAccount(_ context.Context, _ flow.Address) (*flow.Account, error) {
-	return nil, errors.New("unimplemented")
+func (*api) GetAccount(_ context.Context, _ flow.Address, _ optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
-func (*api) GetAccountAtLatestBlock(_ context.Context, _ flow.Address) (*flow.Account, error) {
-	return nil, errors.New("unimplemented")
+func (*api) GetAccountAtLatestBlock(_ context.Context, _ flow.Address, _ optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
-func (*api) GetAccountAtBlockHeight(_ context.Context, _ flow.Address, _ uint64) (*flow.Account, error) {
-	return nil, errors.New("unimplemented")
+func (*api) GetAccountAtBlockHeight(_ context.Context, _ flow.Address, _ uint64, _ optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
-func (*api) GetAccountBalanceAtLatestBlock(_ context.Context, _ flow.Address) (uint64, error) {
-	return 0, errors.New("unimplemented")
+func (*api) GetAccountBalanceAtLatestBlock(_ context.Context, _ flow.Address, _ optimistic_sync.Criteria,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
+	return 0, nil, errors.New("unimplemented")
 }
 
 func (*api) GetAccountBalanceAtBlockHeight(
 	_ context.Context,
 	_ flow.Address,
 	_ uint64,
-) (uint64, error) {
-	return 0, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
+	return 0, nil, errors.New("unimplemented")
 }
 
 func (*api) GetAccountKeyAtLatestBlock(
 	_ context.Context,
 	_ flow.Address,
 	_ uint32,
-) (*flow.AccountPublicKey, error) {
-	return nil, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetAccountKeyAtBlockHeight(
@@ -394,23 +400,26 @@ func (*api) GetAccountKeyAtBlockHeight(
 	_ flow.Address,
 	_ uint32,
 	_ uint64,
-) (*flow.AccountPublicKey, error) {
-	return nil, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetAccountKeysAtLatestBlock(
 	_ context.Context,
 	_ flow.Address,
-) ([]flow.AccountPublicKey, error) {
-	return nil, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (*api) GetAccountKeysAtBlockHeight(
 	_ context.Context,
 	_ flow.Address,
 	_ uint64,
-) ([]flow.AccountPublicKey, error) {
-	return nil, errors.New("unimplemented")
+	_ optimistic_sync.Criteria,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, errors.New("unimplemented")
 }
 
 func (a *api) ExecuteScriptAtLatestBlock(

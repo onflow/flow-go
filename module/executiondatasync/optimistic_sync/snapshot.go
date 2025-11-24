@@ -24,7 +24,7 @@ type Snapshot interface {
 	// Registers returns a reader for querying register data.
 	//
 	// Expected error returns during normal operation:
-	//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
+	//   - [indexer.ErrIndexNotInitialized]: If the storage is still bootstrapping.
 	Registers() (storage.RegisterSnapshotReader, error)
 
 	// BlockExecutionData returns a reader for querying execution data.

@@ -92,8 +92,8 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.ServiceUnavailable] - if the configured upstream access client failed to respond.
-//   - [access.DataNotFoundError] - if the collection is not found.
+//   - [access.ServiceUnavailable]: If the configured upstream access client failed to respond.
+//   - [access.DataNotFoundError]: If the collection is not found.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -200,122 +200,165 @@ func (r *RestProxyHandler) GetTransactionResult(
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.
-func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	getAccountAtBlockHeightRequest := &accessproto.GetAccountAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountResponse, err := upstream.GetAccountAtBlockHeight(ctx, getAccountAtBlockHeightRequest)
 	r.log("upstream", "GetAccountAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessageToAccount(accountResponse.Account)
+	account, err := convert.MessageToAccount(accountResponse.Account)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return account, metadata, nil
 }
 
 // GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
-func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	defer closer.Close()
 
 	getAccountBalanceAtBlockHeightRequest := &accessproto.GetAccountBalanceAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(ctx, getAccountBalanceAtBlockHeightRequest)
 	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
 
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
-	return accountBalanceResponse.GetBalance(), nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountBalanceResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountBalanceResponse.GetBalance(), metadata, nil
 
 }
 
 // GetAccountKeys returns account keys by account address and block height.
-func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	getAccountKeysAtBlockHeightRequest := &accessproto.GetAccountKeysAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountKeyResponse, err := upstream.GetAccountKeysAtBlockHeight(ctx, getAccountKeysAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
 	for i, key := range accountKeyResponse.GetAccountKeys() {
 		accountKey, err := convert.MessageToAccountKey(key)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		accountKeys[i] = *accountKey
 	}
 
-	return accountKeys, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountKeyResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountKeys, metadata, nil
 }
 
 // GetAccountKeyByIndex returns account key by account address, key index and block height.
-func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
+func (r *RestProxyHandler) GetAccountKeyByIndex(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex uint32,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
 	getAccountKeyAtBlockHeightRequest := &accessproto.GetAccountKeyAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		Index:       keyIndex,
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		Index:               keyIndex,
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(ctx, getAccountKeyAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessageToAccountKey(accountKeyResponse.AccountKey)
+	accountKey, err := convert.MessageToAccountKey(accountKeyResponse.GetAccountKey())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountKeyResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountKey, metadata, nil
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
@@ -346,16 +389,16 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 // ExecuteScriptAtBlockHeight executes script at the given block height.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -393,16 +436,16 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 // ExecuteScriptAtBlockID executes script at the given block id.
 //
 // Expected sentinel errors providing details to clients about failed requests:
-//   - [access.InvalidRequestError] - if the request had invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if configured to use an external node for script execution and
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,

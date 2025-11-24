@@ -204,13 +204,6 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(s.rootBlock.Height).Maybe()
 	s.registers.On("FirstHeight").Return(s.rootBlock.Height).Maybe()
-	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
-		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-			if id == s.registerID {
-				return flow.RegisterValue{}, nil
-			}
-			return nil, storage.ErrNotFound
-		}).Maybe()
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Maybe()
@@ -901,6 +894,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	})
 }
 
+// TestGetRegisterValues tests that GetRegisterValues correctly returns register data
+// in normal conditions and propagates appropriate errors for all failure scenarios.
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -913,7 +908,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.highestBlockHeader = block.ToHeader()
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 
-	s.Run("normal case", func() {
+	s.Run("happy case", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(&optimistic_sync.ExecutionResultInfo{
@@ -933,12 +928,16 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
 
+		expectedRegister := flow.RegisterValue("value0")
+		s.registers.On("Get", s.registerID, block.Height).Return(expectedRegister, nil).Once()
+
 		res, resMetadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
 
 		require.NotEmpty(s.T(), res)
+		require.Equal(s.T(), []flow.RegisterValue{expectedRegister}, res)
 		require.NotEmpty(s.T(), resMetadata)
-		require.NoError(s.T(), err)
 		require.Equal(s.T(), metadata, resMetadata)
+		require.NoError(s.T(), err)
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
@@ -950,7 +949,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.True(s.T(), access.IsPreconditionFailedError(err))
 	})
 
-	s.Run("returns error if failed to get execution result info for block because no execution receipts were found for a given block ID", func() {
+	s.Run("returns error if failed to get execution result info for block - insufficient receipts", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(nil, common.NewInsufficientExecutionReceipts(block.ID(), 0)).Once()
@@ -962,7 +961,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.True(s.T(), common.IsInsufficientExecutionReceipts(err))
 	})
 
-	s.Run("returns error if failed to get execution result info for block", func() {
+	s.Run("returns error if failed to get execution result info for block - not found", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(nil, storage.ErrNotFound).Once()
@@ -990,7 +989,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 		require.Error(s.T(), err)
 	})
 
-	s.Run("returns error if result is not available, not ready for querying, or does not descend from the latest sealed result", func() {
+	s.Run("returns error when snapshot is not found", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
 			Return(&optimistic_sync.ExecutionResultInfo{
@@ -1094,7 +1093,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Once()
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
-		s.registers.On("Get", s.registerID, block.Height).Unset()
+
 		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrHeightNotIndexed).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
@@ -1118,7 +1117,6 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 			Once()
 
 		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
-		s.registers.On("Get", s.registerID, block.Height).Unset()
 		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrNotFound).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)

@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -560,7 +561,7 @@ func TestGetRegisterValues(t *testing.T) {
 			ExecutorIDs:       unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution)).NodeIDs(),
 		}
 
-		api.On("GetRegisterValues", ctx, testIds, testHeight, mock.Anything).Return(testValues, metadata, nil)
+		api.On("GetRegisterValues", testIds, testHeight, mock.Anything).Return(testValues, metadata, nil).Once()
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
@@ -586,7 +587,9 @@ func TestGetRegisterValues(t *testing.T) {
 	t.Run("unavailable registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.NotFound, "could not get register values: %v", storage.ErrNotFound)
-		api.On("GetRegisterValues", ctx, invalidIDs, testHeight, mock.Anything).Return(nil, nil, expectedErr)
+
+		api.On("GetRegisterValues", invalidIDs, testHeight, mock.Anything).Return(nil, nil, expectedErr).Once()
+
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		unavailableRegisters := make([]*entities.RegisterID, len(invalidIDs))
@@ -599,14 +602,16 @@ func TestGetRegisterValues(t *testing.T) {
 			BlockHeight: testHeight,
 		}
 
-		_, err := h.GetRegisterValues(ctx, req)
+		resp, err := h.GetRegisterValues(ctx, req)
+		require.Nil(t, resp)
 		require.Equal(t, codes.NotFound, status.Code(err))
 	})
 
 	t.Run("wrong height", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.OutOfRange, "could not get register values: %v", storage.ErrHeightNotIndexed)
-		api.On("GetRegisterValues", ctx, testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr)
+		api.On("GetRegisterValues", testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr).Once()
+
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
@@ -619,8 +624,30 @@ func TestGetRegisterValues(t *testing.T) {
 			BlockHeight: testHeight + 1,
 		}
 
-		_, err := h.GetRegisterValues(ctx, req)
+		resp, err := h.GetRegisterValues(ctx, req)
+		require.Nil(t, resp)
 		require.Equal(t, codes.OutOfRange, status.Code(err))
+	})
+
+	t.Run("failed to get height", func(t *testing.T) {
+		api := ssmock.NewAPI(t)
+		expectedErr := status.Errorf(codes.FailedPrecondition, "could not get register values:: %v", indexer.ErrIndexNotInitialized)
+		api.On("GetRegisterValues", testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr).Once()
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+
+		validRegisters := make([]*entities.RegisterID, len(testIds))
+		for i, id := range testIds {
+			validRegisters[i] = convert.RegisterIDToMessage(id)
+		}
+
+		req := &executiondata.GetRegisterValuesRequest{
+			RegisterIds: validRegisters,
+			BlockHeight: testHeight + 1,
+		}
+
+		resp, err := h.GetRegisterValues(ctx, req)
+		require.Nil(t, resp)
+		require.Equal(t, codes.FailedPrecondition, status.Code(err))
 	})
 }
 

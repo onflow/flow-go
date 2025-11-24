@@ -53,8 +53,8 @@ type ExecutionResultInfoProvider interface {
 	// the execution nodes that produced it.
 	//
 	// Expected error returns during normal operation:
-	//   - [common.InsufficientExecutionReceipts] - found insufficient receipts for given block ID.
-	//   - [storage.ErrNotFound] - if the request is for the spork root block and the node was bootstrapped
+	//   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
+	//   - [storage.ErrNotFound]: If the request is for the spork root block and the node was bootstrapped
 	//     from a newer block.
 	ExecutionResultInfo(blockID flow.Identifier, criteria Criteria) (*ExecutionResultInfo, error)
 }

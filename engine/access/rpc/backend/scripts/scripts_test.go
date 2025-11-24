@@ -357,9 +357,12 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 			expectedError: access.NewInvalidRequestError(cadenceErr),
 		},
 		{
-			ctx:           func() context.Context { return ctx },
+			ctx: func() context.Context {
+				return irrecoverable.WithSignalerContext(context.Background(),
+					irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), fvmFailureErr))
+			},
 			err:           fvmFailureErr,
-			expectedError: access.NewInternalError(fvmFailureErr),
+			expectedError: irrecoverable.NewException(fvmFailureErr),
 		},
 		{
 			ctx: func() context.Context {
