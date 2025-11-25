@@ -752,11 +752,13 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 }
 
 // IterateChildren returns an [iter.Seq] that iterates over all children of the given result ID
-func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
-	rf.mu.RLock()
-	defer rf.mu.RUnlock()
-	return rf.iterateChildren(resultID)
-}
+// TODO: this is currently not concurrency safe because the lock is only held while constructing the
+// iterator, not during iteration. Fix this to make it concurrency safe.
+// func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
+// 	rf.mu.RLock()
+// 	defer rf.mu.RUnlock()
+// 	return rf.iterateChildren(resultID)
+// }
 
 // iterateChildren returns an [iter.Seq] that iterates over all children of the given result ID
 // NOT CONCURRENCY SAFE!
@@ -773,11 +775,13 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*Exe
 }
 
 // IterateView returns an [iter.Seq] that iterates over all containers whose executed block has the given view
-func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
-	rf.mu.RLock()
-	defer rf.mu.RUnlock()
-	return rf.iterateView(view)
-}
+// TODO: this is currently not concurrency safe because the lock is only held while constructing the
+// iterator, not during iteration. Fix this to make it concurrency safe.
+// func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
+// 	rf.mu.RLock()
+// 	defer rf.mu.RUnlock()
+// 	return rf.iterateView(view)
+// }
 
 // iterateView returns an [iter.Seq] that iterates over all containers whose executed block has the given view
 // NOT CONCURRENCY SAFE!
