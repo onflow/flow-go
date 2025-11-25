@@ -175,8 +175,8 @@ func removeCollectionsFromHeight(
 	finalRemoved := 0
 	total := int(final.Height-fromHeight) + 1
 
-	// removing for finalized blocks
-	for height := fromHeight; height <= final.Height; height++ {
+	// removing for finalized blocks, iterating backwards from highest to lowest
+	for height := final.Height; height >= fromHeight; height-- {
 		head, err := protoState.AtHeight(height).Head()
 		if err != nil {
 			return fmt.Errorf("could not get header at height: %w", err)
