@@ -7,6 +7,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion/collections"
@@ -96,6 +97,7 @@ func New(
 	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -187,6 +189,8 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
+
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -341,9 +345,9 @@ func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event int
 	return e.process(originID, event)
 }
 
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+// onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization registrar and forwards them to the finalizedBlockConsumer.
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.finalizedBlockNotifier.Notify()
 }
 
