@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dapperlabs/testingdock"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -31,9 +31,11 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -238,25 +240,17 @@ func (c *Container) Name() string {
 }
 
 // DB returns the node's database.
-func (c *Container) DB() (*badger.DB, error) {
-	opts := badger.
-		DefaultOptions(c.DBPath()).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	return db, err
+func (c *Container) DB() (storage.DB, error) {
+	pdb, err := storagepebble.SafeOpen(unittest.Logger(), c.DBPath())
+	if err != nil {
+		return nil, err
+	}
+	return pebbleimpl.ToDB(pdb), nil
 }
 
 // DB returns the node's execution data database.
-func (c *Container) ExecutionDataDB() (*badger.DB, error) {
-	opts := badger.
-		DefaultOptions(c.ExecutionDataDBPath()).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	return db, err
+func (c *Container) ExecutionDataDB() (*pebble.DB, error) {
+	return storagepebble.SafeOpen(unittest.Logger(), c.ExecutionDataDBPath())
 }
 
 func (c *Container) DBPath() string {
@@ -384,32 +378,33 @@ func (c *Container) Connect() error {
 }
 
 func (c *Container) OpenState() (*state.State, error) {
+	lockManager := storage.NewTestingLockManager()
 	db, err := c.DB()
 	if err != nil {
 		return nil, err
 	}
-
 	metrics := metrics.NewNoopCollector()
-	index := storage.NewIndex(metrics, db)
-	headers := storage.NewHeaders(metrics, db)
-	seals := storage.NewSeals(metrics, db)
-	results := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewExecutionReceipts(metrics, db, results, storage.DefaultCacheSize)
-	guarantees := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
-	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
-	setups := storage.NewEpochSetups(metrics, db)
-	commits := storage.NewEpochCommits(metrics, db)
-	protocolState := storage.NewEpochProtocolStateEntries(metrics, setups, commits, db,
-		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
-		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
+	index := store.NewIndex(metrics, db)
+	headers := store.NewHeaders(metrics, db)
+	seals := store.NewSeals(metrics, db)
+	results := store.NewExecutionResults(metrics, db)
+	receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)
+	guarantees := store.NewGuarantees(metrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
+	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := store.NewBlocks(db, headers, payloads)
+	qcs := store.NewQuorumCertificates(metrics, db, store.DefaultCacheSize)
+	setups := store.NewEpochSetups(metrics, db)
+	commits := store.NewEpochCommits(metrics, db)
+	protocolState := store.NewEpochProtocolStateEntries(metrics, setups, commits, db,
+		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
+	protocolKVStates := store.NewProtocolKVStore(metrics, db,
+		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := store.NewVersionBeacons(db)
 
 	return state.OpenState(
 		metrics,
 		db,
+		lockManager,
 		headers,
 		seals,
 		results,
@@ -475,7 +470,7 @@ func (c *Container) TestnetClient() (*Client, error) {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
-	chain := c.net.Root().Header.ChainID.Chain()
+	chain := c.net.Root().ChainID.Chain()
 	return NewClient(c.Addr(GRPCPort), chain)
 }
 

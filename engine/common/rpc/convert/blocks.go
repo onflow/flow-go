@@ -2,6 +2,7 @@ package convert
 
 import (
 	"fmt"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -10,18 +11,20 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
+// BlockTimestamp2ProtobufTime is just a shorthand function to ensure consistent conversion
+// of block timestamps (measured in unix milliseconds) to protobuf's Timestamp format.
+func BlockTimestamp2ProtobufTime(blockTimestamp uint64) *timestamppb.Timestamp {
+	return timestamppb.New(time.UnixMilli(int64(blockTimestamp)))
+}
+
 // BlockToMessage converts a flow.Block to a protobuf Block message.
-// signerIDs is a precomputed list of signer IDs for the block based on the block's signer indicies.
+// signerIDs is a precomputed list of signer IDs for the block based on the block's signer indices.
 func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	*entities.Block,
 	error,
 ) {
 	id := h.ID()
-
-	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
-
 	seals := BlockSealsToMessages(h.Payload.Seals)
 
 	execResults, err := ExecutionResultsToMessages(h.Payload.Results)
@@ -29,43 +32,39 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 		return nil, err
 	}
 
-	blockHeader, err := BlockHeaderToMessage(h.Header, signerIDs)
+	blockHeader, err := BlockHeaderToMessage(h.ToHeader(), signerIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	bh := entities.Block{
 		Id:                       IdentifierToMessage(id),
-		Height:                   h.Header.Height,
-		ParentId:                 IdentifierToMessage(parentID),
-		Timestamp:                t,
+		Height:                   h.Height,
+		ParentId:                 IdentifierToMessage(h.ParentID),
+		Timestamp:                BlockTimestamp2ProtobufTime(h.Timestamp),
 		CollectionGuarantees:     cg,
 		BlockSeals:               seals,
-		Signatures:               [][]byte{h.Header.ParentVoterSigData},
+		Signatures:               [][]byte{h.ParentVoterSigData},
 		ExecutionReceiptMetaList: ExecutionResultMetaListToMessages(h.Payload.Receipts),
 		ExecutionResultList:      execResults,
 		ProtocolStateId:          IdentifierToMessage(h.Payload.ProtocolStateID),
 		BlockHeader:              blockHeader,
 	}
-
 	return &bh, nil
 }
 
 // BlockToMessageLight converts a flow.Block to the light form of a protobuf Block message.
 func BlockToMessageLight(h *flow.Block) *entities.Block {
 	id := h.ID()
-
-	parentID := h.Header.ParentID
-	t := timestamppb.New(h.Header.Timestamp)
 	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
 
 	return &entities.Block{
 		Id:                   id[:],
-		Height:               h.Header.Height,
-		ParentId:             parentID[:],
-		Timestamp:            t,
+		Height:               h.Height,
+		ParentId:             h.ParentID[:],
+		Timestamp:            BlockTimestamp2ProtobufTime(h.Timestamp),
 		CollectionGuarantees: cg,
-		Signatures:           [][]byte{h.Header.ParentVoterSigData},
+		Signatures:           [][]byte{h.ParentVoterSigData},
 	}
 }
 
@@ -79,10 +78,31 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
-	return &flow.Block{
-		Header:  header,
-		Payload: payload,
-	}, nil
+
+	if IsRootBlockHeader(m.BlockHeader) {
+		block, err := flow.NewRootBlock(
+			flow.UntrustedBlock{
+				HeaderBody: header.HeaderBody,
+				Payload:    *payload,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root block: %w", err)
+		}
+		return block, nil
+	}
+
+	block, err := flow.NewBlock(
+		flow.UntrustedBlock{
+			HeaderBody: header.HeaderBody,
+			Payload:    *payload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build block: %w", err)
+	}
+
+	return block, nil
 }
 
 // BlockSealToMessage converts a flow.Seal to a protobuf BlockSeal message.
@@ -146,23 +166,36 @@ func MessagesToBlockSeals(m []*entities.BlockSeal) ([]*flow.Seal, error) {
 
 // PayloadFromMessage converts a protobuf Block message to a flow.Payload.
 func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
-	cgs := MessagesToCollectionGuarantees(m.CollectionGuarantees)
+	cgs, err := MessagesToCollectionGuarantees(m.CollectionGuarantees)
+	if err != nil {
+		return nil, err
+	}
 	seals, err := MessagesToBlockSeals(m.BlockSeals)
 	if err != nil {
 		return nil, err
 	}
-	receipts := MessagesToExecutionResultMetaList(m.ExecutionReceiptMetaList)
+	receipts, err := MessagesToExecutionResultMetaList(m.ExecutionReceiptMetaList)
+	if err != nil {
+		return nil, err
+	}
 	results, err := MessagesToExecutionResults(m.ExecutionResultList)
 	if err != nil {
 		return nil, err
 	}
-	return &flow.Payload{
-		Guarantees:      cgs,
-		Seals:           seals,
-		Receipts:        receipts,
-		Results:         results,
-		ProtocolStateID: MessageToIdentifier(m.ProtocolStateId),
-	}, nil
+	payload, err := flow.NewPayload(
+		flow.UntrustedPayload{
+			Guarantees:      cgs,
+			Seals:           seals,
+			Receipts:        receipts,
+			Results:         results,
+			ProtocolStateID: MessageToIdentifier(m.ProtocolStateId),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not build the payload: %w", err)
+	}
+
+	return payload, nil
 }
 
 // MessageToBlockStatus converts a protobuf BlockStatus message to a flow.BlockStatus.

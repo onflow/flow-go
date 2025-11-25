@@ -26,20 +26,20 @@ func TestReadWrite(t *testing.T) {
 
 		// Test read nothing should return not found
 		var item Entity
-		err := operation.Retrieve(e.Key(), &item)(r)
+		err := operation.RetrieveByKey(r, e.Key(), &item)
 		require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error")
 
 		require.NoError(t, withWriter(operation.Upsert(e.Key(), e)))
 
 		var readBack Entity
-		require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
+		require.NoError(t, operation.RetrieveByKey(r, e.Key(), &readBack))
 		require.Equal(t, e, readBack, "expected retrieved value to match written value")
 
 		// Test write again should overwrite
 		newEntity := Entity{ID: 42}
 		require.NoError(t, withWriter(operation.Upsert(e.Key(), newEntity)))
 
-		require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
+		require.NoError(t, operation.RetrieveByKey(r, e.Key(), &readBack))
 		require.Equal(t, newEntity, readBack, "expected overwritten value to be retrieved")
 
 		// Test write should not overwrite a different key
@@ -47,7 +47,7 @@ func TestReadWrite(t *testing.T) {
 		require.NoError(t, withWriter(operation.Upsert(anotherEntity.Key(), anotherEntity)))
 
 		var anotherReadBack Entity
-		require.NoError(t, operation.Retrieve(anotherEntity.Key(), &anotherReadBack)(r))
+		require.NoError(t, operation.RetrieveByKey(r, anotherEntity.Key(), &anotherReadBack))
 		require.Equal(t, anotherEntity, anotherReadBack, "expected different key to return different value")
 	})
 }
@@ -66,7 +66,9 @@ func TestReadWriteMalformed(t *testing.T) {
 
 		// Test read should return decoding error
 		var exists bool
-		require.NoError(t, operation.Exists(e.Key(), &exists)(r))
+		var err error
+		exists, err = operation.KeyExists(r, e.Key())
+		require.NoError(t, err)
 		require.False(t, exists, "expected key to not exist")
 	})
 }
@@ -94,7 +96,7 @@ func TestBatchWrite(t *testing.T) {
 		// Verify that each entity can be read back
 		for _, e := range entities {
 			var readBack Entity
-			require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
+			require.NoError(t, operation.RetrieveByKey(r, e.Key(), &readBack))
 			require.Equal(t, e, readBack, "expected retrieved value to match written value for entity ID %d", e.ID)
 		}
 
@@ -111,7 +113,7 @@ func TestBatchWrite(t *testing.T) {
 		// Verify that each entity has been removed
 		for _, e := range entities {
 			var readBack Entity
-			err := operation.Retrieve(e.Key(), &readBack)(r)
+			err := operation.RetrieveByKey(r, e.Key(), &readBack)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error for entity ID %d after removal", e.ID)
 		}
 	})
@@ -195,7 +197,9 @@ func TestRemove(t *testing.T) {
 		e := Entity{ID: 1337}
 
 		var exists bool
-		require.NoError(t, operation.Exists(e.Key(), &exists)(r))
+		var err error
+		exists, err = operation.KeyExists(r, e.Key())
+		require.NoError(t, err)
 		require.False(t, exists, "expected key to not exist")
 
 		// Test delete nothing should return OK
@@ -204,13 +208,14 @@ func TestRemove(t *testing.T) {
 		// Test write, delete, then read should return not found
 		require.NoError(t, withWriter(operation.Upsert(e.Key(), e)))
 
-		require.NoError(t, operation.Exists(e.Key(), &exists)(r))
+		exists, err = operation.KeyExists(r, e.Key())
+		require.NoError(t, err)
 		require.True(t, exists, "expected key to exist")
 
 		require.NoError(t, withWriter(operation.Remove(e.Key())))
 
 		var item Entity
-		err := operation.Retrieve(e.Key(), &item)(r)
+		err = operation.RetrieveByKey(r, e.Key(), &item)
 		require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error after delete")
 	})
 }
@@ -294,7 +299,7 @@ func TestConcurrentWrite(t *testing.T) {
 				require.NoError(t, withWriter(operation.Upsert(e.Key(), e)))
 
 				var readBack Entity
-				require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
+				require.NoError(t, operation.RetrieveByKey(r, e.Key(), &readBack))
 				require.Equal(t, e, readBack, "expected retrieved value to match written value for key %d", i)
 			}(i)
 		}
@@ -326,7 +331,7 @@ func TestConcurrentRemove(t *testing.T) {
 
 				// Check that the item is no longer retrievable
 				var item Entity
-				err := operation.Retrieve(e.Key(), &item)(r)
+				err := operation.RetrieveByKey(r, e.Key(), &item)
 				require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error after delete for key %d", i)
 			}(i)
 		}
@@ -375,7 +380,9 @@ func TestRemoveByPrefix(t *testing.T) {
 		// Verify that the keys in the prefix range have been removed
 		for i, key := range keys {
 			var exists bool
-			require.NoError(t, operation.Exists(key, &exists)(r))
+			var err error
+			exists, err = operation.KeyExists(r, key)
+			require.NoError(t, err)
 			t.Logf("key %x exists: %t", key, exists)
 
 			deleted := includeStart <= i && i <= includeEnd
@@ -387,10 +394,10 @@ func TestRemoveByPrefix(t *testing.T) {
 
 		// Verify that after the removal, Traverse the removed prefix would return nothing
 		removedKeys := make([]string, 0)
-		err := operation.Traverse(prefix, operation.KeyOnlyIterateFunc(func(key []byte) error {
+		err := operation.TraverseByPrefix(r, prefix, func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
 			removedKeys = append(removedKeys, fmt.Sprintf("%x", key))
-			return nil
-		}), storage.DefaultIteratorOptions())(r)
+			return false, nil
+		}, storage.DefaultIteratorOptions())
 		require.NoError(t, err)
 		require.Len(t, removedKeys, 0, "expected no entries to be found when traversing the removed prefix")
 
@@ -402,10 +409,10 @@ func TestRemoveByPrefix(t *testing.T) {
 		}
 
 		actual := make([][]byte, 0)
-		err = operation.Iterate([]byte{keys[0][0]}, storage.PrefixUpperBound(keys[len(keys)-1]), func(key []byte) error {
+		err = operation.IterateKeysByPrefixRange(r, []byte{keys[0][0]}, storage.PrefixUpperBound(keys[len(keys)-1]), func(key []byte) error {
 			actual = append(actual, key)
 			return nil
-		})(r)
+		})
 		require.NoError(t, err)
 		require.Equal(t, expected, actual, "expected keys to match expected values")
 	})
@@ -452,7 +459,9 @@ func TestRemoveByRange(t *testing.T) {
 		// Verify that the keys in the prefix range have been removed
 		for i, key := range keys {
 			var exists bool
-			require.NoError(t, operation.Exists(key, &exists)(r))
+			var err error
+			exists, err = operation.KeyExists(r, key)
+			require.NoError(t, err)
 			t.Logf("key %x exists: %t", key, exists)
 
 			deleted := includeStart <= i && i <= includeEnd
@@ -499,7 +508,9 @@ func TestRemoveFrom(t *testing.T) {
 		// Verify that the keys in the prefix range have been removed
 		for i, key := range keys {
 			var exists bool
-			require.NoError(t, operation.Exists(key, &exists)(r))
+			var err error
+			exists, err = operation.KeyExists(r, key)
+			require.NoError(t, err)
 			t.Logf("key %x exists: %t", key, exists)
 
 			deleted := includeStart <= i && i <= includeEnd
@@ -562,4 +573,116 @@ func getFolderSize(t testing.TB, dir string) int64 {
 	}))
 
 	return size
+}
+
+func TestBatchValue(t *testing.T) {
+	const key = "key1"
+
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		t.Run("no data", func(t *testing.T) {
+			const expectedCallbackInvocationCount = 2
+			callbackInvocationCount := 0
+
+			err := db.WithReaderBatchWriter(func(b storage.ReaderBatchWriter) error {
+				callbackFunc := func(error) {
+					callbackInvocationCount++
+
+					value, exists := b.ScopedValue(key)
+					require.Nil(t, value)
+					require.False(t, exists)
+				}
+
+				for range expectedCallbackInvocationCount {
+					b.AddCallback(callbackFunc)
+				}
+
+				k := []byte{0x01}
+				v := []byte{0x02}
+
+				// Insert k and v into batch.
+				err := b.Writer().Set(k, v)
+				require.NoError(t, err)
+
+				return nil
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
+		})
+
+		t.Run("store data multiple times", func(t *testing.T) {
+			const expectedCallbackInvocationCount = 2
+			callbackInvocationCount := 0
+
+			err := db.WithReaderBatchWriter(func(b storage.ReaderBatchWriter) error {
+				b.SetScopedValue(key, []string{"value1", "value2"})
+
+				b.SetScopedValue(key, []string{"value2", "value3"})
+
+				callbackFunc := func(error) {
+					callbackInvocationCount++
+
+					data, exists := b.ScopedValue(key)
+					require.Equal(t, []string{"value2", "value3"}, data.([]string))
+					require.True(t, exists)
+				}
+
+				for range expectedCallbackInvocationCount {
+					b.AddCallback(callbackFunc)
+				}
+
+				k := []byte{0x01}
+				v := []byte{0x02}
+
+				// Insert k and v into batch.
+				err := b.Writer().Set(k, v)
+				require.NoError(t, err)
+
+				return nil
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
+		})
+
+		t.Run("store and remove data", func(t *testing.T) {
+			const expectedCallbackInvocationCount = 2
+			callbackInvocationCount := 0
+
+			err := db.WithReaderBatchWriter(func(b storage.ReaderBatchWriter) error {
+				b.SetScopedValue(key, []string{"value1", "value2"})
+
+				callbackFunc := func(error) {
+					callbackInvocationCount++
+
+					data, exists := b.ScopedValue(key)
+					if callbackInvocationCount == 1 {
+						require.Equal(t, []string{"value1", "value2"}, data.([]string))
+						require.True(t, exists)
+
+						b.SetScopedValue(key, nil)
+					} else {
+						require.Nil(t, data)
+						require.False(t, exists)
+					}
+				}
+
+				for range expectedCallbackInvocationCount {
+					b.AddCallback(callbackFunc)
+				}
+
+				k := []byte{0x01}
+				v := []byte{0x02}
+
+				// Insert k and v into batch.
+				err := b.Writer().Set(k, v)
+				require.NoError(t, err)
+
+				return nil
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, expectedCallbackInvocationCount, callbackInvocationCount)
+		})
+	})
 }

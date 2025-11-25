@@ -265,7 +265,7 @@ func (creator *accountCreator) CreateAccount(
 
 	// don't enforce limit during account creation
 	var address flow.Address
-	creator.txnState.RunWithAllLimitsDisabled(func() {
+	creator.txnState.RunWithMeteringDisabled(func() {
 		address, err = creator.createAccount(flow.ConvertAddress(runtimePayer))
 	})
 

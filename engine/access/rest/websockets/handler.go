@@ -34,11 +34,12 @@ func NewWebSocketHandler(
 	config Config,
 	chain flow.Chain,
 	maxRequestSize int64,
+	maxResponseSize int64,
 	dataProviderFactory dp.DataProviderFactory,
 ) *Handler {
 	return &Handler{
 		ctx:                 ctx,
-		HttpHandler:         common.NewHttpHandler(logger, chain, maxRequestSize),
+		HttpHandler:         common.NewHttpHandler(logger, chain, maxRequestSize, maxResponseSize),
 		websocketConfig:     config,
 		logger:              logger,
 		dataProviderFactory: dataProviderFactory,

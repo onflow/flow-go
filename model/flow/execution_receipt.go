@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/onflow/crypto"
 )
@@ -9,72 +10,169 @@ import (
 type Spock []byte
 
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
-// Specifically, it contains the detailed execution result.
+// Specifically, it contains the detailed execution result. The `ExecutorSignature`
+// signs the `UnsignedExecutionReceipt`.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type ExecutionReceipt struct {
-	ExecutorID Identifier
-	ExecutionResult
-	Spocks            []crypto.Signature
+	UnsignedExecutionReceipt
 	ExecutorSignature crypto.Signature
+}
+
+// UntrustedExecutionReceipt is an untrusted input-only representation of a ExecutionReceipt,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedExecutionReceipt should be validated and converted into
+// a trusted ExecutionReceipt using NewExecutionReceipt constructor.
+type UntrustedExecutionReceipt ExecutionReceipt
+
+// NewExecutionReceipt creates a new instance of ExecutionReceipt.
+// Construction ExecutionReceipt allowed only within the constructor.
+//
+// All errors indicate a valid ExecutionReceipt cannot be constructed from the input.
+func NewExecutionReceipt(untrusted UntrustedExecutionReceipt) (*ExecutionReceipt, error) {
+	unsignedExecutionReceipt, err := NewUnsignedExecutionReceipt(UntrustedUnsignedExecutionReceipt(untrusted.UnsignedExecutionReceipt))
+	if err != nil {
+		return nil, fmt.Errorf("invalid unsigned execution receipt: %w", err)
+	}
+	if len(untrusted.ExecutorSignature) == 0 {
+		return nil, fmt.Errorf("executor signature must not be empty")
+	}
+	return &ExecutionReceipt{
+		UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+		ExecutorSignature:        untrusted.ExecutorSignature,
+	}, nil
 }
 
 // ID returns the canonical ID of the execution receipt.
 func (er *ExecutionReceipt) ID() Identifier {
-	return er.Meta().ID()
+	return er.Stub().ID()
 }
 
-// Checksum returns a checksum for the execution receipt including the signatures.
-func (er *ExecutionReceipt) Checksum() Identifier {
-	return MakeID(er)
-}
-
-// Meta returns the receipt metadata for the receipt.
-func (er *ExecutionReceipt) Meta() *ExecutionReceiptMeta {
-	return &ExecutionReceiptMeta{
-		ExecutorID:        er.ExecutorID,
-		ResultID:          er.ExecutionResult.ID(),
-		Spocks:            er.Spocks,
-		ExecutorSignature: er.ExecutorSignature,
+// Stub returns a stub of the full ExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
+func (er *ExecutionReceipt) Stub() *ExecutionReceiptStub {
+	// Constructor is skipped since we're using an already-valid ExecutionReceipt object.
+	//nolint:structwrite
+	return &ExecutionReceiptStub{
+		UnsignedExecutionReceiptStub: *er.UnsignedExecutionReceipt.Stub(),
+		ExecutorSignature:            er.ExecutorSignature,
 	}
 }
 
-// ExecutionReceiptMeta contains the fields from the Execution Receipts
+// UnsignedExecutionReceipt represents the unsigned execution receipt, whose contents the
+// Execution Node testifies to be correct by its signature.
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type UnsignedExecutionReceipt struct {
+	ExecutorID Identifier
+	ExecutionResult
+	Spocks []crypto.Signature
+}
+
+// UntrustedUnsignedExecutionReceipt is an untrusted input-only representation of a UnsignedExecutionReceipt,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedUnsignedExecutionReceipt should be validated and converted into
+// a trusted UnsignedExecutionReceipt using NewUnsignedExecutionReceipt constructor.
+type UntrustedUnsignedExecutionReceipt UnsignedExecutionReceipt
+
+// NewUnsignedExecutionReceipt creates a new instance of UnsignedExecutionReceipt.
+// Construction UnsignedExecutionReceipt allowed only within the constructor.
+//
+// All errors indicate a valid UnsignedExecutionReceipt cannot be constructed from the input.
+func NewUnsignedExecutionReceipt(untrusted UntrustedUnsignedExecutionReceipt) (*UnsignedExecutionReceipt, error) {
+	if untrusted.ExecutorID == ZeroID {
+		return nil, fmt.Errorf("executor ID must not be zero")
+	}
+	executionResult, err := NewExecutionResult(UntrustedExecutionResult(untrusted.ExecutionResult))
+	if err != nil {
+		return nil, fmt.Errorf("invalid execution result: %w", err)
+	}
+	if len(untrusted.Spocks) == 0 {
+		return nil, fmt.Errorf("spocks must not be empty")
+	}
+	return &UnsignedExecutionReceipt{
+		ExecutorID:      untrusted.ExecutorID,
+		ExecutionResult: *executionResult,
+		Spocks:          untrusted.Spocks,
+	}, nil
+}
+
+// ID returns a hash over the data of the execution receipt.
+// This is what is signed by the executor and verified by recipients.
+// Necessary to override ExecutionResult.ID().
+func (erb UnsignedExecutionReceipt) ID() Identifier {
+	return erb.Stub().ID()
+}
+
+// Stub returns a stub of the UnsignedExecutionReceipt, where the ExecutionResult is replaced by its cryptographic hash.
+func (erb UnsignedExecutionReceipt) Stub() *UnsignedExecutionReceiptStub {
+	// Constructor is skipped since we're using an already-valid UnsignedExecutionReceipt object.
+	//nolint:structwrite
+	return &UnsignedExecutionReceiptStub{
+		ExecutorID: erb.ExecutorID,
+		ResultID:   erb.ExecutionResult.ID(),
+		Spocks:     erb.Spocks,
+	}
+}
+
+// ExecutionReceiptStub contains the fields from the Execution Receipts
 // that vary from one executor to another (assuming they commit to the same
 // result). It only contains the ID (cryptographic hash) of the execution
-// result the receipt commits to. The ExecutionReceiptMeta is useful for
+// result the receipt commits to. The ExecutionReceiptStub is useful for
 // storing results and receipts separately in a composable way.
-type ExecutionReceiptMeta struct {
-	ExecutorID        Identifier
-	ResultID          Identifier
-	Spocks            []crypto.Signature
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type ExecutionReceiptStub struct {
+	UnsignedExecutionReceiptStub
 	ExecutorSignature crypto.Signature
 }
 
-func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult) *ExecutionReceipt {
-	return &ExecutionReceipt{
-		ExecutorID:        meta.ExecutorID,
-		ExecutionResult:   result,
-		Spocks:            meta.Spocks,
-		ExecutorSignature: meta.ExecutorSignature,
+// UntrustedExecutionReceiptStub is an untrusted input-only representation of a ExecutionReceiptStub,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedExecutionReceiptStub should be validated and converted into
+// a trusted ExecutionReceiptStub using NewExecutionReceiptStub constructor.
+type UntrustedExecutionReceiptStub ExecutionReceiptStub
+
+// NewExecutionReceiptStub creates a new instance of ExecutionReceiptStub.
+// Construction ExecutionReceiptStub allowed only within the constructor.
+//
+// All errors indicate a valid ExecutionReceiptStub cannot be constructed from the input.
+func NewExecutionReceiptStub(untrusted UntrustedExecutionReceiptStub) (*ExecutionReceiptStub, error) {
+	unsignedExecutionReceiptStub, err := NewUnsignedExecutionReceiptStub(UntrustedUnsignedExecutionReceiptStub(untrusted.UnsignedExecutionReceiptStub))
+	if err != nil {
+		return nil, fmt.Errorf("invalid unsigned execution receipt stub: %w", err)
 	}
+	if len(untrusted.ExecutorSignature) == 0 {
+		return nil, fmt.Errorf("executor signature must not be empty")
+	}
+	return &ExecutionReceiptStub{
+		UnsignedExecutionReceiptStub: *unsignedExecutionReceiptStub,
+		ExecutorSignature:            untrusted.ExecutorSignature,
+	}, nil
 }
 
 // ID returns the canonical ID of the execution receipt.
 // It is identical to the ID of the full receipt.
-func (er *ExecutionReceiptMeta) ID() Identifier {
-	body := struct {
-		ExecutorID Identifier
-		ResultID   Identifier
-		Spocks     []crypto.Signature
-	}{
-		ExecutorID: er.ExecutorID,
-		ResultID:   er.ResultID,
-		Spocks:     er.Spocks,
-	}
-	return MakeID(body)
+func (er *ExecutionReceiptStub) ID() Identifier {
+	return MakeID(er)
 }
 
-func (er ExecutionReceiptMeta) MarshalJSON() ([]byte, error) {
-	type Alias ExecutionReceiptMeta
+func (er ExecutionReceiptStub) MarshalJSON() ([]byte, error) {
+	type Alias ExecutionReceiptStub
 	return json.Marshal(struct {
 		Alias
 		ID string
@@ -84,9 +182,79 @@ func (er ExecutionReceiptMeta) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Checksum returns a checksum for the execution receipt including the signatures.
-func (er *ExecutionReceiptMeta) Checksum() Identifier {
-	return MakeID(er)
+// ExecutionReceiptFromStub creates ExecutionReceipt from execution result and ExecutionReceiptStub.
+// No errors are expected during normal operation.
+func ExecutionReceiptFromStub(stub ExecutionReceiptStub, result ExecutionResult) (*ExecutionReceipt, error) {
+	unsignedExecutionReceipt, err := NewUnsignedExecutionReceipt(
+		UntrustedUnsignedExecutionReceipt{
+			ExecutorID:      stub.ExecutorID,
+			ExecutionResult: result,
+			Spocks:          stub.Spocks,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct unsigned execution receipt: %w", err)
+	}
+
+	executionReceipt, err := NewExecutionReceipt(
+		UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+			ExecutorSignature:        stub.ExecutorSignature,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct execution receipt: %w", err)
+	}
+
+	return executionReceipt, nil
+}
+
+// UnsignedExecutionReceiptStub contains the fields of ExecutionReceiptStub that are signed by the executor.
+//
+//structwrite:immutable - mutations allowed only within the constructor
+type UnsignedExecutionReceiptStub struct {
+	ExecutorID Identifier
+	ResultID   Identifier
+	Spocks     []crypto.Signature
+}
+
+// UntrustedUnsignedExecutionReceiptStub is an untrusted input-only representation of a UnsignedExecutionReceiptStub,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedUnsignedExecutionReceiptStub should be validated and converted into
+// a trusted UnsignedExecutionReceiptStub using NewUnsignedExecutionReceiptStub constructor.
+type UntrustedUnsignedExecutionReceiptStub UnsignedExecutionReceiptStub
+
+// NewUnsignedExecutionReceiptStub creates a new instance of UnsignedExecutionReceiptStub.
+// Construction UnsignedExecutionReceiptStub allowed only within the constructor.
+//
+// All errors indicate a valid UnsignedExecutionReceiptStub cannot be constructed from the input.
+func NewUnsignedExecutionReceiptStub(untrusted UntrustedUnsignedExecutionReceiptStub) (*UnsignedExecutionReceiptStub, error) {
+	if untrusted.ExecutorID == ZeroID {
+		return nil, fmt.Errorf("executor ID must not be zero")
+	}
+	if untrusted.ResultID == ZeroID {
+		return nil, fmt.Errorf("result ID must not be zero")
+	}
+	if len(untrusted.Spocks) == 0 {
+		return nil, fmt.Errorf("spocks must not be empty")
+	}
+	return &UnsignedExecutionReceiptStub{
+		ExecutorID: untrusted.ExecutorID,
+		ResultID:   untrusted.ResultID,
+		Spocks:     untrusted.Spocks,
+	}, nil
+}
+
+// ID returns cryptographic hash of unsigned execution receipt.
+// This is what is signed by the executor and verified by recipients.
+// It is identical to the ID of the full UnsignedExecutionReceipt.
+func (erb UnsignedExecutionReceiptStub) ID() Identifier {
+	return MakeID(erb)
 }
 
 /*******************************************************************************
@@ -135,6 +303,15 @@ func (l ExecutionReceiptList) Size() int {
 	return len(l)
 }
 
+// Stubs converts the ExecutionReceiptList to an ExecutionReceiptStubList
+func (l ExecutionReceiptList) Stubs() ExecutionReceiptStubList {
+	stubs := make(ExecutionReceiptStubList, len(l))
+	for i, receipt := range l {
+		stubs[i] = receipt.Stub()
+	}
+	return stubs
+}
+
 // GetGroup returns the receipts that were mapped to the same identifier by the
 // grouping function. Returns an empty (nil) ExecutionReceiptList if groupID does not exist.
 func (g ExecutionReceiptGroupedList) GetGroup(groupID Identifier) ExecutionReceiptList {
@@ -147,25 +324,25 @@ func (g ExecutionReceiptGroupedList) NumberGroups() int {
 }
 
 /*******************************************************************************
-GROUPING for ExecutionReceiptMeta information:
-allows to split a list of receipt meta information by some property
+GROUPING for ExecutionReceiptStub information:
+allows to split a list of receipt stub information by some property
 *******************************************************************************/
 
-// ExecutionReceiptMetaList is a slice of ExecutionResultMetas with the additional
+// ExecutionReceiptStubList is a slice of ExecutionResultStubs with the additional
 // functionality to group them by various properties
-type ExecutionReceiptMetaList []*ExecutionReceiptMeta
+type ExecutionReceiptStubList []*ExecutionReceiptStub
 
-// ExecutionReceiptMetaGroupedList is a partition of an ExecutionReceiptMetaList
-type ExecutionReceiptMetaGroupedList map[Identifier]ExecutionReceiptMetaList
+// ExecutionReceiptStubGroupedList is a partition of an ExecutionReceiptStubList
+type ExecutionReceiptStubGroupedList map[Identifier]ExecutionReceiptStubList
 
-// ExecutionReceiptMetaGroupingFunction is a function that assigns an identifier to each receipt meta
-type ExecutionReceiptMetaGroupingFunction func(*ExecutionReceiptMeta) Identifier
+// ExecutionReceiptStubGroupingFunction is a function that assigns an identifier to each receipt stub
+type ExecutionReceiptStubGroupingFunction func(*ExecutionReceiptStub) Identifier
 
-// GroupBy partitions the ExecutionReceiptMetaList. All receipts that are mapped
+// GroupBy partitions the ExecutionReceiptStubList. All receipts that are mapped
 // by the grouping function to the same identifier are placed in the same group.
 // Within each group, the order and multiplicity of the receipts is preserved.
-func (l ExecutionReceiptMetaList) GroupBy(grouper ExecutionReceiptMetaGroupingFunction) ExecutionReceiptMetaGroupedList {
-	groups := make(map[Identifier]ExecutionReceiptMetaList)
+func (l ExecutionReceiptStubList) GroupBy(grouper ExecutionReceiptStubGroupingFunction) ExecutionReceiptStubGroupedList {
+	groups := make(map[Identifier]ExecutionReceiptStubList)
 	for _, rcpt := range l {
 		groupID := grouper(rcpt)
 		groups[groupID] = append(groups[groupID], rcpt)
@@ -173,39 +350,39 @@ func (l ExecutionReceiptMetaList) GroupBy(grouper ExecutionReceiptMetaGroupingFu
 	return groups
 }
 
-// GroupByExecutorID partitions the ExecutionReceiptMetaList by the receipts' ExecutorIDs.
+// GroupByExecutorID partitions the ExecutionReceiptStubList by the receipts' ExecutorIDs.
 // Within each group, the order and multiplicity of the receipts is preserved.
-func (l ExecutionReceiptMetaList) GroupByExecutorID() ExecutionReceiptMetaGroupedList {
-	grouper := func(receipt *ExecutionReceiptMeta) Identifier { return receipt.ExecutorID }
+func (l ExecutionReceiptStubList) GroupByExecutorID() ExecutionReceiptStubGroupedList {
+	grouper := func(receipt *ExecutionReceiptStub) Identifier { return receipt.ExecutorID }
 	return l.GroupBy(grouper)
 }
 
-// GroupByResultID partitions the ExecutionReceiptMetaList by the receipts' Result IDs.
+// GroupByResultID partitions the ExecutionReceiptStubList by the receipts' Result IDs.
 // Within each group, the order and multiplicity of the receipts is preserved.
-func (l ExecutionReceiptMetaList) GroupByResultID() ExecutionReceiptMetaGroupedList {
-	grouper := func(receipt *ExecutionReceiptMeta) Identifier { return receipt.ResultID }
+func (l ExecutionReceiptStubList) GroupByResultID() ExecutionReceiptStubGroupedList {
+	grouper := func(receipt *ExecutionReceiptStub) Identifier { return receipt.ResultID }
 	return l.GroupBy(grouper)
 }
 
 // Size returns the number of receipts in the list
-func (l ExecutionReceiptMetaList) Size() int {
+func (l ExecutionReceiptStubList) Size() int {
 	return len(l)
 }
 
 // GetGroup returns the receipts that were mapped to the same identifier by the
-// grouping function. Returns an empty (nil) ExecutionReceiptMetaList if groupID does not exist.
-func (g ExecutionReceiptMetaGroupedList) GetGroup(groupID Identifier) ExecutionReceiptMetaList {
+// grouping function. Returns an empty (nil) ExecutionReceiptStubList if groupID does not exist.
+func (g ExecutionReceiptStubGroupedList) GetGroup(groupID Identifier) ExecutionReceiptStubList {
 	return g[groupID]
 }
 
 // NumberGroups returns the number of groups
-func (g ExecutionReceiptMetaGroupedList) NumberGroups() int {
+func (g ExecutionReceiptStubGroupedList) NumberGroups() int {
 	return len(g)
 }
 
-// Lookup generates a map from ExecutionReceipt ID to ExecutionReceiptMeta
-func (l ExecutionReceiptMetaList) Lookup() map[Identifier]*ExecutionReceiptMeta {
-	receiptsByID := make(map[Identifier]*ExecutionReceiptMeta, len(l))
+// Lookup generates a map from ExecutionReceipt ID to ExecutionReceiptStub
+func (l ExecutionReceiptStubList) Lookup() map[Identifier]*ExecutionReceiptStub {
+	receiptsByID := make(map[Identifier]*ExecutionReceiptStub, len(l))
 	for _, receipt := range l {
 		receiptsByID[receipt.ID()] = receipt
 	}

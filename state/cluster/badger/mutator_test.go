@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,16 +27,18 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	protocolutil "github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type MutatorSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+	db          storage.DB
+	dbdir       string
+	lockManager lockctx.Manager
 
 	genesis      *model.Block
 	chainID      flow.ChainID
@@ -54,27 +56,30 @@ type MutatorSuite struct {
 func (suite *MutatorSuite) SetupTest() {
 	var err error
 
-	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.Header.ChainID
+	suite.genesis, err = unittest.ClusterBlock.Genesis()
+	require.NoError(suite.T(), err)
+	suite.chainID = suite.genesis.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.db = pebbleimpl.ToDB(pdb)
+	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := storage.InitAll(metrics, suite.db)
-	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db)
+	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 
 	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100_000
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.View + 100_000
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.ChainID)
 	require.NoError(suite.T(), err)
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
@@ -88,7 +93,7 @@ func (suite *MutatorSuite) SetupTest() {
 	)
 	require.NoError(suite.T(), err)
 	genesis.Payload.ProtocolStateID = rootProtocolState.ID()
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
+	rootSnapshot, err := unittest.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 
@@ -96,12 +101,13 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -109,7 +115,9 @@ func (suite *MutatorSuite) SetupTest() {
 		rootSnapshot,
 	)
 	require.NoError(suite.T(), err)
-	suite.protoState, err = pbadger.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(
+		log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer(),
+	)
 	require.NoError(suite.T(), err)
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
@@ -119,15 +127,15 @@ func (suite *MutatorSuite) SetupTest() {
 		state.Params(),
 		all.Headers,
 		all.Results,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 	)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
-	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
 }
 
@@ -157,35 +165,50 @@ func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.
 			minRefID = refBlock.ID()
 		}
 	}
-	return model.PayloadFromTransactions(minRefID, transactions...)
+
+	// avoid a nil transaction list
+	if len(transactions) == 0 {
+		transactions = []*flow.TransactionBody{}
+	}
+
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
+	suite.Assert().NoError(err)
+
+	return *payload
 }
 
-// BlockWithParent returns a valid block with the given parent.
-func (suite *MutatorSuite) BlockWithParent(parent *model.Block) model.Block {
-	block := unittest.ClusterBlockWithParent(parent)
-	payload := suite.Payload()
-	block.SetPayload(payload)
-	return block
+// ProposalWithParent returns a valid block proposal with the given parent and the given payload.
+func (suite *MutatorSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+		unittest.ClusterBlock.WithPayload(payload),
+	)
+	return *unittest.ClusterProposalFromBlock(block)
 }
 
-// Block returns a valid cluster block with genesis as parent.
-func (suite *MutatorSuite) Block() model.Block {
-	return suite.BlockWithParent(suite.genesis)
+// Proposal returns a valid cluster block proposal with genesis as parent.
+func (suite *MutatorSuite) Proposal() model.Proposal {
+	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
 func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
-	err := suite.db.Update(func(tx *badger.Txn) error {
-		var refBlock flow.Header
-		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
-		if err != nil {
-			return err
-		}
-		err = procedure.FinalizeClusterBlock(block.ID())(tx)
-		if err != nil {
-			return err
-		}
-		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
-		return err
+	var refBlock flow.Header
+	err := operation.RetrieveHeader(suite.db.Reader(), block.Payload.ReferenceBlockID, &refBlock)
+	suite.Require().Nil(err)
+
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := operation.FinalizeClusterBlock(lctx, rw, block.ID())
+			if err != nil {
+				return err
+			}
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+		})
 	})
 	suite.Assert().NoError(err)
 }
@@ -204,21 +227,14 @@ func TestMutator(t *testing.T) {
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidHeight() {
-	suite.genesis.Header.Height = 1
+	suite.genesis.Height = 1
 
 	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
-	suite.genesis.Header.ParentID = unittest.IdentifierFixture()
-
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
-	suite.Assert().Error(err)
-}
-
-func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
-	suite.genesis.Header.PayloadHash = unittest.IdentifierFixture()
+	suite.genesis.ParentID = unittest.IdentifierFixture()
 
 	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
@@ -226,72 +242,81 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
 
 func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	// this is invalid because genesis collection should be empty
-	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
+	suite.genesis.Payload = *unittest.ClusterPayloadFixture(2)
 
 	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
+// TestBootstrap_Successful verifies that basic information is successfully persisted during bootstrapping.
+//  1. The collector's root block was inserted and indexed. Specifically:
+//     - The collection contained in the root block can be retrieved by its ID.
+//     - The transactions contained in the root block's collection can be looked up by the root block's ID.
+//     - The root block's header can be retrieved by its ID.
+//     (The payload, i.e. the collection, we already retrieved above.)
+//     - The root block can be looked up by its height.
+//     - The latest finalized cluster block height should be the height of the root block.
 func (suite *MutatorSuite) TestBootstrap_Successful() {
-	err := suite.db.View(func(tx *badger.Txn) error {
-
-		// should insert collection
-		var collection flow.LightCollection
-		err := operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
+	err := (func(r storage.Reader) error {
+		// Bootstrapping should have inserted the collection contained in the root block
+		collection := new(flow.LightCollection)
+		err := operation.RetrieveCollection(r, suite.genesis.Payload.Collection.ID(), collection)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
-		// should index collection
-		collection = flow.LightCollection{} // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
+		// Bootstrapping should have indexed the transactions contained in the collector's root block.
+		var txIDs []flow.Identifier // reset the collection
+		err = operation.LookupCollectionPayload(r, suite.genesis.ID(), &txIDs)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
-		// should insert header
+		// Bootstrapping should have inserted the collector's root block header
 		var header flow.Header
-		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
+		err = operation.RetrieveHeader(r, suite.genesis.ID(), &header)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Header.ID(), header.ID())
+		suite.Assert().Equal(suite.genesis.ToHeader().ID(), header.ID())
 
-		// should insert block height -> ID lookup
+		// Bootstrapping should have indexed the root block's by the root block's height.
 		var blockID flow.Identifier
-		err = operation.LookupClusterBlockHeight(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(r, suite.genesis.ChainID, suite.genesis.Height, &blockID)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
-		// should insert boundary
-		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.Header.ChainID, &boundary)(tx)
+		// As the latest finalized cluster block height, bootstrapping should have indexed the root block.
+		var latestFinalizedClusterBlockHeight uint64
+		err = operation.RetrieveClusterFinalizedHeight(r, suite.genesis.ChainID, &latestFinalizedClusterBlockHeight)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
+		suite.Assert().Equal(suite.genesis.Height, latestFinalizedClusterBlockHeight)
 
 		return nil
-	})
+	})(suite.db.Reader())
 	suite.Assert().Nil(err)
 }
 
 func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
-	block := unittest.ClusterBlockWithParent(suite.genesis)
-	err := suite.state.Extend(&block)
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(suite.genesis),
+	)
+	err := suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_InvalidChainID() {
-	block := suite.Block()
+	proposal := suite.Proposal()
 	// change the chain ID
-	block.Header.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", block.Header.ChainID))
+	proposal.Block.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", proposal.Block.ChainID))
 
-	err := suite.state.Extend(&block)
+	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
-	block := suite.Block()
+	proposal := suite.Proposal()
 	// change the block height
-	block.Header.Height = block.Header.Height - 1
+	proposal.Block.Height = proposal.Block.Height + 1
 
-	err := suite.state.Extend(&block)
+	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
@@ -299,92 +324,100 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 // TestExtend_InvalidParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
 // with view of block referred by ParentID.
 func (suite *MutatorSuite) TestExtend_InvalidParentView() {
-	block := suite.Block()
-	// change the block parent view
-	block.Header.ParentView--
+	tx1 := suite.Tx()
+	tx2 := suite.Tx()
 
-	err := suite.state.Extend(&block)
+	proposal1 := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+
+	err := suite.state.Extend(&proposal1)
+	suite.Assert().Nil(err)
+
+	suite.FinalizeBlock(proposal1.Block)
+	suite.Assert().Nil(err)
+
+	proposal2 := suite.ProposalWithParentAndPayload(&proposal1.Block, suite.Payload(&tx2))
+	// change the block ParentView
+	proposal2.Block.ParentView--
+
+	err = suite.state.Extend(&proposal2)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {
-	block := suite.Block()
 	// add the same transaction to a payload twice
 	tx := suite.Tx()
-	payload := suite.Payload(&tx, &tx)
-	block.SetPayload(payload)
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx, &tx))
 
 	// should fail to extend block with invalid payload
-	err := suite.state.Extend(&block)
+	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 	// build one block on top of genesis
-	block1 := suite.Block()
-	err := suite.state.Extend(&block1)
+	proposal1 := suite.Proposal()
+	err := suite.state.Extend(&proposal1)
 	suite.Assert().Nil(err)
 
 	// finalize the block
-	suite.FinalizeBlock(block1)
+	suite.FinalizeBlock(proposal1.Block)
 
 	// insert another block on top of genesis
 	// since we have already finalized block 1, this is invalid
-	block2 := suite.Block()
+	proposal2 := suite.Proposal()
 
 	// try to extend with the invalid block
-	err = suite.state.Extend(&block2)
+	err = suite.state.Extend(&proposal2)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsOutdatedExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_Success() {
-	block := suite.Block()
-	err := suite.state.Extend(&block)
+	proposal := suite.Proposal()
+	err := suite.state.Extend(&proposal)
 	suite.Assert().Nil(err)
 
 	// should be able to retrieve the block
+	r := suite.db.Reader()
 	var extended model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(block.ID(), &extended))
+	err = operation.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
 	suite.Assert().Nil(err)
-	suite.Assert().Equal(*block.Payload, *extended.Payload)
+	suite.Assert().Equal(proposal.Block.Payload, extended.Payload)
 
 	// the block should be indexed by its parent
 	var childIDs flow.IdentifierList
-	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
+	err = operation.RetrieveBlockChildren(r, suite.genesis.ID(), &childIDs)
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)
-	suite.Assert().Equal(block.ID(), childIDs[0])
+	suite.Assert().Equal(proposal.Block.ID(), childIDs[0])
 }
 
 func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
-	block := suite.Block()
 	// set an empty collection as the payload
-	block.SetPayload(suite.Payload())
-	err := suite.state.Extend(&block)
+	proposal := suite.Proposal()
+	err := suite.state.Extend(&proposal)
 	suite.Assert().Nil(err)
 }
 
 // an unknown reference block is unverifiable
 func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
 	suite.Run("empty collection", func() {
-		block := suite.Block()
-		block.Payload.ReferenceBlockID = unittest.IdentifierFixture()
-		block.SetPayload(*block.Payload)
-		err := suite.state.Extend(&block)
+		payload := suite.Payload()
+		payload.ReferenceBlockID = unittest.IdentifierFixture()
+		proposal := suite.ProposalWithParentAndPayload(suite.genesis, payload)
+		err := suite.state.Extend(&proposal)
 		suite.Assert().Error(err)
 		suite.Assert().True(state.IsUnverifiableExtensionError(err))
 	})
 	suite.Run("non-empty collection", func() {
-		block := suite.Block()
 		tx := suite.Tx()
 		payload := suite.Payload(&tx)
 		// set a random reference block ID
 		payload.ReferenceBlockID = unittest.IdentifierFixture()
-		block.SetPayload(payload)
-		err := suite.state.Extend(&block)
+		proposal := suite.ProposalWithParentAndPayload(suite.genesis, payload)
+		err := suite.state.Extend(&proposal)
 		suite.Assert().Error(err)
 		suite.Assert().True(state.IsUnverifiableExtensionError(err))
 	})
@@ -397,28 +430,25 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 	parent := suite.protoGenesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		next := unittest.BlockWithParentProtocolState(parent)
-		err := suite.protoState.ExtendCertified(context.Background(), next, unittest.CertifyBlock(next.Header))
+		err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(next))
 		suite.Require().Nil(err)
 		err = suite.protoState.Finalize(context.Background(), next.ID())
 		suite.Require().Nil(err)
 		parent = next
 	}
 
-	block := suite.Block()
 	// set genesis as reference block
-	block.SetPayload(model.EmptyPayload(suite.protoGenesis.ID()))
-	err := suite.state.Extend(&block)
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(suite.protoGenesis.ID()))
+	err := suite.state.Extend(&proposal)
 	suite.Assert().Nil(err)
 }
 
 func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
 	// TODO skipping as this isn't implemented yet
 	unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "skipping as this isn't implemented yet")
-
-	block := suite.Block()
 	// set genesis from cluster chain as reference block
-	block.SetPayload(model.EmptyPayload(suite.genesis.ID()))
-	err := suite.state.Extend(&block)
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(suite.genesis.ID()))
+	err := suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 }
 
@@ -433,9 +463,8 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 	nextEpochHeader, err := suite.protoState.AtHeight(heights.FinalHeight() + 1).Head()
 	require.NoError(suite.T(), err)
 
-	block := suite.Block()
-	block.SetPayload(model.EmptyPayload(nextEpochHeader.ID()))
-	err = suite.state.Extend(&block)
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(nextEpochHeader.ID()))
+	err = suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
@@ -446,12 +475,11 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 // block has been finalized, we just haven't processed it yet.
 func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 	unfinalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
-	err := suite.protoState.ExtendCertified(context.Background(), unfinalized, unittest.CertifyBlock(unfinalized.Header))
+	err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(unfinalized))
 	suite.Require().NoError(err)
 
-	block := suite.Block()
-	block.SetPayload(model.EmptyPayload(unfinalized.ID()))
-	err = suite.state.Extend(&block)
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(unfinalized.ID()))
+	err = suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsUnverifiableExtensionError(err))
 }
@@ -463,22 +491,20 @@ func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which is not finalized
 	orphaned := unittest.BlockWithParentProtocolState(suite.protoGenesis)
-	err := suite.protoState.ExtendCertified(context.Background(), orphaned, unittest.CertifyBlock(orphaned.Header))
+	err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphaned))
 	suite.Require().NoError(err)
 
 	// create a block extending genesis (conflicting with previous) which is finalized
 	finalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
 	finalized.Payload.Guarantees = nil
-	finalized.SetPayload(*finalized.Payload)
-	err = suite.protoState.ExtendCertified(context.Background(), finalized, unittest.CertifyBlock(finalized.Header))
+	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(finalized))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), finalized.ID())
 	suite.Require().NoError(err)
 
 	// test referencing the orphaned block
-	block := suite.Block()
-	block.SetPayload(model.EmptyPayload(orphaned.ID()))
-	err = suite.state.Extend(&block)
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(orphaned.ID()))
+	err = suite.state.Extend(&proposal)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
@@ -487,21 +513,17 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	tx1 := suite.Tx()
 
 	// create a block extending genesis containing tx1
-	block1 := suite.Block()
-	payload1 := suite.Payload(&tx1)
-	block1.SetPayload(payload1)
+	proposal1 := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
 
 	// should be able to extend block 1
-	err := suite.state.Extend(&block1)
+	err := suite.state.Extend(&proposal1)
 	suite.Assert().Nil(err)
 
 	// create a block building on block1 ALSO containing tx1
-	block2 := suite.BlockWithParent(&block1)
-	payload2 := suite.Payload(&tx1)
-	block2.SetPayload(payload2)
+	proposal2 := suite.ProposalWithParentAndPayload(&proposal1.Block, suite.Payload(&tx1))
 
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.state.Extend(&block2)
+	err = suite.state.Extend(&proposal2)
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
@@ -510,49 +532,79 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	tx1 := suite.Tx()
 
 	// create a block extending genesis containing tx1
-	block1 := suite.Block()
-	payload1 := suite.Payload(&tx1)
-	block1.SetPayload(payload1)
+	proposal1 := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
 
 	// should be able to extend block 1
-	err := suite.state.Extend(&block1)
+	err := suite.state.Extend(&proposal1)
 	suite.Assert().Nil(err)
 
 	// should be able to finalize block 1
-	suite.FinalizeBlock(block1)
+	suite.FinalizeBlock(proposal1.Block)
 	suite.Assert().Nil(err)
 
 	// create a block building on block1 ALSO containing tx1
-	block2 := suite.BlockWithParent(&block1)
-	payload2 := suite.Payload(&tx1)
-	block2.SetPayload(payload2)
-
+	block2 := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(&proposal1.Block),
+		unittest.ClusterBlock.WithPayload(suite.Payload(&tx1)),
+	)
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.state.Extend(&block2)
+	err = suite.state.Extend(unittest.ClusterProposalFromBlock(block2))
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
+}
+
+// TestExtend_RaceCondition_FinalizedForkWithDupeTx tests the case where an extending
+// block conflicts with a block on another fork, and that fork is finalized.
+// Usually the extending block would be rejected because it is orphaned, however
+// concurrent finalization and extension can allow this scenario to occur.
+//
+//	  ↙ B(tx1)  [tentatively withheld by byzantine proposer to force a fork]
+//	A
+//	  ↖ C(tx1) ← D ← E [E finalizes C]
+func (suite *MutatorSuite) TestExtend_RaceCondition_FinalizedForkWithDupeTx() {
+	tx1 := suite.Tx()
+
+	// create a block extending genesis containing tx1
+	B := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+	// create a conflicting block C, which will be finalized concurrently with inserting B
+	C := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+
+	// should be able to extend block C
+	err := suite.state.Extend(&C)
+	suite.Assert().NoError(err)
+
+	// We want to replicate a race condition where block C is finalized concurrently with
+	// block B being inserted. To accomplish this, we skip actually inserting D/E (although
+	// they would be need in practice). Instead, we manually insert the reference block to
+	// transaction lookup for C which would be inserted during finalization.
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), suite.genesis.Height, C.Block.ID())
+		})
+	})
+	require.NoError(suite.T(), err)
+
+	// we should be able to extend B, because C is on a fork.
+	err = suite.state.Extend(&B)
+	suite.Assert().NoError(err)
 }
 
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 	tx1 := suite.Tx()
 
 	// create a block extending genesis containing tx1
-	block1 := suite.Block()
-	payload1 := suite.Payload(&tx1)
-	block1.SetPayload(payload1)
+	proposal1 := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
 
 	// should be able to extend block 1
-	err := suite.state.Extend(&block1)
+	err := suite.state.Extend(&proposal1)
 	suite.Assert().Nil(err)
 
 	// create a block ALSO extending genesis ALSO containing tx1
-	block2 := suite.Block()
-	payload2 := suite.Payload(&tx1)
-	block2.SetPayload(payload2)
+	proposal2 := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
 
 	// should be able to extend block2
 	// although it conflicts with block1, it is on a different fork
-	err = suite.state.Extend(&block2)
+	err = suite.state.Extend(&proposal2)
 	suite.Assert().Nil(err)
 }
 
@@ -565,7 +617,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 	refID := final.ID()
 
 	// keep track of the head of the chain
-	head := *suite.genesis
+	head := suite.genesis
 
 	// keep track of transactions in orphaned forks (eligible for inclusion in future block)
 	var invalidatedTransactions []*flow.TransactionBody
@@ -589,34 +641,35 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 
 		// by default, build on the head - if we are building a
 		// conflicting fork, build on the parent of the head
-		parent := head
+		parent := *head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
+			err = operation.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)
-		} else if head.Header.Height < 50 {
+		} else if head.Height < 50 {
 			oldTransactions = append(oldTransactions, &tx)
 		}
 
 		// create a block containing the transaction
-		block := unittest.ClusterBlockWithParent(&head)
-		payload := suite.Payload(&tx)
-		block.SetPayload(payload)
-		err = suite.state.Extend(&block)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(head),
+			unittest.ClusterBlock.WithPayload(suite.Payload(&tx)),
+		)
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 		assert.NoError(t, err)
 
 		// reset the valid head if we aren't building a conflicting fork
 		if !conflicting {
 			head = block
-			suite.FinalizeBlock(block)
+			suite.FinalizeBlock(*block)
 			assert.NoError(t, err)
 		}
 
 		// stop building blocks once we've built a history which exceeds the transaction
 		// expiry length - this tests that deduplication works properly against old blocks
 		// which nevertheless have a potentially conflicting reference block
-		if head.Header.Height > flow.DefaultTransactionExpiry+100 {
+		if head.Height > flow.DefaultTransactionExpiry+100 {
 			break
 		}
 	}
@@ -624,18 +677,20 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 	t.Log("conflicting: ", len(invalidatedTransactions))
 
 	t.Run("should be able to extend with transactions in orphaned forks", func(t *testing.T) {
-		block := unittest.ClusterBlockWithParent(&head)
-		payload := suite.Payload(invalidatedTransactions...)
-		block.SetPayload(payload)
-		err = suite.state.Extend(&block)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(head),
+			unittest.ClusterBlock.WithPayload(suite.Payload(invalidatedTransactions...)),
+		)
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 		assert.NoError(t, err)
 	})
 
 	t.Run("should be unable to extend with conflicting transactions within reference height range of extending block", func(t *testing.T) {
-		block := unittest.ClusterBlockWithParent(&head)
-		payload := suite.Payload(oldTransactions...)
-		block.SetPayload(payload)
-		err = suite.state.Extend(&block)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(head),
+			unittest.ClusterBlock.WithPayload(suite.Payload(oldTransactions...)),
+		)
+		err = suite.state.Extend(unittest.ClusterProposalFromBlock(block))
 		assert.Error(t, err)
 		suite.Assert().True(state.IsInvalidExtensionError(err))
 	})

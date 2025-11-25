@@ -54,7 +54,7 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 		Role:       role,
 		Weight:     flow.DefaultInitialWeight,
 		Identifier: unittest.IdentifierFixture(), // default random ID
-		LogLevel:   zerolog.DebugLevel,           // log at debug by default
+		LogLevel:   zerolog.InfoLevel,            // log at info by default
 	}
 
 	for _, apply := range opts {

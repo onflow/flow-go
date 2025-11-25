@@ -139,8 +139,11 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 		return
 	}
 	dkgMessageOut := messages.PrivDKGMessageOut{
-		DKGMessage: messages.NewDKGMessage(data, b.dkgInstanceID),
-		DestID:     b.committee[dest].NodeID,
+		DKGMessage: messages.DKGMessage{
+			Data:          data,
+			DKGInstanceID: b.dkgInstanceID,
+		},
+		DestID: b.committee[dest].NodeID,
 	}
 	b.tunnel.SendOut(dkgMessageOut)
 }
@@ -466,10 +469,10 @@ func (b *Broker) hasValidDKGInstanceID(msg messages.DKGMessage) error {
 // prepareBroadcastMessage creates BroadcastDKGMessage with a signature from the
 // node's staking key.
 func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMessage, error) {
-	dkgMessage := messages.NewDKGMessage(
-		data,
-		b.dkgInstanceID,
-	)
+	dkgMessage := messages.DKGMessage{
+		Data:          data,
+		DKGInstanceID: b.dkgInstanceID,
+	}
 	sigData := fingerprint.Fingerprint(dkgMessage)
 	signature, err := b.me.Sign(sigData[:], NewDKGMessageHasher())
 	if err != nil {

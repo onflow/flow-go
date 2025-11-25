@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
@@ -46,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -53,11 +56,12 @@ import (
 // as well as all of its backend dependencies.
 type StateFixture struct {
 	DBDir          string
-	PublicDB       *badger.DB
+	PublicDB       storage.DB
 	SecretsDB      *badger.DB
-	Storage        *storage.All
+	Storage        *store.All
 	ProtocolEvents *events.Distributor
 	State          protocol.ParticipantState
+	LockManager    lockctx.Manager
 }
 
 // GenericNode implements a generic in-process node for tests.
@@ -70,8 +74,9 @@ type GenericNode struct {
 	Log                zerolog.Logger
 	Metrics            *metrics.NoopCollector
 	Tracer             module.Tracer
-	PublicDB           *badger.DB
+	PublicDB           storage.DB
 	SecretsDB          *badger.DB
+	LockManager        lockctx.Manager
 	Headers            storage.Headers
 	Guarantees         storage.Guarantees
 	Seals              storage.Seals
@@ -217,7 +222,7 @@ type ExecutionNode struct {
 	FollowerEngine      *followereng.ComplianceEngine
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
-	BadgerDB            *badger.DB
+	ProtocolDB          storage.DB
 	VM                  fvm.VM
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
@@ -305,6 +310,7 @@ type VerificationNode struct {
 	// block consumer for chunk consumer
 	ProcessedBlockHeight storage.ConsumerProgressInitializer
 	BlockConsumer        *blockconsumer.BlockConsumer
+	FollowerDistributor  *pubsub.FollowerDistributor
 
 	VerifierEngine  *verifier.Engine
 	AssignerEngine  *assigner.Engine

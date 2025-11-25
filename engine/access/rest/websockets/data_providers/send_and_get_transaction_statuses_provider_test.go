@@ -13,8 +13,8 @@ import (
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -28,7 +28,7 @@ type SendTransactionStatusesProviderSuite struct {
 	api *accessmock.API
 
 	chain          flow.Chain
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory       *DataProviderFactoryImpl
@@ -46,8 +46,9 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
+	s.rootBlock = unittest.BlockFixture(
+		unittest.Block.WithHeight(0),
+	)
 
 	s.factory = NewDataProviderFactory(
 		s.log,
@@ -83,7 +84,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 		{
 			name:      "SubscribeTransactionStatusesFromStartBlockID happy path",
 			arguments: unittest.CreateSendTxHttpPayload(tx),
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SendAndSubscribeTransactionStatuses",
 					mock.Anything,

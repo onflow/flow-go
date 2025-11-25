@@ -1,6 +1,7 @@
 package model_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,78 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// TestTimeoutObject_Equals verifies the correctness of the Equals method on TimeoutObject.
+// It checks that TimeoutObjects are considered equal if and only if all fields except
+// TimeoutTick match. This test is crucial for ensuring deduplication logic works correctly
+// in the cache.
+//
+// Fields compared for equality:
+// - View
+// - NewestQC
+// - LastViewTC
+// - SignerID
+// - SigData
+//
+// TimeoutTick is explicitly excluded from equality checks.
+func TestTimeoutObject_Equals(t *testing.T) {
+	// Create two TimeoutObjects with random but different values.
+	timeout1 := helper.TimeoutObjectFixture()
+	timeout2 := helper.TimeoutObjectFixture()
+	require.False(t, timeout1.Equals(timeout2), "Initially, all fields are different, so the objects should not be equal.")
+
+	// List of mutations to apply on timeout1 to gradually make it equal to timeout2
+	// (excluding TimeoutTick).
+	mutations := []func(){
+		func() {
+			timeout1.View = timeout2.View
+		}, func() {
+			timeout1.NewestQC = timeout2.NewestQC
+		}, func() {
+			timeout1.LastViewTC = timeout2.LastViewTC
+		}, func() {
+			timeout1.SignerID = timeout2.SignerID
+		}, func() {
+			timeout1.SigData = timeout2.SigData
+		},
+	}
+
+	// Shuffle the order of mutations
+	rand.Shuffle(len(mutations), func(i, j int) {
+		mutations[i], mutations[j] = mutations[j], mutations[i]
+	})
+
+	// Apply each mutation one at a time, except the last.
+	// After each step, the objects should still not be equal.
+	for _, mutation := range mutations[:len(mutations)-1] {
+		mutation()
+		require.False(t, timeout1.Equals(timeout2))
+	}
+
+	// Apply the final mutation; now all relevant fields should match, so the objects must be equal.
+	mutations[len(mutations)-1]()
+	require.True(t, timeout1.Equals(timeout2))
+
+	// Even if TimeoutTick differs, equality should still hold since TimeoutTick is not important for equality.
+	timeout1.TimeoutTick = timeout2.TimeoutTick + 1
+	require.True(t, timeout1.Equals(timeout2))
+}
+
+// TestTimeoutObject_Equals_Nil verifies the behavior of the Equals method when either
+// or both the receiver and the function input are nil
+func TestTimeoutObject_Equals_Nil(t *testing.T) {
+	var nilTO *model.TimeoutObject
+	to := helper.TimeoutObjectFixture()
+	t.Run("nil receiver", func(t *testing.T) {
+		require.False(t, nilTO.Equals(to))
+	})
+	t.Run("nil input", func(t *testing.T) {
+		require.False(t, to.Equals(nilTO))
+	})
+	t.Run("both nil", func(t *testing.T) {
+		require.True(t, nilTO.Equals(nil))
+	})
+}
 
 // TestNewTimeoutObject verifies the behavior of the NewTimeoutObject constructor.
 // It ensures proper handling of both valid and invalid untrusted input fields.

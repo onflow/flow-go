@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
@@ -41,10 +42,13 @@ type Config struct {
 
 	BackendConfig             backend.Config // configurable options for creating Backend
 	RestConfig                rest.Config    // the REST server configuration
-	MaxMsgSize                uint           // GRPC max message size
 	CompressorName            string         // GRPC compressor name
 	WebSocketConfig           websockets.Config
 	EnableWebSocketsStreamAPI bool
+
+	// holds value of deprecated MaxMsgSize flag for use during bootstrapping.
+	// will be removed in a future release.
+	DeprecatedMaxMsgSize uint // in bytes
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -93,6 +97,7 @@ func NewBuilder(
 	stateStreamBackend state_stream.API,
 	stateStreamConfig statestreambackend.Config,
 	indexReporter state_synchronization.IndexReporter,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -143,6 +148,9 @@ func NewBuilder(
 		builder.WithMetrics()
 	}
 
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(eng.onFinalizedBlock)
+
 	return builder, nil
 }
 
@@ -171,8 +179,8 @@ func (e *Engine) shutdown() {
 	}
 }
 
-// OnFinalizedBlock responds to block finalization events.
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
+// onFinalizedBlock responds to block finalization events.
+func (e *Engine) onFinalizedBlock(block *model.Block) {
 	e.finalizedHeaderCacheActor.OnFinalizedBlock(block)
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
@@ -182,20 +190,12 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 // The input to this callback is treated as trusted.
 // No errors expected during normal operations.
 func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
-	finalizedHeader := e.finalizedHeaderCache.Get()
-
-	var err error
 	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
 	if e.backend.BlockTracker != nil {
-		err = e.backend.BlockTracker.ProcessOnFinalizedBlock()
+		err := e.backend.BlockTracker.ProcessOnFinalizedBlock()
 		if err != nil {
 			return err
 		}
-	}
-
-	err = e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
-	if err != nil {
-		return fmt.Errorf("could not process finalized block height %d: %w", finalizedHeader.Height, err)
 	}
 
 	return nil

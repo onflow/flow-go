@@ -3,7 +3,7 @@ package common
 import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // BaseKeyValueStoreStateMachine implements a subset of the KeyValueStoreStateMachine interface which is usually common
@@ -29,8 +29,8 @@ func NewBaseKeyValueStoreStateMachine(
 }
 
 // Build is a no-op by default. If a state machine needs to persist data, it should override this method.
-func (m *BaseKeyValueStoreStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
-	return transaction.NewDeferredBlockPersist(), nil
+func (m *BaseKeyValueStoreStateMachine) Build() (*deferred.DeferredBlockPersist, error) {
+	return deferred.NewDeferredBlockPersist(), nil
 }
 
 // View returns the view associated with this state machine.

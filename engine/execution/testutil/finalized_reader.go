@@ -27,11 +27,11 @@ func NewMockFinalizedReader(initHeight uint64, count int) (*MockFinalizedReader,
 
 	blockByHeight := make(map[uint64]*flow.Block, len(blocks)+1)
 	for _, b := range blocks {
-		headerByHeight[b.Header.Height] = b.Header
-		blockByHeight[b.Header.Height] = b
+		headerByHeight[b.Height] = b.ToHeader()
+		blockByHeight[b.Height] = b
 	}
 
-	highest := blocks[len(blocks)-1].Header.Height
+	highest := blocks[len(blocks)-1].Height
 	return &MockFinalizedReader{
 		headerByHeight:  headerByHeight,
 		blockByHeight:   blockByHeight,

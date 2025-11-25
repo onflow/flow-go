@@ -1,6 +1,8 @@
 package util
 
 import (
+	"math"
+
 	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -9,6 +11,8 @@ import (
 
 // NopMeter is a meter that does nothing. It can be used in migrations.
 type NopMeter struct{}
+
+func (n NopMeter) RunWithMeteringDisabled(f func()) {}
 
 func (n NopMeter) ComputationAvailable(_ common.ComputationUsage) bool {
 	return false
@@ -24,6 +28,10 @@ func (n NopMeter) ComputationUsed() (uint64, error) {
 
 func (n NopMeter) ComputationIntensities() meter.MeteredComputationIntensities {
 	return meter.MeteredComputationIntensities{}
+}
+
+func (n NopMeter) ComputationRemaining(_ common.ComputationKind) uint64 {
+	return math.MaxUint64
 }
 
 func (n NopMeter) MeterMemory(_ common.MemoryUsage) error {

@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -16,6 +17,7 @@ import (
 )
 
 func TestEventStoreRetrieve(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		events := store.NewEvents(metrics, db)
@@ -23,20 +25,38 @@ func TestEventStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx1ID, 0)
-		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, tx2ID, 0)
+		evt1_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithTransactionID(tx1ID),
+		)
+		evt1_2 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
-		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, tx2ID, 0)
+		evt2_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountUpdated),
+			unittest.Event.WithTransactionIndex(2),
+			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
 		expected := []flow.EventsList{
 			{evt1_1, evt1_2},
 			{evt2_1},
 		}
 
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// store event
-			return events.BatchStore(blockID, expected, rw)
-		}))
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// store event
+				return events.BatchStore(lctx, blockID, expected, rw)
+			})
+		})
+		require.NoError(t, err)
 
 		// retrieve by blockID
 		actual, err := events.ByBlockID(blockID)
@@ -121,6 +141,7 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 }
 
 func TestEventStoreAndRemove(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := store.NewEvents(metrics, db)
@@ -129,17 +150,36 @@ func TestEventStoreAndRemove(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx1ID, 0)
-		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, tx2ID, 0)
+		evt1_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithTransactionID(tx1ID),
+		)
+		evt1_2 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
-		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, tx2ID, 0)
+		evt2_1 := unittest.EventFixture(
+			unittest.Event.WithEventType(flow.EventAccountUpdated),
+			unittest.Event.WithTransactionIndex(2),
+			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithTransactionID(tx2ID),
+		)
 
 		expected := []flow.EventsList{
 			{evt1_1, evt1_2},
 			{evt2_1},
 		}
 
-		err := store.Store(blockID, expected)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store.BatchStore(lctx, blockID, expected, rw)
+			})
+		})
 		require.NoError(t, err)
 
 		// Ensure it exists

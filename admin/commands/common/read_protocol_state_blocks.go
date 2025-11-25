@@ -122,7 +122,7 @@ func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.C
 	}
 
 	result = append(result, block)
-	firstHeight := int64(block.Header.Height)
+	firstHeight := int64(block.Height)
 
 	for height := firstHeight - 1; height >= 0 && height > firstHeight-int64(data.numBlocksToQuery); height-- {
 		block, err = r.getBlockByHeight(uint64(height))

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +32,7 @@ import (
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -42,7 +42,7 @@ type ExecutionDataRequesterSuite struct {
 
 	blobstore   blobs.Blobstore
 	datastore   datastore.Batching
-	db          *badger.DB
+	db          *pebble.DB
 	downloader  *exedatamock.Downloader
 	distributor *ExecutionDataDistributor
 
@@ -138,7 +138,7 @@ func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[u
 	state := new(statemock.State)
 
 	suite.mockSnapshot = new(mockSnapshot)
-	suite.mockSnapshot.set(blocksByHeight[0].Header, nil) // genesis block
+	suite.mockSnapshot.set(blocksByHeight[0].ToHeader(), nil) // genesis block
 
 	state.On("Sealed").Return(suite.mockSnapshot).Maybe()
 	return state
@@ -173,7 +173,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 
 	for _, run := range tests {
 		suite.Run(run.name, func() {
-			unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+			unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 				suite.db = db
 
 				suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
@@ -202,7 +202,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterResumesAfterRestart() {
 	test := func(stopHeight, resumeHeight uint64) {
 		testData.fetchedExecutionData = nil
 
-		unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 			suite.db = db
 
 			// Process half of the blocks
@@ -240,7 +240,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterResumesAfterRestart() {
 // TestRequesterCatchesUp tests that the requester processes all heights when it starts with a
 // backlog of sealed blocks.
 func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 		suite.db = db
 
 		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
@@ -262,7 +262,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
 // TestRequesterPausesAndResumes tests that the requester pauses when it downloads maxSearchAhead
 // blocks beyond the last processed block, and resumes when it catches up.
 func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 		suite.db = db
 
 		pauseHeight := uint64(10)
@@ -293,7 +293,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 // TestRequesterHalts tests that the requester handles halting correctly when it encounters an
 // invalid block
 func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 		suite.db = db
 
 		suite.run.blockCount = 10
@@ -412,8 +412,8 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	edCache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
-	processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := store.NewConsumerProgress(badgerimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
+	processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotification := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
 
 	edr, err := New(
 		logger,
@@ -432,10 +432,9 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 			MaxRetryDelay:      cfg.maxRetryDelay,
 		},
 		suite.distributor,
+		followerDistributor,
 	)
 	require.NoError(suite.T(), err)
-
-	followerDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
 	return edr, followerDistributor
 }
@@ -547,7 +546,7 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 			return
 		}
 
-		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
+		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Height, len(fetchedExecutionData), cfg.sealedCount)
 
 		if cfg.IsLastSeal(ed.BlockID) {
 			done()
@@ -559,11 +558,11 @@ func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, foll
 	for i := cfg.StartHeight(); i <= cfg.endHeight; i++ {
 		b := cfg.blocksByHeight[i]
 
-		suite.T().Log(">>>> Finalizing block", b.ID(), b.Header.Height)
+		suite.T().Log(">>>> Finalizing block", b.ID(), b.Height)
 
 		if len(b.Payload.Seals) > 0 {
 			seal := b.Payload.Seals[0]
-			sealedHeader := cfg.blocksByID[seal.BlockID].Header
+			sealedHeader := cfg.blocksByID[seal.BlockID].ToHeader()
 
 			suite.mockSnapshot.set(sealedHeader, nil)
 			suite.T().Log(">>>> Sealing block", sealedHeader.ID(), sealedHeader.Height)
@@ -659,7 +658,7 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 		if i >= firstSeal {
 			sealedBlock := blocksByHeight[uint64(i-firstSeal+1)]
 			seals = []*flow.Header{
-				sealedBlock.Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
+				sealedBlock.ToHeader(), // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
 
 			sealsByBlockID[sealedBlock.ID()] = unittest.Seal.Fixture(
@@ -723,14 +722,14 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 
 func buildBlock(height uint64, parent *flow.Block, seals []*flow.Header) *flow.Block {
 	if parent == nil {
-		return unittest.GenesisFixture()
+		return unittest.Block.Genesis(flow.Emulator)
 	}
 
 	if len(seals) == 0 {
-		return unittest.BlockWithParentFixture(parent.Header)
+		return unittest.BlockWithParentFixture(parent.ToHeader())
 	}
 
-	return unittest.BlockWithParentAndSeals(parent.Header, seals)
+	return unittest.BlockWithParentAndSeals(parent.ToHeader(), seals)
 }
 
 func buildResult(block *flow.Block, cid flow.Identifier, previousResult *flow.ExecutionResult) *flow.ExecutionResult {

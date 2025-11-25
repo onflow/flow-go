@@ -51,6 +51,8 @@ import (
 var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
+	t.Parallel()
+
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.NewVirtualMachine()
@@ -66,52 +68,56 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		chain)
 	require.NoError(t, err)
 
-	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
-	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
+	tx1Builder := testutil.DeployCounterContractTransaction(accounts[0], chain).
+		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
-	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
+	err = testutil.SignPayload(tx1Builder, accounts[0], privateKeys[0])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(tx1Builder, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
-	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
-	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
+	tx2Builder := testutil.CreateCounterTransaction(accounts[0], accounts[1]).
+		SetProposalKey(chain.ServiceAddress(), 0, 0).
 		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
-	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
+	err = testutil.SignPayload(tx2Builder, accounts[1], privateKeys[1])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(tx2, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(tx2Builder, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
-	transactions := []*flow.TransactionBody{tx1, tx2}
+	tx1Body, err := tx1Builder.Build()
+	require.NoError(t, err)
+	tx2Body, err := tx2Builder.Build()
+	require.NoError(t, err)
+
+	transactions := []*flow.TransactionBody{tx1Body, tx2Body}
 
 	col := flow.Collection{Transactions: transactions}
 
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			View: 42,
-		},
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(42),
+		unittest.Block.WithParentView(41),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
+	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: &block,
+		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+			guarantee.CollectionID: {
+				Guarantee:  guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -119,7 +125,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -176,6 +182,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
+	t.Parallel()
 
 	noopCollector := &metrics.NoopCollector{}
 
@@ -191,7 +198,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -226,6 +233,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 }
 
 func TestExecuteScript(t *testing.T) {
+	t.Parallel()
 
 	logger := zerolog.Nop()
 
@@ -233,7 +241,7 @@ func TestExecuteScript(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -292,6 +300,7 @@ func TestExecuteScript(t *testing.T) {
 // Balance script used to swallow errors, which meant that even if the view was empty, a script that did nothing but get
 // the balance of an account would succeed and return 0.
 func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
+	t.Parallel()
 
 	logger := zerolog.Nop()
 
@@ -299,7 +308,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -357,6 +366,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 }
 
 func TestExecuteScripPanicsAreHandled(t *testing.T) {
+	t.Parallel()
 
 	ctx := fvm.NewContext()
 
@@ -407,6 +417,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 }
 
 func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
+	t.Parallel()
 
 	ctx := fvm.NewContext()
 
@@ -460,6 +471,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 }
 
 func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
+	t.Parallel()
 
 	ctx := fvm.NewContext()
 
@@ -643,6 +655,7 @@ func (f *FakeBlockComputer) ExecuteBlock(
 }
 
 func TestExecuteScriptTimeout(t *testing.T) {
+	t.Parallel()
 
 	timeout := 1 * time.Millisecond
 	manager, err := New(
@@ -690,6 +703,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 }
 
 func TestExecuteScriptCancelled(t *testing.T) {
+	t.Parallel()
 
 	timeout := 30 * time.Second
 	manager, err := New(
@@ -746,6 +760,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 }
 
 func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
+	t.Parallel()
 
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
@@ -772,41 +787,46 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	account := accounts[0]
 	privKey := privateKeys[0]
 	// tx1 deploys contract version 1
-	tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
-	prepareTx(t, tx1, account, privKey, 0, chain)
+	tx1Builder := testutil.DeployEventContractTransaction(account, chain, 1)
+	prepareTx(t, tx1Builder, account, privKey, 0, chain)
+	tx1, err := tx1Builder.Build()
+	require.NoError(t, err)
 
 	// tx2 emits event which will fail encoding
-	tx2 := testutil.CreateEmitEventTransaction(account, account)
-	prepareTx(t, tx2, account, privKey, 1, chain)
+	tx2Builder := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx2Builder, account, privKey, 1, chain)
+	tx2, err := tx2Builder.Build()
+	require.NoError(t, err)
 
 	// tx3 emits event that will work fine
-	tx3 := testutil.CreateEmitEventTransaction(account, account)
-	prepareTx(t, tx3, account, privKey, 2, chain)
+	tx3Builder := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx3Builder, account, privKey, 2, chain)
+	tx3, err := tx3Builder.Build()
+	require.NoError(t, err)
 
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 
 	col := flow.Collection{Transactions: transactions}
 
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			View: 26,
-		},
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(26),
+		unittest.Block.WithParentView(25),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
+	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: &block,
+		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+			guarantee.CollectionID: {
+				Guarantee:  guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -814,7 +834,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -899,6 +919,7 @@ func (e *testingEventEncoder) Encode(event cadence.Event) ([]byte, error) {
 }
 
 func TestScriptStorageMutationsDiscarded(t *testing.T) {
+	t.Parallel()
 
 	timeout := 10 * time.Second
 	chain := flow.Mainnet.Chain()

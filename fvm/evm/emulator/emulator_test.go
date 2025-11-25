@@ -3,7 +3,6 @@ package emulator_test
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/testutils/contracts"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -210,7 +210,7 @@ func TestContractInteraction(t *testing.T) {
 						call := types.NewDeployCall(
 							testAccount,
 							testContract.ByteCode,
-							math.MaxUint64,
+							gethParams.MaxTxGas,
 							amountToBeTransfered,
 							testAccountNonce)
 						res, err := blk.DirectCall(call)
@@ -598,7 +598,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								testAccount,
 								target,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								amountToBeTransfered,
 								0,
 							),
@@ -628,7 +628,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								testAccount,
 								target,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								amountToBeTransfered,
 								0),
 						)
@@ -686,7 +686,7 @@ func TestSelfdestruct(t *testing.T) {
 							types.NewDeployCall(
 								testAddress,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								deployBalance,
 								0),
 						)
@@ -767,7 +767,7 @@ func TestFactoryPatterns(t *testing.T) {
 							types.NewDeployCall(
 								factoryDeployer,
 								factoryContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								factoryBalance,
 								0),
 						)
@@ -1252,4 +1252,8 @@ func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {
 		panic("Run not set for the mocked precompiled contract")
 	}
 	return mp.RunFunc(input)
+}
+
+func (mp *MockedPrecompiled) Name() string {
+	return precompiles.CADENCE_ARCH_PRECOMPILE_NAME
 }

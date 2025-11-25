@@ -11,12 +11,16 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/go-yaml/yaml"
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 
 	"github.com/onflow/flow-go/integration/testnet"
 )
@@ -45,7 +49,6 @@ const (
 	DefaultProfiler           = false
 	DefaultProfileUploader    = false
 	DefaultTracing            = true
-	DefaultCadenceTracing     = false
 	DefaultExtensiveTracing   = false
 	DefaultConsensusDelay     = 800 * time.Millisecond
 	DefaultCollectionDelay    = 950 * time.Millisecond
@@ -63,12 +66,13 @@ var (
 	numViewsInStakingPhase      uint64
 	numViewsInDKGPhase          uint64
 	numViewsEpoch               uint64
+	kvStoreVersion              string
+	epochExtensionViewCount     uint64
 	numViewsPerSecond           uint64
 	finalizationSafetyThreshold uint64
 	profiler                    bool
 	profileUploader             bool
 	tracing                     bool
-	cadenceTracing              bool
 	extensiveTracing            bool
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
@@ -89,12 +93,13 @@ func init() {
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
-	flag.Uint64Var(&finalizationSafetyThreshold, "finalization-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
+	flag.StringVar(&kvStoreVersion, "kvstore-version", "default", "protocol state KVStore version to initialize ('default' or an integer equal to a supported protocol version: '0', '1', '2', ...)")
+	flag.Uint64Var(&epochExtensionViewCount, "kvstore-epoch-extension-view-count", 0, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
+	flag.Uint64Var(&finalizationSafetyThreshold, "kvstore-finalization-safety-threshold", 0, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
 	flag.Uint64Var(&numViewsPerSecond, "target-view-rate", 1, "target number of views per second")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
-	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
 	flag.BoolVar(&extensiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
@@ -125,6 +130,11 @@ func main() {
 	// Prepare test node configurations of each type, access, execution, verification, etc
 	flowNodes := prepareFlowNodes()
 
+	defaultEpochSafetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+	if err != nil {
+		panic(fmt.Sprintf("could not get default epoch commit safety parameters: %s", err))
+	}
+
 	// Generate a Flow network config for localnet
 	flowNetworkOpts := []testnet.NetworkConfigOpt{testnet.WithClusters(nClusters)}
 	if numViewsEpoch != 0 {
@@ -139,9 +149,30 @@ func main() {
 	if numViewsInDKGPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
 	}
-	if finalizationSafetyThreshold != 0 {
-		flowNetworkOpts = append(flowNetworkOpts, testnet.WithFinalizationSafetyThreshold(finalizationSafetyThreshold))
+
+	// Set default finalizationSafetyThreshold if not explicitly set
+	if finalizationSafetyThreshold == 0 {
+		finalizationSafetyThreshold = defaultEpochSafetyParams.FinalizationSafetyThreshold
 	}
+	// Set default epochExtensionViewCount if not explicitly set
+	if epochExtensionViewCount == 0 {
+		epochExtensionViewCount = defaultEpochSafetyParams.EpochExtensionViewCount
+	}
+
+	kvStoreFactory := func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+		if kvStoreVersion != "default" {
+			version, err := strconv.ParseUint(kvStoreVersion, 10, 64)
+			if err != nil {
+				panic(fmt.Sprintf("--kvstore-version must be a supported integer version number: (eg. '0', '1' or '2', etc.) got %s ", kvStoreVersion))
+			}
+			return kvstore.NewKVStore(version, finalizationSafetyThreshold, epochExtensionViewCount, epochStateID)
+
+		} else {
+			return kvstore.NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount, epochStateID)
+		}
+	}
+	flowNetworkOpts = append(flowNetworkOpts, testnet.WithKVStoreFactory(kvStoreFactory))
+
 	flowNetworkConf := testnet.NewNetworkConfig("localnet", flowNodes, flowNetworkOpts...)
 	displayFlowNetworkConf(flowNetworkConf)
 
@@ -152,7 +183,7 @@ func main() {
 	dockerServices := make(Services)
 	dockerServices = prepareFlowServices(dockerServices, flowNodeContainerConfigs)
 	serviceDisc := prepareServiceDiscovery(flowNodeContainerConfigs)
-	err := writePrometheusConfig(serviceDisc)
+	err = writePrometheusConfig(serviceDisc)
 	if err != nil {
 		panic(err)
 	}
@@ -367,6 +398,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(service.Command,
 		"--chunk-alpha=1",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	return service
@@ -400,12 +432,12 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
-		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extensiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 		"--pruning-config-threshold=20",
 		"--pruning-config-sleep-after-iteration=1m",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -440,6 +472,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--script-execution-mode=execution-nodes-only",
 		"--event-query-mode=execution-nodes-only",
 		"--tx-result-query-mode=execution-nodes-only",
+		"--scheduled-callbacks-enabled=true",
 	)
 
 	service.AddExposedPorts(
@@ -525,8 +558,8 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
 		},
 		Labels: map[string]string{
-			"com.dapperlabs.role": role,
-			"com.dapperlabs.num":  num,
+			"org.flowfoundation.role": role,
+			"org.flowfoundation.num":  num,
 		},
 	}
 

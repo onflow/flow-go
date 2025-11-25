@@ -23,7 +23,7 @@ import (
 
 	"github.com/onflow/flow-go-sdk/test"
 
-	emulator "github.com/onflow/flow-go/integration/internal/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
@@ -42,8 +42,8 @@ func StorableTransactionResultFixture(eventEncodingVersion entities.EventEncodin
 		ErrorMessage: "foo",
 		Logs:         []string{"a", "b", "c"},
 		Events: []flowgo.Event{
-			eventA,
-			eventB,
+			*eventA,
+			*eventB,
 		},
 	}
 }

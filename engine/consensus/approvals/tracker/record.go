@@ -92,7 +92,7 @@ func (r *SealingRecord) Generate() (Rec, error) {
 	rec["result_initial_state"] = hex.EncodeToString(initialState[:])
 	rec["number_chunks"] = len(result.Chunks)
 	rec["number_receipts"] = numberReceipts
-	_, rec["candidate_seal_in_mempool"] = r.sealsPl.ByID(irID)
+	_, rec["candidate_seal_in_mempool"] = r.sealsPl.Get(irID)
 
 	if finalizationStatus != nil {
 		rec["incorporating_block"] = *finalizationStatus

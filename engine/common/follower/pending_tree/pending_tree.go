@@ -29,7 +29,7 @@ func NewVertex(certifiedBlock flow.CertifiedBlock, connectedToFinalized bool) (*
 func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.CertifyingQC.BlockID }
 func (v *PendingBlockVertex) Level() uint64             { return v.CertifyingQC.View }
 func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
-	return v.Block.Header.ParentID, v.Block.Header.ParentView
+	return v.Proposal.Block.ParentID, v.Proposal.Block.ParentView
 }
 
 // PendingTree is a mempool holding certified blocks that eventually might be connected to the finalized state.
@@ -102,13 +102,13 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []flow.CertifiedBlock) ([]flow.C
 		if iter.HasNext() {
 			v := iter.NextVertex().(*PendingBlockVertex)
 
-			if v.VertexID() == block.ID() {
+			if v.VertexID() == block.BlockID() {
 				// this vertex is already in tree, skip it
 				continue
 			} else {
 				return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 					"conflicting QCs at view %d: %v and %v",
-					block.View(), v.ID(), block.ID(),
+					block.View(), v.BlockID(), block.BlockID(),
 				)}
 			}
 		}
@@ -133,10 +133,10 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []flow.CertifiedBlock) ([]flow.C
 
 // connectsToFinalizedBlock checks if candidate block connects to the finalized state.
 func (t *PendingTree) connectsToFinalizedBlock(block flow.CertifiedBlock) bool {
-	if block.Block.Header.ParentID == t.lastFinalizedID {
+	if block.Proposal.Block.ParentID == t.lastFinalizedID {
 		return true
 	}
-	if parentVertex, found := t.forest.GetVertex(block.Block.Header.ParentID); found {
+	if parentVertex, found := t.forest.GetVertex(block.Proposal.Block.ParentID); found {
 		return parentVertex.(*PendingBlockVertex).connectedToFinalized
 	}
 	return false

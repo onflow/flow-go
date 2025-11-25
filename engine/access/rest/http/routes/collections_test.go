@@ -32,7 +32,7 @@ func TestGetCollections(t *testing.T) {
 	backend := &mock.API{}
 
 	t.Run("get by ID", func(t *testing.T) {
-		inputs := []flow.LightCollection{
+		inputs := []*flow.LightCollection{
 			unittest.CollectionFixture(1).Light(),
 			unittest.CollectionFixture(10).Light(),
 			unittest.CollectionFixture(100).Light(),
@@ -41,7 +41,7 @@ func TestGetCollections(t *testing.T) {
 		for _, col := range inputs {
 			backend.Mock.
 				On("GetCollectionByID", mocks.Anything, col.ID()).
-				Return(&col, nil).
+				Return(col, nil).
 				Once()
 
 			txs := make([]string, len(col.Transactions))
@@ -82,7 +82,7 @@ func TestGetCollections(t *testing.T) {
 
 		backend.Mock.
 			On("GetCollectionByID", mocks.Anything, col.ID()).
-			Return(&col, nil).
+			Return(col, nil).
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -20,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -34,21 +35,22 @@ type EngineSuite struct {
 	suite.Suite
 
 	finalized *flow.Header
-	net       *mocknetwork.Network
+	net       *mocknetwork.EngineRegistry
 	con       *mocknetwork.Conduit
 	me        *module.Local
 	headers   *storage.Headers
 	core      *followermock.ComplianceCore
 
-	ctx    irrecoverable.SignalerContext
-	cancel context.CancelFunc
-	errs   <-chan error
-	engine *ComplianceEngine
+	ctx                 irrecoverable.SignalerContext
+	cancel              context.CancelFunc
+	errs                <-chan error
+	engine              *ComplianceEngine
+	followerDistributor *pubsub.FollowerDistributor
 }
 
 func (s *EngineSuite) SetupTest() {
 
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.me = module.NewLocal(s.T())
 	s.headers = storage.NewHeaders(s.T())
@@ -64,6 +66,7 @@ func (s *EngineSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	s.finalized = unittest.BlockHeaderFixture()
+	s.followerDistributor = pubsub.NewFollowerDistributor()
 	eng, err := NewComplianceLayer(
 		unittest.Logger(),
 		s.net,
@@ -72,6 +75,7 @@ func (s *EngineSuite) SetupTest() {
 		s.headers,
 		s.finalized,
 		s.core,
+		s.followerDistributor,
 		compliance.DefaultConfig())
 	require.NoError(s.T(), err)
 
@@ -96,49 +100,67 @@ func (s *EngineSuite) TearDownTest() {
 // TestProcessSyncedBlock checks that processing single synced block results in call to FollowerCore.
 func (s *EngineSuite) TestProcessSyncedBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.Proposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  flowBlocksToBlockProposals(block),
+		Message:  []*flow.Proposal{proposal},
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
-// TestProcessGossipedBlock check that processing single gossiped block results in call to FollowerCore.
-func (s *EngineSuite) TestProcessGossipedBlock() {
+// TestProcessGossipedValidBlock check that processing single structurally valid gossiped block results in call to FollowerCore.
+func (s *EngineSuite) TestProcessGossipedValidBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.Proposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewBlockProposal(block))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
+// TestProcessGossipedInvalidBlock check that processing single structurally invalid gossiped block results in call to FollowerCore.
+func (s *EngineSuite) TestProcessGossipedInvalidBlock() {
+	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
+	proposal.ProposerSigData = nil
+
+	originID := unittest.IdentifierFixture()
+
+	err := s.engine.Process(channels.ReceiveBlocks, originID, (*messages.Proposal)(proposal))
+	require.NoError(s.T(), err)
+
+	// OnBlockRange should NOT be called for invalid proposal
+	s.core.AssertNotCalled(s.T(), "OnBlockRange", mock.Anything, mock.Anything)
+}
+
 // TestProcessBlockFromComplianceInterface check that processing single gossiped block using compliance interface results in call to FollowerCore.
 func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.Proposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
-	s.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+	s.engine.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(block),
+		Message:  proposal,
 	})
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -148,7 +170,7 @@ func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 // results in submitting all of them.
 func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 	originID := unittest.IdentifierFixture()
-	blocks := unittest.ChainFixtureFrom(10, s.finalized)
+	blocks := unittest.ProposalChainFixtureFrom(10, s.finalized)
 	// drop second block
 	blocks = append(blocks[0:1], blocks[2:]...)
 	// drop second from end block
@@ -166,9 +188,9 @@ func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 		wg.Done()
 	}).Return(nil).Once()
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  flowBlocksToBlockProposals(blocks...),
+		Message:  blocks,
 	})
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to return before timeout")
 }
@@ -185,13 +207,15 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}).Return(nil).Once()
 	s.headers.On("ByBlockID", newFinalizedBlock.ID()).Return(newFinalizedBlock, nil).Once()
 
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
+	s.followerDistributor.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 
 	// check if batch gets filtered out since it's lower than finalized view
 	done = make(chan struct{})
 	block := unittest.BlockWithParentFixture(s.finalized)
-	block.Header.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
+	block.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
+
+	proposal := unittest.ProposalFromBlock(block)
 
 	// use metrics mock to track that we have indeed processed the message, and the batch was filtered out since it was
 	// lower than finalized height
@@ -202,9 +226,9 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}).Return().Once()
 	s.engine.engMetrics = metricsMock
 
-	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message:  flowBlocksToBlockProposals(block),
+		Message:  []*flow.Proposal{proposal},
 	})
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 	// check if message wasn't buffered in internal channel
@@ -214,13 +238,4 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	default:
 
 	}
-}
-
-// flowBlocksToBlockProposals is a helper function to transform types.
-func flowBlocksToBlockProposals(blocks ...*flow.Block) []*messages.BlockProposal {
-	result := make([]*messages.BlockProposal, 0, len(blocks))
-	for _, block := range blocks {
-		result = append(result, messages.NewBlockProposal(block))
-	}
-	return result
 }

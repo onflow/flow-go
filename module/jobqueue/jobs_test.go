@@ -20,7 +20,7 @@ func TestJobID(t *testing.T) {
 
 func TestBlockJob(t *testing.T) {
 	block := unittest.BlockFixture()
-	job := jobqueue.BlockToJob(&block)
+	job := jobqueue.BlockToJob(block)
 
 	t.Run("job is correct type", func(t *testing.T) {
 		assert.IsType(t, &jobqueue.BlockJob{}, job, "job is not a block job")
@@ -34,7 +34,7 @@ func TestBlockJob(t *testing.T) {
 	t.Run("job converts to block", func(t *testing.T) {
 		b, err := jobqueue.JobToBlock(job)
 		assert.NoError(t, err, "unexpected error converting notify job to block")
-		assert.Equal(t, block, *b, "converted block is not the same as the original block")
+		assert.Equal(t, block, b, "converted block is not the same as the original block")
 	})
 
 	t.Run("incorrect job type fails to convert to block", func(t *testing.T) {

@@ -129,3 +129,14 @@ func CompatibleAlgorithms(sigAlgo crypto.SigningAlgorithm, hashAlgo hash.Hashing
 	}
 	return false
 }
+
+// RuntimeAccountPublicKey is a public key associated with an account for Cadence runtime that doesn't need sequence number.
+// A runtime account public key contains the public key, signing and hashing algorithms, a key weight, and revoked status.
+type RuntimeAccountPublicKey struct {
+	PublicKey crypto.PublicKey
+	SignAlgo  crypto.SigningAlgorithm
+	HashAlgo  hash.HashingAlgorithm
+	Weight    int
+	Index     uint32
+	Revoked   bool
+}

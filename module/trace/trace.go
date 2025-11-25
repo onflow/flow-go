@@ -57,6 +57,36 @@ func NewTracer(
 	error,
 ) {
 	ctx := context.TODO()
+	// OLTP trace gRPC client initialization. Connection parameters for the exporter are extracted
+	// from environment variables. e.g.: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`.
+	//
+	// For more information, see OpenTelemetry specification:
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
+	traceExporter, err := otlptracegrpc.New(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create trace exporter: %w", err)
+	}
+
+	return NewTracerWithExporter(
+		log,
+		serviceName,
+		chainID,
+		sensitivity,
+		traceExporter,
+	)
+}
+
+func NewTracerWithExporter(
+	log zerolog.Logger,
+	serviceName string,
+	chainID string,
+	sensitivity uint,
+	traceExporter sdktrace.SpanExporter,
+) (
+	*Tracer,
+	error,
+) {
+	ctx := context.TODO()
 	res, err := resource.New(
 		ctx,
 		resource.WithAttributes(
@@ -66,16 +96,6 @@ func NewTracer(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
-
-	// OLTP trace gRPC client initialization. Connection parameters for the exporter are extracted
-	// from environment variables. e.g.: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`.
-	//
-	// For more information, see OpenTelemetry specification:
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
-	traceExporter, err := otlptracegrpc.New(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create trace exporter: %w", err)
 	}
 
 	tracerProvider := sdktrace.NewTracerProvider(
@@ -205,6 +225,18 @@ func (t *Tracer) StartCollectionSpan(
 	context.Context,
 ) {
 	return t.startEntitySpan(ctx, collectionID, EntityTypeCollection, spanName, opts...)
+}
+
+func (t *Tracer) StartTransactionSpan(
+	ctx context.Context,
+	transactionID flow.Identifier,
+	spanName SpanName,
+	opts ...trace.SpanStartOption,
+) (
+	trace.Span,
+	context.Context,
+) {
+	return t.startEntitySpan(ctx, transactionID, EntityTypeTransaction, spanName, opts...)
 }
 
 func (t *Tracer) StartSpanFromContext(

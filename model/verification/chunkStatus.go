@@ -1,7 +1,6 @@
 package verification
 
 import (
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,10 +13,6 @@ type ChunkStatus struct {
 
 func (s ChunkStatus) Chunk() *flow.Chunk {
 	return s.ExecutionResult.Chunks[s.ChunkIndex]
-}
-
-func (s ChunkStatus) ChunkLocatorID() flow.Identifier {
-	return chunks.ChunkLocatorID(s.ExecutionResult.ID(), s.ChunkIndex)
 }
 
 type ChunkStatusList []*ChunkStatus

@@ -1,21 +1,26 @@
 package run
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func GenerateRootHeader(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time) *flow.Header {
-	return &flow.Header{
+func GenerateRootHeaderBody(chainID flow.ChainID, parentID flow.Identifier, height uint64, view uint64, timestamp time.Time) (*flow.HeaderBody, error) {
+	rootHeaderBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		ChainID:            chainID,
 		ParentID:           parentID,
 		Height:             height,
-		Timestamp:          timestamp,
-		View:               0,
+		Timestamp:          uint64(timestamp.UnixMilli()),
+		View:               view,
 		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
-		ProposerSigData:    nil,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate root header body: %w", err)
 	}
+
+	return rootHeaderBody, nil
 }

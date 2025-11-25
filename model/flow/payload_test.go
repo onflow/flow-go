@@ -14,7 +14,7 @@ import (
 
 func TestPayloadEncodeEmptyJSON(t *testing.T) {
 	// nil slices
-	payload := unittest.PayloadFixture()
+	payload := *flow.NewEmptyPayload()
 	payloadHash1 := payload.Hash()
 	encoded1, err := json.Marshal(payload)
 	require.NoError(t, err)
@@ -62,4 +62,36 @@ func TestPayloadEncodingMsgpack(t *testing.T) {
 	decodedHash := decoded.Hash()
 	assert.Equal(t, payloadHash, decodedHash)
 	assert.Equal(t, payload, decoded)
+}
+
+// TestNewPayload verifies the behavior of the NewPayload constructor.
+// It ensures proper handling of both valid and invalid untrusted input fields.
+//
+// Test Cases:
+//
+// 1. Valid input:
+//   - Verifies that a properly populated UntrustedPayload results in a valid Payload.
+//
+// 2. Valid input with zero ProtocolStateID:
+//   - Ensures that an error is returned when ProtocolStateID is flow.ZeroID.
+func TestNewPayload(t *testing.T) {
+	t.Run("valid input", func(t *testing.T) {
+		payload := unittest.PayloadFixture(
+			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
+		)
+
+		res, err := flow.NewPayload(flow.UntrustedPayload(payload))
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
+	t.Run("valid input with zero ProtocolStateID", func(t *testing.T) {
+		payload := unittest.PayloadFixture()
+		payload.ProtocolStateID = flow.ZeroID
+
+		res, err := flow.NewPayload(flow.UntrustedPayload(payload))
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "ProtocolStateID must not be zero")
+	})
 }

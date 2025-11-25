@@ -22,10 +22,5 @@ type ChunkVerifier interface {
 	// the final state commitment.
 	// It returns a Spock Secret as a byte array, verification fault of the
 	// chunk, and an error.
-	Verify(
-		ch *verification.VerifiableChunkData,
-	) (
-		[]byte,
-		error,
-	)
+	Verify(ch *verification.VerifiableChunkData) ([]byte, error)
 }

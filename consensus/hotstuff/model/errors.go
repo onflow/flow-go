@@ -513,7 +513,10 @@ func NewInvalidTimeoutErrorf(timeout *TimeoutObject, msg string, args ...interfa
 }
 
 func (e InvalidTimeoutError) Error() string {
-	return fmt.Sprintf("invalid timeout %x for view %d: %s", e.Timeout.ID(), e.Timeout.View, e.Err.Error())
+	return fmt.Sprintf("invalid timeout: %s: %s",
+		e.Timeout.String(),
+		e.Err.Error(),
+	)
 }
 
 // IsInvalidTimeoutError returns whether an error is InvalidTimeoutError

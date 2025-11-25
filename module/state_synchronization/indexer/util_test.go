@@ -14,14 +14,13 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 // TestFindContractUpdates tests the findContractUpdates function returns all contract updates
 func TestFindContractUpdates(t *testing.T) {
 	t.Parallel()
 
-	g := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+	g := unittest.NewEventGenerator(unittest.EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
 
 	expectedAddress1 := unittest.RandomAddressFixture()
 	expected1 := common.NewAddressLocation(nil, common.Address(expectedAddress1), "TestContract1")

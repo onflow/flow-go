@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 func run(*cobra.Command, []string) {
@@ -14,10 +14,15 @@ func run(*cobra.Command, []string) {
 		Str("datadir", flagDatadir).
 		Msg("flags")
 
-	db := common.InitStorage(flagDatadir)
+	db, err := common.InitStorage(flagDatadir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize storage")
+	}
 	defer db.Close()
 
-	err := db.Update(operation.RemoveExecutionForkEvidence())
+	err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.RemoveExecutionForkEvidence(rw.Writer())
+	})
 
 	// for testing purpose
 	// expectedSeals := unittest.IncorporatedResultSeal.Fixtures(2)

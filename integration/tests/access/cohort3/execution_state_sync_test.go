@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	pebbleds "github.com/ipfs/go-ds-pebble"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
@@ -49,20 +48,14 @@ type ExecutionStateSyncSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	net                 *testnet.FlowNetwork
-	executionDataDBMode execution_data.ExecutionDataDBMode
+	net *testnet.FlowNetwork
 }
 
 func (s *ExecutionStateSyncSuite) SetupTest() {
-	s.setup(execution_data.ExecutionDataDBModeBadger)
-}
-
-func (s *ExecutionStateSyncSuite) setup(executionDataDBMode execution_data.ExecutionDataDBMode) {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
-	s.executionDataDBMode = executionDataDBMode
 	s.buildNetworkConfig()
 
 	// start the network
@@ -96,7 +89,6 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-db=%s", s.executionDataDBMode.String())),
 	)
 
 	// add the ghost (access) node config
@@ -136,7 +128,6 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			"--execution-data-sync-enabled=true",
 			"--event-query-mode=execution-nodes-only",
-			fmt.Sprintf("--execution-data-db=%s", s.executionDataDBMode.String()),
 		},
 	}}
 
@@ -162,7 +153,7 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	// get the first block height
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
-	s.T().Logf("got block height %v ID %v", blockA.Header.Height, blockA.Header.ID())
+	s.T().Logf("got block height %v ID %v", blockA.Height, blockA.ID())
 
 	// Loop through checkBlocks and verify the execution data was downloaded correctly
 	an := s.net.ContainerByName(testnet.PrimaryAN)
@@ -176,7 +167,7 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Minute)
 	defer cancel()
 
-	for i := blockA.Header.Height; i <= blockA.Header.Height+checkBlocks; i++ {
+	for i := blockA.Height; i <= blockA.Height+checkBlocks; i++ {
 		anBED, err := s.executionDataForHeight(ctx, anClient, i)
 		require.NoError(s.T(), err, "could not get execution data from AN for height %v", i)
 
@@ -240,11 +231,7 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container
 	var err error
 	dsPath := filepath.Join(node.ExecutionDataDBPath(), "blobstore")
 
-	if s.executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-		ds, err = pebbleds.NewDatastore(dsPath, nil)
-	} else {
-		ds, err = badgerds.NewDatastore(dsPath, &badgerds.DefaultOptions)
-	}
+	ds, err = pebbleds.NewDatastore(dsPath, nil)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)

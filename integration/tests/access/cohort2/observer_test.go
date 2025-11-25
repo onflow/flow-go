@@ -423,7 +423,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			name:   "createTransaction",
 			method: http.MethodPost,
 			path:   "/transactions",
-			body:   createTx(s.net),
+			body:   createTx(s.T(), s.net),
 		},
 		{
 			name:   "getTransactionResultByID",
@@ -489,7 +489,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 	}
 }
 
-func createTx(net *testnet.FlowNetwork) interface{} {
+func createTx(t *testing.T, net *testnet.FlowNetwork) interface{} {
 	flowAddr := flow.Localnet.Chain().ServiceAddress()
 	payloadSignature := unittest.TransactionSignatureFixture()
 	envelopeSignature := unittest.TransactionSignatureFixture()
@@ -499,12 +499,15 @@ func createTx(net *testnet.FlowNetwork) interface{} {
 	envelopeSignature.Address = flowAddr
 	envelopeSignature.KeyIndex = 2
 
-	tx := flow.NewTransactionBody().
+	tx, err := flow.NewTransactionBodyBuilder().
 		AddAuthorizer(flowAddr).
 		SetPayer(flowAddr).
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(net.Root().ID()).
-		SetProposalKey(flowAddr, 1, 0)
+		SetProposalKey(flowAddr, 1, 0).
+		Build()
+	require.NoError(t, err)
+
 	tx.PayloadSignatures = []flow.TransactionSignature{payloadSignature}
 	tx.EnvelopeSignatures = []flow.TransactionSignature{envelopeSignature}
 

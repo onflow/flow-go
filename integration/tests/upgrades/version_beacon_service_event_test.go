@@ -38,7 +38,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 
 	ctx := context.Background()
 
-	serviceAddress := sdk.Address(s.net.Root().Header.ChainID.Chain().ServiceAddress())
+	serviceAddress := sdk.Address(s.net.Root().ChainID.Chain().ServiceAddress())
 	env := templates.Environment{
 		NodeVersionBeaconAddress: serviceAddress.String(),
 	}
@@ -215,11 +215,11 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 		shouldExecute := s.BlockState.WaitForBlocksByHeight(s.T(), height-1)
 		shouldNotExecute := s.BlockState.WaitForBlocksByHeight(s.T(), height)
 
-		s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].Header.ID(), s.exe1ID)
+		s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].ID(), s.exe1ID)
 		s.ReceiptState.WaitForNoReceiptFrom(
 			s.T(),
 			5*time.Second,
-			shouldNotExecute[0].Header.ID(),
+			shouldNotExecute[0].ID(),
 			s.exe1ID,
 		)
 
@@ -260,7 +260,7 @@ func (s *TestServiceEventVersionControl) sendSetVersionBoundaryTransaction(
 	env templates.Environment,
 	boundary versionBoundary,
 ) *sdk.TransactionResult {
-	serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
+	serviceAddress := s.net.Root().ChainID.Chain().ServiceAddress()
 
 	versionTableChangeScript := templates.GenerateSetVersionBoundaryScript(env)
 

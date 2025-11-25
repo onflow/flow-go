@@ -68,7 +68,19 @@ func (l *LocalEventProvider) Events(
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockInfo.ID, err)
 					return Response{}, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
-				event.Payload = payload
+				filteredEvent, err := flow.NewEvent(
+					flow.UntrustedEvent{
+						Type:             event.Type,
+						TransactionID:    event.TransactionID,
+						TransactionIndex: event.TransactionIndex,
+						EventIndex:       event.EventIndex,
+						Payload:          payload,
+					},
+				)
+				if err != nil {
+					return Response{}, rpc.ConvertError(err, "could not construct event", codes.Internal)
+				}
+				event = *filteredEvent
 			}
 
 			filteredEvents = append(filteredEvents, event)

@@ -218,7 +218,11 @@ func TestWithWhiteboard(t *testing.T) {
 	blocks := make(map[uint64]*flow.Header)
 	var view uint64
 	for view = 100; view <= 250; view += dkgeng.DefaultPollStep {
-		blocks[view] = &flow.Header{View: view}
+		blocks[view] = &flow.Header{
+			HeaderBody: flow.HeaderBody{
+				View: view,
+			},
+		}
 	}
 	firstBlock := blocks[100]
 

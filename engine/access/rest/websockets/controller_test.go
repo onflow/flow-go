@@ -554,7 +554,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		dataProvider.On("Close").Return(nil).Maybe()
 
 		// Simulate data provider write a block to the controller
-		expectedBlock := unittest.BlockFixture()
+		expectedBlock := *unittest.BlockFixture()
 		dataProvider.
 			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -894,6 +894,11 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 }
 
 func (s *WsControllerSuite) TestKeepaliveRoutine() {
+	keepaliveConfig := KeepaliveConfig{
+		PingPeriod: time.Microsecond,
+		PongWait:   2 * time.Microsecond,
+	}
+
 	s.T().Run("Successfully pings connection n times", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
 		conn.On("Close").Return(nil).Once()
@@ -923,9 +928,9 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		factory := dpmock.NewDataProviderFactory(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
-		controller.HandleConnection(context.Background())
+		controller.keepaliveConfig = keepaliveConfig
 
-		conn.AssertExpectations(t)
+		controller.HandleConnection(context.Background())
 	})
 
 	s.T().Run("Error on write to closed connection", func(t *testing.T) {
@@ -938,6 +943,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		factory := dpmock.NewDataProviderFactory(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller.keepaliveConfig = keepaliveConfig
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -945,8 +951,6 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		err := controller.keepalive(ctx)
 		s.Require().Error(err)
 		s.Require().ErrorIs(expectedError, err)
-
-		conn.AssertExpectations(t)
 	})
 
 	s.T().Run("Error on write to open connection", func(t *testing.T) {
@@ -958,6 +962,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		factory := dpmock.NewDataProviderFactory(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller.keepaliveConfig = keepaliveConfig
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -965,14 +970,13 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		err := controller.keepalive(ctx)
 		s.Require().Error(err)
 		s.Require().ErrorContains(err, "error sending ping")
-
-		conn.AssertExpectations(t)
 	})
 
 	s.T().Run("Context cancelled", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
 		factory := dpmock.NewDataProviderFactory(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller.keepaliveConfig = keepaliveConfig
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Immediately cancel the context
@@ -980,8 +984,6 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		// Start the keepalive process with the context canceled
 		err := controller.keepalive(ctx)
 		s.Require().NoError(err)
-
-		conn.AssertExpectations(t) // Should not invoke WriteMessage after context cancellation
 	})
 }
 

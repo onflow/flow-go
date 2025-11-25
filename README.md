@@ -54,7 +54,7 @@ The following table lists all work streams and links to their home directory and
 ## Installation
 
 - Clone this repository
-- Install [Go](https://golang.org/doc/install) (Flow requires Go 1.23 and later)
+- Install [Go](https://golang.org/doc/install) (Flow requires Go 1.25 and later)
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running a local network and integration tests
 - Make sure the [`GOPATH`](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable) and `GOBIN` environment variables
   are set, and `GOBIN` is added to your path:
@@ -155,4 +155,40 @@ Generate mocks used for unit tests:
 
 ```bash
 make generate-mocks
+```
+
+### Mocks
+
+We use `github.com/vektra/mockery` for mocking interfaces within tests. The configuration is in `.mockery.yaml`.
+
+#### Adding and updating packages
+
+You can add new packages by their fully qualified name. e.g.
+```
+github.com/onflow/flow-go/module/execution:
+```
+
+This will add all interfaces within the `module/execution/` (non-recursive).
+
+#### Mocking functions
+
+Mockery dropped support for generating function mocks. Instead, you can use this pattern:
+
+1. Create a `mock_interfaces` directory in the package where the function mock exists.
+2. Add a file that mocks the function. for example, this mocks the `StateMachineEventsTelemetryFactory(candidateView uint64) protocol_state.StateMachineTelemetryConsumer
+```golang
+package mockinterfaces
+
+import "github.com/onflow/flow-go/state/protocol/protocol_state"
+
+// ExecForkActor allows to create a mock for the ExecForkActor callback
+type StateMachineEventsTelemetryFactory interface {
+	Execute(candidateView uint64) protocol_state.StateMachineTelemetryConsumer
+}
+```
+3. Add the package to `.mockery.yaml`. Note: specify the directory where you want the mock to be placed.
+```
+  github.com/onflow/flow-go/state/protocol/protocol_state/mock_interfaces:
+    config:
+      dir: "state/protocol/protocol_state/mock"
 ```

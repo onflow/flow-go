@@ -19,7 +19,7 @@ on:
       - master
 
 env:
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.25"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -62,8 +62,6 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
         with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.63
           args: "--no-config --disable-all" # set args so that no linters are actually run
       - name: Build custom linter binary
         if: steps.cache-linter.outputs.cache-hit != 'true'
@@ -239,7 +237,7 @@ jobs:
       timeout-minutes: 1
       continue-on-error: true
       with:
-        file: ./coverage.txt
+        files: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
@@ -285,7 +283,7 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          file: ./coverage.txt
+          files: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -295,10 +293,6 @@ jobs:
     runs-on: buildjet-16vcpu-ubuntu-2204
     env:
       CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
-    # Set the environment based on the author association of the pull request.
-    # This is used to determine whether the build should be run in an internal or external environment.
-    # If the author is a member or collaborator, use the internal environment; otherwise, use the external environment that will require approval
-    environment: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) && 'internal-ci' || 'external-ci' }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -325,6 +319,8 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
         if: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) }}
+        # this docker auth is exclusively for higher rate limits. continue unauthenticated if it fails
+        continue-on-error: true
 
 
       - name: Docker build
@@ -393,7 +389,7 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          file: ./coverage.txt
+          files: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}

@@ -1,7 +1,9 @@
 package computer_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
@@ -125,7 +128,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -218,7 +221,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		require.Equal(t, 2, committer.callCount)
 
-		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
+		assert.Equal(t, block.BlockID(), result.BlockExecutionData.BlockID)
 
 		expectedChunk1EndState := incStateCommitment(*block.StartState)
 		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
@@ -235,7 +238,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			t,
 			parentBlockExecutionResultID,
 			receipt.PreviousResultID)
-		assert.Equal(t, block.ID(), receipt.BlockID)
+		assert.Equal(t, block.BlockID(), receipt.BlockID)
 		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
 
 		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
@@ -243,7 +246,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		chunk1 := receipt.Chunks[0]
 
 		eventCommits := result.AllEventCommitments()
-		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, block.BlockID(), chunk1.BlockID)
 		assert.Equal(t, uint(0), chunk1.CollectionIndex)
 		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
 		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
@@ -255,7 +258,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
 
 		chunk2 := receipt.Chunks[1]
-		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, block.BlockID(), chunk2.BlockID)
 		assert.Equal(t, uint(1), chunk2.CollectionIndex)
 		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
 		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
@@ -269,7 +272,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		chunkDataPacks := result.AllChunkDataPacks()
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		require.NoError(t, err)
 		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
 		chunkDataPack1 := chunkDataPacks[0]
@@ -563,7 +567,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		expectedResults := make([]flow.TransactionResult, 0)
 		for _, c := range block.CompleteCollections {
-			for _, t := range c.Transactions {
+			for _, t := range c.Collection.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
 					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
@@ -584,6 +588,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.LessOrEqual(t, vm.CallCount(), (1+totalTransactionCount)/2*totalTransactionCount)
 	})
 
+	// TODO: this test is flaky with a low probability of failing
 	t.Run(
 		"service events are emitted", func(t *testing.T) {
 			execCtx := fvm.NewContext(
@@ -636,7 +641,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			transactions := []*flow.TransactionBody{}
 			for _, col := range block.Collections() {
-				transactions = append(transactions, col.Transactions...)
+				transactions = append(transactions, col.Collection.Transactions...)
 			}
 
 			// events to emit for each iteration/transaction
@@ -885,7 +890,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		normalTransactions := map[common.Location]struct{}{}
 		for _, col := range block.Collections() {
-			for _, txn := range col.Transactions {
+			for _, txn := range col.Collection.Transactions {
 				loc := common.TransactionLocation(txn.ID())
 				normalTransactions[loc] = struct{}{}
 			}
@@ -1325,7 +1330,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -1363,21 +1368,27 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	committer.AssertExpectations(t)
 }
 
-func Test_ScheduledCallback(t *testing.T) {
+func Test_ScheduledTransactions(t *testing.T) {
+	chain := flow.Testnet.Chain()
+
 	t.Run("process with no scheduled callback", func(t *testing.T) {
-		testScheduledCallback(t, []cadence.Event{}, 2) // process callback + system chunk
+		testScheduledTransactions(t, chain, []cadence.Event{}, 2) // process callback + system chunk
 	})
 
 	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
 		// create callback events that process callback will return
-		location := common.NewAddressLocation(nil, common.Address(flow.HexToAddress("0x0000000000000000")), "CallbackScheduler")
+		env := systemcontracts.SystemContractsForChain(chain.ChainID())
+		location := common.NewAddressLocation(nil, common.Address(env.FlowTransactionScheduler.Address), "FlowTransactionScheduler")
 
 		eventType := cadence.NewEventType(
 			location,
-			"CallbackProcessed",
+			"PendingExecution",
 			[]cadence.Field{
-				{Identifier: "ID", Type: cadence.UInt64Type},
+				{Identifier: "id", Type: cadence.UInt64Type},
+				{Identifier: "priority", Type: cadence.UInt8Type},
 				{Identifier: "executionEffort", Type: cadence.UInt64Type},
+				{Identifier: "fees", Type: cadence.UFix64Type},
+				{Identifier: "callbackOwner", Type: cadence.AddressType},
 			},
 			nil,
 		)
@@ -1385,32 +1396,64 @@ func Test_ScheduledCallback(t *testing.T) {
 		callbackID1 := uint64(1)
 		callbackID2 := uint64(2)
 
+		fees, err := cadence.NewUFix64("0.0")
+		require.NoError(t, err)
+
 		callbackEvent1 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID1),
+				cadence.NewUInt8(1),
 				cadence.NewUInt64(1000), // execution effort
+				fees,
+				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
 
 		callbackEvent2 := cadence.NewEvent(
 			[]cadence.Value{
 				cadence.NewUInt64(callbackID2),
+				cadence.NewUInt8(1),
 				cadence.NewUInt64(2000), // execution effort
+				fees,
+				cadence.NewAddress(env.FlowServiceAccount.Address),
 			},
 		).WithType(eventType)
 
-		testScheduledCallback(t, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
+		testScheduledTransactions(t, chain, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
+	})
+
+	t.Run("process callback transaction execution error", func(t *testing.T) {
+		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback execution failed")
+		testScheduledTransactionsWithError(t, chain, []cadence.Event{}, 0, processCallbackError, nil)
+	})
+
+	t.Run("process callback transaction output error", func(t *testing.T) {
+		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback output error")
+		testScheduledTransactionsWithError(t, chain, []cadence.Event{}, 2, nil, processCallbackError)
 	})
 }
 
-func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expectedTransactionCount int) {
-	rag := &RandomAddressGenerator{}
+func testScheduledTransactions(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int) {
+	testScheduledTransactionsWithError(t, chain, callbackEvents, expectedTransactionCount, nil, nil)
+}
 
+func testScheduledTransactionsWithError(
+	t *testing.T,
+	chain flow.Chain,
+	callbackEvents []cadence.Event,
+	expectedTransactionCount int,
+	processExecuteError fvmErrors.CodedError,
+	processOutputError fvmErrors.CodedError,
+) {
+	rag := &RandomAddressGenerator{}
 	executorID := unittest.IdentifierFixture()
 
+	testLogger := NewTestLogger()
+
 	execCtx := fvm.NewContext(
-		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
-		fvm.WithChain(flow.Localnet.Chain()),
+		fvm.WithScheduledTransactionsEnabled(true), // Enable scheduled transactions
+		fvm.WithChain(chain),
+		fvm.WithLogger(testLogger.Logger),
 	)
 
 	// track which transactions were executed and their details
@@ -1431,7 +1474,7 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 			require.NoError(t, err)
 			if cadenceEvent, ok := decodedEvent.(cadence.Event); ok {
 				// search for the ID field in the event
-				idField := cadence.SearchFieldByName(cadenceEvent, "ID")
+				idField := cadence.SearchFieldByName(cadenceEvent, "id")
 				if idValue, ok := idField.(cadence.UInt64); ok {
 					callbackIDs[i] = uint64(idValue)
 				}
@@ -1443,8 +1486,10 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 	vm := &callbackTestVM{
 		testVM: testVM{
 			t:                    t,
-			eventsPerTransaction: 0, // we'll handle events manually
+			eventsPerTransaction: 0,                   // we'll handle events manually
+			err:                  processExecuteError, // inject error if provided
 		},
+		processOutputErr:     processOutputError,
 		executedTransactions: executedTransactions,
 		executedMutex:        &executedTransactionsMutex,
 		eventPayloads:        eventPayloads,
@@ -1457,9 +1502,9 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 
 	me := new(modulemock.Local)
 	me.On("NodeID").Return(executorID)
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil)
+		Return(unittest.SignatureFixture(), nil)
 
 	exemetrics := new(modulemock.ExecutionMetrics)
 	exemetrics.On("ExecutionBlockExecuted",
@@ -1475,15 +1520,34 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 		Return(nil).
 		Times(1)
 
-	// expect the specified number of transactions
-	exemetrics.On("ExecutionTransactionExecuted",
-		mock.Anything,
-		mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
-			return !arg.Failed && arg.SystemTransaction
-		}),
-		mock.Anything).
-		Return(nil).
-		Times(expectedTransactionCount)
+	if processOutputError != nil {
+		// expect 1 failed transaction (process callback) + 1 successful transaction (system chunk)
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return arg.Failed && (arg.SystemTransaction || arg.ScheduledTransaction)
+			}),
+			mock.Anything).
+			Return(nil).
+			Times(1)
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return !arg.Failed && (arg.SystemTransaction || arg.ScheduledTransaction)
+			}),
+			mock.Anything).
+			Return(nil).
+			Times(expectedTransactionCount - 1)
+	} else {
+		exemetrics.On("ExecutionTransactionExecuted",
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return !arg.Failed && (arg.SystemTransaction || arg.ScheduledTransaction)
+			}),
+			mock.Anything).
+			Return(nil).
+			Times(expectedTransactionCount)
+	}
 
 	exemetrics.On(
 		"ExecutionChunkDataPackGenerated",
@@ -1497,6 +1561,16 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 		mock.Anything).
 		Return(nil).
 		Times(1)
+
+	// expect scheduled transaction execution metrics if there are scheduled transactions
+	if len(callbackEvents) > 0 {
+		exemetrics.On("ExecutionScheduledTransactionsExecuted",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(1)
+	}
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -1514,7 +1588,7 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 		execCtx,
 		exemetrics,
 		trace.NewNoopTracer(),
-		zerolog.Nop(),
+		testLogger.Logger,
 		committer,
 		me,
 		prov,
@@ -1533,6 +1607,34 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 		block,
 		nil,
 		derived.NewEmptyDerivedBlockData(0))
+
+	// If we expect an error, verify it and return early
+	if processExecuteError != nil {
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "system process transaction")
+		return
+	}
+
+	if processOutputError != nil {
+		require.NoError(t, err)
+		require.Truef(
+			t,
+			testLogger.HasLogWithField("system process transaction output error", "critical_error", true),
+			"expected critical error log not found",
+		)
+
+		// verify the process callback transaction failed as expected
+		require.Len(t, result.AllTransactionResults(), expectedTransactionCount)
+		processCallbackResult := result.AllTransactionResults()[0]
+		require.NotEmpty(t, processCallbackResult.ErrorMessage, "process callback transaction should have failed")
+		require.Contains(t, processCallbackResult.ErrorMessage, "process callback output error")
+
+		// verify system chunk transaction succeeded
+		systemChunkResult := result.AllTransactionResults()[1]
+		require.Empty(t, systemChunkResult.ErrorMessage, "system chunk transaction should not have failed")
+		return
+	}
+
 	require.NoError(t, err)
 
 	// verify execution results
@@ -1575,12 +1677,12 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 	receipt := result.ExecutionReceipt
 	assert.Equal(t, executorID, receipt.ExecutorID)
 	assert.Equal(t, parentBlockExecutionResultID, receipt.PreviousResultID)
-	assert.Equal(t, block.ID(), receipt.BlockID)
+	assert.Equal(t, block.BlockID(), receipt.BlockID)
 	assert.Len(t, receipt.Chunks, 1) // Only system chunk
 
 	// verify system chunk details
 	systemChunk := receipt.Chunks[0]
-	assert.Equal(t, block.ID(), systemChunk.BlockID)
+	assert.Equal(t, block.BlockID(), systemChunk.BlockID)
 	assert.Equal(t, uint(0), systemChunk.CollectionIndex) // System collection is at index 0 for empty block
 	assert.Equal(t, uint64(expectedTransactionCount), systemChunk.NumberOfTransactions)
 
@@ -1590,7 +1692,8 @@ func testScheduledCallback(t *testing.T, callbackEvents []cadence.Event, expecte
 
 // callbackTestVM is a custom VM for testing callback execution
 type callbackTestVM struct {
-	testVM               // Embed testVM
+	testVM
+	processOutputErr     fvmErrors.CodedError
 	executedTransactions map[string]string
 	executedMutex        *sync.Mutex
 	eventPayloads        [][]byte
@@ -1620,31 +1723,61 @@ type callbackTestExecutor struct {
 	vm *callbackTestVM
 }
 
+func (c *callbackTestExecutor) Execute() error {
+	// Return error if one was injected for process callback transaction
+	if c.vm.err != nil {
+		txProc, ok := c.proc.(*fvm.TransactionProcedure)
+		if ok {
+			script := string(txProc.Transaction.Script)
+			if strings.Contains(script, "scheduler.process") {
+				return c.vm.err
+			}
+		}
+	}
+
+	return c.testExecutor.Execute()
+}
+
 // we need to reimplement this Output since the events are consumed in the block computer
 // from the output of the procedure executor
-func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
-	executor.vm.executedMutex.Lock()
-	defer executor.vm.executedMutex.Unlock()
+func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
+	// Return error if one was injected for process callback transaction
+	if c.vm.processOutputErr != nil {
+		txProc, ok := c.proc.(*fvm.TransactionProcedure)
+		if ok {
+			script := string(txProc.Transaction.Script)
+			if strings.Contains(script, "scheduler.process") {
+				return fvm.ProcedureOutput{
+					Err: c.vm.processOutputErr,
+				}
+			}
+		}
+	}
 
-	txProc, ok := executor.proc.(*fvm.TransactionProcedure)
+	c.vm.executedMutex.Lock()
+	defer c.vm.executedMutex.Unlock()
+
+	txProc, ok := c.proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fvm.ProcedureOutput{}
 	}
 
+	const callbackSchedulerImport = `import "FlowTransactionScheduler"`
 	txBody := txProc.Transaction
 	txID := fmt.Sprintf("tx_%d", txProc.TxIndex)
 
 	switch {
 	// scheduled callbacks process transaction
-	case strings.Contains(string(txBody.Script), "CallbackScheduler.process"):
-		executor.vm.executedTransactions[txID] = "process_callback"
+	case strings.Contains(string(txBody.Script), "scheduler.process"):
+		c.vm.executedTransactions[txID] = "process_callback"
+		env := systemcontracts.SystemContractsForChain(c.ctx.Chain.ChainID()).AsTemplateEnv()
+		eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.PendingExecution", env.FlowTransactionSchedulerAddress)
 
 		// return events for each scheduled callback
-		events := make([]flow.Event, len(executor.vm.eventPayloads))
-		for i, payload := range executor.vm.eventPayloads {
+		events := make([]flow.Event, len(c.vm.eventPayloads))
+		for i, payload := range c.vm.eventPayloads {
 			events[i] = flow.Event{
-				// TODO: we shouldn't hardcode this event types, refactor after the scheduler contract is done
-				Type:             flow.EventType("A.0x0000000000000000.CallbackScheduler.CallbackProcessed"),
+				Type:             flow.EventType(eventTypeString),
 				TransactionID:    txProc.ID,
 				TransactionIndex: txProc.TxIndex,
 				EventIndex:       uint32(i),
@@ -1656,19 +1789,19 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(string(txBody.Script), "CallbackScheduler.executeCallback"):
+	case strings.Contains(string(txBody.Script), "schedulerRef.executeTransaction"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}
 		}
 
 		// decode the argument to check which callback it is
-		argValue, err := ccf.Decode(nil, txBody.Arguments[0])
+		argValue, err := jsoncdc.Decode(nil, txBody.Arguments[0])
 		if err == nil {
 			if idValue, ok := argValue.(cadence.UInt64); ok {
 				// find which callback this is
 				callbackIndex := -1
-				for i, callbackID := range executor.vm.callbackIDs {
+				for i, callbackID := range c.vm.callbackIDs {
 					if uint64(idValue) == callbackID {
 						callbackIndex = i
 						break
@@ -1676,9 +1809,9 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 				}
 
 				if callbackIndex >= 0 {
-					executor.vm.executedTransactions[txID] = fmt.Sprintf("callback%d", callbackIndex+1)
+					c.vm.executedTransactions[txID] = fmt.Sprintf("callback%d", callbackIndex+1)
 				} else {
-					executor.vm.executedTransactions[txID] = "unknown_callback"
+					c.vm.executedTransactions[txID] = "unknown_callback"
 				}
 			}
 		}
@@ -1686,7 +1819,7 @@ func (executor *callbackTestExecutor) Output() fvm.ProcedureOutput {
 		return fvm.ProcedureOutput{}
 	// system chunk transaction
 	default:
-		executor.vm.executedTransactions[txID] = "system_chunk"
+		c.vm.executedTransactions[txID] = "system_chunk"
 		return fvm.ProcedureOutput{}
 	}
 }
@@ -1711,22 +1844,20 @@ func generateBlockWithVisitor(
 		collection := generateCollection(transactionCount, addressGenerator, visitor)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
-		completeCollections[collection.Guarantee.ID()] = collection
+		completeCollections[collection.Guarantee.CollectionID] = collection
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			Timestamp: flow.GenesisTime,
-			Height:    42,
-			View:      42,
-		},
-		Payload: &flow.Payload{
-			Guarantees: guarantees,
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithHeight(42),
+		unittest.Block.WithView(42),
+		unittest.Block.WithParentView(41),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)),
+		),
+	)
 
 	return &entity.ExecutableBlock{
-		Block:               &block,
+		Block:               block,
 		CompleteCollections: completeCollections,
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
@@ -1759,8 +1890,8 @@ func generateCollection(
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 
 	return &entity.CompleteCollection{
-		Guarantee:    guarantee,
-		Transactions: transactions,
+		Guarantee:  guarantee,
+		Collection: &flow.Collection{Transactions: transactions},
 	}
 }
 
@@ -1988,4 +2119,68 @@ func (p *programLoader) Compute(
 	error,
 ) {
 	return p.load()
+}
+
+// TestLogger captures log output for testing and provides methods to verify logged messages.
+type TestLogger struct {
+	buffer bytes.Buffer
+	Logger zerolog.Logger
+}
+
+func NewTestLogger() *TestLogger {
+	tl := &TestLogger{}
+	tl.Logger = zerolog.New(&tl.buffer).Level(zerolog.DebugLevel)
+	return tl
+}
+
+type LogEntry struct {
+	Level   string
+	Message string
+	Fields  map[string]interface{}
+}
+
+func (tl *TestLogger) Logs() []LogEntry {
+	var entries []LogEntry
+	lines := strings.Split(tl.buffer.String(), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var rawEntry map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &rawEntry); err != nil {
+			continue
+		}
+		entry := LogEntry{
+			Fields: make(map[string]interface{}),
+		}
+		for k, v := range rawEntry {
+			switch k {
+			case "level":
+				entry.Level = fmt.Sprintf("%v", v)
+			case "message":
+				entry.Message = fmt.Sprintf("%v", v)
+			default:
+				entry.Fields[k] = v
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+func (tl *TestLogger) HasLog(message string) bool {
+	return strings.Contains(tl.buffer.String(), message)
+}
+
+func (tl *TestLogger) HasLogWithField(message string, fieldName string, fieldValue interface{}) bool {
+	for _, entry := range tl.Logs() {
+		if strings.Contains(entry.Message, message) {
+			if val, ok := entry.Fields[fieldName]; ok {
+				if val == fieldValue {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

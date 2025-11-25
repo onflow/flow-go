@@ -3,7 +3,7 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/collection"
@@ -17,35 +17,41 @@ import (
 )
 
 type BuilderFactory struct {
-	db               *badger.DB
+	db               storage.DB
 	protoState       protocol.State
+	lockManager      lockctx.Manager
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
 	opts             []builder.Opt
 	metrics          module.CollectionMetrics
 	pusher           collection.GuaranteedCollectionPublisher // engine for pushing finalized collection to consensus committee
+	configGetter     module.ReadonlySealingLagRateLimiterConfig
 	log              zerolog.Logger
 }
 
 func NewBuilderFactory(
-	db *badger.DB,
+	db storage.DB,
 	protoState protocol.State,
+	lockManager lockctx.Manager,
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
 	metrics module.CollectionMetrics,
 	pusher collection.GuaranteedCollectionPublisher,
 	log zerolog.Logger,
+	configGetter module.ReadonlySealingLagRateLimiterConfig,
 	opts ...builder.Opt,
 ) (*BuilderFactory, error) {
 
 	factory := &BuilderFactory{
 		db:               db,
 		protoState:       protoState,
+		lockManager:      lockManager,
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
 		metrics:          metrics,
 		pusher:           pusher,
 		log:              log,
+		configGetter:     configGetter,
 		opts:             opts,
 	}
 	return factory, nil
@@ -62,6 +68,8 @@ func (f *BuilderFactory) Create(
 	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
+		f.lockManager,
+		f.metrics,
 		f.protoState,
 		clusterState,
 		f.mainChainHeaders,
@@ -70,6 +78,7 @@ func (f *BuilderFactory) Create(
 		pool,
 		f.log,
 		epoch,
+		f.configGetter,
 		f.opts...,
 	)
 	if err != nil {
@@ -78,6 +87,7 @@ func (f *BuilderFactory) Create(
 
 	final := finalizer.NewFinalizer(
 		f.db,
+		f.lockManager,
 		pool,
 		f.pusher,
 		f.metrics,

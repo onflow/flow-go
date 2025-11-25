@@ -30,11 +30,12 @@ const (
 )
 
 type Config struct {
-	ListenAddress  string
-	WriteTimeout   time.Duration
-	ReadTimeout    time.Duration
-	IdleTimeout    time.Duration
-	MaxRequestSize int64
+	ListenAddress   string
+	WriteTimeout    time.Duration
+	ReadTimeout     time.Duration
+	IdleTimeout     time.Duration
+	MaxRequestSize  int64
+	MaxResponseSize int64
 }
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -50,9 +51,9 @@ func NewServer(
 	enableNewWebsocketsStreamAPI bool,
 	wsConfig websockets.Config,
 ) (*http.Server, error) {
-	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
+	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize, config.MaxResponseSize)
 	if stateStreamApi != nil {
-		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
+		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize, config.MaxResponseSize)
 	}
 
 	dataProviderFactory := dp.NewDataProviderFactory(
@@ -66,7 +67,7 @@ func NewServer(
 	)
 
 	if enableNewWebsocketsStreamAPI {
-		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
+		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, config.MaxResponseSize, dataProviderFactory)
 	}
 
 	c := cors.New(cors.Options{

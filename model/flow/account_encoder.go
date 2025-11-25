@@ -40,6 +40,14 @@ type runtimeAccountPublicKeyWrapper struct {
 	Weight    uint
 }
 
+// StoredPublicKey represents public key stored on chain in batch public key register.
+// Weight is stored separately to reduce duplicate public keys.
+type StoredPublicKey struct {
+	PublicKey crypto.PublicKey
+	SignAlgo  crypto.SigningAlgorithm
+	HashAlgo  hash.HashingAlgorithm
+}
+
 // accountPrivateKeyWrapper is used for encoding and decoding.
 type accountPrivateKeyWrapper struct {
 	PrivateKey []byte
@@ -88,6 +96,19 @@ func EncodeRuntimeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 		Weight:    uint(a.Weight),
 	}
 
+	return rlp.EncodeToBytes(&w)
+}
+
+func EncodeStoredPublicKey(a StoredPublicKey) ([]byte, error) {
+	w := struct {
+		PublicKey []byte
+		SignAlgo  uint
+		HashAlgo  uint
+	}{
+		PublicKey: a.PublicKey.Encode(),
+		SignAlgo:  uint(a.SignAlgo),
+		HashAlgo:  uint(a.HashAlgo),
+	}
 	return rlp.EncodeToBytes(&w)
 }
 
@@ -171,6 +192,32 @@ func DecodeRuntimeAccountPublicKey(b []byte, seqNumber uint64) (AccountPublicKey
 	}, nil
 }
 
+func DecodeStoredPublicKey(b []byte) (StoredPublicKey, error) {
+	var w struct {
+		PublicKey []byte
+		SignAlgo  uint
+		HashAlgo  uint
+	}
+	err := rlp.DecodeBytes(b, &w)
+	if err != nil {
+		return StoredPublicKey{}, err
+	}
+
+	signAlgo := crypto.SigningAlgorithm(w.SignAlgo)
+	hashAlgo := hash.HashingAlgorithm(w.HashAlgo)
+
+	publicKey, err := crypto.DecodePublicKey(signAlgo, w.PublicKey)
+	if err != nil {
+		return StoredPublicKey{}, err
+	}
+
+	return StoredPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  signAlgo,
+		HashAlgo:  hashAlgo,
+	}, nil
+}
+
 func EncodeAccountPrivateKey(a AccountPrivateKey) ([]byte, error) {
 	privateKey := a.PrivateKey.Encode()
 
@@ -204,4 +251,19 @@ func DecodeAccountPrivateKey(b []byte) (AccountPrivateKey, error) {
 		SignAlgo:   signAlgo,
 		HashAlgo:   hashAlgo,
 	}, nil
+}
+
+// Sequence Number
+
+func EncodeSequenceNumber(num uint64) ([]byte, error) {
+	return rlp.EncodeToBytes(num)
+}
+
+func DecodeSequenceNumber(b []byte) (uint64, error) {
+	var num uint64
+	err := rlp.DecodeBytes(b, &num)
+	if err != nil {
+		return 0, err
+	}
+	return num, nil
 }

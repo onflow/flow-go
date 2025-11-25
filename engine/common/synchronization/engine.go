@@ -77,6 +77,7 @@ func New(
 	core module.SyncCore,
 	participantsProvider module.IdentifierProvider,
 	spamDetectionConfig *SpamDetectionConfig,
+	registrar hotstuff.FinalizationRegistrar,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -133,6 +134,9 @@ func New(
 		return nil, fmt.Errorf("could not setup message handler")
 	}
 
+	registrar.AddOnBlockFinalizedConsumer(finalizedHeaderCache.OnFinalizedBlock)
+	registrar.AddOnBlockIncorporatedConsumer(finalizedHeaderCache.OnBlockIncorporated)
+
 	return e, nil
 }
 
@@ -162,7 +166,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncResponse)
+				_, ok := msg.Payload.(*flow.SyncResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 				}
@@ -172,7 +176,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BlockResponse)
+				_, ok := msg.Payload.(*flow.BlockResponse)
 				if ok {
 					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 				}
@@ -205,34 +209,34 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch message := event.(type) {
-	case *messages.BatchRequest:
+	case *flow.BatchRequest:
 		err := e.validateBatchRequestForALSP(originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err))
 		}
 		return e.requestHandler.Process(channel, originID, event)
-	case *messages.RangeRequest:
+	case *flow.RangeRequest:
 		err := e.validateRangeRequestForALSP(originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate range request from %x: %w", originID[:], err))
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
-	case *messages.SyncRequest:
+	case *flow.SyncRequest:
 		err := e.validateSyncRequestForALSP(originID)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate sync request from %x: %w", originID[:], err))
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
-	case *messages.BlockResponse:
+	case *flow.BlockResponse:
 		err := e.validateBlockResponseForALSP(channel, originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate block response from %x: %w", originID[:], err))
 		}
 		return e.responseMessageHandler.Process(originID, event)
 
-	case *messages.SyncResponse:
+	case *flow.SyncResponse:
 		err := e.validateSyncResponseForALSP(channel, originID, message)
 		if err != nil {
 			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate sync response from %x: %w", originID[:], err))
@@ -270,14 +274,14 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
-			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			e.onSyncResponse(msg.OriginID, msg.Payload.(*flow.SyncResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 			continue
 		}
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
+			e.onBlockResponse(msg.OriginID, msg.Payload.(*flow.BlockResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			continue
 		}
@@ -289,38 +293,39 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 }
 
 // onSyncResponse processes a synchronization response.
-func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
+func (e *Engine) onSyncResponse(originID flow.Identifier, res *flow.SyncResponse) {
 	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
 	final := e.finalizedHeaderCache.Get()
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a response containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	// process the blocks one by one
+// onBlockResponse processes a structurally validated block proposal containing a specifically requested block response.
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *flow.BlockResponse) {
+	// process the proposal one by one
 	if len(res.Blocks) == 0 {
-		e.log.Debug().Msg("received empty block response")
+		e.log.Debug().Msg("received empty proposals")
 		return
 	}
 
-	first := res.Blocks[0].Header.Height
-	last := res.Blocks[len(res.Blocks)-1].Header.Height
-	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
+	proposals := res.Blocks
+	first := proposals[0].Block.Height
+	last := proposals[len(proposals)-1].Block.Height
+	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received proposal")
 
-	filteredBlocks := make([]*messages.BlockProposal, 0, len(res.Blocks))
-	for _, block := range res.Blocks {
-		header := block.Header
-		if !e.core.HandleBlock(&header) {
+	filteredProposals := make([]*flow.Proposal, 0, len(proposals))
+	for _, proposal := range proposals {
+		header := proposal.Block.ToHeader()
+		if !e.core.HandleBlock(header) {
 			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}
-		filteredBlocks = append(filteredBlocks, &messages.BlockProposal{Block: block})
+		filteredProposals = append(filteredProposals, &proposal)
 	}
 
 	// forward the block to the compliance engine for validation and processing
-	e.comp.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+	e.comp.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 		OriginID: originID,
-		Message:  filteredBlocks,
+		Message:  filteredProposals,
 	})
 }
 
@@ -468,7 +473,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 // - batchRequest: the batch request to validate
 // Returns:
 // - error: If an error is encountered while validating the batch request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
-func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) error {
+func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *flow.BatchRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 	if err != nil {
@@ -528,7 +533,7 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *messages.BlockResponse) error {
+func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *flow.BlockResponse) error {
 	return nil
 }
 
@@ -543,7 +548,7 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 // - rangeRequest: the range request to validate
 // Returns:
 // - error: If an error is encountered while validating the range request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
-func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) error {
+func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *flow.RangeRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 	if err != nil {
@@ -647,6 +652,6 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, syncResponse *messages.SyncResponse) error {
+func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, syncResponse *flow.SyncResponse) error {
 	return nil
 }

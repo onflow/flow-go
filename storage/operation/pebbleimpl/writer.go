@@ -3,7 +3,6 @@ package pebbleimpl
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/cockroachdb/pebble/v2"
 
@@ -23,8 +22,16 @@ type ReaderBatchWriter struct {
 	// for executing callbacks after the batch has been flushed, such as updating caches
 	callbacks *operation.Callbacks
 
-	// for repreventing re-entrant deadlock
-	locks *operation.BatchLocks
+	// values contains the values for this batch.
+	// The values map is set using SetScopedValue(key, value) and retrieved using ScopedValue(key).
+	// Initialization of the values map is deferred until it is needed, because
+	// ReaderBatchWriter is created frequently to update the database, but
+	// this values map is used infrequently to save data for batch operations.
+	// For example, store.TransactionResults.BatchRemoveByBlockID() saves batch
+	// removed block IDs in values map, and retrieves the batch removed block
+	// IDs in OnCommitSucceed() callback.  This allows locking just once,
+	// instead of locking TransactionResults cache for every removed block ID.
+	values map[string]any
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -48,14 +55,6 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 
 func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
 	return b.batch
-}
-
-// Lock tries to acquire the lock for the batch.
-// if the lock is already acquired by this same batch from other pending db operations,
-// then it will not be blocked and can continue updating the batch, which prevents a re-entrant deadlock.
-// CAUTION: The caller must ensure that no other references exist for the input lock.
-func (b *ReaderBatchWriter) Lock(lock *sync.Mutex) {
-	b.locks.Lock(lock, b.callbacks)
 }
 
 // AddCallback adds a callback to execute after the batch has been flush
@@ -113,7 +112,6 @@ func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 		globalReader: ToReader(db),
 		batch:        db.NewBatch(),
 		callbacks:    operation.NewCallbacks(),
-		locks:        operation.NewBatchLocks(),
 	}
 }
 
@@ -160,4 +158,31 @@ func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPref
 		}
 		return nil
 	})
+}
+
+// SetScopedValue stores the given value by the given key in this batch.
+// Stored value can be retrieved by the same key via ScopedValue().
+func (b *ReaderBatchWriter) SetScopedValue(key string, value any) {
+	// Creation of b.values is deferred until needed, so b.values can be nil here.
+	// Deleting element from nil b.values (map[string]any) is no-op.
+	// Inserting element to b.values requires initializing b.values first.
+
+	if value == nil {
+		delete(b.values, key)
+		return
+	}
+	if b.values == nil {
+		b.values = make(map[string]any)
+	}
+	b.values[key] = value
+}
+
+// ScopedValue returns the value associated with this batch for the given key and true if key exists,
+// or nil and false if key doesn't exist.
+func (b *ReaderBatchWriter) ScopedValue(key string) (any, bool) {
+	// Creation of b.values is deferred until needed, so b.values can be nil here.
+	// Accessing nil b.values (map[string]any) always returns (nil, false).
+
+	v, exists := b.values[key]
+	return v, exists
 }

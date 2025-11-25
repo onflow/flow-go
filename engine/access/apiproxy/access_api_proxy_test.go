@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -149,13 +150,16 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	// create the factory
 	connectionFactory := &connection.ConnectionFactoryImpl{
 		// set metrics reporting
-		AccessMetrics:             metrics,
-		CollectionNodeGRPCTimeout: time.Second,
+		AccessMetrics: metrics,
+		CollectionConfig: connection.Config{
+			Timeout:            time.Second,
+			MaxRequestMsgSize:  commonrpc.DefaultCollectionMaxRequestSize,
+			MaxResponseMsgSize: commonrpc.DefaultCollectionMaxResponseSize,
+		},
 		Manager: connection.NewManager(
 			unittest.Logger(),
 			metrics,
 			nil,
-			grpcutils.DefaultMaxMsgSize,
 			connection.CircuitBreakerConfig{},
 			grpcutils.NoCompressor,
 		),
@@ -266,7 +270,7 @@ func newFlowLite(network string, address string, done chan int) (*grpc.Server, *
 func openFlowLite(address string) error {
 	c, err := grpc.Dial(
 		"unix://"+address,
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultAccessMaxResponseSize)),
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	if err != nil {
 		return err

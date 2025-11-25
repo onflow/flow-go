@@ -17,11 +17,15 @@ const (
 	AddressStateKey = "account_address_state"
 
 	// Account level keys
-	AccountKeyPrefix   = "a."
-	AccountStatusKey   = AccountKeyPrefix + "s"
-	CodeKeyPrefix      = "code."
-	ContractNamesKey   = "contract_names"
-	PublicKeyKeyPrefix = "public_key_"
+	AccountKeyPrefix                 = "a."
+	AccountStatusKey                 = AccountKeyPrefix + "s"
+	CodeKeyPrefix                    = "code."
+	ContractNamesKey                 = "contract_names"
+	AccountPublicKey0RegisterKey     = "apk_0"
+	SequenceNumberRegisterKeyPattern = "sn_%d"
+	SequenceNumberRegisterKeyPrefix  = "sn_"
+	BatchPublicKeyRegisterKeyPrefix  = "pk_b"
+	BatchPublicKeyRegisterKeyPattern = "pk_b%d"
 )
 
 func addressToOwner(address Address) string {
@@ -58,10 +62,24 @@ func AccountStatusRegisterID(address Address) RegisterID {
 	}
 }
 
-func PublicKeyRegisterID(address Address, index uint32) RegisterID {
+func AccountPublicKey0RegisterID(address Address) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(address),
-		Key:   fmt.Sprintf("public_key_%d", index),
+		Key:   AccountPublicKey0RegisterKey,
+	}
+}
+
+func AccountBatchPublicKeyRegisterID(address Address, batchIndex uint32) RegisterID {
+	return RegisterID{
+		Owner: addressToOwner(address),
+		Key:   fmt.Sprintf(BatchPublicKeyRegisterKeyPattern, batchIndex),
+	}
+}
+
+func AccountPublicKeySequenceNumberRegisterID(address Address, keyIndex uint32) RegisterID {
+	return RegisterID{
+		Owner: addressToOwner(address),
+		Key:   fmt.Sprintf(SequenceNumberRegisterKeyPattern, keyIndex),
 	}
 }
 
@@ -141,11 +159,15 @@ func (id RegisterID) IsInternalState() bool {
 	// cases:
 	//      - address, "contract_names"
 	//      - address, "code.%s" (contract name)
-	//      - address, "public_key_%d" (index)
+	//      - address, "apk_0"
+	//      - address, "pk_b%d" (batch index)
+	//      - address, "sn_%d" (key index)
 	//      - address, "a.s" (account status)
-	return strings.HasPrefix(id.Key, PublicKeyKeyPrefix) ||
-		id.Key == ContractNamesKey ||
+	return id.Key == ContractNamesKey ||
 		strings.HasPrefix(id.Key, CodeKeyPrefix) ||
+		id.Key == AccountPublicKey0RegisterKey ||
+		strings.HasPrefix(id.Key, BatchPublicKeyRegisterKeyPrefix) ||
+		strings.HasPrefix(id.Key, SequenceNumberRegisterKeyPrefix) ||
 		id.Key == AccountStatusKey
 }
 

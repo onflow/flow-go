@@ -16,7 +16,6 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/jordanschalm/lockctx"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,6 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/storage/locks"
 )
 
 type SkipReason int
@@ -456,16 +454,6 @@ func RunWithTypedPebbleDB(
 	})
 }
 
-func LockManagerWithContext(t *testing.T, lcks ...string) (lockctx.Manager, lockctx.Context) {
-	lockManager := locks.NewTestingLockManager()
-	lctx := lockManager.NewContext()
-	for _, lock := range lcks {
-		err := lctx.AcquireLock(lock)
-		require.NoError(t, err)
-	}
-	return lockManager, lctx
-}
-
 func Concurrently(n int, f func(int)) {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
@@ -478,9 +466,15 @@ func Concurrently(n int, f func(int)) {
 	wg.Wait()
 }
 
-// AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
-func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
-	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
+// AssertEqualBlockSequences is given a sequence of Blocks and a sequence of Proposals. It asserts that
+// both sequences are of the same length, and that each proposal is for the block at the same index (via block hash).
+// Used as a convenience function for Sealing Segment tests due to differences with nils vs empty slices.
+func AssertEqualBlockSequences(t *testing.T, blocks []*flow.Block, proposals []*flow.Proposal) {
+	assert.Equal(t, len(blocks), len(proposals), "block and proposal sequences have different lengths (%d vs %d)", len(blocks), len(proposals))
+	for i, block := range blocks {
+		proposal := proposals[i]
+		assert.Equal(t, block.ID(), proposal.Block.ID(), "block and proposal at index %d do not match", i)
+	}
 }
 
 // NetworkCodec returns cbor codec.

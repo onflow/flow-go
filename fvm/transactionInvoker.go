@@ -281,7 +281,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	if executor.errs.CollectedError() {
 		invalidator = nil
-		executor.txnState.RunWithAllLimitsDisabled(executor.errorExecution)
+		executor.txnState.RunWithMeteringDisabled(executor.errorExecution)
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
@@ -301,7 +301,7 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 		return nil
 	}
 
-	computationLimit := uint64(executor.txnState.TotalComputationLimit())
+	computationLimit := executor.txnState.TotalComputationLimit()
 
 	computationUsed, err := executor.env.ComputationUsed()
 	if err != nil {
@@ -360,7 +360,7 @@ func (executor *transactionExecutor) normalExecution() (
 	var maxTxFees uint64
 	// run with limits disabled since this is a static cost check
 	// and should be accounted for in the inclusion cost.
-	executor.txnState.RunWithAllLimitsDisabled(func() {
+	executor.txnState.RunWithMeteringDisabled(func() {
 		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(
 			executor.proc,
 			executor.txnState,
@@ -424,7 +424,7 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	executor.txnState.RunWithAllLimitsDisabled(func() {
+	executor.txnState.RunWithMeteringDisabled(func() {
 		err = executor.deductTransactionFees()
 	})
 

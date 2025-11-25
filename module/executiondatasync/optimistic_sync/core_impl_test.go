@@ -2,11 +2,11 @@ package optimistic_sync
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -17,12 +17,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
 // CoreImplSuite is a test suite for testing the CoreImpl.
 type CoreImplSuite struct {
 	suite.Suite
-	logger                        zerolog.Logger
 	execDataRequester             *reqestermock.ExecutionDataRequester
 	txResultErrMsgsRequester      *txerrmsgsmock.Requester
 	txResultErrMsgsRequestTimeout time.Duration
@@ -43,127 +43,228 @@ func TestCoreImplSuiteSuite(t *testing.T) {
 
 func (c *CoreImplSuite) SetupTest() {
 	t := c.T()
-	c.logger = zerolog.Nop()
 
 	c.execDataRequester = reqestermock.NewExecutionDataRequester(t)
 	c.txResultErrMsgsRequester = txerrmsgsmock.NewRequester(t)
-	c.txResultErrMsgsRequestTimeout = DefaultTxResultErrMsgsRequestTimeout
-
-	c.db = storagemock.NewDB(t)
-	c.db.On("WithReaderBatchWriter", mock.Anything).Return(
-		func(fn func(storage.ReaderBatchWriter) error) error {
-			return fn(storagemock.NewBatch(t))
-		},
-	).Maybe()
-
-	// Create storage mocks with proper expectations for persist operations
-	c.persistentRegisters = storagemock.NewRegisterIndex(t)
-	c.persistentEvents = storagemock.NewEvents(t)
-	c.persistentCollections = storagemock.NewCollections(t)
-	c.persistentTransactions = storagemock.NewTransactions(t)
-	c.persistentResults = storagemock.NewLightTransactionResults(t)
-	c.persistentTxResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
-	c.latestPersistedSealedResult = storagemock.NewLatestPersistedSealedResult(t)
-
-	// Set up default expectations for persist operations
-	// These will be called by the real Persister during Persist()
-	c.persistentRegisters.On("Store", mock.Anything, mock.Anything).Return(nil).Maybe()
-	c.persistentEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	c.persistentCollections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Maybe()
-	c.persistentTransactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Maybe()
-	c.persistentResults.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	c.persistentTxResultErrMsg.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	c.latestPersistedSealedResult.On("BatchSet", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	c.txResultErrMsgsRequestTimeout = 100 * time.Millisecond
 }
 
 // createTestCoreImpl creates a CoreImpl instance with mocked dependencies for testing.
 //
 // Returns a configured CoreImpl ready for testing.
-func (c *CoreImplSuite) createTestCoreImpl() *CoreImpl {
-	block := unittest.BlockFixture()
-	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
-
-	core := NewCoreImpl(
-		c.logger,
-		executionResult,
-		block.Header,
+func (c *CoreImplSuite) createTestCoreImpl(tf *testFixture) *CoreImpl {
+	core, err := NewCoreImpl(
+		unittest.Logger(),
+		tf.exeResult,
+		tf.block,
 		c.execDataRequester,
 		c.txResultErrMsgsRequester,
 		c.txResultErrMsgsRequestTimeout,
 		c.persistentRegisters,
 		c.persistentEvents,
 		c.persistentCollections,
-		c.persistentTransactions,
 		c.persistentResults,
 		c.persistentTxResultErrMsg,
 		c.latestPersistedSealedResult,
 		c.db,
+		storage.NewTestingLockManager(),
 	)
-
+	c.NoError(err)
 	return core
 }
 
-// TestCoreImpl_Download tests the Download method which retrieves execution data and transaction error messages.
+type testFixture struct {
+	block     *flow.Block
+	exeResult *flow.ExecutionResult
+	execData  *execution_data.BlockExecutionData
+	txErrMsgs []flow.TransactionResultErrorMessage
+}
+
+// generateFixture generates a test fixture for the indexer. The returned data has the following
+// properties:
+//   - The block execution data contains collections for each of the block's guarantees, plus the system chunk
+//   - Each collection has 3 transactions
+//   - The first path in each trie update is the same, testing that the indexer will use the last value
+//   - Every 3rd transaction is failed
+//   - There are tx error messages for all failed transactions
+func generateFixture(g *fixtures.GeneratorSuite) *testFixture {
+	collections := g.Collections().List(4, fixtures.Collection.WithTxCount(3))
+	chunkExecutionDatas := make([]*execution_data.ChunkExecutionData, len(collections))
+	guarantees := make([]*flow.CollectionGuarantee, len(collections)-1)
+	var txErrMsgs []flow.TransactionResultErrorMessage
+	path := g.LedgerPaths().Fixture()
+	for i, collection := range collections {
+		chunkData := g.ChunkExecutionDatas().Fixture(
+			fixtures.ChunkExecutionData.WithCollection(collection),
+		)
+		// use the same path fo the first ledger payload in each chunk. the indexer should chose the
+		// last value in the register entry.
+		chunkData.TrieUpdate.Paths[0] = path
+		chunkExecutionDatas[i] = chunkData
+
+		if i < len(collections)-1 {
+			guarantees[i] = g.Guarantees().Fixture(fixtures.Guarantee.WithCollectionID(collection.ID()))
+		}
+		for txIndex := range chunkExecutionDatas[i].TransactionResults {
+			if txIndex%3 == 0 {
+				chunkExecutionDatas[i].TransactionResults[txIndex].Failed = true
+			}
+		}
+		txErrMsgs = append(txErrMsgs, g.TransactionErrorMessages().ForTransactionResults(chunkExecutionDatas[i].TransactionResults)...)
+	}
+
+	payload := g.Payloads().Fixture(fixtures.Payload.WithGuarantees(guarantees...))
+	block := g.Blocks().Fixture(fixtures.Block.WithPayload(payload))
+
+	exeResult := g.ExecutionResults().Fixture(fixtures.ExecutionResult.WithBlock(block))
+	execData := g.BlockExecutionDatas().Fixture(
+		fixtures.BlockExecutionData.WithBlockID(block.ID()),
+		fixtures.BlockExecutionData.WithChunkExecutionDatas(chunkExecutionDatas...),
+	)
+	return &testFixture{
+		block:     block,
+		exeResult: exeResult,
+		execData:  execData,
+		txErrMsgs: txErrMsgs,
+	}
+}
+
+func (c *CoreImplSuite) TestCoreImpl_Constructor() {
+	block := unittest.BlockFixture()
+	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+
+	c.Run("happy path", func() {
+		core, err := NewCoreImpl(
+			unittest.Logger(),
+			executionResult,
+			block,
+			c.execDataRequester,
+			c.txResultErrMsgsRequester,
+			c.txResultErrMsgsRequestTimeout,
+			c.persistentRegisters,
+			c.persistentEvents,
+			c.persistentCollections,
+			c.persistentResults,
+			c.persistentTxResultErrMsg,
+			c.latestPersistedSealedResult,
+			c.db,
+			storage.NewTestingLockManager(),
+		)
+		c.NoError(err)
+		c.NotNil(core)
+	})
+
+	c.Run("block ID mismatch", func() {
+		core, err := NewCoreImpl(
+			unittest.Logger(),
+			executionResult,
+			unittest.BlockFixture(),
+			c.execDataRequester,
+			c.txResultErrMsgsRequester,
+			c.txResultErrMsgsRequestTimeout,
+			c.persistentRegisters,
+			c.persistentEvents,
+			c.persistentCollections,
+			c.persistentResults,
+			c.persistentTxResultErrMsg,
+			c.latestPersistedSealedResult,
+			c.db,
+			storage.NewTestingLockManager(),
+		)
+		c.ErrorContains(err, "header ID and execution result block ID must match")
+		c.Nil(core)
+	})
+}
+
+// TestCoreImpl_Download tests the Download method retrieves execution data and transaction error
+// messages.
 func (c *CoreImplSuite) TestCoreImpl_Download() {
+	ctx := context.Background()
+	g := fixtures.NewGeneratorSuite()
+
+	eventuallyCanceled := func(args mock.Arguments) {
+		// make sure that the context is eventually canceled
+		ctx := args.Get(0).(context.Context)
+		c.Require().Eventually(func() bool {
+			return ctx.Err() != nil
+		}, time.Second, 10*time.Millisecond)
+	}
+
 	c.Run("successful download", func() {
-		core := c.createTestCoreImpl()
-		ctx := context.Background()
+		tf := generateFixture(g)
+		core := c.createTestCoreImpl(tf)
 
-		expectedExecutionData := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(core.header.ID()))
-		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
-
-		expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(1)
-		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
+		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(tf.execData, nil).Once()
+		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(tf.txErrMsgs, nil).Once()
 
 		err := core.Download(ctx)
 		c.Require().NoError(err)
 
-		c.Assert().Equal(expectedExecutionData, core.workingData.executionData.BlockExecutionData)
-		c.Assert().Equal(expectedTxResultErrMsgs, core.workingData.txResultErrMsgsData)
+		c.Assert().Equal(tf.execData, core.workingData.executionData)
+		c.Assert().Equal(tf.txErrMsgs, core.workingData.txResultErrMsgsData)
+
+		// downloading a second time should return an error
+		err = core.Download(ctx)
+		c.ErrorContains(err, "already downloaded")
 	})
 
 	c.Run("execution data request error", func() {
-		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return((*execution_data.BlockExecutionData)(nil), assert.AnError).Once()
-		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), nil).Once()
+		tf := generateFixture(g)
+		core := c.createTestCoreImpl(tf)
 
-		ctx := context.Background()
-		core := c.createTestCoreImpl()
+		expectedErr := fmt.Errorf("test execution data request error")
+
+		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(nil, expectedErr).Once()
+		c.txResultErrMsgsRequester.
+			On("Request", mock.Anything).
+			Return(nil, context.Canceled).
+			Run(eventuallyCanceled).Once()
+
 		err := core.Download(ctx)
 		c.Require().Error(err)
 
-		c.Assert().ErrorIs(err, assert.AnError)
-		c.Assert().Contains(err.Error(), "failed to request execution data")
+		c.Assert().ErrorIs(err, expectedErr)
 		c.Assert().Nil(core.workingData.executionData)
 		c.Assert().Nil(core.workingData.txResultErrMsgsData)
 	})
 
 	c.Run("transaction result error messages request error", func() {
-		expectedExecutionData := unittest.BlockExecutionDataFixture()
-		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
-		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(([]flow.TransactionResultErrorMessage)(nil), assert.AnError).Once()
+		tf := generateFixture(g)
+		core := c.createTestCoreImpl(tf)
 
-		ctx := context.Background()
-		core := c.createTestCoreImpl()
+		expectedErr := fmt.Errorf("test tx error messages request error")
+
+		c.execDataRequester.
+			On("RequestExecutionData", mock.Anything).
+			Return(nil, context.Canceled).
+			Run(eventuallyCanceled).Once()
+		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(nil, expectedErr).Once()
 
 		err := core.Download(ctx)
 		c.Require().Error(err)
 
-		c.Assert().ErrorIs(err, assert.AnError)
-		c.Assert().Contains(err.Error(), "failed to request transaction result error messages data")
+		c.Assert().ErrorIs(err, expectedErr)
 		c.Assert().Nil(core.workingData.executionData)
 		c.Assert().Nil(core.workingData.txResultErrMsgsData)
 	})
 
 	c.Run("context cancellation", func() {
-		core := c.createTestCoreImpl()
+		tf := generateFixture(g)
+		core := c.createTestCoreImpl(tf)
+
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		expectedExecutionData := unittest.BlockExecutionDataFixture()
-		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, ctx.Err()).Once()
-
-		expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(1)
-		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, ctx.Err()).Once()
+		c.execDataRequester.
+			On("RequestExecutionData", mock.Anything).
+			Return(nil, ctx.Err()).
+			Run(eventuallyCanceled).
+			Once()
+		c.txResultErrMsgsRequester.
+			On("Request", mock.Anything).
+			Return(nil, ctx.Err()).
+			Run(eventuallyCanceled).
+			Once()
 
 		err := core.Download(ctx)
 		c.Require().Error(err)
@@ -174,168 +275,273 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 	})
 
 	c.Run("txResultErrMsgsRequestTimeout expiration", func() {
-		c.txResultErrMsgsRequestTimeout = 100 * time.Millisecond
+		tf := generateFixture(g)
+		core := c.createTestCoreImpl(tf)
 
-		expectedExecutionData := unittest.BlockExecutionDataFixture()
-		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
+		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(tf.execData, nil).Once()
 
 		// Transaction result error messages request times out
-		c.txResultErrMsgsRequester.On("Request", mock.MatchedBy(func(ctx context.Context) bool {
-			// Verify we received a context with timeout
-			deadline, hasDeadline := ctx.Deadline()
-			if !hasDeadline {
-				return false
-			}
-			// Verify the timeout is approximately what we expect
-			timeUntilDeadline := time.Until(deadline)
-			return timeUntilDeadline > 0 && timeUntilDeadline <= c.txResultErrMsgsRequestTimeout
-		})).Run(func(args mock.Arguments) {
-			// Simulate a slow request by sleeping longer than the timeout
-			time.Sleep(2 * c.txResultErrMsgsRequestTimeout)
-		}).Return(([]flow.TransactionResultErrorMessage)(nil), context.DeadlineExceeded).Once()
+		c.txResultErrMsgsRequester.
+			On("Request", mock.Anything).
+			Return(nil, context.DeadlineExceeded).
+			Run(func(args mock.Arguments) {
+				// Simulate a slow request by sleeping longer than the timeout
+				time.Sleep(2 * c.txResultErrMsgsRequestTimeout)
+			}).
+			Once()
 
-		core := c.createTestCoreImpl()
-		ctx := context.Background()
-
-		var err error
 		unittest.AssertReturnsBefore(c.T(), func() {
-			err = core.Download(ctx)
+			err := core.Download(ctx)
+			c.Require().NoError(err)
 		}, time.Second)
 
-		c.Require().NoError(err)
-		c.Assert().Equal(expectedExecutionData, core.workingData.executionData.BlockExecutionData)
+		// the tx error messages timeout should be handled gracefully, and the execution data should
+		// be downloaded and stored
+		c.Assert().Equal(tf.execData, core.workingData.executionData)
 		c.Assert().Nil(core.workingData.txResultErrMsgsData)
+	})
+
+	c.Run("Download after Abandon returns an error", func() {
+		tf := generateFixture(g)
+		core := c.createTestCoreImpl(tf)
+
+		core.Abandon()
+		c.Nil(core.workingData)
+
+		err := core.Download(ctx)
+		c.ErrorIs(err, errResultAbandoned)
 	})
 }
 
 // TestCoreImpl_Index tests the Index method which processes downloaded data.
 func (c *CoreImplSuite) TestCoreImpl_Index() {
+	ctx := context.Background()
+	g := fixtures.NewGeneratorSuite()
+
+	tf := generateFixture(g)
+	c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(tf.execData, nil)
+	c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(tf.txErrMsgs, nil)
+
 	c.Run("successful indexing", func() {
-		core := c.createTestCoreImpl()
+		core := c.createTestCoreImpl(tf)
 
-		// Create execution data with the SAME block ID as the execution result
-		expectedExecutionData := unittest.BlockExecutionDataFixture(
-			unittest.WithBlockExecutionDataBlockID(core.executionResult.BlockID),
-		)
-		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(expectedExecutionData, nil).Once()
-
-		expectedTxResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(1)
-		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(expectedTxResultErrMsgs, nil).Once()
-
-		ctx := context.Background()
 		err := core.Download(ctx)
 		c.Require().NoError(err)
 
 		err = core.Index()
 		c.Require().NoError(err)
+
+		c.NotNil(core.workingData.indexerData)
+		c.NotNil(core.workingData.inmemCollections)
+		c.NotNil(core.workingData.inmemTransactions)
+		c.NotNil(core.workingData.inmemTxResultErrMsgs)
+		c.NotNil(core.workingData.inmemEvents)
+		c.NotNil(core.workingData.inmemResults)
+		c.NotNil(core.workingData.inmemRegisters)
+
+		// indexing a second time should return an error
+		err = core.Index()
+		c.ErrorContains(err, "already indexed")
+		c.NotNil(core.workingData.indexerData)
 	})
 
-	c.Run("block ID mismatch", func() {
-		core := c.createTestCoreImpl()
+	c.Run("indexer constructor error", func() {
+		core := c.createTestCoreImpl(tf)
+		core.block = g.Blocks().Fixture()
 
-		// Create execution data with a DIFFERENT block ID than expected
-		executionData := unittest.BlockExecutionDataFixture()
-		core.workingData.executionData = execution_data.NewBlockExecutionDataEntity(
-			unittest.IdentifierFixture(),
-			executionData,
-		)
+		err := core.Download(ctx)
+		c.Require().NoError(err)
 
-		err := core.Index()
-		c.Require().Error(err)
-
-		c.Assert().Contains(err.Error(), "invalid block execution data")
-		c.Assert().Contains(err.Error(), "expected block_id")
+		err = core.Index()
+		c.ErrorContains(err, "failed to create indexer")
+		c.Nil(core.workingData.indexerData)
 	})
 
-	c.Run("execution data is empty", func() {
-		core := c.createTestCoreImpl()
+	c.Run("failed to index block", func() {
+		core := c.createTestCoreImpl(tf)
 
-		// Do not download data, just index it
+		err := core.Download(ctx)
+		c.Require().NoError(err)
+
+		core.workingData.executionData = g.BlockExecutionDatas().Fixture()
+
+		err = core.Index()
+		c.ErrorContains(err, "failed to index execution data")
+		c.Nil(core.workingData.indexerData)
+	})
+
+	c.Run("failed to validate transaction result error messages", func() {
+		core := c.createTestCoreImpl(tf)
+
+		err := core.Download(ctx)
+		c.Require().NoError(err)
+
+		// add an extra error message
+		core.workingData.txResultErrMsgsData = append(core.workingData.txResultErrMsgsData, flow.TransactionResultErrorMessage{
+			TransactionID: g.Identifiers().Fixture(),
+		})
+
+		err = core.Index()
+		c.ErrorContains(err, "failed to validate transaction result error messages")
+		c.Nil(core.workingData.indexerData)
+	})
+
+	c.Run("Index after Abandon returns an error", func() {
+		core := c.createTestCoreImpl(tf)
+
+		core.Abandon()
+		c.Nil(core.workingData)
+
 		err := core.Index()
-		c.Require().Error(err)
+		c.ErrorIs(err, errResultAbandoned)
+	})
 
-		c.Assert().Contains(err.Error(), "could not index an empty execution data")
+	c.Run("Index before Download returns an error", func() {
+		core := c.createTestCoreImpl(tf)
+
+		err := core.Index()
+		c.ErrorContains(err, "downloading is not complete")
+		c.Nil(core.workingData.indexerData)
 	})
 }
 
 // TestCoreImpl_Persist tests the Persist method which persists indexed data to storages and database.
 func (c *CoreImplSuite) TestCoreImpl_Persist() {
 	t := c.T()
+	ctx := context.Background()
+	g := fixtures.NewGeneratorSuite()
+
+	resetMocks := func() {
+		c.db = storagemock.NewDB(t)
+		c.persistentRegisters = storagemock.NewRegisterIndex(t)
+		c.persistentEvents = storagemock.NewEvents(t)
+		c.persistentCollections = storagemock.NewCollections(t)
+		c.persistentTransactions = storagemock.NewTransactions(t)
+		c.persistentResults = storagemock.NewLightTransactionResults(t)
+		c.persistentTxResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
+		c.latestPersistedSealedResult = storagemock.NewLatestPersistedSealedResult(t)
+	}
+
+	tf := generateFixture(g)
+	blockID := tf.block.ID()
+	c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(tf.execData, nil)
+	c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(tf.txErrMsgs, nil)
 
 	c.Run("successful persistence of empty data", func() {
-		// Create mocks with proper expectations
-		c.db = storagemock.NewDB(t)
-		c.db.On("WithReaderBatchWriter", mock.Anything).Return(nil)
+		resetMocks()
+		core := c.createTestCoreImpl(tf)
 
-		core := c.createTestCoreImpl()
-		err := core.Persist()
-
+		err := core.Download(ctx)
 		c.Require().NoError(err)
+
+		err = core.Index()
+		c.Require().NoError(err)
+
+		c.db.
+			On("WithReaderBatchWriter", mock.Anything).
+			Return(func(fn func(storage.ReaderBatchWriter) error) error {
+				return fn(storagemock.NewBatch(t))
+			}).
+			Once()
+
+		indexerData := core.workingData.indexerData
+		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil)
+		c.persistentEvents.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			blockID, []flow.EventsList{indexerData.Events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(nil)
+		for _, collection := range indexerData.Collections {
+			c.persistentCollections.On("BatchStoreAndIndexByTransaction",
+				mock.MatchedBy(func(lctx lockctx.Proof) bool {
+					return lctx.HoldsLock(storage.LockInsertCollection)
+				}),
+				collection, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(nil, nil).Once()
+		}
+		c.persistentResults.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool {
+				return lctx.HoldsLock(storage.LockInsertLightTransactionResult)
+			}),
+			mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil }),
+			blockID, indexerData.Results).Return(nil)
+		c.persistentTxResultErrMsg.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool {
+				return lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage)
+			}),
+			mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil }),
+			blockID, core.workingData.txResultErrMsgsData).Return(nil)
+		c.latestPersistedSealedResult.On("BatchSet", tf.exeResult.ID(), tf.block.Height,
+			mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(nil)
+
+		err = core.Persist()
+		c.Require().NoError(err)
+
+		// persisting a second time should return an error
+		err = core.Persist()
+		c.ErrorContains(err, "already persisted")
 	})
 
-	c.Run("persistence with batch commit failure", func() {
-		// Create a failing DB
-		c.db = storagemock.NewDB(t)
-		c.db.On("WithReaderBatchWriter", mock.Anything).Return(assert.AnError)
+	c.Run("persisting registers fails", func() {
+		expectedErr := fmt.Errorf("test persisting registers failure")
 
-		// Create CoreImpl with the failing DB
-		core := c.createTestCoreImpl()
+		resetMocks()
+		core := c.createTestCoreImpl(tf)
+
+		err := core.Download(ctx)
+		c.Require().NoError(err)
+
+		err = core.Index()
+		c.Require().NoError(err)
+
+		indexerData := core.workingData.indexerData
+		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(expectedErr).Once()
+
+		err = core.Persist()
+		c.ErrorIs(err, expectedErr)
+	})
+
+	c.Run("persisting block data fails", func() {
+		expectedErr := fmt.Errorf("test persisting events failure")
+
+		resetMocks()
+		core := c.createTestCoreImpl(tf)
+
+		err := core.Download(ctx)
+		c.Require().NoError(err)
+
+		err = core.Index()
+		c.Require().NoError(err)
+
+		c.db.
+			On("WithReaderBatchWriter", mock.Anything).
+			Return(func(fn func(storage.ReaderBatchWriter) error) error {
+				return fn(storagemock.NewBatch(t))
+			}).
+			Once()
+
+		indexerData := core.workingData.indexerData
+		c.persistentRegisters.On("Store", flow.RegisterEntries(indexerData.Registers), tf.block.Height).Return(nil).Once()
+		c.persistentEvents.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			blockID, []flow.EventsList{indexerData.Events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(expectedErr).Once()
+
+		err = core.Persist()
+		c.ErrorIs(err, expectedErr)
+	})
+
+	c.Run("Persist after Abandon returns an error", func() {
+		resetMocks()
+		core := c.createTestCoreImpl(tf)
+
+		core.Abandon()
+		c.Nil(core.workingData)
 
 		err := core.Persist()
-		c.Require().Error(err)
-
-		c.Assert().ErrorIs(err, assert.AnError)
-		c.Assert().Contains(err.Error(), "failed to persist block data")
+		c.ErrorIs(err, errResultAbandoned)
 	})
-}
 
-// TestCoreImpl_Abandon tests the Abandon method which clears all references for garbage collection.
-func (c *CoreImplSuite) TestCoreImpl_Abandon() {
-	core := c.createTestCoreImpl()
-
-	core.workingData.executionData = unittest.BlockExecutionDatEntityFixture()
-	core.workingData.txResultErrMsgsData = unittest.TransactionResultErrorMessagesFixture(1)
-
-	err := core.Abandon()
-	c.Require().NoError(err)
-
-	c.Assert().Nil(core.workingData)
-}
-
-// TestCoreImpl_IntegrationWorkflow tests the complete workflow of download -> index -> persist operations.
-func (c *CoreImplSuite) TestCoreImpl_IntegrationWorkflow() {
-	t := c.T()
-
-	// Set up mocks with proper expectations
-	c.db = storagemock.NewDB(t)
-	c.db.On("WithReaderBatchWriter", mock.Anything).Return(
-		func(fn func(storage.ReaderBatchWriter) error) error {
-			return fn(storagemock.NewBatch(t))
-		},
-	).Maybe()
-
-	core := c.createTestCoreImpl()
-	ctx := context.Background()
-
-	// Create execution data with the SAME block ID as the execution result
-	executionData := unittest.BlockExecutionDataFixture(
-		unittest.WithBlockExecutionDataBlockID(core.executionResult.BlockID),
-	)
-	txResultErrMsgs := unittest.TransactionResultErrorMessagesFixture(1)
-
-	c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(executionData, nil).Once()
-	c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(txResultErrMsgs, nil).Once()
-
-	err := core.Download(ctx)
-	c.Require().NoError(err)
-
-	err = core.Index()
-	c.Require().NoError(err)
-
-	err = core.Persist()
-	c.Require().NoError(err)
-
-	c.Assert().NotNil(core.workingData.executionData)
-	c.Assert().Equal(executionData, core.workingData.executionData.BlockExecutionData)
-	c.Assert().Equal(txResultErrMsgs, core.workingData.txResultErrMsgsData)
+	c.Run("Persist before Index returns an error", func() {
+		resetMocks()
+		core := c.createTestCoreImpl(tf)
+		err := core.Persist()
+		c.ErrorContains(err, "indexing is not complete")
+	})
 }

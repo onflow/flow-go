@@ -15,22 +15,13 @@ import (
 // In this implementation, the ChunkRequests
 // wraps the ChunkDataPackRequests around an internal ChunkRequestStatus data object, and maintains the wrapped
 // version in memory.
+// Stored chunk request status are keyed by chunk ID.
 type ChunkRequests struct {
-	*Backend
+	*Backend[flow.Identifier, *chunkRequestStatus]
 }
 
 func NewChunkRequests(limit uint) *ChunkRequests {
-	return &ChunkRequests{
-		Backend: NewBackend(WithLimit(limit)),
-	}
-}
-
-func toChunkRequestStatus(entity flow.Entity) *chunkRequestStatus {
-	status, ok := entity.(*chunkRequestStatus)
-	if !ok {
-		panic(fmt.Sprintf("could not convert the entity into chunk status from the mempool: %v", entity))
-	}
-	return status
+	return &ChunkRequests{NewBackend(WithLimit[flow.Identifier, *chunkRequestStatus](limit))}
 }
 
 // RequestHistory returns the number of times the chunk has been requested,
@@ -44,16 +35,15 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 	var retryAfter time.Duration
 	var attempts uint64
 
-	err := cs.Backend.Run(func(backdata mempool.BackData) error {
-		entity, ok := backdata.ByID(chunkID)
+	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
+		status, ok := backdata.Get(chunkID)
 		if !ok {
 			return fmt.Errorf("request does not exist for chunk %x", chunkID)
 		}
 
-		request := toChunkRequestStatus(entity)
-		lastAttempt = request.LastAttempt
-		retryAfter = request.RetryAfter
-		attempts = request.Attempt
+		lastAttempt = status.LastAttempt
+		retryAfter = status.RetryAfter
+		attempts = status.Attempt
 		return nil
 	})
 
@@ -64,8 +54,8 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 // The insertion is only successful if there is no duplicate chunk request for the same
 // tuple of (chunkID, resultID, chunkIndex).
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
-	err := cs.Backend.Run(func(backdata mempool.BackData) error {
-		entity, exists := backdata.ByID(request.ChunkID)
+	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
+		status, exists := backdata.Get(request.ChunkID)
 		chunkLocatorID := request.Locator.ID()
 
 		if !exists {
@@ -73,7 +63,7 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 			locators[chunkLocatorID] = &request.Locator
 
 			// no chunk request status exists for this chunk ID, hence initiating one.
-			status := &chunkRequestStatus{
+			status = &chunkRequestStatus{
 				Locators:    locators,
 				RequestInfo: request.ChunkDataPackRequestInfo,
 			}
@@ -84,7 +74,6 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 			return nil
 		}
 
-		status := toChunkRequestStatus(entity)
 		if _, ok := status.Locators[chunkLocatorID]; ok {
 			return fmt.Errorf("chunk request exists with same locator (result_id=%x, chunk_index=%d)", request.Locator.ResultID, request.Locator.Index)
 		}
@@ -101,13 +90,6 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	return err == nil
 }
 
-// Remove provides deletion functionality from the memory pool.
-// If there is a chunk request with this ID, Remove removes it and returns true.
-// Otherwise it returns false.
-func (cs *ChunkRequests) Remove(chunkID flow.Identifier) bool {
-	return cs.Backend.Remove(chunkID)
-}
-
 // PopAll atomically returns all locators associated with this chunk ID while clearing out the
 // chunk request status for this chunk id.
 // Boolean return value indicates whether there are requests in the memory pool associated
@@ -115,12 +97,12 @@ func (cs *ChunkRequests) Remove(chunkID flow.Identifier) bool {
 func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, bool) {
 	var locators map[flow.Identifier]*chunks.Locator
 
-	err := cs.Backend.Run(func(backdata mempool.BackData) error {
-		entity, exists := backdata.ByID(chunkID)
+	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
+		status, exists := backdata.Get(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		locators = toChunkRequestStatus(entity).Locators
+		locators = status.Locators
 
 		_, removed := backdata.Remove(chunkID)
 		if !removed {
@@ -143,14 +125,13 @@ func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, boo
 //
 // The increments are done atomically, thread-safe, and in isolation.
 func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
-	err := cs.Backend.Run(func(backdata mempool.BackData) error {
-		entity, exists := backdata.ByID(chunkID)
+	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
+		status, exists := backdata.Get(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		chunk := toChunkRequestStatus(entity)
-		chunk.Attempt++
-		chunk.LastAttempt = time.Now()
+		status.Attempt++
+		status.LastAttempt = time.Now()
 		return nil
 	})
 
@@ -161,8 +142,8 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 func (cs *ChunkRequests) All() verification.ChunkDataPackRequestInfoList {
 	all := cs.Backend.All()
 	requestInfoList := verification.ChunkDataPackRequestInfoList{}
-	for _, entity := range all {
-		requestInfo := toChunkRequestStatus(entity).RequestInfo
+	for _, status := range all {
+		requestInfo := status.RequestInfo
 		requestInfoList = append(requestInfoList, &requestInfo)
 	}
 	return requestInfoList
@@ -180,12 +161,11 @@ func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater m
 	var retryAfter time.Duration
 	var attempts uint64
 
-	err := cs.Backend.Run(func(backdata mempool.BackData) error {
-		entity, exists := backdata.ByID(chunkID)
+	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
+		status, exists := backdata.Get(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		status := toChunkRequestStatus(entity)
 
 		var ok bool
 		attempts, retryAfter, ok = updater(status.Attempt, status.RetryAfter)
@@ -205,11 +185,6 @@ func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater m
 	return attempts, lastAttempt, retryAfter, err == nil
 }
 
-// Size returns total number of chunk requests in the memory pool.
-func (cs ChunkRequests) Size() uint {
-	return cs.Backend.Size()
-}
-
 // chunkRequestStatus is an internal data type for ChunkRequests mempool. It acts as a wrapper for ChunkDataRequests, maintaining
 // some auxiliary attributes that are internal to ChunkRequests.
 type chunkRequestStatus struct {
@@ -218,12 +193,4 @@ type chunkRequestStatus struct {
 	LastAttempt time.Time     // timestamp of last request dispatched for this chunk id.
 	RetryAfter  time.Duration // interval until request should be retried.
 	Attempt     uint64        // number of times this chunk request has been dispatched in the network.
-}
-
-func (c chunkRequestStatus) ID() flow.Identifier {
-	return c.RequestInfo.ChunkID
-}
-
-func (c chunkRequestStatus) Checksum() flow.Identifier {
-	return c.RequestInfo.ChunkID
 }

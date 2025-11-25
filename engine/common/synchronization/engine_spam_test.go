@@ -6,15 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/chainsync"
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -41,7 +40,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		nonce, err := rand.Uint64()
 		require.NoError(ss.T(), err, "should generate nonce")
 
-		req := &messages.SyncRequest{
+		req := &flow.SyncRequest{
 			Nonce:  nonce,
 			Height: 0,
 		}
@@ -67,11 +66,13 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		// force creating misbehavior report by setting syncRequestProb to 1.0 (i.e. report misbehavior 100% of the time)
 		ss.e.spamDetectionConfig.syncRequestProb = 1.0
 
+		ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Once()
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 	}
 
 	ss.core.AssertExpectations(ss.T())
 	ss.con.AssertExpectations(ss.T())
+	ss.metrics.AssertExpectations(ss.T())
 	assert.Equal(ss.T(), misbehaviorsCounter, load) // should generate misbehavior report every time
 }
 
@@ -129,7 +130,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 				// generate origin and request message
 				originID := unittest.IdentifierFixture()
-				req := &messages.SyncRequest{
+				req := &flow.SyncRequest{
 					Nonce:  nonce,
 					Height: 0,
 				}
@@ -152,12 +153,15 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 					},
 				)
 				ss.e.spamDetectionConfig.syncRequestProb = loadGroup.syncRequestProbabilityFactor
+				ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
+				ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Once()
 				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 			}
 
 			// check function call expectations at the end of the load test; otherwise, load test would take much longer
 			ss.core.AssertExpectations(ss.T())
 			ss.con.AssertExpectations(ss.T())
+			ss.metrics.AssertExpectations(ss.T())
 
 			// check that correct range of misbehavior reports were generated
 			// since we're using a probabilistic approach to generate misbehavior reports, we can't guarantee the exact number,
@@ -243,11 +247,15 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 			// generate origin and request message
 			originID := unittest.IdentifierFixture()
-			req := &messages.RangeRequest{
+			req := &flow.RangeRequest{
 				Nonce:      nonce,
 				FromHeight: loadGroup.fromHeight,
 				ToHeight:   loadGroup.toHeight,
 			}
+
+			// maybe function calls that might or might not occur over the course of the load test
+			ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+			ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 			// count misbehavior reports over the course of a load test
 			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
@@ -256,11 +264,14 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 				},
 			)
 			ss.e.spamDetectionConfig.rangeRequestBaseProb = loadGroup.rangeRequestBaseProb
+			ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageRangeRequest).Once()
+			ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
 			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		}
 		// check function call expectations at the end of the load test; otherwise, load test would take much longer
 		ss.core.AssertExpectations(ss.T())
 		ss.con.AssertExpectations(ss.T())
+		ss.metrics.AssertExpectations(ss.T())
 
 		// check that correct range of misbehavior reports were generated
 		// since we're using a probabilistic approach to generate misbehavior reports, we can't guarantee the exact number,
@@ -327,7 +338,6 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
-
 	for _, loadGroup := range loadGroups {
 		for i := 0; i < load; i++ {
 			ss.T().Log("load iteration", i)
@@ -337,10 +347,14 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 			// generate origin and request message
 			originID := unittest.IdentifierFixture()
-			req := &messages.BatchRequest{
+			req := &flow.BatchRequest{
 				Nonce:    nonce,
 				BlockIDs: loadGroup.blockIDs,
 			}
+
+			// maybe function calls that might or might not occur over the course of the load test
+			ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+			ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 			// count misbehavior reports over the course of a load test
 			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
@@ -349,11 +363,15 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 				},
 			)
 			ss.e.spamDetectionConfig.batchRequestBaseProb = loadGroup.batchRequestBaseProb
+			ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
+			ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageBatchRequest).Once()
+
 			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		}
 		// check function call expectations at the end of the load test; otherwise, load test would take much longer
 		ss.core.AssertExpectations(ss.T())
 		ss.con.AssertExpectations(ss.T())
+		ss.metrics.AssertExpectations(ss.T())
 
 		// check that correct range of misbehavior reports were generated
 		// since we're using a probabilistic approach to generate misbehavior reports, we can't guarantee the exact number,

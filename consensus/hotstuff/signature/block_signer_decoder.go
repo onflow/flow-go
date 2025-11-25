@@ -32,7 +32,7 @@ var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 //   - state.ErrUnknownSnapshotReference if the input header is not a known incorporated block.
 func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
 	// root block does not have signer indices
-	if header.ParentVoterIndices == nil && header.View == 0 {
+	if !header.ContainsParentQC() {
 		return []flow.Identifier{}, nil
 	}
 

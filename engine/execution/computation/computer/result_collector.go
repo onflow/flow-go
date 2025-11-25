@@ -169,9 +169,8 @@ func (collector *resultCollector) commitCollection(
 	txResults := execColRes.TransactionResults()
 	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
 
-	col := collection.Collection()
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection:         &col,
+		Collection:         collection.Collection,
 		Events:             events,
 		TrieUpdate:         trieUpdate,
 		TransactionResults: convertedTxResults,
@@ -187,7 +186,7 @@ func (collector *resultCollector) commitCollection(
 
 	collector.metrics.ExecutionChunkDataPackGenerated(
 		len(proof),
-		len(collection.Transactions))
+		len(collection.Collection.Transactions))
 
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
@@ -241,14 +240,11 @@ func (collector *resultCollector) processTransactionResult(
 			Logger()
 		logger.Info().Msg("transaction execution failed")
 
-		if txn.isSystemTransaction {
+		if txn.transactionType == ComputerTransactionTypeSystem {
 			// This log is used as the data source for an alert on grafana.
-			// The system_chunk_error field must not be changed without adding
+			// The critical_error field must not be changed without adding
 			// the corresponding changes in grafana.
-			// https://github.com/dapperlabs/flow-internal/issues/1546
 			logger.Error().
-				Bool("system_chunk_error", true).
-				Bool("system_transaction_error", true).
 				Bool("critical_error", true).
 				Msg("error executing system chunk transaction")
 		}
@@ -315,7 +311,8 @@ func (collector *resultCollector) handleTransactionExecutionMetrics(
 		ComputationIntensities:     output.ComputationIntensities,
 		NumberOfTxnConflictRetries: numConflictRetries,
 		Failed:                     output.Err != nil,
-		SystemTransaction:          txn.isSystemTransaction,
+		ScheduledTransaction:       txn.transactionType == ComputerTransactionTypeScheduled,
+		SystemTransaction:          txn.transactionType == ComputerTransactionTypeSystem,
 	}
 	for _, entry := range txnExecutionSnapshot.UpdatedRegisters() {
 		transactionExecutionStats.NumberOfBytesWrittenToRegisters += len(entry.Value)
@@ -402,12 +399,21 @@ func (collector *resultCollector) Finalize(
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
-	executionResult := flow.NewExecutionResult(
-		collector.parentBlockExecutionResultID,
-		collector.result.ExecutableBlock.ID(),
-		collector.result.AllChunks(),
-		collector.result.AllConvertedServiceEvents(),
-		executionDataID)
+	chunks, err := collector.result.AllChunks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunks data: %w", err)
+	}
+
+	executionResult, err := flow.NewExecutionResult(flow.UntrustedExecutionResult{
+		PreviousResultID: collector.parentBlockExecutionResultID,
+		BlockID:          collector.result.ExecutableBlock.BlockID(),
+		Chunks:           chunks,
+		ServiceEvents:    collector.result.AllConvertedServiceEvents(),
+		ExecutionDataID:  executionDataID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not build execution result: %w", err)
+	}
 
 	executionReceipt, err := GenerateExecutionReceipt(
 		collector.signer,
@@ -443,21 +449,33 @@ func GenerateExecutionReceipt(
 	*flow.ExecutionReceipt,
 	error,
 ) {
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult:   *result,
-		Spocks:            spockSignatures,
-		ExecutorSignature: crypto.Signature{},
-		ExecutorID:        signer.NodeID(),
+	unsignedExecutionReceipt, err := flow.NewUnsignedExecutionReceipt(
+		flow.UntrustedUnsignedExecutionReceipt{
+			ExecutionResult: *result,
+			Spocks:          spockSignatures,
+			ExecutorID:      signer.NodeID(),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct unsigned execution receipt: %w", err)
 	}
 
-	// generates a signature over the execution result
-	id := receipt.ID()
-	sig, err := signer.Sign(id[:], receiptHasher)
+	// generates a signature over the execution receipt's body
+	unsignedReceiptID := unsignedExecutionReceipt.ID()
+	sig, err := signer.Sign(unsignedReceiptID[:], receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}
 
-	receipt.ExecutorSignature = sig
+	executionReceipt, err := flow.NewExecutionReceipt(
+		flow.UntrustedExecutionReceipt{
+			UnsignedExecutionReceipt: *unsignedExecutionReceipt,
+			ExecutorSignature:        sig,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct execution receipt: %w", err)
+	}
 
-	return receipt, nil
+	return executionReceipt, nil
 }

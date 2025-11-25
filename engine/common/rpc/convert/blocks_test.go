@@ -18,17 +18,15 @@ func TestConvertBlock(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
-
 	signerIDs := unittest.IdentifierListFixture(5)
 
-	msg, err := convert.BlockToMessage(&block, signerIDs)
+	msg, err := convert.BlockToMessage(block, signerIDs)
 	require.NoError(t, err)
 
 	converted, err := convert.MessageToBlock(msg)
 	require.NoError(t, err)
 
-	assert.Equal(t, block, *converted)
+	assert.Equal(t, block, converted)
 }
 
 // TestConvertBlockLight tests that converting a block to its light form results in only the correct
@@ -37,21 +35,20 @@ func TestConvertBlockLight(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
-
-	msg := convert.BlockToMessageLight(&block)
+	msg := convert.BlockToMessageLight(block)
 
 	// required fields are set
 	blockID := block.ID()
 	assert.Equal(t, 0, bytes.Compare(blockID[:], msg.Id))
-	assert.Equal(t, block.Header.Height, msg.Height)
-	assert.Equal(t, 0, bytes.Compare(block.Header.ParentID[:], msg.ParentId))
-	assert.Equal(t, block.Header.Timestamp, msg.Timestamp.AsTime())
-	assert.Equal(t, 0, bytes.Compare(block.Header.ParentVoterSigData, msg.Signatures[0]))
+	assert.Equal(t, block.Height, msg.Height)
+	assert.Equal(t, 0, bytes.Compare(block.ParentID[:], msg.ParentId))
+	assert.Equal(t, block.Timestamp, uint64(msg.Timestamp.AsTime().UnixMilli()))
+	assert.Equal(t, 0, bytes.Compare(block.ParentVoterSigData, msg.Signatures[0]))
 
 	guarantees := []*flow.CollectionGuarantee{}
 	for _, g := range msg.CollectionGuarantees {
-		guarantee := convert.MessageToCollectionGuarantee(g)
+		guarantee, err := convert.MessageToCollectionGuarantee(g)
+		require.NoError(t, err)
 		guarantees = append(guarantees, guarantee)
 	}
 
@@ -62,4 +59,20 @@ func TestConvertBlockLight(t *testing.T) {
 	assert.Len(t, msg.BlockSeals, 0)
 	assert.Len(t, msg.ExecutionReceiptMetaList, 0)
 	assert.Len(t, msg.ExecutionResultList, 0)
+}
+
+// TestConvertRootBlock tests that converting a root block to and from a protobuf message results in
+// the same block
+func TestConvertRootBlock(t *testing.T) {
+	t.Parallel()
+
+	block := unittest.Block.Genesis(flow.Emulator)
+
+	msg, err := convert.BlockToMessage(block, flow.IdentifierList{})
+	require.NoError(t, err)
+
+	converted, err := convert.MessageToBlock(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, block.ID(), converted.ID())
 }

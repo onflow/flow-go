@@ -104,9 +104,8 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 // => Therefore, only seals whose results pass the sub-graph check will be
 // allowed.
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
-	header := candidate.Header
 	payload := candidate.Payload
-	parentID := header.ParentID
+	parentID := candidate.ParentID
 
 	// Get the latest seal in the fork that ends with the candidate's parent.
 	// The protocol state saves this information for each block that has been

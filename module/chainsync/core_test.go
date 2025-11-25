@@ -394,38 +394,42 @@ func (ss *SyncSuite) TestPrune() {
 	final.Height = 100
 
 	var (
-		prunableHeights  []flow.Block
-		prunableBlockIDs []flow.Block
-		unprunable       []flow.Block
+		prunableHeights  []*flow.Block
+		prunableBlockIDs []*flow.Block
+		unprunable       []*flow.Block
 	)
 
 	// add some finalized blocks by height
 	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i + 1)
-		ss.core.heights[block.Header.Height] = ss.QueuedStatus()
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i + 1)),
+		)
+		ss.core.heights[block.Height] = ss.QueuedStatus()
 		prunableHeights = append(prunableHeights, block)
 	}
 	// add some un-finalized blocks by height
 	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = final.Height + uint64(i+1)
-		ss.core.heights[block.Header.Height] = ss.QueuedStatus()
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(final.Height + uint64(i+1)),
+		)
+		ss.core.heights[block.Height] = ss.QueuedStatus()
 		unprunable = append(unprunable, block)
 	}
 
 	// add some finalized blocks by block ID
 	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i + 1)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(uint64(i + 1)),
+		)
+		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.ToHeader())
 		prunableBlockIDs = append(prunableBlockIDs, block)
 	}
 	// add some un-finalized, received blocks by block ID
 	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = 100 + uint64(i+1)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		block := unittest.BlockFixture(
+			unittest.Block.WithHeight(100 + uint64(i+1)),
+		)
+		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.ToHeader())
 		unprunable = append(unprunable, block)
 	}
 
@@ -444,11 +448,11 @@ func (ss *SyncSuite) TestPrune() {
 		assert.False(ss.T(), exists)
 	}
 	for _, block := range prunableHeights {
-		_, exists := ss.core.heights[block.Header.Height]
+		_, exists := ss.core.heights[block.Height]
 		assert.False(ss.T(), exists)
 	}
 	for _, block := range unprunable {
-		_, heightExists := ss.core.heights[block.Header.Height]
+		_, heightExists := ss.core.heights[block.Height]
 		_, blockIDExists := ss.core.blockIDs[block.ID()]
 		assert.True(ss.T(), heightExists || blockIDExists)
 	}

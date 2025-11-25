@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	moduleconsensus "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -24,11 +23,13 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	moduleutil "github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -44,23 +45,25 @@ import (
 func TestFollowerHappyPath(t *testing.T) {
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	lockManager := storage.NewTestingLockManager()
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		all := bstorage.InitAll(metrics, db)
+		all := store.InitAll(metrics, pebbleimpl.ToDB(pdb))
 
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(
 			metrics,
-			db,
+			pebbleimpl.ToDB(pdb),
+			lockManager,
 			all.Headers,
 			all.Seals,
 			all.Results,
 			all.Blocks,
 			all.QuorumCertificates,
-			all.Setups,
+			all.EpochSetups,
 			all.EpochCommits,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
@@ -81,7 +84,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			mockTimer,
 		)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizer(pebbleimpl.ToDB(pdb).Reader(), all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
@@ -121,7 +124,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		nodeID := unittest.IdentifierFixture()
 		me.On("NodeID").Return(nodeID).Maybe()
 
-		net := mocknetwork.NewNetwork(t)
+		net := mocknetwork.NewEngineRegistry(t)
 		con := mocknetwork.NewConduit(t)
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
@@ -134,16 +137,17 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.Headers,
 			rootHeader,
 			followerCore,
+			consensusConsumer,
 			compliance.DefaultConfig(),
 		)
 		require.NoError(t, err)
-		// don't forget to subscribe for finalization notifications
-		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
+		// Create an [irrecoverable.SignalerContext] to consume any irrecoverable errors that might be thrown by
+		// hotstuff or follower engine. This mock will fail the test when `SignalerContext.Throw` is called.
+		mockCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
 		// start hotstuff logic and follower engine
-		ctx, cancel, errs := irrecoverable.WithSignallerAndCancel(context.Background())
-		followerLoop.Start(ctx)
-		engine.Start(ctx)
+		followerLoop.Start(mockCtx)
+		engine.Start(mockCtx)
 		unittest.RequireCloseBefore(t, moduleutil.AllReady(engine, followerLoop), time.Second, "engine failed to start")
 
 		// prepare chain of blocks, we will use a continuous chain assuming it was generated on happy path.
@@ -151,19 +155,28 @@ func TestFollowerHappyPath(t *testing.T) {
 		batchesPerWorker := 10
 		blocksPerBatch := 100
 		blocksPerWorker := blocksPerBatch * batchesPerWorker
-		flowBlocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, rootHeader)
-		require.Greaterf(t, len(flowBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
+		pendingBlocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, rootHeader)
+		require.Greaterf(t, len(pendingBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
 
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
-		for i, block := range flowBlocks {
-			block.Header.View = block.Header.Height
-			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		for i, proposal := range pendingBlocks {
+			proposal.Block.View = proposal.Block.Height
+			proposal.Block.ParentView = proposal.Block.View - 1
+			block, err := flow.NewBlock(
+				flow.UntrustedBlock{
+					HeaderBody: proposal.Block.HeaderBody,
+					Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+				},
+			)
+			require.NoError(t, err)
+
+			proposal.Block = *block
+
 			if i > 0 {
-				block.Header.ParentView = flowBlocks[i-1].Header.View
-				block.Header.ParentID = flowBlocks[i-1].Header.ID()
+				proposal.Block.ParentView = pendingBlocks[i-1].Block.View
+				proposal.Block.ParentID = pendingBlocks[i-1].Block.ID()
 			}
 		}
-		pendingBlocks := flowBlocksToBlockProposals(flowBlocks...)
 
 		// Regarding the block that we expect to be finalized based on 2-chain finalization rule, we consider the last few blocks in `pendingBlocks`
 		//  ... <-- X <-- Y <-- Z
@@ -173,7 +186,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// Note: the HotStuff Follower does not see block Z (as there is no QC for X proving its validity). Instead, it sees the certified block
 		//  [◄(X) Y] ◄(Y)
 		// where ◄(B) denotes a QC for block B
-		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Header.Height
+		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Height
 
 		// emulate syncing logic, where we push same blocks over and over.
 		originID := unittest.IdentifierFixture()
@@ -181,11 +194,11 @@ func TestFollowerHappyPath(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(workers)
 		for i := 0; i < workers; i++ {
-			go func(blocks []*messages.BlockProposal) {
+			go func(blocks []*flow.Proposal) {
 				defer wg.Done()
 				for submittingBlocks.Load() {
 					for batch := 0; batch < batchesPerWorker; batch++ {
-						engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+						engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 							OriginID: originID,
 							Message:  blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch],
 						})
@@ -194,22 +207,33 @@ func TestFollowerHappyPath(t *testing.T) {
 			}(pendingBlocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 		}
 
+		// Ensure graceful shutdown even if the test fails early (e.g., Eventually times out).
+		// Otherwise, the test may panic with "pebble: closed" when threads are attempting to still write to the database, while
+		// the test is unwinding and closing the database. If such panics happen, we don't know what assertation failed and
+		// just see the panic. Hence, we call `cancel()` and attempt to wait for the engine to stop in all cases.
+		defer func() {
+			// stop producers and wait for them to exit
+			submittingBlocks.Store(false)
+			unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "expect workers to stop producing")
+
+			// stop engines and wait for graceful shutdown
+			cancel()
+			unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
+			// Note: in case any error occur, the `mockCtx` will fail the test, due to the unexpected call of `Throw` on the mock.
+		}()
+
 		// wait for target block to become finalized, this might take a while.
 		require.Eventually(t, func() bool {
 			final, err := followerState.Final().Head()
 			require.NoError(t, err)
-			return final.Height == targetBlockHeight
-		}, time.Minute, time.Second, "expect to process all blocks before timeout")
+			success := final.Height == targetBlockHeight
+			if !success {
+				t.Logf("finalized height %d, waiting for %d", final.Height, targetBlockHeight)
+			} else {
+				t.Logf("successfully finalized target height %d\n", targetBlockHeight)
+			}
+			return success
+		}, 90*time.Second, time.Second, "expect to process all blocks before timeout")
 
-		// shutdown and cleanup test
-		submittingBlocks.Store(false)
-		unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "expect workers to stop producing")
-		cancel()
-		unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
-		select {
-		case err := <-errs:
-			require.NoError(t, err)
-		default:
-		}
 	})
 }

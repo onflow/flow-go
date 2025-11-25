@@ -19,7 +19,7 @@ type ClusterLightBlock struct {
 func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterLightBlock {
 	return &ClusterLightBlock{
 		ID:           clusterBlock.ID(),
-		Height:       clusterBlock.Header.Height,
+		Height:       clusterBlock.Height,
 		CollectionID: clusterBlock.Payload.Collection.ID(),
 		Transactions: clusterBlock.Payload.Collection.Light().Transactions,
 	}
@@ -28,14 +28,14 @@ func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterLightBlock {
 func ReadClusterLightBlockByHeightRange(clusterBlocks storage.ClusterBlocks, startHeight uint64, endHeight uint64) ([]*ClusterLightBlock, error) {
 	blocks := make([]*ClusterLightBlock, 0)
 	for height := startHeight; height <= endHeight; height++ {
-		block, err := clusterBlocks.ByHeight(height)
+		block, err := clusterBlocks.ProposalByHeight(height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				break
 			}
 			return nil, fmt.Errorf("could not get cluster block by height %v: %w", height, err)
 		}
-		light := ClusterBlockToLight(block)
+		light := ClusterBlockToLight(&block.Block)
 		blocks = append(blocks, light)
 	}
 	return blocks, nil
@@ -50,7 +50,7 @@ type LightBlock struct {
 func BlockToLight(block *flow.Block) *LightBlock {
 	return &LightBlock{
 		ID:          block.ID(),
-		Height:      block.Header.Height,
+		Height:      block.Height,
 		Collections: flow.EntitiesToIDs(block.Payload.Guarantees),
 	}
 }

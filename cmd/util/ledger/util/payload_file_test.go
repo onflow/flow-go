@@ -301,7 +301,7 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 			[]ledger.Value{[]byte{'1'}, []byte{'A'}}
 	case 1:
 		return []ledger.Key{getKey("ADDRESS", "public_key_count"),
-				getKey("ADDRESS", "public_key_0"),
+				getKey("ADDRESS", "apk_0"),
 				getKey("ADDRESS", "exists"),
 				getKey("ADDRESS", "storage_used")},
 			[]ledger.Value{[]byte{1}, []byte("PUBLICKEYXYZ"), []byte{1}, []byte{100}}

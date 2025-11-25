@@ -2,24 +2,28 @@ package testnet
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
-	"github.com/onflow/flow-go-sdk/templates"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/onflow/cadence"
-
+	"github.com/onflow/crypto/hash"
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
-	"github.com/onflow/flow-go-sdk/crypto"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -51,7 +55,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	acc, err := getAccount(ctx, flowClient, accountAddr)
@@ -61,7 +65,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 
 	accountKey := acc.Keys[0]
 
-	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := sdkcrypto.NewInMemorySigner(key, accountKey.HashAlgo)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a signer: %w", err)
 	}
@@ -122,7 +126,6 @@ func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, err
 // code to the root account.
 func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 	return c.deployContract(ctx, refID, dsl.Transaction{
-		Import: dsl.Import{},
 		Content: dsl.Prepare{
 			Content: dsl.SetAccountCode{
 				Code: contract.ToCadence(),
@@ -136,7 +139,6 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 // code to the root account.
 func (c *Client) UpdateContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 	return c.deployContract(ctx, refID, dsl.Transaction{
-		Import: dsl.Import{},
 		Content: dsl.Prepare{
 			Content: dsl.SetAccountCode{
 				Code:   contract.ToCadence(),
@@ -174,6 +176,60 @@ func (c *Client) SignTransaction(tx *sdk.Transaction) (*sdk.Transaction, error) 
 	return tx, err
 }
 
+func (c *Client) SignTransactionWebAuthN(tx *sdk.Transaction) (*sdk.Transaction, error) {
+	transactionMessage := tx.EnvelopeMessage()
+
+	extensionData, messageToSign, err := c.validWebAuthnExtensionData(transactionMessage)
+	if err != nil {
+		return nil, err
+	}
+	sig, err := c.signer.Sign(messageToSign)
+	if err != nil {
+		return nil, err
+	}
+	tx.AddEnvelopeSignature(tx.Payer, tx.ProposalKey.KeyIndex, sig)
+	tx.EnvelopeSignatures[0].ExtensionData = slices.Concat([]byte{byte(flow.WebAuthnScheme)}, extensionData)
+	return tx, nil
+}
+
+func (c *Client) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, []byte, error) {
+	hasher, err := crypto.NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
+	if err != nil {
+		return nil, nil, err
+	}
+	authNChallenge := hasher.ComputeHash(transactionMessage)
+	authNChallengeBase64Url := base64.RawURLEncoding.EncodeToString(authNChallenge)
+	validUserFlag := byte(0x01)
+	validClientDataOrigin := "https://testing.com"
+	rpIDHash := unittest.RandomBytes(32)
+	sigCounter := unittest.RandomBytes(4)
+
+	// For use in cases where you're testing the other value
+	validAuthenticatorData := slices.Concat(rpIDHash, []byte{validUserFlag}, sigCounter)
+	validClientDataJSON := map[string]string{
+		"type":      flow.WebAuthnTypeGet,
+		"challenge": authNChallengeBase64Url,
+		"origin":    validClientDataOrigin,
+	}
+
+	clientDataJsonBytes, err := json.Marshal(validClientDataJSON)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	extensionData := flow.WebAuthnExtensionData{
+		AuthenticatorData: validAuthenticatorData,
+		ClientDataJson:    clientDataJsonBytes,
+	}
+	extensionDataRLPBytes := rlp.NewMarshaler().MustMarshal(extensionData)
+
+	var clientDataHash [hash.HashLenSHA2_256]byte
+	hash.ComputeSHA2_256(&clientDataHash, clientDataJsonBytes)
+	messageToSign := slices.Concat(validAuthenticatorData, clientDataHash[:])
+
+	return extensionDataRLPBytes, messageToSign, nil
+}
+
 // SendTransaction submits the transaction to the Access API. The caller must
 // set up the transaction, including signing it.
 func (c *Client) SendTransaction(ctx context.Context, tx *sdk.Transaction) error {
@@ -191,11 +247,24 @@ func (c *Client) SignAndSendTransaction(ctx context.Context, tx *sdk.Transaction
 	return c.SendTransaction(ctx, tx)
 }
 
+func (c *Client) GetTransactionResult(ctx context.Context, txID sdk.Identifier) (*sdk.TransactionResult, error) {
+	return c.client.GetTransactionResult(ctx, txID)
+}
+
 func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Value, error) {
 
 	code := script.ToCadence()
 
 	res, err := c.client.ExecuteScriptAtLatestBlock(ctx, []byte(code), nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not execute script: %w", err)
+	}
+
+	return res, nil
+}
+
+func (c *Client) ExecuteScriptAtBlock(ctx context.Context, script dsl.Main, blockID sdk.Identifier) (cadence.Value, error) {
+	res, err := c.client.ExecuteScriptAtBlockID(ctx, blockID, []byte(script.ToCadence()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not execute script: %w", err)
 	}
@@ -240,6 +309,22 @@ func (c *Client) WaitForExecuted(ctx context.Context, id sdk.Identifier) (*sdk.T
 	return c.waitForStatus(ctx, id, sdk.TransactionStatusExecuted)
 }
 
+// WaitUntilIndexed blocks until the node has indexed the given height.
+func (c *Client) WaitUntilIndexed(ctx context.Context, height uint64) error {
+	for {
+		resp, err := c.client.RPCClient().GetLatestBlockHeader(ctx, &accessproto.GetLatestBlockHeaderRequest{
+			IsSealed: true,
+		})
+		if err != nil {
+			return fmt.Errorf("could not get metadata response: %w", err)
+		}
+		if resp.GetMetadata().GetHighestIndexedHeight() >= height {
+			return nil
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
 // waitForStatus waits for the transaction to be in a certain status, then returns the result.
 func (c *Client) waitForStatus(
 	ctx context.Context,
@@ -251,7 +336,7 @@ func (c *Client) waitForStatus(
 	var result *sdk.TransactionResult
 	var err error
 	for result == nil || (result.Status != targetStatus) {
-		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		childCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 		result, err = c.client.GetTransactionResult(childCtx, id)
 		cancel()
 		if err != nil {
@@ -390,6 +475,14 @@ func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
 	return account, nil
 }
 
+func (c *Client) GetAccountAtBlockHeight(ctx context.Context, accountAddress sdk.Address, blockHeight uint64) (*sdk.Account, error) {
+	account, err := c.client.GetAccountAtBlockHeight(ctx, accountAddress, blockHeight)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account at block height: %w", err)
+	}
+	return account, nil
+}
+
 func (c *Client) CreateAccount(
 	ctx context.Context,
 	accountKey *sdk.AccountKey,
@@ -436,6 +529,19 @@ func (c *Client) GetEventsForBlockIDs(
 		return nil, fmt.Errorf("could not get events for block ids: %w", err)
 	}
 
+	return events, nil
+}
+
+func (c *Client) GetEventsForHeightRange(
+	ctx context.Context,
+	eventType string,
+	startHeight uint64,
+	endHeight uint64,
+) ([]sdk.BlockEvents, error) {
+	events, err := c.client.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight)
+	if err != nil {
+		return nil, fmt.Errorf("could not get events for height range: %w", err)
+	}
 	return events, nil
 }
 

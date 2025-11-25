@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
@@ -16,16 +17,19 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type SnapshotSuite struct {
 	suite.Suite
-	db    *badger.DB
-	dbdir string
+
+	db          storage.DB
+	dbdir       string
+	lockManager lockctx.Manager
 
 	genesis      *model.Block
 	chainID      flow.ChainID
@@ -40,17 +44,20 @@ type SnapshotSuite struct {
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
 
-	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.Header.ChainID
+	suite.genesis, err = unittest.ClusterBlock.Genesis()
+	require.NoError(suite.T(), err)
+	suite.chainID = suite.genesis.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	pdb := unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.db = pebbleimpl.ToDB(pdb)
+	suite.lockManager = storage.NewTestingLockManager()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	all := storage.InitAll(metrics, suite.db)
-	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db)
+	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
@@ -58,12 +65,13 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.protoState, err = pbadger.Bootstrap(
 		metrics,
 		suite.db,
+		suite.lockManager,
 		all.Headers,
 		all.Seals,
 		all.Results,
 		all.Blocks,
 		all.QuorumCertificates,
-		all.Setups,
+		all.EpochSetups,
 		all.EpochCommits,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
@@ -74,9 +82,9 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Require().NoError(err)
-	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
 	suite.Require().NoError(err)
 }
 
@@ -106,25 +114,44 @@ func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model
 			minRefID = refBlock.ID()
 		}
 	}
-	return model.PayloadFromTransactions(minRefID, transactions...)
+
+	// avoid a nil transaction list to match empty (but non-nil) list returned by snapshot query
+	if len(transactions) == 0 {
+		transactions = []*flow.TransactionBody{}
+	}
+
+	payload, err := model.NewPayload(
+		model.UntrustedPayload{
+			ReferenceBlockID: minRefID,
+			Collection:       flow.Collection{Transactions: transactions},
+		},
+	)
+	suite.Assert().NoError(err)
+
+	return *payload
 }
 
-// BlockWithParent returns a valid block with the given parent.
-func (suite *SnapshotSuite) BlockWithParent(parent *model.Block) model.Block {
-	block := unittest.ClusterBlockWithParent(parent)
-	payload := suite.Payload()
-	block.SetPayload(payload)
-	return block
+// ProposalWithParentAndPayload returns a valid block proposal with the given parent and payload.
+func (suite *SnapshotSuite) ProposalWithParentAndPayload(parent *model.Block, payload model.Payload) model.Proposal {
+	block := unittest.ClusterBlockFixture(
+		unittest.ClusterBlock.WithParent(parent),
+		unittest.ClusterBlock.WithPayload(payload),
+	)
+	return *unittest.ClusterProposalFromBlock(block)
 }
 
-// Block returns a valid cluster block with genesis as parent.
-func (suite *SnapshotSuite) Block() model.Block {
-	return suite.BlockWithParent(suite.genesis)
+// Proposal returns a valid cluster block proposal with genesis as parent.
+func (suite *SnapshotSuite) Proposal() model.Proposal {
+	return suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload())
 }
 
-func (suite *SnapshotSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&block))
-	suite.Assert().Nil(err)
+func (suite *SnapshotSuite) InsertBlock(proposal model.Proposal) {
+	err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertClusterBlock(lctx, rw, &proposal)
+		})
+	})
+	suite.Require().NoError(err)
 }
 
 // InsertSubtree recursively inserts chain state as a subtree of the parent
@@ -136,9 +163,9 @@ func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int)
 	}
 
 	for i := 0; i < fanout; i++ {
-		block := suite.BlockWithParent(&parent)
-		suite.InsertBlock(block)
-		suite.InsertSubtree(block, depth-1, fanout)
+		proposal := suite.ProposalWithParentAndPayload(&parent, suite.Payload())
+		suite.InsertBlock(proposal)
+		suite.InsertSubtree(proposal.Block, depth-1, fanout)
 	}
 }
 
@@ -172,59 +199,62 @@ func (suite *SnapshotSuite) TestAtBlockID() {
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, suite.genesis.ID(), head.ID())
+	assert.Equal(t, suite.genesis.ToHeader().ID(), head.ID())
 }
 
 func (suite *SnapshotSuite) TestEmptyCollection() {
 	t := suite.T()
 
 	// create a block with an empty collection
-	block := suite.BlockWithParent(suite.genesis)
-	block.SetPayload(model.EmptyPayload(flow.ZeroID))
-	suite.InsertBlock(block)
+	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(flow.ZeroID))
+	suite.InsertBlock(proposal)
 
-	snapshot := suite.state.AtBlockID(block.ID())
+	snapshot := suite.state.AtBlockID(proposal.Block.ID())
 
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.NoError(t, err)
-	assert.Equal(t, &block.Payload.Collection, coll)
+	assert.Equal(t, &proposal.Block.Payload.Collection, coll)
 }
 
 func (suite *SnapshotSuite) TestFinalizedBlock() {
 	t := suite.T()
 
 	// create a new finalized block on genesis (height=1)
-	finalizedBlock1 := suite.Block()
-	err := suite.state.Extend(&finalizedBlock1)
+	finalizedProposal1 := suite.Proposal()
+	err := suite.state.Extend(&finalizedProposal1)
 	assert.NoError(t, err)
 
 	// create an un-finalized block on genesis (height=1)
-	unFinalizedBlock1 := suite.Block()
-	err = suite.state.Extend(&unFinalizedBlock1)
+	unFinalizedProposal1 := suite.Proposal()
+	err = suite.state.Extend(&unFinalizedProposal1)
 	assert.NoError(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
-	unFinalizedBlock2 := suite.BlockWithParent(&finalizedBlock1)
-	err = suite.state.Extend(&unFinalizedBlock2)
+	unFinalizedProposal2 := suite.ProposalWithParentAndPayload(&finalizedProposal1.Block, suite.Payload())
+	err = suite.state.Extend(&unFinalizedProposal2)
 	assert.NoError(t, err)
 
 	// finalize the block
-	err = suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock1.ID()))
-	assert.NoError(t, err)
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.FinalizeClusterBlock(lctx, rw, finalizedProposal1.Block.ID())
+		})
+	})
+	suite.Require().NoError(err)
 
-	// get the final snapshot, should map to finalizedBlock1
+	// get the final snapshot, should map to finalizedProposal1
 	snapshot := suite.state.Final()
 
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.NoError(t, err)
-	assert.Equal(t, &finalizedBlock1.Payload.Collection, coll)
+	assert.Equal(t, &finalizedProposal1.Block.Payload.Collection, coll)
 
 	// ensure head is correct
 	head, err := snapshot.Head()
 	assert.NoError(t, err)
-	assert.Equal(t, finalizedBlock1.ID(), head.ID())
+	assert.Equal(t, finalizedProposal1.Block.ToHeader().ID(), head.ID())
 }
 
 // test that no pending blocks are returned when there are none
@@ -246,9 +276,9 @@ func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 	parent := suite.genesis
 	pendings := make([]flow.Identifier, 0, 10)
 	for i := 0; i < 10; i++ {
-		next := suite.BlockWithParent(parent)
+		next := suite.ProposalWithParentAndPayload(parent, suite.Payload())
 		suite.InsertBlock(next)
-		pendings = append(pendings, next.ID())
+		pendings = append(pendings, next.Block.ID())
 	}
 
 	pending, err := suite.state.Final().Pending()
@@ -277,19 +307,19 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 	for _, blockID := range pending {
 		var header flow.Header
-		err := suite.db.View(operation.RetrieveHeader(blockID, &header))
+		err := operation.RetrieveHeader(suite.db.Reader(), blockID, &header)
 		suite.Require().Nil(err)
 
 		// we must have already seen the parent
 		_, seen := parents[header.ParentID]
-		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", header.ID(), header.ParentID)
+		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", blockID, header.ParentID)
 
 		// mark this block as seen
-		parents[header.ID()] = struct{}{}
+		parents[blockID] = struct{}{}
 	}
 }
 
 func (suite *SnapshotSuite) TestParams_ChainID() {
 	chainID := suite.state.Params().ChainID()
-	suite.Assert().Equal(suite.genesis.Header.ChainID, chainID)
+	suite.Assert().Equal(suite.genesis.ChainID, chainID)
 }

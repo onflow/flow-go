@@ -61,7 +61,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	s.Run("Get Block", func() {
 		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
 			getBlock(at: %d)!
-			return getCurrentBlock().height 
+			return getCurrentBlock().height
 		}`, s.height))
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
@@ -153,6 +153,7 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 }
 
 func (s *scriptTestSuite) SetupTest() {
+	lockManager := storage.NewTestingLockManager()
 	logger := unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	entropyProvider := testutil.ProtocolStateWithSourceFixture(nil)
 	blockchain := unittest.BlockchainFixture(10)
@@ -166,7 +167,7 @@ func (s *scriptTestSuite) SetupTest() {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
-	s.height = blockchain[0].Header.Height
+	s.height = blockchain[0].Height
 
 	s.dbDir = unittest.TempDir(s.T())
 	db := pebbleStorage.NewBootstrappedRegistersWithPathForTest(s.T(), s.dbDir, s.height, s.height)
@@ -177,7 +178,7 @@ func (s *scriptTestSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	index, err := indexer.New(
+	index := indexer.New(
 		logger,
 		metrics.NewNoopCollector(),
 		nil,
@@ -187,11 +188,13 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		nil,
 		nil,
-		flow.Testnet.Chain(),
+		nil,
+		flow.Testnet,
 		derivedChainData,
 		nil,
+		nil,
+		lockManager,
 	)
-	s.Require().NoError(err)
 
 	s.scripts = NewScripts(
 		logger,
@@ -240,9 +243,12 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 		  }
 		}`
 
-	txBody := flow.NewTransactionBody().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(createAccountTransaction)).
-		AddAuthorizer(s.chain.ServiceAddress())
+		SetPayer(unittest.RandomAddressFixture()).
+		AddAuthorizer(s.chain.ServiceAddress()).
+		Build()
+	s.Require().NoError(err)
 
 	executionSnapshot, output, err := s.vm.Run(
 		s.vmCtx,
@@ -280,10 +286,13 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 }
 
 func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uint64) {
-	transferTx := transferTokensTx(s.chain).
+	transferTx, err := transferTokensTx(s.chain).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.Address(accountAddress))).
-		AddAuthorizer(s.chain.ServiceAddress())
+		AddAuthorizer(s.chain.ServiceAddress()).
+		SetPayer(accountAddress).
+		Build()
+	s.Require().NoError(err)
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
@@ -330,10 +339,13 @@ transaction(key: [UInt8]) {
 
 	publicKey, encodedCadencePublicKey := newAccountKey(s.T(), privateKey, apiVersion)
 
-	txBody := flow.NewTransactionBody().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(addAccountKeyTransaction)).
+		SetPayer(accountAddress).
 		AddArgument(encodedCadencePublicKey).
-		AddAuthorizer(accountAddress)
+		AddAuthorizer(accountAddress).
+		Build()
+	s.Require().NoError(err)
 
 	executionSnapshot, _, err := s.vm.Run(
 		s.vmCtx,
@@ -380,16 +392,16 @@ func newAccountKey(
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByHeight := make(map[uint64]*flow.Block)
 	for _, b := range blocks {
-		blocksByHeight[b.Header.Height] = b
+		blocksByHeight[b.Height] = b
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
-func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(
 			`
 	// This transaction is a template for a transaction that

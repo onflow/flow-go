@@ -41,18 +41,22 @@ type TelemetryConsumer struct {
 // Telemetry implements consumers for _all happy-path_ interfaces in consensus/hotstuff/notifications/telemetry.go:
 var _ hotstuff.ParticipantConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.CommunicatorConsumer = (*TelemetryConsumer)(nil)
-var _ hotstuff.FinalizationConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.VoteCollectorConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.TimeoutCollectorConsumer = (*TelemetryConsumer)(nil)
 
 // NewTelemetryConsumer creates consumer that reports telemetry events using logger backend.
 // Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
-func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
+func NewTelemetryConsumer(log zerolog.Logger, registrar hotstuff.FinalizationRegistrar) *TelemetryConsumer {
 	pathHandler := NewPathHandler(log)
-	return &TelemetryConsumer{
+	t := &TelemetryConsumer{
 		pathHandler:  pathHandler,
 		noPathLogger: pathHandler.log,
 	}
+
+	registrar.AddOnBlockFinalizedConsumer(t.onFinalizedBlock)
+	registrar.AddOnBlockIncorporatedConsumer(t.onBlockIncorporated)
+
+	return t
 }
 
 func (t *TelemetryConsumer) OnStart(currentView uint64) {
@@ -67,7 +71,7 @@ func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *mode
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
 		Hex("block_proposer_id", logging.ID(block.ProposerID)).
-		Time("block_time", block.Timestamp).
+		Time("block_time", time.UnixMilli(int64(block.Timestamp)).UTC()).
 		Uint64("qc_view", block.QC.View).
 		Hex("qc_block_id", logging.ID(block.QC.BlockID))
 
@@ -138,13 +142,13 @@ func (t *TelemetryConsumer) OnStartingTimeout(info model.TimerInfo) {
 		Msg("OnStartingTimeout")
 }
 
-func (t *TelemetryConsumer) OnBlockIncorporated(block *model.Block) {
+func (t *TelemetryConsumer) onBlockIncorporated(block *model.Block) {
 	t.pathHandler.NextStep().
 		Hex("block_id", logging.ID(block.BlockID)).
 		Msg("OnBlockIncorporated")
 }
 
-func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
+func (t *TelemetryConsumer) onFinalizedBlock(block *model.Block) {
 	t.pathHandler.NextStep().
 		Hex("block_id", logging.ID(block.BlockID)).
 		Msg("OnFinalizedBlock")
@@ -177,16 +181,16 @@ func (t *TelemetryConsumer) OnOwnVote(vote *model.Vote, recipientID flow.Identif
 		Msg("OnOwnVote")
 }
 
-func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+func (t *TelemetryConsumer) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicationTime time.Time) {
 	step := t.pathHandler.NextStep().
-		Uint64("block_view", proposal.View).
-		Hex("block_id", logging.ID(proposal.ID())).
-		Hex("block_proposer_id", logging.ID(proposal.ProposerID)).
-		Time("block_time", proposal.Timestamp).
-		Uint64("qc_view", proposal.ParentView).
-		Hex("qc_block_id", logging.ID(proposal.ParentID)).
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", logging.ID(proposal.Header.ID())).
+		Hex("block_proposer_id", logging.ID(proposal.Header.ProposerID)).
+		Time("block_time", time.UnixMilli(int64(proposal.Header.Timestamp)).UTC()).
+		Uint64("qc_view", proposal.Header.ParentView).
+		Hex("qc_block_id", logging.ID(proposal.Header.ParentID)).
 		Time("targetPublicationTime", targetPublicationTime)
-	lastViewTC := proposal.LastViewTC
+	lastViewTC := proposal.Header.LastViewTC
 	if lastViewTC != nil {
 		step.
 			Uint64("last_view_tc_view", lastViewTC.View).

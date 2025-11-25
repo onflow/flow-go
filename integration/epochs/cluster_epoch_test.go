@@ -153,7 +153,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 		clusterNodeWeights[index] = cadence.NewArray(nodeWeights)
 	}
 
-	// add cluster indicies to tx argument
+	// add cluster indices to tx argument
 	err := startVotingTx.AddArgument(cadence.NewArray(clusterIndices))
 	require.NoError(s.T(), err)
 

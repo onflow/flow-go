@@ -16,10 +16,11 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/follower/database"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 
 	"github.com/dapperlabs/testingdock"
-	badgerv2 "github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -52,11 +53,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/locks"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -77,8 +76,6 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
-	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
-	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -138,7 +135,8 @@ const (
 )
 
 func init() {
-	testingdock.Verbose = true
+	// Set to true to turn on logs from docker containers (logs will be prefixed with "DOCK:")
+	testingdock.Verbose = false
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
@@ -428,31 +426,29 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                       NodeConfigs
-	ConsensusFollowers          []ConsensusFollowerConfig
-	Observers                   []ObserverConfig
-	Name                        string
-	NClusters                   uint
-	ViewsInDKGPhase             uint64
-	ViewsInStakingAuction       uint64
-	ViewsInEpoch                uint64
-	ViewsPerSecond              uint64
-	FinalizationSafetyThreshold uint64
-	KVStoreFactory              func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
+	Nodes                 NodeConfigs
+	ConsensusFollowers    []ConsensusFollowerConfig
+	Observers             []ObserverConfig
+	Name                  string
+	NClusters             uint
+	ViewsInDKGPhase       uint64
+	ViewsInStakingAuction uint64
+	ViewsInEpoch          uint64
+	ViewsPerSecond        uint64
+	KVStoreFactory        func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                       nodes,
-		Name:                        name,
-		NClusters:                   1, // default to 1 cluster
-		ViewsInStakingAuction:       DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:             DefaultViewsInDKGPhase,
-		ViewsInEpoch:                DefaultViewsInEpoch,
-		ViewsPerSecond:              DefaultViewsPerSecond,
-		FinalizationSafetyThreshold: DefaultFinalizationSafetyThreshold,
+		Nodes:                 nodes,
+		Name:                  name,
+		NClusters:             1, // default to 1 cluster
+		ViewsInStakingAuction: DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:       DefaultViewsInDKGPhase,
+		ViewsInEpoch:          DefaultViewsInEpoch,
+		ViewsPerSecond:        DefaultViewsPerSecond,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 			return kvstore.NewDefaultKVStore(DefaultFinalizationSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
 		},
@@ -465,12 +461,11 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 	return c
 }
 
-func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch, safetyThreshold uint64, opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NewNetworkConfig(name, nodes,
 		WithViewsInStakingAuction(viewsInStakingAuction),
 		WithViewsInDKGPhase(viewsInDKGPhase),
-		WithViewsInEpoch(viewsInEpoch),
-		WithFinalizationSafetyThreshold(safetyThreshold))
+		WithViewsInEpoch(viewsInEpoch))
 
 	for _, apply := range opts {
 		apply(&c)
@@ -500,12 +495,6 @@ func WithViewsPerSecond(views uint64) func(*NetworkConfig) {
 func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInDKGPhase = views
-	}
-}
-
-func WithFinalizationSafetyThreshold(threshold uint64) func(*NetworkConfig) {
-	return func(config *NetworkConfig) {
-		config.FinalizationSafetyThreshold = threshold
 	}
 }
 
@@ -679,14 +668,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	return flowNetwork
 }
 
-func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
+func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, _ []ContainerConfig) {
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
-	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
 
-	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
+	pebbleDB, _, err := database.InitPebbleDB(net.log, dataDir)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
@@ -699,25 +687,16 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
-	dbOpts := badgerv2.
-		DefaultOptions(dataDir).
-		WithKeepL0InMemory(true).
-		WithValueLogFileSize(128 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-	badgerDB, err := badgerstorage.InitPublic(dbOpts)
-	require.NoError(t, err)
+	lockManager := storage.NewTestingLockManager()
 
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
+	protocolDB := pebbleimpl.ToDB(pebbleDB)
 	opts := append(
 		followerConf.Opts,
-		consensus_follower.WithDB(badgerDB),
-		// this is required, otherwise consensus follower will create a pebble db at the default
-		// path /data/protocol-pebble, which is outside of the tmpdir, and will run into permission
-		// denied error.
-		consensus_follower.WithPebbleDB(pebbleDB),
+		consensus_follower.WithProtocolDB(protocolDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 		// each consenesus follower will have a different lock manager singleton
-		consensus_follower.WithLockManager(locks.NewTestingLockManager()),
+		consensus_follower.WithLockManager(lockManager),
 	)
 
 	stakedANContainer := net.ContainerByID(followerConf.StakedNodeID)
@@ -1160,12 +1139,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	// define root block parameters
 	parentID := flow.ZeroID
 	height := uint64(0)
+	view := uint64(0)
 	timestamp := time.Now().UTC()
 	epochCounter := uint64(0)
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	rootHeader := run.GenerateRootHeader(chainID, parentID, height, timestamp)
+	rootHeaderBody, err := run.GenerateRootHeaderBody(chainID, parentID, height, view, timestamp)
+	if err != nil {
+		return nil, err
+	}
 
 	// generate root blocks for each collector cluster
 	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
@@ -1195,7 +1178,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
+	dkgOffsetView := rootHeaderBody.View + networkConf.ViewsInStakingAuction - 1
 
 	// target number of seconds in epoch
 	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
@@ -1204,11 +1187,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	epochSetup, err := flow.NewEpochSetup(
 		flow.UntrustedEpochSetup{
 			Counter:            epochCounter,
-			FirstView:          rootHeader.View,
+			FirstView:          rootHeaderBody.View,
 			DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
 			DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
 			DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-			FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
+			FinalView:          rootHeaderBody.View + networkConf.ViewsInEpoch - 1,
 			Participants:       participants.ToSkeleton(),
 			Assignments:        clusterAssignments,
 			RandomSource:       randomSource,
@@ -1233,9 +1216,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("could not construct epoch commit: %w", err)
 	}
 
-	root := &flow.Block{
-		Header: rootHeader,
-	}
 	minEpochStateEntry, err := inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct epoch protocol state: %w", err)
@@ -1244,9 +1224,15 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	if err != nil {
 		return nil, err
 	}
-	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		rootProtocolState.ID(),
-	)))
+	root, err := flow.NewRootBlock(
+		flow.UntrustedBlock{
+			HeaderBody: *rootHeaderBody,
+			Payload:    unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolState.ID())),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root block: %w", err)
+	}
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1272,12 +1258,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		trieDir,
 		unittest.ServiceAccountPublicKey,
 		chain,
-		fvm.WithRootBlock(root.Header),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithRootBlock(root.Header),
+		fvm.WithRootBlock(root.ToHeader()),
 		fvm.WithEpochConfig(epochConfig),
 		fvm.WithNodes(stakedNodeInfos),
 	)
@@ -1286,7 +1271,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	// generate execution result and block seal
-	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	result, err := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	if err != nil {
+		return nil, fmt.Errorf("generating root result failed: %w", err)
+	}
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
@@ -1321,7 +1309,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
 
-	err = badger.IsValidRootSnapshotQCs(snapshot)
+	err = datastore.IsValidRootSnapshotQCs(snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("invalid root snapshot qcs: %w", err)
 	}
@@ -1442,7 +1430,10 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 
 	for _, cluster := range clusters {
 		// generate root cluster block
-		block := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		block, err := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to generate canonical root block: %w", err)
+		}
 
 		lookup := make(map[flow.Identifier]struct{})
 		for _, node := range cluster {

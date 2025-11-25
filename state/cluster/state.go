@@ -22,8 +22,10 @@ type State interface {
 
 	// AtBlockID returns the snapshot of the persistent cluster at the given
 	// block ID. It is available for any block that was introduced into the
-	// the cluster state, and can thus represent an ambiguous state that was or
+	// cluster state, and can thus represent an ambiguous state that was or
 	// will never be finalized.
+	// If the block is unknown, it returns an invalid snapshot, which returns
+	// state.ErrUnknownSnapshotReference for all methods
 	AtBlockID(blockID flow.Identifier) Snapshot
 }
 
@@ -39,5 +41,5 @@ type MutableState interface {
 	//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 	//   - state.InvalidExtensionError if the candidate block is invalid
-	Extend(candidate *cluster.Block) error
+	Extend(proposal *cluster.Proposal) error
 }

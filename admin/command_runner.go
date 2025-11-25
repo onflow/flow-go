@@ -284,8 +284,16 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 			defer shutdownCancel()
 
 			if err := httpServer.Shutdown(shutdownCtx); err != nil {
-				r.logger.Err(err).Msg("failed to shutdown http server")
-				ctx.Throw(err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					r.logger.Warn().Err(err).Msg("failed to shutdown http server gracefully; forcing close")
+					if closeErr := httpServer.Close(); closeErr != nil {
+						r.logger.Err(closeErr).Msg("failed to force close http server")
+						ctx.Throw(closeErr)
+					}
+				} else {
+					r.logger.Err(err).Msg("failed to shutdown http server")
+					ctx.Throw(err)
+				}
 			}
 		}
 	}()

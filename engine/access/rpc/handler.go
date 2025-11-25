@@ -397,12 +397,22 @@ func (h *Handler) GetSystemTransaction(
 		return nil, err
 	}
 
-	id, err := convert.BlockID(req.GetBlockId())
+	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	tx, err := h.api.GetSystemTransaction(ctx, id)
+	var txID flow.Identifier
+	if id := req.GetId(); id == nil {
+		txID = flow.ZeroID
+	} else {
+		txID, err = convert.TransactionID(id)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
+		}
+	}
+
+	tx, err := h.api.GetSystemTransaction(ctx, txID, blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -422,12 +432,62 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, err
 	}
 
-	id, err := convert.BlockID(req.GetBlockId())
+	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	result, err := h.api.GetSystemTransactionResult(ctx, id, req.GetEventEncodingVersion())
+	var txID flow.Identifier
+	if id := req.GetId(); id == nil {
+		txID = flow.ZeroID
+	} else {
+		txID, err = convert.TransactionID(id)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
+		}
+	}
+
+	result, err := h.api.GetSystemTransactionResult(ctx, txID, blockID, req.GetEventEncodingVersion())
+	if err != nil {
+		return nil, err
+	}
+
+	message := convert.TransactionResultToMessage(result)
+	message.Metadata = metadata
+
+	return message, nil
+}
+
+func (h *Handler) GetScheduledTransaction(
+	ctx context.Context,
+	req *accessproto.GetScheduledTransactionRequest,
+) (*accessproto.TransactionResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := h.api.GetScheduledTransaction(ctx, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+
+	return &accessproto.TransactionResponse{
+		Transaction: convert.TransactionToMessage(*tx),
+		Metadata:    metadata,
+	}, nil
+}
+
+func (h *Handler) GetScheduledTransactionResult(
+	ctx context.Context,
+	req *accessproto.GetScheduledTransactionResultRequest,
+) (*accessproto.TransactionResultResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.api.GetScheduledTransactionResult(ctx, req.GetId(), req.GetEventEncodingVersion())
 	if err != nil {
 		return nil, err
 	}
@@ -1369,7 +1429,7 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.Subscribe
 func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsResponseFunc) func(*flow.BlockDigest) error {
 	return func(blockDigest *flow.BlockDigest) error {
 		err := send(&accessproto.SubscribeBlockDigestsResponse{
-			BlockId:        convert.IdentifierToMessage(blockDigest.ID()),
+			BlockId:        convert.IdentifierToMessage(blockDigest.BlockID),
 			BlockHeight:    blockDigest.Height,
 			BlockTimestamp: timestamppb.New(blockDigest.Timestamp),
 		})
@@ -1458,7 +1518,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 		return nil, err
 	}
 
-	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.ToHeader())
 	if err != nil {
 		return nil, err // the block was retrieved from local storage - so no errors are expected
 	}

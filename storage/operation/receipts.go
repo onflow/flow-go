@@ -1,48 +1,105 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertExecutionReceiptMeta inserts an execution receipt meta by ID.
-func InsertExecutionReceiptMeta(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) error {
+// InsertExecutionReceiptStub inserts a [flow.ExecutionReceiptStub] into the database, keyed by its ID.
+//
+// CAUTION: The caller must ensure receiptID is a collision-resistant hash of the provided
+// [flow.ExecutionReceiptMeta]! This method silently overrides existing data, which is safe only if
+// for the same key, we always write the same value.
+//
+// No error returns are expected during normal operation.
+func InsertExecutionReceiptStub(w storage.Writer, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return UpsertByKey(w, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// RetrieveExecutionReceiptMeta retrieves a execution receipt meta by ID.
-func RetrieveExecutionReceiptMeta(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) error {
+// RetrieveExecutionReceiptStub retrieves a [flow.ExecutionReceiptStub] by its ID.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no receipt stub with the specified ID is known.
+func RetrieveExecutionReceiptStub(r storage.Reader, receiptID flow.Identifier, meta *flow.ExecutionReceiptStub) error {
 	return RetrieveByKey(r, MakePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// IndexOwnExecutionReceipt inserts an execution receipt ID keyed by block ID
-func IndexOwnExecutionReceipt(w storage.Writer, blockID flow.Identifier, receiptID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeOwnBlockReceipt, blockID), receiptID)
+// IndexMyExecutionReceipt indexes the Execution Node's OWN execution receipt by the executed block ID.
+//
+// CAUTION: Persisting the receipt if and only if none is already stored for the block, requires an atomic database read and write.
+// Therefore, the caller must acquire [storage.LockInsertMyReceipt] and hold it until the database write has been committed.
+//
+// Error returns:
+//   - [storage.ErrDataMismatch] if a *different* receipt has already been indexed for the same block
+func IndexMyExecutionReceipt(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, receiptID flow.Identifier) error {
+	if !lctx.HoldsLock(storage.LockInsertMyReceipt) {
+		return fmt.Errorf("cannot index own execution receipt without holding lock %s", storage.LockInsertMyReceipt)
+	}
+
+	key := MakePrefix(codeOwnBlockReceipt, blockID)
+
+	var existing flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), key, &existing)
+	if err == nil {
+		if existing != receiptID {
+			return fmt.Errorf("own execution receipt for block %v already exists with different value, (existing: %v, new: %v), %w", blockID, existing, receiptID, storage.ErrDataMismatch)
+		}
+		return nil // The receipt already exists, no need to index again
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not check existing own execution receipt: %w", err)
+	}
+
+	return UpsertByKey(rw.Writer(), key, receiptID)
 }
 
-// LookupOwnExecutionReceipt finds execution receipt ID by block
+// LookupOwnExecutionReceipt retrieves the Execution Node's OWN execution receipt ID for the specified block.
+// Intended for Execution Node only. For every block executed by this node, this index should be populated.
+//
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if `blockID` does not refer to a block executed by this node
 func LookupOwnExecutionReceipt(r storage.Reader, blockID flow.Identifier, receiptID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeOwnBlockReceipt, blockID), receiptID)
 }
 
-// RemoveOwnExecutionReceipt removes own execution receipt index by blockID
+// RemoveOwnExecutionReceipt removes the Execution Node's OWN execution receipt index for the given block ID.
+// CAUTION: this is for recovery purposes only, and should not be used during normal operations!
+// It returns nil if the collection does not exist.
+//
+// No errors are expected during normal operation.
 func RemoveOwnExecutionReceipt(w storage.Writer, blockID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeOwnBlockReceipt, blockID))
 }
 
-// IndexExecutionReceipts inserts an execution receipt ID keyed by block ID and receipt ID.
-// one block could have multiple receipts, even if they are from the same executor
+// IndexExecutionReceipts adds the given execution receipts to the set of all known receipts for the
+// given block. It produces a mapping from block ID to the set of all known receipts for that block.
+// One block could have multiple receipts, even if they are from the same executor.
+//
+// This method is idempotent, and can be called repeatedly with the same block ID and receipt ID,
+// without the risk of data corruption.
+//
+// No errors are expected during normal operation.
 func IndexExecutionReceipts(w storage.Writer, blockID, receiptID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeAllBlockReceipts, blockID, receiptID), receiptID)
 }
 
-// LookupExecutionReceipts finds all execution receipts by block ID
+// LookupExecutionReceipts retrieves the set of all execution receipts for the specified block.
+// For every known block (at or above the root block height), this index should be populated
+// with all known receipts for that block.
+//
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupExecutionReceipts(r storage.Reader, blockID flow.Identifier, receiptIDs *[]flow.Identifier) error {
 	iterationFunc := receiptIterationFunc(receiptIDs)
 	return TraverseByPrefix(r, MakePrefix(codeAllBlockReceipts, blockID), iterationFunc, storage.DefaultIteratorOptions())
 }
 
-// receiptIterationFunc returns an in iteration function which returns all receipt IDs found during traversal
+// receiptIterationFunc returns an iteration function which collects all receipt IDs found during traversal.
 func receiptIterationFunc(receiptIDs *[]flow.Identifier) IterationFunc {
 	return func(keyCopy []byte, getValue func(destVal any) error) (bail bool, err error) {
 		var receiptID flow.Identifier

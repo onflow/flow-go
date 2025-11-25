@@ -89,7 +89,7 @@ func (te *EchoEngine) Process(channel channels.Channel, originID flow.Identifier
 	te.received <- struct{}{}
 
 	// asserting event as string
-	lip2pEvent, ok := (event).(*message.TestMessage)
+	lip2pEvent, ok := (event).(*flow.TestMessage)
 	require.True(te.t, ok, "could not assert event as TestMessage")
 
 	// checks for duplication

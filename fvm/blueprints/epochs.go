@@ -34,8 +34,8 @@ var fundAccountTemplate string
 var deployLockedTokensTemplate string
 
 // DeployEpochTransaction returns the transaction body for the deploy epoch transaction
-func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) (*flow.TransactionBody, error) {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
 				deployEpochTransactionTemplate,
@@ -44,6 +44,7 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				},
 			),
 		)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowEpoch"))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochConfig.CurrentEpochCounter)).
@@ -54,7 +55,8 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 		AddArgument(jsoncdc.MustEncode(epochConfig.FLOWsupplyIncreasePercentage)).
 		AddArgument(jsoncdc.MustEncode(epochConfig.RandomSource)).
 		AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters)).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // SetupAccountTransaction returns the transaction body for the setup account transaction
@@ -62,8 +64,8 @@ func SetupAccountTransaction(
 	fungibleToken flow.Address,
 	flowToken flow.Address,
 	accountAddress flow.Address,
-) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+) (*flow.TransactionBody, error) {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			templates.ReplaceAddresses(
 				setupAccountTemplate,
@@ -73,17 +75,21 @@ func SetupAccountTransaction(
 				},
 			),
 		)).
-		AddAuthorizer(accountAddress)
+		SetPayer(accountAddress).
+		AddAuthorizer(accountAddress).
+		Build()
 }
 
 // DeployIDTableStakingTransaction returns the transaction body for the deploy id table staking transaction
-func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) (*flow.TransactionBody, error) {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployIDTableStakingTransactionTemplate)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochTokenPayout)).
 		AddArgument(jsoncdc.MustEncode(rewardCut)).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // FundAccountTransaction returns the transaction body for the fund account transaction
@@ -92,14 +98,14 @@ func FundAccountTransaction(
 	fungibleToken flow.Address,
 	flowToken flow.Address,
 	nodeAddress flow.Address,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 
 	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", 2_000_000))
 	if err != nil {
 		panic(err)
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(
 			fundAccountTemplate,
 			templates.Environment{
@@ -107,20 +113,24 @@ func FundAccountTransaction(
 				FlowTokenAddress:     flowToken.Hex(),
 			},
 		))).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cdcAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // DeployLockedTokensTransaction returns the transaction body for the deploy locked tokens transaction
-func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) (*flow.TransactionBody, error) {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(
 			deployLockedTokensTemplate,
 		)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.NewArray(publicKeys))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // RegisterNodeTransaction creates a new node struct object.
@@ -198,8 +208,10 @@ func RegisterNodeTransaction(
 	}
 
 	// register node
-	return flow.NewTransactionBody().
+
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(templates.GenerateEpochRegisterNodeScript(env)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cdcNodeID)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(node.Role)))).
 		AddArgument(jsoncdc.MustEncode(cdcAddress)).
@@ -208,19 +220,27 @@ func RegisterNodeTransaction(
 		AddArgument(jsoncdc.MustEncode(cdcStakingKeyPoP)).
 		AddArgument(jsoncdc.MustEncode(cdcAmount)).
 		AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
-		AddAuthorizer(nodeAddress)
+		AddAuthorizer(nodeAddress).
+		Build()
+	if err != nil {
+		panic(err)
+	}
+
+	return txBody
 }
 
 // SetStakingAllowlistTransaction returns transaction body for set staking allowlist transaction
-func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNodeIDs []flow.Identifier) *flow.TransactionBody {
+func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNodeIDs []flow.Identifier) (*flow.TransactionBody, error) {
 	env := templates.Environment{
 		IDTableAddress: idTableStakingAddr.HexWithPrefix(),
 	}
 	allowedNodesArg := SetStakingAllowlistTxArg(allowedNodeIDs)
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
+		SetPayer(idTableStakingAddr).
 		AddArgument(jsoncdc.MustEncode(allowedNodesArg)).
-		AddAuthorizer(idTableStakingAddr)
+		AddAuthorizer(idTableStakingAddr).
+		Build()
 }
 
 // SetStakingAllowlistTxArg returns the transaction argument for setting the staking allow-list.

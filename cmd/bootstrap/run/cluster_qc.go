@@ -22,7 +22,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	if !allCommitteeMembers.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
 		return nil, fmt.Errorf("can't create root cluster QC: committee members are not sorted in canonical order")
 	}
-	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.Header)
+	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.ToHeader())
 
 	// STEP 1: create votes for cluster root block
 	votes, err := createRootBlockVotes(signers, clusterRootBlock)

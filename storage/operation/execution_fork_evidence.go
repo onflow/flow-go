@@ -1,6 +1,10 @@
 package operation
 
 import (
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -21,9 +25,31 @@ func RetrieveExecutionForkEvidence(r storage.Reader, conflictingSeals *[]*flow.I
 	return RetrieveByKey(r, MakePrefix(codeExecutionFork), conflictingSeals)
 }
 
-// InsertExecutionForkEvidence upserts conflicting seals to the database.
-// If a record already exists, it is overwritten; otherwise a new record is created.
+// RemoveExecutionForkEvidence deletes conflicting seals record from the database.
 // No errors are expected during normal operations.
-func InsertExecutionForkEvidence(w storage.Writer, conflictingSeals []*flow.IncorporatedResultSeal) error {
-	return UpsertByKey(w, MakePrefix(codeExecutionFork), conflictingSeals)
+func RemoveExecutionForkEvidence(w storage.Writer) error {
+	return RemoveByKey(w, MakePrefix(codeExecutionFork))
+}
+
+// InsertExecutionForkEvidence upserts conflicting seals to the database.
+// If a record already exists, it is NOT overwritten, the new record is ignored.
+// The caller must hold the [storage.LockInsertExecutionForkEvidence] lock.
+// No errors are expected during normal operations.
+func InsertExecutionForkEvidence(lctx lockctx.Proof, rw storage.ReaderBatchWriter, conflictingSeals []*flow.IncorporatedResultSeal) error {
+	if !lctx.HoldsLock(storage.LockInsertExecutionForkEvidence) {
+		return fmt.Errorf("InsertExecutionForkEvidence requires LockInsertExecutionForkEvidence to be held")
+	}
+	key := MakePrefix(codeExecutionFork)
+	exist, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return fmt.Errorf("failed to check if execution fork evidence exists: %w", err)
+	}
+
+	if exist {
+		// Some evidence about execution fork already stored;
+		// We only keep the first evidence => nothing more to do
+		return nil
+	}
+
+	return UpsertByKey(rw.Writer(), key, conflictingSeals)
 }

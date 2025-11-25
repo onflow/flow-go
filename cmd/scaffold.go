@@ -12,7 +12,6 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
-	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -78,14 +77,11 @@ import (
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/dbops"
-	"github.com/onflow/flow-go/storage/locks"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -171,11 +167,14 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol database")
+
+	var rejectPebbleDir rejectPebbleDirValue
+	fnb.flags.VarP(rejectPebbleDir, "pebble-dir", "", "DEPRECATED")
+	_ = fnb.flags.MarkHidden("pebble-dir")
+
 	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
-	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
-	fnb.flags.StringVar(&fnb.BaseConfig.DBOps, "dbops", defaultConfig.DBOps, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -286,6 +285,17 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"Disables calling the transaction fee deduction. This is only for testing purposes. To disable fees on a network it is better to set the fee price to 0.0 .")
 }
 
+// TODO: remove after mainnet27 spork
+// this struct is to reject the deprecated --pebble-dir flag
+type rejectPebbleDirValue struct{}
+
+func (rejectPebbleDirValue) String() string { return "" }
+func (rejectPebbleDirValue) Set(string) error {
+	return fmt.Errorf("the --pebble-dir flag is deprecated. Please remove the flag.  " +
+		"Database will be stored in the location pointed by the --datadir flag which defaults to /data/protocol if not specified.")
+}
+func (rejectPebbleDirValue) Type() string { return "string" }
+
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		pingLibP2PProtocolID := protocols.PingProtocolId(node.SporkID)
@@ -293,7 +303,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		var hotstuffViewFunc func() (uint64, error)
 		// Setup consensus nodes to report their HotStuff view
 		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			hotstuffReader, err := persister.NewReader(node.ProtocolDB, node.RootChainID)
+			hotstuffReader, err := persister.NewReader(node.ProtocolDB, node.RootChainID, node.StorageLockMgr)
 			if err != nil {
 				return nil, err
 			}
@@ -1084,95 +1094,27 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) initBadgerDB() error {
-	// if the badger DB is already set, use it.
-	// the badger DB might be set by the follower engine
-	if fnb.BaseConfig.badgerDB != nil {
-		fnb.DB = fnb.BaseConfig.badgerDB
+// create protocol protocol db
+func (fnb *FlowNodeBuilder) initProtocolDB() error {
+	// if the protocol DB is already set, use it
+	// the protocol DB might be set by the follower engine
+	if fnb.BaseConfig.protocolDB != nil {
+		fnb.ProtocolDB = fnb.BaseConfig.protocolDB
 		return nil
 	}
 
-	// if the badger DB is not set, then the datadir must be provided to initialize
-	// the badger DB
-	// since we've set an default directory for the badger DB, this check
-	// is not necessary, but rather a sanity check
-	if fnb.BaseConfig.datadir == NotSet {
-		return fmt.Errorf("missing required flag '--datadir'")
-	}
-
-	// Pre-create DB path (Badger creates only one-level dirs)
-	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
-	if err != nil {
-		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
-	}
-
-	// we initialize the database with options that allow us to keep the maximum
-	// item size in the trie itself (up to 1MB) and where we keep all level zero
-	// tables in-memory as well; this slows down compaction and increases memory
-	// usage, but it improves overall performance and disk i/o
-	opts := badger.
-		DefaultOptions(fnb.BaseConfig.datadir).
-		WithKeepL0InMemory(true).
-		WithLogger(sutil.NewLogger(fnb.Logger.With().Str("badgerdb", "protocol").Logger())).
-
-		// the ValueLogFileSize option specifies how big the value of a
-		// key-value pair is allowed to be saved into badger.
-		// exceeding this limit, will fail with an error like this:
-		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-		// Maximum value size is 10G, needed by execution node
-		// TODO: finding a better max value for each node type
-		WithValueLogFileSize(128 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-
-	publicDB, err := bstorage.InitPublic(opts)
-	if err != nil {
-		return fmt.Errorf("could not open public db: %w", err)
-	}
-	fnb.DB = publicDB
-
-	fnb.ShutdownFunc(func() error {
-		if err := publicDB.Close(); err != nil {
-			return fmt.Errorf("error closing protocol database: %w", err)
-		}
-		return nil
-	})
-
-	fnb.Component("badger log cleaner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
-	})
-
-	return nil
-}
-
-func (fnb *FlowNodeBuilder) initPebbleDB() error {
-	// if the pebble DB is already set, use it
-	// the pebble DB might be set by the follower engine
-	if fnb.BaseConfig.pebbleDB != nil {
-		fnb.PebbleDB = fnb.BaseConfig.pebbleDB
-		return nil
-	}
-
-	db, closer, err := scaffold.InitPebbleDB(fnb.Logger.With().Str("pebbledb", "protocol").Logger(), fnb.BaseConfig.pebbleDir)
+	pebbleDB, closer, err := scaffold.InitPebbleDB(fnb.Logger.With().Str("pebbledb", "protocol").Logger(), fnb.BaseConfig.datadir)
 	if err != nil {
 		return err
 	}
 
-	fnb.PebbleDB = db
-	fnb.ShutdownFunc(closer.Close)
-	return nil
-}
+	fnb.AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
+		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", pebbleDB)
+	})
 
-// create protocol db according to the badger or pebble db
-func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
-	if dbops.IsBadgerBased(fnb.DBOps) {
-		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
-		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
-	} else if dbops.IsPebbleBatch(fnb.DBOps) {
-		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
-		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
-	} else {
-		return fmt.Errorf(dbops.UsageErrMsg, fnb.DBOps)
-	}
+	fnb.ProtocolDB = pebbleimpl.ToDB(pebbleDB)
+	fnb.ShutdownFunc(closer.Close)
 	return nil
 }
 
@@ -1240,40 +1182,30 @@ func (fnb *FlowNodeBuilder) initStorageLockManager() error {
 		return nil
 	}
 
-	fnb.StorageLockMgr = locks.SingletonLockManager()
+	fnb.StorageLockMgr = storage.MakeSingletonLockManager()
 	return nil
 }
 
 func (fnb *FlowNodeBuilder) initStorage() error {
-
-	// in order to void long iterations with big keys when initializing with an
-	// already populated database, we bootstrap the initial maximum key size
-	// upon starting
-	err := operation.RetryOnConflict(fnb.DB.Update, func(tx *badger.Txn) error {
-		return operation.InitMax(tx)
-	})
-	if err != nil {
-		return fmt.Errorf("could not initialize max tracker: %w", err)
-	}
-
-	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
-	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
-	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
-	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
-	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
-	qcs := bstorage.NewQuorumCertificates(fnb.Metrics.Cache, fnb.DB, bstorage.DefaultCacheSize)
-	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
-	collections := bstorage.NewCollections(fnb.DB, transactions)
-	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
-	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
-		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
-	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
-		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
+	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB)
+	guarantees := store.NewGuarantees(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.BaseConfig.guaranteesCacheSize,
+		store.DefaultCacheSize)
+	seals := store.NewSeals(fnb.Metrics.Cache, fnb.ProtocolDB)
+	results := store.NewExecutionResults(fnb.Metrics.Cache, fnb.ProtocolDB)
+	receipts := store.NewExecutionReceipts(fnb.Metrics.Cache, fnb.ProtocolDB, results, fnb.BaseConfig.receiptsCacheSize)
+	index := store.NewIndex(fnb.Metrics.Cache, fnb.ProtocolDB)
+	payloads := store.NewPayloads(fnb.ProtocolDB, index, guarantees, seals, receipts, results)
+	blocks := store.NewBlocks(fnb.ProtocolDB, headers, payloads)
+	qcs := store.NewQuorumCertificates(fnb.Metrics.Cache, fnb.ProtocolDB, store.DefaultCacheSize)
+	transactions := store.NewTransactions(fnb.Metrics.Cache, fnb.ProtocolDB)
+	collections := store.NewCollections(fnb.ProtocolDB, transactions)
+	setups := store.NewEpochSetups(fnb.Metrics.Cache, fnb.ProtocolDB)
+	epochCommits := store.NewEpochCommits(fnb.Metrics.Cache, fnb.ProtocolDB)
+	protocolState := store.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.ProtocolDB,
+		store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
+	protocolKVStores := store.NewProtocolKVStore(fnb.Metrics.Cache, fnb.ProtocolDB,
+		store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := store.NewVersionBeacons(fnb.ProtocolDB)
 
 	fnb.Storage = Storage{
 		Headers:                   headers,
@@ -1368,7 +1300,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 func (fnb *FlowNodeBuilder) initState() error {
 	fnb.ProtocolEvents = events.NewDistributor()
 
-	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
+	isBootStrapped, err := badgerState.IsBootstrapped(fnb.ProtocolDB)
 	if err != nil {
 		return fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}
@@ -1377,7 +1309,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.Logger.Info().Msg("opening already bootstrapped protocol state")
 		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
-			fnb.DB,
+			fnb.ProtocolDB,
+			fnb.StorageLockMgr,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -1426,7 +1359,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
-			fnb.DB,
+			fnb.ProtocolDB,
+			fnb.StorageLockMgr,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -1448,9 +1382,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
 			Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 			Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 			Msg("protocol state bootstrapped")
 	}
 
@@ -1478,9 +1412,9 @@ func (fnb *FlowNodeBuilder) initState() error {
 		Hex("last_sealed_block_id", logging.Entity(lastSealed)).
 		Uint64("last_sealed_block_height", lastSealed.Height).
 		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Height).
 		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
-		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
+		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Height).
 		Msg("successfully opened protocol state")
 
 	return nil
@@ -1491,7 +1425,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	var err error
 
 	// validate the root snapshot QCs
-	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	err = datastore.IsValidRootSnapshotQCs(rootSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}
@@ -1523,7 +1457,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
+	fnb.RootChainID = fnb.FinalizedRootBlock.ChainID
 	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
@@ -1970,12 +1904,12 @@ func WithBindAddress(bindAddress string) Option {
 	}
 }
 
-// WithDataDir set the data directory for the badger database
-// It will be ignored if WithBadgerDB is used
-func WithDataDir(dataDir string) Option {
+// WithProtocolDir set the protocol data directory for the database
+// It will be ignored if WithProtocolDB is used
+func WithProtocolDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		if config.badgerDB != nil {
-			log.Warn().Msgf("ignoring data directory %s as badger database is already set", dataDir)
+		if config.protocolDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as storage database is already set", dataDir)
 			return
 		}
 
@@ -1983,42 +1917,16 @@ func WithDataDir(dataDir string) Option {
 	}
 }
 
-// WithBadgerDB sets the badger database instance
+// WithProtocolDB sets the storage database instance
 // If used, then WithDataDir method will be ignored
-func WithBadgerDB(db *badger.DB) Option {
+func WithProtocolDB(db storage.DB) Option {
 	return func(config *BaseConfig) {
 		if config.datadir != "" && config.datadir != NotSet {
 			log.Warn().Msgf("ignoring data directory is already set for badger %v", config.datadir)
 			config.datadir = ""
 		}
 
-		config.badgerDB = db
-	}
-}
-
-// WithPebbleDir set the data directory for the pebble database
-// It will be ignored if WithPebbleDB is used
-func WithPebbleDir(dataDir string) Option {
-	return func(config *BaseConfig) {
-		if config.pebbleDB != nil {
-			log.Warn().Msgf("ignoring data directory %s as pebble database is already set", dataDir)
-			return
-		}
-
-		config.pebbleDir = dataDir
-	}
-}
-
-// WithPebbleDB sets the pebble database instance
-// If used, then WithPebbleDir method will be ignored
-func WithPebbleDB(db *pebble.DB) Option {
-	return func(config *BaseConfig) {
-		if config.pebbleDir != "" && config.pebbleDir != NotSet {
-			log.Warn().Msgf("ignoring data directory is already set for pebble %v", config.pebbleDir)
-			config.pebbleDir = ""
-		}
-
-		config.pebbleDB = db
+		config.protocolDB = db
 	}
 }
 
@@ -2126,9 +2034,6 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetIdentityCommand(config.IdentityProvider)
-	}).AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
-		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
-		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", config.PebbleDB)
 	})
 }
 
@@ -2164,17 +2069,7 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
-	// we always initialize both badger and pebble databases
-	// even if we only use one of them, this simplify the code and checks
-	if err := fnb.initBadgerDB(); err != nil {
-		return err
-	}
-
-	if err := fnb.initPebbleDB(); err != nil {
-		return err
-	}
-
-	if err := fnb.initProtocolDB(fnb.DB, fnb.PebbleDB); err != nil {
+	if err := fnb.initProtocolDB(); err != nil {
 		return err
 	}
 

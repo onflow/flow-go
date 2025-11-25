@@ -1,21 +1,23 @@
 package evm_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -83,20 +85,23 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -179,7 +184,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -200,6 +205,8 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
+				require.Equal(t, uint64(23_520), res.GasConsumed)
+				require.Equal(t, uint64(23_520), res.MaxGasConsumed)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
@@ -244,20 +251,23 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -291,7 +301,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -353,20 +363,23 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -435,20 +448,23 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -518,20 +534,23 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -557,6 +576,190 @@ func TestEVMRun(t *testing.T) {
 				)
 			},
 		)
+	})
+
+	t.Run("testing EVM.run failed with gas limit validation error", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+							assert(res.status == EVM.Status.invalid, message: "unexpected status")
+							assert(res.errorCode == 100, message: "unexpected error code: \(res.errorCode)")
+							assert(res.errorMessage == "transaction gas limit too high (cap: 16777216, tx: 16777220)")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				num := int64(12)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(16_777_220), // max is 16,777,216
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// assert no events were produced from an invalid EVM transaction
+				require.Len(t, output.Events, 0)
+			})
+	})
+
+	t.Run("testing EVM.run with max gas limit cap", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code: \(res.errorCode)")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				num := int64(12)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(16_777_216),
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				snapshot = snapshot.Append(state)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+
+				// fee transfer event
+				feeTransferEvent := output.Events[1]
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+
+				// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(64785), blockEventPayload.TotalGasUsed)
+				require.NotEmpty(t, blockEventPayload.Hash)
+
+				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
+				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
+
+				require.Equal(t, innerTxBytes, txEventPayload.Payload)
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
+				require.Empty(t, txEventPayload.ContractAddress)
+			})
 	})
 }
 
@@ -618,12 +821,12 @@ func TestEVMBatchRun(t *testing.T) {
 
 					// build txs argument
 					txBytes[i] = cadence.NewArray(
-						ConvertToCadence(tx),
+						unittest.BytesToCdcUInt8(tx),
 					).WithType(stdlib.EVMTransactionBytesCadenceType)
 				}
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(coinbaseAddr.Bytes()),
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -631,13 +834,16 @@ func TestEVMBatchRun(t *testing.T) {
 						stdlib.EVMTransactionBytesCadenceType,
 					))
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(batchRunCode).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(txs)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(ctx, tx, snapshot)
 				require.NoError(t, err)
@@ -724,7 +930,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(retrieveCode).WithArguments(
@@ -813,12 +1019,12 @@ func TestEVMBatchRun(t *testing.T) {
 
 					// build txs argument
 					txBytes[i] = cadence.NewArray(
-						ConvertToCadence(tx),
+						unittest.BytesToCdcUInt8(tx),
 					).WithType(stdlib.EVMTransactionBytesCadenceType)
 				}
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -826,13 +1032,16 @@ func TestEVMBatchRun(t *testing.T) {
 						stdlib.EVMTransactionBytesCadenceType,
 					))
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(batchRunCode).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(txs)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(ctx, tx, snapshot)
 				require.NoError(t, err)
@@ -864,7 +1073,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(retrieveCode).WithArguments(
@@ -957,12 +1166,12 @@ func TestEVMBatchRun(t *testing.T) {
 
 					// build txs argument
 					txBytes[i] = cadence.NewArray(
-						ConvertToCadence(tx),
+						unittest.BytesToCdcUInt8(tx),
 					).WithType(stdlib.EVMTransactionBytesCadenceType)
 				}
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -970,12 +1179,15 @@ func TestEVMBatchRun(t *testing.T) {
 						stdlib.EVMTransactionBytesCadenceType,
 					))
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(batchRunCode).
-						AddArgument(json.MustEncode(txs)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(ctx, tx, snapshot)
 
@@ -1008,7 +1220,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				script := fvm.Script(retrieveCode).WithArguments(
@@ -1031,6 +1243,89 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
+			})
+	})
+
+	// run a batch of two transactions. The sum of their gas usage would overflow an uint46
+	// so the batch run should fail with an overflow error.
+	t.Run("Batch run evm gas overflow", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						execute {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				batchCount := 2
+				txBytes := make([]cadence.Value, batchCount)
+
+				tx := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "storeWithLog", big.NewInt(0)),
+					big.NewInt(0),
+					uint64(200_000),
+					big.NewInt(1),
+				)
+
+				txBytes[0] = cadence.NewArray(
+					unittest.BytesToCdcUInt8(tx),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				tx = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "storeWithLog", big.NewInt(1)),
+					big.NewInt(0),
+					math.MaxUint64-uint64(100_000),
+					big.NewInt(1),
+				)
+
+				txBytes[1] = cadence.NewArray(
+					unittest.BytesToCdcUInt8(tx),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				state, output, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(t, output.Err, "insufficient computation")
+				require.Empty(t, state.WriteSet)
 			})
 	})
 }
@@ -1070,11 +1365,11 @@ func TestEVMBlockData(t *testing.T) {
 			)
 
 			coinbase := cadence.NewArray(
-				ConvertToCadence(testAccount.Address().Bytes()),
+				unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 			).WithType(stdlib.EVMAddressBytesCadenceType)
 
 			innerTx := cadence.NewArray(
-				ConvertToCadence(innerTxBytes),
+				unittest.BytesToCdcUInt8(innerTxBytes),
 			).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 			script := fvm.Script(code).WithArguments(
@@ -1094,7 +1389,7 @@ func TestEVMBlockData(t *testing.T) {
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 			require.Empty(t, res.ErrorMessage)
-			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedData).Int64())
+			require.Equal(t, ctx.BlockHeader.Timestamp/1000, new(big.Int).SetBytes(res.ReturnedData).Uint64()) // EVM reports block time as Unix time in seconds
 
 		})
 }
@@ -1138,14 +1433,17 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			addr := RandomAddress(t)
 
-			tx := fvm.Transaction(
-				flow.NewTransactionBody().
-					SetScript(code).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(json.MustEncode(cadence.NewArray(
-						ConvertToCadence(addr.Bytes()),
-					).WithType(stdlib.EVMAddressBytesCadenceType))),
-				0)
+			txBody, err := flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(cadence.NewArray(
+					unittest.BytesToCdcUInt8(addr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType))).
+				Build()
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
 
 			execSnap, output, err := vm.Run(
 				ctx,
@@ -1337,11 +1635,14 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.FlowToken.Address.HexWithPrefix(),
 				))
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				_, output, err := vm.Run(
 					ctx,
@@ -1416,7 +1717,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				))
 
 				addr := cadence.NewArray(
-					ConvertToCadence(RandomAddress(t).Bytes()),
+					unittest.BytesToCdcUInt8(RandomAddress(t).Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -1528,7 +1829,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				script := fvm.Script(code).
 					WithArguments(json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(testContract.ByteCode),
+							unittest.BytesToCdcUInt8(testContract.ByteCode),
 						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 					))
 
@@ -1590,20 +1891,23 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -1663,23 +1967,25 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				data := json.MustEncode(
 					cadence.NewArray(
-						ConvertToCadence(testContract.MakeCallData(t, "retrieve")),
+						unittest.BytesToCdcUInt8(testContract.MakeCallData(t, "retrieve")),
 					).WithType(stdlib.EVMTransactionBytesCadenceType),
 				)
 				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
 				require.NoError(t, err)
 				to := json.MustEncode(toAddress)
 
-				tx = fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(data).
-						AddArgument(to).
-						AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
-						AddArgument(json.MustEncode(cadence.NewUInt(0))),
-					0,
-				)
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(data).
+					AddArgument(to).
+					AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
+					AddArgument(json.MustEncode(cadence.NewUInt(0))).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
 
 				state, output, err = vm.Run(
 					ctx,
@@ -1690,6 +1996,134 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 0)
 				assert.Len(t, state.UpdatedRegisterIDs(), 0)
+			})
+	})
+
+	t.Run("test coa deploy with max gas limit cap", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					import FlowToken from %s
+					access(all)
+					fun main(code: [UInt8]): EVM.Result {
+						let admin = getAuthAccount<auth(Storage) &Account>(%s)
+							.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
+						let res = cadenceOwnedAccount.deploy(
+							code: code,
+							gasLimit: 16_777_216,
+							value: EVM.Balance(attoflow: 1230000000000000000)
+						)
+						destroy cadenceOwnedAccount
+						return res
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code).
+					WithArguments(json.MustEncode(
+						cadence.NewArray(
+							unittest.BytesToCdcUInt8(testContract.ByteCode),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+					))
+
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
+				require.NotNil(t, res.DeployedContractAddress)
+				// we strip away first few bytes because they contain deploy code
+				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedData))
+			})
+	})
+
+	t.Run("test coa deploy with bigger than max gas limit cap", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					import FlowToken from %s
+					access(all)
+					fun main(code: [UInt8]): EVM.Result {
+						let admin = getAuthAccount<auth(Storage) &Account>(%s)
+							.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
+						let res = cadenceOwnedAccount.deploy(
+							code: code,
+							gasLimit: 16_777_226,
+							value: EVM.Balance(attoflow: 1230000000000000000)
+						)
+						destroy cadenceOwnedAccount
+						return res
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code).
+					WithArguments(json.MustEncode(
+						cadence.NewArray(
+							unittest.BytesToCdcUInt8(testContract.ByteCode),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+					))
+
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusInvalid, res.Status)
+				require.Equal(t, types.ValidationErrCodeMisc, res.ErrorCode)
+				require.Equal(
+					t,
+					"transaction gas limit too high (cap: 16777216, tx: 16777226)",
+					res.ErrorMessage,
+				)
+				require.Nil(t, res.DeployedContractAddress)
+				// we strip away first few bytes because they contain deploy code
+				require.Empty(t, []byte(res.ReturnedData))
 			})
 	})
 }
@@ -1726,7 +2160,7 @@ func TestDryRun(t *testing.T) {
 		script := fvm.Script(code).WithArguments(
 			json.MustEncode(
 				cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType),
 			),
 		)
@@ -1754,7 +2188,8 @@ func TestDryRun(t *testing.T) {
 			) {
 				data := testContract.MakeCallData(t, "store", big.NewInt(1337))
 
-				limit := uint64(math.MaxUint64 - 1)
+				// EVM.dryRun must not be limited by the `gethParams.MaxTxGas`
+				limit := gethParams.MaxTxGas + 1_000
 				tx := gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
@@ -1833,11 +2268,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -1898,20 +2333,23 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				_, output, err := vm.Run(
 					ctx,
@@ -1960,11 +2398,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase = cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2024,20 +2462,23 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -2086,11 +2527,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx = cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase = cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2163,11 +2604,11 @@ func TestDryRun(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2281,7 +2722,7 @@ func TestDryCall(t *testing.T) {
 		script := fvm.Script(code).WithArguments(
 			json.MustEncode(
 				cadence.NewArray(
-					ConvertToCadence(tx.Data()),
+					unittest.BytesToCdcUInt8(tx.Data()),
 				).WithType(stdlib.EVMTransactionBytesCadenceType),
 			),
 			json.MustEncode(toAddress),
@@ -2343,6 +2784,22 @@ func TestDryCall(t *testing.T) {
 				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
 				require.Equal(t, types.StatusFailed, result.Status)
 				require.Equal(t, result.GasConsumed, limit)
+
+				// EVM.dryCall must not be limited to `gethParams.MaxTxGas`
+				limit = gethParams.MaxTxGas + 1_000
+				tx = gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					limit,
+					big.NewInt(0),
+					data,
+				)
+				result, _ = dryCall(t, tx, ctx, vm, snapshot)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+				require.Less(t, result.GasConsumed, limit)
 			})
 	})
 
@@ -2383,20 +2840,23 @@ func TestDryCall(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(innerTx)).
-						AddArgument(json.MustEncode(coinbase)),
-					0)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
 
 				state, output, err := vm.Run(
 					ctx,
@@ -2444,23 +2904,25 @@ func TestDryCall(t *testing.T) {
 
 				data := json.MustEncode(
 					cadence.NewArray(
-						ConvertToCadence(testContract.MakeCallData(t, "retrieve")),
+						unittest.BytesToCdcUInt8(testContract.MakeCallData(t, "retrieve")),
 					).WithType(stdlib.EVMTransactionBytesCadenceType),
 				)
 				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
 				require.NoError(t, err)
 				to := json.MustEncode(toAddress)
 
-				tx = fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(code).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(data).
-						AddArgument(to).
-						AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
-						AddArgument(json.MustEncode(cadence.NewUInt(0))),
-					0,
-				)
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(data).
+					AddArgument(to).
+					AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
+					AddArgument(json.MustEncode(cadence.NewUInt(0))).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
 
 				state, output, err = vm.Run(
 					ctx,
@@ -2524,11 +2986,11 @@ func TestDryCall(t *testing.T) {
 				)
 
 				innerTx := cadence.NewArray(
-					ConvertToCadence(innerTxBytes),
+					unittest.BytesToCdcUInt8(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -2634,12 +3096,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2687,12 +3149,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2737,12 +3199,13 @@ func TestCadenceArch(t *testing.T) {
 				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
 				// since doing this automatically would require a block computer and whole execution setup
 				height := uint64(1)
-				block1 := unittest.BlockFixture()
-				block1.Header.Height = height
-				ctx.BlockHeader = block1.Header
+				block1 := unittest.BlockFixture(
+					unittest.Block.WithHeight(height),
+				)
+				ctx.BlockHeader = block1.ToHeader()
 				ctx.EntropyProvider = testutil.EntropyProviderFixture(entropy) // fix the entropy
 
-				txBody := flow.NewTransactionBody().
+				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(fmt.Sprintf(`
 						import RandomBeaconHistory from %s
 
@@ -2755,7 +3218,10 @@ func TestCadenceArch(t *testing.T) {
 							}
 						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
 					).
-					AddAuthorizer(sc.FlowServiceAccount.Address)
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					Build()
+				require.NoError(t, err)
 
 				s, out, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
 				require.NoError(t, err)
@@ -2780,8 +3246,8 @@ func TestCadenceArch(t *testing.T) {
 
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
-				block1.Header.Height = 2
-				ctx.BlockHeader = block1.Header
+				block1.Height = 2
+				ctx.BlockHeader = block1.ToHeader()
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -2793,12 +3259,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2834,11 +3300,12 @@ func TestCadenceArch(t *testing.T) {
 				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
 				// since doing this automatically would require a block computer and whole execution setup
 				height := uint64(1)
-				block1 := unittest.BlockFixture()
-				block1.Header.Height = height
-				ctx.BlockHeader = block1.Header
+				block1 := unittest.BlockFixture(
+					unittest.Block.WithHeight(height),
+				)
+				ctx.BlockHeader = block1.ToHeader()
 
-				txBody := flow.NewTransactionBody().
+				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(fmt.Sprintf(`
 						import RandomBeaconHistory from %s
 
@@ -2851,7 +3318,10 @@ func TestCadenceArch(t *testing.T) {
 							}
 						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
 					).
-					AddAuthorizer(sc.FlowServiceAccount.Address)
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					Build()
+				require.NoError(t, err)
 
 				s, out, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
 				require.NoError(t, err)
@@ -2876,8 +3346,8 @@ func TestCadenceArch(t *testing.T) {
 
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
-				block1.Header.Height = 2
-				ctx.BlockHeader = block1.Header
+				block1.Height = 2
+				ctx.BlockHeader = block1.ToHeader()
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -2889,12 +3359,12 @@ func TestCadenceArch(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(testAccount.Address().Bytes()),
+							unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
 						).WithType(stdlib.EVMAddressBytesCadenceType),
 					),
 				)
@@ -2987,13 +3457,13 @@ func TestCadenceArch(t *testing.T) {
 				verifyScript := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(
 							stdlib.EVMTransactionBytesCadenceType,
 						)),
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(
+							unittest.BytesToCdcUInt8(
 								testAccount.Address().Bytes(),
 							),
 						).WithType(
@@ -3035,13 +3505,13 @@ func TestCadenceArch(t *testing.T) {
 				verifyScript = fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(innerTxBytes),
+							unittest.BytesToCdcUInt8(innerTxBytes),
 						).WithType(
 							stdlib.EVMTransactionBytesCadenceType,
 						)),
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(
+							unittest.BytesToCdcUInt8(
 								testAccount.Address().Bytes(),
 							),
 						).WithType(
@@ -3057,6 +3527,277 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 			})
+	})
+}
+
+func TestNativePrecompiles(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+
+	t.Run("testing out of gas precompile call", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.failed, message: "unexpected status")
+							assert(res.errorCode == 301, message: "unexpected error code: \(res.errorCode)")
+							assert(res.errorMessage == "out of gas", message: "unexpected error message: \(res.errorMessage)")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				// The address below is the latest precompile on the Prague hard-fork:
+				// https://github.com/ethereum/go-ethereum/blob/v1.16.3/core/vm/contracts.go#L140 .
+				to := common.HexToAddress("0x00000000000000000000000000000000000000011")
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					to,
+					nil,
+					big.NewInt(1_000_000),
+					uint64(21_000),
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.Equal(t, uint16(types.ExecutionErrCodeOutOfGas), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, uint64(21000), txEventPayload.GasConsumed)
+				require.NoError(t, err)
+			})
+	})
+}
+
+func TestEVMFileSystemContract(t *testing.T) {
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	runFileSystemContract := func(
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+		testAccount *EOATestAccount,
+		computeLimit uint64,
+	) (
+		*snapshot.ExecutionSnapshot,
+		fvm.ProcedureOutput,
+	) {
+		code := []byte(fmt.Sprintf(
+			`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+						}
+					}
+					`,
+			sc.EVMContract.Address.HexWithPrefix(),
+		))
+
+		coinbaseAddr := types.Address{1, 2, 3}
+		coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+		require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+		var buffer bytes.Buffer
+		address := common.HexToAddress("0xea02F564664A477286B93712829180be4764fAe2")
+		chunkHash := "0x2521660d04da85198d1cc71c20a69b7e875ebbf1682f6a5c6a3fec69068ccc13"
+		index := int64(0)
+		chunk := "T1ARYBYsPOJPVYoU7wVp+PYuXmdS6bgkLf2egcxa+1hP64wAxfkLXtnllU6DmEuj+Id4oWl1ZV4ftQ+ofQ3DQhOoxNlPZGOYbhoMLuzE"
+		for i := 0; i <= 500; i++ {
+			buffer.WriteString(chunk)
+		}
+		innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+			testContract.DeployedAt.ToCommon(),
+			testContract.MakeCallData(
+				t,
+				"publishChunk",
+				address,
+				chunkHash,
+				big.NewInt(index),
+				buffer.String(),
+			),
+			big.NewInt(0),
+			uint64(2_132_171),
+			big.NewInt(1),
+		)
+
+		innerTx := cadence.NewArray(
+			unittest.BytesToCdcUInt8(innerTxBytes),
+		).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+		coinbase := cadence.NewArray(
+			unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+		).WithType(stdlib.EVMAddressBytesCadenceType)
+
+		txBody, err := flow.NewTransactionBodyBuilder().
+			SetScript(code).
+			SetComputeLimit(computeLimit).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			AddArgument(json.MustEncode(innerTx)).
+			AddArgument(json.MustEncode(coinbase)).
+			Build()
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(
+			txBody,
+			0,
+		)
+
+		state, output, err := vm.Run(ctx, tx, snapshot)
+		require.NoError(t, err)
+		return state, output
+	}
+
+	t.Run("happy case", func(t *testing.T) {
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFileSystemContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 10001)
+
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				snapshot = snapshot.Append(state)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+
+				// fee transfer event
+				feeTransferEvent := output.Events[1]
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				//
+				//// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+				//
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(2_132_170), blockEventPayload.TotalGasUsed)
+
+				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
+				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
+
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
+				require.Empty(t, txEventPayload.ContractAddress)
+
+				require.Greater(t, int(output.ComputationUsed), 900)
+			},
+			fvm.WithExecutionEffortWeights(
+				environment.MainnetExecutionEffortWeights,
+			),
+		)
+	})
+
+	t.Run("insufficient FVM computation to execute EVM transaction", func(t *testing.T) {
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFileSystemContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				state, output := runFileSystemContract(ctx, vm, snapshot, testContract, testAccount, 500)
+				snapshot = snapshot.Append(state)
+
+				require.Len(t, output.Events, 0)
+
+				//// commit block
+				blockEventPayload, _ := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+				//
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(0), blockEventPayload.TotalGasUsed)
+
+				// only a small amount of computation was used due to the EVM transaction never being executed
+				require.Less(t, int(output.ComputationUsed), 900)
+			},
+			fvm.WithExecutionEffortWeights(
+				environment.MainnetExecutionEffortWeights,
+			),
+		)
 	})
 }
 
@@ -3107,11 +3848,14 @@ func createAndFundFlowAccount(
 		flowAccount.HexWithPrefix(),
 	))
 
-	tx := fvm.Transaction(
-		flow.NewTransactionBody().
-			SetScript(code).
-			AddAuthorizer(sc.FlowServiceAccount.Address),
-		0)
+	txBody, err := flow.NewTransactionBodyBuilder().
+		SetScript(code).
+		SetPayer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		Build()
+	require.NoError(t, err)
+
+	tx := fvm.Transaction(txBody, 0)
 
 	es, output, err := vm.Run(ctx, tx, snapshot)
 	require.NoError(t, err)
@@ -3176,12 +3920,15 @@ func setupCOA(
 		sc.FlowToken.Address.HexWithPrefix(),
 	))
 
-	tx := fvm.Transaction(
-		flow.NewTransactionBody().
-			SetScript(script).
-			AddAuthorizer(coaOwner).
-			AddArgument(json.MustEncode(cadence.UFix64(initialFund))),
-		0)
+	txBody, err := flow.NewTransactionBodyBuilder().
+		SetScript(script).
+		SetPayer(coaOwner).
+		AddAuthorizer(coaOwner).
+		AddArgument(json.MustEncode(cadence.UFix64(initialFund))).
+		Build()
+	require.NoError(t, err)
+
+	tx := fvm.Transaction(txBody, 0)
 	es, output, err := vm.Run(ctx, tx, snap)
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
@@ -3216,11 +3963,14 @@ func callEVMHeartBeat(
 	`,
 		sc.EVMContract.Address.HexWithPrefix(),
 	))
-	tx := fvm.Transaction(
-		flow.NewTransactionBody().
-			SetScript(heartBeatCode).
-			AddAuthorizer(sc.FlowServiceAccount.Address),
-		0)
+	txBody, err := flow.NewTransactionBodyBuilder().
+		SetScript(heartBeatCode).
+		SetPayer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		Build()
+	require.NoError(t, err)
+
+	tx := fvm.Transaction(txBody, 0)
 
 	state, output, err := vm.Run(ctx, tx, snap)
 	require.NoError(t, err)
@@ -3285,7 +4035,7 @@ func getEVMAccountBalance(
 	script := fvm.Script(code).WithArguments(
 		json.MustEncode(
 			cadence.NewArray(
-				ConvertToCadence(address.Bytes()),
+				unittest.BytesToCdcUInt8(address.Bytes()),
 			).WithType(stdlib.EVMAddressBytesCadenceType),
 		),
 	)
@@ -3323,7 +4073,7 @@ func getEVMAccountNonce(
 	script := fvm.Script(code).WithArguments(
 		json.MustEncode(
 			cadence.NewArray(
-				ConvertToCadence(address.Bytes()),
+				unittest.BytesToCdcUInt8(address.Bytes()),
 			).WithType(stdlib.EVMAddressBytesCadenceType),
 		),
 	)
@@ -3341,30 +4091,22 @@ func getEVMAccountNonce(
 func RunWithNewEnvironment(
 	t *testing.T,
 	chain flow.Chain,
-	f func(
-		fvm.Context,
-		fvm.VM,
-		snapshot.SnapshotTree,
-		*TestContract,
-		*EOATestAccount,
-	),
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
-
 	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-
 				blocks := new(envMock.Blocks)
 				block1 := unittest.BlockFixture()
 				blocks.On("ByHeightFrom",
-					block1.Header.Height,
-					block1.Header,
-				).Return(block1.Header, nil)
+					block1.Height,
+					block1.ToHeader(),
+				).Return(block1.ToHeader(), nil)
 
 				opts := []fvm.Option{
 					fvm.WithChain(chain),
-					fvm.WithBlockHeader(block1.Header),
+					fvm.WithBlockHeader(block1.ToHeader()),
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
@@ -3380,6 +4122,67 @@ func RunWithNewEnvironment(
 				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 				}
+
+				executionSnapshot, _, err := vm.Run(
+					ctx,
+					fvm.Bootstrap(unittest.ServiceAccountPublicKey, baseBootstrapOpts...),
+					snapshotTree)
+				require.NoError(t, err)
+
+				snapshotTree = snapshotTree.Append(executionSnapshot)
+
+				f(
+					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					vm,
+					snapshotTree,
+					testContract,
+					testAccount,
+				)
+			})
+		})
+	})
+}
+
+func RunContractWithNewEnvironment(
+	t *testing.T,
+	chain flow.Chain,
+	tc *TestContract,
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
+	bootstrapOpts ...fvm.BootstrapProcedureOption,
+) {
+	rootAddr := evm.StorageAccountAddress(chain.ChainID())
+
+	RunWithTestBackend(t, func(backend *TestBackend) {
+		RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+
+				blocks := new(envMock.Blocks)
+				block1 := unittest.BlockFixture()
+				header1 := block1.ToHeader()
+				blocks.On("ByHeightFrom",
+					header1.Height,
+					header1,
+				).Return(header1, nil)
+
+				opts := []fvm.Option{
+					fvm.WithChain(chain),
+					fvm.WithBlockHeader(header1),
+					fvm.WithAuthorizationChecksEnabled(false),
+					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+					fvm.WithRandomSourceHistoryCallAllowed(true),
+					fvm.WithBlocks(blocks),
+					fvm.WithCadenceLogging(true),
+				}
+				ctx := fvm.NewContext(opts...)
+
+				vm := fvm.NewVirtualMachine()
+				snapshotTree := snapshot.NewSnapshotTree(backend)
+
+				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+				}
+				baseBootstrapOpts = append(baseBootstrapOpts, bootstrapOpts...)
 
 				executionSnapshot, _, err := vm.Run(
 					ctx,

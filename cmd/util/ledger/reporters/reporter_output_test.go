@@ -142,3 +142,67 @@ func TestReportFileWriterJSONL(t *testing.T) {
 			"{\"TestField\":\"something\"}\n{\"TestField\":\"something\"}\n{\"TestField\":\"something\"}")
 	})
 }
+
+func TestReportFileWriterCSV(t *testing.T) {
+	dir := t.TempDir()
+
+	filename := path.Join(dir, "test.csv")
+	log := zerolog.Logger{}
+
+	requireFileContains := func(t *testing.T, expected string) {
+		dat, err := os.ReadFile(filename)
+		require.NoError(t, err)
+		require.Equal(t, []byte(expected), dat)
+	}
+
+	type testData struct {
+		TestField string
+	}
+
+	t.Run("Open & Close", func(t *testing.T) {
+		rw := reporters.NewReportFileWriter(filename, log, reporters.ReportFormatCSV)
+		rw.Close()
+
+		requireFileContains(t, "")
+	})
+
+	t.Run("Open & Write One & Close", func(t *testing.T) {
+		rw := reporters.NewReportFileWriter(filename, log, reporters.ReportFormatCSV)
+		rw.Write([]string{"something", "or other"})
+		rw.Close()
+
+		requireFileContains(t, "something,or other\n")
+	})
+
+	t.Run("Open & Write Many & Close", func(t *testing.T) {
+		rw := reporters.NewReportFileWriter(filename, log, reporters.ReportFormatCSV)
+		rw.Write([]string{"something0"})
+		rw.Write([]string{"something1"})
+		rw.Write([]string{"something2"})
+
+		rw.Close()
+
+		requireFileContains(t,
+			"something0\nsomething1\nsomething2\n")
+	})
+
+	t.Run("Open & Write Many in threads & Close", func(t *testing.T) {
+		rw := reporters.NewReportFileWriter(filename, log, reporters.ReportFormatCSV)
+
+		wg := &sync.WaitGroup{}
+		for i := 0; i < 3; i++ {
+			wg.Add(1)
+			go func() {
+				rw.Write([]string{"something"})
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
+
+		rw.Close()
+
+		requireFileContains(t,
+			"something\nsomething\nsomething\n")
+	})
+}

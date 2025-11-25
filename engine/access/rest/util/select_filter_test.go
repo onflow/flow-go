@@ -138,7 +138,7 @@ func generateBlock() (commonmodels.Block, error) {
 			Id:                   dummyID,
 			ParentId:             dummyID,
 			Height:               "100",
-			Timestamp:            t,
+			Timestamp:            t.UTC(),
 			ParentVoterSignature: dummySignature,
 		},
 		Payload: &commonmodels.BlockPayload{

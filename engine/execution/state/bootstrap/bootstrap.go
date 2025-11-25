@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -92,47 +93,46 @@ func (b *Bootstrapper) IsBootstrapped(db storage.DB) (flow.StateCommitment, bool
 }
 
 func (b *Bootstrapper) BootstrapExecutionDatabase(
+	manager lockctx.Manager,
 	db storage.DB,
 	rootSeal *flow.Seal,
 ) error {
-
 	commit := rootSeal.FinalState
-	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		w := rw.Writer()
-		err := operation.UpdateExecutedBlock(w, rootSeal.BlockID)
-		if err != nil {
-			return fmt.Errorf("could not index initial genesis execution block: %w", err)
-		}
+	return storage.WithLocks(manager, storage.LockGroupExecutionBootstrap, func(lctx lockctx.Context) error {
+		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			w := rw.Writer()
+			err := operation.UpdateExecutedBlock(w, rootSeal.BlockID)
+			if err != nil {
+				return fmt.Errorf("could not index initial genesis execution block: %w", err)
+			}
 
-		err = operation.IndexExecutionResult(w, rootSeal.BlockID, rootSeal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index result for root result: %w", err)
-		}
+			// during bootstrapping, we index the sealed root block or the spork root block, which is not
+			// produced by the node itself, but we still need to index its execution result to be able to
+			// execute next block
+			err = operation.IndexTrustedExecutionResult(lctx, rw, rootSeal.BlockID, rootSeal.ResultID)
+			if err != nil {
+				return fmt.Errorf("could not index result for root result: %w", err)
+			}
 
-		err = operation.IndexStateCommitment(w, flow.ZeroID, commit)
-		if err != nil {
-			return fmt.Errorf("could not index void state commitment: %w", err)
-		}
+			err = operation.IndexStateCommitment(lctx, rw, flow.ZeroID, commit)
+			if err != nil {
+				return fmt.Errorf("could not index void state commitment: %w", err)
+			}
 
-		err = operation.IndexStateCommitment(w, rootSeal.BlockID, commit)
-		if err != nil {
-			return fmt.Errorf("could not index genesis state commitment: %w", err)
-		}
+			err = operation.IndexStateCommitment(lctx, rw, rootSeal.BlockID, commit)
+			if err != nil {
+				return fmt.Errorf("could not index genesis state commitment: %w", err)
+			}
 
-		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
-		err = operation.InsertExecutionStateInteractions(w, rootSeal.BlockID, snapshots)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
-		}
+			snapshots := make([]*snapshot.ExecutionSnapshot, 0)
+			err = operation.InsertExecutionStateInteractions(w, rootSeal.BlockID, snapshots)
+			if err != nil {
+				return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
+			}
 
-		return nil
+			return nil
+		})
 	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func ImportRegistersFromCheckpoint(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, pdb *pebble.DB, workerCount int) error {

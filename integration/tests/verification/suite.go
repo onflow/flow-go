@@ -23,13 +23,14 @@ type Suite struct {
 	lib.TestnetStateTracker                      // used to track messages over testnet
 	cancel                  context.CancelFunc   // used to tear down the testnet
 	net                     *testnet.FlowNetwork // used to keep an instance of testnet
-	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
 	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
 	ghostID                 flow.Identifier      // represents id of ghost node
 	exe1ID                  flow.Identifier
 	exe2ID                  flow.Identifier
 	verID                   flow.Identifier // represents id of verification node
 	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
+
+	accessClient *testnet.Client
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -41,9 +42,12 @@ func (s *Suite) Ghost() *client.GhostClient {
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (s *Suite) AccessClient() *testnet.Client {
-	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
-	require.NoError(s.T(), err, "could not get access client")
-	return client
+	if s.accessClient == nil { // cache access client
+		client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+		require.NoError(s.T(), err, "could not get access client")
+		s.accessClient = client
+	}
+	return s.accessClient
 }
 
 // AccessPort returns the port number of access node api on testnet.
@@ -65,7 +69,8 @@ func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
+	var nodeConfigs []testnet.NodeConfig
+	nodeConfigs = append(nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
@@ -77,7 +82,7 @@ func (s *Suite) SetupSuite() {
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 			testnet.WithAdditionalFlag("cruise-ctl-fallback-proposal-duration=1ms"),
 		)
-		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
+		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 
 	// generates one verification node
@@ -86,8 +91,10 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	s.nodeConfigs = append(s.nodeConfigs, verConfig)
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
+	)
+	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// generates two execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
@@ -95,16 +102,20 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
+	)
+	nodeConfigs = append(nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
+	)
+	nodeConfigs = append(nodeConfigs, exe2Config)
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
@@ -115,7 +126,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
-	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
+	nodeConfigs = append(nodeConfigs, coll1Config, coll2Config)
 
 	// Ghost Node
 	// the ghost node's objective is to observe the messages exchanged on the
@@ -125,13 +136,14 @@ func (s *Suite) SetupSuite() {
 	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel))
-	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
+		testnet.WithLogLevel(zerolog.FatalLevel),
+	)
+	nodeConfigs = append(nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
 	netConfig := testnet.NewNetworkConfig(
 		"verification_tests",
-		s.nodeConfigs,
+		nodeConfigs,
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),

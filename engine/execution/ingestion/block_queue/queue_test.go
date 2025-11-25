@@ -507,21 +507,20 @@ func makeChainABCDEFG() (GetBlock, GetCollection, GetCommit) {
 		return cs[name-1]
 	}
 
-	r := unittest.BlockFixture()
-	blockR := &r
-	bs := unittest.ChainBlockFixtureWithRoot(blockR.Header, 4)
+	blockR := unittest.BlockFixture()
+	bs := unittest.ChainBlockFixtureWithRoot(blockR.ToHeader(), 4)
 	blockA, blockB, blockC, blockD := bs[0], bs[1], bs[2], bs[3]
 	unittest.AddCollectionsToBlock(blockA, []*flow.Collection{c1})
 	unittest.AddCollectionsToBlock(blockB, []*flow.Collection{c2, c3})
 	unittest.RechainBlocks(bs)
 
-	bs = unittest.ChainBlockFixtureWithRoot(blockA.Header, 2)
+	bs = unittest.ChainBlockFixtureWithRoot(blockA.ToHeader(), 2)
 	blockE, blockF := bs[0], bs[1]
 	unittest.AddCollectionsToBlock(blockE, []*flow.Collection{c4, c5})
 	unittest.AddCollectionsToBlock(blockF, []*flow.Collection{c6})
 	unittest.RechainBlocks(bs)
 
-	bs = unittest.ChainBlockFixtureWithRoot(blockE.Header, 1)
+	bs = unittest.ChainBlockFixtureWithRoot(blockE.ToHeader(), 1)
 	blockG := bs[0]
 
 	blockLookup := map[string]*flow.Block{
@@ -569,21 +568,20 @@ func makeChainABCDEF() (GetBlock, GetCollection, GetCommit) {
 		return cs[name-1]
 	}
 
-	r := unittest.BlockFixture()
-	blockR := &r
-	bs := unittest.ChainBlockFixtureWithRoot(blockR.Header, 3)
+	blockR := unittest.BlockFixture()
+	bs := unittest.ChainBlockFixtureWithRoot(blockR.ToHeader(), 3)
 	blockA, blockB, blockC := bs[0], bs[1], bs[2]
 	unittest.AddCollectionsToBlock(blockB, []*flow.Collection{c1, c2})
 	unittest.AddCollectionsToBlock(blockC, []*flow.Collection{c3})
 	unittest.RechainBlocks(bs)
 
-	bs = unittest.ChainBlockFixtureWithRoot(blockA.Header, 2)
+	bs = unittest.ChainBlockFixtureWithRoot(blockA.ToHeader(), 2)
 	blockD, blockE := bs[0], bs[1]
 	unittest.AddCollectionsToBlock(blockD, []*flow.Collection{c1, c2})
 	unittest.AddCollectionsToBlock(blockE, []*flow.Collection{c3})
 	unittest.RechainBlocks(bs)
 
-	bs = unittest.ChainBlockFixtureWithRoot(blockA.Header, 1)
+	bs = unittest.ChainBlockFixtureWithRoot(blockA.ToHeader(), 1)
 	blockF := bs[0]
 	unittest.AddCollectionsToBlock(blockF, []*flow.Collection{c1, c2, c3})
 	unittest.RechainBlocks(bs)

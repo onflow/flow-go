@@ -3,7 +3,6 @@
 /cmd/consensus/consensus
 /cmd/execution/execution
 /cmd/verification/verification
-/cmd/testclient/testclient
 /cmd/util/util
 /cmd/bootstrap/bootstrap
 

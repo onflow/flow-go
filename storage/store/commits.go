@@ -1,6 +1,8 @@
 package store
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -13,11 +15,9 @@ type Commits struct {
 	cache *Cache[flow.Identifier, flow.StateCommitment]
 }
 
-func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
+var _ storage.Commits = (*Commits)(nil)
 
-	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, commit flow.StateCommitment) error {
-		return operation.IndexStateCommitment(rw.Writer(), blockID, commit)
-	}
+func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
 
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (flow.StateCommitment, error) {
 		var commit flow.StateCommitment
@@ -33,17 +33,12 @@ func NewCommits(collector module.CacheMetrics, db storage.DB) *Commits {
 		db: db,
 		cache: newCache(collector, metrics.ResourceCommit,
 			withLimit[flow.Identifier, flow.StateCommitment](1000),
-			withStore(store),
 			withRetrieve(retrieve),
 			withRemove[flow.Identifier, flow.StateCommitment](remove),
 		),
 	}
 
 	return c
-}
-
-func (c *Commits) storeTx(rw storage.ReaderBatchWriter, blockID flow.Identifier, commit flow.StateCommitment) error {
-	return c.cache.PutTx(rw, blockID, commit)
 }
 
 func (c *Commits) retrieveTx(r storage.Reader, blockID flow.Identifier) (flow.StateCommitment, error) {
@@ -54,19 +49,21 @@ func (c *Commits) retrieveTx(r storage.Reader, blockID flow.Identifier) (flow.St
 	return val, nil
 }
 
-func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
-	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return c.storeTx(rw, blockID, commit)
-	})
-}
-
-// BatchStore stores Commit keyed by blockID in provided batch
-// No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, rw storage.ReaderBatchWriter) error {
+// BatchStore stores a state commitment keyed by the blockID whose execution results in that state.
+// The function ensures data integrity by first checking if a commitment already exists for the given block
+// and rejecting overwrites with different values. This function is idempotent, i.e. repeated calls with the
+// *initially* indexed value are no-ops.
+//
+// CAUTION:
+//   - Confirming that no value is already stored and the subsequent write must be atomic to prevent data corruption.
+//     The caller must acquire the [storage.LockIndexStateCommitment] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrDataMismatch] if a *different* state commitment is already indexed for the same block ID
+func (c *Commits) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, commit flow.StateCommitment, rw storage.ReaderBatchWriter) error {
 	// we can't cache while using batches, as it's unknown at this point when, and if
 	// the batch will be committed. Cache will be populated on read however.
-	return operation.IndexStateCommitment(rw.Writer(), blockID, commit)
+	return operation.IndexStateCommitment(lctx, rw, blockID, commit)
 }
 
 func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
@@ -81,7 +78,7 @@ func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
 
 // BatchRemoveByBlockID removes Commit keyed by blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// If the database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (c *Commits) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	return c.cache.RemoveTx(rw, blockID)
 }

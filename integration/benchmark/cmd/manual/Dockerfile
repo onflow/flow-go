@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
-FROM golang:1.23-bullseye AS build-setup
+FROM golang:1.25-bookworm AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install zip

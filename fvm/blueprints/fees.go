@@ -44,16 +44,16 @@ var setupFeesTransactionTemplate string
 //go:embed scripts/setExecutionMemoryLimit.cdc
 var setExecutionMemoryLimit string
 
-func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBody {
-
-	return flow.NewTransactionBody().
+func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(deployTxFeesTransactionTemplate)).
+		SetPayer(service).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowFees).
 		AddAuthorizer(service)
 }
 
-func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBody {
+func DeployStorageFeesContractTransaction(service flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	return DeployContractTransaction(service, contract, "FlowStorageFees")
 }
 
@@ -63,7 +63,7 @@ func SetupParametersTransaction(
 	minimumStorageReservation,
 	storagePerFlow cadence.UFix64,
 	restrictedAccountCreationEnabled cadence.Bool,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	addressCreationFeeArg, err := jsoncdc.Encode(addressCreationFee)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode address creation fee: %s", err.Error()))
@@ -81,7 +81,7 @@ func SetupParametersTransaction(
 		panic(fmt.Sprintf("failed to encode restrictedAccountCreationEnabled: %s", err.Error()))
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupParametersTransactionTemplate,
 			templates.Environment{
 				StorageFeesAddress:    service.Hex(),
@@ -92,13 +92,15 @@ func SetupParametersTransaction(
 		AddArgument(minimumStorageReservationArg).
 		AddArgument(storagePerFlowArg).
 		AddArgument(restrictedAccountCreationEnabledArg).
-		AddAuthorizer(service)
+		SetPayer(service).
+		AddAuthorizer(service).
+		Build()
 }
 
 func SetupStorageForServiceAccountsTransaction(
 	service, fungibleToken, flowToken, feeContract flow.Address,
-) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+) (*flow.TransactionBody, error) {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupStorageForServiceAccountsTemplate,
 			templates.Environment{
 				ServiceAccountAddress: service.Hex(),
@@ -107,16 +109,18 @@ func SetupStorageForServiceAccountsTransaction(
 				FlowTokenAddress:      flowToken.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddAuthorizer(service).
 		AddAuthorizer(fungibleToken).
 		AddAuthorizer(flowToken).
-		AddAuthorizer(feeContract)
+		AddAuthorizer(feeContract).
+		Build()
 }
 
 func SetupStorageForAccountTransaction(
 	account, service, fungibleToken, flowToken flow.Address,
-) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+) (*flow.TransactionBody, error) {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupStorageForAccountTemplate,
 			templates.Environment{
 				ServiceAccountAddress: service.Hex(),
@@ -125,8 +129,10 @@ func SetupStorageForAccountTransaction(
 				FlowTokenAddress:      flowToken.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddAuthorizer(account).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 func SetupFeesTransaction(
@@ -135,7 +141,7 @@ func SetupFeesTransaction(
 	surgeFactor,
 	inclusionEffortCost,
 	executionEffortCost cadence.UFix64,
-) *flow.TransactionBody {
+) (*flow.TransactionBody, error) {
 	surgeFactorArg, err := jsoncdc.Encode(surgeFactor)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode surge factor: %s", err.Error()))
@@ -149,16 +155,18 @@ func SetupFeesTransaction(
 		panic(fmt.Sprintf("failed to encode execution effort cost: %s", err.Error()))
 	}
 
-	return flow.NewTransactionBody().
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(templates.ReplaceAddresses(setupFeesTransactionTemplate,
 			templates.Environment{
 				FlowFeesAddress: flowFees.Hex(),
 			})),
 		).
+		SetPayer(service).
 		AddArgument(surgeFactorArg).
 		AddArgument(inclusionEffortCostArg).
 		AddArgument(executionEffortCostArg).
-		AddAuthorizer(service)
+		AddAuthorizer(service).
+		Build()
 }
 
 // SetExecutionEffortWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
@@ -209,13 +217,18 @@ func setExecutionWeightsTransaction(
 		return nil, err
 	}
 
-	tx := flow.NewTransactionBody().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setExecutionWeightsScript)).
+		SetPayer(parametersAccount).
 		AddArgument(newWeights).
 		AddArgument(storagePath).
-		AddAuthorizer(parametersAccount)
+		AddAuthorizer(parametersAccount).
+		Build()
+	if err != nil {
+		return nil, err
+	}
 
-	return tx, nil
+	return txBody, nil
 }
 
 //go:embed scripts/setExecutionWeightsScript.cdc
@@ -235,11 +248,16 @@ func SetExecutionMemoryLimitTransaction(
 		return nil, err
 	}
 
-	tx := flow.NewTransactionBody().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript([]byte(setExecutionMemoryLimit)).
+		SetPayer(parametersAccount).
 		AddArgument(newLimit).
 		AddArgument(storagePath).
-		AddAuthorizer(parametersAccount)
+		AddAuthorizer(parametersAccount).
+		Build()
+	if err != nil {
+		return nil, err
+	}
 
-	return tx, nil
+	return txBody, nil
 }

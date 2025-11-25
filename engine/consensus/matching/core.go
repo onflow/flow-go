@@ -121,7 +121,7 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 	}
 
 	childReceipts := c.pendingReceipts.ByPreviousResultID(resultID)
-	c.pendingReceipts.Remove(receipt.ID())
+	c.pendingReceipts.Remove(receiptID)
 
 	for _, childReceipt := range childReceipts {
 		// recursively processing the child receipts

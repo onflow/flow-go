@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
@@ -55,6 +54,7 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		ChainID:              from.ChainID(),
 		SporkID:              from.SporkID(),
 		SporkRootBlockHeight: from.SporkRootBlockHeight(),
+		SporkRootBlockView:   from.SporkRootBlockView(),
 	}
 	return &Params{params}, nil
 }
@@ -62,19 +62,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 // ClusterFromEncodable returns a Cluster backed by the given encodable representation.
 func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 	return &Cluster{enc}, nil
-}
-
-// SnapshotFromBootstrapState generates a protocol.Snapshot representing a
-// root bootstrap state. This is used to bootstrap the protocol state for
-// genesis or post-spork states.
-func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
-	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
-	}
-	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-		return kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
-	})
 }
 
 // SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
@@ -117,9 +104,10 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	params := EncodableParams{
-		ChainID:              root.Header.ChainID, // chain ID must match the root block
-		SporkID:              root.ID(),           // use root block ID as the unique spork identifier
-		SporkRootBlockHeight: root.Header.Height,  // use root block height as the spork root block height
+		ChainID:              root.ChainID, // chain ID must match the root block
+		SporkID:              root.ID(),    // use root block ID as the unique spork identifier
+		SporkRootBlockHeight: root.Height,  // use root block height as the spork root block height
+		SporkRootBlockView:   root.View,    // use root block view as the spork root block view
 	}
 
 	rootMinEpochState, err := EpochProtocolStateFromServiceEvents(setup, commit)
@@ -167,16 +155,29 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochEntry: richRootEpochState,
 	}
 
+	proposal, err := flow.NewRootProposal(
+		flow.UntrustedProposal{
+			Block:           *root,
+			ProposerSigData: nil,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root proposal: %w", err)
+	}
+
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		SealingSegment: &flow.SealingSegment{
-			Blocks:           []*flow.Block{root},
+			Blocks: []*flow.Proposal{
+				proposal,
+			},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
 				rootKvStore.ID(): rootProtocolStateEntryWrapper,
 			},
-			FirstSeal:   seal,
-			ExtraBlocks: make([]*flow.Block, 0),
+			FirstSeal:      seal,
+			ExtraBlocks:    make([]*flow.Proposal, 0),
+			SporkRootBlock: root,
 		},
 		QuorumCertificate:   qc,
 		Params:              params,

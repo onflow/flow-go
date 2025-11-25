@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,25 +17,26 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type MutableState struct {
 	*State
-	tracer   module.Tracer
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
+	lockManager lockctx.Manager
+	tracer      module.Tracer
+	headers     storage.Headers
+	payloads    storage.ClusterPayloads
 }
 
 var _ clusterstate.MutableState = (*MutableState)(nil)
 
-func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
+func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
 	mutableState := &MutableState{
-		State:    state,
-		tracer:   tracer,
-		headers:  headers,
-		payloads: payloads,
+		State:       state,
+		lockManager: lockManager,
+		tracer:      tracer,
+		headers:     headers,
+		payloads:    payloads,
 	}
 	return mutableState, nil
 }
@@ -57,36 +58,32 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	var ctx extendContext
 	ctx.candidate = candidate
 
-	err := m.State.db.View(func(tx *badger.Txn) error {
-		// get the latest finalized cluster block and latest finalized consensus height
-		ctx.finalizedClusterBlock = new(flow.Header)
-		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.Header.ChainID, ctx.finalizedClusterBlock)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
-		}
-		err = operation.RetrieveFinalizedHeight(&ctx.finalizedConsensusHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
-		}
-
-		err = operation.RetrieveEpochFirstHeight(m.State.epoch, &ctx.epochFirstHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get operating epoch first height: %w", err)
-		}
-		err = operation.RetrieveEpochLastHeight(m.State.epoch, &ctx.epochLastHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				ctx.epochHasEnded = false
-				return nil
-			}
-			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
-		}
-		ctx.epochHasEnded = true
-		return nil
-	})
+	r := m.State.db.Reader()
+	// get the latest finalized cluster block and latest finalized consensus height
+	ctx.finalizedClusterBlock = new(flow.Header)
+	err := operation.RetrieveLatestFinalizedClusterHeader(r, candidate.ChainID, ctx.finalizedClusterBlock)
 	if err != nil {
-		return extendContext{}, fmt.Errorf("could not read required state information for Extend checks: %w", err)
+		return extendContext{}, fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 	}
+	err = operation.RetrieveFinalizedHeight(r, &ctx.finalizedConsensusHeight)
+	if err != nil {
+		return extendContext{}, fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
+	}
+
+	err = operation.RetrieveEpochFirstHeight(r, m.State.epoch, &ctx.epochFirstHeight)
+	if err != nil {
+		return extendContext{}, fmt.Errorf("could not get operating epoch first height: %w", err)
+	}
+	err = operation.RetrieveEpochLastHeight(r, m.State.epoch, &ctx.epochLastHeight)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			ctx.epochHasEnded = false
+			return ctx, nil
+		}
+		return extendContext{}, fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
+	}
+	ctx.epochHasEnded = true
+
 	return ctx, nil
 }
 
@@ -98,19 +95,20 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *MutableState) Extend(candidate *cluster.Block) error {
+func (m *MutableState) Extend(proposal *cluster.Proposal) error {
+	candidate := proposal.Block
 	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.ID(), trace.COLClusterStateMutatorExtend)
 	defer parentSpan.End()
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckHeader)
-	err := m.checkHeaderValidity(candidate)
+	err := m.checkHeaderValidity(&candidate)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error checking header validity: %w", err)
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendGetExtendCtx)
-	extendCtx, err := m.getExtendCtx(candidate)
+	extendCtx, err := m.getExtendCtx(&candidate)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error gettting extend context data: %w", err)
@@ -130,19 +128,29 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 		return fmt.Errorf("error checking reference block: %w", err)
 	}
 
+	lctx := m.lockManager.NewContext()
+	defer lctx.Release()
+	err = lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock)
+	if err != nil {
+		return fmt.Errorf("could not acquire lock for inserting cluster block: %w", err)
+	}
+
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
-	err = m.checkPayloadTransactions(extendCtx)
+	err = m.checkPayloadTransactions(lctx, extendCtx)
 	span.End()
 	if err != nil {
 		return fmt.Errorf("error checking payload transactions: %w", err)
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(candidate))
+	err = m.State.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.InsertClusterBlock(lctx, rw, proposal)
+	})
 	span.End()
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)
 	}
+
 	return nil
 }
 
@@ -151,29 +159,27 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 // Expected error returns:
 //   - state.InvalidExtensionError if the candidate header is invalid
 func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
-	header := candidate.Header
-
 	// check chain ID
-	if header.ChainID != m.State.clusterID {
-		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", header.ChainID, m.State.clusterID)
+	if candidate.ChainID != m.State.clusterID {
+		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", candidate.ChainID, m.State.clusterID)
 	}
 
 	// get the header of the parent of the new block
-	parent, err := m.headers.ByBlockID(header.ParentID)
+	parent, err := m.headers.ByBlockID(candidate.ParentID)
 	if err != nil {
 		return irrecoverable.NewExceptionf("could not retrieve latest finalized header: %w", err)
 	}
 
 	// extending block must have correct parent view
-	if header.ParentView != parent.View {
+	if candidate.ParentView != parent.View {
 		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
-			header.ParentView, parent.View)
+			candidate.ParentView, parent.View)
 	}
 
 	// the extending block must increase height by 1 from parent
-	if header.Height != parent.Height+1 {
+	if candidate.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
-			header.Height, parent.Height)
+			candidate.Height, parent.Height)
 	}
 	return nil
 }
@@ -183,17 +189,16 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 // Expected error returns:
 //   - state.OutdatedExtensionError if the candidate extends an orphaned fork
 func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
-	header := ctx.candidate.Header
+	parentID := ctx.candidate.ParentID
 	finalizedID := ctx.finalizedClusterBlock.ID()
 	finalizedHeight := ctx.finalizedClusterBlock.Height
 
 	// start with the extending block's parent
-	parentID := header.ParentID
 	for parentID != finalizedID {
 		// get the parent of current block
 		ancestor, err := m.headers.ByBlockID(parentID)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", header.ParentID, err)
+			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", parentID, err)
 		}
 
 		// if its height is below current boundary, the block does not connect
@@ -256,17 +261,22 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 	return nil
 }
 
-// checkPayloadTransactions validates the transactions included int the candidate cluster block's payload.
+// checkPayloadTransactions validates the transactions included in the candidate cluster block's payload.
 // It enforces:
 //   - transactions are individually valid
 //   - no duplicate transaction exists along the fork being extended
 //   - the collection's reference block is equal to the oldest reference block among
 //     its constituent transactions
 //
+// PREREQUISITE:
+//   - the candidate block's ancestry connects to the finalized block at height `ctx.finalizedClusterBlock`
+//
+// Concurrent finalization and cluster block extension is fully supported by this function!
+//
 // Expected error returns:
 //   - state.InvalidExtensionError if the reference block is invalid for use.
 //   - state.UnverifiableExtensionError if the reference block is unknown.
-func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
+func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendContext) error {
 	block := ctx.candidate
 	payload := block.Payload
 
@@ -283,7 +293,7 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 	for _, flowTx := range payload.Collection.Transactions {
 		refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
 		if errors.Is(err, storage.ErrNotFound) {
-			// unknown reference blocks are invalid
+			// Reject collection if it contains a transaction with an unknown reference block, because we cannot verify its validity.
 			return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)
 		}
 		if err != nil {
@@ -314,7 +324,9 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 			minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
 	}
 
-	// check for duplicate transactions in block's ancestry
+	// DUPLICATION CHECK of transaction in block's ancestry:
+	// (i) We first scan the candidate block's own payload for duplicates. We memorize all
+	// transactions in a set for efficient lookup while traversing the ancestry (subsequent steps).
 	txLookup := make(map[flow.Identifier]struct{})
 	for _, tx := range block.Payload.Collection.Transactions {
 		txID := tx.ID()
@@ -324,7 +336,7 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 		txLookup[txID] = struct{}{}
 	}
 
-	// first, check for duplicate transactions in the un-finalized ancestry
+	// (ii) traverse candidate block's ancestry in the height range (block.Height, finalHeight), where "(○,○)" denotes the open interval
 	duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, ctx.finalizedClusterBlock.Height)
 	if err != nil {
 		return fmt.Errorf("could not check for duplicate txs in un-finalized ancestry: %w", err)
@@ -333,8 +345,25 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 		return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in un-finalized ancestry (duplicates: %s)", duplicateTxIDs)
 	}
 
-	// second, check for duplicate transactions in the finalized ancestry
-	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(txLookup, minRefHeight, maxRefHeight)
+	// With the call of `checkDupeTransactionsInUnfinalizedAncestry` above, we have now scanned the candidate's ancestry
+	// down to the height `ctx.finalizedClusterBlock + 1`. At the beginning of the `Extend` process, we verified (function
+	// `checkConnectsToFinalizedState`) that the candidate block descends from the finalized block at height
+	// `ctx.finalizedClusterBlock`.
+	// The function `checkDupeTransactionsInFinalizedAncestry` below determines whether the finalized fork up to
+	// and including `ctx.finalizedClusterBlock.Height` contains no duplicate transactions. So by the point step
+	// (iii) below passes, we have confirmed that the candidate block's entire ancestry contains no duplicate
+	// transactions.
+
+	// (iii) check for duplicate transactions in the finalized fork over the height range [0, finalizedClusterBlock.Height],
+	// where "[○,○]" denotes the closed interval.
+	//
+	// [Details] Concurrent finalization and cluster block extension is supported:
+	// Although not yet implemented system-wide, we want to support concurrent finalization and cluster block extension
+	// here. Hence, we assume that block(s) higher than `ctx.finalizedClusterBlock` may have been finalized just now. It
+	// is important to consider that finalization is not guaranteed to follow the same fork as the one we are extending.
+	// Either way, our approach utilizes the knowledge that `ctx.finalizedClusterBlock` is a finalized block
+	// the candidate descends from. This holds, irrespective of finalization progressing concurrently.
+	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(lctx, txLookup, minRefHeight, maxRefHeight, ctx.finalizedClusterBlock.Height)
 	if err != nil {
 		return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
 	}
@@ -345,12 +374,18 @@ func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 	return nil
 }
 
-// checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized
-// ancestry of the given block, and returns a list of all duplicates if there are any.
+// checkDupeTransactionsInUnfinalizedAncestry scans the un-finalized ancestry of the given block, checking for
+// duplicated transactions.
+// IMPORTANT, traversing the candidate block's ancestry is limited to the height range (block.Height, finalHeight),
+// where "(○,○)" denotes the open interval. In other words:
+//   - initially scanned block: candidate block's parent `block.Height-1`
+//   - last scanned ancestor: at height `finalHeight +1`
+//
+// We return a list of all duplicates.
+// No errors are expected during normal operation.
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
-
 	var duplicateTxIDs []flow.Identifier
-	err := fork.TraverseBackward(m.headers, block.Header.ParentID, func(ancestor *flow.Header) error {
+	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
 		payload, err := m.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
@@ -371,8 +406,19 @@ func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster
 
 // checkDupeTransactionsInFinalizedAncestry checks for duplicate transactions in the finalized
 // ancestry, and returns a list of all duplicates if there are any.
-func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransactions map[flow.Identifier]struct{}, minRefHeight, maxRefHeight uint64) ([]flow.Identifier, error) {
-	var duplicatedTxIDs []flow.Identifier
+//
+// IMPORTANT: this function limits its scan to finalized cluster blocks at or below
+// `finalClusterHeight`, i.e. it scans the finalized fork in the height range [0, finalClusterHeight],
+// where "[○,○]" denotes the closed interval. The caller must verify that the candidate's ancestry
+// connects to the finalized block at this height.
+//
+// No errors are expected during normal operation.
+func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
+	lctx lockctx.Proof,
+	includedTransactions map[flow.Identifier]struct{},
+	minRefHeight, maxRefHeight, finalClusterHeight uint64,
+) ([]flow.Identifier, error) {
+	var dupeTxIDs []flow.Identifier
 
 	// Let E be the global transaction expiry constant, measured in blocks. For each
 	// T ∈ `includedTransactions`, we have to decide whether the transaction
@@ -385,22 +431,26 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 	// Boundary conditions:
 	// 1. C's reference block height is equal to the lowest reference block height of
 	//    all its constituent transactions. Hence, for collection C to potentially contain T, it must satisfy c <= t.
-	// 2. For T to be eligible for inclusion in collection C, _none_ of the transactions within C are allowed
-	// to be expired w.r.t. C's reference block. Hence, for collection C to potentially contain T, it must satisfy t < c + E.
+	// 2. For T to be eligible for inclusion in collection C, _none_ of the transactions within C are allowed to be
+	//    expired w.r.t. C's reference block. Hence, for collection C to potentially contain T, it must satisfy t < c + E.
 	//
 	// Therefore, for collection C to potentially contain transaction T, it must satisfy t - E < c <= t.
 	// In other words, we only need to inspect collections with reference block height c ∈ (t-E, t].
 	// Consequently, for a set of transactions, with `minRefHeight` (`maxRefHeight`) being the smallest (largest)
 	// reference block height, we only need to inspect collections with c ∈ (minRefHeight-E, maxRefHeight].
 
-	// the finalized cluster blocks which could possibly contain any conflicting transactions
+	// The finalized cluster blocks which could possibly contain any conflicting transactions:
 	var clusterBlockIDs []flow.Identifier
 	start := minRefHeight - flow.DefaultTransactionExpiry + 1
-	if start > minRefHeight {
-		start = 0 // overflow check
+	if start > minRefHeight { // underflow check
+		start = 0 // ancestry has fewer than E blocks, so we start from height 0
 	}
 	end := maxRefHeight
-	err := m.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
+	// CAUTION: the following database lookup will return *all* known finalized cluster blocks, whose reference blocks fall
+	// in the specified height range. Finalization might progress concurrently while we are extending the block-tree here,
+	// following a *different* fork than the one we are extending here. In other words, the returned set of finalized blocks
+	// might include cluster blocks that are not ancestors of the candidate block.
+	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, m.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
@@ -411,14 +461,44 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve cluster payload (block_id=%x) to de-duplicate: %w", blockID, err)
 		}
+
+		// capture any transactions in the finalized block duplicating transactions in the candidate block
+		var dupeTxIDsForBlock []flow.Identifier
 		for _, tx := range payload.Collection.Transactions {
 			txID := tx.ID()
 			_, duplicated := includedTransactions[txID]
 			if duplicated {
-				duplicatedTxIDs = append(duplicatedTxIDs, txID)
+				dupeTxIDsForBlock = append(dupeTxIDsForBlock, txID)
 			}
 		}
-	}
 
-	return duplicatedTxIDs, nil
+		// if no duplicates were found, continue to the next block
+		if len(dupeTxIDsForBlock) == 0 {
+			continue
+		}
+
+		// This implementation is optimized for the common case, without forks and honest proposers.
+		// In this case the deduplication check would exit above, with zero duplicates found. However,
+		// if duplicates were found, we need to remember that the database search may have given us
+		// a few more finalized blocks, which are *not* ancestors of the candidate block.
+		// Although not yet implemented system-wide, we support concurrent finalization and cluster block
+		// extension here. Hence, a higher block may have been finalized just now and returned by the
+		// database search. However, all newer finalized blocks have height > `finalClusterHeight`, i.e.
+		// a height outside the range this function scans.
+		header, err := m.headers.ByBlockID(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve header by block_id=%x: %w", blockID, err)
+		}
+		// We already checked the candidate's ancestry for duplicate transactions down to height `finalClusterHeight`.
+		// So if we found a duplicate here ABOVE height `finalClusterHeight`, it must be on a different fork
+		// (otherwise we would have found it before). So, we only consider blocks at or below our view of the finalized height.
+		if header.Height <= finalClusterHeight {
+			dupeTxIDs = append(dupeTxIDs, dupeTxIDsForBlock...)
+			// TODO: We could stop at this point since we know the candidate is invalid.
+			//       We likely SHOULD stop here when permissionless LNs are available, for performance reasons.
+			//       For now, we continue and obtain a complete list of duplicates for debugging purposes, since we don't expect this case to occur.
+			continue
+		}
+	}
+	return dupeTxIDs, nil
 }

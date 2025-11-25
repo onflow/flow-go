@@ -25,11 +25,3 @@ type All struct {
 	Results  ExecutionResults
 	Receipts ExecutionReceipts
 }
-
-type Execution struct {
-	Results            ExecutionResults
-	Receipts           ExecutionReceipts
-	Commits            Commits
-	TransactionResults TransactionResults
-	Events             Events
-}

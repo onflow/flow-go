@@ -60,7 +60,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	assert.NoError(t, err)
 
 	// generate a test transaction
-	tx := unittest.TransactionBodyFixture()
+	tx := (messages.TransactionBody)(unittest.TransactionBodyFixture())
 
 	// send the transaction as an event to a real collection node
 	err = ghostClient.Send(ctx, channels.PushTransactions, &tx, realCollNode.Identifier)
@@ -124,8 +124,8 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
-		case *messages.BlockProposal:
-			fmt.Printf("Received block proposal: %s from %s\n", v.Block.Header.ID().String(), from.String())
+		case *flow.Proposal:
+			fmt.Printf("Received block proposal: %s from %s\n", v.Block.ID().String(), from.String())
 			i++
 		default:
 			t.Logf(" ignoring event: :%T: %v", v, v)

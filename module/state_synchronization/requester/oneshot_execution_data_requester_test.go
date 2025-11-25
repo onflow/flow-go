@@ -40,7 +40,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 
 	suite.Run("Happy path. Raw setup", func() {
 		block := unittest.BlockFixture()
-		result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+		result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 		blockEd := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
 
 		execDataDownloader := edmock.NewDownloader(suite.T())
@@ -49,7 +49,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 			Return(blockEd, nil).
 			Once()
 
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, result, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, result, block.ToHeader(), config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -79,7 +79,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecutionData() {
 				metricsCollector,
 				execDataDownloader,
 				result,
-				block.Header,
+				block.ToHeader(),
 				config,
 			)
 			require.NoError(suite.T(), err)
@@ -106,7 +106,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 
 	// Create a block and execution result
 	block := unittest.BlockFixture()
-	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
 	suite.Run("blob not found error", func() {
 		// Mock downloader to return blob not found error first, then success
@@ -124,7 +124,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Return(blockEd, nil).
 			Once()
 
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.ToHeader(), config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -145,7 +145,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Return(nil, expectedError).
 			Maybe()
 
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.ToHeader(), config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -166,7 +166,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Return(nil, expectedError).
 			Once()
 
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.ToHeader(), config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -186,7 +186,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Return(nil, expectedError).
 			Once()
 
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.ToHeader(), config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -212,7 +212,7 @@ func (suite *OneshotExecutionDataRequesterSuite) TestRequestExecution_ERCacheRet
 			Return(nil, expectedError).
 			Once()
 
-		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.Header, config)
+		requester, err := NewOneshotExecutionDataRequester(logger, metricsCollector, execDataDownloader, executionResult, block.ToHeader(), config)
 		require.NoError(suite.T(), err)
 
 		ctx, cancel := context.WithCancel(context.Background())

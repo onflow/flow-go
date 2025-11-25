@@ -81,27 +81,27 @@ func (params StateParameters) WithMaxValueSizeAllowed(
 }
 
 type limitsController struct {
-	enforceLimits       bool
+	meteringEnabled     bool
 	maxKeySizeAllowed   uint64
 	maxValueSizeAllowed uint64
 }
 
 func newLimitsController(params StateParameters) *limitsController {
 	return &limitsController{
-		enforceLimits:       true,
+		meteringEnabled:     true,
 		maxKeySizeAllowed:   params.maxKeySizeAllowed,
 		maxValueSizeAllowed: params.maxValueSizeAllowed,
 	}
 }
 
-func (controller *limitsController) RunWithAllLimitsDisabled(f func()) {
+func (controller *limitsController) RunWithMeteringDisabled(f func()) {
 	if f == nil {
 		return
 	}
-	current := controller.enforceLimits
-	controller.enforceLimits = false
+	current := controller.meteringEnabled
+	controller.meteringEnabled = false
 	f()
-	controller.enforceLimits = current
+	controller.meteringEnabled = current
 }
 
 // NewExecutionState constructs a new state
@@ -176,7 +176,7 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 	var value []byte
 	var err error
 
-	if state.enforceLimits {
+	if state.meteringEnabled {
 		if err = state.checkSize(id, []byte{}); err != nil {
 			return nil, err
 		}
@@ -189,7 +189,7 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 		return nil, fmt.Errorf("failed to read %s: %w", id, getError)
 	}
 
-	err = state.meter.MeterStorageRead(id, value, state.enforceLimits)
+	err = state.meter.MeterStorageRead(id, value, state.meteringEnabled)
 	return value, err
 }
 
@@ -199,7 +199,7 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 		return fmt.Errorf("cannot Set on a finalized state")
 	}
 
-	if state.enforceLimits {
+	if state.meteringEnabled {
 		if err := state.checkSize(id, value); err != nil {
 			return err
 		}
@@ -212,7 +212,7 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 		return fmt.Errorf("failed to update %s: %w", id, setError)
 	}
 
-	return state.meter.MeterStorageWrite(id, value, state.enforceLimits)
+	return state.meter.MeterStorageWrite(id, value, state.meteringEnabled)
 }
 
 // MeterComputation meters computation usage
@@ -221,7 +221,7 @@ func (state *ExecutionState) MeterComputation(usage common.ComputationUsage) err
 		return fmt.Errorf("cannot MeterComputation on a finalized state")
 	}
 
-	if state.enforceLimits {
+	if state.meteringEnabled {
 		return state.meter.MeterComputation(usage)
 	}
 	return nil
@@ -234,23 +234,22 @@ func (state *ExecutionState) ComputationAvailable(usage common.ComputationUsage)
 		return false
 	}
 
-	if state.enforceLimits {
+	if state.meteringEnabled {
 		return state.meter.ComputationAvailable(usage)
 	}
 	return true
 }
 
-// ComputationRemaining returns the available computation capacity without metering
+// ComputationRemaining returns the remaining computation for the given kind.
 func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) uint64 {
 	if state.finalized {
-		// if state is finalized return 0
+		// if state is finalized return false
 		return 0
 	}
 
-	if state.enforceLimits {
+	if state.meteringEnabled {
 		return state.meter.ComputationRemaining(kind)
 	}
-
 	return math.MaxUint64
 }
 
@@ -275,7 +274,7 @@ func (state *ExecutionState) MeterMemory(usage common.MemoryUsage) error {
 		return fmt.Errorf("cannot MeterMemory on a finalized state")
 	}
 
-	if state.enforceLimits {
+	if state.meteringEnabled {
 		return state.meter.MeterMemory(usage)
 	}
 
@@ -302,7 +301,7 @@ func (state *ExecutionState) MeterEmittedEvent(byteSize uint64) error {
 		return fmt.Errorf("cannot MeterEmittedEvent on a finalized state")
 	}
 
-	if state.enforceLimits {
+	if state.meteringEnabled {
 		return state.meter.MeterEmittedEvent(byteSize)
 	}
 

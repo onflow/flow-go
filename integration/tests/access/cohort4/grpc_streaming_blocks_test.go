@@ -152,7 +152,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 			if rpc.name == "SubscribeBlocksFromStartBlockID" {
 				startValue = convert.IdentifierToMessage(blockA.ID())
 			} else {
-				startValue = blockA.Header.Height
+				startValue = blockA.Height
 			}
 
 			accessRecv := rpc.call(s.ctx, accessClient, startValue)
@@ -175,11 +175,11 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 				case err := <-observerBlockErrs:
 					s.Require().NoErrorf(err, "unexpected ON error")
 				case block := <-accessBlocks:
-					s.T().Logf("AN block received: height: %d", block.Header.Height)
-					r.Add(s.T(), block.Header.Height, "access", block)
+					s.T().Logf("AN block received: height: %d", block.Height)
+					r.Add(s.T(), block.Height, "access", block)
 					foundANTxCount++
 				case block := <-observerBlocks:
-					s.T().Logf("ON block received: height: %d", block.Header.Height)
+					s.T().Logf("ON block received: height: %d", block.Height)
 					s.addObserverBlock(block, r, rpc.name, &foundONTxCount)
 				}
 
@@ -211,12 +211,12 @@ func (s *GrpcBlocksStreamSuite) addObserverBlock(
 	// when subscribing to the latest block, the specific start height depends on the node's
 	// local sealed height, so it may vary.
 	// check only the responses for ON that are also tracked by AN and compare them
-	isANResponseExist := len(responseTracker.r[block.Header.Height]) > 0
+	isANResponseExist := len(responseTracker.r[block.Height]) > 0
 	if rpcCallName == "SubscribeBlocksFromLatest" && !isANResponseExist {
 		return
 	}
 
-	responseTracker.Add(s.T(), block.Header.Height, "observer", block)
+	responseTracker.Add(s.T(), block.Height, "observer", block)
 	*txCount++
 }
 
@@ -236,8 +236,8 @@ func compareBlocksResponse(t *testing.T, responses map[uint64]map[string]*flow.B
 
 func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Block) {
 	require.Equal(t, accessBlock.ID(), observerBlock.ID())
-	require.Equal(t, accessBlock.Header.Height, observerBlock.Header.Height)
-	require.Equal(t, accessBlock.Header.Timestamp, observerBlock.Header.Timestamp)
+	require.Equal(t, accessBlock.Height, observerBlock.Height)
+	require.Equal(t, accessBlock.Timestamp, observerBlock.Timestamp)
 	require.Equal(t, accessBlock.Payload.Hash(), observerBlock.Payload.Hash())
 }
 

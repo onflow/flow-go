@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
@@ -18,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -27,9 +28,9 @@ import (
 // and its corresponding job can be converted back to the same block.
 func TestBlockToJob(t *testing.T) {
 	block := unittest.BlockFixture()
-	actual, err := jobqueue.JobToBlock(jobqueue.BlockToJob(&block))
+	actual, err := jobqueue.JobToBlock(jobqueue.BlockToJob(block))
 	require.NoError(t, err)
-	require.Equal(t, &block, actual)
+	require.Equal(t, block, actual)
 }
 
 func TestProduceConsume(t *testing.T) {
@@ -48,14 +49,14 @@ func TestProduceConsume(t *testing.T) {
 			// hence from consumer perspective, it is blocking on each received block.
 		}
 
-		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, followerDistributor *pubsub.FollowerDistributor) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 
 			for i := 0; i < len(blocks); i++ {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
-				consumer.OnFinalizedBlock(&model.Block{})
+				followerDistributor.OnFinalizedBlock(&model.Block{})
 			}
 
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
@@ -86,7 +87,7 @@ func TestProduceConsume(t *testing.T) {
 			}()
 		}
 
-		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, followerDistributor *pubsub.FollowerDistributor) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 			processAll.Add(len(blocks))
 
@@ -94,7 +95,7 @@ func TestProduceConsume(t *testing.T) {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
-				consumer.OnFinalizedBlock(&model.Block{})
+				followerDistributor.OnFinalizedBlock(&model.Block{})
 			}
 
 			// waits until all blocks finish processing
@@ -116,13 +117,13 @@ func withConsumer(
 	blockCount int,
 	workerCount int,
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *pubsub.FollowerDistributor),
 ) {
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		maxProcessing := uint64(workerCount)
 
-		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressVerificationBlockHeight)
+		processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(pdb), module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
@@ -134,6 +135,7 @@ func withConsumer(
 			process: process,
 		}
 
+		followerDistributor := pubsub.NewFollowerDistributor()
 		consumer, _, err := blockconsumer.NewBlockConsumer(
 			unittest.Logger(),
 			collector,
@@ -141,7 +143,8 @@ func withConsumer(
 			s.Storage.Blocks,
 			s.State,
 			engine,
-			maxProcessing)
+			maxProcessing,
+			followerDistributor)
 		require.NoError(t, err)
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
@@ -167,7 +170,7 @@ func withConsumer(
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
 
-		withBlockConsumer(consumer, blocks)
+		withBlockConsumer(consumer, blocks, followerDistributor)
 	})
 }
 

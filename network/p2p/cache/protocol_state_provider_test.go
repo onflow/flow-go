@@ -68,7 +68,7 @@ func (suite *ProtocolStateProviderTestSuite) triggerUpdate() {
 	suite.participants = unittest.IdentityListFixture(5, unittest.WithAllRoles(), unittest.WithKeys)
 
 	block := unittest.BlockFixture()
-	suite.head = block.Header
+	suite.head = block.ToHeader()
 
 	// set up protocol snapshot mock
 	snapshot := &mockprotocol.Snapshot{}
@@ -80,7 +80,7 @@ func (suite *ProtocolStateProviderTestSuite) triggerUpdate() {
 	)
 	snapshot.On("Identity", mock.Anything).Return(func(id flow.Identifier) *flow.Identity {
 		for _, n := range suite.participants {
-			if n.ID() == id {
+			if n.NodeID == id {
 				return n
 			}
 		}

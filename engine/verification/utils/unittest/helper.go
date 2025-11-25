@@ -16,6 +16,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
@@ -23,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -31,7 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -80,7 +80,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 			// request should be dispatched by a verification node.
 			require.Contains(t, participants.Filter(filter.HasRole[flow.Identity](flow.RoleVerification)).NodeIDs(), originID)
 
-			req, ok := args[2].(*messages.ChunkDataRequest)
+			req, ok := args[2].(*flow.ChunkDataRequest)
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
@@ -310,12 +310,6 @@ func WithAssignee(t *testing.T, assignee flow.Identifier) func(flow.Identifier, 
 	}
 }
 
-func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
-	return flow.ChunkDataPack{
-		ChunkID: chunkID,
-	}
-}
-
 type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 
 // MockChunkAssignmentFixture is a test helper that mocks a chunk assigner for a set of verification nodes for the
@@ -347,10 +341,7 @@ func MockChunkAssignmentFixture(t *testing.T,
 
 			for _, chunk := range receipt.ExecutionResult.Chunks {
 				if isAssigned(chunk.Index, len(receipt.ExecutionResult.Chunks)) {
-					locatorID := chunks.Locator{
-						ResultID: receipt.ExecutionResult.ID(),
-						Index:    chunk.Index,
-					}.ID()
+					locatorID := unittest.ChunkLocatorFixture(receipt.ExecutionResult.ID(), chunk.Index).ID()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
 					expectedChunkIds = append(expectedChunkIds, chunk.ID())
 					require.NoError(t, a.Add(chunk.Index, verIds.NodeIDs()))
@@ -403,7 +394,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 				continue
 			}
 
-			err := state.Extend(context.Background(), receipt.ReferenceBlock)
+			err := state.Extend(context.Background(), unittest.ProposalFromBlock(receipt.ReferenceBlock))
 			require.NoError(t, err, fmt.Errorf("can not extend block %v: %w", receipt.ReferenceBlock.ID(), err))
 			err = state.Finalize(context.Background(), refBlockID)
 			require.NoError(t, err)
@@ -418,7 +409,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 			// skips extending state with already duplicate container block
 			continue
 		}
-		err := state.Extend(context.Background(), completeER.ContainerBlock)
+		err := state.Extend(context.Background(), unittest.ProposalFromBlock(completeER.ContainerBlock))
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), containerBlockID)
 		require.NoError(t, err)
@@ -451,13 +442,14 @@ func NewVerificationHappyPathTest(t *testing.T,
 		blockConsumer *blockconsumer.BlockConsumer,
 		blocks []*flow.Block,
 		resultApprovalsWG *sync.WaitGroup,
-		chunkDataRequestWG *sync.WaitGroup) {
+		chunkDataRequestWG *sync.WaitGroup,
+		followerDistributor *pubsub.FollowerDistributor) {
 
 		for i := 0; i < len(blocks)*eventRepetition; i++ {
 			// consumer is only required to be "notified" that a new finalized block available.
 			// It keeps track of the last finalized block it has read, and read the next height upon
 			// getting notified as follows:
-			blockConsumer.OnFinalizedBlock(&model.Block{})
+			followerDistributor.OnFinalizedBlock(&model.Block{})
 		}
 
 		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(10*retry*blockCount)*time.Second,
@@ -479,7 +471,7 @@ func withConsumers(t *testing.T,
 	verCollector module.VerificationMetrics, // verification metrics collector
 	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
 	providerFunc MockChunkDataProviderFunc,
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup, *pubsub.FollowerDistributor),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := trace.NewNoopTracer()
@@ -591,7 +583,7 @@ func withConsumers(t *testing.T,
 		verNode.VerifierEngine)
 
 	// plays test scenario
-	withBlockConsumer(verNode.BlockConsumer, blocks, conWG, exeWG)
+	withBlockConsumer(verNode.BlockConsumer, blocks, conWG, exeWG, verNode.FollowerDistributor)
 
 	// tears down engines and nodes
 	unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")
@@ -666,7 +658,7 @@ func bootstrapSystem(
 			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,
 			stateFixture.Storage.Results,
-			stateFixture.Storage.Setups,
+			stateFixture.Storage.EpochSetups,
 			stateFixture.Storage.EpochCommits,
 		)
 		epochBuilder := unittest.NewEpochBuilder(t, mutableProtocolState, stateFixture.State)

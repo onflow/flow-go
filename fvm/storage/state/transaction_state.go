@@ -36,8 +36,13 @@ type Meter interface {
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
 
-	// RunWithAllLimitsDisabled runs f with limits disabled
-	RunWithAllLimitsDisabled(f func())
+	// RunWithMeteringDisabled runs f with limits disabled
+	// This function can be used to run a function that fits one of these cases:
+	// - the function should not fail due to metering limits
+	// - the function is not invokable by the user and has a constant execution time (e.g. fee deduction)
+	// - the function is metered once before calling `RunWithMeteringDisabled` with a special weight (e.g. create account)
+	// 		and doesn't need additional metering inside the function
+	RunWithMeteringDisabled(f func())
 }
 
 // NestedTransactionPreparer provides active transaction states and facilitates
@@ -493,6 +498,6 @@ func (txnState *transactionState) TotalEmittedEventBytes() uint64 {
 	return txnState.current().TotalEmittedEventBytes()
 }
 
-func (txnState *transactionState) RunWithAllLimitsDisabled(f func()) {
-	txnState.current().RunWithAllLimitsDisabled(f)
+func (txnState *transactionState) RunWithMeteringDisabled(f func()) {
+	txnState.current().RunWithMeteringDisabled(f)
 }

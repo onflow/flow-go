@@ -1,12 +1,12 @@
 package testutils
 
 import (
-	"math"
 	"math/big"
 	"strings"
 	"testing"
 
 	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
@@ -66,6 +66,13 @@ func GetFactoryTestContract(t testing.TB) *TestContract {
 	}
 }
 
+func GetFileSystemContract(t testing.TB) *TestContract {
+	return &TestContract{
+		ABI:      contracts.FileSystemContractABIJSON,
+		ByteCode: contracts.FileSystemContractBytes,
+	}
+}
+
 func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*TestContract)) {
 	DeployContract(t, RandomAddress(t), tc, led, flowEVMRootAddress)
 	f(tc)
@@ -103,7 +110,7 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 		types.NewDeployCall(
 			caller,
 			tc.ByteCode,
-			math.MaxUint64,
+			gethParams.MaxTxGas,
 			big.NewInt(0),
 			nonce+1,
 		),

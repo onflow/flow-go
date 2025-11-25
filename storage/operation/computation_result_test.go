@@ -18,7 +18,7 @@ import (
 func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := testutil.ComputationResultFixture(t)
-		expectedId := expected.ExecutableBlock.ID()
+		expectedId := expected.ExecutableBlock.BlockID()
 
 		t.Run("Upsert ComputationResult", func(t *testing.T) {
 			// first upsert as false
@@ -54,7 +54,7 @@ func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 func TestRemoveComputationResultUploadStatus(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := testutil.ComputationResultFixture(t)
-		expectedId := expected.ExecutableBlock.ID()
+		expectedId := expected.ExecutableBlock.BlockID()
 
 		t.Run("Remove ComputationResult", func(t *testing.T) {
 			testUploadStatusVal := true
@@ -91,7 +91,7 @@ func TestListComputationResults(t *testing.T) {
 			expectedIDs := make(map[string]bool, 0)
 			// Store a list of ComputationResult instances first
 			for _, cr := range expected {
-				expectedId := cr.ExecutableBlock.ID()
+				expectedId := cr.ExecutableBlock.BlockID()
 				expectedIDs[expectedId.String()] = true
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.UpsertComputationResultUploadStatus(rw.Writer(), expectedId, true)

@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"crypto/rand"
+	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 func GenerateRandomSeeds(n int, seedLen int) [][]byte {
@@ -18,4 +21,15 @@ func GenerateRandomSeed(seedLen int) []byte {
 		log.Fatal().Err(err).Msg("cannot generate random seed")
 	}
 	return seed
+}
+
+// zeroLoggerHook is a simple logger hook used for capturing log output
+// from zerolog during tests. It writes all log messages to a provided
+// strings.Builder so they can be inspected later.
+type zeroLoggerHook struct {
+	logs *strings.Builder
+}
+
+func (h zeroLoggerHook) Run(_ *zerolog.Event, _ zerolog.Level, msg string) {
+	h.logs.WriteString(msg)
 }

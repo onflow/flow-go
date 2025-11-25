@@ -20,31 +20,28 @@ var systemChunkTransactionTemplate string
 
 const placeholderMigrationAddress = "\"Migration\""
 
-func prepareSystemContractCode(chainID flow.ChainID) string {
-	sc := systemcontracts.SystemContractsForChain(chainID)
-	code := templates.ReplaceAddresses(
-		systemChunkTransactionTemplate,
-		sc.AsTemplateEnv(),
-	)
+func prepareSystemContractCode(sc *systemcontracts.SystemContracts) []byte {
+	code := templates.ReplaceAddresses(systemChunkTransactionTemplate, sc.AsTemplateEnv())
 	code = strings.ReplaceAll(
 		code,
 		placeholderMigrationAddress,
 		sc.Migration.Address.HexWithPrefix(),
 	)
-	return code
+	return []byte(code)
 }
 
 // SystemChunkTransaction creates and returns the transaction corresponding to the
 // system chunk for the given chain.
+//
+// No error returns are expected during normal operation.
 func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
-	tx := flow.NewTransactionBody().
-		SetScript(
-			[]byte(prepareSystemContractCode(chain.ChainID())),
-		).
-		// The heartbeat resources needed by the system tx have are on the service account,
-		// therefore, the service account is the only authorizer needed.
+	// The heartbeat resources needed by the system tx have are on the service account,
+	// therefore, the service account is the only authorizer needed.
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	script := prepareSystemContractCode(sc)
+	return flow.NewTransactionBodyBuilder().
+		SetScript(script).
+		SetComputeLimit(SystemChunkTransactionGasLimit).
 		AddAuthorizer(chain.ServiceAddress()).
-		SetComputeLimit(SystemChunkTransactionGasLimit)
-
-	return tx, nil
+		Build()
 }

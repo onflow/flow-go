@@ -17,14 +17,15 @@ type ChunkDataPackValidationError struct {
 	err             error
 }
 
-func NewChunkDataPackValidationError(originID flow.Identifier,
+func NewChunkDataPackValidationError(
+	originID flow.Identifier,
 	resultID flow.Identifier,
 	chunkIndex uint64,
 	chunkDataPackID flow.Identifier,
 	chunkID flow.Identifier,
 	collectionID flow.Identifier,
-	err error) error {
-
+	err error,
+) error {
 	return ChunkDataPackValidationError{
 		originID:        originID,
 		chunkDataPackID: chunkDataPackID,
@@ -45,7 +46,8 @@ func (c ChunkDataPackValidationError) Error() string {
 		c.chunkDataPackID,
 		c.chunkID,
 		c.collectionID,
-		c.err)
+		c.err,
+	)
 }
 
 func IsChunkDataPackValidationError(err error) bool {

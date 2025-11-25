@@ -46,8 +46,8 @@ func (s *DynamicBootstrapInEFMSuite) TestDynamicBootstrapInEFM() {
 	require.NoError(s.T(), err)
 	s.TimedLogf("retrieved header after entering EpochPhaseFallback phase: root_height=%d, root_view=%d, segment_heights=[%d-%d], segment_views=[%d-%d]",
 		header.Height, header.View,
-		segment.Sealed().Header.Height, segment.Highest().Header.Height,
-		segment.Sealed().Header.View, segment.Highest().Header.View)
+		segment.Sealed().Height, segment.Highest().Height,
+		segment.Sealed().View, segment.Highest().View)
 
 	observerConf := testnet.ObserverConfig{
 		ContainerName: "observer_1",

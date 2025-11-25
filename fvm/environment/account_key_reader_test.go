@@ -37,7 +37,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 	t.Run("invalid hash algo", func(t *testing.T) {
 		t.Parallel()
 
-		accountKey := FakePublicKey{}.toAccountPublicKey()
+		accountKey := FakePublicKey{}.toRuntimeAccountPublicKey()
 		accountKey.HashAlgo = hash.UnknownHashingAlgorithm
 
 		rtKey, err := environment.FlowToRuntimeAccountKey(accountKey)
@@ -48,7 +48,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 	t.Run("invalid sign algo", func(t *testing.T) {
 		t.Parallel()
 
-		accountKey := FakePublicKey{}.toAccountPublicKey()
+		accountKey := FakePublicKey{}.toRuntimeAccountPublicKey()
 		accountKey.SignAlgo = crypto.UnknownSigningAlgorithm
 
 		rtKey, err := environment.FlowToRuntimeAccountKey(accountKey)
@@ -59,7 +59,7 @@ func TestKeyConversionValidAlgorithms(t *testing.T) {
 	t.Run("valid key", func(t *testing.T) {
 		t.Parallel()
 
-		accountKey := FakePublicKey{}.toAccountPublicKey()
+		accountKey := FakePublicKey{}.toRuntimeAccountPublicKey()
 
 		rtKey, err := environment.FlowToRuntimeAccountKey(accountKey)
 		require.NoError(t, err)
@@ -76,7 +76,7 @@ func TestAccountKeyReader_get_valid_key(t *testing.T) {
 	require.NoError(t, err)
 
 	expected, err := environment.FlowToRuntimeAccountKey(
-		FakePublicKey{}.toAccountPublicKey(),
+		FakePublicKey{}.toRuntimeAccountPublicKey(),
 	)
 
 	require.NoError(t, err)

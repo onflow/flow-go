@@ -16,7 +16,7 @@ import (
 func TestGenerateRootQC(t *testing.T) {
 	participantData := createSignerData(t, 3)
 
-	block := unittest.GenesisFixture()
+	block := unittest.Block.Genesis(flow.Emulator)
 
 	votes, err := GenerateRootBlockVotes(block, participantData)
 	require.NoError(t, err)
@@ -29,7 +29,7 @@ func TestGenerateRootQC(t *testing.T) {
 func TestGenerateRootQCWithSomeInvalidVotes(t *testing.T) {
 	participantData := createSignerData(t, 10)
 
-	block := unittest.GenesisFixture()
+	block := unittest.Block.Genesis(flow.Emulator)
 
 	votes, err := GenerateRootBlockVotes(block, participantData)
 	require.NoError(t, err)

@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -146,7 +147,7 @@ func (e *Events) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
 			ID:        blockID,
 			Height:    header.Height,
-			Timestamp: header.Timestamp,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		})
 	}
 
@@ -184,7 +185,7 @@ func (e *Events) GetEventsForBlockIDs(
 		blockHeaders = append(blockHeaders, provider.BlockMetadata{
 			ID:        blockID,
 			Height:    header.Height,
-			Timestamp: header.Timestamp,
+			Timestamp: time.UnixMilli(int64(header.Timestamp)).UTC(),
 		})
 	}
 

@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -21,13 +23,13 @@ func NewBlock(
 	}
 
 	var result Block
-	result.Header = NewBlockHeader(block.Header)
+	result.Header = NewBlockHeader(block.ToHeader())
 
 	// add the payload to the response if it is specified as an expandable field
 	result.Expandable = &BlockExpandable{}
 	if expand[ExpandableFieldPayload] {
 		var payload BlockPayload
-		err := payload.Build(block.Payload)
+		err := payload.Build(&block.Payload)
 		if err != nil {
 			return nil, err
 		}
@@ -83,14 +85,14 @@ func (b *Block) Build(
 	}
 
 	var header BlockHeader
-	header.Build(block.Header)
+	header.Build(block.ToHeader())
 	b.Header = &header
 
 	// add the payload to the response if it is specified as an expandable field
 	b.Expandable = &BlockExpandable{}
 	if expand[ExpandableFieldPayload] {
 		var payload BlockPayload
-		err := payload.Build(block.Payload)
+		err := payload.Build(&block.Payload)
 		if err != nil {
 			return err
 		}
@@ -166,7 +168,7 @@ func NewBlockHeader(header *flow.Header) *BlockHeader {
 		Id:                   header.ID().String(),
 		ParentId:             header.ParentID.String(),
 		Height:               util.FromUint(header.Height),
-		Timestamp:            header.Timestamp,
+		Timestamp:            time.UnixMilli(int64(header.Timestamp)).UTC(),
 		ParentVoterSignature: util.ToBase64(header.ParentVoterSigData),
 	}
 }
@@ -175,7 +177,7 @@ func (b *BlockHeader) Build(header *flow.Header) {
 	b.Id = header.ID().String()
 	b.ParentId = header.ParentID.String()
 	b.Height = util.FromUint(header.Height)
-	b.Timestamp = header.Timestamp
+	b.Timestamp = time.UnixMilli(int64(header.Timestamp)).UTC()
 	b.ParentVoterSignature = util.ToBase64(header.ParentVoterSigData)
 }
 

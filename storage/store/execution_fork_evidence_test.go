@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -25,6 +26,7 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 
 	t.Run("Store and read evidence", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
 			block := unittest.BlockFixture()
 
 			conflictingSeals := make([]*flow.IncorporatedResultSeal, 2)
@@ -32,12 +34,14 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 				conflictingSeals[i] = unittest.IncorporatedResultSeal.Fixture(
 					unittest.IncorporatedResultSeal.WithResult(
 						unittest.ExecutionResultFixture(
-							unittest.WithBlock(&block))))
+							unittest.WithBlock(block))))
 			}
 
 			evidenceStore := store.NewExecutionForkEvidence(db)
 
-			err := evidenceStore.StoreIfNotExists(conflictingSeals)
+			err := unittest.WithLock(t, lockManager, storage.LockInsertExecutionForkEvidence, func(lctx lockctx.Context) error {
+				return evidenceStore.StoreIfNotExists(lctx, conflictingSeals)
+			})
 			require.NoError(t, err)
 
 			retrievedConflictingSeals, err := evidenceStore.Retrieve()
@@ -48,6 +52,7 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 
 	t.Run("Don't overwrite evidence", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
 			block := unittest.BlockFixture()
 
 			conflictingSeals := make([]*flow.IncorporatedResultSeal, 2)
@@ -55,7 +60,7 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 				conflictingSeals[i] = unittest.IncorporatedResultSeal.Fixture(
 					unittest.IncorporatedResultSeal.WithResult(
 						unittest.ExecutionResultFixture(
-							unittest.WithBlock(&block))))
+							unittest.WithBlock(block))))
 			}
 
 			conflictingSeals2 := make([]*flow.IncorporatedResultSeal, 2)
@@ -63,14 +68,16 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 				conflictingSeals2[i] = unittest.IncorporatedResultSeal.Fixture(
 					unittest.IncorporatedResultSeal.WithResult(
 						unittest.ExecutionResultFixture(
-							unittest.WithBlock(&block))))
+							unittest.WithBlock(block))))
 			}
 
 			evidenceStore := store.NewExecutionForkEvidence(db)
 
 			// Store and read evidence.
 			{
-				err := evidenceStore.StoreIfNotExists(conflictingSeals)
+				err := unittest.WithLock(t, lockManager, storage.LockInsertExecutionForkEvidence, func(lctx lockctx.Context) error {
+					return evidenceStore.StoreIfNotExists(lctx, conflictingSeals)
+				})
 				require.NoError(t, err)
 
 				retrievedConflictingSeals, err := evidenceStore.Retrieve()
@@ -80,7 +87,9 @@ func TestExecutionForkEvidenceStoreAndRetrieve(t *testing.T) {
 
 			// Overwriting existing evidence is no-op.
 			{
-				err := evidenceStore.StoreIfNotExists(conflictingSeals2)
+				err := unittest.WithLock(t, lockManager, storage.LockInsertExecutionForkEvidence, func(lctx lockctx.Context) error {
+					return evidenceStore.StoreIfNotExists(lctx, conflictingSeals2)
+				})
 				require.NoError(t, err)
 
 				retrievedConflictingSeals, err := evidenceStore.Retrieve()

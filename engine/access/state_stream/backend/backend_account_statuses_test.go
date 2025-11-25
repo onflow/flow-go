@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 var testProtocolEventTypes = []flow.EventType{
@@ -54,17 +53,19 @@ func TestBackendAccountStatusesSuite(t *testing.T) {
 // generateProtocolMockEvents generates a set of mock events.
 func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsList {
 	events := make([]flow.Event, 4)
-	events = append(events, unittest.EventFixture(testEventTypes[0], 0, 0, unittest.IdentifierFixture(), 0))
+	events = append(events, unittest.EventFixture(
+		unittest.Event.WithEventType(testEventTypes[0]),
+	))
 
-	accountCreateEvent := generator.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
+	accountCreateEvent := unittest.EventGenerator.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
 	accountCreateEvent.TransactionIndex = 1
 	events = append(events, accountCreateEvent)
 
-	accountContractAdded := generator.GenerateAccountContractEvent(s.T(), "AccountContractAdded", s.accountContractAdded)
+	accountContractAdded := unittest.EventGenerator.GenerateAccountContractEvent(s.T(), "AccountContractAdded", s.accountContractAdded)
 	accountContractAdded.TransactionIndex = 2
 	events = append(events, accountContractAdded)
 
-	accountContractUpdated := generator.GenerateAccountContractEvent(s.T(), "AccountContractUpdated", s.accountContractUpdated)
+	accountContractUpdated := unittest.EventGenerator.GenerateAccountContractEvent(s.T(), "AccountContractUpdated", s.accountContractUpdated)
 	accountContractUpdated.TransactionIndex = 3
 	events = append(events, accountContractUpdated)
 
@@ -85,13 +86,13 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 	s.accountContractUpdated, err = addressGenerator.NextAddress()
 	require.NoError(s.T(), err)
 
-	parent := s.rootBlock.Header
+	parent := s.rootBlock.ToHeader()
 	events := s.generateProtocolMockEvents()
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
-		parent = block.Header
+		parent = block.ToHeader()
 
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
@@ -111,11 +112,11 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 		s.blocks = append(s.blocks, block)
 		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 		s.blockEvents[block.ID()] = events
-		s.blockMap[block.Header.Height] = block
+		s.blockMap[block.Height] = block
 		s.sealMap[block.ID()] = seal
 		s.resultMap[seal.ResultID] = result
 
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
+		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Height, block.ID(), result.ExecutionDataID)
 	}
 
 	s.SetupTestMocks()
@@ -127,7 +128,7 @@ func (s *BackendAccountStatusesSuite) subscribeFromStartBlockIdTestCases() []tes
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startValue:      s.rootBlock.ID(),
+			startValue:      s.blocks[0].ID(),
 		},
 		{
 			name:            "happy path - partial backfill",
@@ -138,11 +139,6 @@ func (s *BackendAccountStatusesSuite) subscribeFromStartBlockIdTestCases() []tes
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startValue:      s.blocks[0].ID(),
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startValue:      s.rootBlock.ID(),  // start from root block
 		},
 	}
 
@@ -155,22 +151,17 @@ func (s *BackendAccountStatusesSuite) subscribeFromStartHeightTestCases() []test
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
-			startValue:      s.rootBlock.Header.Height,
+			startValue:      s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
-			startValue:      s.blocks[0].Header.Height,
+			startValue:      s.blocks[0].Height,
 		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startValue:      s.blocks[0].Header.Height,
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,         // backfill all blocks
-			startValue:      s.rootBlock.Header.Height, // start from root block
+			startValue:      s.blocks[0].Height,
 		},
 	}
 
@@ -290,7 +281,7 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 			// Add "backfill" block - blocks that are already in the database before the test starts
 			// This simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.highestBlockHeader = s.blocks[test.highestBackfill].Header
+				s.highestBlockHeader = s.blocks[test.highestBackfill].ToHeader()
 			}
 
 			// Set up subscription context and cancellation
@@ -305,39 +296,26 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 				// Simulate new exec data received.
 				// Exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.highestBlockHeader = b.Header
+					s.highestBlockHeader = b.ToHeader()
 
 					s.broadcaster.Publish()
 				}
 
-				expectedEvents := map[string]flow.EventsList{}
-				for _, event := range s.blockEvents[b.ID()] {
-					if test.filters.Match(event) {
-						var address string
-						switch event.Type {
-						case state_stream.CoreEventAccountCreated:
-							address = s.accountCreatedAddress.HexWithPrefix()
-						case state_stream.CoreEventAccountContractAdded:
-							address = s.accountContractAdded.HexWithPrefix()
-						case state_stream.CoreEventAccountContractUpdated:
-							address = s.accountContractUpdated.HexWithPrefix()
-						}
-						expectedEvents[address] = append(expectedEvents[address], event)
-					}
-				}
+				expectedEvents := s.expectedAccountStatuses(b.ID(), test.filters)
 
 				// Consume execution data from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Header.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Height, b.ID(), sub.Err())
 
-					resp, ok := v.(*AccountStatusesResponse)
-					require.True(s.T(), ok, "unexpected response type: %T", v)
+					expected := &AccountStatusesResponse{
+						BlockID:       b.ID(),
+						Height:        b.Height,
+						AccountEvents: expectedEvents,
+					}
+					s.requireEventsResponse(v, expected)
 
-					assert.Equal(s.T(), b.Header.ID(), resp.BlockID)
-					assert.Equal(s.T(), b.Header.Height, resp.Height)
-					assert.Equal(s.T(), expectedEvents, resp.AccountEvents)
-				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 			}
 
 			// Make sure there are no new messages waiting. The channel should be opened with nothing waiting
@@ -407,6 +385,102 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 	s.subscribeToAccountStatuses(call, s.subscribeFromLatestTestCases())
 }
 
+// requireEventsResponse ensures that the received event information matches the expected data.
+func (s *BackendAccountStatusesSuite) requireEventsResponse(v interface{}, expected *AccountStatusesResponse) {
+	actual, ok := v.(*AccountStatusesResponse)
+	require.True(s.T(), ok, "unexpected response type: %T", v)
+
+	assert.Equal(s.T(), expected.BlockID, actual.BlockID)
+	assert.Equal(s.T(), expected.Height, actual.Height)
+	assert.Equal(s.T(), expected.AccountEvents, actual.AccountEvents)
+}
+
+// TestSubscribeAccountStatusesFromSporkRootBlock tests that events subscriptions starting from the spork
+// root block return an empty result for the root block.
+func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootBlock() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// setup the backend to have 1 available block
+	s.highestBlockHeader = s.blocks[0].ToHeader()
+
+	rootEventResponse := &AccountStatusesResponse{
+		BlockID:       s.rootBlock.ID(),
+		Height:        s.rootBlock.Height,
+		AccountEvents: map[string]flow.EventsList{},
+	}
+
+	filter, err := state_stream.NewAccountStatusFilter(state_stream.DefaultEventFilterConfig, chainID.Chain(), []string{}, []string{})
+	require.NoError(s.T(), err)
+
+	expectedEvents := s.expectedAccountStatuses(s.blocks[0].ID(), filter)
+	firstEventResponse := &AccountStatusesResponse{
+		BlockID:       s.blocks[0].ID(),
+		Height:        s.blocks[0].Height,
+		AccountEvents: expectedEvents,
+	}
+
+	assertSubscriptionResponses := func(sub subscription.Subscription, cancel context.CancelFunc) {
+		// the first response should have details from the root block and no events
+		resp := <-sub.Channel()
+		s.requireEventsResponse(resp, rootEventResponse)
+
+		// the second response should have details from the first block and its events
+		resp = <-sub.Channel()
+		s.requireEventsResponse(resp, firstEventResponse)
+
+		cancel()
+		resp, ok := <-sub.Channel()
+		assert.False(s.T(), ok)
+		assert.Nil(s.T(), resp)
+		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
+	}
+
+	s.Run("by height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromHeight", s.rootBlock.Height).
+			Return(func(startHeight uint64) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+			})
+
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Height, filter)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by ID", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.executionDataTracker.On("GetStartHeightFromBlockID", s.rootBlock.ID()).
+			Return(func(startBlockID flow.Identifier) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+			})
+
+		sub := s.backend.SubscribeAccountStatusesFromStartBlockID(subCtx, s.rootBlock.ID(), filter)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+	s.Run("by latest", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		// simulate the case where the latest block is also the root block
+		s.snapshot.On("Head").Unset()
+		s.snapshot.On("Head").Return(s.rootBlock.ToHeader(), nil).Once()
+
+		s.executionDataTracker.On("GetStartHeightFromLatest", mock.Anything).
+			Return(func(ctx context.Context) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+			})
+
+		sub := s.backend.SubscribeAccountStatusesFromLatestBlock(subCtx, filter)
+		assertSubscriptionResponses(sub, subCancel)
+	})
+
+}
+
 // TestSubscribeAccountStatusesHandlesErrors tests handling of expected errors in the SubscribeAccountStatuses.
 func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -439,7 +513,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Header.Height-1, state_stream.AccountStatusFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Height-1, state_stream.AccountStatusFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -450,7 +524,31 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.AccountStatusFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Height+10, state_stream.AccountStatusFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
+}
+
+// expectedAccountStatuses returns the account status events from the mock block events that match
+// the provided filter.
+func (s *BackendAccountStatusesSuite) expectedAccountStatuses(
+	blockID flow.Identifier,
+	filter state_stream.AccountStatusFilter,
+) map[string]flow.EventsList {
+	expectedEvents := map[string]flow.EventsList{}
+	for _, event := range s.blockEvents[blockID] {
+		if filter.Match(event) {
+			var address string
+			switch event.Type {
+			case state_stream.CoreEventAccountCreated:
+				address = s.accountCreatedAddress.HexWithPrefix()
+			case state_stream.CoreEventAccountContractAdded:
+				address = s.accountContractAdded.HexWithPrefix()
+			case state_stream.CoreEventAccountContractUpdated:
+				address = s.accountContractUpdated.HexWithPrefix()
+			}
+			expectedEvents[address] = append(expectedEvents[address], event)
+		}
+	}
+	return expectedEvents
 }

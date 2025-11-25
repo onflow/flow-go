@@ -38,7 +38,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -55,7 +54,8 @@ type VerificationConfig struct {
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
-	stopAtHeight uint64 // height to stop the node on
+	stopAtHeight                 uint64 // height to stop the node on
+	scheduledTransactionsEnabled bool   // enable execution of scheduled transactions
 }
 
 type VerificationNodeBuilder struct {
@@ -83,6 +83,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
+			flags.BoolVar(&v.verConf.scheduledTransactionsEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "enable execution of scheduled transactions")
 		})
 }
 
@@ -168,20 +169,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var ok bool
 			var err error
 
-			if dbops.IsBadgerTransaction(v.DBOps) {
-				return fmt.Errorf("badger transaction is not supported for chunks queue")
-			} else if dbops.IsBatchUpdate(node.DBOps) {
-				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
-				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
-				if err != nil {
-					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
-				}
-
-				chunkQueue = queue
-				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
-			} else {
-				return fmt.Errorf(dbops.UsageErrMsg, v.DBOps)
+			queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
+			ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
+			if err != nil {
+				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 			}
+
+			chunkQueue = queue
+			node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
 
 			node.Logger.Info().
 				Str("component", "node-builder").
@@ -211,19 +206,19 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			)
 
 			// TODO(JanezP): cleanup creation of fvm context github.com/onflow/flow-go/issues/5249
-			fvmOptions = append(fvmOptions, computation.DefaultFVMOptions(node.RootChainID, false, false)...)
+			fvmOptions = append(
+				fvmOptions,
+				computation.DefaultFVMOptions(
+					node.RootChainID,
+					false,
+					v.verConf.scheduledTransactionsEnabled,
+				)...,
+			)
 			vmCtx := fvm.NewContext(fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 
-			var approvalStorage storage.ResultApprovals
-			if dbops.IsBadgerTransaction(v.DBOps) {
-				return nil, fmt.Errorf("badger transaction is not supported for approval storage")
-			} else if dbops.IsBatchUpdate(v.DBOps) {
-				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
-			} else {
-				return nil, fmt.Errorf("invalid db opts type: %v", v.DBOps)
-			}
+			approvalStorage := store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB, node.StorageLockMgr)
 
 			verifierEng, err = verifier.New(
 				node.Logger,
@@ -327,7 +322,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Blocks,
 				node.State,
 				assignerEngine,
-				v.verConf.blockWorkers)
+				v.verConf.blockWorkers,
+				followerDistributor)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
@@ -357,14 +353,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			final := finalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, followerState, node.Tracer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
-
-			followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
@@ -374,7 +368,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				final,
 				followerDistributor,
-				node.FinalizedRootBlock.Header,
+				node.FinalizedRootBlock.ToHeader(),
 				node.RootQC,
 				finalized,
 				pending,
@@ -419,12 +413,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				node.LastFinalizedHeader,
 				core,
+				followerDistributor,
 				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
@@ -445,11 +439,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				syncCore,
 				node.SyncEngineIdentifierProvider,
 				spamConfig,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		})

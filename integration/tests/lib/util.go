@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -53,11 +55,79 @@ var (
 	}
 )
 
+// TestFlowScheduledTransactionHandlerContract creates a test contract DSL for testing FlowTransactionScheduler
+func TestFlowScheduledTransactionHandlerContract(transactionScheduler sdk.Address, flowToken sdk.Address, fungibleToken sdk.Address) dsl.Contract {
+	return dsl.Contract{
+		Name: "TestFlowTransactionSchedulerHandler",
+		Imports: []dsl.Import{
+			{
+				Names:   []string{"FlowTransactionScheduler"},
+				Address: transactionScheduler,
+			},
+			{
+				Names:   []string{"FlowToken"},
+				Address: flowToken,
+			},
+			{
+				Names:   []string{"FungibleToken"},
+				Address: fungibleToken,
+			},
+		},
+		Members: []dsl.CadenceCode{
+			dsl.Code(`
+				access(all) var scheduledTransactions: @{UInt64: FlowTransactionScheduler.ScheduledTransaction}
+				access(all) var executedTransactions: [UInt64]
+
+				access(all) let HandlerStoragePath: StoragePath
+				access(all) let HandlerPublicPath: PublicPath
+				
+				access(all) resource Handler: FlowTransactionScheduler.TransactionHandler {
+					
+					access(FlowTransactionScheduler.Execute) 
+					fun executeTransaction(id: UInt64, data: AnyStruct?) {
+						TestFlowTransactionSchedulerHandler.executedTransactions.append(id)
+					}
+				}
+
+				access(all) fun createHandler(): @Handler {
+					return <- create Handler()
+				}
+
+				access(all) fun addScheduledTransaction(tx: @FlowTransactionScheduler.ScheduledTransaction) {
+					self.scheduledTransactions[tx.id] <-! tx
+				}
+
+				access(all) fun cancelTransaction(id: UInt64): @FlowToken.Vault {
+					let tx <- self.scheduledTransactions.remove(key: id)
+						?? panic("Invalid ID: \(id) tx not found")
+					return <-FlowTransactionScheduler.cancel(scheduledTx: <-tx)
+				}
+
+				access(all) fun getExecutedTransactions(): [UInt64] {
+					return self.executedTransactions
+				}
+
+				access(all) init() {
+					self.scheduledTransactions <- {}
+					self.executedTransactions = []
+
+					self.HandlerStoragePath = /storage/testTransactionHandler
+					self.HandlerPublicPath = /public/testTransactionHandler
+				}
+			`),
+		},
+	}
+}
+
 // CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
 // authorizing account NOTE: the counter contract must be deployed first
 func CreateCounterTx(counterAddress sdk.Address) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: counterAddress},
+		Imports: dsl.Imports{
+			dsl.Import{
+				Address: counterAddress,
+			},
+		},
 		Content: dsl.Prepare{
 			Content: dsl.Code(fmt.Sprintf(
 				`
@@ -91,8 +161,8 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 			`
 			  let account = getAccount(0x%s)
 			  let counter = account.capabilities.borrow<&Testing.Counter>(/public/counter)
-              return counter?.count ?? %d
-            `,
+			  return counter?.count ?? %d
+			`,
 			accountAddress.Hex(),
 			CounterDefaultValue,
 		),
@@ -104,7 +174,11 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 // contract must be deployed first
 func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
+		Imports: dsl.Imports{
+			dsl.Import{
+				Address: sdk.Address(chain.ServiceAddress()),
+			},
+		},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.storage.load<@Testing.Counter>(from: /storage/counter)
@@ -244,10 +318,10 @@ func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *te
 	require.NoError(t, err)
 	counter := epoch.Counter()
 
-	log.Info().Uint64("final_height", finalized.Header.Height).
-		Uint64("final_view", finalized.Header.View).
-		Uint64("sealed_height", sealed.Header.Height).
-		Uint64("sealed_view", sealed.Header.View).
+	log.Info().Uint64("final_height", finalized.Height).
+		Uint64("final_view", finalized.View).
+		Uint64("sealed_height", sealed.Height).
+		Uint64("sealed_view", sealed.View).
 		Str("cur_epoch_phase", phase.String()).
 		Uint64("cur_epoch_counter", counter).
 		Msg("test run status")
@@ -268,4 +342,207 @@ func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Log
 		LogStatus(t, ctx, log, client)
 		cancel()
 	}
+}
+
+// ScheduleTransactionAtTimestamp sends a test transaction to schedule a transaction on FlowTransactionScheduler
+// at a given timestamp and returns the scheduled transaction ID.
+func ScheduleTransactionAtTimestamp(
+	timestamp int64,
+	client *testnet.Client,
+	sc *systemcontracts.SystemContracts,
+) (uint64, error) {
+	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("could not get latest block ID: %w", err)
+	}
+
+	flowTransactionScheduler := sdk.Address(sc.FlowTransactionScheduler.Address)
+	flowToken := sdk.Address(sc.FlowToken.Address)
+	fungibleToken := sdk.Address(sc.FungibleToken.Address)
+
+	serviceAccountAddress := client.SDKServiceAddress()
+	script := []byte(fmt.Sprintf(`
+		import FlowTransactionScheduler from 0x%s
+		import TestFlowTransactionSchedulerHandler from 0x%s
+		import FlowToken from 0x%s
+		import FungibleToken from 0x%s
+
+		transaction(timestamp: UFix64) {
+
+			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
+				if !account.storage.check<@TestFlowTransactionSchedulerHandler.Handler>(from: TestFlowTransactionSchedulerHandler.HandlerStoragePath) {
+					let handler <- TestFlowTransactionSchedulerHandler.createHandler()
+
+					account.storage.save(<-handler, to: TestFlowTransactionSchedulerHandler.HandlerStoragePath)
+					account.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>(TestFlowTransactionSchedulerHandler.HandlerStoragePath)
+				}
+
+				let transactionCap = account.capabilities.storage
+					.getControllers(forPath: TestFlowTransactionSchedulerHandler.HandlerStoragePath)[0]
+					.capability as! Capability<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>
+				
+				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow FlowToken vault")
+				
+				let testData = "test data"
+				let feeAmount = 1.0
+				let effort = UInt64(1000)
+				let priority = FlowTransactionScheduler.Priority.High
+
+				let fees <- vault.withdraw(amount: feeAmount) as! @FlowToken.Vault
+				
+				let scheduledTransaction <- FlowTransactionScheduler.schedule(
+					handlerCap: transactionCap,
+					data: testData,
+					timestamp: timestamp,
+					priority: priority,
+					executionEffort: effort,
+					fees: <-fees
+				)
+
+				TestFlowTransactionSchedulerHandler.addScheduledTransaction(tx: <-scheduledTransaction)
+			}
+		} 
+	`, serviceAccountAddress.Hex(), flowTransactionScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
+
+	timeArg, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
+	if err != nil {
+		return 0, fmt.Errorf("could not create time argument: %w", err)
+	}
+
+	tx := sdk.NewTransaction().
+		SetScript(script).
+		SetReferenceBlockID(referenceBlock.ID).
+		SetProposalKey(serviceAccountAddress, 0, client.GetAndIncrementSeqNumber()).
+		SetPayer(serviceAccountAddress).
+		AddAuthorizer(serviceAccountAddress)
+
+	err = tx.AddArgument(timeArg)
+	if err != nil {
+		return 0, fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	return sendScheduledTransactionTx(client, tx)
+}
+
+// CancelTransactionByID sends a test transaction for canceling a scheduled transaction on FlowTransactionScheduler by ID.
+func CancelTransactionByID(
+	transactionID uint64,
+	client *testnet.Client,
+	sc *systemcontracts.SystemContracts,
+) (uint64, error) {
+	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("could not get latest block ID: %w", err)
+	}
+
+	flowTransactionScheduler := sdk.Address(sc.FlowTransactionScheduler.Address)
+	flowToken := sdk.Address(sc.FlowToken.Address)
+	fungibleToken := sdk.Address(sc.FungibleToken.Address)
+
+	serviceAccountAddress := client.SDKServiceAddress()
+	cancelTx := fmt.Sprintf(`
+		import FlowTransactionScheduler from 0x%s
+		import TestFlowTransactionSchedulerHandler from 0x%s
+		import FlowToken from 0x%s
+		import FungibleToken from 0x%s
+
+		transaction(id: UInt64) {
+
+			prepare(account: auth(BorrowValue, SaveValue, IssueStorageCapabilityController, PublishCapability, GetStorageCapabilityController) &Account) {
+
+				let vault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow FlowToken vault")
+
+				vault.deposit(from: <-TestFlowTransactionSchedulerHandler.cancelTransaction(id: id))
+			}
+		} 
+	`, serviceAccountAddress.Hex(), flowTransactionScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
+
+	tx := sdk.NewTransaction().
+		SetScript([]byte(cancelTx)).
+		SetReferenceBlockID(referenceBlock.ID).
+		SetProposalKey(serviceAccountAddress, 0, client.GetAndIncrementSeqNumber()).
+		SetPayer(serviceAccountAddress).
+		AddAuthorizer(serviceAccountAddress)
+
+	err = tx.AddArgument(cadence.UInt64(transactionID))
+	if err != nil {
+		return 0, fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	return sendScheduledTransactionTx(client, tx)
+}
+
+// ExtractTransactionIDFromEvents extracts the scheduled transaction ID from the events of a transaction result.
+func ExtractTransactionIDFromEvents(result *sdk.TransactionResult) uint64 {
+	for _, event := range result.Events {
+		if strings.Contains(string(event.Type), "FlowTransactionScheduler.Scheduled") ||
+			strings.Contains(string(event.Type), "FlowTransactionScheduler.Canceled") ||
+			strings.Contains(string(event.Type), "FlowTransactionScheduler.Executed") ||
+			strings.Contains(string(event.Type), "FlowTransactionScheduler.PendingExecution") {
+
+			if id := event.Value.SearchFieldByName("id"); id != nil {
+				return uint64(id.(cadence.UInt64))
+			}
+		}
+	}
+
+	return 0
+}
+
+// DeployScheduledTransactionsTestContract deploys the test contract for scheduled transactions.
+func DeployScheduledTransactionsTestContract(
+	client *testnet.Client,
+	sc *systemcontracts.SystemContracts,
+) (sdk.Identifier, error) {
+	referenceBlock, err := client.GetLatestFinalizedBlockHeader(context.Background())
+	if err != nil {
+		return sdk.Identifier{}, fmt.Errorf("could not get latest block ID: %w", err)
+	}
+
+	flowTransactionScheduler := sdk.Address(sc.FlowTransactionScheduler.Address)
+	flowToken := sdk.Address(sc.FlowToken.Address)
+	fungibleToken := sdk.Address(sc.FungibleToken.Address)
+
+	testContract := TestFlowScheduledTransactionHandlerContract(flowTransactionScheduler, flowToken, fungibleToken)
+	tx, err := client.DeployContract(context.Background(), referenceBlock.ID, testContract)
+	if err != nil {
+		return sdk.Identifier{}, fmt.Errorf("could not deploy test contract: %w", err)
+	}
+
+	res, err := client.WaitForExecuted(context.Background(), tx.ID())
+	if err != nil {
+		return sdk.Identifier{}, fmt.Errorf("could not wait for deploy transaction to be sealed: %w", err)
+	}
+
+	if res.Error != nil {
+		return sdk.Identifier{}, fmt.Errorf("deploy transaction should not have error: %w", res.Error)
+	}
+
+	return tx.ID(), nil
+}
+
+func sendScheduledTransactionTx(client *testnet.Client, tx *sdk.Transaction) (uint64, error) {
+	err := client.SignAndSendTransaction(context.Background(), tx)
+	if err != nil {
+		return 0, fmt.Errorf("could not send schedule transaction: %w", err)
+	}
+
+	// Wait for the transaction to be executed
+	executedResult, err := client.WaitForExecuted(context.Background(), tx.ID())
+	if err != nil {
+		return 0, fmt.Errorf("could not wait for schedule transaction to be executed: %w", err)
+	}
+
+	if executedResult.Error != nil {
+		return 0, fmt.Errorf("schedule transaction should not have error: %w", executedResult.Error)
+	}
+
+	transactionID := ExtractTransactionIDFromEvents(executedResult)
+	if transactionID == 0 {
+		return 0, fmt.Errorf("scheduled transaction ID should not be 0")
+	}
+
+	return transactionID, nil
 }

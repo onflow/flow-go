@@ -98,6 +98,9 @@ type ExecutionCollector struct {
 	evmTransactionGasUsed                   prometheus.Histogram
 	evmBlockTxCount                         prometheus.Histogram
 	evmBlockGasUsed                         prometheus.Histogram
+	callbacksExecutedCount                  prometheus.Histogram
+	callbacksProcessComputationUsed         prometheus.Histogram
+	callbacksExecuteComputationLimits       prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -793,6 +796,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Name:      "evm_block_total_supply",
 			Help:      "the total amount of flow deposited to EVM (in FLOW)",
 		}),
+
+		callbacksExecutedCount: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "callbacks_executed_count",
+			Help:      "the number of callbacks executed",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 9),
+		}),
+
+		callbacksProcessComputationUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "callbacks_process_computation_used",
+			Help:      "the computation used by the process callback transaction",
+			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
+		}),
+
+		callbacksExecuteComputationLimits: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "callbacks_execute_computation_limits",
+			Help:      "the total computation limits for execute callback transactions",
+			Buckets:   prometheus.ExponentialBuckets(10_000, 2, 12),
+		}),
 	}
 
 	return ec
@@ -851,14 +878,16 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
 	stats module.TransactionExecutionResultStats,
-	info module.TransactionExecutionResultInfo,
+	_ module.TransactionExecutionResultInfo,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionConflictRetries.Observe(float64(stats.NumberOfTxnConflictRetries))
 	ec.transactionComputationUsed.Observe(float64(stats.ComputationUsed))
-	ec.transactionNormalizedTimePerComputation.Observe(
-		flow.NormalizedExecutionTimePerComputationUnit(dur, stats.ComputationUsed))
+	if stats.ComputationUsed > 0 {
+		ec.transactionNormalizedTimePerComputation.Observe(
+			flow.NormalizedExecutionTimePerComputationUnit(dur, stats.ComputationUsed))
+	}
 	ec.transactionMemoryEstimate.Observe(float64(stats.MemoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(stats.EventCounts))
 	ec.transactionEventSize.Observe(float64(stats.EventSize))
@@ -873,7 +902,7 @@ func (ec *ExecutionCollector) ExecutionChunkDataPackGenerated(proofSize, numberO
 	ec.chunkDataPackCollectionSize.Observe(float64(numberOfTransactions))
 }
 
-// ScriptExecuted reports the time spent executing a single script
+// ExecutionScriptExecuted reports the time spent executing a single script
 func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimated uint64) {
 	ec.totalExecutedScriptsCounter.Inc()
 	ec.scriptExecutionTime.Observe(float64(dur.Milliseconds()))
@@ -881,6 +910,13 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 	ec.scriptMemoryUsage.Observe(float64(memoryUsed))
 	ec.scriptMemoryEstimate.Observe(float64(memoryEstimated))
 	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
+}
+
+// ExecutionScheduledTransactionsExecuted reports scheduled transaction execution metrics
+func (ec *ExecutionCollector) ExecutionScheduledTransactionsExecuted(scheduledTransactionCount int, processComputationUsed, executeComputationLimits uint64) {
+	ec.callbacksExecutedCount.Observe(float64(scheduledTransactionCount))
+	ec.callbacksProcessComputationUsed.Observe(float64(processComputationUsed))
+	ec.callbacksExecuteComputationLimits.Observe(float64(executeComputationLimits))
 }
 
 // ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes

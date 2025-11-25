@@ -1,43 +1,41 @@
 package storage
 
 import (
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type ExecutionResultsReader interface {
-	// ByID retrieves an execution result by its ID. Returns `ErrNotFound` if `resultID` is unknown.
+	// ByID retrieves an execution result by its ID. Returns [storage.ErrNotFound] if `resultID` is unknown.
 	ByID(resultID flow.Identifier) (*flow.ExecutionResult, error)
 
-	// ByIDTx returns a functor which retrieves the execution result by its ID, as part of a future database transaction.
-	// When executing the functor, it returns `ErrNotFound` if no execution result with the respective ID is known.
-	// deprecated
-	ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error)
-
 	// ByBlockID retrieves an execution result by block ID.
+	// It returns [storage.ErrNotFound] if `blockID` refers to a block which is unknown, or for which a trusted (sealed or executed by this node) execution result does not exist.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)
+
+	// IDByBlockID retrieves an execution result ID by block ID.
+	// It returns [storage.ErrNotFound] if `blockID` does not refer to a block executed by this node
+	IDByBlockID(blockID flow.Identifier) (flow.Identifier, error)
 }
 
 type ExecutionResults interface {
 	ExecutionResultsReader
 
-	// Store stores an execution result.
-	Store(result *flow.ExecutionResult) error
-
-	// BatchStore stores an execution result in a given batch
+	// BatchStore stores an execution result in a given batch.
+	// The key (result ID) is derived from the value (result) via a collision-resistant hash function. Hence,
+	// unchecked overwrites pose no risk of data corruption, because for the same key, we expect the same value.
+	// No error is expected during normal operation.
 	BatchStore(result *flow.ExecutionResult, batch ReaderBatchWriter) error
 
-	// Index indexes an execution result by block ID.
-	Index(blockID flow.Identifier, resultID flow.Identifier) error
-
-	// ForceIndex indexes an execution result by block ID overwriting existing database entry
-	ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error
-
-	// BatchIndex indexes an execution result by block ID in a given batch
-	BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch ReaderBatchWriter) error
+	// BatchIndex indexes an execution result by block ID in a given batch.
+	// Conceptually, an execution result for a block should be persisted once and never changed thereafter.
+	// The function enforces this, for which reason the caller must acquire [storage.LockIndexExecutionResult].
+	// It returns [storage.ErrDataMismatch] if there is already an indexed result for the given blockID,
+	// but it is different from the given resultID.
+	BatchIndex(lctx lockctx.Proof, rw ReaderBatchWriter, blockID flow.Identifier, resultID flow.Identifier) error
 
 	// BatchRemoveIndexByBlockID removes blockID-to-executionResultID index entries keyed by blockID in a provided batch.
 	// No errors are expected during normal operation, even if no entries are matched.
-	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchRemoveIndexByBlockID(blockID flow.Identifier, batch ReaderBatchWriter) error
 }

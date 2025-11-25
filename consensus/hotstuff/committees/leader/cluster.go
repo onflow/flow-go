@@ -26,7 +26,7 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.CommittedEpoch
 		return nil, fmt.Errorf("could not create rng: %w", err)
 	}
 
-	firstView := cluster.RootBlock().Header.View
+	firstView := cluster.RootBlock().View
 	finalView := firstView + EstimatedSixMonthOfViews // TODO what is a good value here?
 
 	// ComputeLeaderSelection already handles zero-weight nodes with marginal overhead.

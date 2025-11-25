@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -30,6 +30,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -95,7 +96,7 @@ type SameGRPCPortTestSuite struct {
 }
 
 func (suite *SameGRPCPortTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -149,17 +150,16 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.blockMap = make(map[uint64]*flow.Block, blockCount)
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
-	suite.blockMap[rootBlock.Header.Height] = &rootBlock
+	parent := rootBlock.ToHeader()
+	suite.blockMap[rootBlock.Height] = rootBlock
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
-		suite.blockMap[block.Header.Height] = block
+		suite.blockMap[block.Height] = block
 	}
 
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil)
-	params.On("SealedRoot").Return(rootBlock.Header, nil)
+	params.On("SporkRootBlockHeight").Return(rootBlock.Height, nil)
 
 	// generate a server certificate that will be served by the GRPC server
 	networkingKey := unittest.NetworkingPrivKeyFixture()
@@ -171,7 +171,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil,
@@ -179,7 +180,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil).Build()
@@ -194,6 +196,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		Headers:              suite.headers,
 		Collections:          suite.collections,
 		Transactions:         suite.transactions,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		AccessMetrics:        suite.metrics,
 		MaxHeightRange:       0,
@@ -207,6 +210,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	stateStreamConfig := statestreambackend.Config{}
+	followerDistributor := pubsub.NewFollowerDistributor()
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -223,6 +227,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		stateStreamConfig,
 		nil,
+		followerDistributor,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -232,7 +237,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) flow.Identifier {
 			if block, ok := suite.blockMap[height]; ok {
-				return block.Header.ID()
+				return block.ID()
 			}
 			return flow.ZeroID
 		},
@@ -262,10 +267,10 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.executionDataTracker = tracker.NewExecutionDataTracker(
 		suite.log,
 		suite.state,
-		rootBlock.Header.Height,
+		rootBlock.Height,
 		suite.headers,
 		nil,
-		rootBlock.Header.Height,
+		rootBlock.Height,
 		eventIndexer,
 		false,
 	)
@@ -313,6 +318,14 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 	// wait for the state stream engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Ready(), 2*time.Second)
+}
+
+func (suite *SameGRPCPortTestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Done(), 2*time.Second)
 }
 
 // TestEnginesOnTheSameGrpcPort verifies if both AccessAPI and ExecutionDataAPI client successfully connect and continue

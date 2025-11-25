@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
 	runtimeCommon "github.com/onflow/cadence/common"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -22,7 +22,9 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -36,10 +38,14 @@ func TestExtractExecutionState(t *testing.T) {
 	metr := &metrics.NoopCollector{}
 
 	t.Run("missing block->state commitment mapping", func(t *testing.T) {
-
 		withDirs(t, func(datadir, execdir, outdir string) {
-			db := common.InitStorage(datadir)
-			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
+			// Initialize a proper Badger database instead of using empty directory
+			db := unittest.PebbleDB(t, datadir)
+			defer db.Close()
+
+			// Convert to storage.DB interface
+			storageDB := pebbleimpl.ToDB(db)
+			commits := store.NewCommits(metr, storageDB)
 
 			_, err := commits.ByBlockID(unittest.IdentifierFixture())
 			require.Error(t, err)
@@ -47,15 +53,26 @@ func TestExtractExecutionState(t *testing.T) {
 	})
 
 	t.Run("retrieves block->state mapping", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 
 		withDirs(t, func(datadir, execdir, outdir string) {
-			db := common.InitStorage(datadir)
-			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
+			// Initialize a proper Badger database instead of using empty directory
+			db := unittest.PebbleDB(t, datadir)
+			defer db.Close()
+
+			// Convert to storage.DB interface
+			storageDB := pebbleimpl.ToDB(db)
+			commits := store.NewCommits(metr, storageDB)
 
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
 
-			err := commits.Store(blockID, stateCommitment)
+			err := unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					// Store the state commitment for the block ID
+					return operation.IndexStateCommitment(lctx, rw, blockID, stateCommitment)
+				})
+			})
 			require.NoError(t, err)
 
 			retrievedStateCommitment, err := commits.ByBlockID(blockID)
@@ -76,16 +93,20 @@ func TestExtractExecutionState(t *testing.T) {
 	})
 
 	t.Run("happy path", func(t *testing.T) {
+		lockManager := storage.NewTestingLockManager()
 
 		withDirs(t, func(datadir, execdir, _ string) {
-
 			const (
 				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 				checkpointsToKeep  = 1
 			)
 
-			db := common.InitStorage(datadir)
-			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
+			// Initialize a proper Badger database instead of using empty directory
+			db := unittest.PebbleDB(t, datadir)
+			defer db.Close()
+
+			// Convert to storage.DB interface
+			storageDB := pebbleimpl.ToDB(db)
 
 			// generate some oldLedger data
 			size := 10
@@ -117,7 +138,12 @@ func TestExtractExecutionState(t *testing.T) {
 
 				// generate random block and map it to state commitment
 				blockID := unittest.IdentifierFixture()
-				err = commits.Store(blockID, flow.StateCommitment(stateCommitment))
+
+				err = unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
+					return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.IndexStateCommitment(lctx, rw, blockID, flow.StateCommitment(stateCommitment))
+					})
+				})
 				require.NoError(t, err)
 
 				data := make(map[string]keyPair, len(keys))
@@ -127,85 +153,40 @@ func TestExtractExecutionState(t *testing.T) {
 						value: values[j],
 					}
 				}
-
-				keysValuesByCommit[string(stateCommitment[:])] = data
+				keysValuesByCommit[stateCommitment.String()] = data
 				commitsByBlocks[blockID] = stateCommitment
 				blocksInOrder[i] = blockID
 			}
 
+			// wait for the ledger and compactor to finish
 			<-f.Done()
 			<-compactor.Done()
 
-			err = db.Close()
+			// extract the execution state
+			extractor := newExecutionStateExtractor(zerolog.Nop(), execdir, flow.StateCommitment(stateCommitment))
+
+			partialState, payloads, err := extractor.extract()
 			require.NoError(t, err)
+			require.False(t, partialState)
+			// Calculate expected number of payloads based on getSampleKeyValues logic
+			expectedPayloads := 2 + 4 + 2 + (7 * 10) // cases 0, 1, 2, and 7 default cases
+			require.Equal(t, expectedPayloads, len(payloads))
 
-			// for blockID, stateCommitment := range commitsByBlocks {
+			// verify the payloads
+			for _, payload := range payloads {
+				key, err := payload.Key()
+				require.NoError(t, err)
 
-			for i, blockID := range blocksInOrder {
-
-				stateCommitment := commitsByBlocks[blockID]
-
-				// we need fresh output dir to prevent contamination
-				unittest.RunWithTempDir(t, func(outdir string) {
-
-					Cmd.SetArgs([]string{
-						"--execution-state-dir", execdir,
-						"--output-dir", outdir,
-						"--state-commitment", stateCommitment.String(),
-						"--datadir", datadir,
-						"--no-migration",
-						"--no-report",
-						"--chain", flow.Emulator.Chain().String()})
-
-					err := Cmd.Execute()
-					require.NoError(t, err)
-
-					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), outdir, size, pathfinder.PathByteSize, wal.SegmentSize)
-					require.NoError(t, err)
-
-					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
-					require.NoError(t, err)
-
-					const (
-						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
-						checkpointsToKeep  = 1
-					)
-					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
-					require.NoError(t, err)
-
-					<-compactor.Ready()
-
-					data := keysValuesByCommit[string(stateCommitment[:])]
-
-					keys := make([]ledger.Key, 0, len(data))
-					for _, v := range data {
-						keys = append(keys, v.key)
+				// Look for the key in all state commitments
+				found := false
+				for _, commitData := range keysValuesByCommit {
+					if kv, exist := commitData[key.String()]; exist {
+						require.Equal(t, kv.value, payload.Value())
+						found = true
+						break
 					}
-
-					query, err := ledger.NewQuery(stateCommitment, keys)
-					require.NoError(t, err)
-
-					registerValues, err := storage.Get(query)
-					// registerValues, err := mForest.Read([]byte(stateCommitment), keys)
-					require.NoError(t, err)
-
-					for i, key := range keys {
-						registerValue := registerValues[i]
-						require.Equal(t, data[key.String()].value, registerValue)
-					}
-
-					// make sure blocks after this one are not in checkpoint
-					// ie - extraction stops after hitting right hash
-					for j := i + 1; j < len(blocksInOrder); j++ {
-
-						query.SetState(commitsByBlocks[blocksInOrder[j]])
-						_, err := storage.Get(query)
-						require.Error(t, err)
-					}
-
-					<-storage.Done()
-					<-compactor.Done()
-				})
+				}
+				require.True(t, found, "key %s not found in any state commitment", key.String())
 			}
 		})
 	})

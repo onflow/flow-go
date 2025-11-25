@@ -155,7 +155,7 @@ func (e *Engine) Done() <-chan struct{} {
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *messages.ChunkDataResponse:
+	case *flow.ChunkDataResponse:
 		e.handleChunkDataPackWithTracing(originID, &resource.ChunkDataPack)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -298,9 +298,9 @@ func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verifi
 		return 0
 	}
 
-	qualified := e.canDispatchRequest(request.ChunkID)
+	qualified, reason := e.canDispatchRequest(request.ChunkID)
 	if !qualified {
-		lg.Debug().Msg("chunk data pack request is not qualified for dispatching at this round")
+		lg.Debug().Msg("chunk data pack request is not qualified for dispatching at this round: " + reason)
 		return 0
 	}
 
@@ -351,10 +351,10 @@ func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest
 }
 
 // canDispatchRequest returns whether chunk data request for this chunk ID can be dispatched.
-func (e *Engine) canDispatchRequest(chunkID flow.Identifier) bool {
+func (e *Engine) canDispatchRequest(chunkID flow.Identifier) (canDispatch bool, reasonMsg string) {
 	attempts, lastAttempt, retryAfter, exists := e.pendingRequests.RequestHistory(chunkID)
 	if !exists {
-		return false
+		return false, fmt.Sprintf("not found in mempool for chunk id: %s", chunkID)
 	}
 
 	return e.reqQualifierFunc(attempts, lastAttempt, retryAfter)

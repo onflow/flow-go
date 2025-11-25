@@ -17,7 +17,7 @@ import (
 )
 
 type signatureType struct {
-	message []byte
+	payload []byte
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
@@ -38,7 +38,7 @@ type signatureContinuation struct {
 	signatureEntry
 
 	// accountKey is set by getAccountKeys().
-	accountKey flow.AccountPublicKey
+	accountKey flow.RuntimeAccountPublicKey
 
 	// invokedVerify and verifyErr are set by verifyAccountSignatures().  Note
 	// that	verifyAccountSignatures() is always called after getAccountKeys()
@@ -66,9 +66,14 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 
 	entry.invokedVerify = true
 
+	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.payload)
+	if !valid {
+		entry.verifyErr = entry.newError(fmt.Errorf("signature extension data is not valid"))
+	}
+
 	valid, err := crypto.VerifySignatureFromTransaction(
 		entry.Signature,
-		entry.message,
+		message,
 		entry.accountKey.PublicKey,
 		entry.accountKey.HashAlgo,
 	)
@@ -173,7 +178,7 @@ func (v *TransactionVerifier) CheckAuthorization(
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
-	txnState.RunWithAllLimitsDisabled(func() {
+	txnState.RunWithMeteringDisabled(func() {
 		err = v.verifyTransaction(tracer, proc, txnState, keyWeightThreshold)
 	})
 	if err != nil {
@@ -206,7 +211,8 @@ func (v *TransactionVerifier) verifyTransaction(
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.EnvelopeSignatures,
-		tx.EnvelopeMessage())
+		tx.EnvelopeMessage(),
+	)
 	if err != nil {
 		return err
 	}
@@ -259,14 +265,14 @@ func (v *TransactionVerifier) verifyTransaction(
 // getAccountKeys gets the signatures' account keys and populate the account
 // keys into the signature continuation structs.
 func (v *TransactionVerifier) getAccountKeys(
-	txnState storage.TransactionPreparer,
+	_ storage.TransactionPreparer,
 	accounts environment.Accounts,
 	signatures []*signatureContinuation,
 	proposalKey flow.ProposalKey,
 ) error {
 	foundProposalSignature := false
 	for _, signature := range signatures {
-		accountKey, err := accounts.GetPublicKey(
+		accountKey, err := accounts.GetRuntimeAccountPublicKey(
 			signature.Address,
 			signature.KeyIndex)
 		if err != nil {

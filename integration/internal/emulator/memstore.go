@@ -63,7 +63,7 @@ func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {
 		}
 		return nil, err
 	}
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
@@ -72,7 +72,7 @@ func (b *Store) FinalizedHeader() (*flowgo.Header, error) {
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) SealedHeader() (*flowgo.Header, error) {
@@ -81,7 +81,7 @@ func (b *Store) SealedHeader() (*flowgo.Header, error) {
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 func (b *Store) IndexedHeight() (uint64, error) {
@@ -90,7 +90,7 @@ func (b *Store) IndexedHeight() (uint64, error) {
 		return 0, err
 	}
 
-	return block.Header.Height, nil
+	return block.Height, nil
 }
 
 // ByHeightFrom We don't have to do anything complex here, as emulator does not fork the chain
@@ -103,7 +103,7 @@ func (b *Store) ByHeightFrom(height uint64, header *flowgo.Header) (*flowgo.Head
 		return nil, err
 	}
 
-	return block.Header, nil
+	return block.ToHeader(), nil
 }
 
 // New returns a new in-memory Store implementation.
@@ -133,7 +133,7 @@ func (b *Store) LatestBlockHeight(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	return block.Header.Height, nil
+	return block.Height, nil
 }
 
 func (b *Store) LatestBlock(_ context.Context) (flowgo.Block, error) {
@@ -155,11 +155,11 @@ func (b *Store) StoreBlock(_ context.Context, block *flowgo.Block) error {
 }
 
 func (b *Store) storeBlock(block *flowgo.Block) error {
-	b.blocks[block.Header.Height] = *block
-	b.blockIDToHeight[block.ID()] = block.Header.Height
+	b.blocks[block.Height] = *block
+	b.blockIDToHeight[block.ID()] = block.Height
 
-	if block.Header.Height > b.blockHeight {
-		b.blockHeight = block.Header.Height
+	if block.Height > b.blockHeight {
+		b.blockHeight = block.Height
 	}
 
 	return nil
@@ -197,7 +197,7 @@ func (b *Store) BlockByHeight(_ context.Context, height uint64) (*flowgo.Block, 
 
 func (b *Store) CommitBlock(
 	_ context.Context,
-	block flowgo.Block,
+	block *flowgo.Block,
 	collections []*flowgo.LightCollection,
 	transactions map[flowgo.Identifier]*flowgo.TransactionBody,
 	transactionResults map[flowgo.Identifier]*StorableTransactionResult,
@@ -215,13 +215,13 @@ func (b *Store) CommitBlock(
 		)
 	}
 
-	err := b.storeBlock(&block)
+	err := b.storeBlock(block)
 	if err != nil {
 		return err
 	}
 
 	for _, col := range collections {
-		err := b.InsertCollection(*col)
+		err := b.InsertCollection(col)
 		if err != nil {
 			return err
 		}
@@ -242,13 +242,13 @@ func (b *Store) CommitBlock(
 	}
 
 	err = b.InsertExecutionSnapshot(
-		block.Header.Height,
+		block.Height,
 		executionSnapshot)
 	if err != nil {
 		return err
 	}
 
-	err = b.InsertEvents(block.Header.Height, events)
+	err = b.InsertEvents(block.Height, events)
 	if err != nil {
 		return err
 	}
@@ -358,8 +358,8 @@ func (b *Store) EventsByHeight(
 	return events, nil
 }
 
-func (b *Store) InsertCollection(col flowgo.LightCollection) error {
-	b.collections[col.ID()] = col
+func (b *Store) InsertCollection(col *flowgo.LightCollection) error {
+	b.collections[col.ID()] = *col
 	return nil
 }
 

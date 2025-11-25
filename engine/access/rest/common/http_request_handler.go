@@ -16,8 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const DefaultMaxRequestSize = 2 << 20 // 2MB
-
 // HttpHandler is custom http handler implementing custom handler function.
 // HttpHandler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
@@ -25,18 +23,21 @@ type HttpHandler struct {
 	Logger zerolog.Logger
 	Chain  flow.Chain
 
-	MaxRequestSize int64
+	MaxRequestSize  int64
+	MaxResponseSize int64
 }
 
 func NewHttpHandler(
 	logger zerolog.Logger,
 	chain flow.Chain,
 	maxRequestSize int64,
+	maxResponseSize int64,
 ) *HttpHandler {
 	return &HttpHandler{
-		Logger:         logger,
-		Chain:          chain,
-		MaxRequestSize: maxRequestSize,
+		Logger:          logger,
+		Chain:           chain,
+		MaxRequestSize:  maxRequestSize,
+		MaxResponseSize: maxResponseSize,
 	}
 }
 
@@ -69,6 +70,12 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 	if cadenceError != nil {
 		msg := fmt.Sprintf("Cadence error: %s", cadenceError.Error())
 		h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+		return
+	}
+
+	var sizeErr *http.MaxBytesError
+	if errors.As(err, &sizeErr) {
+		h.errorResponse(w, http.StatusRequestEntityTooLarge, "request size exceeds maximum allowed", errorLogger)
 		return
 	}
 
@@ -111,6 +118,12 @@ func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response int
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		errLogger.Error().Err(err).Str("response", string(encodedResponse)).Msg("failed to indent response")
+		return
+	}
+
+	if len(encodedResponse) > int(h.MaxResponseSize) {
+		w.WriteHeader(http.StatusInternalServerError)
+		errLogger.Error().Int("response_size", len(encodedResponse)).Msg("response size exceeds maximum allowed")
 		return
 	}
 

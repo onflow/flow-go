@@ -23,7 +23,7 @@ func TestNewSpamRecordCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -38,8 +38,8 @@ func TestNewSpamRecordCache(t *testing.T) {
 // Returns:
 // - alsp.ProtocolSpamRecord, the created spam record.
 // Note that the returned spam record is not a valid spam record. It is used only for testing.
-func protocolSpamRecordFixture(id flow.Identifier) model.ProtocolSpamRecord {
-	return model.ProtocolSpamRecord{
+func protocolSpamRecordFixture(id flow.Identifier) *model.ProtocolSpamRecord {
+	return &model.ProtocolSpamRecord{
 		OriginId:      id,
 		Decay:         1000,
 		CutoffCounter: 0,
@@ -56,11 +56,11 @@ func TestSpamRecordCache_Adjust_Init(t *testing.T) {
 	collector := metrics.NewNoopCollector()
 
 	recordFactoryCalled := 0
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		require.Less(t, recordFactoryCalled, 2, "record factory must be called only twice")
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFuncIncrement := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFuncIncrement := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		record.Penalty += 1
 		return record, nil
 	}
@@ -117,10 +117,10 @@ func TestSpamRecordCache_Adjust_Error(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -139,7 +139,7 @@ func TestSpamRecordCache_Adjust_Error(t *testing.T) {
 	require.Equal(t, 0.0, penalty, "expected penalty to be 0")
 
 	// test adjusting the spam record for an existing origin ID
-	adjustFunc := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFunc := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		record.Penalty -= 10
 		return record, nil
 	}
@@ -153,7 +153,7 @@ func TestSpamRecordCache_Adjust_Error(t *testing.T) {
 	require.Equal(t, -10.0, record1.Penalty)
 
 	// test adjusting the spam record with an adjustFunc that returns an error
-	adjustFuncError := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFuncError := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, errors.New("adjustment error")
 	}
 	_, err = cache.AdjustWithInit(originID1, adjustFuncError)
@@ -174,10 +174,10 @@ func TestSpamRecordCache_Identities(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -220,10 +220,10 @@ func TestSpamRecordCache_Remove(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -267,10 +267,10 @@ func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -287,7 +287,7 @@ func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 
 	// 2. Test adjusting a non-existent spam record
 	originID2 := unittest.IdentifierFixture()
-	initialPenalty, err := cache.AdjustWithInit(originID2, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	initialPenalty, err := cache.AdjustWithInit(originID2, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		record.Penalty -= 10
 		return record, nil
 	})
@@ -310,10 +310,10 @@ func TestSpamRecordCache_ConcurrentInitialization(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -354,10 +354,10 @@ func TestSpamRecordCache_ConcurrentSameRecordAdjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFn := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFn := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		record.Penalty -= 1.0
 		record.DisallowListed = true
 		record.Decay += 1.0
@@ -403,10 +403,10 @@ func TestSpamRecordCache_ConcurrentRemoval(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -452,10 +452,10 @@ func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -472,7 +472,7 @@ func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(len(originIDs) * 2)
 
-	adjustFunc := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFunc := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		record.Penalty -= 1
 		return record, nil
 	}
@@ -514,10 +514,10 @@ func TestSpamRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -581,10 +581,10 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -602,7 +602,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 		require.Equal(t, float64(0), penalty)
 	}
 
-	adjustFunc := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFunc := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		record.Penalty -= 1
 		return record, nil
 	}
@@ -652,10 +652,10 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 
@@ -707,7 +707,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 		originID := originID
 		go func() {
 			defer wg.Done()
-			_, err := cache.AdjustWithInit(originID, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+			_, err := cache.AdjustWithInit(originID, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 				record.Penalty -= 1
 				return record, nil
 			})
@@ -748,10 +748,10 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) *model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
-	adjustFnNoOp := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	adjustFnNoOp := func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 		return record, nil // no-op
 	}
 

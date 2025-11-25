@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -11,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -40,7 +41,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 		s.validBlockDigestsArgumentsTestCases(),
 		func(dataChan chan interface{}) {
 			for _, block := range s.blocks {
-				dataChan <- flow.NewBlockDigest(block.Header.ID(), block.Header.Height, block.Header.Timestamp)
+				dataChan <- flow.NewBlockDigest(block.ID(), block.Height, time.UnixMilli(int64(block.Timestamp)).UTC())
 			}
 		},
 		s.requireBlockDigest,
@@ -52,7 +53,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []testType {
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
-		blockDigest := flow.NewBlockDigest(b.Header.ID(), b.Header.Height, b.Header.Timestamp)
+		blockDigest := flow.NewBlockDigest(b.ID(), b.Height, time.UnixMilli(int64(b.Timestamp)).UTC())
 		blockDigestPayload := models.NewBlockDigest(blockDigest)
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockDigestsTopic,
@@ -67,7 +68,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlockDigestsFromStartBlockID",
 					mock.Anything,
@@ -80,14 +81,14 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 		{
 			name: "happy path with start_block_height argument",
 			arguments: wsmodels.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"start_block_height": strconv.FormatUint(s.rootBlock.Height, 10),
 				"block_status":       parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlockDigestsFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
+					s.rootBlock.Height,
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
@@ -98,7 +99,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
-			setupBackend: func(sub *statestreamsmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeBlockDigestsFromLatest",
 					mock.Anything,

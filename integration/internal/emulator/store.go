@@ -66,7 +66,7 @@ type EmulatorStorage interface {
 	// CommitBlock atomically saves the execution results for a block.
 	CommitBlock(
 		ctx context.Context,
-		block flowgo.Block,
+		block *flowgo.Block,
 		collections []*flowgo.LightCollection,
 		transactions map[flowgo.Identifier]*flowgo.TransactionBody,
 		transactionResults map[flowgo.Identifier]*StorableTransactionResult,

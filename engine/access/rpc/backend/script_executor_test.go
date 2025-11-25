@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -62,7 +63,7 @@ func TestScriptExecutorSuite(t *testing.T) {
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByHeight := make(map[uint64]*flow.Block)
 	for _, b := range blocks {
-		blocksByHeight[b.Header.Height] = b
+		blocksByHeight[b.Height] = b
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
@@ -96,6 +97,7 @@ func (s *ScriptExecutorSuite) bootstrap() {
 // SetupTest sets up the test environment for each test in the suite.
 // This includes initializing various components and mock objects needed for the tests.
 func (s *ScriptExecutorSuite) SetupTest() {
+	lockManager := storage.NewTestingLockManager()
 	s.log = unittest.Logger()
 	s.chain = flow.Emulator.Chain()
 
@@ -106,7 +108,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 
 	blockchain := unittest.BlockchainFixture(10)
 	s.headers = newBlockHeadersStorage(blockchain)
-	s.height = blockchain[0].Header.Height
+	s.height = blockchain[0].Height
 
 	protocolState := testutil.ProtocolStateWithSourceFixture(nil)
 
@@ -127,9 +129,9 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	indexerCore, err := indexer.New(
+	indexerCore := indexer.New(
 		s.log,
-		metrics.NewNoopCollector(),
+		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
 		nil,
 		s.registerIndex,
 		s.headers,
@@ -137,11 +139,13 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		nil,
 		nil,
 		nil,
-		s.chain,
+		nil,
+		s.chain.ChainID(),
 		derivedChainData,
 		nil,
+		metrics.NewNoopCollector(),
+		lockManager,
 	)
-	s.Require().NoError(err)
 
 	s.scripts = execution.NewScripts(
 		s.log,

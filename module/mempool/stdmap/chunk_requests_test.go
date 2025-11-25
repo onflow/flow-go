@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/verification/requester"
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool"
@@ -27,8 +26,9 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 		expectedAttempts := 10
 
 		withUpdaterScenario(t, chunks, expectedAttempts, incUpdater, func(t *testing.T, attempts uint64, lastTried time.Time, retryAfter time.Duration) {
-			require.Equal(t, expectedAttempts, int(attempts))           // each chunk request should be attempted 10 times.
-			require.True(t, qualifier(attempts, lastTried, retryAfter)) // request should be immediately qualified for retrial.
+			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, qualified) // request should be immediately qualified for retrial.
 		})
 	})
 
@@ -45,7 +45,8 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, !qualifier(attempts, lastTried, retryAfter))
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, !qualified)
 
 			// retryAfter should be equal to 2^(attempts-1) * minInterval.
 			// note that after the first attempt, retry after is set to minInterval.
@@ -70,7 +71,8 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, !qualifier(attempts, lastTried, retryAfter))
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, !qualified)
 
 			// expected retry after should be equal to the min interval, since updates should always underflow due
 			// to the very small multiplier.
@@ -92,7 +94,8 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, !qualifier(attempts, lastTried, retryAfter))
+			qualified, _ := qualifier(attempts, lastTried, retryAfter)
+			require.True(t, !qualified)
 
 			// expected retry after should be equal to the maxInterval, since updates should eventually overflow due
 			// to the very small maxInterval and quite noticeable multiplier (2).
@@ -204,10 +207,7 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	// adding another request for the same tuple of (chunkID, resultID, chunkIndex)
 	// is deduplicated.
 	require.False(t, requests.Add(&verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: thisReq.ResultID,
-			Index:    thisReq.Index,
-		},
+		Locator: *unittest.ChunkLocatorFixture(thisReq.ResultID, thisReq.Index),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID: thisReq.ChunkID,
 		},
@@ -215,10 +215,7 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 
 	// adding another request for the same chunk ID but different result ID is stored.
 	otherReq := &verification.ChunkDataPackRequest{
-		Locator: chunks.Locator{
-			ResultID: unittest.IdentifierFixture(),
-			Index:    thisReq.Index,
-		},
+		Locator: *unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), thisReq.Index),
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
 			ChunkID:   thisReq.ChunkID,
 			Agrees:    unittest.IdentifierListFixture(2),
@@ -239,8 +236,8 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	require.ElementsMatch(t, thisReq.Agrees.Union(otherReq.Agrees), reqInfoList[0].Agrees)
 	require.ElementsMatch(t, thisReq.Disagrees.Union(otherReq.Disagrees), reqInfoList[0].Disagrees)
 
-	var thisTargets flow.IdentifierList = thisReq.Targets.NodeIDs()
-	var otherTargets flow.IdentifierList = otherReq.Targets.NodeIDs()
+	thisTargets := thisReq.Targets.NodeIDs()
+	otherTargets := otherReq.Targets.NodeIDs()
 	require.ElementsMatch(t, thisTargets.Union(otherTargets), reqInfoList[0].Targets.NodeIDs())
 
 	locators, ok := requests.PopAll(thisReq.ChunkID)

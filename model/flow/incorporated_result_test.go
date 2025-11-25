@@ -56,6 +56,21 @@ func TestIncorporatedResultGroupBy(t *testing.T) {
 	assert.Equal(t, 0, unknown.Size())
 }
 
+// TestIncorporatedResultID_Malleability confirms that the IncorporatedResult struct, which implements
+// the [flow.IDEntity] interface, is resistant to tampering.
+func TestIncorporatedResultID_Malleability(t *testing.T) {
+	incorporatedResult, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
+		IncorporatedBlockID: unittest.IdentifierFixture(),
+		Result:              unittest.ExecutionResultFixture(),
+	})
+	require.NoError(t, err)
+	unittest.RequireEntityNonMalleable(t,
+		incorporatedResult,
+		unittest.WithFieldGenerator("Result.ServiceEvents", func() []flow.ServiceEvent {
+			return unittest.ServiceEventsFixture(3)
+		}))
+}
+
 // TestNewIncorporatedResult verifies that NewIncorporatedResult constructs a valid
 // IncorporatedResult when given complete, non-zero fields, and returns an error
 // if any required field is missing.

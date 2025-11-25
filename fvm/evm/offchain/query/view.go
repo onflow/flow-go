@@ -147,15 +147,20 @@ func (v *View) DryCall(
 		return nil, err
 	}
 
-	res, err := bv.DirectCall(
-		&types.DirectCall{
-			From:     types.NewAddress(from),
-			To:       types.NewAddress(to),
-			Data:     data,
-			Value:    value,
-			GasLimit: gasLimit,
-		},
-	)
+	call := &types.DirectCall{
+		From:     types.NewAddress(from),
+		To:       types.NewAddress(to),
+		Data:     data,
+		Value:    value,
+		GasLimit: gasLimit,
+	}
+	// We deliberately skip the EIP-7825 tx gas limit cap, because
+	// `DryCall` is used only for `eth_estimateGas` & `eth_call`
+	// JSON-RPC endpoints, for which the tx gas limit cap does
+	// not apply. These endpoints don't mutate the state, they
+	// simply read the state.
+	call.SkipTxGasLimitCheck()
+	res, err := bv.DirectCall(call)
 	if err != nil {
 		return nil, err
 	}
@@ -277,9 +282,15 @@ func WithStateOverrideState(
 		if err != nil {
 			return err
 		}
+
+		// This forces the account of the slots to be created, otherwise we
+		// might add slots without its owner account being created.
+		if err := setupAccount(addr, baseView); err != nil {
+			return err
+		}
+
 		// purge all the slots
-		err = baseView.PurgeAllSlotsOfAnAccount(addr)
-		if err != nil {
+		if err = baseView.PurgeAllSlotsOfAnAccount(addr); err != nil {
 			return err
 		}
 		// no need to be sorted this is off-chain operation
@@ -307,6 +318,13 @@ func WithStateOverrideStateDiff(
 		if err != nil {
 			return err
 		}
+
+		// This forces the account of the slots to be created, otherwise we
+		// might add slots without its owner account being created.
+		if err := setupAccount(addr, baseView); err != nil {
+			return err
+		}
+
 		// no need to be sorted this is off-chain operation
 		for k, v := range slots {
 			err = baseView.UpdateSlot(types.SlotAddress{
@@ -343,4 +361,32 @@ func WithExtraPrecompiledContracts(pcs []types.PrecompiledContract) DryCallOptio
 		v.extraPCs = pcs
 		return nil
 	}
+}
+
+// setupAccount updates an account's metadata. If the account does not exist,
+// it will be created and initialized with the proper default values.
+func setupAccount(addr gethCommon.Address, baseView *state.BaseView) error {
+	balance, err := baseView.GetBalance(addr)
+	if err != nil {
+		return err
+	}
+	nonce, err := baseView.GetNonce(addr)
+	if err != nil {
+		return err
+	}
+	code, err := baseView.GetCode(addr)
+	if err != nil {
+		return err
+	}
+	codeHash := gethTypes.EmptyCodeHash
+	if len(code) > 0 {
+		codeHash = gethCrypto.Keccak256Hash(code)
+	}
+
+	err = baseView.UpdateAccount(addr, balance, nonce, code, codeHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

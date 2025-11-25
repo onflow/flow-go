@@ -29,14 +29,22 @@ func EventToMessage(e flow.Event) *entities.Event {
 
 // MessageToEvent converts a protobuf message to a flow.Event
 // Note: this function does not convert the payload encoding
-func MessageToEvent(m *entities.Event) flow.Event {
-	return flow.Event{
-		Type:             flow.EventType(m.GetType()),
-		TransactionID:    flow.HashToID(m.GetTransactionId()),
-		TransactionIndex: m.GetTransactionIndex(),
-		EventIndex:       m.GetEventIndex(),
-		Payload:          m.GetPayload(),
+// All errors indicate the input cannot be converted to a valid event.
+func MessageToEvent(m *entities.Event) (*flow.Event, error) {
+	event, err := flow.NewEvent(
+		flow.UntrustedEvent{
+			Type:             flow.EventType(m.GetType()),
+			TransactionID:    flow.HashToID(m.GetTransactionId()),
+			TransactionIndex: m.GetTransactionIndex(),
+			EventIndex:       m.GetEventIndex(),
+			Payload:          m.GetPayload(),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct event: %w", err)
 	}
+
+	return event, nil
 }
 
 // EventsToMessages converts a slice of flow.Events to a slice of protobuf messages
@@ -44,20 +52,24 @@ func MessageToEvent(m *entities.Event) flow.Event {
 func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
 	events := make([]*entities.Event, len(flowEvents))
 	for i, e := range flowEvents {
-		event := EventToMessage(e)
-		events[i] = event
+		events[i] = EventToMessage(e)
 	}
 	return events
 }
 
 // MessagesToEvents converts a slice of protobuf messages to a slice of flow.Events
 // Note: this function does not convert the payload encoding
-func MessagesToEvents(l []*entities.Event) []flow.Event {
+func MessagesToEvents(l []*entities.Event) ([]flow.Event, error) {
 	events := make([]flow.Event, len(l))
 	for i, m := range l {
-		events[i] = MessageToEvent(m)
+		event, err := MessageToEvent(m)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert message at index %d to event: %w", i, err)
+		}
+		events[i] = *event
 	}
-	return events
+
+	return events, nil
 }
 
 // EventToMessageFromVersion converts a flow.Event to a protobuf message, converting the payload
@@ -85,17 +97,32 @@ func EventToMessageFromVersion(e flow.Event, version entities.EventEncodingVersi
 // MessageToEventFromVersion converts a protobuf message to a flow.Event, and converts the payload
 // encoding from CCF to JSON if the input version is CCF
 func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEncodingVersion) (*flow.Event, error) {
-	event := MessageToEvent(m)
+	event, err := MessageToEvent(m)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert the event: %w", err)
+	}
 	switch inputVersion {
 	case entities.EventEncodingVersion_CCF_V0:
 		convertedPayload, err := CcfPayloadToJsonPayload(event.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
 		}
-		event.Payload = convertedPayload
-		return &event, nil
+		e, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             event.Type,
+				TransactionID:    event.TransactionID,
+				TransactionIndex: event.TransactionIndex,
+				EventIndex:       event.EventIndex,
+				Payload:          convertedPayload,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct the event: %w", err)
+		}
+
+		return e, nil
 	case entities.EventEncodingVersion_JSON_CDC_V0:
-		return &event, nil
+		return event, nil
 	default:
 		return nil, fmt.Errorf("invalid encoding format %d", inputVersion)
 	}
@@ -140,7 +167,7 @@ func MessagesToEventsWithEncodingConversion(
 	}
 
 	if from == to {
-		return MessagesToEvents(messageEvents), nil
+		return MessagesToEvents(messageEvents)
 	}
 
 	events := make([]flow.Event, len(messageEvents))
@@ -232,13 +259,21 @@ func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &flow.Event{
-		Type:             e.Type,
-		TransactionID:    e.TransactionID,
-		TransactionIndex: e.TransactionIndex,
-		EventIndex:       e.EventIndex,
-		Payload:          convertedPayload,
-	}, nil
+
+	event, err := flow.NewEvent(
+		flow.UntrustedEvent{
+			Type:             e.Type,
+			TransactionID:    e.TransactionID,
+			TransactionIndex: e.TransactionIndex,
+			EventIndex:       e.EventIndex,
+			Payload:          convertedPayload,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct event: %w", err)
+	}
+
+	return event, nil
 }
 
 // CcfEventsToJsonEvents returns a new event with the payload converted from CCF to JSON
@@ -249,30 +284,49 @@ func CcfEventsToJsonEvents(events []flow.Event) ([]flow.Event, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert event payload for event %d: %w", i, err)
 		}
-		e.Payload = payload
-		convertedEvents[i] = e
+		convertedEvent, err := flow.NewEvent(
+			flow.UntrustedEvent{
+				Type:             e.Type,
+				TransactionID:    e.TransactionID,
+				TransactionIndex: e.TransactionIndex,
+				EventIndex:       e.EventIndex,
+				Payload:          payload,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct event: %w", err)
+		}
+		convertedEvents[i] = *convertedEvent
 	}
 	return convertedEvents, nil
 }
 
 // MessagesToBlockEvents converts a protobuf EventsResponse_Result messages to a slice of flow.BlockEvents.
-func MessagesToBlockEvents(blocksEvents []*accessproto.EventsResponse_Result) []flow.BlockEvents {
+func MessagesToBlockEvents(blocksEvents []*accessproto.EventsResponse_Result) ([]flow.BlockEvents, error) {
 	evs := make([]flow.BlockEvents, len(blocksEvents))
 	for i, ev := range blocksEvents {
-		evs[i] = MessageToBlockEvents(ev)
+		event, err := MessageToBlockEvents(ev)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert message at index %d to block events: %w", i, err)
+		}
+		evs[i] = *event
 	}
 
-	return evs
+	return evs, nil
 }
 
 // MessageToBlockEvents converts a protobuf EventsResponse_Result message to a flow.BlockEvents.
-func MessageToBlockEvents(blockEvents *accessproto.EventsResponse_Result) flow.BlockEvents {
-	return flow.BlockEvents{
+func MessageToBlockEvents(blockEvents *accessproto.EventsResponse_Result) (*flow.BlockEvents, error) {
+	events, err := MessagesToEvents(blockEvents.Events)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert message to events: %w", err)
+	}
+	return &flow.BlockEvents{
 		BlockHeight:    blockEvents.BlockHeight,
 		BlockID:        MessageToIdentifier(blockEvents.BlockId),
 		BlockTimestamp: blockEvents.BlockTimestamp.AsTime(),
-		Events:         MessagesToEvents(blockEvents.Events),
-	}
+		Events:         events,
+	}, nil
 }
 
 func BlockEventsToMessages(blocks []flow.BlockEvents) ([]*accessproto.EventsResponse_Result, error) {

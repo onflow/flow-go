@@ -2,6 +2,7 @@ package run
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -14,26 +15,21 @@ import (
 func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
-	block := unittest.BlockFixture()
-
-	block.Payload.Seals = nil
-	block.Payload.Guarantees = nil
-	block.Header.ParentID = flow.ZeroID
-	block.Header.View = 3
-	block.Header.Height = 0
-	block.Header.PayloadHash = block.Payload.Hash()
-
-	clusterBlock := cluster.Block{
-		Header: &flow.Header{
-			ParentID: flow.ZeroID,
-			View:     42,
+	clusterBlock, err := cluster.NewRootBlock(
+		cluster.UntrustedBlock{
+			HeaderBody: flow.HeaderBody{
+				ChainID:   flow.Emulator,
+				ParentID:  flow.ZeroID,
+				Timestamp: uint64(time.Now().UnixMilli()),
+				View:      42,
+			},
+			Payload: *cluster.NewEmptyPayload(flow.ZeroID),
 		},
-	}
-	payload := cluster.EmptyPayload(flow.ZeroID)
-	clusterBlock.SetPayload(payload)
+	)
+	require.NoError(t, err)
 
 	orderedParticipants := model.ToIdentityList(participants).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
-	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
+	_, err = GenerateClusterRootQC(participants, orderedParticipants, clusterBlock)
 	require.NoError(t, err)
 }
 

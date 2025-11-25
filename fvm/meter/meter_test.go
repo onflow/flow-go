@@ -214,7 +214,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		))
 	})
 
-	t.Run("check computation remaining", func(t *testing.T) {
+	t.Run("check computation available", func(t *testing.T) {
 		m := meter.NewMeter(
 			meter.DefaultParameters().
 				WithComputationLimit(10).
@@ -222,8 +222,8 @@ func TestWeightedComputationMetering(t *testing.T) {
 					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
 		)
 
-		remaining := m.ComputationRemaining(0)
-		require.Equal(t, uint64(10), remaining)
+		available := m.ComputationAvailable(common.ComputationUsage{Kind: 0, Intensity: 10})
+		require.True(t, available)
 
 		err := m.MeterComputation(
 			common.ComputationUsage{
@@ -234,10 +234,10 @@ func TestWeightedComputationMetering(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 
-		require.Equal(t, uint64(9), m.ComputationRemaining(0))
+		require.False(t, m.ComputationAvailable(common.ComputationUsage{Kind: 0, Intensity: 10}))
 
-		// test a type without a weight (default zero)
-		require.Equal(t, uint64(math.MaxUint64), m.ComputationRemaining(1))
+		// test a type without a weight (default MaxUint64)
+		require.True(t, m.ComputationAvailable(common.ComputationUsage{Kind: 1, Intensity: math.MaxUint64}))
 	})
 
 	t.Run("merge meters", func(t *testing.T) {
@@ -671,6 +671,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 func TestMemoryWeights(t *testing.T) {
 	for kind := common.MemoryKindUnknown + 1; kind < common.MemoryKindLast; kind++ {
+
 		weight, ok := meter.DefaultMemoryWeights[kind]
 		if !assert.True(t, ok, fmt.Sprintf("missing weight for memory kind '%s'", kind.String())) {
 			continue

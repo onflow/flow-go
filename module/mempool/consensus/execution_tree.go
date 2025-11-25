@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
@@ -165,9 +166,8 @@ func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter
 	}
 
 	receipts := make([]*flow.ExecutionReceipt, 0, 10) // we expect just below 10 execution Receipts per call
-	receipts = et.reachableReceipts(vertex, blockFilter, receiptFilter, receipts)
 
-	return receipts, nil
+	return et.reachableReceipts(vertex, blockFilter, receiptFilter, receipts)
 }
 
 // reachableReceipts implements a depth-first search over the Execution Tree.
@@ -175,15 +175,20 @@ func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter
 // For each result (vertex in the Execution Tree), which the tree search visits, the known receipts are inspected.
 // Receipts that pass the receiptFilter are appended to `receipts` in the order they are encountered during the
 // tree search. the resulting slice is returned.
-func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts []*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
+//
+// No errors are expected during normal operation.
+func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts []*flow.ExecutionReceipt) ([]*flow.ExecutionReceipt, error) {
 	receiptsForResult := vertex.(*ReceiptsOfSameResult)
 	if !blockFilter(receiptsForResult.blockHeader) {
-		return receipts
+		return receipts, nil
 	}
 
 	// add all Execution Receipts for result to `receipts` provided they pass the receiptFilter
 	for _, recMeta := range receiptsForResult.receipts {
-		receipt := flow.ExecutionReceiptFromMeta(*recMeta, *receiptsForResult.result)
+		receipt, err := flow.ExecutionReceiptFromStub(*recMeta, *receiptsForResult.result)
+		if err != nil {
+			return nil, irrecoverable.NewExceptionf("could not create execution receipt from stub: %w", err)
+		}
 		if !receiptFilter(receipt) {
 			continue
 		}
@@ -192,11 +197,15 @@ func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mem
 
 	// travers down the tree in a deep-first-search manner
 	children := et.forest.GetChildren(vertex.VertexID())
+	var err error
 	for children.HasNext() {
 		child := children.NextVertex()
-		receipts = et.reachableReceipts(child, blockFilter, receiptFilter, receipts)
+		receipts, err = et.reachableReceipts(child, blockFilter, receiptFilter, receipts)
+		if err != nil {
+			return nil, irrecoverable.NewExceptionf("failed to find execution receipts over the execution tree: %w", err)
+		}
 	}
-	return receipts
+	return receipts, nil
 }
 
 // PruneUpToHeight prunes all results for all blocks with height up to but

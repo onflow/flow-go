@@ -47,11 +47,11 @@ func TestConvertExecutionResultMetaList(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 	metaList := block.Payload.Receipts
 
 	msg := convert.ExecutionResultMetaListToMessages(metaList)
-	converted := convert.MessagesToExecutionResultMetaList(msg)
+	converted, err := convert.MessagesToExecutionResultMetaList(msg)
+	require.NoError(t, err)
 
 	assert.Equal(t, metaList, converted)
 }

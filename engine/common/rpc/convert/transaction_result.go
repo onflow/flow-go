@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
@@ -23,17 +25,23 @@ func TransactionResultToMessage(result *accessmodel.TransactionResult) *access.T
 }
 
 // MessageToTransactionResult converts a protobuf message to a TransactionResult
-func MessageToTransactionResult(message *access.TransactionResultResponse) *accessmodel.TransactionResult {
+// All errors indicate the input cannot be converted to a valid event.
+func MessageToTransactionResult(message *access.TransactionResultResponse) (*accessmodel.TransactionResult, error) {
+	events, err := MessagesToEvents(message.Events)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert message to events: %w", err)
+	}
+
 	return &accessmodel.TransactionResult{
 		Status:        flow.TransactionStatus(message.Status),
 		StatusCode:    uint(message.StatusCode),
 		ErrorMessage:  message.ErrorMessage,
-		Events:        MessagesToEvents(message.Events),
+		Events:        events,
 		BlockID:       flow.HashToID(message.BlockId),
 		TransactionID: flow.HashToID(message.TransactionId),
 		CollectionID:  flow.HashToID(message.CollectionId),
 		BlockHeight:   message.BlockHeight,
-	}
+	}, nil
 }
 
 // TransactionResultsToMessage converts a slice of TransactionResults to a protobuf message
@@ -49,10 +57,15 @@ func TransactionResultsToMessage(results []*accessmodel.TransactionResult) *acce
 }
 
 // MessageToTransactionResults converts a protobuf message to a slice of TransactionResults
-func MessageToTransactionResults(message *access.TransactionResultsResponse) []*accessmodel.TransactionResult {
+// All errors indicate the input cannot be converted to a valid event.
+func MessageToTransactionResults(message *access.TransactionResultsResponse) ([]*accessmodel.TransactionResult, error) {
 	results := make([]*accessmodel.TransactionResult, len(message.TransactionResults))
+	var err error
 	for i, result := range message.TransactionResults {
-		results[i] = MessageToTransactionResult(result)
+		results[i], err = MessageToTransactionResult(result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert message at index %d to transaction result: %w", i, err)
+		}
 	}
-	return results
+	return results, nil
 }

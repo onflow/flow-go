@@ -13,12 +13,15 @@ type CadenceCode interface {
 }
 
 type Transaction struct {
-	Import  Import
+	Imports Imports
 	Content CadenceCode
 }
 
 func (t Transaction) ToCadence() string {
-	return fmt.Sprintf("%s \n transaction { %s }", t.Import.ToCadence(), t.Content.ToCadence())
+	return fmt.Sprintf(`
+		%s
+		transaction { %s }
+	`, t.Imports.ToCadence(), t.Content.ToCadence())
 }
 
 type Prepare struct {
@@ -30,18 +33,21 @@ func (p Prepare) ToCadence() string {
 }
 
 type Contract struct {
+	Imports Imports
 	Name    string
 	Members []CadenceCode
 }
 
 func (c Contract) ToCadence() string {
-
 	memberStrings := make([]string, len(c.Members))
 	for i, member := range c.Members {
 		memberStrings[i] = member.ToCadence()
 	}
 
-	return fmt.Sprintf("access(all) contract %s { %s }", c.Name, strings.Join(memberStrings, "\n"))
+	return fmt.Sprintf(`
+		%s
+		access(all) contract %s { %s }
+	`, c.Imports.ToCadence(), c.Name, strings.Join(memberStrings, "\n"))
 }
 
 type Resource struct {
@@ -66,6 +72,16 @@ func (i Import) ToCadence() string {
 		return fmt.Sprintf("import 0x%s\n", i.Address)
 	}
 	return ""
+}
+
+type Imports []Import
+
+func (i Imports) ToCadence() string {
+	imports := ""
+	for _, imp := range i {
+		imports += imp.ToCadence()
+	}
+	return imports
 }
 
 type SetAccountCode struct {

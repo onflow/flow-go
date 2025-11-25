@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -146,6 +147,8 @@ func getTestContract(
 }
 
 func Test_Programs(t *testing.T) {
+	t.Parallel()
+
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
@@ -170,10 +173,12 @@ func Test_Programs(t *testing.T) {
 		require.Empty(t, retrievedContractA)
 
 		// deploy contract A0
+		txBody, err := contractDeployTx("A", contractA0Code, addressA)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("A", contractA0Code, addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -189,10 +194,12 @@ func Test_Programs(t *testing.T) {
 		require.Equal(t, contractA0Code, string(retrievedContractA))
 
 		// deploy contract A
+		txBody, err = updateContractTx("A", contractACode, addressA)
+		require.NoError(t, err)
 		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
-				updateContractTx("A", contractACode, addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -226,10 +233,12 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
+		txBody, err := callTx("A", addressA)
+		require.NoError(t, err)
 		executionSnapshotA, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("A", addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			execASnapshot)
 		require.NoError(t, err)
@@ -270,10 +279,12 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
+		txBody, err = callTx("A", addressA)
+		require.NoError(t, err)
 		executionSnapshotA2, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("A", addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			execA2Snapshot)
 		require.NoError(t, err)
@@ -290,10 +301,12 @@ func Test_Programs(t *testing.T) {
 
 	t.Run("deploying another contract invalidates dependant programs", func(t *testing.T) {
 		// deploy contract B
+		txBody, err := contractDeployTx("B", contractBCode, addressB)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("B", contractBCode, addressB),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -320,11 +333,12 @@ func Test_Programs(t *testing.T) {
 		// programs should have no entries for A and B, as per previous test
 
 		// run a TX using contract B
-
+		txBody, err := callTx("B", addressB)
+		require.NoError(t, err)
 		executionSnapshotB, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("B", addressB),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -375,10 +389,12 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
+		txBody, err = callTx("B", addressB)
+		require.NoError(t, err)
 		executionSnapshotB2, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("B", addressB),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			execB2Snapshot)
 		require.NoError(t, err)
@@ -393,10 +409,12 @@ func Test_Programs(t *testing.T) {
 
 	t.Run("deploying new contract A2 invalidates B because of * imports", func(t *testing.T) {
 		// deploy contract A2
+		txBody, err := contractDeployTx("A2", contractA2Code, addressA)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("A2", contractA2Code, addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -422,11 +440,12 @@ func Test_Programs(t *testing.T) {
 		// programs should have no entries for A and B, as per previous test
 
 		// run a TX using contract B
-
+		txBody, err := callTx("B", addressB)
+		require.NoError(t, err)
 		executionSnapshotB, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("B", addressB),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -483,10 +502,12 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
+		txBody, err = callTx("B", addressB)
+		require.NoError(t, err)
 		executionSnapshotB2, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("B", addressB),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			execB2Snapshot)
 		require.NoError(t, err)
@@ -514,10 +535,12 @@ func Test_Programs(t *testing.T) {
 			})
 
 		// run a TX using contract A
+		txBody, err := callTx("A", addressA)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("A", addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			execASnapshot)
 		require.NoError(t, err)
@@ -534,10 +557,12 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, contractBSnapshot)
 
 		// deploy contract C
+		txBody, err := contractDeployTx("C", contractCCode, addressC)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("C", contractCCode, addressC),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -560,10 +585,12 @@ func Test_Programs(t *testing.T) {
 	})
 
 	t.Run("importing C should chain-import B and A", func(t *testing.T) {
+		txBody, err := callTx("C", addressC)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				callTx("C", addressC),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			mainSnapshot)
 		require.NoError(t, err)
@@ -617,10 +644,12 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
 		// deploy contract A
+		txBody, err := contractDeployTx("A", contractACode, addressA)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("A", contractACode, addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			snapshotTree)
 		require.NoError(t, err)
@@ -629,10 +658,12 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// deploy contract B
+		txBody, err = contractDeployTx("B", contractBCode, addressB)
+		require.NoError(t, err)
 		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("B", contractBCode, addressB),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			snapshotTree)
 		require.NoError(t, err)
@@ -641,10 +672,12 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// deploy contract C
+		txBody, err = contractDeployTx("C", contractCCode, addressC)
+		require.NoError(t, err)
 		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("C", contractCCode, addressC),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			snapshotTree)
 		require.NoError(t, err)
@@ -653,10 +686,12 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// deploy contract A2 last to clear any cache so far
+		txBody, err = contractDeployTx("A2", contractA2Code, addressA)
+		require.NoError(t, err)
 		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
-				contractDeployTx("A2", contractA2Code, addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			snapshotTree)
 		require.NoError(t, err)
@@ -679,8 +714,8 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 	})
 
 	callC := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
-		procCallC := fvm.Transaction(
-			flow.NewTransactionBody().SetScript(
+		txBody, err := flow.NewTransactionBodyBuilder().
+			SetScript(
 				[]byte(
 					`
 					import A from 0xa
@@ -691,8 +726,12 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 							log(C.hello())
 						}
 					}`,
-				)),
-			derivedBlockData.NextTxIndexForTestingOnly())
+				)).
+			SetPayer(unittest.RandomAddressFixture()).
+			Build()
+		require.NoError(t, err)
+
+		procCallC := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 		executionSnapshot, output, err := vm.Run(
 			context,
@@ -764,10 +803,12 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	t.Run("update A to breaking change and ensure cache state", func(t *testing.T) {
 		// deploy contract A
+		txBody, err := updateContractTx("A", contractABreakingCode, addressA)
+		require.NoError(t, err)
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
-				updateContractTx("A", contractABreakingCode, addressA),
+				txBody,
 				derivedBlockData.NextTxIndexForTestingOnly()),
 			snapshotTree)
 		require.NoError(t, err)
@@ -788,10 +829,9 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 	})
 
 	callCAfterItsBroken := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
-		procCallC := fvm.Transaction(
-			flow.NewTransactionBody().SetScript(
-				[]byte(
-					`
+		txBody, err := flow.NewTransactionBodyBuilder().SetScript(
+			[]byte(
+				`
 					import A from 0xa
 					import B from 0xb
 					import C from 0xc
@@ -800,8 +840,12 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 							log(C.hello())
 						}
 					}`,
-				)),
-			derivedBlockData.NextTxIndexForTestingOnly())
+			)).
+			SetPayer(unittest.RandomAddressFixture()).
+			Build()
+		require.NoError(t, err)
+
+		procCallC := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
 		executionSnapshot, output, err := vm.Run(
 			context,
@@ -837,9 +881,9 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 }
 
-func callTx(name string, address flow.Address) *flow.TransactionBody {
+func callTx(name string, address flow.Address) (*flow.TransactionBody, error) {
 
-	return flow.NewTransactionBody().SetScript(
+	return flow.NewTransactionBodyBuilder().SetScript(
 		[]byte(fmt.Sprintf(`
 			import %s from %s
 			transaction {
@@ -847,31 +891,41 @@ func callTx(name string, address flow.Address) *flow.TransactionBody {
                 log(%s.hello())
               }
             }`, name, address.HexWithPrefix(), name)),
-	)
+	).
+		SetPayer(address).
+		Build()
 }
 
-func contractDeployTx(name, code string, address flow.Address) *flow.TransactionBody {
+func contractDeployTx(name, code string, address flow.Address) (*flow.TransactionBody, error) {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewTransactionBody().SetScript(
-		[]byte(fmt.Sprintf(`transaction {
+	return flow.NewTransactionBodyBuilder().
+		SetScript(
+			[]byte(fmt.Sprintf(`transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, name, encoded)),
-	).AddAuthorizer(address)
+		).
+		AddAuthorizer(address).
+		SetPayer(address).
+		Build()
 }
 
-func updateContractTx(name, code string, address flow.Address) *flow.TransactionBody {
+func updateContractTx(name, code string, address flow.Address) (*flow.TransactionBody, error) {
 	encoded := hex.EncodeToString([]byte(code))
 
-	return flow.NewTransactionBody().SetScript([]byte(
-		fmt.Sprintf(`transaction {
+	return flow.NewTransactionBodyBuilder().
+		SetScript(
+			[]byte(fmt.Sprintf(`transaction {
              prepare(signer: auth(UpdateContract) &Account) {
                signer.contracts.update(name: "%s", code: "%s".decodeHex())
              }
            }`, name, encoded)),
-	).AddAuthorizer(address)
+		).
+		AddAuthorizer(address).
+		SetPayer(address).
+		Build()
 }
 
 func compareExecutionSnapshots(t *testing.T, a, b *snapshot.ExecutionSnapshot) {

@@ -54,6 +54,7 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 		runtime.NewCodesAndPrograms(),
 		nil,
 		nil,
+		nil,
 	)
 
 	SetupEnvironment(env, nil, evmContractAddress)

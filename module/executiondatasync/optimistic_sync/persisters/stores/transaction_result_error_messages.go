@@ -1,47 +1,53 @@
 package stores
 
 import (
+	"errors"
 	"fmt"
+
+	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
 )
 
 var _ PersisterStore = (*TxResultErrMsgStore)(nil)
 
 // TxResultErrMsgStore handles persisting transaction result error messages
 type TxResultErrMsgStore struct {
-	inMemoryTxResultErrMsg  *unsynchronized.TransactionResultErrorMessages
+	data                    []flow.TransactionResultErrorMessage
 	persistedTxResultErrMsg storage.TransactionResultErrorMessages
 	blockID                 flow.Identifier
+	lockManager             storage.LockManager
 }
 
 func NewTxResultErrMsgStore(
-	inMemoryTxResultErrMsg *unsynchronized.TransactionResultErrorMessages,
+	data []flow.TransactionResultErrorMessage,
 	persistedTxResultErrMsg storage.TransactionResultErrorMessages,
 	blockID flow.Identifier,
+	lockManager storage.LockManager,
 ) *TxResultErrMsgStore {
 	return &TxResultErrMsgStore{
-		inMemoryTxResultErrMsg:  inMemoryTxResultErrMsg,
+		data:                    data,
 		persistedTxResultErrMsg: persistedTxResultErrMsg,
 		blockID:                 blockID,
+		lockManager:             lockManager,
 	}
 }
 
-// Persist adds transaction result error messages to the batch.
-// No errors are expected during normal operations
-func (t *TxResultErrMsgStore) Persist(batch storage.ReaderBatchWriter) error {
-	txResultErrMsgs, err := t.inMemoryTxResultErrMsg.ByBlockID(t.blockID)
+// Persist saves and indexes all transaction result error messages for our block as part of the
+// provided database batch. The caller must acquire [storage.LockInsertTransactionResultErrMessage]
+// and hold it until the write batch has been committed.
+// No error returns are expected during normal operations
+func (t *TxResultErrMsgStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+	err := t.persistedTxResultErrMsg.BatchStore(lctx, rw, t.blockID, t.data)
 	if err != nil {
-		return fmt.Errorf("could not get transaction result error messages: %w", err)
-	}
-
-	if len(txResultErrMsgs) > 0 {
-		if err := t.persistedTxResultErrMsg.BatchStore(t.blockID, txResultErrMsgs, batch); err != nil {
-			return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
+		// CAUTION: here we assume that if something is already stored for our blockID, then the data is identical.
+		// This only holds true for sealed execution results, whose consistency has previously been verified by
+		// comparing the data's hash to commitments in the execution result.
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
 		}
+		return fmt.Errorf("could not add transaction result error messages to batch: %w", err)
 	}
-
 	return nil
 }

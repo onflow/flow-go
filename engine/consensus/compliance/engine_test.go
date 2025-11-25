@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -36,7 +36,8 @@ type EngineSuite struct {
 func (cs *EngineSuite) SetupTest() {
 	cs.CommonSuite.SetupTest()
 
-	e, err := NewEngine(unittest.Logger(), cs.me, cs.core)
+	distributor := pubsub.NewDistributor()
+	e, err := NewEngine(unittest.Logger(), cs.me, cs.core, distributor)
 	require.NoError(cs.T(), err)
 	cs.engine = e
 
@@ -69,13 +70,13 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	go func() {
 		for i := 0; i < blockCount; i++ {
 			block := unittest.BlockWithParentFixture(cs.head)
-			proposal := messages.NewBlockProposal(block)
-			hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+			proposal := unittest.ProposalFromBlock(block)
+			hotstuffProposal := model.SignedProposalFromBlock(proposal)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			cs.engine.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 				OriginID: unittest.IdentifierFixture(),
 				Message:  proposal,
 			})
@@ -88,11 +89,11 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		block := unittest.BlockWithParentFixture(cs.head)
 		proposal := unittest.ProposalFromBlock(block)
 
-		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromBlock(proposal)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		cs.engine.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: unittest.IdentifierFixture(),
 			Message:  proposal,
 		})

@@ -85,10 +85,10 @@ func createCore(t *testing.T, blocks []*flow.Block) (
 	state := unittestMocks.NewProtocolState()
 	require.NoError(t, state.Bootstrap(blocks[0], nil, nil))
 	execState := stateMock.NewExecutionState(t)
-	execState.On("GetHighestFinalizedExecuted").Return(blocks[0].Header.Height, nil)
+	execState.On("GetHighestFinalizedExecuted").Return(blocks[0].Height, nil)
 
 	// root block is executed
-	consumer := newMockConsumer(blocks[0].Header.ID())
+	consumer := newMockConsumer(blocks[0].ID())
 
 	execState.On("StateCommitmentByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) (flow.StateCommitment, error) {
@@ -116,7 +116,7 @@ func createCore(t *testing.T, blocks []*flow.Block) (
 		headers,
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{HeaderBody: flow.HeaderBody{Height: 1}},
 		false,
 		false,
 	)
@@ -133,8 +133,8 @@ func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) 
 	cs := unittest.CollectionListFixture(2)
 	col0, col1 := cs[0], cs[1]
 
-	genesis := unittest.GenesisFixture()
-	blocks := unittest.ChainFixtureFrom(4, genesis.Header)
+	genesis := unittest.Block.Genesis(flow.Emulator)
+	blocks := unittest.ChainFixtureFrom(4, genesis.ToHeader())
 
 	bs := append([]*flow.Block{genesis}, blocks...)
 	unittest.AddCollectionsToBlock(bs[2], []*flow.Collection{col0})
@@ -147,7 +147,7 @@ func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) 
 func receiveBlock(t *testing.T, throttle Throttle, state *unittestMocks.ProtocolState, headers *headerStore, blocksDB *storage.Blocks, consumer *mockConsumer, block *flow.Block, wg *sync.WaitGroup) {
 	require.NoError(t, state.Extend(block))
 	blocksDB.On("ByID", block.ID()).Return(block, nil)
-	require.NoError(t, throttle.OnBlock(block.ID(), block.Header.Height))
+	require.NoError(t, throttle.OnBlock(block.ID(), block.Height))
 	consumer.WaitForExecuted(block.ID(), wg)
 }
 
@@ -167,7 +167,8 @@ func verifyBlockNotExecuted(t *testing.T, consumer *mockConsumer, blocks ...*flo
 
 func storeCollection(t *testing.T, collectionDB *mocks.MockCollectionStore, collection *flow.Collection) {
 	log.Info().Msgf("collectionDB: store collection %v", collection.ID())
-	require.NoError(t, collectionDB.Store(collection))
+	_, err := collectionDB.Store(collection)
+	require.NoError(t, err)
 }
 
 func receiveCollection(t *testing.T, fetcher *mockFetcher, core *Core, collection *flow.Collection) {
@@ -180,11 +181,11 @@ type mockExecutor struct {
 	consumer *mockConsumer
 }
 
-func (m *mockExecutor) ExecuteBlock(ctx context.Context, block *entity.ExecutableBlock) (*execution.ComputationResult, error) {
+func (m *mockExecutor) ExecuteBlock(_ context.Context, block *entity.ExecutableBlock) (*execution.ComputationResult, error) {
 	result := testutil.ComputationResultFixture(m.t)
 	result.ExecutableBlock = block
-	result.ExecutionResult.BlockID = block.ID()
-	log.Info().Msgf("mockExecutor: block %v executed", block.Block.Header.Height)
+	result.ExecutionReceipt.ExecutionResult.BlockID = block.BlockID()
+	log.Info().Msgf("mockExecutor: block %v executed", block.Block.Height)
 	return result, nil
 }
 
@@ -206,15 +207,15 @@ func newMockConsumer(executed flow.Identifier) *mockConsumer {
 func (m *mockConsumer) BeforeComputationResultSaved(ctx context.Context, result *execution.ComputationResult) {
 }
 
-func (m *mockConsumer) OnComputationResultSaved(ctx context.Context, result *execution.ComputationResult) string {
+func (m *mockConsumer) OnComputationResultSaved(_ context.Context, result *execution.ComputationResult) string {
 	m.Lock()
 	defer m.Unlock()
-	blockID := result.BlockExecutionResult.ExecutableBlock.ID()
+	blockID := result.BlockExecutionResult.ExecutableBlock.BlockID()
 	if _, ok := m.executed[blockID]; ok {
 		return fmt.Sprintf("block %v is already executed", blockID)
 	}
 	m.executed[blockID] = struct{}{}
-	log.Info().Uint64("height", result.BlockExecutionResult.ExecutableBlock.Block.Header.Height).Msg("mockConsumer: block result saved")
+	log.Info().Uint64("height", result.BlockExecutionResult.ExecutableBlock.Block.Height).Msg("mockConsumer: block result saved")
 	m.wgs[blockID].Done()
 	return ""
 }
@@ -248,12 +249,12 @@ func (f *mockFetcher) FetchCollection(blockID flow.Identifier, height uint64, gu
 	f.Lock()
 	defer f.Unlock()
 
-	if _, ok := f.fetching[guarantee.ID()]; ok {
-		return fmt.Errorf("collection %v is already fetching", guarantee.ID())
+	if _, ok := f.fetching[guarantee.CollectionID]; ok {
+		return fmt.Errorf("collection %v is already fetching", guarantee.CollectionID)
 	}
 
-	f.fetching[guarantee.ID()] = struct{}{}
-	log.Info().Msgf("mockFetcher: fetching collection %v for block %v", guarantee.ID(), height)
+	f.fetching[guarantee.CollectionID] = struct{}{}
+	log.Info().Msgf("mockFetcher: fetching collection %v for block %v", guarantee.CollectionID, height)
 	return nil
 }
 

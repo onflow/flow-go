@@ -27,7 +27,10 @@ func constructRootResultAndSeal(
 			Msg("root state commitment has incompatible length")
 	}
 
-	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
+	result, err := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not generate root result")
+	}
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate root seal")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -38,7 +37,7 @@ type Suite struct {
 	state    *protocolmock.State
 	snapshot *protocolmock.Snapshot
 
-	block                     flow.Block
+	block                     *flow.Block
 	blockID                   flow.Identifier
 	fixedExecutionNodes       flow.IdentityList
 	fixedExecutionNodeIDs     flow.IdentifierList
@@ -64,8 +63,7 @@ func TestSuite(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	//suite.log = unittest.Logger()
-	suite.log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Logger()
+	suite.log = unittest.Logger()
 	suite.snapshot = protocolmock.NewSnapshot(suite.T())
 
 	header := unittest.BlockHeaderFixture()
@@ -87,7 +85,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.block = unittest.BlockFixture()
 	suite.blockID = suite.block.ID()
-	_, suite.fixedExecutionNodes = suite.setupReceipts(&suite.block)
+	_, suite.fixedExecutionNodes = suite.setupReceipts(suite.block)
 	suite.fixedExecutionNodeIDs = suite.fixedExecutionNodes.NodeIDs()
 	suite.preferredExecutionNodeIDs = nil
 
@@ -154,7 +152,7 @@ func (suite *Suite) TestLookupByTxID_FromExecutionNode_HappyPath() {
 	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxId,
 	)
 	suite.Require().NoError(err)
@@ -189,7 +187,7 @@ func (suite *Suite) TestLookupByTxID_FromStorage_HappyPath() {
 	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxId,
 	)
 	suite.Require().NoError(err)
@@ -202,8 +200,8 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_UnknownTx() {
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	// lookup should try each of the 2 ENs in fixedENIDs
 	suite.executionAPIClient.
@@ -238,7 +236,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_UnknownTx() {
 	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxId,
 	)
 	suite.Require().Error(err)
@@ -252,8 +250,8 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultNotFailed() {
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	// Lookup should try each of the 2 ENs in fixedENIDs
 	suite.executionAPIClient.
@@ -294,7 +292,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultNotFailed() {
 	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxId,
 	)
 	suite.Require().NoError(err)
@@ -307,8 +305,8 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultFailed() {
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	// lookup should try each of the 2 ENs in fixedENIDs
 	suite.executionAPIClient.
@@ -349,7 +347,7 @@ func (suite *Suite) TestLookupByTxID_ExecNodeError_TxResultFailed() {
 	errMsg, err := errMessageProvider.ErrorMessageByTransactionID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxId,
 	)
 	suite.Require().NoError(err)
@@ -402,7 +400,7 @@ func (suite *Suite) TestLookupByIndex_FromExecutionNode_HappyPath() {
 	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxIndex,
 	)
 	suite.Require().NoError(err)
@@ -455,7 +453,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 			suite.nodeProvider,
 		)
 
-		errMsg, err := errMessageProvider.ErrorMessageByIndex(context.Background(), suite.blockID, suite.block.Header.Height, failedTxIndex)
+		errMsg, err := errMessageProvider.ErrorMessageByIndex(context.Background(), suite.blockID, suite.block.Height, failedTxIndex)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 	})
@@ -483,7 +481,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 		errMsg, err := errMessageProvider.ErrorMessageByIndex(
 			context.Background(),
 			suite.blockID,
-			suite.block.Header.Height,
+			suite.block.Height,
 			failedTxIndex,
 		)
 		suite.Require().NoError(err)
@@ -496,8 +494,8 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_UnknownTx() {
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
@@ -532,7 +530,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_UnknownTx() {
 	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxIndex,
 	)
 	suite.Require().Error(err)
@@ -547,8 +545,8 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultNotFailed() {
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
@@ -589,7 +587,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultNotFailed() {
 	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxIndex,
 	)
 	suite.Require().NoError(err)
@@ -603,8 +601,8 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultFailed() {
 
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	// lookup should try each of the 2 ENs in fixedENIDs
 	suite.executionAPIClient.
@@ -645,7 +643,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultFailed() {
 	errMsg, err := errMessageProvider.ErrorMessageByIndex(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 		failedTxIndex,
 	)
 	suite.Require().NoError(err)
@@ -707,7 +705,7 @@ func (suite *Suite) TestLookupByBlockID_FromExecutionNode_HappyPath() {
 	errMessages, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 	)
 	suite.Require().NoError(err)
 	suite.Require().Len(errMessages, len(exeErrMessagesResp.Results))
@@ -759,7 +757,7 @@ func (suite *Suite) TestLookupByBlockID_FromStorage_HappyPath() {
 	errMessages, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 	)
 	suite.Require().NoError(err)
 	suite.Require().Len(errMessages, len(txErrorMessages))
@@ -774,8 +772,8 @@ func (suite *Suite) TestLookupByBlockID_FromStorage_HappyPath() {
 func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_UnknownBlock() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
@@ -810,7 +808,7 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_UnknownBlock() {
 	errMsg, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 	)
 	suite.Require().Error(err)
 	suite.Require().Equal(codes.NotFound, status.Code(err))
@@ -820,8 +818,8 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_UnknownBlock() {
 func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_TxResultNotFailed() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
@@ -869,7 +867,7 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_TxResultNotFailed() {
 	errMsg, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 	)
 	suite.Require().NoError(err)
 	suite.Require().Empty(errMsg)
@@ -878,8 +876,8 @@ func (suite *Suite) TestLookupByBlockID_ExecutionNodeError_TxResultNotFailed() {
 func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(suite.fixedExecutionNodes, nil).Once()
-	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Header.Height, nil).Once()
-	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Header.Height+10, nil).Once()
+	suite.reporter.On("LowestIndexedHeight").Return(suite.block.Height, nil).Once()
+	suite.reporter.On("HighestIndexedHeight").Return(suite.block.Height+10, nil).Once()
 
 	suite.connectionFactory.
 		On("GetExecutionAPIClient", mock.Anything).
@@ -936,7 +934,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 	errMsg, err := errMessageProvider.ErrorMessagesByBlockID(
 		context.Background(),
 		suite.blockID,
-		suite.block.Header.Height,
+		suite.block.Height,
 	)
 	suite.Require().NoError(err)
 	suite.Require().Len(errMsg, len(expectedTxErrorMessages))

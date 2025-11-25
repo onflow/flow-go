@@ -1,10 +1,7 @@
 package router
 
 import (
-	"fmt"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -58,9 +55,10 @@ func (b *RouterBuilder) AddRestRoutes(
 	backend access.API,
 	chain flow.Chain,
 	maxRequestSize int64,
+	maxResponseSize int64,
 ) *RouterBuilder {
 	for _, r := range Routes {
-		h := flowhttp.NewHandler(b.logger, backend, r.Handler, b.LinkGenerator, chain, maxRequestSize)
+		h := flowhttp.NewHandler(b.logger, backend, r.Handler, b.LinkGenerator, chain, maxRequestSize, maxResponseSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -79,10 +77,11 @@ func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	chain flow.Chain,
 	stateStreamConfig backend.Config,
 	maxRequestSize int64,
+	maxResponseSize int64,
 ) *RouterBuilder {
 
 	for _, r := range WSLegacyRoutes {
-		h := legacyws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig, maxRequestSize)
+		h := legacyws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig, maxRequestSize, maxResponseSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -98,9 +97,10 @@ func (b *RouterBuilder) AddWebsocketsRoute(
 	chain flow.Chain,
 	config websockets.Config,
 	maxRequestSize int64,
+	maxResponseSize int64,
 	dataProviderFactory dp.DataProviderFactory,
 ) *RouterBuilder {
-	handler := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, dataProviderFactory)
+	handler := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, maxResponseSize, dataProviderFactory)
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").
@@ -112,67 +112,4 @@ func (b *RouterBuilder) AddWebsocketsRoute(
 
 func (b *RouterBuilder) Build() *mux.Router {
 	return b.router
-}
-
-var routeUrlMap = map[string]string{}
-var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+))?(/(\w+))?(/(\w+))?`)
-
-func init() {
-	for _, r := range Routes {
-		routeUrlMap[r.Pattern] = r.Name
-	}
-	for _, r := range WSLegacyRoutes {
-		routeUrlMap[r.Pattern] = r.Name
-	}
-}
-
-func URLToRoute(url string) (string, error) {
-	normalized, err := normalizeURL(url)
-	if err != nil {
-		return "", err
-	}
-
-	name, ok := routeUrlMap[normalized]
-	if !ok {
-		return "", fmt.Errorf("invalid url")
-	}
-	return name, nil
-}
-
-func normalizeURL(url string) (string, error) {
-	matches := routeRE.FindAllStringSubmatch(url, -1)
-	if len(matches) != 1 || len(matches[0]) != 8 {
-		return "", fmt.Errorf("invalid url")
-	}
-
-	// given a URL like
-	//      /v1/blocks/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef/payload
-	// groups  [  1  ] [                                3                             ] [  5  ]
-	// normalized form like /v1/blocks/{id}/payload
-
-	parts := []string{matches[0][1]}
-
-	switch len(matches[0][3]) {
-	case 0:
-		// top level resource. e.g. /v1/blocks
-	case 64:
-		// id based resource. e.g. /v1/blocks/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-		parts = append(parts, "{id}")
-		if matches[0][5] != "" {
-			parts = append(parts, matches[0][5])
-		}
-	case 16:
-		// address based resource. e.g. /v1/accounts/1234567890abcdef
-		parts = append(parts, "{address}")
-		if matches[0][5] == "keys" && matches[0][7] != "" {
-			parts = append(parts, "keys", "{index}")
-		} else if matches[0][5] != "" {
-			parts = append(parts, matches[0][5])
-		}
-	default:
-		// named resource. e.g. /v1/network/parameters
-		parts = append(parts, matches[0][3])
-	}
-
-	return "/" + strings.Join(parts, "/"), nil
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployLocalReplayLimitedTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func DeployLocalReplayLimitedTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 
 	var builder strings.Builder
 	builder.WriteString("let t = T")
@@ -23,7 +23,7 @@ func DeployLocalReplayLimitedTransaction(authorizer flow.Address, chain flow.Cha
 	)
 }
 
-func DeployGlobalReplayLimitedTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func DeployGlobalReplayLimitedTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 
 	var builder strings.Builder
 	for j := 0; j < 2; j++ {

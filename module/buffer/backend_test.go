@@ -12,7 +12,7 @@ import (
 
 type BackendSuite struct {
 	suite.Suite
-	backend *backend
+	backend *backend[*flow.Proposal]
 }
 
 func TestBackendSuite(t *testing.T) {
@@ -20,38 +20,39 @@ func TestBackendSuite(t *testing.T) {
 }
 
 func (suite *BackendSuite) SetupTest() {
-	suite.backend = newBackend()
+	suite.backend = newBackend[*flow.Proposal]()
 }
 
-func (suite *BackendSuite) item() *item {
+func (suite *BackendSuite) item() *item[*flow.Proposal] {
 	parent := unittest.BlockHeaderFixture()
 	return suite.itemWithParent(parent)
 }
 
-func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item {
-	header := unittest.BlockHeaderWithParentFixture(parent)
-	return &item{
-		header: flow.Slashable[*flow.Header]{
+func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item[*flow.Proposal] {
+	block := unittest.BlockWithParentFixture(parent)
+	return &item[*flow.Proposal]{
+		view:     block.View,
+		parentID: block.ParentID,
+		block: flow.Slashable[*flow.Proposal]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  header,
+			Message:  unittest.ProposalFromBlock(block),
 		},
-		payload: unittest.IdentifierFixture(),
 	}
 }
 
-func (suite *BackendSuite) Add(item *item) {
-	suite.backend.add(item.header, item.payload)
+func (suite *BackendSuite) Add(item *item[*flow.Proposal]) {
+	suite.backend.add(item.block)
 }
 
 func (suite *BackendSuite) TestAdd() {
 	expected := suite.item()
-	suite.backend.add(expected.header, expected.payload)
+	suite.backend.add(expected.block)
 
-	actual, ok := suite.backend.byID(expected.header.Message.ID())
+	actual, ok := suite.backend.byID(expected.block.Message.Block.ID())
 	suite.Assert().True(ok)
 	suite.Assert().Equal(expected, actual)
 
-	byParent, ok := suite.backend.byParentID(expected.header.Message.ParentID)
+	byParent, ok := suite.backend.byParentID(expected.parentID)
 	suite.Assert().True(ok)
 	suite.Assert().Len(byParent, 1)
 	suite.Assert().Equal(expected, byParent[0])
@@ -60,9 +61,9 @@ func (suite *BackendSuite) TestAdd() {
 func (suite *BackendSuite) TestChildIndexing() {
 
 	parent := suite.item()
-	child1 := suite.itemWithParent(parent.header.Message)
-	child2 := suite.itemWithParent(parent.header.Message)
-	grandchild := suite.itemWithParent(child1.header.Message)
+	child1 := suite.itemWithParent(parent.block.Message.Block.ToHeader())
+	child2 := suite.itemWithParent(parent.block.Message.Block.ToHeader())
+	grandchild := suite.itemWithParent(child1.block.Message.Block.ToHeader())
 	unrelated := suite.item()
 
 	suite.Add(child1)
@@ -71,7 +72,7 @@ func (suite *BackendSuite) TestChildIndexing() {
 	suite.Add(unrelated)
 
 	suite.Run("retrieve by parent ID", func() {
-		byParent, ok := suite.backend.byParentID(parent.header.Message.ID())
+		byParent, ok := suite.backend.byParentID(parent.block.Message.Block.ID())
 		suite.Assert().True(ok)
 		// should only include direct children
 		suite.Assert().Len(byParent, 2)
@@ -80,22 +81,22 @@ func (suite *BackendSuite) TestChildIndexing() {
 	})
 
 	suite.Run("drop for parent ID", func() {
-		suite.backend.dropForParent(parent.header.Message.ID())
+		suite.backend.dropForParent(parent.block.Message.Block.ID())
 
 		// should only drop direct children
-		_, exists := suite.backend.byID(child1.header.Message.ID())
+		_, exists := suite.backend.byID(child1.block.Message.Block.ID())
 		suite.Assert().False(exists)
-		_, exists = suite.backend.byID(child2.header.Message.ID())
+		_, exists = suite.backend.byID(child2.block.Message.Block.ID())
 		suite.Assert().False(exists)
 
 		// grandchildren should be unaffected
-		_, exists = suite.backend.byParentID(child1.header.Message.ID())
+		_, exists = suite.backend.byParentID(child1.block.Message.Block.ID())
 		suite.Assert().True(exists)
-		_, exists = suite.backend.byID(grandchild.header.Message.ID())
+		_, exists = suite.backend.byID(grandchild.block.Message.Block.ID())
 		suite.Assert().True(exists)
 
 		// nothing else should be affected
-		_, exists = suite.backend.byID(unrelated.header.Message.ID())
+		_, exists = suite.backend.byID(unrelated.block.Message.Block.ID())
 		suite.Assert().True(exists)
 	})
 }
@@ -103,7 +104,7 @@ func (suite *BackendSuite) TestChildIndexing() {
 func (suite *BackendSuite) TestPruneByView() {
 
 	const N = 100 // number of items we're testing with
-	items := make([]*item, 0, N)
+	items := make([]*item[*flow.Proposal], 0, N)
 
 	// build a pending buffer
 	for i := 0; i < N; i++ {
@@ -119,20 +120,20 @@ func (suite *BackendSuite) TestPruneByView() {
 		// 90% of the time, build on an existing header
 		if i%2 == 1 {
 			parent := items[rand.Intn(len(items))]
-			item := suite.itemWithParent(parent.header.Message)
+			item := suite.itemWithParent(parent.block.Message.Block.ToHeader())
 			suite.Add(item)
 			items = append(items, item)
 		}
 	}
 
 	// pick a height to prune that's guaranteed to prune at least one item
-	pruneAt := items[rand.Intn(len(items))].header.Message.View
+	pruneAt := items[rand.Intn(len(items))].view
 	suite.backend.pruneByView(pruneAt)
 
 	for _, item := range items {
-		view := item.header.Message.View
-		id := item.header.Message.ID()
-		parentID := item.header.Message.ParentID
+		view := item.view
+		id := item.block.Message.Block.ID()
+		parentID := item.parentID
 
 		// check that items below the prune view were removed
 		if view <= pruneAt {
@@ -143,7 +144,7 @@ func (suite *BackendSuite) TestPruneByView() {
 		}
 
 		// check that other items were not removed
-		if view > item.header.Message.View {
+		if view > item.view {
 			_, exists := suite.backend.byID(id)
 			suite.Assert().True(exists)
 			_, exists = suite.backend.byParentID(parentID)

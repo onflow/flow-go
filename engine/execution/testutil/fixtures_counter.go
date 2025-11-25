@@ -46,28 +46,28 @@ access(all) contract Container {
 }
 `
 
-func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	return CreateContractDeploymentTransaction("Container", CounterContract, authorizer, chain)
 }
 
-func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return CreateUnauthorizedContractDeploymentTransaction("Container", CounterContract, authorizer)
 }
 
-func UpdateUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+func UpdateUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return UpdateContractUnathorizedDeploymentTransaction("Container", CounterContractV2, authorizer)
 }
 
-func RemoveUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+func RemoveUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return RemoveContractUnathorizedDeploymentTransaction("Container", authorizer)
 }
 
-func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	return RemoveContractDeploymentTransaction("Container", authorizer, chain)
 }
 
-func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
+func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
 			import 0x%s
 
@@ -88,9 +88,9 @@ func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBod
 
 // CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage
 // and then panic. It can be used to test whether execution state stays untouched/will revert
-func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.TransactionBody {
-	return &flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`
+func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
+		SetScript([]byte(fmt.Sprintf(`
 			import 0x%s
 
 			transaction {
@@ -101,14 +101,13 @@ func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.Transacti
 
 					panic("fail for testing purposes")
               	}
-            }`, counter)),
-		Authorizers: []flow.Address{signer},
-	}
+            }`, counter))).
+		AddAuthorizer(signer)
 }
 
-func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
-	return &flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`
+func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
+	return flow.NewTransactionBodyBuilder().
+		SetScript([]byte(fmt.Sprintf(`
 			import 0x%s
 
 			transaction {
@@ -116,7 +115,6 @@ func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBody
 					let counter = acc.storage.borrow<&Container.Counter>(from: /storage/counter)
 					counter?.add(2)
 				}
-			}`, counter)),
-		Authorizers: []flow.Address{signer},
-	}
+			}`, counter))).
+		AddAuthorizer(signer)
 }

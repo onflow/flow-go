@@ -1,9 +1,11 @@
 package collection
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // rateLimiter implements payer-based rate limiting. See Config for details.
@@ -111,4 +113,51 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 	}
 
 	return false
+}
+
+// GetMaxCollectionSizeForSealingLag computes the maximum collection size based on the sealing lag using a step halving algorithm.
+// The function takes the current protocol state, minimum and maximum sealing lag, halving interval, minimum and maximum collection size as input parameters
+// and outputs a single uint representing the maximum collection size allowed for the current sealing lag.
+// No errors are expected during normal operations.
+func GetMaxCollectionSizeForSealingLag(
+	state protocol.State,
+	minSealingLag, maxSealingLag, halvingInterval, minCollectionSize, maxCollectionSize uint,
+) (uint, error) {
+	lastFinalized, err := state.Final().Head()
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve finalized block: %w", err)
+	}
+	lastSealed, err := state.Sealed().Head()
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve sealed block: %w", err)
+	}
+	sealingLag := uint(lastFinalized.Height - lastSealed.Height)
+	collectionSize := StepHalving(
+		[2]uint{minSealingLag, maxSealingLag},         // [minSealingLag, maxSealingLag] is the range of input values where the halving is applied
+		[2]uint{minCollectionSize, maxCollectionSize}, // [minCollectionSize, maxCollectionSize] is the range of collection sizes that halving function outputs
+		sealingLag,      // the current sealing lag
+		halvingInterval, // interval in blocks in which the halving is applied
+	)
+	return collectionSize, nil
+}
+
+// StepHalving applies a step halving algorithm to determine the maximum collection size based on the sealing lag.
+// minValue is the minimum collection size, maxValue is the maximum collection size,
+func StepHalving(sealingLagBounds, collectionMaxSizeBounds [2]uint, sealingLag, interval uint) uint {
+	if sealingLag <= sealingLagBounds[0] {
+		return collectionMaxSizeBounds[1]
+	}
+	if sealingLag >= sealingLagBounds[1] {
+		return collectionMaxSizeBounds[0]
+	}
+	sealingLag = sealingLag - sealingLagBounds[0] // normalize sealingLag to start from 0
+	if sealingLag <= 0 {
+		return collectionMaxSizeBounds[1]
+	}
+	halvings := sealingLag / interval
+	result := uint(float64(collectionMaxSizeBounds[1]) / math.Pow(2, float64(halvings)))
+	if result < collectionMaxSizeBounds[0] {
+		return collectionMaxSizeBounds[0]
+	}
+	return result
 }

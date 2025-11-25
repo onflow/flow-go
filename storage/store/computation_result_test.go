@@ -18,7 +18,7 @@ func TestUpsertAndRetrieveComputationResult(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := testutil.ComputationResultFixture(t)
 		crStorage := store.NewComputationResultUploadStatus(db)
-		crId := expected.ExecutableBlock.ID()
+		crId := expected.ExecutableBlock.BlockID()
 
 		// True case - upsert
 		testUploadStatus := true
@@ -46,7 +46,7 @@ func TestRemoveComputationResults(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		t.Run("Remove ComputationResult", func(t *testing.T) {
 			expected := testutil.ComputationResultFixture(t)
-			crId := expected.ExecutableBlock.ID()
+			crId := expected.ExecutableBlock.BlockID()
 			crStorage := store.NewComputationResultUploadStatus(db)
 
 			testUploadStatus := true
@@ -77,7 +77,7 @@ func TestListComputationResults(t *testing.T) {
 			// Store a list of ComputationResult instances first
 			expectedIDs := make(map[string]bool, 0)
 			for _, cr := range expected {
-				crId := cr.ExecutableBlock.ID()
+				crId := cr.ExecutableBlock.BlockID()
 				expectedIDs[crId.String()] = true
 				err := crStorage.Upsert(crId, true)
 				require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestListComputationResults(t *testing.T) {
 				testutil.ComputationResultFixture(t),
 			}
 			for _, cr := range unexpected {
-				crId := cr.ExecutableBlock.ID()
+				crId := cr.ExecutableBlock.BlockID()
 				err := crStorage.Upsert(crId, false)
 				require.NoError(t, err)
 			}

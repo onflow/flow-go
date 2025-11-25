@@ -73,7 +73,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		require.NoError(t, err)
 
 		// verify each argument
-		decodedValues := unittest.InterfafceToCdcValues(t, outputTxArgs)
+		decodedValues := unittest.InterfaceToCdcValues(t, outputTxArgs)
 		currEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
 		finalView := currEpoch.FinalView()

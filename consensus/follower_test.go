@@ -63,7 +63,7 @@ type HotStuffFollowerSuite struct {
 	rootHeader    *flow.Header
 	rootQC        *flow.QuorumCertificate
 	finalized     *flow.Header
-	pending       []*flow.Header
+	pending       []*flow.ProposalHeader
 	follower      *hotstuff.FollowerLoop
 	mockConsensus *MockConsensus
 
@@ -91,11 +91,13 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
 	require.NoError(s.T(), err)
 	s.rootHeader = &flow.Header{
-		ParentID:   parentID,
-		Timestamp:  time.Now().UTC(),
-		Height:     21053,
-		View:       52078,
-		ParentView: 52077,
+		HeaderBody: flow.HeaderBody{
+			ParentID:   parentID,
+			Timestamp:  uint64(time.Now().UnixMilli()),
+			Height:     21053,
+			View:       52078,
+			ParentView: 52077,
+		},
 	}
 
 	signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])
@@ -109,7 +111,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// we start with the latest finalized block being the root block
 	s.finalized = s.rootHeader
 	// and no pending (unfinalized) block
-	s.pending = []*flow.Header{}
+	s.pending = []*flow.ProposalHeader{}
 }
 
 // BeforeTest instantiates and starts Follower
@@ -211,7 +213,7 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	// adding the certified child of b should advance finality to b
 	finalityAdvanced := make(chan struct{}) // close when finality has advanced to b
 	certifiedChild := toCertifiedBlock(s.T(), c, d.ParentQC())
-	s.notifier.On("OnBlockIncorporated", blockWithID(certifiedChild.ID())).Return().Once()
+	s.notifier.On("OnBlockIncorporated", blockWithID(certifiedChild.BlockID())).Return().Once()
 	s.finalizer.On("MakeFinal", blockID(b.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(b.ID())).Run(func(_ mock.Arguments) {
 		close(finalityAdvanced)

@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	badgerdb "github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -90,14 +90,14 @@ func TestConsumer(t *testing.T) {
 }
 
 func testOnStartup(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		assertProcessed(t, cp, 0)
 	})
 }
 
 func TestProcessedOrder(t *testing.T) {
-	runWith(t, 5, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, 5, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		assertProcessed(t, cp, 5)
 	})
@@ -106,7 +106,7 @@ func TestProcessedOrder(t *testing.T) {
 // [+1] => 									[0#, 1!]
 // when received job 1, it will be processed
 func testOnReceiveOneJob(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 
@@ -122,7 +122,7 @@ func testOnReceiveOneJob(t *testing.T) {
 // [+1, 1*] => 							[0#, 1#]
 // when job 1 is finished, it will be marked as processed
 func testOnJobFinished(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 
@@ -139,7 +139,7 @@ func testOnJobFinished(t *testing.T) {
 // [+1, +2, 1*, 2*] => 			[0#, 1#, 2#]
 // when job 2 and 1 are finished, they will be marked as processed
 func testOnJobsFinished(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -160,7 +160,7 @@ func testOnJobsFinished(t *testing.T) {
 // [+1, +2, +3, +4] => 			[0#, 1!, 2!, 3!, 4]
 // when more jobs are arrived than the max number of workers, only the first 3 jobs will be processed
 func testMaxWorker(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -184,7 +184,7 @@ func testMaxWorker(t *testing.T) {
 // [+1, +2, +3, +4, +5, +6] => [0#, !1, *2, *3, *4, *5, 6, +7] => [0#, *1, *2, *3, *4, *5, !6, !7]
 // when processing lags behind, the consumer is paused until processing catches up
 func testPauseResume(t *testing.T) {
-	runWithSeatchAhead(t, 5, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWithSeatchAhead(t, 5, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -230,7 +230,7 @@ func testPauseResume(t *testing.T) {
 // [+1, +2, +3, +4, 3*] => 	[0#, 1!, 2!, 3*, 4!]
 // when job 3 is finished, which is not the next processing job 1, the processed index won't change
 func testNonNextFinished(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -260,7 +260,7 @@ func testNonNextFinished(t *testing.T) {
 //
 // [+1, +2, +3, +3, +4] => 	[1, 2, 3*, 4] => [1, 2, 3*, 4*] => => [1#, 2, 3*, 4*] => [1#, 2#, 3#, 4#]
 func testMovingProcessedIndex(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -313,7 +313,7 @@ func testMovingProcessedIndex(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*] => 			[0#, 1!, 2*, 3*, 4!]
 // when job 3 and 2 are finished, the processed index won't change, because 1 is still not finished
 func testTwoNonNextFinished(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -340,7 +340,7 @@ func testTwoNonNextFinished(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5] =>	[0#, 1!, 2*, 3*, 4!, 5!]
 // when job 5 is received, it will be processed, because the worker has capacity
 func testProcessingWithNonNextFinished(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -370,7 +370,7 @@ func testProcessingWithNonNextFinished(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5, +6] =>	[0#, 1!, 2*, 3*, 4!, 5!, 6]
 // when job 6 is received, no more worker can process it, it will be buffered
 func testMaxWorkerWithFinishedNonNexts(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -403,7 +403,7 @@ func testMaxWorkerWithFinishedNonNexts(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5, 1*] => [0#, 1#, 2#, 3#, 4!, 5!]
 // when job 1 is finally finished, it will fast forward the processed index to 3
 func testFastforward(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -435,7 +435,7 @@ func testFastforward(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5, 1*, +6, +7, 6*], restart => [0#, 1#, 2#, 3#, 4!, 5!, 6*, 7!]
 // when job queue crashed and restarted, the queue can be resumed
 func testWorkOnNextAfterFastforward(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
@@ -470,7 +470,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		// rebuild a consumer with the dependencies to simulate a restart
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
-		reProgress := store.NewConsumerProgress(badgerimpl.ToDB(db), ConsumerTag)
+		reProgress := store.NewConsumerProgress(pebbleimpl.ToDB(db), ConsumerTag)
 		reConsumer := newTestConsumer(t, reProgress, j, reWorker, 0, DefaultIndex)
 
 		progress, err := reProgress.Initialize(DefaultIndex)
@@ -489,7 +489,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 // [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 // when Stop is called, it won't work on any job any more
 func testStopRunning(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		for i := 0; i < 4; i++ {
 			require.NoError(t, j.PushOne())
@@ -511,7 +511,7 @@ func testStopRunning(t *testing.T) {
 }
 
 func testConcurrency(t *testing.T) {
-	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
 		var finishAll sync.WaitGroup
 		finishAll.Add(100)
@@ -555,20 +555,20 @@ type Job = module.Job
 
 func runWith(t testing.TB,
 	defaultIndex uint64,
-	runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
+	runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *pebble.DB)) {
 	runWithSeatchAhead(t, 0, defaultIndex, runTestWith)
 }
 
 func runWithSeatchAhead(t testing.TB, maxSearchAhead uint64, defaultIndex uint64,
-	runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
-	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
+	runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *pebble.DB)) {
+	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
-		progressInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), ConsumerTag)
+		progressInitializer := store.NewConsumerProgress(pebbleimpl.ToDB(pdb), ConsumerTag)
 		consumer := newTestConsumer(t, progressInitializer, jobs, worker, maxSearchAhead, defaultIndex)
 		progress, err := progressInitializer.Initialize(defaultIndex)
 		require.NoError(t, err)
-		runTestWith(consumer, progress, worker, jobs, db)
+		runTestWith(consumer, progress, worker, jobs, pdb)
 	})
 }
 
@@ -640,7 +640,7 @@ func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int64) {
 // 0.22 ms to finish job
 func BenchmarkPushAndConsume(b *testing.B) {
 	b.StopTimer()
-	runWith(b, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(b, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		var wg sync.WaitGroup
 		wg.Add(b.N)
 

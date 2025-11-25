@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -104,9 +103,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 	}
 	`, "WrappedToken", hex.EncodeToString([]byte(testContract))))
 
-	txBody := flow.NewTransactionBody().
+	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(deployingTestContractScript).
-		AddAuthorizer(chain.ServiceAddress())
+		SetPayer(chain.ServiceAddress()).
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
+	require.NoError(t, err)
 
 	tx := fvm.Transaction(txBody, 0)
 	snapshot, output, err := vm.Run(ctx, tx, view)
@@ -137,10 +139,13 @@ func TestFungibleTokenTracker(t *testing.T) {
 		sc.FlowServiceAccount.Address.Hex(),
 	))
 
-	txBody = flow.NewTransactionBody().
+	txBody, err = flow.NewTransactionBodyBuilder().
 		SetScript(wrapTokenScript).
+		SetPayer(chain.ServiceAddress()).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(105))).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress()).
+		Build()
+	require.NoError(t, err)
 
 	tx = fvm.Transaction(txBody, 0)
 	snapshot, output, err = vm.Run(ctx, tx, view)
@@ -164,13 +169,13 @@ func TestFungibleTokenTracker(t *testing.T) {
 	require.NoError(t, err)
 
 	// wrappedToken
-	require.True(t, strings.Contains(string(data), `{"path":"storage/wrappedToken/vault","address":"8c5303eaa26202d6","balance":105,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	require.Contains(t, string(data), `{"path":"storage/wrappedToken/vault","address":"8c5303eaa26202d6","balance":105,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`)
 	// flowTokenVaults
-	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"8c5303eaa26202d6","balance":99999999999599895,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
-	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"9a0766d93b6608b7","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
-	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"7e60df042a9c0868","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
-	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"912d5440f7e3769e","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
-	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"754aed9de6197641","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	require.Contains(t, string(data), `{"path":"storage/flowTokenVault","address":"8c5303eaa26202d6","balance":99999999999599895,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`)
+	require.Contains(t, string(data), `{"path":"storage/flowTokenVault","address":"9a0766d93b6608b7","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`)
+	require.Contains(t, string(data), `{"path":"storage/flowTokenVault","address":"7e60df042a9c0868","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`)
+	require.Contains(t, string(data), `{"path":"storage/flowTokenVault","address":"912d5440f7e3769e","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`)
+	require.Contains(t, string(data), `{"path":"storage/flowTokenVault","address":"754aed9de6197641","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`)
 
 	// do not remove this line, see https://github.com/onflow/flow-go/pull/2237
 	t.Log("success")

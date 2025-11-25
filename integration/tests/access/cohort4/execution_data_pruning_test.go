@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	badgerds "github.com/ipfs/go-ds-badger2"
+	pebbleds "github.com/ipfs/go-ds-pebble"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,8 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -160,11 +161,11 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	anEds := s.nodeExecutionDataStore(accessNode)
 
 	// setup storage objects needed to get the execution data id
-	anDB, err := accessNode.DB()
+	db, err := accessNode.DB()
 	require.NoError(s.T(), err, "could not open db")
-
-	anHeaders := badger.NewHeaders(metrics, anDB)
-	anResults := badger.NewExecutionResults(metrics, anDB)
+	anHeaders := store.NewHeaders(metrics, db)
+	anResults := store.NewExecutionResults(metrics, db)
+	anSeals := store.NewSeals(metrics, db)
 
 	// start an execution data service using the Observer Node's execution data db
 
@@ -173,9 +174,10 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	onDB, err := observerNode.DB()
 	require.NoError(s.T(), err, "could not open db")
 
-	onResults := badger.NewExecutionResults(metrics, onDB)
+	onResults := store.NewExecutionResults(metrics, onDB)
+	onSeals := store.NewSeals(metrics, onDB)
 
-	s.checkResults(anHeaders, anResults, onResults, anEds, onEds)
+	s.checkResults(anHeaders, anResults, anSeals, onResults, onSeals, anEds, onEds)
 }
 
 // waitUntilExecutionDataForBlockIndexed waits until the execution data for the specified block height is indexed.
@@ -233,9 +235,11 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 
 // checkResults checks the results of execution data pruning to ensure correctness.
 func (s *ExecutionDataPruningSuite) checkResults(
-	headers *badger.Headers,
-	anResults *badger.ExecutionResults,
-	onResults *badger.ExecutionResults,
+	headers storage.Headers,
+	anResults storage.ExecutionResults,
+	anSeals storage.Seals,
+	onResults storage.ExecutionResults,
+	onSeals storage.Seals,
 	anEds execution_data.ExecutionDataStore,
 	onEds execution_data.ExecutionDataStore,
 ) {
@@ -248,7 +252,10 @@ func (s *ExecutionDataPruningSuite) checkResults(
 		header, err := headers.ByHeight(i)
 		require.NoError(s.T(), err, "%s: could not get header", s.accessNodeName)
 
-		result, err := anResults.ByBlockID(header.ID())
+		// Get the seal for the block, then get the result by seal.ResultID
+		seal, err := anSeals.FinalizedSealForBlock(header.ID())
+		require.NoError(s.T(), err, "%s: could not get seal for block", s.accessNodeName)
+		result, err := anResults.ByID(seal.ResultID)
 		require.NoError(s.T(), err, "%s: could not get sealed result", s.accessNodeName)
 
 		var blobNotFoundError *execution_data.BlobNotFoundError
@@ -269,7 +276,7 @@ func (s *ExecutionDataPruningSuite) checkResults(
 }
 
 func (s *ExecutionDataPruningSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
-	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
+	ds, err := pebbleds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), nil)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)

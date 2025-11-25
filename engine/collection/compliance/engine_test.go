@@ -14,12 +14,11 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -37,7 +36,7 @@ type EngineSuite struct {
 	myID       flow.Identifier
 	cluster    flow.IdentityList
 	me         *module.Local
-	net        *mocknetwork.Network
+	net        *mocknetwork.EngineRegistry
 	payloads   *storage.ClusterPayloads
 	protoState *protocol.State
 	con        *mocknetwork.Conduit
@@ -125,7 +124,7 @@ func (cs *EngineSuite) SetupTest() {
 	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
-	cs.net = &mocknetwork.Network{}
+	cs.net = &mocknetwork.EngineRegistry{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
@@ -163,14 +162,16 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < blockCount; i++ {
-			block := unittest.ClusterBlockWithParent(cs.head)
-			proposal := messages.NewClusterBlockProposal(&block)
-			hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+			block := unittest.ClusterBlockFixture(
+				unittest.ClusterBlock.WithParent(&cs.head.Block),
+			)
+			proposal := unittest.ClusterProposalFromBlock(block)
+			hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+			cs.engine.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 				OriginID: unittest.IdentifierFixture(),
 				Message:  proposal,
 			})
@@ -180,14 +181,16 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		// create a proposal that directly descends from the latest finalized header
-		block := unittest.ClusterBlockWithParent(cs.head)
-		proposal := messages.NewClusterBlockProposal(&block)
+		block := unittest.ClusterBlockFixture(
+			unittest.ClusterBlock.WithParent(&cs.head.Block),
+		)
+		proposal := unittest.ClusterProposalFromBlock(block)
 
-		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
+		cs.engine.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: unittest.IdentifierFixture(),
 			Message:  proposal,
 		})
@@ -206,21 +209,22 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 // Tests the whole processing pipeline.
 func (cs *EngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockFixture()
-	cs.head = &finalizedBlock
-	cs.headerDB[finalizedBlock.ID()] = &finalizedBlock
+	proposal := unittest.ClusterProposalFromBlock(finalizedBlock)
+	cs.head = proposal
+	cs.headerDB[finalizedBlock.ID()] = proposal.Block.ToHeader()
 
 	*cs.pending = module.PendingClusterBlockBuffer{}
 	// wait for both expected calls before ending the test
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
-	cs.pending.On("PruneByView", finalizedBlock.Header.View).
+	cs.pending.On("PruneByView", finalizedBlock.View).
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(nil).Once()
 	cs.pending.On("Size").
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	err := cs.engine.processOnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header))
+	err := cs.engine.processOnFinalizedBlock(model.BlockFromFlow(finalizedBlock.ToHeader()))
 	require.NoError(cs.T(), err)
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

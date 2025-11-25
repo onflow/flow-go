@@ -61,7 +61,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[BlockProposal] = MsgAuthConfig{
 		Name: BlockProposal,
 		Type: func() interface{} {
-			return new(messages.BlockProposal)
+			return new(messages.Proposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusCommittee: {
@@ -181,7 +181,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[ClusterBlockProposal] = MsgAuthConfig{
 		Name: ClusterBlockProposal,
 		Type: func() interface{} {
-			return new(messages.ClusterBlockProposal)
+			return new(messages.ClusterProposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.ConsensusClusterPrefix: {
@@ -231,7 +231,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[CollectionGuarantee] = MsgAuthConfig{
 		Name: CollectionGuarantee,
 		Type: func() interface{} {
-			return new(flow.CollectionGuarantee)
+			return new(messages.CollectionGuarantee)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushGuarantees: {
@@ -243,7 +243,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[TransactionBody] = MsgAuthConfig{
 		Name: TransactionBody,
 		Type: func() interface{} {
-			return new(flow.TransactionBody)
+			return new(messages.TransactionBody)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushTransactions: {
@@ -257,7 +257,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[ExecutionReceipt] = MsgAuthConfig{
 		Name: ExecutionReceipt,
 		Type: func() interface{} {
-			return new(flow.ExecutionReceipt)
+			return new(messages.ExecutionReceipt)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushReceipts: {
@@ -269,7 +269,7 @@ func initializeMessageAuthConfigsMap() {
 	authorizationConfigs[ResultApproval] = MsgAuthConfig{
 		Name: ResultApproval,
 		Type: func() interface{} {
-			return new(flow.ResultApproval)
+			return new(messages.ResultApproval)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.PushApprovals: {
@@ -405,7 +405,7 @@ func initializeMessageAuthConfigsMap() {
 func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus
-	case *messages.BlockProposal:
+	case *messages.Proposal:
 		return authorizationConfigs[BlockProposal], nil
 	case *messages.BlockVote:
 		return authorizationConfigs[BlockVote], nil
@@ -425,7 +425,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[BlockResponse], nil
 
 	// cluster consensus
-	case *messages.ClusterBlockProposal:
+	case *messages.ClusterProposal:
 		return authorizationConfigs[ClusterBlockProposal], nil
 	case *messages.ClusterBlockVote:
 		return authorizationConfigs[ClusterBlockVote], nil
@@ -435,15 +435,15 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[ClusterBlockResponse], nil
 
 	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
+	case *messages.CollectionGuarantee:
 		return authorizationConfigs[CollectionGuarantee], nil
-	case *flow.TransactionBody:
+	case *messages.TransactionBody:
 		return authorizationConfigs[TransactionBody], nil
 
 	// core messages for execution & verification
-	case *flow.ExecutionReceipt:
+	case *messages.ExecutionReceipt:
 		return authorizationConfigs[ExecutionReceipt], nil
-	case *flow.ResultApproval:
+	case *messages.ResultApproval:
 		return authorizationConfigs[ResultApproval], nil
 
 	// data exchange for execution of blocks

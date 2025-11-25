@@ -27,30 +27,30 @@ func (f *FailoverTransactionProvider) TransactionResult(
 	ctx context.Context,
 	header *flow.Header,
 	txID flow.Identifier,
+	collectionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.TransactionResult(ctx, header, txID, encodingVersion)
+	localResult, localErr := f.localProvider.TransactionResult(ctx, header, txID, collectionID, encodingVersion)
 	if localErr == nil {
 		return localResult, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion)
-	return execNodeResult, execNodeErr
+	return f.execNodeProvider.TransactionResult(ctx, header, txID, collectionID, encodingVersion)
 }
 
 func (f *FailoverTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
+	collectionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
+	localResult, localErr := f.localProvider.TransactionResultByIndex(ctx, block, index, collectionID, encodingVersion)
 	if localErr == nil {
 		return localResult, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResultByIndex(ctx, block, index, encodingVersion)
-	return execNodeResult, execNodeErr
+	return f.execNodeProvider.TransactionResultByIndex(ctx, block, index, collectionID, encodingVersion)
 }
 
 func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
@@ -63,6 +63,29 @@ func (f *FailoverTransactionProvider) TransactionResultsByBlockID(
 		return localResults, nil
 	}
 
-	execNodeResults, execNodeErr := f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
-	return execNodeResults, execNodeErr
+	return f.execNodeProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
+}
+
+func (f *FailoverTransactionProvider) TransactionsByBlockID(
+	ctx context.Context,
+	block *flow.Block,
+) ([]*flow.TransactionBody, error) {
+	localResults, localErr := f.localProvider.TransactionsByBlockID(ctx, block)
+	if localErr == nil {
+		return localResults, nil
+	}
+
+	return f.execNodeProvider.TransactionsByBlockID(ctx, block)
+}
+
+func (f *FailoverTransactionProvider) ScheduledTransactionsByBlockID(
+	ctx context.Context,
+	header *flow.Header,
+) ([]*flow.TransactionBody, error) {
+	localResults, localErr := f.localProvider.ScheduledTransactionsByBlockID(ctx, header)
+	if localErr == nil {
+		return localResults, nil
+	}
+
+	return f.execNodeProvider.ScheduledTransactionsByBlockID(ctx, header)
 }

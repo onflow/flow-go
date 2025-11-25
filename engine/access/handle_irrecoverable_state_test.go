@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/crypto"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -29,12 +29,13 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -44,10 +45,12 @@ import (
 // IrrecoverableStateTestSuite tests that Access node indicate an inconsistent or corrupted node state
 type IrrecoverableStateTestSuite struct {
 	suite.Suite
+	log    zerolog.Logger
+	cancel context.CancelFunc
+
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
 	epochQuery *protocol.EpochQuery
-	log        zerolog.Logger
 	net        *mocknetwork.EngineRegistry
 	request    *module.Requester
 	collClient *accessmock.AccessAPIClient
@@ -64,8 +67,7 @@ type IrrecoverableStateTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
-
-	ctx irrecoverable.SignalerContext
+	seals        *storagemock.Seals
 
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
@@ -73,7 +75,7 @@ type IrrecoverableStateTestSuite struct {
 }
 
 func (suite *IrrecoverableStateTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = mocknetwork.NewEngineRegistry(suite.T())
 	suite.state = protocol.NewState(suite.T())
 	suite.snapshot = protocol.NewSnapshot(suite.T())
@@ -90,6 +92,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.transactions = storagemock.NewTransactions(suite.T())
 	suite.collections = storagemock.NewCollections(suite.T())
 	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
+	suite.seals = storagemock.NewSeals(suite.T())
 
 	suite.collClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.execClient = accessmock.NewExecutionAPIClient(suite.T())
@@ -127,7 +130,8 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 
 	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil,
@@ -135,7 +139,8 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 
 	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
 		false,
 		nil,
 		nil).Build()
@@ -150,6 +155,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		Headers:              suite.headers,
 		Collections:          suite.collections,
 		Transactions:         suite.transactions,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		AccessMetrics:        suite.metrics,
 		MaxHeightRange:       0,
@@ -164,6 +170,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 
 	stateStreamConfig := statestreambackend.Config{}
+	followerDistributor := pubsub.NewFollowerDistributor()
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
 		suite.state,
@@ -179,19 +186,24 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		nil,
 		stateStreamConfig,
 		nil,
+		followerDistributor,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
 
 	err = fmt.Errorf("inconsistent node's state")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
+
 	signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-	ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
+	signalCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), ctx, signCtxErr)
 
-	suite.rpcEng.Start(ctx)
+	suite.rpcEng.Start(signalCtx)
 
-	suite.secureGrpcServer.Start(ctx)
-	suite.unsecureGrpcServer.Start(ctx)
+	suite.secureGrpcServer.Start(signalCtx)
+	suite.unsecureGrpcServer.Start(signalCtx)
 
 	// wait for the servers to startup
 	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
@@ -199,6 +211,13 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 
 	// wait for the engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
+}
+
+func (suite *IrrecoverableStateTestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
 func TestIrrecoverableState(t *testing.T) {
@@ -233,11 +252,13 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 // TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	collections := unittest.CollectionListFixture(1)
-	blockHeader := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	block := unittest.BlockFixture(
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(unittest.CollectionGuaranteesWithCollectionIDFixture(collections)...)),
+		),
 	)
-	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
-	suite.headers.On("BlockIDByHeight", blockHeader.Header.Height).Return(blockHeader.ID(), nil)
+	suite.blocks.On("ByID", block.ID()).Return(block, nil)
+	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
 	err := fmt.Errorf("inconsistent node's state")
 	suite.snapshot.On("Head").Return(nil, err)
@@ -249,7 +270,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
+	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, optionsForBlocksIdGetOpts())
 	suite.Require().Error(err)
 	suite.Require().Nil(actual)
 }

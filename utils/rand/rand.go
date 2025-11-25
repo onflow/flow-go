@@ -90,6 +90,8 @@ func Uint32() (uint32, error) {
 	// for 64-bits machines, doing 64 bits operations and then casting
 	// should be faster than dealing with 32 bits operations
 	r, err := Uint64()
+	// 64 bits are sampled but only 32 bits are used. This does not affect the uniformity of the output
+	// assuming that the 64-bits distribution is uniform
 	return uint32(r), err
 }
 
@@ -102,7 +104,7 @@ func Uint32() (uint32, error) {
 //   - (random, nil) otherwise
 func Uint32n(n uint32) (uint32, error) {
 	r, err := Uint64n(uint64(n))
-	return uint32(r), err
+	return uint32(r), err // `r` is less than `n` and necessarily fits in 32 bits
 }
 
 // Uint returns a random uint.

@@ -64,23 +64,21 @@ func newSafetyRulesConcurrencyWrapper(safetyRules hotstuff.SafetyRules) *safetyR
 //   - model.NoVoteError if it is not safe for us to vote (our proposal includes our vote)
 //     for this view. This can happen if we have already proposed or timed out this view.
 //   - generic error in case of unexpected failure
-func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.Header) error {
+func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.Header) ([]byte, error) {
 	if !w.signingStatus.CompareAndSwap(0, 1) { // value of `signingStatus` is something else than 0
-		return fmt.Errorf("signer has already commenced signing; possibly repeated signer call")
+		return nil, fmt.Errorf("signer has already commenced signing; possibly repeated signer call")
 	} // signer is now in state 1, and this thread is the only one every going to execute the following logic
 
 	// signature for own block is structurally a vote
 	vote, err := w.safetyRules.SignOwnProposal(model.ProposalFromFlow(unsignedHeader))
 	if err != nil {
-		return fmt.Errorf("could not sign block proposal: %w", err)
+		return nil, fmt.Errorf("could not sign block proposal: %w", err)
 	}
-	unsignedHeader.ProposerSigData = vote.SigData
-
 	// value of `signingStatus` is always 1, i.e. the following check always succeeds.
 	if !w.signingStatus.CompareAndSwap(1, 2) { // sanity check protects logic from future modifications accidentally breaking this invariant
 		panic("signer wrapper completed its work but encountered state other than 1") // never happens
 	}
-	return nil
+	return vote.SigData, nil
 }
 
 // IsSigningComplete atomically checks whether the Sign logic has concluded, and returns true only in this case.

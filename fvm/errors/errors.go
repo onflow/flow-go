@@ -316,6 +316,19 @@ func NewCodedFailure(
 	return newFailure(code, fmt.Errorf(format, formatArguments...))
 }
 
+func NewCodedFailuref(
+	code FailureCode,
+	msgPrefix string,
+	format string,
+	formatArguments ...interface{},
+) codedFailure {
+	err := fmt.Errorf(format, formatArguments...)
+	if msgPrefix != "" {
+		err = fmt.Errorf("%s: %w", msgPrefix, err)
+	}
+	return newFailure(code, err)
+}
+
 func (err codedFailure) Unwrap() error {
 	return err.err
 }

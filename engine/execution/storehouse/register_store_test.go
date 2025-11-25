@@ -296,7 +296,7 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 		require.NoError(t, err)
 
 		// save block 11 fork
-		block11Fork := unittest.BlockWithParentFixture(headerByHeight[rootHeight]).Header
+		block11Fork := unittest.BlockWithParentFixture(headerByHeight[rootHeight]).ToHeader()
 		err = rs.SaveRegisters(block11Fork, flow.RegisterEntries{makeReg("X", "4")})
 		require.NoError(t, err)
 

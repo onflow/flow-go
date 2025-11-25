@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/events"
@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.ClusterBlockProposal`s
+// defaultBlockQueueCapacity maximum capacity of inbound queue for `cluster.UntrustedProposal`s
 const defaultBlockQueueCapacity = 10_000
 
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
@@ -119,7 +119,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			inBlock := msg.(flow.Slashable[*messages.ClusterBlockProposal])
+			inBlock := msg.(flow.Slashable[*cluster.Proposal])
 			err := e.core.OnBlockProposal(inBlock)
 			e.core.engineMetrics.MessageHandled(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
 			if err != nil {
@@ -134,9 +134,9 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	}
 }
 
-// OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
+// OnClusterBlockProposal feeds a new structurally validated block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) {
+func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[*cluster.Proposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
 	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
@@ -145,9 +145,9 @@ func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[*messages.Cluste
 	}
 }
 
-// OnSyncedClusterBlock feeds a block obtained from sync proposal into the processing pipeline.
+// OnSyncedClusterBlock feeds a structurally validated block proposal obtained from sync proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[*messages.ClusterBlockProposal]) {
+func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[*cluster.Proposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 	if e.pendingBlocks.Push(syncedBlock) {
 		e.pendingBlocksNotifier.Notify()

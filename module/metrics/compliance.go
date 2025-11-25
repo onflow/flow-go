@@ -176,7 +176,10 @@ func (cc *ComplianceCollector) BlockFinalized(block *flow.Block) {
 
 	cc.finalizedBlocks.Inc()
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
+	// count of seals INCLUDES emergency seals
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
+	// keep track of emergency seals (any seal without a verifier signature)
+	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceEmergencySeal}).Add(float64(countPayloadSealsWithoutApproverSig(block.Payload.Seals)))
 }
 
 // SealedHeight sets the finalized height.
@@ -225,4 +228,21 @@ func (cc *ComplianceCollector) EpochFallbackModeExited() {
 
 func (cc *ComplianceCollector) ProtocolStateVersion(version uint64) {
 	cc.protocolStateVersion.Set(float64(version))
+}
+
+// countPayloadSealsWithoutApproverSig counts the number of seals which have any nil signature fields.
+// A seal with a nil signature field can be created in two legitimate ways:
+//  1. If emergency sealing is enabled
+//  2. If a network is configured to disable verification (via chunk alpha, or consensus node seal construction config)
+func countPayloadSealsWithoutApproverSig(seals []*flow.Seal) int {
+	count := 0
+	for _, seal := range seals {
+		for _, sig := range seal.AggregatedApprovalSigs {
+			if sig.SignerIDs == nil || sig.VerifierSignatures == nil {
+				count++
+				break
+			}
+		}
+	}
+	return count
 }

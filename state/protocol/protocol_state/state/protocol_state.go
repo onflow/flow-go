@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -15,8 +16,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/pubsub"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information
@@ -201,25 +201,26 @@ func newMutableProtocolState(
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (s *MutableProtocolState) EvolveState(
+	deferredDBOps *deferred.DeferredBlockPersist,
 	parentBlockID flow.Identifier,
 	candidateView uint64,
 	candidateSeals []*flow.Seal,
-) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
+) (flow.Identifier, error) {
 	serviceEvents, err := s.serviceEventsFromSeals(candidateSeals)
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
+		return flow.ZeroID, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
 	}
 
 	parentStateID, stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
+		return flow.ZeroID, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
 
-	resultingStateID, dbUpdates, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
+	resultingStateID, err := s.build(deferredDBOps, parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
+		return flow.ZeroID, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
 	}
-	return resultingStateID, dbUpdates, nil
+	return resultingStateID, nil
 }
 
 // initializeOrthogonalStateMachines instantiates the sub-state machines that in aggregate evolve the protocol state.
@@ -317,38 +318,45 @@ func (s *MutableProtocolState) serviceEventsFromSeals(candidateSeals []*flow.Sea
 //     on the candidate block's ID, which is still unknown at the time of block construction.
 //   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 func (s *MutableProtocolState) build(
+	deferredDBOps *deferred.DeferredBlockPersist,
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
 	evolvingState protocol.KVStoreReader,
-) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
+) (flow.Identifier, error) {
 	for _, stateMachine := range stateMachines {
 		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions
 		if err != nil {
-			return flow.ZeroID, nil, fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
+			return flow.ZeroID, fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
 		}
 	}
 
 	// _after_ all state machines have ingested the available information, we build the resulting overall state
-	dbUpdates := transaction.NewDeferredBlockPersist()
 	for _, stateMachine := range stateMachines {
 		dbOps, err := stateMachine.Build()
 		if err != nil {
-			return flow.ZeroID, nil, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
+			return flow.ZeroID, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
 		}
-		dbUpdates.AddIndexingOps(dbOps.Pending())
+		deferredDBOps.Chain(dbOps)
 	}
 	resultingStateID := evolvingState.ID()
 
 	// We _always_ index the protocol state by the candidate block's ID. But only if the
 	// state actually changed, we add a database operation to persist it.
-	dbUpdates.AddIndexingOp(func(blockID flow.Identifier, tx *transaction.Tx) error {
-		return s.kvStoreSnapshots.IndexTx(blockID, resultingStateID)(tx)
+	deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		return s.kvStoreSnapshots.BatchIndex(lctx, rw, blockID, resultingStateID)
 	})
+
 	if parentStateID != resultingStateID {
-		// note that `SkipDuplicatesTx` is still required, because the result might equal to an earlier known state (we explicitly want to de-duplicate)
-		dbUpdates.AddDbOp(operation.SkipDuplicatesTx(s.kvStoreSnapshots.StoreTx(resultingStateID, evolvingState)))
+		deferredDBOps.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+			// no need to hold any lock, because the resultingStateID is a full content hash of the value
+			err := s.kvStoreSnapshots.BatchStore(rw, resultingStateID, evolvingState)
+			if err == nil {
+				return nil
+			}
+			return irrecoverable.NewExceptionf("unexpected error while trying to store new protocol state: %w", err)
+		})
 	}
 
-	return resultingStateID, dbUpdates, nil
+	return resultingStateID, nil
 }

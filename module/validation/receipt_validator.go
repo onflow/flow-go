@@ -49,9 +49,9 @@ func NewReceiptValidator(state protocol.State,
 // verifySignature ensures that the given receipt has a valid signature from nodeIdentity.
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the signature is invalid
-func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, nodeIdentity *flow.Identity) error {
-	id := receipt.ID()
-	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], v.signatureHasher)
+func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptStub, nodeIdentity *flow.Identity) error {
+	unsignedReceiptID := receipt.UnsignedExecutionReceiptStub.ID()
+	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, unsignedReceiptID[:], v.signatureHasher)
 	if err != nil { // Verify(..) returns (false,nil) for invalid signature. Any error indicates unexpected internal failure.
 		return irrecoverable.NewExceptionf("failed to verify signature: %w", err)
 	}
@@ -108,7 +108,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 		}
 		return irrecoverable.NewExceptionf("unexpected failure retrieving index for executed block %v: %w", result.BlockID, err)
 	}
-	requiredChunks := 1 + len(index.CollectionIDs) // one chunk per collection + 1 system chunk
+	requiredChunks := 1 + len(index.GuaranteeIDs) // one chunk per collection + 1 system chunk
 	if result.Chunks.Len() != requiredChunks {
 		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
 	}
@@ -206,7 +206,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 		return fmt.Errorf("could not validate single result %v at index: %w", receipt.ExecutionResult.ID(), err)
 	}
 
-	err = v.validateReceipt(receipt.Meta(), receipt.ExecutionResult.BlockID)
+	err = v.validateReceipt(receipt.Stub(), receipt.ExecutionResult.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not validate receipt %v: %w", receipt.ID(), err)
 	}
@@ -236,19 +236,19 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 // Note that module.UnknownResultError is not possible; we have either an invalid candidate block
 // (yields engine.InvalidInputError) or a missing parent block (yields module.UnknownBlockError).
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
-	header := candidate.Header
 	payload := candidate.Payload
+	parentID := candidate.ParentID
 
 	// As a prerequisite, we check that candidate's parent block is known. Otherwise, we cannot validate it.
 	// This check is important to distinguish expected error cases from unexpected exceptions. By confirming
 	// that the protocol state knows the parent block, we guarantee that we can successfully traverse the
 	// candidate's ancestry below.
-	exists, err := v.headers.Exists(header.ParentID)
+	exists, err := v.headers.Exists(parentID)
 	if err != nil {
-		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", header.ParentID, err)
+		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", parentID, err)
 	}
 	if !exists {
-		return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v", header.ParentID)
+		return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v", parentID)
 	}
 
 	// return if nothing to validate
@@ -258,9 +258,9 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
-	lastSeal, err := v.seals.HighestInFork(header.ParentID)
+	lastSeal, err := v.seals.HighestInFork(parentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", header.ParentID, err)
+		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", parentID, err)
 	}
 	latestSealedResult, err := v.results.ByID(lastSeal.ResultID)
 	if err != nil {
@@ -312,7 +312,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 		return nil
 	}
-	err = fork.TraverseForward(v.headers, header.ParentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
+	err = fork.TraverseForward(v.headers, parentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
 	if err != nil {
 		// At the beginning, we checked that candidate's parent exists in the protocol state, i.e. its
 		// ancestry is known and valid. Hence, any error here is a symptom of internal state corruption.
@@ -433,7 +433,7 @@ func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResu
 // Error returns:
 //   - engine.InvalidInputError if `receipt` is invalid
 //   - module.UnknownBlockError if executedBlockID is unknown
-func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, executedBlockID flow.Identifier) error {
+func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptStub, executedBlockID flow.Identifier) error {
 	identity, err := identityForNode(v.state, executedBlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf("retrieving idenity of node %v at block %v failed: %w", receipt.ExecutorID, executedBlockID, err)

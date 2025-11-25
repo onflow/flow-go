@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage/deferred"
 )
 
 // EpochHeights is a structure caching the results of building an epoch with
@@ -179,7 +180,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// Define receipts and seals for block B payload. They will be nil if A is
 	// the root block
 	var receiptA *flow.ExecutionReceipt
-	var prevReceipts []*flow.ExecutionReceiptMeta
+	var prevReceipts []*flow.ExecutionReceiptStub
 	var prevResults []*flow.ExecutionResult
 	var sealsForPrev []*flow.Seal
 
@@ -188,8 +189,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		// A is not the root block. B will contain a receipt for A, and a seal
 		// for the receipt contained in A.
 		receiptA = ReceiptForBlockFixture(aBlock)
-		prevReceipts = []*flow.ExecutionReceiptMeta{
-			receiptA.Meta(),
+		prevReceipts = []*flow.ExecutionReceiptStub{
+			receiptA.Stub(),
 		}
 		prevResults = []*flow.ExecutionResult{
 			&receiptA.ExecutionResult,
@@ -210,13 +211,14 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	setup := EpochSetupFixture(append(setupDefaults, builder.setupOpts...)...)
 
 	// build block B, sealing up to and including block A
-	B := BlockWithParentFixture(A)
-	B.SetPayload(flow.Payload{
-		Receipts: prevReceipts,
-		Results:  prevResults,
-		Seals:    sealsForPrev,
-	})
-
+	B := BlockWithParentAndPayload(
+		A,
+		flow.Payload{
+			Receipts: prevReceipts,
+			Results:  prevResults,
+			Seals:    sealsForPrev,
+		},
+	)
 	builder.addBlock(B)
 
 	// create a receipt for block B, to be included in block C
@@ -226,33 +228,37 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// insert block C with a receipt for block B, and a seal for the receipt in
 	// block B if there was one
-	C := BlockWithParentFixture(B.Header)
 	var sealsForA []*flow.Seal
 	if receiptA != nil {
 		sealsForA = []*flow.Seal{
 			Seal.Fixture(Seal.WithResult(&receiptA.ExecutionResult)),
 		}
 	}
-	C.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
-		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
-		Seals:    sealsForA,
-	})
+	C := BlockWithParentAndPayload(
+		B.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{receiptB.Stub()},
+			Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
+			Seals:    sealsForA,
+		},
+	)
 	builder.addBlock(C)
 	// create a receipt for block C, to be included in block D
 	receiptC := ReceiptForBlockFixture(C)
 
 	// build block D
 	// D contains a seal for block B and a receipt for block C
-	D := BlockWithParentFixture(C.Header)
 	sealForB := Seal.Fixture(
 		Seal.WithResult(&receiptB.ExecutionResult),
 	)
-	D.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receiptC.Meta()},
-		Results:  []*flow.ExecutionResult{&receiptC.ExecutionResult},
-		Seals:    []*flow.Seal{sealForB},
-	})
+	D := BlockWithParentAndPayload(
+		C.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{receiptC.Stub()},
+			Results:  []*flow.ExecutionResult{&receiptC.ExecutionResult},
+			Seals:    []*flow.Seal{sealForB},
+		},
+	)
 	builder.addBlock(D)
 
 	// defaults for the EpochCommit event
@@ -270,15 +276,17 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// build block E
 	// E contains a seal for C and a receipt for D
-	E := BlockWithParentFixture(D.Header)
 	sealForC := Seal.Fixture(
 		Seal.WithResult(&receiptC.ExecutionResult),
 	)
-	E.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receiptD.Meta()},
-		Results:  []*flow.ExecutionResult{&receiptD.ExecutionResult},
-		Seals:    []*flow.Seal{sealForC},
-	})
+	E := BlockWithParentAndPayload(
+		D.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{receiptD.Stub()},
+			Results:  []*flow.ExecutionResult{&receiptD.ExecutionResult},
+			Seals:    []*flow.Seal{sealForC},
+		},
+	)
 	builder.addBlock(E)
 	// create receipt for block E
 	receiptE := ReceiptForBlockFixture(E)
@@ -286,24 +294,26 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// build block F
 	// F contains a seal for block D and the EpochCommit event, as well as a
 	// receipt for block E
-	F := BlockWithParentFixture(E.Header)
 	sealForD := Seal.Fixture(
 		Seal.WithResult(&receiptD.ExecutionResult),
 	)
-	F.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receiptE.Meta()},
-		Results:  []*flow.ExecutionResult{&receiptE.ExecutionResult},
-		Seals:    []*flow.Seal{sealForD},
-	})
+	F := BlockWithParentAndPayload(
+		E.ToHeader(),
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{receiptE.Stub()},
+			Results:  []*flow.ExecutionResult{&receiptE.ExecutionResult},
+			Seals:    []*flow.Seal{sealForD},
+		},
+	)
 	builder.addBlock(F)
 
 	// cache information about the built epoch
 	builder.built[counter] = &EpochHeights{
 		Counter:        counter,
 		Staking:        A.Height,
-		Setup:          D.Header.Height,
-		Committed:      F.Header.Height,
-		CommittedFinal: F.Header.Height,
+		Setup:          D.Height,
+		Committed:      F.Height,
+		CommittedFinal: F.Height,
 	}
 
 	return builder
@@ -330,23 +340,24 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	require.True(builder.t, ok)
 
 	// A is the first block of the next epoch (see diagram in BuildEpoch)
-	A := BlockWithParentFixture(final)
-	// first view is not necessarily exactly final view of previous epoch
-	A.Header.View = finalView + (rand.Uint64() % 4) + 1
 	finalReceipt := ReceiptForBlockFixture(finalBlock)
-	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{
-			finalReceipt.Meta(),
-		},
-		Results: []*flow.ExecutionResult{
-			&finalReceipt.ExecutionResult,
-		},
-		Seals: []*flow.Seal{
-			Seal.Fixture(
-				Seal.WithResult(finalBlock.Payload.Results[0]),
-			),
-		},
-	})
+	A := BlockWithParentAndPayload(
+		final,
+		flow.Payload{
+			Receipts: []*flow.ExecutionReceiptStub{
+				finalReceipt.Stub(),
+			},
+			Results: []*flow.ExecutionResult{
+				&finalReceipt.ExecutionResult,
+			},
+			Seals: []*flow.Seal{
+				Seal.Fixture(
+					Seal.WithResult(finalBlock.Payload.Results[0]),
+				),
+			},
+		})
+	// first view is not necessarily exactly final view of previous epoch
+	A.View = finalView + (rand.Uint64() % 4) + 1
 	builder.addBlock(A)
 
 	return builder
@@ -355,15 +366,15 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	updatedStateId, dbUpdates, err := builder.mutableProtocolState.EvolveState(block.Header.ParentID, block.Header.View, block.Payload.Seals)
+	dbUpdates := deferred.NewDeferredBlockPersist()
+	updatedStateId, err := builder.mutableProtocolState.EvolveState(dbUpdates, block.ParentID, block.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
 	require.False(builder.t, dbUpdates.IsEmpty())
 
 	block.Payload.ProtocolStateID = updatedStateId
-	block.Header.PayloadHash = block.Payload.Hash()
 	blockID := block.ID()
 	for _, state := range builder.states {
-		err = state.ExtendCertified(context.Background(), block, CertifyBlock(block.Header))
+		err = state.ExtendCertified(context.Background(), NewCertifiedBlock(block))
 		require.NoError(builder.t, err)
 
 		err = state.Finalize(context.Background(), blockID)
@@ -387,7 +398,6 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 
 		receiptB := ReceiptForBlockFixture(b)
 
-		block := BlockWithParentFixture(b.Header)
 		seal := Seal.Fixture(
 			Seal.WithResult(b.Payload.Results[0]),
 		)
@@ -396,13 +406,16 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 			WithReceipts(receiptB),
 			WithSeals(seal),
 		)
-		block.SetPayload(payload)
+		block := BlockWithParentAndPayload(
+			b.ToHeader(),
+			payload,
+		)
 
 		builder.addBlock(block)
 
 		// update cache information about the built epoch
 		// we have extended the commit phase
-		builder.built[counter].CommittedFinal = block.Header.Height
+		builder.built[counter].CommittedFinal = block.Height
 	}
 
 	return builder

@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,7 +31,7 @@ type TransactionStatusesProviderSuite struct {
 	api *accessmock.API
 
 	chain          flow.Chain
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	factory       *DataProviderFactoryImpl
@@ -46,12 +46,8 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = accessmock.NewAPI(s.T())
 	s.linkGenerator = mockcommonmodels.NewLinkGenerator(s.T())
-
 	s.chain = flow.Testnet.Chain()
-
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-
+	s.rootBlock = unittest.Block.Genesis(s.chain.ChainID())
 	s.factory = NewDataProviderFactory(
 		s.log,
 		nil,
@@ -98,7 +94,7 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 			arguments: wsmodels.Arguments{
 				"tx_id": unittest.IdentifierFixture().String(),
 			},
-			setupBackend: func(sub *ssmock.Subscription) {
+			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeTransactionStatuses",
 					mock.Anything,
@@ -123,19 +119,16 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
-func backendTransactionStatusesResponse(block flow.Block) []*accessmodel.TransactionResult {
-	id := unittest.IdentifierFixture()
+func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.TransactionResult {
 	cid := unittest.IdentifierFixture()
 	txr := accessmodel.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-		},
+		Status:       flow.TransactionStatusSealed,
+		StatusCode:   10,
+		Events:       unittest.EventsFixture(1),
 		ErrorMessage: "",
 		BlockID:      block.ID(),
 		CollectionID: cid,
-		BlockHeight:  block.Header.Height,
+		BlockHeight:  block.Height,
 	}
 
 	var expectedTxResultsResponses []*accessmodel.TransactionResult
@@ -175,7 +168,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	txStatusesChan := make(chan interface{})
 
 	// Create a mock subscription and mock the channel
-	sub := ssmock.NewSubscription(s.T())
+	sub := submock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(txStatusesChan))
 	sub.On("Err").Return(nil).Once()
 
@@ -226,7 +219,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var txResults []*accessmodel.TransactionResult
 	for i := 0; i < txStatusesCount; i++ {
 		txResults = append(txResults, &accessmodel.TransactionResult{
-			BlockHeight: s.rootBlock.Header.Height,
+			BlockHeight: s.rootBlock.Height,
 		})
 	}
 

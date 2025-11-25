@@ -1,119 +1,105 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import "fmt"
 
-// Collection is set of transactions.
+// Collection is an ordered list of transactions.
+// Collections form a part of the payload of cluster blocks, produced by Collection Nodes.
+// Every Collection maps 1-1 to a Chunk, which is used for transaction execution.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type Collection struct {
 	Transactions []*TransactionBody
 }
 
-// CollectionFromTransactions creates a new collection from the list of
-// transactions.
-func CollectionFromTransactions(transactions []*Transaction) Collection {
-	coll := Collection{Transactions: make([]*TransactionBody, 0, len(transactions))}
-	for _, tx := range transactions {
-		coll.Transactions = append(coll.Transactions, &tx.TransactionBody)
+// UntrustedCollection is an untrusted input-only representation of an Collection,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedCollection should be validated and converted into
+// a trusted Collection using NewCollection constructor.
+type UntrustedCollection Collection
+
+// NewCollection creates a new instance of Collection.
+// Construction Collection allowed only within the constructor
+//
+// All errors indicate a valid Collection cannot be constructed from the input.
+func NewCollection(untrusted UntrustedCollection) (*Collection, error) {
+	for i, tx := range untrusted.Transactions {
+		if tx == nil {
+			return nil, fmt.Errorf("transaction at index %d is nil", i)
+		}
 	}
-	return coll
+
+	return &Collection{
+		Transactions: untrusted.Transactions,
+	}, nil
 }
 
-// Light returns the light, reference-only version of the collection.
-func (c Collection) Light() LightCollection {
-	lc := LightCollection{Transactions: make([]Identifier, 0, len(c.Transactions))}
+// NewEmptyCollection creates a new empty instance of Collection.
+func NewEmptyCollection() *Collection {
+	return &Collection{
+		Transactions: []*TransactionBody{},
+	}
+}
+
+// Light returns a LightCollection, which contains only the list of transaction IDs from the Collection.
+func (c Collection) Light() *LightCollection {
+	txIDs := make([]Identifier, 0, len(c.Transactions))
 	for _, tx := range c.Transactions {
-		lc.Transactions = append(lc.Transactions, tx.ID())
+		txIDs = append(txIDs, tx.ID())
 	}
-	return lc
+	return NewLightCollection(UntrustedLightCollection{
+		Transactions: txIDs,
+	})
 }
 
-// Guarantee returns a collection guarantee for this collection.
-func (c *Collection) Guarantee() CollectionGuarantee {
-	return CollectionGuarantee{
-		CollectionID: c.ID(),
-	}
-}
-
+// ID returns a cryptographic commitment to the Collection.
+// The ID of a Collection is equivalent to the ID of its corresponding LightCollection.
 func (c Collection) ID() Identifier {
 	return c.Light().ID()
 }
 
+// Len returns the number of transactions in the collection.
 func (c Collection) Len() int {
 	return len(c.Transactions)
 }
 
-func (c Collection) Checksum() Identifier {
-	return c.Light().Checksum()
-}
-
-func (c Collection) Fingerprint() []byte {
-	var txs []byte
-	for _, tx := range c.Transactions {
-		txs = append(txs, tx.Fingerprint()...)
-	}
-
-	return fingerprint.Fingerprint(struct {
-		Transactions []byte
-	}{
-		Transactions: txs,
-	})
-}
-
-// LightCollection is a collection containing references to the constituent
-// transactions rather than full transaction bodies. It is used for indexing
-// transactions by collection and for computing the collection fingerprint.
+// LightCollection contains cryptographic commitments to the constituent transactions instead of transaction bodies.
+// It is used for indexing transactions by collection and for computing the collection fingerprint.
+//
+//structwrite:immutable - mutations allowed only within the constructor
 type LightCollection struct {
 	Transactions []Identifier
 }
 
+// UntrustedLightCollection is an untrusted input-only representation of a LightCollection,
+// used for construction.
+//
+// This type exists to ensure that constructor functions are invoked explicitly
+// with named fields, which improves clarity and reduces the risk of incorrect field
+// ordering during construction.
+//
+// An instance of UntrustedLightCollection should be validated and converted into
+// a trusted LightCollection using NewLightCollection constructor.
+type UntrustedLightCollection LightCollection
+
+// NewLightCollection constructs a new LightCollection instance.
+func NewLightCollection(untrusted UntrustedLightCollection) *LightCollection {
+	return &LightCollection{
+		Transactions: untrusted.Transactions,
+	}
+}
+
+// ID returns a cryptographic commitment to the LightCollection.
+// The ID of a LightCollection is equivalent to the ID for its corresponding Collection.
 func (lc LightCollection) ID() Identifier {
 	return MakeID(lc)
 }
 
-func (lc LightCollection) Checksum() Identifier {
-	return MakeID(lc)
-}
-
+// Len returns the number of transactions in the collection.
 func (lc LightCollection) Len() int {
 	return len(lc.Transactions)
-}
-
-func (lc LightCollection) Has(txID Identifier) bool {
-	for _, id := range lc.Transactions {
-		if txID == id {
-			return true
-		}
-	}
-	return false
-}
-
-// Note that this is the basic version of the List, we need to substitute it with something like Merkle tree at some point
-type CollectionList struct {
-	collections []*Collection
-}
-
-func (cl *CollectionList) Fingerprint() Identifier {
-	return MerkleRoot(GetIDs(cl.collections)...)
-}
-
-func (cl *CollectionList) Insert(ch *Collection) {
-	cl.collections = append(cl.collections, ch)
-}
-
-func (cl *CollectionList) Items() []*Collection {
-	return cl.collections
-}
-
-// ByChecksum returns an entity from the list by entity fingerprint
-func (cl *CollectionList) ByChecksum(cs Identifier) (*Collection, bool) {
-	for _, coll := range cl.collections {
-		if coll.Checksum() == cs {
-			return coll, true
-		}
-	}
-	return nil, false
-}
-
-// ByIndex returns an entity from the list by index
-func (cl *CollectionList) ByIndex(i uint64) *Collection {
-	return cl.collections[i]
 }

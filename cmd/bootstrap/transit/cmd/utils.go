@@ -75,7 +75,6 @@ func getFileSHA256(file string) (string, error) {
 
 // moveFile moves a file from source to destination where src and dst are full paths including the filename
 func moveFile(src, dst string) error {
-
 	// check if source file exist
 	if !ioutils.FileExists(src) {
 		return fmt.Errorf("file not found: %s", src)
@@ -153,14 +152,12 @@ func moveFile(src, dst string) error {
 	return nil
 }
 
-func unWrapFile(bootDir string, nodeID string) error {
-
+func unWrapFile(bootDir, nodeID, cipherTextDir, plaintextPath string) error {
 	log.Info().Msg("decrypting Random Beacon key")
 
 	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
 	privKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
-	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
-	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	ciphertextPath := filepath.Join(cipherTextDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
 
 	ciphertext, err := ioutils.ReadFile(ciphertextPath)
 	if err != nil {
@@ -231,7 +228,6 @@ func wrapFile(bootDir string, nodeID string) error {
 
 // generateKeys creates the transit keypair and writes them to disk for later
 func generateKeys(bootDir string, nodeID string) error {
-
 	privPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
 	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
 

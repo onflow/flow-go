@@ -3,9 +3,9 @@ package tx_error_messages
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -22,7 +22,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -38,20 +39,21 @@ type TxErrorMessagesCoreSuite struct {
 		params   *protocol.Params
 	}
 
-	receipts        *storage.ExecutionReceipts
-	txErrorMessages *storage.TransactionResultErrorMessages
-	lightTxResults  *storage.LightTransactionResults
+	receipts        *storagemock.ExecutionReceipts
+	txErrorMessages *storagemock.TransactionResultErrorMessages
+	lightTxResults  *storagemock.LightTransactionResults
 
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
 	txResultsIndex *index.TransactionResultsIndex
+	lockManager    storage.LockManager
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
 	connFactory *connectionmock.ConnectionFactory
 
 	blockMap       map[uint64]*flow.Block
-	rootBlock      flow.Block
+	rootBlock      *flow.Block
 	finalizedBlock *flow.Header
 
 	ctx    context.Context
@@ -72,7 +74,7 @@ type mockCloser struct{}
 func (mc *mockCloser) Close() error { return nil }
 
 func (s *TxErrorMessagesCoreSuite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	// mock out protocol state
 	s.proto.state = protocol.NewFollowerState(s.T())
@@ -80,24 +82,25 @@ func (s *TxErrorMessagesCoreSuite) SetupTest() {
 	s.proto.params = protocol.NewParams(s.T())
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
 	s.connFactory = connectionmock.NewConnectionFactory(s.T())
-	s.receipts = storage.NewExecutionReceipts(s.T())
-	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
+	s.receipts = storagemock.NewExecutionReceipts(s.T())
+	s.txErrorMessages = storagemock.NewTransactionResultErrorMessages(s.T())
+	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
+	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.ToHeader()).ToHeader()
 
-	s.lightTxResults = storage.NewLightTransactionResults(s.T())
+	s.lightTxResults = storagemock.NewLightTransactionResults(s.T())
 	s.reporter = syncmock.NewIndexReporter(s.T())
 	s.indexReporter = index.NewReporter()
 	err := s.indexReporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 	s.txResultsIndex = index.NewTransactionResultsIndex(s.indexReporter, s.lightTxResults)
 
-	s.rootBlock = unittest.BlockFixture()
-	s.rootBlock.Header.Height = 0
-	s.finalizedBlock = unittest.BlockWithParentFixture(s.rootBlock.Header).Header
+	// Initialize lock manager for tests
+	s.lockManager = storage.NewTestingLockManager()
 
 	s.proto.state.On("Params").Return(s.proto.params)
 
 	// Mock the finalized root block header with height 0.
-	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
+	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -146,8 +149,11 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
 
 	// Mock the storage of the fetched error messages into the protocol database.
-	s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
-		Return(nil).Once()
+	s.txErrorMessages.On("Store", mock.Anything, blockId, expectedStoreTxErrorMessages).
+		Return(func(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+			require.True(s.T(), lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage))
+			return nil
+		}).Once()
 
 	core := s.initCore()
 	err := core.FetchErrorMessages(irrecoverableCtx, blockId)
@@ -231,8 +237,11 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 
 		// Simulate an error when attempting to store the fetched transaction error messages in storage.
 		expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
-		s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
-			Return(fmt.Errorf("storage error")).Once()
+		s.txErrorMessages.On("Store", mock.Anything, blockId, expectedStoreTxErrorMessages).
+			Return(func(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+				require.True(s.T(), lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage))
+				return fmt.Errorf("storage error")
+			}).Once()
 
 		core := s.initCore()
 		err := core.FetchErrorMessages(irrecoverableCtx, blockId)
@@ -271,6 +280,7 @@ func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
 		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
+		s.lockManager,
 	)
 	return core
 }
@@ -314,7 +324,7 @@ func mockTransactionResultsByBlock(count int) []flow.LightTransactionResult {
 
 // setupReceiptsForBlock sets up mock execution receipts for a block and returns the receipts along
 // with the identities of the execution nodes that processed them.
-func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier) {
+func setupReceiptsForBlock(receipts *storagemock.ExecutionReceipts, block *flow.Block, eNodeID flow.Identifier) {
 	receipt1 := unittest.ReceiptForBlockFixture(block)
 	receipt1.ExecutorID = eNodeID
 	receipt2 := unittest.ReceiptForBlockFixture(block)
@@ -331,7 +341,7 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 }
 
 // setupReceiptsForBlockWithResult sets up mock execution receipts for a block with a specific execution result
-func setupReceiptsForBlockWithResult(receipts *storage.ExecutionReceipts, executionResult *flow.ExecutionResult, executorIDs ...flow.Identifier) {
+func setupReceiptsForBlockWithResult(receipts *storagemock.ExecutionReceipts, executionResult *flow.ExecutionResult, executorIDs ...flow.Identifier) {
 	receiptList := make(flow.ExecutionReceiptList, 0, len(executorIDs))
 	for _, enID := range executorIDs {
 		receiptList = append(receiptList, unittest.ExecutionReceiptFixture(

@@ -1,40 +1,37 @@
 package persisters
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/persisters/stores"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/store/inmemory/unsynchronized"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
 type PersisterSuite struct {
 	suite.Suite
-	persister                   *BlockPersister
-	inMemoryRegisters           *unsynchronized.Registers
-	inMemoryEvents              *unsynchronized.Events
-	inMemoryCollections         *unsynchronized.Collections
-	inMemoryTransactions        *unsynchronized.Transactions
-	inMemoryResults             *unsynchronized.LightTransactionResults
-	inMemoryTxResultErrMsg      *unsynchronized.TransactionResultErrorMessages
-	registers                   *storagemock.RegisterIndex
-	events                      *storagemock.Events
-	collections                 *storagemock.Collections
-	transactions                *storagemock.Transactions
-	results                     *storagemock.LightTransactionResults
-	txResultErrMsg              *storagemock.TransactionResultErrorMessages
-	latestPersistedSealedResult *storagemock.LatestPersistedSealedResult
-	database                    *storagemock.DB
-	executionResult             *flow.ExecutionResult
-	header                      *flow.Header
+
+	headers          *storagemock.Headers
+	executionResults *storagemock.ExecutionResults
+
+	executionResult *flow.ExecutionResult
+	header          *flow.Header
+	indexerData     *indexer.IndexerData
+	txErrMsgs       []flow.TransactionResultErrorMessage
 }
 
 func TestPersisterSuite(t *testing.T) {
@@ -43,249 +40,191 @@ func TestPersisterSuite(t *testing.T) {
 }
 
 func (p *PersisterSuite) SetupTest() {
-	t := p.T()
+	g := fixtures.NewGeneratorSuite()
 
-	block := unittest.BlockFixture()
-	p.header = block.Header
-	p.executionResult = unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	block := g.Blocks().Fixture()
+	p.header = block.ToHeader()
+	p.executionResult = g.ExecutionResults().Fixture(fixtures.ExecutionResult.WithBlock(block))
 
-	p.inMemoryRegisters = unsynchronized.NewRegisters(p.header.Height)
-	p.inMemoryEvents = unsynchronized.NewEvents()
-	p.inMemoryCollections = unsynchronized.NewCollections()
-	p.inMemoryTransactions = unsynchronized.NewTransactions()
-	p.inMemoryResults = unsynchronized.NewLightTransactionResults()
-	p.inMemoryTxResultErrMsg = unsynchronized.NewTransactionResultErrorMessages()
+	p.indexerData = &indexer.IndexerData{
+		Events:       g.Events().List(5),
+		Collections:  g.Collections().List(2),
+		Transactions: g.Transactions().List(2),
+		Results:      g.LightTransactionResults().List(4),
+		Registers:    g.RegisterEntries().List(3),
+	}
 
-	p.registers = storagemock.NewRegisterIndex(t)
-	p.events = storagemock.NewEvents(t)
-	p.collections = storagemock.NewCollections(t)
-	p.transactions = storagemock.NewTransactions(t)
-	p.results = storagemock.NewLightTransactionResults(t)
-	p.txResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
-	p.latestPersistedSealedResult = storagemock.NewLatestPersistedSealedResult(t)
-
-	p.database = storagemock.NewDB(t)
-	p.database.On("WithReaderBatchWriter", mock.Anything).Return(
-		func(fn func(storage.ReaderBatchWriter) error) error {
-			return fn(storagemock.NewBatch(t))
-		},
-	)
-
-	p.persister = NewBlockPersister(
-		zerolog.Nop(),
-		p.database,
-		p.executionResult,
-		p.header,
-		[]stores.PersisterStore{
-			stores.NewEventsStore(p.inMemoryEvents, p.events, p.executionResult.BlockID),
-			stores.NewResultsStore(p.inMemoryResults, p.results, p.executionResult.BlockID),
-			stores.NewCollectionsStore(p.inMemoryCollections, p.collections),
-			stores.NewTransactionsStore(p.inMemoryTransactions, p.transactions),
-			stores.NewTxResultErrMsgStore(p.inMemoryTxResultErrMsg, p.txResultErrMsg, p.executionResult.BlockID),
-			stores.NewLatestSealedResultStore(p.latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
-		},
-	)
+	for txIndex := range p.indexerData.Results {
+		if txIndex%2 == 0 {
+			p.indexerData.Results[txIndex].Failed = true
+		}
+	}
+	p.txErrMsgs = g.TransactionErrorMessages().ForTransactionResults(p.indexerData.Results)
 }
 
-func (p *PersisterSuite) populateInMemoryStorages() {
-	regEntries := make(flow.RegisterEntries, 3)
-	for i := 0; i < 3; i++ {
-		regEntries[i] = unittest.RegisterEntryFixture()
+func (p *PersisterSuite) TestPersister_HappyPath() {
+	p.testWithDatabase()
+}
+
+func (p *PersisterSuite) TestPersister_EmptyData() {
+	p.indexerData = &indexer.IndexerData{
+		// this is needed because the events storage caches an empty slice when no events are passed.
+		// without it, assert.Equals will fail because nil != empty slice
+		Events: []flow.Event{},
 	}
-	err := p.inMemoryRegisters.Store(regEntries, p.header.Height)
-	p.Require().NoError(err)
+	p.txErrMsgs = nil
+	p.testWithDatabase()
+}
 
-	eventsList := unittest.EventsFixture(5)
-	err = p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{eventsList})
-	p.Require().NoError(err)
+func (p *PersisterSuite) testWithDatabase() {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+	lockManager := storage.NewTestingLockManager()
 
-	for i := 0; i < 2; i++ {
-		collection := unittest.CollectionFixture(2)
-		light := collection.Light()
-		err := p.inMemoryCollections.StoreLightAndIndexByTransaction(&light)
+	p.headers = storagemock.NewHeaders(p.T())
+	p.headers.On("ByHeight", p.header.Height).Return(p.header, nil)
+
+	p.executionResults = storagemock.NewExecutionResults(p.T())
+	p.executionResults.On("ByBlockID", p.executionResult.BlockID).Return(p.executionResult, nil)
+
+	unittest.RunWithPebbleDB(p.T(), func(pdb *pebble.DB) {
+		db := pebbleimpl.ToDB(pdb)
+
+		events := store.NewEvents(metrics, db)
+		results := store.NewLightTransactionResults(metrics, db, store.DefaultCacheSize)
+		transactions := store.NewTransactions(metrics, db)
+		collections := store.NewCollections(db, transactions)
+		txResultErrMsg := store.NewTransactionResultErrorMessages(metrics, db, store.DefaultCacheSize)
+
+		progress, err := store.NewConsumerProgress(db, "test_consumer").Initialize(p.header.Height)
 		p.Require().NoError(err)
 
-		for _, tx := range collection.Transactions {
-			err := p.inMemoryTransactions.Store(tx)
+		latestPersistedSealedResult, err := store.NewLatestPersistedSealedResult(progress, p.headers, p.executionResults)
+		p.Require().NoError(err)
+
+		persister := NewBlockPersister(
+			logger,
+			db,
+			lockManager,
+			p.executionResult,
+			[]stores.PersisterStore{
+				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
+				stores.NewResultsStore(p.indexerData.Results, results, p.executionResult.BlockID),
+				stores.NewCollectionsStore(p.indexerData.Collections, collections),
+				stores.NewTxResultErrMsgStore(p.txErrMsgs, txResultErrMsg, p.executionResult.BlockID, lockManager),
+				stores.NewLatestSealedResultStore(latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
+			},
+		)
+
+		err = persister.Persist()
+		p.Require().NoError(err)
+
+		// Assert all of the expected data exists in the database
+		blockEvents, err := events.ByBlockID(p.executionResult.BlockID)
+		p.Require().NoError(err)
+		p.Require().Equal(p.indexerData.Events, blockEvents)
+
+		blockTxResults, err := results.ByBlockID(p.executionResult.BlockID)
+		p.Require().NoError(err)
+		p.Require().Equal(p.indexerData.Results, blockTxResults)
+
+		for _, expectedCollection := range p.indexerData.Collections {
+			expectedLightCollection := expectedCollection.Light()
+			expectedID := expectedCollection.ID()
+
+			actualCollection, err := collections.ByID(expectedID)
 			p.Require().NoError(err)
+			p.Require().Equal(expectedCollection, actualCollection)
+
+			actualLightCollection, err := collections.LightByID(expectedID)
+			p.Require().NoError(err)
+			p.Require().Equal(expectedLightCollection, actualLightCollection)
+
+			for i, txID := range expectedLightCollection.Transactions {
+				tx, err := transactions.ByID(txID)
+				p.Require().NoError(err)
+				p.Require().Equal(expectedCollection.Transactions[i], tx)
+			}
 		}
-	}
 
-	results := unittest.LightTransactionResultsFixture(4)
-	err = p.inMemoryResults.Store(p.executionResult.BlockID, results)
-	p.Require().NoError(err)
+		blockTxResultErrMsgs, err := txResultErrMsg.ByBlockID(p.executionResult.BlockID)
+		p.Require().NoError(err)
+		require.Equal(p.T(), p.txErrMsgs, blockTxResultErrMsgs)
 
-	txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 2)
-	executorID := unittest.IdentifierFixture()
-	for i := 0; i < 2; i++ {
-		txResultErrMsgs[i] = flow.TransactionResultErrorMessage{
-			TransactionID: unittest.IdentifierFixture(),
-			ErrorMessage:  "expected test error",
-			Index:         uint32(i),
-			ExecutorID:    executorID,
+		resultID, height := latestPersistedSealedResult.Latest()
+		p.Require().Equal(p.executionResult.ID(), resultID)
+		p.Require().Equal(p.header.Height, height)
+
+		height, err = progress.ProcessedIndex()
+		p.Require().NoError(err)
+		p.Require().Equal(p.header.Height, height)
+	})
+}
+
+func (p *PersisterSuite) TestPersister_ErrorHandling() {
+	p.Run("persistor error", func() {
+		expectedErr := errors.New("event persistor error")
+
+		lockManager := storage.NewTestingLockManager()
+
+		database := storagemock.NewDB(p.T())
+		database.
+			On("WithReaderBatchWriter", mock.Anything).
+			Return(func(fn func(storage.ReaderBatchWriter) error) error {
+				return fn(storagemock.NewBatch(p.T()))
+			}).
+			Once()
+
+		collections := storagemock.NewCollections(p.T())
+		for _, collection := range p.indexerData.Collections {
+			collections.
+				On("BatchStoreAndIndexByTransaction",
+					mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertCollection) }),
+					collection, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).
+				Return(nil, nil).
+				Once()
 		}
-	}
-	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, txResultErrMsgs)
-	p.Require().NoError(err)
-}
 
-func (p *PersisterSuite) TestPersister_PersistWithEmptyData() {
-	t := p.T()
+		events := storagemock.NewEvents(p.T())
+		events.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			p.executionResult.BlockID, []flow.EventsList{p.indexerData.Events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(expectedErr).Once()
 
-	err := p.inMemoryEvents.Store(p.executionResult.BlockID, []flow.EventsList{})
-	p.Require().NoError(err)
-
-	err = p.inMemoryResults.Store(p.executionResult.BlockID, []flow.LightTransactionResult{})
-	p.Require().NoError(err)
-
-	err = p.inMemoryTxResultErrMsg.Store(p.executionResult.BlockID, []flow.TransactionResultErrorMessage{})
-	p.Require().NoError(err)
-
-	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
-
-	err = p.persister.Persist()
-	p.Require().NoError(err)
-
-	// Verify other storages were not called since the data is empty
-	p.events.AssertNotCalled(t, "BatchStore")
-	p.results.AssertNotCalled(t, "BatchStore")
-	p.collections.AssertNotCalled(t, "BatchStoreLightAndIndexByTransaction")
-	p.transactions.AssertNotCalled(t, "BatchStore")
-	p.txResultErrMsg.AssertNotCalled(t, "BatchStore")
-}
-
-func (p *PersisterSuite) TestPersister_PersistWithData() {
-	p.populateInMemoryStorages()
-
-	storedEvents := make([]flow.EventsList, 0)
-	storedCollections := make([]flow.LightCollection, 0)
-	storedTransactions := make([]flow.TransactionBody, 0)
-	storedResults := make([]flow.LightTransactionResult, 0)
-	storedTxResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
-
-	p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		se, ok := args.Get(1).([]flow.EventsList)
-		p.Require().True(ok)
-		storedEvents = se
-	}).Return(nil)
-
-	p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		collection, ok := args.Get(0).(*flow.LightCollection)
-		p.Require().True(ok)
-		storedCollections = append(storedCollections, *collection)
-	}).Return(nil)
-
-	p.transactions.On("BatchStore", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		transaction, ok := args.Get(0).(*flow.TransactionBody)
-		p.Require().True(ok)
-		storedTransactions = append(storedTransactions, *transaction)
-	}).Return(nil)
-
-	p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		sr, ok := args.Get(1).([]flow.LightTransactionResult)
-		p.Require().True(ok)
-		storedResults = sr
-	}).Return(nil)
-
-	p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		terrm, ok := args.Get(1).([]flow.TransactionResultErrorMessage)
-		p.Require().True(ok)
-		storedTxResultErrMsgs = terrm
-	}).Return(nil)
-
-	p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(nil).Once()
-
-	err := p.persister.Persist()
-	p.Require().NoError(err)
-
-	// Verify expected data was stored
-	p.Assert().ElementsMatch([]flow.EventsList{p.inMemoryEvents.Data()}, storedEvents)
-	p.Assert().ElementsMatch(p.inMemoryResults.Data(), storedResults)
-	p.Assert().ElementsMatch(p.inMemoryCollections.LightCollections(), storedCollections)
-	p.Assert().ElementsMatch(p.inMemoryTransactions.Data(), storedTransactions)
-	p.Assert().ElementsMatch(p.inMemoryTxResultErrMsg.Data(), storedTxResultErrMsgs)
-}
-
-func (p *PersisterSuite) TestPersister_PersistErrorHandling() {
-	tests := []struct {
-		name          string
-		setupMocks    func()
-		expectedError string
-	}{
-		{
-			name: "EventsBatchStoreError",
-			setupMocks: func() {
-				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
+		persister := NewBlockPersister(
+			unittest.Logger(),
+			database,
+			lockManager,
+			p.executionResult,
+			[]stores.PersisterStore{
+				stores.NewCollectionsStore(p.indexerData.Collections, collections),
+				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
 			},
-			expectedError: "could not add events to batch",
-		},
-		{
-			name: "ResultsBatchStoreError",
-			setupMocks: func() {
-				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
-			},
-			expectedError: "could not add transaction results to batch",
-		},
-		{
-			name: "CollectionsStoreError",
-			setupMocks: func() {
-				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(assert.AnError).Once()
-			},
-			expectedError: "could not add light collections to batch",
-		},
-		{
-			name: "TransactionsStoreError",
-			setupMocks: func() {
-				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				numberOfCollections := len(p.inMemoryCollections.LightCollections())
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
-				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(assert.AnError).Once()
-			},
-			expectedError: "could not add transactions to batch",
-		},
-		{
-			name: "TxResultErrMsgStoreError",
-			setupMocks: func() {
-				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				numberOfCollections := len(p.inMemoryCollections.LightCollections())
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
-				numberOfTransactions := len(p.inMemoryTransactions.Data())
-				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
-				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(assert.AnError).Once()
-			},
-			expectedError: "could not add transaction result error messages to batch",
-		},
-		{
-			name: "LatestPersistedSealedResultStoreError",
-			setupMocks: func() {
-				p.events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.results.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				numberOfCollections := len(p.inMemoryCollections.LightCollections())
-				p.collections.On("BatchStoreLightAndIndexByTransaction", mock.Anything, mock.Anything).Return(nil).Times(numberOfCollections)
-				numberOfTransactions := len(p.inMemoryTransactions.Data())
-				p.transactions.On("BatchStore", mock.Anything, mock.Anything).Return(nil).Times(numberOfTransactions)
-				p.txResultErrMsg.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(nil).Once()
-				p.latestPersistedSealedResult.On("BatchSet", p.executionResult.ID(), p.header.Height, mock.Anything).Return(assert.AnError).Once()
-			},
-			expectedError: "could not persist latest sealed result",
-		},
-	}
+		)
 
-	p.populateInMemoryStorages()
+		err := persister.Persist()
+		p.Require().ErrorIs(err, expectedErr)
+	})
 
-	for _, test := range tests {
-		p.Run(test.name, func() {
-			test.setupMocks()
+	p.Run("lock manager error", func() {
+		lockManager := lockctx.NewManager(nil, lockctx.NoPolicy)
 
-			err := p.persister.Persist()
-			p.Require().Error(err)
+		database := storagemock.NewDB(p.T())
+		collections := storagemock.NewCollections(p.T())
+		events := storagemock.NewEvents(p.T())
 
-			p.Assert().Contains(err.Error(), test.expectedError)
-		})
-	}
+		persister := NewBlockPersister(
+			unittest.Logger(),
+			database,
+			lockManager,
+			p.executionResult,
+			[]stores.PersisterStore{
+				stores.NewCollectionsStore(p.indexerData.Collections, collections),
+				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
+			},
+		)
+
+		err := persister.Persist()
+		p.Require().Error(err)
+		p.True(lockctx.IsUnknownLockError(err))
+	})
 }

@@ -73,7 +73,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 	// verify that the downloaded snapshot is not for the root block
 	header, err := snapshot.Head()
 	require.NoError(t, err)
-	assert.True(t, header.ID() != flowNetwork.Root().Header.ID())
+	assert.True(t, header.ID() != flowNetwork.Root().ID())
 
 	t.Log("@@ restarting network with new root snapshot")
 

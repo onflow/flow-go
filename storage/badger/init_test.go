@@ -3,6 +3,7 @@ package badger_test
 import (
 	"testing"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
@@ -52,5 +53,32 @@ func TestEncryptionKeyMismatch(t *testing.T) {
 		_, err := badger.Open(opts)
 		// opening the database should return an error
 		require.Error(t, err)
+	})
+}
+
+func TestIsBadgerFolder(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		ok, err := bstorage.IsBadgerFolder(dir)
+		require.NoError(t, err)
+		require.False(t, ok)
+
+		db := unittest.BadgerDB(t, dir)
+		ok, err = bstorage.IsBadgerFolder(dir)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.NoError(t, db.Close())
+	})
+}
+
+func TestPebbleIsNotBadgerFolder(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		db, err := pebble.Open(dir, &pebble.Options{})
+		require.NoError(t, err)
+
+		ok, err := bstorage.IsBadgerFolder(dir)
+		require.NoError(t, err)
+		require.False(t, ok)
+
+		require.NoError(t, db.Close())
 	})
 }

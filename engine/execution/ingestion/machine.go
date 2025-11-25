@@ -139,9 +139,9 @@ func (e *Machine) OnComputationResultSaved(
 	ctx context.Context,
 	result *execution.ComputationResult,
 ) string {
-	header := result.BlockExecutionResult.ExecutableBlock.Block.Header
+	block := result.BlockExecutionResult.ExecutableBlock.Block
 	broadcasted, err := e.broadcaster.BroadcastExecutionReceipt(
-		ctx, header.Height, result.ExecutionReceipt)
+		ctx, block.Height, result.ExecutionReceipt)
 	if err != nil {
 		e.log.Err(err).Msg("critical: failed to broadcast the receipt")
 	}
@@ -152,15 +152,15 @@ func (e *Machine) OnComputationResultSaved(
 var _ BlockExecutor = (*Machine)(nil)
 
 func (e *Machine) ExecuteBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) (*execution.ComputationResult, error) {
-	parentID := executableBlock.Block.Header.ParentID
-	parentErID, err := e.execState.GetExecutionResultID(ctx, parentID)
+	block := executableBlock.Block
+	parentErID, err := e.execState.GetExecutionResultID(ctx, block.ParentID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get parent execution result ID %v: %w", parentID, err)
+		return nil, fmt.Errorf("failed to get parent execution result ID %v: %w", block.ParentID, err)
 	}
 
 	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState,
-		executableBlock.Block.Header.ParentID,
-		executableBlock.Block.Header.Height-1,
+		block.ParentID,
+		block.Height-1,
 	)
 
 	computationResult, err := e.computationManager.ComputeBlock(

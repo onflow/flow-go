@@ -101,7 +101,7 @@ type FollowerServiceBuilder struct {
 	FollowerDistributor *pubsub.FollowerDistributor
 	Committee           hotstuff.DynamicCommittee
 	Finalized           *flow.Header
-	Pending             []*flow.Header
+	Pending             []*flow.ProposalHeader
 	FollowerCore        module.HotStuffFollower
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -201,7 +201,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
-		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
+		final := finalizer.NewFinalizer(node.ProtocolDB.Reader(), node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
@@ -209,7 +209,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.FinalizedRootBlock.Header,
+			node.FinalizedRootBlock.ToHeader(),
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -259,13 +259,13 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			node.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
@@ -291,12 +291,12 @@ func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
 			spamConfig,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
-		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return builder.SyncEng, nil
 	})

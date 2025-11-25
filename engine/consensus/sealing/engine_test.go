@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -37,8 +37,9 @@ type SealingEngineSuite struct {
 	myID    flow.Identifier
 
 	// Sealing Engine
-	engine *Engine
-	cancel context.CancelFunc
+	engine      *Engine
+	distributor *pubsub.FollowerDistributor
+	cancel      context.CancelFunc
 }
 
 func (s *SealingEngineSuite) SetupTest() {
@@ -80,6 +81,12 @@ func (s *SealingEngineSuite) SetupTest() {
 
 	// setup ComponentManager and start the engine
 	s.engine.Component = s.engine.buildComponentManager()
+
+	// register callbacks with distributor
+	s.distributor = pubsub.NewFollowerDistributor()
+	s.distributor.AddOnBlockFinalizedConsumer(s.engine.onFinalizedBlock)
+	s.distributor.AddOnBlockIncorporatedConsumer(s.engine.onBlockIncorporated)
+
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
 	s.cancel = cancel
 	s.engine.Start(ctx)
@@ -102,7 +109,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
+	s.distributor.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -121,7 +128,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	index := &flow.Index{}
 
 	for _, result := range payload.Results {
-		index.ResultIDs = append(index.ReceiptIDs, result.ID())
+		index.ResultIDs = append(index.ResultIDs, result.ID())
 		s.results.On("ByID", result.ID()).Return(result, nil).Once()
 
 		IR, err := flow.NewIncorporatedResult(flow.UntrustedIncorporatedResult{
@@ -138,7 +145,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	headers.On("ByBlockID", incorporatedBlockID).Return(incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
-	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
+	s.distributor.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -156,24 +163,30 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	for i := range receipts {
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(originID),
-			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(block))),
 		)
 		receipts[i] = receipt
 	}
 
 	numApprovalsPerReceipt := 1
 	approvals := make([]*flow.ResultApproval, 0, len(receipts)*numApprovalsPerReceipt)
-	responseApprovals := make([]*messages.ApprovalResponse, 0)
+	responseApprovals := make([]*flow.ApprovalResponse, 0)
 	approverID := unittest.IdentifierFixture()
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
-			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ID()),
-				unittest.WithApproverID(approverID))
-			responseApproval := &messages.ApprovalResponse{
+			approval := unittest.ResultApprovalFixture(
+				unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
+				unittest.WithApproverID(approverID),
+			)
+
+			responseApproval := &flow.ApprovalResponse{
+				Nonce:    0,
 				Approval: *approval,
 			}
+
 			responseApprovals = append(responseApprovals, responseApproval)
 			approvals = append(approvals, approval)
+
 			s.core.On("ProcessApproval", approval).Return(nil).Twice()
 		}
 	}
@@ -184,15 +197,16 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 		defer wg.Done()
 		for _, approval := range approvals {
 			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
-			s.Require().NoError(err, "should process approval")
+			s.Require().NoError(err, "should process approval (trusted)")
 		}
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for _, approval := range responseApprovals {
-			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
-			s.Require().NoError(err, "should process approval")
+		for _, resp := range responseApprovals {
+
+			err := s.engine.Process(channels.ReceiveApprovals, approverID, resp)
+			s.Require().NoError(err, "should process approval (converted from wire)")
 		}
 	}()
 

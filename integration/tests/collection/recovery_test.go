@@ -119,9 +119,9 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 
 	// ensure no progress was made (3/5 nodes cannot make progress)
 	proposals := suite.AwaitProposals(10)
-	height := proposals[0].Header.Height
+	height := proposals[0].Height
 	for _, prop := range proposals {
-		suite.Assert().LessOrEqual(prop.Header.Height, height+2)
+		suite.Assert().LessOrEqual(prop.Height, height+2)
 	}
 
 	// restart the paused collectors

@@ -9,15 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocolEvents "github.com/onflow/flow-go/state/protocol/events"
@@ -36,9 +36,9 @@ type SyncSuite struct {
 	myID         flow.Identifier
 	participants flow.IdentityList
 	head         *flow.Header
-	heights      map[uint64]*flow.Block
-	blockIDs     map[flow.Identifier]*flow.Block
-	net          *mocknetwork.Network
+	heights      map[uint64]*flow.Proposal
+	blockIDs     map[flow.Identifier]*flow.Proposal
+	net          *mocknetwork.EngineRegistry
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *protocol.State
@@ -46,6 +46,7 @@ type SyncSuite struct {
 	blocks       *storage.Blocks
 	comp         *mockconsensus.Compliance
 	core         *module.SyncCore
+	metrics      *module.EngineMetrics
 	e            *Engine
 }
 
@@ -64,11 +65,11 @@ func (ss *SyncSuite) SetupTest() {
 	ss.head = header
 
 	// create maps to enable block returns
-	ss.heights = make(map[uint64]*flow.Block)
-	ss.blockIDs = make(map[flow.Identifier]*flow.Block)
+	ss.heights = make(map[uint64]*flow.Proposal)
+	ss.blockIDs = make(map[flow.Identifier]*flow.Proposal)
 
 	// set up the network module mock
-	ss.net = &mocknetwork.Network{}
+	ss.net = &mocknetwork.EngineRegistry{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
@@ -121,30 +122,22 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up blocks storage mock
 	ss.blocks = &storage.Blocks{}
-	ss.blocks.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Block {
-			return ss.heights[height]
-		},
-		func(height uint64) error {
-			_, enabled := ss.heights[height]
+	ss.blocks.On("ProposalByHeight", mock.Anything).Return(
+		func(height uint64) (*flow.Proposal, error) {
+			block, enabled := ss.heights[height]
 			if !enabled {
-				return storerr.ErrNotFound
+				return nil, storerr.ErrNotFound
 			}
-			return nil
-		},
-	)
-	ss.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Block {
-			return ss.blockIDs[blockID]
-		},
-		func(blockID flow.Identifier) error {
-			_, enabled := ss.blockIDs[blockID]
+			return block, nil
+		})
+	ss.blocks.On("ProposalByID", mock.Anything).Return(
+		func(blockID flow.Identifier) (*flow.Proposal, error) {
+			block, enabled := ss.blockIDs[blockID]
 			if !enabled {
-				return storerr.ErrNotFound
+				return nil, storerr.ErrNotFound
 			}
-			return nil
-		},
-	)
+			return block, nil
+		})
 
 	// set up compliance engine mock
 	ss.comp = mockconsensus.NewCompliance(ss.T())
@@ -155,13 +148,14 @@ func (ss *SyncSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(io.Discard)
-	metrics := metrics.NewNoopCollector()
+	ss.metrics = new(module.EngineMetrics)
 
 	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	spamConfig, err := NewSpamDetectionConfig()
 	require.NoError(ss.T(), err, "could not create spam detection config")
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
+	followerDistributor := pubsub.NewFollowerDistributor()
+	e, err := New(log, ss.metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole[flow.Identity](flow.RoleConsensus),
@@ -169,7 +163,8 @@ func (ss *SyncSuite) SetupTest() {
 			),
 			idCache,
 		),
-		spamConfig)
+		spamConfig,
+		followerDistributor)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 	ss.e = e
 }

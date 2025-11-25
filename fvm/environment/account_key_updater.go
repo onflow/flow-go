@@ -237,7 +237,7 @@ func (updater *accountKeyUpdater) addAccountKey(
 			errors.NewAccountNotFoundError(address))
 	}
 
-	keyIndex, err := updater.accounts.GetPublicKeyCount(address)
+	keyIndex, err := updater.accounts.GetAccountPublicKeyCount(address)
 	if err != nil {
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
@@ -251,7 +251,7 @@ func (updater *accountKeyUpdater) addAccountKey(
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
-	err = updater.accounts.AppendPublicKey(address, *accountPublicKey)
+	err = updater.accounts.AppendAccountPublicKey(address, *accountPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
@@ -292,10 +292,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 			errors.NewAccountNotFoundError(address))
 	}
 
-	var publicKey flow.AccountPublicKey
-	publicKey, err = updater.accounts.GetPublicKey(
-		address,
-		keyIndex)
+	err = updater.accounts.RevokeAccountPublicKey(address, keyIndex)
 	if err != nil {
 		// If a key is not found at a given index, then return a nil key with
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise
@@ -307,15 +304,9 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
-	// mark this key as revoked
-	publicKey.Revoked = true
-
-	_, err = updater.accounts.SetPublicKey(
-		address,
-		keyIndex,
-		publicKey)
+	publicKey, err := updater.accounts.GetRuntimeAccountPublicKey(address, keyIndex)
 	if err != nil {
-		return nil, fmt.Errorf("revoking account key failed: %w", err)
+		return nil, err
 	}
 
 	// Prepare account key to return

@@ -55,6 +55,10 @@ func (we *WrappedEnvironment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, 
 	return index, handleEnvironmentError(err)
 }
 
+func (we *WrappedEnvironment) RunWithMeteringDisabled(f func()) {
+	we.env.RunWithMeteringDisabled(f)
+}
+
 // MeterComputation updates the total computation used based on the kind and intensity of the operation.
 func (we *WrappedEnvironment) MeterComputation(usage common.ComputationUsage) error {
 	err := we.env.MeterComputation(usage)
@@ -78,7 +82,11 @@ func (we *WrappedEnvironment) ComputationAvailable(usage common.ComputationUsage
 	return we.env.ComputationAvailable(usage)
 }
 
-// MeterMemory meters the memory usage of a new operation.
+// ComputationRemaining returns the remaining computation for the given kind.
+func (we *WrappedEnvironment) ComputationRemaining(kind common.ComputationKind) uint64 {
+	return we.env.ComputationRemaining(kind)
+}
+
 func (we *WrappedEnvironment) MeterMemory(usage common.MemoryUsage) error {
 	err := we.env.MeterMemory(usage)
 	return handleEnvironmentError(err)
@@ -99,12 +107,6 @@ func (we *WrappedEnvironment) MeterEmittedEvent(byteSize uint64) error {
 // TotalEmittedEventBytes returns the total byte size of events emitted so far.
 func (we *WrappedEnvironment) TotalEmittedEventBytes() uint64 {
 	return we.env.TotalEmittedEventBytes()
-}
-
-// InteractionUsed returns the total storage interaction used.
-func (we *WrappedEnvironment) InteractionUsed() (uint64, error) {
-	val, err := we.env.InteractionUsed()
-	return val, handleEnvironmentError(err)
 }
 
 // EmitEvent emits an event.

@@ -40,6 +40,8 @@ const (
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
+	t.Parallel()
+
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
@@ -57,55 +59,67 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	account := accounts[0]
 	privKey := privateKeys[0]
 	// tx1 deploys contract version 1
-	tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
-	prepareTx(t, tx1, account, privKey, 0, chain)
+	tx1Builder := testutil.DeployEventContractTransaction(account, chain, 1)
+	prepareTx(t, tx1Builder, account, privKey, 0, chain)
+	tx1, err := tx1Builder.Build()
+	require.NoError(t, err)
 
 	// tx2 calls the method of the contract (version 1)
-	tx2 := testutil.CreateEmitEventTransaction(account, account)
-	prepareTx(t, tx2, account, privKey, 1, chain)
+	tx2Builder := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx2Builder, account, privKey, 1, chain)
+	tx2, err := tx2Builder.Build()
+	require.NoError(t, err)
 
 	// tx3 updates the contract to version 2
-	tx3 := testutil.UpdateEventContractTransaction(account, chain, 2)
-	prepareTx(t, tx3, account, privKey, 2, chain)
+	tx3Builder := testutil.UpdateEventContractTransaction(account, chain, 2)
+	prepareTx(t, tx3Builder, account, privKey, 2, chain)
+	tx3, err := tx3Builder.Build()
+	require.NoError(t, err)
 
 	// tx4 calls the method of the contract (version 2)
-	tx4 := testutil.CreateEmitEventTransaction(account, account)
-	prepareTx(t, tx4, account, privKey, 3, chain)
+	tx4Builder := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx4Builder, account, privKey, 3, chain)
+	tx4, err := tx4Builder.Build()
+	require.NoError(t, err)
 
 	// tx5 updates the contract to version 3 but fails (no env signature of service account)
-	tx5 := testutil.UnauthorizedDeployEventContractTransaction(account, chain, 3)
-	tx5.SetProposalKey(account, 0, 4).SetPayer(account)
-	err = testutil.SignEnvelope(tx5, account, privKey)
+	tx5Builder := testutil.UnauthorizedDeployEventContractTransaction(account, chain, 3).
+		SetProposalKey(account, 0, 4).
+		SetPayer(account)
+	err = testutil.SignEnvelope(tx5Builder, account, privKey)
+	require.NoError(t, err)
+	tx5, err := tx5Builder.Build()
 	require.NoError(t, err)
 
 	// tx6 calls the method of the contract (version 2 expected)
-	tx6 := testutil.CreateEmitEventTransaction(account, account)
-	prepareTx(t, tx6, account, privKey, 5, chain)
+	tx6Builder := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx6Builder, account, privKey, 5, chain)
+	tx6, err := tx6Builder.Build()
+	require.NoError(t, err)
 
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3, tx4, tx5, tx6}
 
 	col := flow.Collection{Transactions: transactions}
 
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := flow.Block{
-		Header: &flow.Header{
-			View: 26,
-		},
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithView(26),
+		unittest.Block.WithParentView(25),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
+	)
 
 	executableBlock := &entity.ExecutableBlock{
-		Block: &block,
+		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
+			guarantee.CollectionID: {
+				Guarantee:  guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -113,7 +127,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -182,7 +196,7 @@ type blockProvider struct {
 func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header, error) {
 	block, has := b.blocks[height]
 	if has {
-		return block.Header, nil
+		return block.ToHeader(), nil
 	}
 	return nil, fmt.Errorf("block for height (%d) is not available", height)
 }
@@ -203,15 +217,16 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 //	        -> Block121 (emit event - version should be 2)
 //	            -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
+	t.Parallel()
+
 	block := unittest.BlockFixture()
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
 		fvm.WithEVMEnabled(true),
-		fvm.WithBlockHeader(block.Header),
-		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
+		fvm.WithBlockHeader(block.ToHeader()),
+		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: block}}),
 		fvm.WithChain(chain))
-
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	snapshotTree, accounts, err := testutil.CreateAccounts(
@@ -226,7 +241,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("Sign", mock.Anything, mock.Anything).Return(unittest.SignatureFixture(), nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -275,10 +290,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = &flow.Block{
-			Header: &flow.Header{
-				View: 1,
+			HeaderBody: flow.HeaderBody{
+				View:      1,
+				ChainID:   flow.Emulator,
+				Timestamp: uint64(time.Now().UnixMilli()),
 			},
-			Payload: &flow.Payload{
+			Payload: flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
 		}
@@ -296,8 +313,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	})
 
 	t.Run("executing block11 (deploys contract version 1)", func(t *testing.T) {
-		block11tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
-		prepareTx(t, block11tx1, account, privKey, 0, chain)
+		block11tx1Builder := testutil.DeployEventContractTransaction(account, chain, 1)
+		prepareTx(t, block11tx1Builder, account, privKey, 0, chain)
+		block11tx1, err := block11tx1Builder.Build()
+		require.NoError(t, err)
 
 		txs11 := []*flow.TransactionBody{block11tx1}
 		col11 := flow.Collection{Transactions: txs11}
@@ -317,12 +336,16 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block111 (emit event (expected v1), update contract to v3)", func(t *testing.T) {
 		block111ExpectedValue := 1
 		// emit event
-		block111tx1 := testutil.CreateEmitEventTransaction(account, account)
-		prepareTx(t, block111tx1, account, privKey, 1, chain)
+		block111tx1Builder := testutil.CreateEmitEventTransaction(account, account)
+		prepareTx(t, block111tx1Builder, account, privKey, 1, chain)
+		block111tx1, err := block111tx1Builder.Build()
+		require.NoError(t, err)
 
 		// update contract version 3
-		block111tx2 := testutil.UpdateEventContractTransaction(account, chain, 3)
-		prepareTx(t, block111tx2, account, privKey, 2, chain)
+		block111tx2Builder := testutil.UpdateEventContractTransaction(account, chain, 3)
+		prepareTx(t, block111tx2Builder, account, privKey, 2, chain)
+		block111tx2, err := block111tx2Builder.Build()
+		require.NoError(t, err)
 
 		col111 := flow.Collection{Transactions: []*flow.TransactionBody{block111tx1, block111tx2}}
 		block111, res, block111Snapshot = createTestBlockAndRun(
@@ -345,8 +368,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block1111 (emit event (expected v3))", func(t *testing.T) {
 		block1111ExpectedValue := 3
-		block1111tx1 := testutil.CreateEmitEventTransaction(account, account)
-		prepareTx(t, block1111tx1, account, privKey, 3, chain)
+		block1111tx1Builder := testutil.CreateEmitEventTransaction(account, account)
+		prepareTx(t, block1111tx1Builder, account, privKey, 3, chain)
+		block1111tx1, err := block1111tx1Builder.Build()
+		require.NoError(t, err)
 
 		col1111 := flow.Collection{Transactions: []*flow.TransactionBody{block1111tx1}}
 		block1111, res, _ = createTestBlockAndRun(
@@ -367,12 +392,16 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block112 (emit event (expected v1))", func(t *testing.T) {
 		block112ExpectedValue := 1
-		block112tx1 := testutil.CreateEmitEventTransaction(account, account)
-		prepareTx(t, block112tx1, account, privKey, 1, chain)
+		block112tx1Builder := testutil.CreateEmitEventTransaction(account, account)
+		prepareTx(t, block112tx1Builder, account, privKey, 1, chain)
+		block112tx1, err := block112tx1Builder.Build()
+		require.NoError(t, err)
 
 		// update contract version 4
-		block112tx2 := testutil.UpdateEventContractTransaction(account, chain, 4)
-		prepareTx(t, block112tx2, account, privKey, 2, chain)
+		block112tx2Builder := testutil.UpdateEventContractTransaction(account, chain, 4)
+		prepareTx(t, block112tx2Builder, account, privKey, 2, chain)
+		block112tx2, err := block112tx2Builder.Build()
+		require.NoError(t, err)
 
 		col112 := flow.Collection{Transactions: []*flow.TransactionBody{block112tx1, block112tx2}}
 		block112, res, block112Snapshot = createTestBlockAndRun(
@@ -395,8 +424,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	})
 	t.Run("executing block1121 (emit event (expected v4))", func(t *testing.T) {
 		block1121ExpectedValue := 4
-		block1121tx1 := testutil.CreateEmitEventTransaction(account, account)
-		prepareTx(t, block1121tx1, account, privKey, 3, chain)
+		block1121tx1Builder := testutil.CreateEmitEventTransaction(account, account)
+		prepareTx(t, block1121tx1Builder, account, privKey, 3, chain)
+		block1121tx1, err := block1121tx1Builder.Build()
+		require.NoError(t, err)
 
 		col1121 := flow.Collection{Transactions: []*flow.TransactionBody{block1121tx1}}
 		block1121, res, _ = createTestBlockAndRun(
@@ -416,9 +447,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	})
 	t.Run("executing block12 (deploys contract V2)", func(t *testing.T) {
-
-		block12tx1 := testutil.DeployEventContractTransaction(account, chain, 2)
-		prepareTx(t, block12tx1, account, privKey, 0, chain)
+		block12tx1Builder := testutil.DeployEventContractTransaction(account, chain, 2)
+		prepareTx(t, block12tx1Builder, account, privKey, 0, chain)
+		block12tx1, err := block12tx1Builder.Build()
+		require.NoError(t, err)
 
 		col12 := flow.Collection{Transactions: []*flow.TransactionBody{block12tx1}}
 		block12, res, block12Snapshot = createTestBlockAndRun(
@@ -437,8 +469,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	})
 	t.Run("executing block121 (emit event (expected V2)", func(t *testing.T) {
 		block121ExpectedValue := 2
-		block121tx1 := testutil.CreateEmitEventTransaction(account, account)
-		prepareTx(t, block121tx1, account, privKey, 1, chain)
+		block121tx1Builder := testutil.CreateEmitEventTransaction(account, account)
+		prepareTx(t, block121tx1Builder, account, privKey, 1, chain)
+		block121tx1, err := block121tx1Builder.Build()
+		require.NoError(t, err)
 
 		col121 := flow.Collection{Transactions: []*flow.TransactionBody{block121tx1}}
 		block121, res, block121Snapshot = createTestBlockAndRun(
@@ -458,8 +492,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	})
 	t.Run("executing Block1211 (emit event (expected V2)", func(t *testing.T) {
 		block1211ExpectedValue := 2
-		block1211tx1 := testutil.CreateEmitEventTransaction(account, account)
-		prepareTx(t, block1211tx1, account, privKey, 2, chain)
+		block1211tx1Builder := testutil.CreateEmitEventTransaction(account, account)
+		prepareTx(t, block1211tx1Builder, account, privKey, 2, chain)
+		block1211tx1, err := block1211tx1Builder.Build()
+		require.NoError(t, err)
 
 		col1211 := flow.Collection{Transactions: []*flow.TransactionBody{block1211tx1}}
 		block1211, res, _ = createTestBlockAndRun(
@@ -493,28 +529,24 @@ func createTestBlockAndRun(
 	*execution.ComputationResult,
 	snapshot.SnapshotTree,
 ) {
-	guarantee := flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,
 	}
 
-	block := &flow.Block{
-		Header: &flow.Header{
-			ParentID:  parentBlock.ID(),
-			View:      parentBlock.Header.Height + 1,
-			Timestamp: time.Now(),
-		},
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
-		},
-	}
+	block := unittest.BlockFixture(
+		unittest.Block.WithParent(parentBlock.ID(), parentBlock.View, parentBlock.Height),
+		unittest.Block.WithPayload(
+			unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
+		),
+	)
 
 	executableBlock := &entity.ExecutableBlock{
 		Block: block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
-			guarantee.ID(): {
-				Guarantee:    &guarantee,
-				Transactions: col.Transactions,
+			guarantee.CollectionID: {
+				Guarantee:  guarantee,
+				Collection: &col,
 			},
 		},
 		StartState: unittest.StateCommitmentPointerFixture(),
@@ -537,17 +569,20 @@ func createTestBlockAndRun(
 	return block, returnedComputationResult, snapshotTree
 }
 
-func prepareTx(t *testing.T,
-	tx *flow.TransactionBody,
+func prepareTx(
+	t *testing.T,
+	txBuilder *flow.TransactionBodyBuilder,
 	account flow.Address,
 	privKey flow.AccountPrivateKey,
 	seqNumber uint64,
 	chain flow.Chain) {
-	tx.SetProposalKey(account, 0, seqNumber).
+
+	txBuilder.SetProposalKey(account, 0, seqNumber).
 		SetPayer(chain.ServiceAddress())
-	err := testutil.SignPayload(tx, account, privKey)
+
+	err := testutil.SignPayload(txBuilder, account, privKey)
 	require.NoError(t, err)
-	err = testutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(txBuilder, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 }
 

@@ -77,8 +77,8 @@ func TestConvertCollectionGuarantee(t *testing.T) {
 	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollRef(unittest.IdentifierFixture()))
 
 	msg := convert.CollectionGuaranteeToMessage(guarantee)
-	converted := convert.MessageToCollectionGuarantee(msg)
-
+	converted, err := convert.MessageToCollectionGuarantee(msg)
+	require.NoError(t, err)
 	assert.Equal(t, guarantee, converted)
 }
 
@@ -90,7 +90,7 @@ func TestConvertCollectionGuarantees(t *testing.T) {
 	guarantees := unittest.CollectionGuaranteesFixture(5, unittest.WithCollRef(unittest.IdentifierFixture()))
 
 	msg := convert.CollectionGuaranteesToMessages(guarantees)
-	converted := convert.MessagesToCollectionGuarantees(msg)
-
+	converted, err := convert.MessagesToCollectionGuarantees(msg)
+	require.NoError(t, err)
 	assert.Equal(t, guarantees, converted)
 }
