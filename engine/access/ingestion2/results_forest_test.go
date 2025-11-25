@@ -66,6 +66,7 @@ func (s *ResultsForestSuite) SetupTest() {
 	resultGen := s.g.ExecutionResults()
 
 	initialSealedBlock := s.g.Blocks().Fixture()
+	initialSealedBlockID := initialSealedBlock.ID()
 	s.initialSealedHeader = initialSealedBlock.ToHeader()
 	s.initialSealedResult = resultGen.Fixture(resultGen.WithBlock(initialSealedBlock))
 
@@ -76,6 +77,9 @@ func (s *ResultsForestSuite) SetupTest() {
 	// Setup blackbox mock for the headers
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) (*flow.Header, error) {
+			if blockID == initialSealedBlockID {
+				return s.initialSealedHeader, nil
+			}
 			for _, block := range s.allBlocks {
 				if block.ID() == blockID {
 					return block.ToHeader(), nil
@@ -563,7 +567,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 		s.allBlocks[block.ID()] = block
 	}
 
-	sealedResults := s.executionFork(blocks, s.initialSealedResult.ID())
+	sealedResults := s.executionFork(blocks, s.initialSealedResult.ID()) // results TO BE SEALED below
 	conflictingReceipts := make([]*flow.ExecutionReceipt, 0)
 	for i, result := range sealedResults {
 		sealedPipeline := s.createPipeline(result)
@@ -596,7 +600,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 		}
 	}
 
-	// concurrently insert sealed results with AddSealedResult and conflicting receipts with AddReceipt
+	// Concurrently insert sealed results with AddSealedResult and conflicting receipts with AddReceipt.
 	// AddSealedResult must be called sequentially to ensure the forest invariant is maintained and
 	// the results are actually added to the forest.
 	// synchronize goroutine startup to maximize concurrency
@@ -611,21 +615,22 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 			}()
 		}
 
-		// wait until all goroutines are running, then release them all at once
+		// wait until all goroutines are running and blocking on the `start` channel, then release them all at once
 		synctest.Wait()
 		close(start)
 
+		// Seal results (this emulates the backfill-logic) and wait until
+		// all goroutines feeding receipts are done and this goroutine is blocking on `Wait` below
 		for _, result := range sealedResults {
 			err := forest.AddSealedResult(result)
 			s.Require().NoError(err)
 		}
-
 		synctest.Wait()
 	})
 
-	// there should be one result for each of the sealed and conflicting results, plus the latest
+	// There should be one result for each of the sealed and conflicting results, plus the latest
 	// persisted sealed result. All sealed results should be marked as sealed, and conflicting results
-	// should have the correct receipt and be marked Abandoned.
+	// should have the correct receipt(s) and be marked Abandoned.
 	expectedSize := uint(1 + len(sealedResults) + len(conflictingReceipts))
 	s.Equal(expectedSize, forest.Size())
 
@@ -641,7 +646,7 @@ func (s *ResultsForestSuite) TestAddSealedResult_ConcurrentWithAddReceipt() {
 		s.True(container.Has(receipt.ID()))
 		s.Equal(ingestion2.ResultForCertifiedBlock, container.ResultStatus())
 
-		// this is mocked, but should be abandoned for all conflicting results
+		// Results Forest should update the pipeline status of any result conflicting with a sealed one as orphaned:
 		s.Equal(optimistic_sync.StateAbandoned, container.Pipeline().GetState())
 	}
 }
@@ -770,9 +775,9 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		forest := s.createForest()
 
 		view := s.initialSealedHeader.View - 1
+		s.True(view < forest.LowestView()) // sanity check that the view did not accidentally underflow
 		result := resultGen.Fixture(resultGen.WithBlock(s.blockWithView(view)))
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*result))
-
 		_ = s.createPipeline(result)
 
 		added, err := forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
@@ -813,6 +818,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		forest := s.createForest()
 
 		// create an execution fork of 3 results descending from the latest persisted sealed result
+		// [Sealed] <- R0 <- R1 <-R2
 		conflictingFork := make([]*flow.ExecutionResult, 3)
 		prevResultID := s.initialSealedResult.ID()
 		for i := range conflictingFork {
@@ -823,8 +829,7 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 			prevResultID = conflictingFork[i].ID()
 		}
 
-		// 1. add the second result. since its parent does not exist yet, it will be added and
-		// NOT abandoned.
+		// 1. add result R2: since its parent does not exist yet, it will be added and NOT abandoned.
 		receipt := receiptGen.Fixture(receiptGen.WithExecutionResult(*conflictingFork[1]))
 		conflictingPipeline1 := s.createPipeline(conflictingFork[1])
 
@@ -832,12 +837,11 @@ func (s *ResultsForestSuite) TestAddReceipt() {
 		s.Require().NoError(err)
 		s.True(added)
 
-		// 2. add a descendant result which will also be abandoned
+		// 2. add descending result R2, which will also be NOT be abandoned yet (ancestry still has a gap)
 		receipt = receiptGen.Fixture(receiptGen.WithExecutionResult(*conflictingFork[2]))
 		conflictingPipeline2 := s.createPipeline(conflictingFork[2])
 
-		// this is called by isAbandonedFork when adding the descendant result
-		// no results should be abandoned yet.
+		// This is called by isAbandonedFork when adding the descendant result - no results should be abandoned yet.
 		conflictingPipeline1.On("GetState").Return(optimistic_sync.StatePending).Once()
 
 		added, err = forest.AddReceipt(receipt, ingestion2.ResultForCertifiedBlock)
