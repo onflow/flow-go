@@ -38,7 +38,7 @@ func CreateProcessedLastFullBlockHeightModule(
 	state protocol.State,
 	db storage.DB,
 ) (*ProcessedLastFullBlockHeightModuleResult, error) {
-	rootBlockHeight := state.Params().FinalizedRoot().Height
+	rootBlockHeight := state.Params().SealedRoot().Height
 
 	// Initialize ConsumeProgressLastFullBlockHeight
 	progress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
