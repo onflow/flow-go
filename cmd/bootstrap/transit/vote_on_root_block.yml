@@ -206,7 +206,7 @@
           - "stderr: {{ push_vote_result.stderr | default('') }}"
 
     - name: Get node id from file
-      command: cat /var/flow/bootstrap/public-root-information/node-id
+      command: cat {{ boostrap_directory }}/public-root-information/node-id
       register: nodeid_result
 
     - name: Strip whitespace from node id
