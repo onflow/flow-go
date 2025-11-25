@@ -175,13 +175,15 @@ func (c *ExecutionResultContainer) ResultStatus() ResultStatus {
 //
 // No error returns expected during normal operations.
 func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) error {
-	if c.resultStatus.Set(resultStatus) {
-		if resultStatus == ResultSealed {
-			c.pipeline.SetSealed()
-		}
-		return nil
+	success, oldValue := c.resultStatus.Set(resultStatus)
+	if !success {
+		return fmt.Errorf("invalid result status transition: %s -> %s", oldValue, resultStatus)
 	}
-	return fmt.Errorf("invalid result status transition: %s -> %s", c.resultStatus.Value(), resultStatus)
+
+	if resultStatus == ResultSealed {
+		c.pipeline.SetSealed()
+	}
+	return nil
 }
 
 // Abandon marks the result as orphaned and abandons the pipeline.

@@ -104,14 +104,14 @@ func NewResultStatusTracker(initialValue ResultStatus) ResultStatusTracker {
 
 // Set the result status to the new value, if and only if this is a valid state transition as defined
 // in function [ResultStatus.IsValidTransition].
-func (t *ResultStatusTracker) Set(newValue ResultStatus) bool {
+func (t *ResultStatusTracker) Set(newValue ResultStatus) (success bool, oldValue ResultStatus) {
 	for {
-		oldValue := t.Value()
+		oldValue = t.Value()
 		if !oldValue.IsValidTransition(newValue) {
-			return false
+			return false, oldValue
 		}
 		if atomic.CompareAndSwapUint64(&t.status, uint64(oldValue), uint64(newValue)) {
-			return true
+			return true, oldValue
 		}
 	}
 }

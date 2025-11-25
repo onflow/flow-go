@@ -132,7 +132,18 @@ func TestResultStatusTracker_Set(t *testing.T) {
 
 			tracker := NewResultStatusTracker(tt.from)
 			t.Run(fmt.Sprintf("%s -> %s (valid: %t)", tt.from, to, isValid), func(t *testing.T) {
-				assert.Equal(t, isValid, tracker.Set(to))
+				success, oldValue := tracker.Set(to)
+				newValue := tracker.Value()
+
+				assert.Equal(t, isValid, success)
+				assert.Equal(t, tt.from, oldValue)
+				if isValid {
+					// successfully updated to the `to` status
+					assert.Equal(t, to, newValue)
+				} else {
+					// never updated, keeps original value
+					assert.Equal(t, tt.from, newValue)
+				}
 			})
 		}
 	}
