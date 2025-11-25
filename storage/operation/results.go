@@ -32,7 +32,6 @@ func RetrieveExecutionResult(r storage.Reader, resultID flow.Identifier, result 
 // It is used by the following scenarios:
 // 1. Execution Node indexes its own executed block's result when finish executing a block
 // 2. Execution Node indexes the sealed root block's result during bootstrapping
-// 3. Access Node indexes the sealed result during syncing from EN.
 //
 // The caller must acquire [storage.LockIndexExecutionResult]
 //
