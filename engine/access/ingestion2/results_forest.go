@@ -908,10 +908,14 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 		return
 	}
 
+	rf.mu.RLock()
+
 	// send state update to all children.
-	for child := range rf.IterateChildren(resultID) {
+	for child := range rf.iterateChildren(resultID) {
 		child.Pipeline().OnParentStateUpdated(newState)
 	}
+
+	rf.mu.RUnlock()
 
 	// process completed pipelines
 	if newState == optimistic_sync.StateComplete {
