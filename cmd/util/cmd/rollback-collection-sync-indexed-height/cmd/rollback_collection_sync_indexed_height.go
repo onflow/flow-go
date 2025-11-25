@@ -65,6 +65,14 @@ func runE(*cobra.Command, []string) error {
 
 		// Get the current progress heights and validate rollback height
 		rootBlockHeight := state.Params().FinalizedRoot().Height
+		sealedRootHeight := state.Params().SealedRoot().Height
+
+		// Validate that rollback height is not lower than SealedRoot height
+		if flagHeight < sealedRootHeight {
+			return fmt.Errorf("cannot rollback to height %v: it is lower than SealedRoot height %v",
+				flagHeight, sealedRootHeight)
+		}
+
 		lastFullBlockHeightProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
 		if err != nil {
 			return fmt.Errorf("could not initialize last full block height progress: %w", err)
