@@ -32,8 +32,6 @@ func init() {
 	Cmd.Flags().Uint64Var(&flagHeight, "height", 0,
 		"the start height to rollback collection sync indexed data from")
 	_ = Cmd.MarkFlagRequired("height")
-
-	common.InitDataDirFlag(Cmd, &flagDatadir)
 }
 
 func runE(*cobra.Command, []string) error {
@@ -195,27 +193,7 @@ func removeCollectionsFromHeight(
 		log.Info().Msgf("collections at height %v have been removed. progress (%v/%v)", height, finalRemoved, total)
 	}
 
-	// removing for pending blocks
-	pendings, err := protoState.Final().Descendants()
-	if err != nil {
-		return fmt.Errorf("could not get pending blocks: %w", err)
-	}
-
-	pendingRemoved := 0
-	total = len(pendings)
-
-	for _, pending := range pendings {
-		err = removeCollectionsForBlock(protocolDBBatch, blocks, collections, transactions, pending)
-		if err != nil {
-			return fmt.Errorf("could not remove collections for pending block %v: %w", pending, err)
-		}
-
-		pendingRemoved++
-		log.Info().Msgf("collections for pending block %v have been removed. progress (%v/%v)", pending, pendingRemoved, total)
-	}
-
-	log.Info().Msgf("removed collections from height %v. removed for %v finalized blocks, and %v pending blocks",
-		fromHeight, finalRemoved, pendingRemoved)
+	log.Info().Msgf("removed collections from height %v. removed for %v finalized blocks", fromHeight, finalRemoved)
 
 	return nil
 }
