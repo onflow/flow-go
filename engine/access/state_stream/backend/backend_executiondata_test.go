@@ -930,9 +930,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 
 		res, resMetadata, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
 
-		require.NotEmpty(s.T(), res)
 		require.Equal(s.T(), []flow.RegisterValue{expectedRegister}, res)
-		require.NotEmpty(s.T(), resMetadata)
 		require.Equal(s.T(), metadata, resMetadata)
 		require.NoError(s.T(), err)
 	})
