@@ -1,6 +1,13 @@
 package ingestion2
 
-import "sync/atomic"
+import (
+	"errors"
+	"sync/atomic"
+)
+
+// InvalidStartingState is returned when the initial value provided to `NewResultStatusTracker` is
+// not a valid starting state for the ResultStatus state machine.
+var InvalidStartingState = errors.New("invalid starting state for result forest")
 
 // ResultStatus represents the [ResultsForest]'s *internal* status of processing a particular result.
 //
@@ -74,13 +81,13 @@ func (rs ResultStatus) IsValidTransition(to ResultStatus) bool {
 	}
 }
 
-// IsValidInitialState returns true if and only if the current value would be VALID INITIAL STATE
+// isValidInitialState returns true if and only if the current value would be VALID INITIAL STATE
 // to start in.
 // This is a slight generalization of the established finite state machine formalism, which has a
 // unique initial state. Instead of always initializing our state machine at the same state and then
 // performing transitions to reach a desired state, we allow our state machine to be initialized at
 // essentially all valid states.
-func (rs ResultStatus) IsValidInitialState() bool {
+func (rs ResultStatus) isValidInitialState() bool {
 	return rs == ResultForCertifiedBlock || rs == ResultForFinalizedBlock || rs == ResultSealed || rs == ResultOrphaned
 }
 
@@ -96,10 +103,16 @@ type ResultStatusTracker struct {
 // as specified in function [ResultStatus.IsValidTransition] above. The intended use is to track the
 // status of an execution result from the perspective of the ResultsForest.
 // Caution: for simplicity, we do not validate the initial value here.
-func NewResultStatusTracker(initialValue ResultStatus) ResultStatusTracker {
+//
+// Expected error returns during normal operations:
+//   - [InvalidStartingState]: if the initial value is not a valid starting state
+func NewResultStatusTracker(initialValue ResultStatus) (ResultStatusTracker, error) {
+	if !initialValue.isValidInitialState() {
+		return ResultStatusTracker{}, InvalidStartingState
+	}
 	return ResultStatusTracker{
 		status: uint64(initialValue),
-	}
+	}, nil
 }
 
 // Set the result status to the new value, if and only if this is a valid state transition as defined

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/utils/slices"
 )
@@ -21,19 +22,20 @@ var allStatuses = []ResultStatus{
 	ResultStatus(ResultOrphaned + 1),
 }
 
+type isvalidTestCase struct {
+	name     string
+	status   ResultStatus
+	expected bool
+}
+
 type transitionTestCase struct {
 	name  string
 	from  ResultStatus
 	valid []ResultStatus
 }
 
-// TestResultStatus_IsValid tests the IsValid method for ResultStatus
-func TestResultStatus_IsValid(t *testing.T) {
-	tests := []struct {
-		name     string
-		status   ResultStatus
-		expected bool
-	}{
+func isValidTests() []isvalidTestCase {
+	return []isvalidTestCase{
 		{
 			name:     "certified status is valid",
 			status:   ResultForCertifiedBlock,
@@ -65,11 +67,28 @@ func TestResultStatus_IsValid(t *testing.T) {
 			expected: false,
 		},
 	}
+}
 
-	for _, tt := range tests {
+// TestResultStatus_IsValid tests the IsValid method for ResultStatus
+func TestResultStatus_IsValid(t *testing.T) {
+	for _, tt := range isValidTests() {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.status.IsValid())
 		})
+	}
+}
+
+func TestNewResultStatusTracker_InvalidInitialState(t *testing.T) {
+	for _, tt := range isValidTests() {
+		tracker, err := NewResultStatusTracker(tt.status)
+		if tt.expected {
+			assert.NoError(t, err)
+			assert.Equal(t, tt.status, tracker.Value())
+		} else {
+			var zeroValue ResultStatus
+			assert.ErrorIs(t, err, InvalidStartingState)
+			assert.Equal(t, zeroValue, tracker.Value())
+		}
 	}
 }
 
@@ -130,7 +149,9 @@ func TestResultStatusTracker_Set(t *testing.T) {
 		for _, to := range allStatuses {
 			_, isValid := validTransition[to]
 
-			tracker := NewResultStatusTracker(tt.from)
+			tracker, err := NewResultStatusTracker(tt.from)
+			require.NoError(t, err)
+
 			t.Run(fmt.Sprintf("%s -> %s (valid: %t)", tt.from, to, isValid), func(t *testing.T) {
 				success, oldValue := tracker.Set(to)
 				newValue := tracker.Value()

@@ -52,13 +52,18 @@ func NewExecutionResultContainer(
 		return nil, fmt.Errorf("initial result is for different block")
 	}
 
+	resultStatus, err := NewResultStatusTracker(ResultForCertifiedBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create result status tracker: %w", err)
+	}
+
 	return &ExecutionResultContainer{
 		receipts:     make(map[flow.Identifier]*flow.ExecutionReceiptStub),
 		result:       result,
 		resultID:     result.ID(),
 		blockHeader:  header,
 		pipeline:     pipeline,
-		resultStatus: NewResultStatusTracker(ResultForCertifiedBlock),
+		resultStatus: resultStatus,
 	}, nil
 }
 
