@@ -113,7 +113,7 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 
 	// Log collection receipt and whether it completes a block
 	if complete {
-		bp.log.Info().
+		bp.log.Debug().
 			Hex("collection_id", collectionID[:]).
 			Hex("origin_id", originID[:]).
 			Uint64("block_height", height).
