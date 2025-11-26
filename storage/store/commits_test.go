@@ -30,7 +30,7 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 		// store a commit in db
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
-		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store1.BatchStore(lctx, blockID, expected, rw)
 			})
@@ -43,7 +43,7 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// re-insert the commit - should be idempotent
-		err = unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store1.BatchStore(lctx, blockID, expected, rw)
 			})
@@ -61,7 +61,7 @@ func TestCommitStoreAndRemove(t *testing.T) {
 		// Create and store a commit
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.StateCommitmentFixture()
-		err := unittest.WithLock(t, lockManager, storage.LockInsertOwnReceipt, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return store.BatchStore(lctx, blockID, expected, rw)
 			})

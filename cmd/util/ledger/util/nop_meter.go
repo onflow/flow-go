@@ -1,6 +1,8 @@
 package util
 
 import (
+	"math"
+
 	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -26,6 +28,10 @@ func (n NopMeter) ComputationUsed() (uint64, error) {
 
 func (n NopMeter) ComputationIntensities() meter.MeteredComputationIntensities {
 	return meter.MeteredComputationIntensities{}
+}
+
+func (n NopMeter) ComputationRemaining(_ common.ComputationKind) uint64 {
+	return math.MaxUint64
 }
 
 func (n NopMeter) MeterMemory(_ common.MemoryUsage) error {
