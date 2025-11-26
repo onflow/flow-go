@@ -203,6 +203,9 @@ func getSimpleMeter() *testMeter {
 		computationUsed: func() (uint64, error) {
 			return compUsed, nil
 		},
+		computationRemaining: func(kind common.ComputationKind) uint64 {
+			return TestComputationLimit - compUsed
+		},
 	}
 }
 
@@ -366,6 +369,7 @@ type testMeter struct {
 	hasComputationCapacity func(common.ComputationUsage) bool
 	computationUsed        func() (uint64, error)
 	computationIntensities func() meter.MeteredComputationIntensities
+	computationRemaining   func(kind common.ComputationKind) uint64
 
 	meterMemory func(usage common.MemoryUsage) error
 	memoryUsed  func() (uint64, error)
@@ -405,6 +409,14 @@ func (m *testMeter) ComputationIntensities() meter.MeteredComputationIntensities
 		panic("method not set")
 	}
 	return computationIntensities()
+}
+
+func (m *testMeter) ComputationRemaining(kind common.ComputationKind) uint64 {
+	computationRemaining := m.computationRemaining
+	if computationRemaining == nil {
+		panic("method not set")
+	}
+	return computationRemaining(kind)
 }
 
 func (m *testMeter) ComputationUsed() (uint64, error) {

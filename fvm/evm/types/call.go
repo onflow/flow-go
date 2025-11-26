@@ -58,6 +58,10 @@ type DirectCall struct {
 	// Sets whether we skip or apply the EIP-7825 tx gas limit cap,
 	// introduced in `Osaka` hard-fork
 	skipTxGasLimitCheck bool
+
+	// setCodeAuthorizations is an authorization list from an account
+	// to deploy code at its address. Useful for EIP-7702 transactions.
+	setCodeAuthorizations []gethTypes.SetCodeAuthorization
 }
 
 // DirectCallFromEncoded constructs a DirectCall from encoded data
@@ -88,15 +92,16 @@ func (dc *DirectCall) Hash() gethCommon.Hash {
 // Message constructs a core.Message from the direct call
 func (dc *DirectCall) Message() *gethCore.Message {
 	return &gethCore.Message{
-		From:      dc.From.ToCommon(),
-		To:        dc.to(),
-		Value:     dc.Value,
-		Data:      dc.Data,
-		Nonce:     dc.Nonce,
-		GasLimit:  dc.GasLimit,
-		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
-		GasTipCap: big.NewInt(0), // also known as maxPriorityFeePerGas (in GWei)
-		GasFeeCap: big.NewInt(0), // also known as maxFeePerGas (in GWei)
+		From:                  dc.From.ToCommon(),
+		To:                    dc.to(),
+		Value:                 dc.Value,
+		Data:                  dc.Data,
+		Nonce:                 dc.Nonce,
+		GasLimit:              dc.GasLimit,
+		GasPrice:              big.NewInt(0),            // price is set to zero fo direct calls
+		GasTipCap:             big.NewInt(0),            // also known as maxPriorityFeePerGas (in GWei)
+		GasFeeCap:             big.NewInt(0),            // also known as maxFeePerGas (in GWei)
+		SetCodeAuthorizations: dc.setCodeAuthorizations, // introduced in EIP-7702 tx type
 		// TODO: maybe revisit setting the access list
 		// AccessList:        tx.AccessList(),
 		// When SkipNonceChecks is true, the message nonce is
@@ -141,6 +146,14 @@ func (dc *DirectCall) EmptyToField() bool {
 // SkipTxGasLimitCheck disables the EIP-7825 transaction gas limit cap
 func (dc *DirectCall) SkipTxGasLimitCheck() {
 	dc.skipTxGasLimitCheck = true
+}
+
+// SetCodeAuthorizations sets the given code authorizaions for EIP-7702
+// transaction types
+func (dc *DirectCall) SetCodeAuthorizations(
+	authList []gethTypes.SetCodeAuthorization,
+) {
+	dc.setCodeAuthorizations = authList
 }
 
 // ValidEIP7825GasLimit checks whether the `GasLimit` of the direct call
