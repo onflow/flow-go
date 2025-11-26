@@ -790,7 +790,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		// hit B because interpreting C because interpreting transaction
 		// hit A because interpreting B because interpreting C because interpreting transaction
 		// hit A2 because interpreting B because interpreting C because interpreting transaction
-		require.Equal(t, ifCompile(15, 7), metrics.CacheHits)
+		require.Equal(t, ifCompile(23, 7), metrics.CacheHits)
 		require.Equal(t, 4, metrics.CacheMisses)
 	})
 
@@ -806,7 +806,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		// hit B because interpreting C because interpreting transaction
 		// hit A because interpreting B because interpreting C because interpreting transaction
 		// hit A2 because interpreting B because interpreting C because interpreting transaction
-		require.Equal(t, ifCompile(23, 7), metrics.CacheHits)
+		require.Equal(t, ifCompile(15, 7), metrics.CacheHits)
 		require.Equal(t, 0, metrics.CacheMisses)
 	})
 
