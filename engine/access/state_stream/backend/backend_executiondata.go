@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -54,12 +53,13 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	criteria optimistic_sync.Criteria,
 ) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error) {
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+	// TODO: change error handling; it is obsolete.
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case common.IsInsufficientExecutionReceipts(err):
+		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)

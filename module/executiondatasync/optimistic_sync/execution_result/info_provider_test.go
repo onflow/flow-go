@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
 // ExecutionResultInfoProviderSuite is a test suite for testing the Provider.
@@ -49,8 +49,8 @@ func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	// This will be used just for the root block
 	suite.snapshot.On("SealedResult").Return(suite.rootBlockResult, nil, nil).Maybe()
 	suite.state.On("SealedResult", rootBlockID).Return(flow.ExecutionReceiptList{}).Maybe()
-	suite.params.On("SporkRootBlock").Return(suite.rootBlock)
-	suite.state.On("Params").Return(suite.params)
+	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Maybe()
+	suite.state.On("Params").Return(suite.params).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
 }
@@ -186,9 +186,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 					RequiredExecutors:      allExecutionNodes[0:1].NodeIDs(),
 				},
 			)
-			suite.Require().Error(err)
-
-			suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
+			suite.Require().ErrorIs(err, optimistic_sync.ErrNotEnoughAgreeingExecutors)
 		},
 	)
 
@@ -215,9 +213,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 					).NodeIDs(),
 				},
 			)
-			suite.Require().Error(err)
-
-			suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
+			suite.Require().ErrorIs(err, optimistic_sync.ErrRequiredExecutorNotFound)
 		},
 	)
 }
@@ -383,4 +379,78 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 			)
 		},
 	)
+}
+
+func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderReturnsErrorWhenForkCannotBeExtended() {
+	preferredExecutors := flow.IdentifierList{}
+	operatorCriteria := optimistic_sync.Criteria{
+		AgreeingExecutorsCount: 1,
+	}
+	provider := suite.createProvider(preferredExecutors, operatorCriteria)
+
+	generator := fixtures.NewGeneratorSuite(
+		fixtures.WithSeed(42),
+		fixtures.WithChainID(flow.Testnet),
+	)
+
+	// set up 2 executors that produce different execution results
+	block := generator.Blocks().Fixture()
+	baseExecutionResult := generator.ExecutionResults().Fixture(fixtures.ExecutionResult.WithBlock(block))
+
+	// fork 1 and fork 2, both descend from baseExecutionResult
+	executionResult1 := generator.ExecutionResults().Fixture(fixtures.ExecutionResult.WithPreviousResultID(baseExecutionResult.ID()))
+	executionResult2 := generator.ExecutionResults().Fixture(fixtures.ExecutionResult.WithPreviousResultID(baseExecutionResult.ID()))
+
+	// two execution identities (executors)
+	executors := generator.Identities().List(2, fixtures.Identity.WithRole(flow.RoleExecution))
+
+	// receipts for both forks, one per executor
+	receipt1 := generator.ExecutionReceipts().Fixture(
+		fixtures.ExecutionReceipt.WithExecutorID(executors[0].NodeID),
+		fixtures.ExecutionReceipt.WithExecutionResult(*executionResult1),
+	)
+	receipt2 := generator.ExecutionReceipts().Fixture(
+		fixtures.ExecutionReceipt.WithExecutorID(executors[1].NodeID),
+		fixtures.ExecutionReceipt.WithExecutionResult(*executionResult2),
+	)
+	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
+
+	// the first call returns both receipts to select fork1
+	suite.receipts.
+		On("ByBlockID", block.ID()).
+		Return(receipts, nil).
+		Once()
+
+	// the second call returns only fork2's receipt to force fork mismatch deterministically
+	suite.receipts.
+		On("ByBlockID", block.ID()).
+		Return(flow.ExecutionReceiptList{receipt2}, nil).
+		Once()
+
+	// request execution result from the first executor
+	suite.snapshot.
+		On("Identities", mock.Anything).
+		Return(flow.IdentityList{executors[0]}, nil).
+		Once()
+
+	result1, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
+		RequiredExecutors:       flow.IdentifierList{executors[0].NodeID},
+		ParentExecutionResultID: baseExecutionResult.ID(),
+	})
+	suite.Require().NoError(err)
+	suite.Require().Equal(executionResult1.ID(), result1.ExecutionResultID)
+
+	// now request the second executor's result (also a child of baseExecutionResult),
+	// but require that it descends from result1; since it's on a different fork, no match should be found.
+	suite.snapshot.
+		On("Identities", mock.Anything).
+		Return(flow.IdentityList{executors[0], executors[1]}, nil).
+		Once()
+
+	result2, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
+		RequiredExecutors:       flow.IdentifierList{executors[1].NodeID},
+		ParentExecutionResultID: result1.ExecutionResultID,
+	})
+	suite.Require().ErrorIs(err, optimistic_sync.ErrForkAbandoned)
+	suite.Require().Empty(result2)
 }

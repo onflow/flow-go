@@ -161,7 +161,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case common.IsInsufficientExecutionReceipts(err):
+		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -219,7 +219,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case common.IsInsufficientExecutionReceipts(err):
+		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -282,7 +282,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case common.IsInsufficientExecutionReceipts(err):
+		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
