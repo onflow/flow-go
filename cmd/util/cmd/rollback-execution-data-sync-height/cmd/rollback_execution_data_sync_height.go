@@ -5,10 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/ipfs/go-cid"
-	pebbleds "github.com/ipfs/go-ds-pebble"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -74,7 +73,24 @@ func runE(*cobra.Command, []string) error {
 				flagHeight, sealedRootHeight)
 		}
 
-		requesterProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight).Initialize(sealedRootHeight)
+		// Initialize execution data datastore manager to access the execution data store DB
+		// Note: ConsumeProgressExecutionDataRequesterBlockHeight is stored in the execution data
+		// datastore DB, not the protocol DB, since that is where the jobqueue writes execution data to.
+		executionDatastoreManager, err := edstorage.CreateDatastoreManager(
+			log.Logger, flagExecutionDataDir)
+		if err != nil {
+			return fmt.Errorf("could not create execution data datastore manager: %w", err)
+		}
+		defer func() {
+			if closeErr := executionDatastoreManager.Close(); closeErr != nil {
+				log.Error().Err(closeErr).Msg("failed to close execution data datastore manager")
+			}
+		}()
+
+		// Use the execution data datastore DB instead of the protocol DB
+		executionDataDB := executionDatastoreManager.DB()
+
+		requesterProgress, err := store.NewConsumerProgress(executionDataDB, module.ConsumeProgressExecutionDataRequesterBlockHeight).Initialize(sealedRootHeight)
 		if err != nil {
 			return fmt.Errorf("could not initialize execution data requester progress: %w", err)
 		}
@@ -95,11 +111,8 @@ func runE(*cobra.Command, []string) error {
 		seals := store.NewSeals(metrics, db)
 		results := store.NewExecutionResults(metrics, db)
 
-		// Initialize execution data blobstore
-		executionDataBlobstore, err := initExecutionDataBlobstore(flagExecutionDataDir)
-		if err != nil {
-			return fmt.Errorf("could not initialize execution data blobstore: %w", err)
-		}
+		// Create execution data blobstore from the datastore manager
+		executionDataBlobstore := blobs.NewBlobstore(executionDatastoreManager.Datastore())
 
 		// remove execution data from the specified height
 		// Note: rollback height is the highest height that is NOT removed (we start removing from rollback height + 1)
@@ -118,17 +131,11 @@ func runE(*cobra.Command, []string) error {
 
 		// Reset only the requester progress height to the rollback height
 		// Note: The indexer progress and indexed data (events, collections, transactions, results, registers) are NOT rolled back
-		protocolDBBatch := db.NewBatch()
-		defer protocolDBBatch.Close()
-
-		err = requesterProgress.BatchSetProcessedIndex(flagHeight, protocolDBBatch)
+		err = executionDataDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return requesterProgress.BatchSetProcessedIndex(flagHeight, rw)
+		})
 		if err != nil {
 			return fmt.Errorf("could not set execution data requester height to %v: %w", flagHeight, err)
-		}
-
-		err = protocolDBBatch.Commit()
-		if err != nil {
-			return fmt.Errorf("could not flush write batch at %v: %w", flagHeight, err)
 		}
 
 		log.Info().
@@ -352,15 +359,4 @@ func collectCIDsFromChunkExecutionData(
 	}
 
 	return result, nil
-}
-
-// initExecutionDataBlobstore initializes the execution data blobstore from the given directory.
-func initExecutionDataBlobstore(executionDataDir string) (blobs.Blobstore, error) {
-	datastoreDir := filepath.Join(executionDataDir, "blobstore")
-	ds, err := pebbleds.NewDatastore(datastoreDir, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not create pebble datastore at %v: %w", datastoreDir, err)
-	}
-
-	return blobs.NewBlobstore(ds), nil
 }
