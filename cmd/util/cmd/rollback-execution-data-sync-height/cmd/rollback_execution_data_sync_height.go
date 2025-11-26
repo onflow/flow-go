@@ -24,8 +24,8 @@ import (
 )
 
 var (
-	flagHeight            uint64
-	flagExecutionDataDir  string
+	flagHeight           uint64
+	flagExecutionDataDir string
 )
 
 var Cmd = &cobra.Command{
@@ -66,7 +66,6 @@ func runE(*cobra.Command, []string) error {
 		}
 
 		// Get the current progress heights and validate rollback height
-		rootBlockHeight := state.Params().FinalizedRoot().Height
 		sealedRootHeight := state.Params().SealedRoot().Height
 
 		// Validate that rollback height is not lower than SealedRoot height
@@ -75,14 +74,9 @@ func runE(*cobra.Command, []string) error {
 				flagHeight, sealedRootHeight)
 		}
 
-		requesterProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight).Initialize(rootBlockHeight)
+		requesterProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight).Initialize(sealedRootHeight)
 		if err != nil {
 			return fmt.Errorf("could not initialize execution data requester progress: %w", err)
-		}
-
-		indexerProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataIndexerBlockHeight).Initialize(rootBlockHeight)
-		if err != nil {
-			return fmt.Errorf("could not initialize execution data indexer progress: %w", err)
 		}
 
 		requesterHeight, err := requesterProgress.ProcessedIndex()
@@ -90,22 +84,14 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("could not get execution data requester height: %w", err)
 		}
 
-		indexerHeight, err := indexerProgress.ProcessedIndex()
-		if err != nil {
-			return fmt.Errorf("could not get execution data indexer height: %w", err)
-		}
-
-		// Find the highest height of the two progress trackers
-		maxProgressHeight := max(requesterHeight, indexerHeight)
-
-		// Validate that rollback height is not beyond the highest progress height
-		if flagHeight > maxProgressHeight {
-			return fmt.Errorf("cannot rollback to height %v: it is beyond the highest progress height %v (requesterHeight: %v, indexerHeight: %v)",
-				flagHeight, maxProgressHeight, requesterHeight, indexerHeight)
+		// Validate that rollback height is not beyond the requester progress height
+		// Note: We only rollback the requester progress, not the indexer progress
+		if flagHeight > requesterHeight {
+			return fmt.Errorf("cannot rollback to height %v: it is beyond the requester progress height %v",
+				flagHeight, requesterHeight)
 		}
 
 		metrics := &metrics.NoopCollector{}
-		headers := store.NewHeaders(metrics, db)
 		seals := store.NewSeals(metrics, db)
 		results := store.NewExecutionResults(metrics, db)
 
@@ -115,18 +101,14 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("could not initialize execution data blobstore: %w", err)
 		}
 
-		executionDataStore := execution_data.NewExecutionDataStore(executionDataBlobstore, execution_data.DefaultSerializer)
-
 		// remove execution data from the specified height
 		// Note: rollback height is the highest height that is NOT removed (we start removing from rollback height + 1)
 		removeFromHeight := flagHeight + 1
 		err = removeExecutionDataFromHeight(
 			context.Background(),
 			state,
-			headers,
 			seals,
 			results,
-			executionDataStore,
 			executionDataBlobstore,
 			removeFromHeight)
 
@@ -134,18 +116,14 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("could not remove execution data from height %v: %w", removeFromHeight, err)
 		}
 
-		// Reset both progress heights to the rollback height
+		// Reset only the requester progress height to the rollback height
+		// Note: The indexer progress and indexed data (events, collections, transactions, results, registers) are NOT rolled back
 		protocolDBBatch := db.NewBatch()
 		defer protocolDBBatch.Close()
 
 		err = requesterProgress.BatchSetProcessedIndex(flagHeight, protocolDBBatch)
 		if err != nil {
 			return fmt.Errorf("could not set execution data requester height to %v: %w", flagHeight, err)
-		}
-
-		err = indexerProgress.BatchSetProcessedIndex(flagHeight, protocolDBBatch)
-		if err != nil {
-			return fmt.Errorf("could not set execution data indexer height to %v: %w", flagHeight, err)
 		}
 
 		err = protocolDBBatch.Commit()
@@ -156,8 +134,7 @@ func runE(*cobra.Command, []string) error {
 		log.Info().
 			Uint64("rollback_height", flagHeight).
 			Uint64("previous_requester_height", requesterHeight).
-			Uint64("previous_indexer_height", indexerHeight).
-			Msg("execution data sync height rolled back and progress heights reset")
+			Msg("execution data requester height rolled back (indexer progress and indexed data preserved)")
 
 		return nil
 	})
@@ -168,10 +145,8 @@ func runE(*cobra.Command, []string) error {
 func removeExecutionDataFromHeight(
 	ctx context.Context,
 	protoState protocol.State,
-	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
-	executionDataStore execution_data.ExecutionDataStore,
 	blobstore blobs.Blobstore,
 	fromHeight uint64,
 ) error {
@@ -195,8 +170,8 @@ func removeExecutionDataFromHeight(
 	finalRemoved := 0
 	total := int(final.Height-fromHeight) + 1
 
-	// removing for finalized blocks
-	for height := fromHeight; height <= final.Height; height++ {
+	// removing for finalized blocks from highest to lowest
+	for height := final.Height; height >= fromHeight; height-- {
 		head, err := protoState.AtHeight(height).Head()
 		if err != nil {
 			return fmt.Errorf("could not get header at height: %w", err)
@@ -204,7 +179,7 @@ func removeExecutionDataFromHeight(
 
 		blockID := head.ID()
 
-		err = removeExecutionDataForBlock(ctx, blockID, seals, results, executionDataStore, blobstore)
+		err = removeExecutionDataForBlock(ctx, blockID, seals, results, blobstore)
 		if err != nil {
 			return fmt.Errorf("could not remove execution data for finalized block: %v, %w", blockID, err)
 		}
@@ -213,27 +188,8 @@ func removeExecutionDataFromHeight(
 		log.Info().Msgf("execution data at height %v has been removed. progress (%v/%v)", height, finalRemoved, total)
 	}
 
-	// removing for pending blocks
-	pendings, err := protoState.Final().Descendants()
-	if err != nil {
-		return fmt.Errorf("could not get pending blocks: %w", err)
-	}
-
-	pendingRemoved := 0
-	total = len(pendings)
-
-	for _, pending := range pendings {
-		err = removeExecutionDataForBlock(ctx, pending, seals, results, executionDataStore, blobstore)
-		if err != nil {
-			return fmt.Errorf("could not remove execution data for pending block %v: %w", pending, err)
-		}
-
-		pendingRemoved++
-		log.Info().Msgf("execution data for pending block %v has been removed. progress (%v/%v)", pending, pendingRemoved, total)
-	}
-
-	log.Info().Msgf("removed execution data from height %v. removed for %v finalized blocks, and %v pending blocks",
-		fromHeight, finalRemoved, pendingRemoved)
+	log.Info().Msgf("removed execution data from height %v. removed for %v finalized blocks",
+		fromHeight, finalRemoved)
 
 	return nil
 }
@@ -245,7 +201,6 @@ func removeExecutionDataForBlock(
 	blockID flow.Identifier,
 	seals storage.Seals,
 	results storage.ExecutionResults,
-	executionDataStore execution_data.ExecutionDataStore,
 	blobstore blobs.Blobstore,
 ) error {
 	// Get seal by block ID
@@ -274,18 +229,8 @@ func removeExecutionDataForBlock(
 		return nil
 	}
 
-	// Get execution data to find all CIDs in the blob tree
-	execData, err := executionDataStore.Get(ctx, result.ExecutionDataID)
-	if err != nil {
-		if execution_data.IsBlobNotFoundError(err) {
-			log.Info().Msgf("execution data not found for block %v (may have been already removed)", blockID)
-			return nil
-		}
-		return fmt.Errorf("could not get execution data for block %v: %w", blockID, err)
-	}
-
 	// Collect all CIDs from the execution data tree
-	allCIDs, err := collectAllCIDsFromExecutionData(ctx, blobstore, result.ExecutionDataID, execData)
+	allCIDs, err := collectAllCIDsFromExecutionData(ctx, blobstore, result.ExecutionDataID)
 	if err != nil {
 		return fmt.Errorf("could not collect CIDs from execution data for block %v: %w", blockID, err)
 	}
@@ -311,7 +256,6 @@ func collectAllCIDsFromExecutionData(
 	ctx context.Context,
 	blobstore blobs.Blobstore,
 	rootID flow.Identifier,
-	execData *execution_data.BlockExecutionData,
 ) ([]cid.Cid, error) {
 	allCIDs := make(map[cid.Cid]struct{})
 	rootCid := flow.IdToCid(rootID)
@@ -420,4 +364,3 @@ func initExecutionDataBlobstore(executionDataDir string) (blobs.Blobstore, error
 
 	return blobs.NewBlobstore(ds), nil
 }
-
