@@ -38,6 +38,8 @@ type CreateFetcherConfig struct {
 //   - blocks: Blocks storage
 //   - processedFinalizedBlockHeight: Initializer for tracking processed block heights
 //   - collectionSyncMetrics: Optional metrics collector for tracking collection sync progress
+//   - lastFullBlockHeight: Progress reader to get the max of fetcher and syncer heights
+//   - accessMetrics: Access metrics for reporting last_full_finalized_block_height
 //   - config: Configuration for the fetcher
 //
 // Returns both the Fetcher and BlockProcessor so they can be reused in other components.
@@ -54,6 +56,8 @@ func createFetcher(
 	processedFinalizedBlockHeight storage.ConsumerProgressInitializer,
 	distributor hotstuff.Distributor,
 	collectionSyncMetrics module.CollectionSyncMetrics,
+	lastFullBlockHeight collection_sync.ProgressReader,
+	accessMetrics module.AccessMetrics,
 	config CreateFetcherConfig,
 ) (*requester.Engine, collection_sync.Fetcher, error) {
 	// Create requester engine for requesting collections
@@ -103,7 +107,7 @@ func createFetcher(
 		}
 	})
 
-	// Create Fetcher
+	// Create Fetcher with callback to update last_full_finalized_block_height metric
 	collectionFetcher, err := fetcher.NewFetcher(
 		log,
 		blockProcessor,
@@ -113,6 +117,10 @@ func createFetcher(
 		config.MaxProcessing,
 		config.MaxSearchAhead,
 		collectionSyncMetrics,
+		func() {
+			// Update last_full_finalized_block_height metric with the max of both heights
+			accessMetrics.UpdateLastFullBlockHeight(lastFullBlockHeight.ProcessedHeight())
+		},
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create fetcher: %w", err)

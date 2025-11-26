@@ -121,6 +121,7 @@ func CreateProcessedLastFullBlockHeightModule(
 //   - blockCollectionIndexer: Block collection indexer
 //   - collectionSyncMetrics: Collection sync metrics
 //   - lastFullBlockHeight: Progress reader to register the processor with
+//   - accessMetrics: Access metrics for reporting last_full_finalized_block_height
 //   - distributor: Execution data distributor to notify on new execution data
 //
 // Returns:
@@ -136,6 +137,7 @@ func CreateExecutionDataProcessorComponent(
 	blockCollectionIndexer collection_sync.BlockCollectionIndexer,
 	collectionSyncMetrics module.CollectionSyncMetrics,
 	lastFullBlockHeight *ProgressReader,
+	accessMetrics module.AccessMetrics,
 	distributor *edrequester.ExecutionDataDistributor,
 ) (module.ReadyDoneAware, error) {
 	shouldCreate := collectionSyncMode.ShouldCreateExecutionDataProcessor(executionDataSyncEnabled)
@@ -174,6 +176,8 @@ func CreateExecutionDataProcessorComponent(
 		blockCollectionIndexer,
 		func(indexedHeight uint64) {
 			collectionSyncMetrics.CollectionSyncedHeight(indexedHeight)
+			// Also update last_full_finalized_block_height metric with the max of both heights
+			accessMetrics.UpdateLastFullBlockHeight(lastFullBlockHeight.ProcessedHeight())
 		},
 	)
 	if err != nil {
@@ -185,6 +189,8 @@ func CreateExecutionDataProcessorComponent(
 
 	// Initialize collection synced height metric to avoid spikes in dashboard
 	collectionSyncMetrics.CollectionSyncedHeight(executionDataProcessor.ProcessedHeight())
+	// Initialize last_full_finalized_block_height metric
+	accessMetrics.UpdateLastFullBlockHeight(lastFullBlockHeight.ProcessedHeight())
 
 	distributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
 		executionDataProcessor.OnNewExectuionData()
@@ -218,6 +224,7 @@ type CollectionSyncFetcherComponentResult struct {
 //   - maxProcessing: Maximum number of concurrent processing jobs
 //   - maxSearchAhead: Maximum number of blocks to search ahead
 //   - lastFullBlockHeight: Progress reader to register the fetcher with
+//   - accessMetrics: Access metrics for reporting last_full_finalized_block_height
 //
 // Returns:
 //   - The result containing the fetcher component, requester component, and requester engine
@@ -239,6 +246,7 @@ func CreateCollectionSyncFetcherComponent(
 	maxProcessing uint64,
 	maxSearchAhead uint64,
 	lastFullBlockHeight *ProgressReader,
+	accessMetrics module.AccessMetrics,
 ) (*CollectionSyncFetcherComponentResult, error) {
 	// Create fetcher if:
 	// 1. collectionSync is "execution_and_collection" (always create, even with execution data sync)
@@ -282,6 +290,8 @@ func CreateCollectionSyncFetcherComponent(
 		fetchAndIndexedCollectionsBlockHeight,
 		followerDistributor,
 		collectionSyncMetrics,
+		lastFullBlockHeight,
+		accessMetrics,
 		CreateFetcherConfig{
 			MaxProcessing:  maxProcessing,
 			MaxSearchAhead: maxSearchAhead,

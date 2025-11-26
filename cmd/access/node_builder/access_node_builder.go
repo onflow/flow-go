@@ -2203,6 +2203,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			notNil(builder.blockCollectionIndexer),
 			notNil(builder.CollectionSyncMetrics),
 			notNil(builder.lastFullBlockHeight),
+			notNil(builder.AccessMetrics),
 			notNil(builder.ExecutionDataDistributor),
 		)
 		if err != nil {
@@ -2578,6 +2579,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				builder.collectionFetcherMaxProcessing,
 				builder.collectionFetcherMaxSearchAhead,
 				notNil(builder.lastFullBlockHeight),
+				notNil(builder.AccessMetrics),
 			)
 			if err != nil {
 				return nil, err

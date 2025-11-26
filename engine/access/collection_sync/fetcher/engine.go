@@ -41,6 +41,7 @@ var _ component.Component = (*Fetcher)(nil)
 //   - maxProcessing: Maximum number of jobs to process concurrently
 //   - maxSearchAhead: Maximum number of jobs beyond processedIndex to process. 0 means no limit
 //   - metrics: Optional metrics collector for reporting collection fetched height
+//   - onHeightUpdated: Optional callback to be called when processed height is updated
 //
 // No error returns are expected during normal operation.
 func NewFetcher(
@@ -51,6 +52,7 @@ func NewFetcher(
 	maxProcessing uint64, // max number of blocks to fetch collections concurrently
 	maxSearchAhead uint64, // max number of blocks beyond the next unfullfilled height to fetch collections for
 	metrics module.CollectionSyncMetrics, // optional metrics collector
+	onHeightUpdated func(), // optional callback when processed height is updated
 ) (*Fetcher, error) {
 	workSignal := engine.NewNotifier()
 
@@ -113,10 +115,16 @@ func NewFetcher(
 	consumer.SetPostNotifier(func(jobID module.JobID) {
 		metrics.CollectionFetchedHeight(f.ProcessedHeight())
 		metrics.MissingCollectionQueueSize(f.blockProcessor.MissingCollectionQueueSize())
+		if onHeightUpdated != nil {
+			onHeightUpdated()
+		}
 	})
 
 	// report the initial metrics, otherwise it creates spikes in dashboard
 	metrics.CollectionFetchedHeight(f.ProcessedHeight())
+	if onHeightUpdated != nil {
+		onHeightUpdated()
+	}
 
 	return f, nil
 }
