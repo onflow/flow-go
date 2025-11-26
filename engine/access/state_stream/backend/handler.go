@@ -61,9 +61,9 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert block ID: %v", err)
 	}
 
-	query := request.GetExecutionStateQuery()
+	executionState := request.GetExecutionStateQuery()
 
-	execData, executorMetadata, err := h.api.GetExecutionDataByBlockID(ctx, blockID, convert.NewCriteria(query))
+	execData, executorMetadata, err := h.api.GetExecutionDataByBlockID(ctx, blockID, convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, rpc.ErrorToStatus(err)
 	}
@@ -82,7 +82,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		BlockExecutionData: message,
 	}
 
-	if query.GetIncludeExecutorMetadata() {
+	if executionState.GetIncludeExecutorMetadata() {
 		response.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
@@ -446,6 +446,7 @@ func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_
 	return filter, nil
 }
 
+// GetRegisterValues returns the register values for the given register IDs at the given block height.
 func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
 	// Convert data
 	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds(), h.chain)
@@ -453,13 +454,23 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert register IDs: %v", err)
 	}
 
+	executionState := request.GetExecutionStateQuery()
+
 	// get payload from store
-	values, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight())
+	values, executorMetadata, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
 		return nil, rpc.ConvertError(err, "could not get register values", codes.Internal)
 	}
 
-	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
+	response := &executiondata.GetRegisterValuesResponse{
+		Values: values,
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		response.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
+	}
+
+	return response, nil
 }
 
 // convertAccountsStatusesResultsToMessage converts account status responses to the message

@@ -11,14 +11,17 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -185,21 +188,69 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
-func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (b *StateStreamBackend) GetRegisterValues(
+	ids flow.RegisterIDs,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error) {
 	if len(ids) > b.registerRequestLimit {
-		return nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
+		return nil, nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
 	}
 
-	values, err := b.registers.RegisterValues(ids, height)
+	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) {
-			return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
-		}
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
+			return nil, nil, status.Errorf(codes.NotFound, "no finalized block is known at the given height %d", height)
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	return values, nil
+	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) || common.IsInsufficientExecutionReceipts(err) {
+			return nil, nil, status.Errorf(codes.NotFound, "failed to get execution result info for block")
+		}
+		return nil, nil, err
+	}
+
+	executionResultID := execResultInfo.ExecutionResultID
+	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
+		}
+		return nil, nil, err
+	}
+
+	registers, err := snapshot.Registers()
+	if err != nil {
+		if errors.Is(err, indexer.ErrIndexNotInitialized) {
+			return nil, nil, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
+		}
+
+		return nil, nil, err
+	}
+
+	result := make([]flow.RegisterValue, len(ids))
+	for i, regID := range ids {
+		val, err := registers.Get(regID, height)
+		if err != nil {
+			if errors.Is(err, storage.ErrHeightNotIndexed) {
+				return nil, nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+			}
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
+			}
+
+			return nil, nil, err
+		}
+		result[i] = val
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return result, metadata, nil
 }
