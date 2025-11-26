@@ -8,15 +8,15 @@ import (
 )
 
 const (
-	// DefaultMinCompactionSizeBytes is the default minimum input size (200MB) for logging compactions.
+	// DefaultMinCompactionSizeBytes is the default minimum input size for logging compactions.
 	// Small compactions below this threshold are ignored.
 	DefaultMinCompactionSizeBytes int64 = 200 << 20 // 200 MB
 
-	// DefaultMinCompactionDuration is the default minimum duration (1 second) for logging compactions.
+	// DefaultMinCompactionDuration is the default minimum duration for logging compactions.
 	// Fast compactions below this threshold are ignored.
-	DefaultMinCompactionDuration = 10 * time.Second
+	DefaultMinCompactionDuration = 5 * time.Second
 
-	// DefaultMinCompactionFiles is the default minimum number of input files (5) for logging compactions.
+	// DefaultMinCompactionFiles is the default minimum number of input files for logging compactions.
 	// Compactions with fewer files are ignored.
 	DefaultMinCompactionFiles = 5
 )
@@ -103,7 +103,7 @@ func (e *CompactionEventListener) CompactionBegin(info pebble.CompactionInfo) {
 		return
 	}
 
-	e.logger.Info().
+	e.logger.Debug().
 		Int("job", info.JobID).
 		Str("reason", info.Reason).
 		Ints("input_levels", inputLevels).
@@ -140,6 +140,6 @@ func (e *CompactionEventListener) CompactionEnd(info pebble.CompactionInfo) {
 		Int("num_output_files", len(info.Output.Tables)).
 		Int64("input_size_bytes", totalInputSize).
 		Int64("output_size_bytes", outputSize).
-		Int64("duration_micros", info.Duration.Microseconds()).
+		Float64("duration_seconds", info.Duration.Seconds()).
 		Msg("compaction finished")
 }
