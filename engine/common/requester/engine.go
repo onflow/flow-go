@@ -57,7 +57,7 @@ type Engine struct {
 	create         CreateFunc
 	handle         HandleFunc
 
-	// changing the following state variables must be guarded by unit.Lock()
+	// changing the following state variables must be guarded by mu.Lock()
 	items                 map[flow.Identifier]*Item
 	requests              map[uint64]*messages.EntityRequest
 	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
@@ -239,15 +239,24 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 			return
 		}
 
-		responseEvent, ok := msg.Payload.(*flow.EntityResponse)
+		res, ok := msg.Payload.(*flow.EntityResponse)
 		if !ok {
 			// should never happen, as we only put EntityRequest in the queue,
 			// if it does happen, it means there is a bug in the queue implementation.
 			ctx.Throw(fmt.Errorf("invalid message type in entity request queue: %T", msg.Payload))
 		}
 
-		err := e.onEntityResponse(msg.OriginID, responseEvent)
+		// TODO(yuraolex): check error handling, some errors are sentinels
+		err := e.onEntityResponse(msg.OriginID, res)
 		if err != nil {
+			if engine.IsInvalidInputError(err) {
+				e.log.Err(err).
+					Str("origin_id", msg.OriginID.String()).
+					Uint64("nonce", res.Nonce).
+					Bool(logging.KeySuspicious, true).
+					Msg("invalid response detected")
+				continue
+			}
 			ctx.Throw(err)
 		}
 	}
@@ -275,6 +284,8 @@ func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Id
 	e.addEntityRequest(key, selector, false)
 }
 
+// addEntityRequest adds request in in-memory storage of pending items to be requested.
+// Concurrency safe.
 func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity], checkIntegrity bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -327,6 +338,7 @@ func (e *Engine) Force() {
 	}()
 }
 
+// poll runs as a dedicated worker for [component.ComponentManager]. It performs dispatch of pending requests using a timer.
 func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.handle == nil {
 		ctx.Throw(fmt.Errorf("must initialize requester engine with handler"))
@@ -348,8 +360,6 @@ func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 
 			dispatched, err := e.dispatchRequest()
 			if err != nil {
-				// TODO(yuraolex): check error handling, some errors are benign
-				e.log.Error().Err(err).Msg("could not dispatch requests")
 				ctx.Throw(err)
 			}
 			if dispatched {
@@ -364,6 +374,7 @@ func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 // if and only if there is something to request. In other words it cannot happen that
 // `dispatchRequest` sends no request, but there is something to be requested.
 // The boolean return value indicates whether a request was dispatched at all.
+// No errors are expected during normal operations.
 func (e *Engine) dispatchRequest() (bool, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -416,7 +427,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		if providerID == flow.ZeroID {
 			filteredProviders := providers.Filter(item.ExtraSelector)
 			if len(filteredProviders) == 0 {
-				return false, fmt.Errorf("no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
+				e.log.Error().Msgf("could not dispatch requests: no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
+				return false, nil
 			}
 			// ramdonly select a provider from the filtered set
 			// to send as many item requests as possible.
@@ -481,7 +493,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
-		return true, fmt.Errorf("could not send request for entities %v: %w", logging.IDs(entityIDs), err)
+		e.log.Error().Err(err).Msgf("could not dispatch requests: could not send request for entities %v", logging.IDs(entityIDs))
+		return false, nil
 	}
 	e.requests[req.Nonce] = req
 
@@ -511,6 +524,12 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	return true, nil
 }
 
+// onEntityResponse handles response for request that was originally made by the engine.
+// For each successful response this function spawns a dedicated go routine to perform handling of the parsed response.
+// Considering the fact we process only responses that we have previously requested it's impossible to force this function to
+// spawn arbitrary number of goroutines.
+// Expected errors during normal operations:
+//   - [engine.InvalidInputError] if the provided response is malformed
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResponse) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
 	lg := e.log.With().Str("origin_id", originID.String()).Uint64("nonce", res.Nonce).Logger()
@@ -518,7 +537,6 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 	lg.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")
 
 	if e.cfg.ValidateStaking {
-
 		// check that the response comes from a valid provider
 		providers, err := e.state.Final().Identities(filter.And(
 			e.selector,
@@ -577,7 +595,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 		entity := e.create()
 		err := msgpack.Unmarshal(blob, &entity)
 		if err != nil {
-			return fmt.Errorf("could not decode entity: %w", err)
+			return engine.NewInvalidInputErrorf("could not decode entity: %s", err.Error())
 		}
 
 		if item.checkIntegrity {
