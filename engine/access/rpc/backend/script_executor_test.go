@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"flag"
 	"math"
 	"testing"
 	"time"
@@ -33,12 +32,6 @@ import (
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
-)
-
-var testWithVMScriptExecution = flag.Bool(
-	"testWithVMScriptExecution",
-	false,
-	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 // ScriptExecutorSuite is a test suite for testing the ScriptExecutor.
@@ -125,7 +118,6 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		fvm.WithChain(s.chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 	)
 
 	s.dbDir = unittest.TempDir(s.T())

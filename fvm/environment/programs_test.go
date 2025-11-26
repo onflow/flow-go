@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/onflow/cadence/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -296,7 +298,7 @@ func Test_Programs(t *testing.T) {
 
 		// same transaction should produce the exact same execution snapshots
 		// but only because we don't do any conditional update in a tx
-		compareExecutionSnapshots(t, executionSnapshotA, executionSnapshotA2)
+		assertExecutionSnapshotsEqual(t, executionSnapshotA, executionSnapshotA2)
 	})
 
 	t.Run("deploying another contract invalidates dependant programs", func(t *testing.T) {
@@ -404,7 +406,7 @@ func Test_Programs(t *testing.T) {
 
 		mainSnapshot = mainSnapshot.Append(executionSnapshotB2)
 
-		compareExecutionSnapshots(t, executionSnapshotB, executionSnapshotB2)
+		assertExecutionSnapshotsEqual(t, executionSnapshotB, executionSnapshotB2)
 	})
 
 	t.Run("deploying new contract A2 invalidates B because of * imports", func(t *testing.T) {
@@ -517,7 +519,7 @@ func Test_Programs(t *testing.T) {
 
 		mainSnapshot = mainSnapshot.Append(executionSnapshotB2)
 
-		compareExecutionSnapshots(t, executionSnapshotB, executionSnapshotB2)
+		assertExecutionSnapshotsEqual(t, executionSnapshotB, executionSnapshotB2)
 	})
 
 	t.Run("contract A runs from cache after program B has been loaded", func(t *testing.T) {
@@ -550,7 +552,7 @@ func Test_Programs(t *testing.T) {
 
 		mainSnapshot = mainSnapshot.Append(executionSnapshot)
 
-		compareExecutionSnapshots(t, txASnapshot, executionSnapshot)
+		assertExecutionSnapshotsEqual(t, txASnapshot, executionSnapshot)
 	})
 
 	t.Run("deploying contract C invalidates C", func(t *testing.T) {
@@ -625,6 +627,13 @@ func Test_Programs(t *testing.T) {
 		cached := derivedBlockData.CachedPrograms()
 		require.Equal(t, 4, cached)
 	})
+}
+
+func ifCompile[T any](a, b T) T {
+	if cadence_vm.DefaultEnabled {
+		return a
+	}
+	return b
 }
 
 func Test_ProgramsDoubleCounting(t *testing.T) {
@@ -781,7 +790,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		// hit B because interpreting C because interpreting transaction
 		// hit A because interpreting B because interpreting C because interpreting transaction
 		// hit A2 because interpreting B because interpreting C because interpreting transaction
-		require.Equal(t, 7, metrics.CacheHits)
+		require.Equal(t, ifCompile(23, 7), metrics.CacheHits)
 		require.Equal(t, 4, metrics.CacheMisses)
 	})
 
@@ -797,7 +806,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		// hit B because interpreting C because interpreting transaction
 		// hit A because interpreting B because interpreting C because interpreting transaction
 		// hit A2 because interpreting B because interpreting C because interpreting transaction
-		require.Equal(t, 7, metrics.CacheHits)
+		require.Equal(t, ifCompile(15, 7), metrics.CacheHits)
 		require.Equal(t, 0, metrics.CacheMisses)
 	})
 
@@ -928,10 +937,12 @@ func updateContractTx(name, code string, address flow.Address) (*flow.Transactio
 		Build()
 }
 
-func compareExecutionSnapshots(t *testing.T, a, b *snapshot.ExecutionSnapshot) {
-	require.Equal(t, a.WriteSet, b.WriteSet)
-	require.Equal(t, a.ReadSet, b.ReadSet)
-	require.Equal(t, a.SpockSecret, b.SpockSecret)
+func assertExecutionSnapshotsEqual(t *testing.T, a, b *snapshot.ExecutionSnapshot) {
+	assert.Equal(t, a.WriteSet, b.WriteSet)
+	assert.Equal(t, a.ReadSet, b.ReadSet)
+	if !cadence_vm.DefaultEnabled {
+		assert.Equal(t, a.SpockSecret, b.SpockSecret)
+	}
 }
 
 type metricsReporter struct {

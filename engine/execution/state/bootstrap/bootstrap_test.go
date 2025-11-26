@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"testing"
 
@@ -19,18 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
-)
-
-var testWithVMTransactionExecution = flag.Bool(
-	"testWithVMTransactionExecution",
-	false,
-	"Run transactions in tests using the Cadence compiler/VM",
-)
-
-var testWithVMScriptExecution = flag.Bool(
-	"testWithVMScriptExecution",
-	false,
-	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 func TestBootstrapLedger(t *testing.T) {
@@ -70,7 +57,9 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("bec4478e1b3aa1fd822c796411e69bd85ef9529b9ef93e231d4b02470d49b4f0")
+	expectedStateCommitmentBytes, _ := hex.DecodeString(
+		"4c71561153301a0dea2e6cc74255ff6473b5ef4b66c7701bbcf8358249ce2048",
+	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -117,7 +106,9 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 // - transaction fee deduction
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("b21c4cea6518d92c34d2eeff1a02f7e1b7b75f9c0e0e52069905bb728361d039")
+	expectedStateCommitmentBytes, _ := hex.DecodeString(
+		"def8795537883765992fda2ef6aafd6b0448bd0cf514f551ee7e7803cd13d11f",
+	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -157,8 +148,6 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
-			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		)
 
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())

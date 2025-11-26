@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"math"
 	"strings"
@@ -35,13 +34,13 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler"
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
@@ -53,18 +52,6 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-)
-
-var testWithVMTransactionExecution = flag.Bool(
-	"testWithVMTransactionExecution",
-	false,
-	"Run transactions in tests using the Cadence compiler/VM",
-)
-
-var testWithVMScriptExecution = flag.Bool(
-	"testWithVMScriptExecution",
-	false,
-	"Run scripts in tests using the Cadence compiler/VM",
 )
 
 type vmTest struct {
@@ -98,8 +85,6 @@ func (vmt vmTest) run(
 			// default chain is Testnet
 			fvm.WithChain(flow.Testnet.Chain()),
 			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
-			fvm.WithVMTransactionExecutionEnabled(*testWithVMTransactionExecution),
-			fvm.WithVMScriptExecutionEnabled(*testWithVMScriptExecution),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
@@ -1796,12 +1781,19 @@ func TestStorageUsed(t *testing.T) {
 	require.Equal(t, cadence.NewUInt64(5), output.Value)
 }
 
+func ifCompile[T any](a, b T) T {
+	if cadence_vm.DefaultEnabled {
+		return a
+	}
+	return b
+}
+
 func TestEnforcingComputationLimit(t *testing.T) {
 	t.Parallel()
 
 	chain, vm := createChainAndVm(flow.Testnet)
 
-	const computationLimit = 5
+	const computationLimit = 6
 
 	type test struct {
 		name           string
@@ -1849,16 +1841,16 @@ func TestEnforcingComputationLimit(t *testing.T) {
             `,
 			payerIsServAcc: true,
 			ok:             true,
-			expCompUsed:    11,
+			expCompUsed:    ifCompile[uint64](13, 11),
 		},
 		{
 			name: "some for-in loop iterations",
 			code: `
-              for i in [1, 2, 3, 4] {}
+              for i in [1, 2, 3] {}
             `,
 			payerIsServAcc: false,
 			ok:             true,
-			expCompUsed:    5,
+			expCompUsed:    ifCompile[uint64](6, 4),
 		},
 	}
 
@@ -2378,7 +2370,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.True(t, errors.IsComputationLimitExceededError(output.Err))
 				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
-				if *testWithVMScriptExecution {
+				if cadence_vm.DefaultEnabled {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(540000979))
 				} else {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(456687216))
@@ -2403,7 +2395,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(17955))
-				if *testWithVMScriptExecution {
+				if cadence_vm.DefaultEnabled {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(969617812))
 				} else {
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
@@ -2589,12 +2581,6 @@ func TestAttachments(t *testing.T) {
 	t.Parallel()
 
 	newVMTest().
-		withBootstrapProcedureOptions().
-		withContextOptions(
-			// TODO: requires support for attachments in Cadence VM
-			fvm.WithVMTransactionExecutionEnabled(false),
-			fvm.WithVMScriptExecutionEnabled(false),
-		).
 		run(
 			func(
 				t *testing.T,
@@ -3110,33 +3096,22 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
-			// generate test address
-			genArr := make([]cadence.Value, 20)
-			for i := range genArr {
-				genArr[i] = cadence.UInt8(i)
-			}
-			addrBytes := cadence.NewArray(genArr).WithType(stdlib.EVMAddressBytesCadenceType)
-			encodedArg, err := jsoncdc.Encode(addrBytes)
-			require.NoError(t, err)
-
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
 				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
 
-						transaction(bytes: [UInt8; 20]) {
+						transaction {
 							execute {
-								let addr = EVM.EVMAddress(bytes: bytes)
-								log(addr)
+								log(EVM.getLatestBlock())
 							}
 						}
 					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
-				SetPayer(chain.ServiceAddress()).
-				AddArgument(encodedArg)
+				SetPayer(chain.ServiceAddress())
 
-			err = testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+			err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
 			require.NoError(t, err)
 
 			txBody, err := txBodyBuilder.Build()
@@ -3151,9 +3126,43 @@ func TestEVM(t *testing.T) {
 			require.NoError(t, output.Err)
 			require.Len(t, output.Logs, 1)
 			require.Equal(t, output.Logs[0], fmt.Sprintf(
-				"A.%s.EVM.EVMAddress(bytes: %s)",
+				`A.%s.EVM.EVMBlock(height: 0, totalSupply: 0, hash: "0xae580e0db03206dc7caa01eeba9dfbaaecebea475ecb6d1081591e5d37dd22af", timestamp: 0)`,
 				sc.EVMContract.Address,
-				addrBytes.String(),
+			))
+		}),
+	)
+
+	t.Run("successful script", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(ctxOpts...).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			script := fvm.Script([]byte(fmt.Sprintf(`
+					import EVM from %s
+
+					access(all) fun main() {
+						log(EVM.getLatestBlock())
+					}
+				`, sc.EVMContract.Address.HexWithPrefix())))
+
+			_, output, err := vm.Run(
+				ctx,
+				script,
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Logs, 1)
+			require.Equal(t, output.Logs[0], fmt.Sprintf(
+				`A.%s.EVM.EVMBlock(height: 0, totalSupply: 0, hash: "0xae580e0db03206dc7caa01eeba9dfbaaecebea475ecb6d1081591e5d37dd22af", timestamp: 0)`,
+				sc.EVMContract.Address,
 			))
 		}),
 	)

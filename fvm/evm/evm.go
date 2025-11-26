@@ -26,7 +26,7 @@ func SetupEnvironment(
 	chainID flow.ChainID,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
-) error {
+) {
 	sc := systemcontracts.SystemContractsForChain(chainID)
 	randomBeaconAddress := sc.RandomBeaconHistory.Address
 	flowTokenAddress := sc.FlowToken.Address
@@ -66,6 +66,4 @@ func SetupEnvironment(
 		internalEVMFunctions,
 		evmContractAddress,
 	)
-
-	return nil
 }
