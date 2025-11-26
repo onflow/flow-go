@@ -77,9 +77,9 @@ func (f *HotStuffFactory) CreateModules(
 	// setup metrics/logging with the new chain ID
 	log := f.createLogger(cluster)
 	metrics := f.createMetrics(cluster.ChainID())
-	telemetryConsumer := notifications.NewTelemetryConsumer(log)
-	slashingConsumer := notifications.NewSlashingViolationsConsumer(log)
 	notifier := pubsub.NewDistributor()
+	telemetryConsumer := notifications.NewTelemetryConsumer(log, notifier)
+	slashingConsumer := notifications.NewSlashingViolationsConsumer(log)
 	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddParticipantConsumer(telemetryConsumer)
