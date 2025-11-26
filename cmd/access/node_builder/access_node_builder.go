@@ -1057,12 +1057,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-			broadcaster := engine.NewBroadcaster()
-
 			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
@@ -1073,15 +1067,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
+			broadcaster := engine.NewBroadcaster()
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
 				broadcaster,
-				highestAvailableHeight,
-				builder.EventsIndex,
-				useIndex,
 			)
 
 			builder.stateStreamBackend, err = statestreambackend.New(

@@ -50,7 +50,7 @@ func NewExecutionResultInfoProvider(
 // based on the provided criteria.
 //
 // Expected errors during normal operations:
-//   - [optimistic_sync.ErrRootBlockNotFound]: If the request is for the spork root block, and the node was bootstrapped
+//   - [optimistic_sync.ErrBlockNotFound]: If the request is for the spork root block, and the node was bootstrapped
 //     from a newer block.
 //   - [optimistic_sync.NotEnoughAgreeingExecutorsError]: If no insufficient receipts are found for given block ID.
 //   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
@@ -80,7 +80,7 @@ func (p *Provider) ExecutionResultInfo(
 		if err != nil {
 			// if the node was bootstrapped from a block after the spork root block, then the root
 			// block's result will not be present.
-			err = errors.Join(err, optimistic_sync.ErrRootBlockNotFound)
+			err = errors.Join(err, optimistic_sync.ErrBlockNotFound)
 			return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
 		}
 

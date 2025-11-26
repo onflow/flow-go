@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -81,7 +80,6 @@ type StateStreamBackend struct {
 	execDataCache        *cache.ExecutionDataCache
 	registers            *execution.RegistersAsyncStore
 	registerRequestLimit int
-	sporkRootBlockHeight uint64
 }
 
 func New(
@@ -114,25 +112,23 @@ func New(
 		execDataCache:        execDataCache,
 		registers:            registers,
 		registerRequestLimit: registerIDsRequestLimit,
-		sporkRootBlockHeight: state.Params().SporkRootBlockHeight(),
 	}
 
-	b.ExecutionDataBackend = ExecutionDataBackend{
-		log:                     logger,
-		headers:                 headers,
-		subscriptionHandler:     subscriptionHandler,
-		getExecutionData:        b.getExecutionData,
-		executionDataTracker:    executionDataTracker,
-		executionResultProvider: executionResultProvider,
-		executionStateCache:     executionStateCache,
-	}
+	b.ExecutionDataBackend = *NewExecutionDataBackend(
+		log,
+		state,
+		headers,
+		subscriptionHandler,
+		executionDataTracker,
+		executionResultProvider,
+		executionStateCache,
+	)
 
 	eventsProvider := EventsProvider{
-		log:              logger,
-		headers:          headers,
-		getExecutionData: b.getExecutionData,
-		useEventsIndex:   useEventsIndex,
-		eventsIndex:      eventsIndex,
+		log:            logger,
+		headers:        headers,
+		useEventsIndex: useEventsIndex,
+		eventsIndex:    eventsIndex,
 	}
 
 	b.EventsBackend = EventsBackend{
@@ -150,40 +146,6 @@ func New(
 	}
 
 	return b, nil
-}
-
-// getExecutionData returns the execution data for the given block height.
-// Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
-func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
-	highestHeight := b.ExecutionDataTracker.GetHighestHeight()
-	// fail early if no notification has been received for the given block height.
-	// note: it's possible for the data to exist in the data store before the notification is
-	// received. this ensures a consistent view is available to all streams.
-	if height > highestHeight {
-		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
-	}
-
-	// the spork root block will never have execution data available. If requested, return an empty result.
-	if height == b.sporkRootBlockHeight {
-		return &execution_data.BlockExecutionDataEntity{
-			BlockExecutionData: &execution_data.BlockExecutionData{
-				BlockID: b.state.Params().SporkRootBlock().ID(),
-			},
-		}, nil
-	}
-
-	execData, err := b.execDataCache.ByHeight(ctx, height)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) ||
-			execution_data.IsBlobNotFoundError(err) {
-			err = errors.Join(err, subscription.ErrBlockNotReady)
-			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
-		}
-		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
-	}
-
-	return execData, nil
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.

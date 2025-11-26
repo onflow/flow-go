@@ -15,28 +15,49 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 // ExecutionDataResponse bundles the execution data returned for a single block.
 type ExecutionDataResponse struct {
-	Height         uint64
-	ExecutionData  *execution_data.BlockExecutionData
-	BlockTimestamp time.Time
+	Height           uint64
+	ExecutionData    *execution_data.BlockExecutionData
+	BlockTimestamp   time.Time
+	ExecutorMetadata accessmodel.ExecutorMetadata
 }
 
 // ExecutionDataBackend exposes read-only access to execution data.
 type ExecutionDataBackend struct {
 	log     zerolog.Logger
+	state   protocol.State
 	headers storage.Headers
-
-	getExecutionData GetExecutionDataFunc
 
 	subscriptionHandler  *subscription.SubscriptionHandler
 	executionDataTracker tracker.ExecutionDataTracker
 
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	executionStateCache     optimistic_sync.ExecutionStateCache
+}
+
+func NewExecutionDataBackend(
+	log zerolog.Logger,
+	state protocol.State,
+	headers storage.Headers,
+	subscriptionHandler *subscription.SubscriptionHandler,
+	executionDataTracker tracker.ExecutionDataTracker,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
+) *ExecutionDataBackend {
+	return &ExecutionDataBackend{
+		log:                     log.With().Str("module", "execution_data_backend").Logger(),
+		state:                   state,
+		headers:                 headers,
+		subscriptionHandler:     subscriptionHandler,
+		executionDataTracker:    executionDataTracker,
+		executionResultProvider: executionResultProvider,
+		executionStateCache:     executionStateCache,
+	}
 }
 
 // GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
@@ -111,13 +132,18 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 // - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription.Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionData(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	startHeight uint64,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createResponseHandler(criteria))
 }
 
 // SubscribeExecutionDataFromStartBlockID streams execution data for all blocks starting at the specified block ID
@@ -129,13 +155,17 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 // - startBlockID: The identifier of the starting block.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
+	header, err := b.headers.ByBlockID(startBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionHandler.Subscribe(ctx, header.Height, b.createResponseHandler(criteria))
 }
 
 // SubscribeExecutionDataFromStartBlockHeight streams execution data for all blocks starting at the specified block height
@@ -147,13 +177,20 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(ctx contex
 // - startHeight: The height of the starting block.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
+	ctx context.Context,
+	startBlockHeight uint64,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
+	// can use headers, though i need a check that startBlockHeight is not greater than the highest indexed height,
+	// i can pass this value to backend without having executionDataTracker
+
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createResponseHandler(criteria))
 }
 
 // SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
@@ -164,23 +201,77 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(ctx co
 // - ctx: Context for the operation.
 //
 // If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
+	ctx context.Context,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createResponseHandler(criteria))
 }
 
-func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {
-	executionData, err := b.getExecutionData(ctx, height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
-	}
+func (b *ExecutionDataBackend) createResponseHandler(criteria optimistic_sync.Criteria) subscription.GetDataByHeightFunc {
+	nextCriteria := criteria
 
-	return &ExecutionDataResponse{
-		Height:        height,
-		ExecutionData: executionData.BlockExecutionData,
-	}, nil
+	return func(ctx context.Context, height uint64) (interface{}, error) {
+		// the spork root block will never have execution data available. If requested, return an empty result.
+		if height == b.state.Params().SporkRootBlockHeight() {
+			return &ExecutionDataResponse{
+				Height: height,
+				ExecutionData: &execution_data.BlockExecutionData{
+					BlockID: b.state.Params().SporkRootBlock().ID(),
+				},
+			}, nil
+		}
+
+		blockID, err := b.headers.BlockIDByHeight(height)
+		if err != nil {
+			err = errors.Join(err, subscription.ErrBlockNotReady)
+			return nil, fmt.Errorf("could not get block ID for height %d: %w", height, err)
+		}
+
+		execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+		if err != nil {
+			switch {
+			case errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound) ||
+				errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+				return nil,
+					fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+
+			case errors.Is(err, optimistic_sync.ErrBlockNotFound):
+				return nil, err
+
+			case errors.Is(err, optimistic_sync.ErrForkAbandoned):
+				return nil, fmt.Errorf("execution fork for the current block has been abandoned")
+
+			default:
+				return nil, fmt.Errorf("failed to get events: %w", err)
+			}
+		}
+
+		executionResultID := execResultInfo.ExecutionResultID
+		snapshot, err := b.executionStateCache.Snapshot(executionResultID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
+		}
+
+		executionData, err := snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find execution data for block %s: %w", blockID, err)
+		}
+
+		nextCriteria.ParentExecutionResultID = executionResultID
+
+		return &ExecutionDataResponse{
+			Height:        height,
+			ExecutionData: executionData.BlockExecutionData,
+			ExecutorMetadata: accessmodel.ExecutorMetadata{
+				ExecutionResultID: executionResultID,
+				ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+			},
+		}, nil
+	}
 }

@@ -15,6 +15,6 @@ var ErrRequiredExecutorNotFound = errors.New("required executor not found")
 // ErrNotEnoughAgreeingExecutors is returned if there are not enough execution nodes that produced the execution result.
 var ErrNotEnoughAgreeingExecutors = errors.New("not enough agreeing executors found")
 
-// ErrRootBlockNotFound is returned if the request is for the spork root block, and the node was bootstrapped from
+// ErrBlockNotFound is returned if the request is for the spork root block, and the node was bootstrapped from
 // a newer block.
-var ErrRootBlockNotFound = errors.New("block not found")
+var ErrBlockNotFound = errors.New("block not found")
