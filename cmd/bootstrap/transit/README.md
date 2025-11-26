@@ -95,7 +95,7 @@ $ transit generate-cluster-block-vote -t ${server-token} -d ${bootstrap-dir}
 $ transit push-cluster-block-vote -t ${server-token} -d ${bootstrap-dir} -v ${vote-file}
 ```
 
-### Pull Clustering Assignment
+### Pull Cluster Assignment
 
 Running `transit pull-clustering` will perform the following actions:
 
@@ -103,11 +103,42 @@ Running `transit pull-clustering` will perform the following actions:
 
 ### Sign Cluster Root Block
 
-After the root block and random beacon key have been fetched, running `transit generate-cluster-block-vote` will:
+After the root clustering has been fetched, running `transit generate-cluster-block-vote` will:
 
-1. Create a signature over the cluster root block, for the cluster the node is assigned to, using the node's private staking key.
+1. Create a signature over the root block of the collection node's assigned cluster, using the node's private staking key.
 2. Store the resulting vote to the file `<bootstrap-dir>/private-root-information/private-node-info_<node_id>/root-cluster-block-vote.json`
 
 ### Upload Vote
 
 Once a vote has been generated, running `transit push-cluster-block-vote` will upload the vote file to the server.
+
+## Root Block Signing Automation
+
+The root block voting is a critical and time-sensitive step of a network upgrade (spork).
+During this process, Collection Node operators must download the cluster assignment, generate votes from each of their Collection Nodes, and upload those votes to the server (one vote per node).
+Then Consensus Node operators must download the root block, generate a vote for it using each of their Consensus Nodes, and upload those votes to the server (one vote per node).
+
+To ensure this step is completed reliably and without delays, operators running multiple Collection Nodes or Consensus Nodes are strongly encouraged to automate the root block voting process.
+The provided `vote_on_cluster_block.yml` and `vote_on_root_block.yml` Ansible playbooks serve as an example for building such automation. They automate:
+
+- Pulling the root information
+  - For Collection Nodes: the collection cluster assignment
+  - For Consensus Nodes: the root block and random beacon key
+- Generating the vote
+- Pushing the vote to the server
+
+for Collection and Consensus nodes respectively.
+
+Refer to this playbook as a reference for how to use the transit script in an automated environment.
+
+Example usage:
+
+```shell
+ansible-playbook -i inventories/mainnet/mainnet26.yml/ vote_on_root_block.yml \ 
+    -e "boot_tools_tar=https://storage.googleapis.com/flow-genesis-bootstrap/boot-tools.tar" \
+    -e "bootstrap_directory=/var/flow/bootstrap"
+    -e "genesis_bucket=flow-genesis-bootstrap" \
+    -e "network_version_token=mainnet-26" \
+    -e "output_directory=/var/flow/bootstrap" \
+    -e force_repull_transit=true \ 
+```
