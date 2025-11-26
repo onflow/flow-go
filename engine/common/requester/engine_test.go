@@ -1,8 +1,6 @@
 package requester
 
 import (
-	"github.com/onflow/flow-go/module/mempool/queue"
-	"github.com/stretchr/testify/suite"
 	"math/rand"
 	"testing"
 	"time"
@@ -11,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"github.com/vmihailenco/msgpack/v4"
 	"go.uber.org/atomic"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	mocknetwork "github.com/onflow/flow-go/network/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
