@@ -82,10 +82,7 @@ func NewRootBlock(untrusted UntrustedBlock) (*Block, error) {
 // Proposal represents a signed proposed block in collection node cluster consensus.
 //
 //structwrite:immutable - mutations allowed only within the constructor.
-type Proposal struct {
-	Block           Block
-	ProposerSigData []byte
-}
+type Proposal = flow.GenericProposal[Payload]
 
 // UntrustedProposal is an untrusted input-only representation of a cluster.Proposal,
 // used for construction.
@@ -135,12 +132,6 @@ func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
 		ProposerSigData: untrusted.ProposerSigData,
 	}, nil
 
-}
-
-// ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
-// where the payload is compressed to a hash reference.
-func (p *Proposal) ProposalHeader() *flow.ProposalHeader {
-	return &flow.ProposalHeader{Header: p.Block.ToHeader(), ProposerSigData: p.ProposerSigData}
 }
 
 // BlockResponse is the same as flow.BlockResponse, but for cluster

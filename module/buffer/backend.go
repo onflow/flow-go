@@ -8,7 +8,7 @@ import (
 
 // item represents an item in the cache: the main block and auxiliary data that is
 // needed to implement indexed lookups by parent ID and pruning by view.
-type item[T any] struct {
+type item[T extractProposalHeader] struct {
 	view     uint64
 	parentID flow.Identifier
 	block    flow.Slashable[T]

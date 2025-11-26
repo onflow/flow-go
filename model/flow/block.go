@@ -163,13 +163,19 @@ func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
 
+// GenericProposal represents a generic Flow proposal structure parameterized by a block payload type.
+// It includes the block header metadata, block payload, and proposer signature.
+type GenericProposal[T HashablePayload] struct {
+	// Block is the block being proposed.
+	Block GenericBlock[T]
+	// ProposerSigData is the signature (vote) from the proposer of this block.
+	ProposerSigData []byte
+}
+
 // Proposal is a signed proposal that includes the block payload, in addition to the required header and signature.
 //
 //structwrite:immutable - mutations allowed only within the constructor
-type Proposal struct {
-	Block           Block
-	ProposerSigData []byte
-}
+type Proposal = GenericProposal[Payload]
 
 // UntrustedProposal is an untrusted input-only representation of a Proposal,
 // used for construction.
@@ -223,7 +229,7 @@ func NewRootProposal(untrusted UntrustedProposal) (*Proposal, error) {
 
 // ProposalHeader converts the proposal into a compact [ProposalHeader] representation,
 // where the payload is compressed to a hash reference.
-func (b *Proposal) ProposalHeader() *ProposalHeader {
+func (b *GenericProposal[T]) ProposalHeader() *ProposalHeader {
 	return &ProposalHeader{Header: b.Block.ToHeader(), ProposerSigData: b.ProposerSigData}
 }
 
