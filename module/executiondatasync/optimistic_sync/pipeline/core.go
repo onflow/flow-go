@@ -57,7 +57,8 @@ type workingData struct {
 var _ optimistic_sync.Core = (*Core)(nil)
 
 // Core implements the core logic for execution data processing. It exposes methods for each of the
-// processing steps, which must be called sequentially in the order: Download, Index, Persist.
+// processing steps, which must be called sequentially in the order:
+// [Core.Download] ➔ [Core.Index] ➔ [Core.Persist].
 // Abandon may be called at any time to abort processing and cleanup working data.
 // The Core instance cannot be used after Abandon is called, and will return ErrAbandoned.
 type Core struct {
@@ -153,11 +154,11 @@ func NewCore(
 	}
 }
 
-// Download downloads execution data and transaction results error for the block
+// Download requests the execution and transaction results data for the block.
 //
 // Expected error returns during normal operations:
-// - context.Canceled: if the provided context was canceled before completion
-// - ErrAbandoned: if the core is already abandoned
+// - [context.Canceled] if the provided context was canceled before completion
+// - [ErrAbandoned] if processing this result has already been abandoned
 func (c *Core) Download(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -167,9 +168,7 @@ func (c *Core) Download(ctx context.Context) error {
 	}
 
 	c.log.Debug().Msg("downloading execution data")
-
 	g, gCtx := errgroup.WithContext(ctx)
-
 	var executionData *execution_data.BlockExecutionData
 	g.Go(func() error {
 		var err error
@@ -224,7 +223,7 @@ func (c *Core) Download(ctx context.Context) error {
 // caches and indexes them into in-memory storage.
 //
 // Expected error returns during normal operations:
-// - ErrAbandoned: if the core is already abandoned
+// - [ErrAbandoned] if processing this result has already been abandoned
 func (c *Core) Index() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -236,6 +235,7 @@ func (c *Core) Index() error {
 	if c.workingData.executionData == nil {
 		return fmt.Errorf("could not index an empty execution data")
 	}
+
 	c.log.Debug().Msg("indexing execution data")
 
 	if err := c.workingData.indexer.IndexBlockData(c.workingData.executionData); err != nil {
@@ -257,7 +257,7 @@ func (c *Core) Index() error {
 // Persist persists the indexed data to permanent storage atomically.
 //
 // Expected error returns during normal operations:
-// - ErrAbandoned: if the core is already abandoned
+// - [ErrAbandoned] if processing this result has already been abandoned
 func (c *Core) Persist() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -289,7 +289,7 @@ func (c *Core) Persist() error {
 // and any data dropped.
 //
 // Expected error returns during normal operations:
-// - ErrAbandoned: if the core is already abandoned
+// - [ErrAbandoned] if processing this result has already been abandoned
 func (c *Core) Abandon() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

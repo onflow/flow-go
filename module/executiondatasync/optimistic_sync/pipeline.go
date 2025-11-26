@@ -38,7 +38,7 @@ type PipelineStateConsumer interface {
 	OnStateUpdated(newState State)
 }
 
-// Pipeline represents a processing pipelined state machine for a single ExecutionResult.
+// Pipeline represents a pipelined state machine for a processing single ExecutionResult.
 // The state machine is initialized in the Pending state.
 //
 // The state machine is designed to be run in a single goroutine. The Run method must only be called once.
@@ -49,7 +49,7 @@ type Pipeline interface {
 	// NOT CONCURRENCY SAFE! Run must only be called once.
 	//
 	// Expected error returns during normal operations:
-	//   - context.Canceled: when the context is canceled
+	//   - [context.Canceled]: when the context is canceled
 	Run(ctx context.Context, core Core, parentState State) error
 
 	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.

@@ -20,13 +20,11 @@ var (
 	ErrInvalidTransition = errors.New("invalid state transition")
 )
 
-var _ optimistic_sync.Pipeline = (*Pipeline)(nil)
-
 // worker implements a single worker goroutine that processes tasks submitted to it.
-// It supports submission of context-based tasks that return an error.
-// Each error that occurs during task execution is sent to a dedicated error channel.
-// The primary purpose of the worker is to handle tasks in a non-blocking manner, while still allowing the parent thread
-// to observe and handle errors that occur during task execution.
+// It supports context-based tasks that return an error. Each error that occurs during
+// task execution is sent to a dedicated error channel.
+// The primary purpose of the worker is to handle tasks in a non-blocking manner, while
+// still allowing the parent thread to observe and handle errors that occur during task execution.
 type worker struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -79,7 +77,10 @@ func (w *worker) StopWait() error {
 	}
 }
 
-// Pipeline implements the Pipeline interface
+// Pipeline represents a pipelined state machine for a processing single ExecutionResult.
+// The state machine is initialized in the Pending state.
+//
+// The state machine is designed to be run in a single goroutine. The Run method must only be called once.
 type Pipeline struct {
 	log                  zerolog.Logger
 	stateConsumer        optimistic_sync.PipelineStateConsumer
@@ -95,6 +96,8 @@ type Pipeline struct {
 	isAbandoned      *atomic.Bool
 	isIndexed        *atomic.Bool
 }
+
+var _ optimistic_sync.Pipeline = (*Pipeline)(nil)
 
 // NewPipeline creates a new processing pipeline.
 // The pipeline is initialized in the Pending state.
