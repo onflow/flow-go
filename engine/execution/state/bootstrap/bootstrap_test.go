@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/cadence_vm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -58,10 +57,9 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString(ifCompile(
-		"3ee915c0ecaf1399d00cc6a768517aa074139ca07045d4e63a1745fc81e1bdf0",
-		"bec4478e1b3aa1fd822c796411e69bd85ef9529b9ef93e231d4b02470d49b4f0",
-	))
+	expectedStateCommitmentBytes, _ := hex.DecodeString(
+		"4c71561153301a0dea2e6cc74255ff6473b5ef4b66c7701bbcf8358249ce2048",
+	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -97,13 +95,6 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 	})
 }
 
-func ifCompile[T any](a, b T) T {
-	if cadence_vm.DefaultEnabled {
-		return a
-	}
-	return b
-}
-
 // TestBootstrapLedger_EmptyTransaction bootstraps a ledger with:
 // - transaction fees
 // - storage fees
@@ -116,10 +107,7 @@ func ifCompile[T any](a, b T) T {
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 	expectedStateCommitmentBytes, _ := hex.DecodeString(
-		ifCompile(
-			"505aa62b494f262df6830b4ace90ee35d5e4574155db4361eff5e97ae4377d31",
-			"b21c4cea6518d92c34d2eeff1a02f7e1b7b75f9c0e0e52069905bb728361d039",
-		),
+		"def8795537883765992fda2ef6aafd6b0448bd0cf514f551ee7e7803cd13d11f",
 	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
