@@ -1090,7 +1090,7 @@ func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) e
 	}
 
 	// children of 𝓹, aka `lowestSealedResult`, must always be accepted by the forest
-	childOfP, err := rf.isChildLowestSealedResult(candidate)
+	childOfP, err := rf.isChildOfLowestSealedResult(candidate)
 	if err != nil {
 		return err
 	}
@@ -1110,13 +1110,13 @@ func (rf *ResultsForest) safeForestInsert(candidate *ExecutionResultContainer) e
 	return nil
 }
 
-// isChildLowestSealedResult returns true if and only if the parent of the candidate result matches the forest's
+// isChildOfLowestSealedResult returns true if and only if the parent of the candidate result matches the forest's
 // `lowestSealedResult` aka 𝓹, aka.
 //
 // NOT CONCURRENCY SAFE!
 //
 // No errors expected during normal operations. Only data-inconsistencies should produce errors.
-func (rf *ResultsForest) isChildLowestSealedResult(candidate *ExecutionResultContainer) (bool, error) {
+func (rf *ResultsForest) isChildOfLowestSealedResult(candidate *ExecutionResultContainer) (bool, error) {
 	parentID, parentView := candidate.Parent()
 	if rf.lowestSealedResult.ResultID() != parentID {
 		return false, nil
