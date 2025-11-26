@@ -128,7 +128,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -212,7 +212,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup private build environment
-      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
       uses: ./actions/private-setup
       with:
         cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -258,7 +258,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -303,7 +303,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -324,11 +324,11 @@ jobs:
         # this docker auth is exclusively for higher rate limits. continue unauthenticated if it fails
         continue-on-error: true
 
-
       - name: Docker build
         env:
           CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
         run: make docker-native-build-flow docker-native-build-flow-corrupt
+
       - name: Save Docker images
         run: |
           docker save \
@@ -342,12 +342,73 @@ jobs:
           gcr.io/flow-container-registry/access-corrupted:latest \
           gcr.io/flow-container-registry/execution-corrupted:latest \
           gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
+
       - name: Cache Docker images
         uses: actions/cache@v4
         with:
           path: flow-docker-images.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+
+  docker-build-cadence-vm:
+    name: Docker Build (with Cadence VM)
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    env:
+      CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+
+      - name: Setup private build environment
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
+        uses: ./actions/private-setup
+        with:
+          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) }}
+        # this docker auth is exclusively for higher rate limits. continue unauthenticated if it fails
+        continue-on-error: true
+
+      - name: Docker build
+        env:
+          CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
+        run: make docker-native-build-flow docker-native-build-flow-corrupt CADENCE_VM=true
+
+      - name: Save Docker images
+        run: |
+          docker save \
+          gcr.io/flow-container-registry/access:latest \
+          gcr.io/flow-container-registry/collection:latest \
+          gcr.io/flow-container-registry/consensus:latest \
+          gcr.io/flow-container-registry/execution:latest \
+          gcr.io/flow-container-registry/ghost:latest \
+          gcr.io/flow-container-registry/observer:latest \
+          gcr.io/flow-container-registry/verification:latest \
+          gcr.io/flow-container-registry/access-corrupted:latest \
+          gcr.io/flow-container-registry/execution-corrupted:latest \
+          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
+
+      - name: Cache Docker images
+        uses: actions/cache@v4
+        with:
+          path: flow-docker-images.tar
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
+          key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}-cadence-vm
 
   integration-test-others:
     name: Integration Tests Others (${{ matrix.targets.name }})
@@ -362,9 +423,9 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      
+
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -398,7 +459,9 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: docker-build
+    needs:
+      - docker-build
+      - docker-build-cadence-vm
     strategy:
       fail-fast: false
       matrix:
@@ -406,6 +469,10 @@ jobs:
           - name: Access Cohort1 Integration Tests
             make: make -C integration access-cohort1-tests
             runner: buildjet-4vcpu-ubuntu-2204
+          - name: Access Cohort1 Integration Tests (Cadence VM)
+            make: make -C integration access-cohort1-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+            cadence_vm: true
           - name: Access Cohort2 Integration Tests
             make: make -C integration access-cohort2-tests
             runner: ubuntu-latest
@@ -434,27 +501,55 @@ jobs:
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
             runner: buildjet-8vcpu-ubuntu-2204
+          - name: Epoch Cohort1 Integration Tests (Cadence VM)
+            make: make -C integration epochs-cohort1-tests
+            runner: buildjet-8vcpu-ubuntu-2204
+            cadence_vm: true
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
             runner: buildjet-4vcpu-ubuntu-2204
+          - name: Epoch Cohort2 Integration Tests (Cadence VM)
+            make: make -C integration epochs-cohort2-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+            cadence_vm: true
           - name: Execution Integration Tests
             make: make -C integration execution-tests
             runner: ubuntu-latest
+          - name: Execution Integration Tests (Cadence VM)
+            make: make -C integration execution-tests
+            runner: ubuntu-latest
+            cadence_vm: true
           - name: Ghost Integration Tests
             make: make -C integration ghost-tests
             runner: ubuntu-latest
+          - name: Ghost Integration Tests (Cadence VM)
+            make: make -C integration ghost-tests
+            runner: ubuntu-latest
+            cadence_vm: true
           - name: MVP Integration Tests
             make: make -C integration mvp-tests
             runner: ubuntu-latest
+          - name: MVP Integration Tests (Cadence VM)
+            make: make -C integration mvp-tests
+            runner: ubuntu-latest
+            cadence_vm: true
           - name: Network Integration Tests
             make: make -C integration network-tests
             runner: ubuntu-latest
           - name: Verification Integration Tests
             make: make -C integration verification-tests
             runner: ubuntu-latest
+          - name: Verification Integration Tests (Cadence VM)
+            make: make -C integration verification-tests
+            runner: ubuntu-latest
+            cadence_vm: true
           - name: Upgrade Integration Tests
             make: make -C integration upgrades-tests
             runner: ubuntu-latest
+          - name: Upgrade Integration Tests (Cadence VM)
+            make: make -C integration upgrades-tests
+            runner: ubuntu-latest
+            cadence_vm: true
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
@@ -464,7 +559,7 @@ jobs:
           fetch-depth: 0
 
     - name: Setup private build environment
-      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
       uses: ./actions/private-setup
       with:
         cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -479,8 +574,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: flow-docker-images.tar
-        # use the same cache key as the docker-build job
-        key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+        # use the same cache key as the docker-build / docker-build-cadence-vm job
+        key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}${{ matrix.cadence_vm && '-cadence-vm' || '' }}
     - name: Load Docker images
       run: docker load -i flow-docker-images.tar
     - name: Run tests (${{ matrix.name }})
