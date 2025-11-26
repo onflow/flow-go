@@ -10,9 +10,14 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-// ErrIncompatibleReceipt is returned when an execution receipt is added to a container for a
-// different execution result.
-var ErrIncompatibleReceipt = errors.New("incompatible execution receipt")
+var (
+	// ErrIncompatibleReceipt is returned when an execution receipt is added to a container for a
+	// different execution result.
+	ErrIncompatibleReceipt = errors.New("incompatible execution receipt")
+
+	// ErrInvalidResultStatusTransition is returned when an invalid result status transition is attempted.
+	ErrInvalidResultStatusTransition = errors.New("invalid result status transition")
+)
 
 // ExecutionResultContainer implements the Vertex interface from the LevelledForest module.
 // It represents a set of ExecutionReceipts all committing to the same ExecutionResult. As
@@ -178,11 +183,12 @@ func (c *ExecutionResultContainer) ResultStatus() ResultStatus {
 
 // SetResultStatus sets the status of this result.
 //
-// No error returns expected during normal operations.
+// Expected error returns during normal operations:
+//   - [ErrInvalidResultStatusTransition]: if the result status transition is invalid
 func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) error {
 	success, oldValue := c.resultStatus.Set(resultStatus)
 	if !success {
-		return fmt.Errorf("invalid result status transition: %s -> %s", oldValue, resultStatus)
+		return fmt.Errorf("%w: %s -> %s", ErrInvalidResultStatusTransition, oldValue, resultStatus)
 	}
 
 	if resultStatus == ResultSealed {
@@ -193,7 +199,8 @@ func (c *ExecutionResultContainer) SetResultStatus(resultStatus ResultStatus) er
 
 // Abandon marks the result as orphaned and abandons the pipeline.
 //
-// No error returns expected during normal operations.
+// Expected error returns during normal operations:
+//   - [ErrInvalidResultStatusTransition]: if the result status transition is invalid
 func (c *ExecutionResultContainer) Abandon() error {
 	if err := c.SetResultStatus(ResultOrphaned); err != nil {
 		return fmt.Errorf("failed to abandon result: %w", err)
