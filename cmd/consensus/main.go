@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine"
 	"os"
 	"path/filepath"
 	"time"
@@ -487,12 +488,17 @@ func main() {
 			return e, err
 		}).
 		Component("matching engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			fifoStore, err := engine.NewFifoMessageStore(requester.DefaultEntityRequestCacheSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester store: %w", err)
+			}
 			receiptRequester, err = requester.New(
 				node.Logger.With().Str("entity", "receipt").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
 				node.State,
+				fifoStore,
 				channels.RequestReceiptsByBlockID,
 				filter.HasRole[flow.Identity](flow.RoleExecution),
 				func() flow.Entity { return new(flow.ExecutionReceipt) },

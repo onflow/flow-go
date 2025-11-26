@@ -9,6 +9,14 @@ type FifoMessageStore struct {
 	*fifoqueue.FifoQueue
 }
 
+func NewFifoMessageStore(maxCapacity int) (*FifoMessageStore, error) {
+	queue, err := fifoqueue.NewFifoQueue(maxCapacity)
+	if err != nil {
+		return nil, err
+	}
+	return &FifoMessageStore{FifoQueue: queue}, nil
+}
+
 func (s *FifoMessageStore) Put(msg *Message) bool {
 	return s.Push(msg)
 }

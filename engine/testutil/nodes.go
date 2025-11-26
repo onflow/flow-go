@@ -459,8 +459,19 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
 	require.NoError(t, err)
 
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return new(flow.ExecutionReceipt) })
+	receiptRequester, err := requester.New(
+		node.Log.With().Str("entity", "receipt").Logger(),
+		node.Metrics,
+		node.Net,
+		node.Me,
+		node.State,
+		requestQueue,
+		channels.RequestReceiptsByBlockID,
+		filter.Any,
+		func() flow.Entity { return new(flow.ExecutionReceipt) },
+	)
 	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -666,8 +677,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.LockManager,
 	)
 
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	requestEngine, err := requester.New(
 		node.Log.With().Str("entity", "collection").Logger(), node.Metrics, node.Net, node.Me, node.State,
+		requestQueue,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity { return new(flow.Collection) },

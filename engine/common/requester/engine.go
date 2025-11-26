@@ -25,6 +25,10 @@ import (
 	"github.com/onflow/flow-go/utils/rand"
 )
 
+// DefaultEntityRequestCacheSize is the default max message queue size for the provider engine.
+// This equates to ~5GB of memory usage with a full queue (10M*500)
+const DefaultEntityRequestCacheSize = 500
+
 // HandleFunc is a function provided to the requester engine to handle an entity
 // once it has been retrieved from a provider. The function should be non-blocking
 // and errors should be handled internally within the function.
