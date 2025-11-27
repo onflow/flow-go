@@ -13,6 +13,7 @@ import (
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -309,7 +310,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 		c.Nil(core.workingData)
 
 		err := core.Download(ctx)
-		c.ErrorIs(err, errResultAbandoned)
+		c.ErrorIs(err, optimistic_sync.ErrResultAbandoned)
 	})
 }
 
@@ -393,7 +394,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 		c.Nil(core.workingData)
 
 		err := core.Index()
-		c.ErrorIs(err, errResultAbandoned)
+		c.ErrorIs(err, optimistic_sync.ErrResultAbandoned)
 	})
 
 	c.Run("Index before Download returns an error", func() {
@@ -535,7 +536,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 		c.Nil(core.workingData)
 
 		err := core.Persist()
-		c.ErrorIs(err, errResultAbandoned)
+		c.ErrorIs(err, optimistic_sync.ErrResultAbandoned)
 	})
 
 	c.Run("Persist before Index returns an error", func() {
