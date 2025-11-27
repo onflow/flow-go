@@ -3,7 +3,9 @@ package access_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/google/go-cmp/cmp"
@@ -16,11 +18,16 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/crypto"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/access/ingestion"
+	ingestioncollections "github.com/onflow/flow-go/engine/access/ingestion/collections"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -51,10 +58,6 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type Suite struct {
@@ -74,7 +77,7 @@ type Suite struct {
 	me                   *mockmodule.Local
 	rootBlock            *flow.Header
 	sealedBlock          *flow.Header
-	finalizedBlock       *flow.Header
+	finalizedBlock       *flow.Block
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	finalizedHeaderCache module.FinalizedHeaderCache
@@ -102,7 +105,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
-	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.sealedBlock)
+	suite.finalizedBlock = unittest.BlockWithParentFixture(suite.sealedBlock)
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.sealedSnapshot, nil).Maybe()
@@ -115,10 +118,9 @@ func (suite *Suite) SetupTest() {
 		nil,
 	).Maybe()
 	suite.finalSnapshot.On("Head").Return(
-		func() *flow.Header {
-			return suite.finalizedBlock
+		func() (*flow.Header, error) {
+			return suite.finalizedBlock.ToHeader(), nil
 		},
-		nil,
 	).Maybe()
 
 	pstate := protocol.NewKVStoreReader(suite.T())
@@ -171,6 +173,7 @@ func (suite *Suite) RunTest(
 			Transactions:             all.Transactions,
 			ExecutionResults:         all.Results,
 			ExecutionReceipts:        all.Receipts,
+			Seals:                    all.Seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            suite.metrics,
 			MaxHeightRange:           events.DefaultMaxHeightRange,
@@ -253,7 +256,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 		transaction := unittest.TransactionBodyFixture(unittest.WithReferenceBlock(referenceBlock.ID()))
 
 		// create latest block that is past the expiry window
-		latestBlock := unittest.BlockHeaderFixture()
+		latestBlock := unittest.BlockFixture()
 		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
 
 		refSnapshot := new(protocol.Snapshot)
@@ -264,7 +267,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 
 		refSnapshot.
 			On("Head").
-			Return(referenceBlock, nil).
+			Return(referenceBlock.ToHeader(), nil).
 			Twice()
 
 		// Advancing final state to expire ref block
@@ -297,6 +300,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
+		seals := store.NewSeals(metrics, db)
 
 		// create collection node cluster
 		count := 2
@@ -339,6 +343,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		bnd, err := backend.New(backend.Params{State: suite.state,
 			Collections:              collections,
 			Transactions:             transactions,
+			Seals:                    seals,
 			ChainID:                  suite.chainID,
 			AccessMetrics:            metrics,
 			ConnFactory:              connFactory,
@@ -544,6 +549,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.RunTest(func(handler *rpc.Handler, db storage.DB, all *store.All) {
+		lockManager := storage.NewTestingLockManager()
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -553,8 +559,27 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithExecutionResultBlockID(blockID),
 			unittest.WithServiceEvents(3))
 
-		require.NoError(suite.T(), all.Results.Store(er))
-		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
+		require.NoError(suite.T(), storage.WithLock(lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := all.Results.BatchStore(er, rw)
+				if err != nil {
+					return err
+				}
+				return all.Results.BatchIndex(lctx, rw, blockID, er.ID()) // requires storage.LockIndexExecutionResult
+			})
+		}))
+
+		// Create and store a seal for the block
+		seal := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(blockID),
+			unittest.Seal.WithResult(er),
+		)
+		require.NoError(suite.T(), all.Seals.Store(seal))
+
+		// Index the seal by block ID so FinalizedSealForBlock can find it
+		require.NoError(suite.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexFinalizedSealByBlockID(rw.Writer(), blockID, seal.ID())
+		}))
 
 		assertResp := func(
 			resp *accessproto.ExecutionResultForBlockIDResponse,
@@ -626,6 +651,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -686,6 +712,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -723,81 +750,106 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// create the ingest engine
 		processedHeight := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
 
-		collectionSyncer := ingestion.NewCollectionSyncer(
+		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
-			module.CollectionExecutedMetric(collectionExecutedMetric),
-			suite.request,
+			db,
+			collectionExecutedMetric,
 			suite.state,
 			all.Blocks,
 			collections,
-			transactions,
 			lastFullBlockHeight,
 			suite.lockManager,
 		)
+		require.NoError(suite.T(), err)
 
+		collectionSyncer := ingestioncollections.NewSyncer(
+			suite.log,
+			suite.request,
+			suite.state,
+			collections,
+			lastFullBlockHeight,
+			collectionIndexer,
+			nil,
+		)
+
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
 			processedHeight,
 			collectionSyncer,
+			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLocks(suite.T(), suite.lockManager, []string{
+			storage.LockInsertBlock,
+			storage.LockFinalizeBlock,
+		}, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return all.Blocks.BatchStore(lctx, rw, proposal)
-			})
-		})
-		require.NoError(suite.T(), err)
+				// store finalized block
+				finalized := suite.finalizedBlock
+				if err := all.Blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(finalized)); err != nil {
+					return fmt.Errorf("could not store block: %w", err)
+				}
+				if err := operation.IndexFinalizedBlockByHeight(lctx, rw, finalized.Height, finalized.ID()); err != nil {
+					return fmt.Errorf("could not index finalized block: %w", err)
+				}
 
-		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockFinalizeBlock, func(fctx lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(fctx, rw, block.Height, block.ID())
+				// store new block
+				if err := all.Blocks.BatchStore(lctx, rw, proposal); err != nil {
+					return fmt.Errorf("could not store block: %w", err)
+				}
+				if err := operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID()); err != nil {
+					return fmt.Errorf("could not index finalized block: %w", err)
+				}
+				return nil
 			})
 		})
 		require.NoError(suite.T(), err)
 
 		suite.sealedBlock = block.ToHeader()
 
-		background, cancel := context.WithCancel(context.Background())
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 		defer cancel()
 
-		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
-		<-ingestEng.Ready()
+		unittest.RequireCloseBefore(suite.T(), ingestEng.Ready(), 1*time.Second, "could not start ingest engine")
 		defer func() {
 			cancel()
-			<-ingestEng.Done()
+			unittest.RequireCloseBefore(suite.T(), ingestEng.Done(), 1*time.Second, "could not stop ingest engine")
 		}()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
-		mb := &model.Block{
-			BlockID: block.ID(),
-		}
-		ingestEng.OnFinalizedBlock(mb)
+		followerDistributor.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
 
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
-		// 4. Indexer IndexCollection receives the requested collection and all the execution receipts
-		// Create a lock context for indexing
-		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertCollection, func(indexLctx lockctx.Context) error {
-			return indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
-		})
-		require.NoError(suite.T(), err)
 
+		// 4.  Syncer receives the requested collection and all the ingestion engine receives the receipts
+		collectionSyncer.OnCollectionDownloaded(unittest.IdentifierFixture(), collection)
 		for _, r := range executionReceipts {
 			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
+
+		// block until the collection is processed by the indexer
+		require.Eventually(suite.T(), func() bool {
+			_, err := collections.LightByID(collection.ID())
+			return err == nil
+		}, 1*time.Second, 10*time.Millisecond, "collection not indexed")
 
 		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
@@ -805,7 +857,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		getReq := &accessproto.GetTransactionRequest{
 			Id: txID[:],
 		}
-		gResp, err := handler.GetTransactionResult(context.Background(), getReq)
+
+		apiCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
+		gResp, err := handler.GetTransactionResult(apiCtx, getReq)
 		require.NoError(suite.T(), err)
 		// assert that the transaction is reported as Sealed
 		require.Equal(suite.T(), entitiesproto.TransactionStatus_SEALED, gResp.GetStatus())
@@ -816,6 +871,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		originID := unittest.IdentifierFixture()
@@ -831,7 +887,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		blockNegativeId := blockNegative.ID()
 
 		finalSnapshot := new(protocol.Snapshot)
-		finalSnapshot.On("Head").Return(suite.finalizedBlock, nil)
+		finalSnapshot.On("Head").Return(suite.finalizedBlock.ToHeader(), nil)
 
 		suite.state.On("Params").Return(suite.params)
 		suite.state.On("Final").Return(finalSnapshot)
@@ -840,16 +896,28 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-		err := unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLocks(suite.T(), suite.lockManager, []string{
+			storage.LockInsertBlock,
+			storage.LockFinalizeBlock,
+		}, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return all.Blocks.BatchStore(lctx, rw, proposal)
-			})
-		})
-		require.NoError(suite.T(), err)
+				// store finalized block
+				finalized := suite.finalizedBlock
+				if err := all.Blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(finalized)); err != nil {
+					return fmt.Errorf("could not store block: %w", err)
+				}
+				if err := operation.IndexFinalizedBlockByHeight(lctx, rw, finalized.Height, finalized.ID()); err != nil {
+					return fmt.Errorf("could not index finalized block: %w", err)
+				}
 
-		err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertBlock, func(lctx2 lockctx.Context) error {
-			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return all.Blocks.BatchStore(lctx2, rw, proposalNegative)
+				// store new blocks
+				if err := all.Blocks.BatchStore(lctx, rw, proposal); err != nil {
+					return fmt.Errorf("could not store proposal: %w", err)
+				}
+				if err := all.Blocks.BatchStore(lctx, rw, proposalNegative); err != nil {
+					return fmt.Errorf("could not store negative propoal: %w", err)
+				}
+				return nil
 			})
 		})
 		require.NoError(suite.T(), err)
@@ -908,6 +976,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			Transactions:               transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -946,39 +1015,57 @@ func (suite *Suite) TestGetTransactionResult() {
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
-		collectionSyncer := ingestion.NewCollectionSyncer(
+		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
-			module.CollectionExecutedMetric(collectionExecutedMetric),
-			suite.request,
+			db,
+			collectionExecutedMetric,
 			suite.state,
 			all.Blocks,
 			collections,
-			transactions,
 			lastFullBlockHeight,
 			suite.lockManager,
 		)
+		require.NoError(suite.T(), err)
 
+		collectionSyncer := ingestioncollections.NewSyncer(
+			suite.log,
+			suite.request,
+			suite.state,
+			collections,
+			lastFullBlockHeight,
+			collectionIndexer,
+			nil,
+		)
+
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
 			processedHeightInitializer,
 			collectionSyncer,
+			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
-		background, cancel := context.WithCancel(context.Background())
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 		defer cancel()
 
-		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
-		<-ingestEng.Ready()
+		unittest.RequireCloseBefore(suite.T(), ingestEng.Ready(), 1*time.Second, "could not start ingest engine")
+		defer func() {
+			cancel()
+			unittest.RequireCloseBefore(suite.T(), ingestEng.Done(), 1*time.Second, "could not stop ingest engine")
+		}()
 
 		processExecutionReceipts := func(
 			block *flow.Block,
@@ -990,17 +1077,10 @@ func (suite *Suite) TestGetTransactionResult() {
 			executionReceipts := unittest.ReceiptsForBlockFixture(block, enNodeIDs)
 			// Ingest engine was notified by the follower engine about a new block.
 			// Follower engine --> Ingest engine
-			mb := &model.Block{
-				BlockID: block.ID(),
-			}
-			ingestEng.OnFinalizedBlock(mb)
+			followerDistributor.OnFinalizedBlock(&model.Block{BlockID: block.ID()})
 
-			// Indexer IndexCollection receives the requested collection and all the execution receipts
-			// Create a lock context for indexing
-			err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertCollection, func(indexLctx lockctx.Context) error {
-				return indexer.IndexCollection(indexLctx, collection, collections, suite.log, module.CollectionExecutedMetric(collectionExecutedMetric))
-			})
-			require.NoError(suite.T(), err)
+			// Syncer receives the requested collection and the ingestion engine processes the receipts
+			collectionSyncer.OnCollectionDownloaded(originID, collection)
 
 			for _, r := range executionReceipts {
 				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
@@ -1023,6 +1103,17 @@ func (suite *Suite) TestGetTransactionResult() {
 		txIdNegative := collectionNegative.Transactions[0].ID()
 		collectionIdNegative := collectionNegative.ID()
 
+		// the transactions should eventually be indexed by the collection indexer
+		require.Eventually(suite.T(), func() bool {
+			if _, err := transactions.ByID(txId); err != nil {
+				return false
+			}
+			if _, err := transactions.ByID(txIdNegative); err != nil {
+				return false
+			}
+			return true
+		}, 1*time.Second, 10*time.Millisecond, "transactions never indexed")
+
 		assertTransactionResult := func(
 			resp *accessproto.TransactionResultResponse,
 			err error,
@@ -1036,13 +1127,15 @@ func (suite *Suite) TestGetTransactionResult() {
 			require.Equal(suite.T(), collectionId, actualCollectionId)
 		}
 
+		apiCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
+
 		// Test behaviour with transactionId provided
 		// POSITIVE
 		suite.Run("Get transaction result by transaction ID", func() {
 			getReq := &accessproto.GetTransactionRequest{
 				Id: txId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
 		})
 
@@ -1052,18 +1145,8 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:      txId[:],
 				BlockId: blockId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
-		})
-
-		suite.Run("Get transaction result with wrong transaction ID and correct block ID", func() {
-			getReq := &accessproto.GetTransactionRequest{
-				Id:      txIdNegative[:],
-				BlockId: blockId[:],
-			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
-			require.Error(suite.T(), err)
-			require.Nil(suite.T(), resp)
 		})
 
 		suite.Run("Get transaction result with wrong block ID and correct transaction ID", func() {
@@ -1071,9 +1154,9 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:      txId[:],
 				BlockId: blockNegativeId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			require.Error(suite.T(), err)
-			require.Contains(suite.T(), err.Error(), "failed to find: transaction not in block")
+			require.Contains(suite.T(), err.Error(), "transaction found in block")
 			require.Nil(suite.T(), resp)
 		})
 
@@ -1083,7 +1166,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:           txId[:],
 				CollectionId: collectionId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
 		})
 
@@ -1092,17 +1175,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:           txId[:],
 				CollectionId: collectionIdNegative[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
-			require.Error(suite.T(), err)
-			require.Nil(suite.T(), resp)
-		})
-
-		suite.Run("Get transaction result with wrong transaction ID and correct collection ID", func() {
-			getReq := &accessproto.GetTransactionRequest{
-				Id:           txIdNegative[:],
-				CollectionId: collectionId[:],
-			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)
 		})
@@ -1114,7 +1187,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockId:      blockId[:],
 				CollectionId: collectionId[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
 		})
 
@@ -1124,7 +1197,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockId:      blockId[:],
 				CollectionId: collectionIdNegative[:],
 			}
-			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)
 		})
@@ -1135,6 +1208,7 @@ func (suite *Suite) TestGetTransactionResult() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		all := store.InitAll(metrics.NewNoopCollector(), db)
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -1163,6 +1237,7 @@ func (suite *Suite) TestExecuteScript() {
 			Transactions:               all.Transactions,
 			ExecutionReceipts:          all.Receipts,
 			ExecutionResults:           all.Results,
+			Seals:                      all.Seals,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -1212,35 +1287,50 @@ func (suite *Suite) TestExecuteScript() {
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
-		collectionSyncer := ingestion.NewCollectionSyncer(
+		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
-			module.CollectionExecutedMetric(collectionExecutedMetric),
-			suite.request,
+			db,
+			collectionExecutedMetric,
 			suite.state,
 			all.Blocks,
 			all.Collections,
-			all.Transactions,
 			lastFullBlockHeight,
 			suite.lockManager,
 		)
+		require.NoError(suite.T(), err)
 
+		collectionSyncer := ingestioncollections.NewSyncer(
+			suite.log,
+			suite.request,
+			suite.state,
+			all.Collections,
+			lastFullBlockHeight,
+			collectionIndexer,
+			nil,
+		)
+
+		followerDistributor := pubsub.NewFollowerDistributor()
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
 			suite.state,
 			suite.me,
+			lockManager,
+			db,
 			all.Blocks,
 			all.Results,
 			all.Receipts,
 			processedHeightInitializer,
 			collectionSyncer,
+			collectionIndexer,
 			collectionExecutedMetric,
 			nil,
+			followerDistributor,
 		)
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
-		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock)
+		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock.ToHeader())
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.ToHeader())
@@ -1394,7 +1484,7 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 // updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	suite.RunTest(func(handler *rpc.Handler, db storage.DB, all *store.All) {
-		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
+		block := unittest.BlockWithParentFixture(suite.finalizedBlock.ToHeader())
 		proposal := unittest.ProposalFromBlock(block)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.ToHeader())
 
@@ -1428,7 +1518,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		resp, err := handler.GetBlockHeaderByID(context.Background(), req)
 		assertFinalizedBlockHeader(resp, err)
 
-		suite.finalizedBlock = newFinalizedBlock.ToHeader()
+		suite.finalizedBlock = newFinalizedBlock
 
 		resp, err = handler.GetBlockHeaderByID(context.Background(), req)
 		assertFinalizedBlockHeader(resp, err)
@@ -1437,7 +1527,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 
 func (suite *Suite) createChain() (*flow.Proposal, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
-	refBlockID := unittest.IdentifierFixture()
+	refBlockID := suite.finalizedBlock.ID()
 	// prepare cluster committee members
 	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	// guarantee signers must be cluster committee members, so that access will fetch collection from
@@ -1451,7 +1541,7 @@ func (suite *Suite) createChain() (*flow.Proposal, *flow.Collection) {
 		SignerIndices:    indices,
 	}
 	block := unittest.BlockWithParentAndPayload(
-		suite.finalizedBlock,
+		suite.finalizedBlock.ToHeader(),
 		unittest.PayloadFixture(unittest.WithGuarantees(guarantee)),
 	)
 	proposal := unittest.ProposalFromBlock(block)

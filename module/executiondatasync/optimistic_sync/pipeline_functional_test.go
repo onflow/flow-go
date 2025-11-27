@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/jordanschalm/lockctx"
@@ -154,10 +155,16 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	require.NoError(t, err)
 
 	// Store and index sealed block execution result
-	err = p.results.Store(sealedExecutionResult)
-	p.Require().NoError(err)
+	err = unittest.WithLock(t, p.lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := p.results.BatchStore(sealedExecutionResult, rw)
+			p.Require().NoError(err)
 
-	err = p.results.Index(sealedBlock.ID(), sealedExecutionResult.ID())
+			err = p.results.BatchIndex(lctx, rw, sealedBlock.ID(), sealedExecutionResult.ID())
+			p.Require().NoError(err)
+			return nil
+		})
+	})
 	p.Require().NoError(err)
 
 	p.persistentLatestSealedResult, err = store.NewLatestPersistedSealedResult(p.consumerProgress, p.headers, p.results)
@@ -231,6 +238,14 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
 	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+		// Check for errors in a separate goroutine
+		go func() {
+			err := <-errChan
+			if err != nil {
+				p.T().Errorf("Pipeline error: %v", err)
+			}
+		}()
+
 		pipeline.OnParentStateUpdated(StateComplete)
 
 		waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing, StateWaitingPersist)
@@ -343,7 +358,9 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages,
 	// it is hard to make a meaningful error explicitly.
 	mockEvents := storagemock.NewEvents(p.T())
-	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Once()
+	mockEvents.On("BatchStore",
+		mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+		p.block.ID(), []flow.EventsList{p.expectedData.events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(expectedError).Once()
 	p.persistentEvents = mockEvents
 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
@@ -436,9 +453,14 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() 
 
 // TestPipelineShutdownOnParentAbandon verifies that the pipeline transitions correctly to a shutdown state when the parent is abandoned.
 func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
+	assertNoError := func(err error) {
+		p.Require().NoError(err)
+	}
+
 	tests := []struct {
 		name        string
 		config      PipelineConfig
+		checkError  func(err error)
 		customSetup func(pipeline Pipeline, updateChan chan State, errChan chan error)
 	}{
 		{
@@ -449,43 +471,68 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 				},
 				parentState: StateAbandoned,
 			},
+			checkError:  assertNoError,
+			customSetup: func(pipeline Pipeline, updateChan chan State, errChan chan error) {},
 		},
 		{
 			name: "from StateProcessing",
-			customSetup: func(pipeline Pipeline, updateChan chan State, errChan chan error) {
-				waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing)
-
-				pipeline.OnParentStateUpdated(StateAbandoned)
+			config: PipelineConfig{
+				beforePipelineRun: func(pipeline *PipelineImpl) {
+					p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(func(ctx context.Context) (*execution_data.BlockExecutionData, error) {
+						pipeline.OnParentStateUpdated(StateAbandoned) // abandon during processing step
+						return p.expectedExecutionData, nil
+					}).Once()
+					// this method may not be called depending on how quickly the RequestExecutionData
+					// mock returns.
+					p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Maybe()
+				},
+				parentState: StateWaitingPersist,
 			},
-			config: p.config,
+			checkError: func(err error) {
+				// depending on the timing, the error may be during or after the indexing step.
+				if err != nil {
+					p.Require().ErrorContains(err, "could not perform indexing")
+				} else {
+					p.Require().NoError(err)
+				}
+			},
+			customSetup: func(pipeline Pipeline, updateChan chan State, errChan chan error) {
+				synctestWaitForStateUpdates(p.T(), updateChan, StateProcessing)
+			},
 		},
 		{
 			name: "from StateWaitingPersist",
+			config: PipelineConfig{
+				beforePipelineRun: func(pipeline *PipelineImpl) {
+					p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
+					p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
+				},
+				parentState: StateWaitingPersist,
+			},
+			checkError: assertNoError,
 			customSetup: func(pipeline Pipeline, updateChan chan State, errChan chan error) {
-				waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing, StateWaitingPersist)
-
+				synctestWaitForStateUpdates(p.T(), updateChan, StateProcessing, StateWaitingPersist)
 				pipeline.OnParentStateUpdated(StateAbandoned)
 			},
-			config: p.config,
 		},
 	}
 
 	for _, test := range tests {
 		p.T().Run(test.name, func(t *testing.T) {
-			p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-				p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Maybe()
-				p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Maybe()
+			p.execDataRequester.On("RequestExecutionData", mock.Anything).Unset()
+			p.txResultErrMsgsRequester.On("Request", mock.Anything).Unset()
 
-				if test.customSetup != nil {
+			synctest.Test(p.T(), func(t *testing.T) {
+				p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
 					test.customSetup(pipeline, updateChan, errChan)
-				}
 
-				waitForStateUpdates(p.T(), updateChan, errChan, StateAbandoned)
-				waitForError(p.T(), errChan, nil)
+					synctestWaitForStateUpdates(p.T(), updateChan, StateAbandoned)
+					test.checkError(<-errChan)
 
-				p.Assert().Equal(StateAbandoned, pipeline.GetState())
-				p.Assert().Nil(p.core.workingData)
-			}, test.config)
+					p.Assert().Equal(StateAbandoned, pipeline.GetState())
+					p.Assert().Nil(p.core.workingData)
+				}, test.config)
+			})
 		})
 	}
 }
@@ -534,13 +581,18 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 	pipelineIsReady := make(chan struct{})
 
 	go func() {
+		defer close(errChan)
+
 		if pipelineConfig.beforePipelineRun != nil {
 			pipelineConfig.beforePipelineRun(pipeline)
 		}
 
 		close(pipelineIsReady)
 
-		errChan <- pipeline.Run(ctx, p.core, pipelineConfig.parentState)
+		err := pipeline.Run(ctx, p.core, pipelineConfig.parentState)
+		if err != nil {
+			errChan <- err
+		}
 	}()
 
 	<-pipelineIsReady

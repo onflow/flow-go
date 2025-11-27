@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/stretchr/testify/require"
 )
 
 func Test_ExecutionForkEvidenceOperations(t *testing.T) {

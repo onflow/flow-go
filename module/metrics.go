@@ -1047,8 +1047,8 @@ type ExecutionMetrics interface {
 	// ExecutionScriptExecuted reports the time and memory spent on executing an script
 	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
 
-	// ExecutionCallbacksExecuted reports the number of callbacks executed, computation used by process transaction, and total computation limits for execute transactions
-	ExecutionCallbacksExecuted(callbackCount int, processComputationUsed, executeComputationLimits uint64)
+	// ExecutionScheduledTransactionsExecuted reports the number of scheduled transactions executed, computation used by process transaction, and total computation limits for execute transactions
+	ExecutionScheduledTransactionsExecuted(scheduledTransactionCount int, processComputationUsed, executeComputationLimits uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()

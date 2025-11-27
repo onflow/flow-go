@@ -145,7 +145,8 @@ func TestExecuteCallbacksTransactions(t *testing.T) {
 				} else {
 					assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), tx.GasLimit)
 				}
-				assert.Equal(t, tx.Authorizers, []flow.Address{chain.ServiceAddress()})
+				executor := systemcontracts.SystemContractsForChain(chain.ChainID()).ScheduledTransactionExecutor.Address
+				assert.Equal(t, tx.Authorizers, []flow.Address{executor})
 				assert.Len(t, tx.Arguments, 1)
 				assert.NotEmpty(t, tx.Arguments[0])
 
@@ -283,111 +284,6 @@ func createPendingExecutionEventWithEncodedValue(t *testing.T, value cadence.Val
 	payload, err := ccf.Encode(value)
 	require.NoError(t, err)
 	return createPendingExecutionEventWithPayload(payload)
-}
-
-func TestSystemCollection(t *testing.T) {
-	t.Parallel()
-
-	chain := flow.Mainnet.Chain()
-
-	tests := []struct {
-		name            string
-		events          []flow.Event
-		expectedTxCount int
-		errorMessage    string
-	}{
-		{
-			name:            "no events",
-			events:          []flow.Event{},
-			expectedTxCount: 2, // process + system chunk
-		},
-		{
-			name:            "single valid callback event",
-			events:          []flow.Event{createValidCallbackEvent(t, 1, 100)},
-			expectedTxCount: 3, // process + execute + system chunk
-		},
-		{
-			name: "multiple valid callback events",
-			events: []flow.Event{
-				createValidCallbackEvent(t, 1, 100),
-				createValidCallbackEvent(t, 2, 200),
-				createValidCallbackEvent(t, 3, 300),
-			},
-			expectedTxCount: 5, // process + 3 executes + system chunk
-		},
-		{
-			name: "mixed events - valid callbacks and invalid types",
-			events: []flow.Event{
-				createValidCallbackEvent(t, 1, 100),
-				createInvalidTypeEvent(),
-				createValidCallbackEvent(t, 2, 200),
-				createInvalidPayloadEvent(),
-			},
-			expectedTxCount: 4, // process + 2 executes + system chunk
-		},
-		{
-			name:            "only invalid event types",
-			events:          []flow.Event{createInvalidTypeEvent(), createInvalidPayloadEvent()},
-			expectedTxCount: 2, // process + system chunk
-		},
-		{
-			name:         "invalid CCF payload in callback event",
-			events:       []flow.Event{createPendingExecutionEventWithPayload([]byte{0xFF, 0xAB, 0xCD})},
-			errorMessage: "failed to construct execute callbacks transactions",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			collection, err := blueprints.SystemCollection(chain, tt.events)
-
-			if tt.errorMessage != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMessage)
-				assert.Nil(t, collection)
-				return
-			}
-
-			require.NoError(t, err)
-			require.NotNil(t, collection)
-
-			transactions := collection.Transactions
-			assert.Len(t, transactions, tt.expectedTxCount)
-
-			if tt.expectedTxCount > 0 {
-				// First transaction should always be the process transaction
-				processTx := transactions[0]
-				assert.NotNil(t, processTx)
-				assert.NotEmpty(t, processTx.Script)
-				assert.Equal(t, uint64(flow.DefaultMaxTransactionGasLimit), processTx.GasLimit)
-				assert.Equal(t, []flow.Address{chain.ServiceAddress()}, processTx.Authorizers)
-				assert.Empty(t, processTx.Arguments)
-
-				// Last transaction should always be the system chunk transaction
-				systemChunkTx := transactions[len(transactions)-1]
-				assert.NotNil(t, systemChunkTx)
-				assert.NotEmpty(t, systemChunkTx.Script)
-				assert.Equal(t, []flow.Address{chain.ServiceAddress()}, systemChunkTx.Authorizers)
-
-				// Middle transactions should be execute callback transactions
-				executeCount := tt.expectedTxCount - 2 // subtract process and system chunk
-				if executeCount > 0 {
-					for i := 1; i < len(transactions)-1; i++ {
-						executeTx := transactions[i]
-						assert.NotNil(t, executeTx)
-						assert.NotEmpty(t, executeTx.Script)
-						assert.Equal(t, []flow.Address{chain.ServiceAddress()}, executeTx.Authorizers)
-						assert.Len(t, executeTx.Arguments, 1)
-						assert.NotEmpty(t, executeTx.Arguments[0])
-					}
-				}
-			}
-
-			// Verify collection properties
-			assert.NotEmpty(t, collection.ID())
-			assert.Equal(t, len(transactions), len(collection.Transactions))
-		})
-	}
 }
 
 func createEventWithModifiedField(t *testing.T, fieldName string, newValue cadence.Value) flow.Event {

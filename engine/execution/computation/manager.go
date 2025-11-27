@@ -106,7 +106,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled)
+	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduledTransactionsEnabled)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -233,7 +233,7 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCall
 			),
 		),
 		fvm.WithEVMEnabled(true),
-		fvm.WithScheduleCallbacksEnabled(scheduleCallbacksEnabled),
+		fvm.WithScheduledTransactionsEnabled(scheduleCallbacksEnabled),
 	}
 
 	if extensiveTracing {
