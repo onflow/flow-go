@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -947,7 +946,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.Run("returns error if failed to get execution result info for block - insufficient receipts", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
-			Return(nil, common.NewInsufficientExecutionReceipts(block.ID(), 0)).Once()
+			Return(nil, optimistic_sync.ErrNotEnoughAgreeingExecutors).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
 		require.Nil(s.T(), res)

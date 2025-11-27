@@ -3,13 +3,13 @@ package backend
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -183,7 +183,7 @@ func (b *StateStreamBackend) GetRegisterValues(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case common.IsInsufficientExecutionReceipts(err):
+		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)

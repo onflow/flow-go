@@ -143,7 +143,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createResponseHandler(criteria))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createExecutionDataProviderFunc(criteria))
 }
 
 // SubscribeExecutionDataFromStartBlockID streams execution data for all blocks starting at the specified block ID
@@ -160,12 +160,12 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 	startBlockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	header, err := b.headers.ByBlockID(startBlockID)
+	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, header.Height, b.createResponseHandler(criteria))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createExecutionDataProviderFunc(criteria))
 }
 
 // SubscribeExecutionDataFromStartBlockHeight streams execution data for all blocks starting at the specified block height
@@ -182,15 +182,14 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	startBlockHeight uint64,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	// can use headers, though i need a check that startBlockHeight is not greater than the highest indexed height,
+	// TODO: can use headers, though i need a check that startBlockHeight is not greater than the highest indexed height,
 	// i can pass this value to backend without having executionDataTracker
-
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createResponseHandler(criteria))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createExecutionDataProviderFunc(criteria))
 }
 
 // SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
@@ -210,13 +209,23 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
 		return subscription.NewFailedSubscription(err, "could not get start block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createResponseHandler(criteria))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.createExecutionDataProviderFunc(criteria))
 }
 
-func (b *ExecutionDataBackend) createResponseHandler(criteria optimistic_sync.Criteria) subscription.GetDataByHeightFunc {
+// createExecutionDataProviderFunc returns a function that retrieves the execution data for a given height.
+func (b *ExecutionDataBackend) createExecutionDataProviderFunc(criteria optimistic_sync.Criteria) subscription.GetDataByHeightFunc {
+	// TODO: add a good comment for this
 	nextCriteria := criteria
 
+	// TODO: all data provider functions SHOULD have a common contract/interface. It will simplify testing and
+	// developer experience.
+	// It is done in my PR for a new subscription package.
 	return func(ctx context.Context, height uint64) (interface{}, error) {
+		// TODO: there was a check like if height > highestAvailableHeight { return err }
+		// highest height were produced by the execution data downloader in the access_node_builder.go
+		// it was passed as an argument to the execution data tracker.
+		// should i add back this check here?
+
 		// the spork root block will never have execution data available. If requested, return an empty result.
 		if height == b.state.Params().SporkRootBlockHeight() {
 			return &ExecutionDataResponse{
@@ -229,26 +238,24 @@ func (b *ExecutionDataBackend) createResponseHandler(criteria optimistic_sync.Cr
 
 		blockID, err := b.headers.BlockIDByHeight(height)
 		if err != nil {
-			err = errors.Join(err, subscription.ErrBlockNotReady)
-			return nil, fmt.Errorf("could not get block ID for height %d: %w", height, err)
+			// this can only happen if a block is not finalized yet. however, we don't want to serve
+			// unfinalized blocks to clients, so we return an error instead.
+			return nil, fmt.Errorf("block %d might not be finalized yet: %w", height, err)
 		}
 
-		execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+		execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, nextCriteria)
 		if err != nil {
 			switch {
 			case errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound) ||
 				errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
-				return nil,
-					fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+				return nil, errors.Join(subscription.ErrBlockNotReady, err)
 
-			case errors.Is(err, optimistic_sync.ErrBlockNotFound):
+			case errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
+				errors.Is(err, optimistic_sync.ErrForkAbandoned):
 				return nil, err
 
-			case errors.Is(err, optimistic_sync.ErrForkAbandoned):
-				return nil, fmt.Errorf("execution fork for the current block has been abandoned")
-
 			default:
-				return nil, fmt.Errorf("failed to get events: %w", err)
+				return nil, fmt.Errorf("unexpected error: %w", err)
 			}
 		}
 
