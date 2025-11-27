@@ -80,8 +80,7 @@ func (p *Provider) ExecutionResultInfo(
 		if err != nil {
 			// if the node was bootstrapped from a block after the spork root block, then the root
 			// block's result will not be present.
-			err = errors.Join(err, optimistic_sync.ErrBlockNotFound)
-			return nil, fmt.Errorf("failed to retrieve root block result: %w", err)
+			return nil, errors.Join(optimistic_sync.ErrBlockNotFound, err)
 		}
 
 		return &optimistic_sync.ExecutionResultInfo{
@@ -144,7 +143,7 @@ func (p *Provider) findResultAndExecutors(
 	}
 
 	// find all results that match the criteria and have at least one acceptable executor
-	results := make([]resultWithReceipts, 0)
+	matchingResults := make([]resultWithReceipts, 0)
 	var lastErr error
 	for executionResultID, executionReceiptList := range allReceiptsForBlock.GroupByResultID() {
 		result := &executionReceiptList[0].ExecutionResult
@@ -156,26 +155,26 @@ func (p *Provider) findResultAndExecutors(
 			continue
 		}
 
-		results = append(results, resultWithReceipts{
+		matchingResults = append(matchingResults, resultWithReceipts{
 			id:       executionResultID,
 			receipts: executionReceiptList,
 		})
 	}
 
-	if len(results) == 0 {
+	if len(matchingResults) == 0 {
 		if lastErr != nil {
 			return flow.ZeroID, nil, lastErr
 		}
 		return flow.ZeroID, nil, optimistic_sync.ErrNotEnoughAgreeingExecutors
 	}
 
-	// sort results by the number of execution nodes in descending order
-	sort.Slice(results, func(i, j int) bool {
-		return len(results[i].receipts) > len(results[j].receipts)
+	// sort matchingResults by the number of execution nodes in descending order
+	sort.Slice(matchingResults, func(i, j int) bool {
+		return len(matchingResults[i].receipts) > len(matchingResults[j].receipts)
 	})
 
-	executorIDs := getExecutorIDs(results[0].receipts)
-	return results[0].id, executorIDs, nil
+	executorIDs := getExecutorIDs(matchingResults[0].receipts)
+	return matchingResults[0].id, executorIDs, nil
 }
 
 // isExecutorGroupMeetingCriteria checks if an executor group meets the specified criteria for execution receipts matching.

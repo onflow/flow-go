@@ -182,9 +182,8 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	startBlockHeight uint64,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	// can use headers, though i need a check that startBlockHeight is not greater than the highest indexed height,
+	// TODO: can use headers, though i need a check that startBlockHeight is not greater than the highest indexed height,
 	// i can pass this value to backend without having executionDataTracker
-
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
@@ -217,6 +216,11 @@ func (b *ExecutionDataBackend) createResponseHandler(criteria optimistic_sync.Cr
 	nextCriteria := criteria
 
 	return func(ctx context.Context, height uint64) (interface{}, error) {
+		// TODO: there was a check like if height > highestHeight { return err }
+		// highest height were produced by the execution data downloader in the access_node_builder.go
+		// it was passed as an argument to the execution data tracker.
+		// should i add back this check here?
+
 		// the spork root block will never have execution data available. If requested, return an empty result.
 		if height == b.state.Params().SporkRootBlockHeight() {
 			return &ExecutionDataResponse{
@@ -229,26 +233,25 @@ func (b *ExecutionDataBackend) createResponseHandler(criteria optimistic_sync.Cr
 
 		blockID, err := b.headers.BlockIDByHeight(height)
 		if err != nil {
+			// TODO: potentially, node could start indexing from the block past given height,
+			// and we would run into the infinite loop here. Maybe it is safer to return an exception?
 			err = errors.Join(err, subscription.ErrBlockNotReady)
 			return nil, fmt.Errorf("could not get block ID for height %d: %w", height, err)
 		}
 
-		execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+		execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, nextCriteria)
 		if err != nil {
 			switch {
 			case errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound) ||
 				errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
-				return nil,
-					fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+				return nil, errors.Join(subscription.ErrBlockNotReady, err)
 
-			case errors.Is(err, optimistic_sync.ErrBlockNotFound):
+			case errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
+				errors.Is(err, optimistic_sync.ErrForkAbandoned):
 				return nil, err
 
-			case errors.Is(err, optimistic_sync.ErrForkAbandoned):
-				return nil, fmt.Errorf("execution fork for the current block has been abandoned")
-
 			default:
-				return nil, fmt.Errorf("failed to get events: %w", err)
+				return nil, fmt.Errorf("unexpected error: %w", err)
 			}
 		}
 
