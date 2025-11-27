@@ -15,6 +15,7 @@ type BufferedProposal interface {
 // cannot yet be processed because they do not connect to the rest of the chain
 // state. They are indexed by parent ID to enable processing all of a parent's
 // children once the parent is received.
+// TODO paste doc from impl
 // Safe for concurrent use.
 type GenericPendingBlockBuffer[T BufferedProposal] interface {
 	Add(block flow.Slashable[T]) bool

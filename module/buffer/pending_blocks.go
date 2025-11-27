@@ -7,8 +7,7 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-// proposalVertex
-// TODO: docs
+// proposalVertex implements [forest.Vertex] for generic block proposals.
 //
 //structwrite:immutable
 type proposalVertex[T module.BufferedProposal] struct {
@@ -16,6 +15,7 @@ type proposalVertex[T module.BufferedProposal] struct {
 	id       flow.Identifier
 }
 
+// header is a shortform way to access the proposal's header.
 func (v proposalVertex[T]) header() *flow.Header {
 	return v.proposal.Message.ProposalHeader().Header
 }
@@ -27,31 +27,48 @@ func newProposalVertex[T module.BufferedProposal](proposal flow.Slashable[T]) pr
 	}
 }
 
+// VertexID returns the block ID for the stored proposal.
 func (v proposalVertex[T]) VertexID() flow.Identifier {
 	return v.id
 }
 
+// Level returns the view for the stored proposal.
 func (v proposalVertex[T]) Level() uint64 {
 	return v.header().View
 }
 
+// Parent returns the parent ID and view for the stored proposal.
 func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
 	return v.header().ParentID, v.header().ParentView
 }
 
+// GenericPendingBlocks implements a mempool of pending blocks that cannot yet be processed
+// because they do not connect to the rest of the chain state.
+// They are indexed by parent ID to enable processing all of a parent's children once the parent is received.
+// They are also indexed by view to support pruning.
+// The size of this mempool is partly limited by the enforcement of an allowed view range, however
+// a strong size limit also requires that stored proposals are validated to ensure we store only
+// one proposal per view. Higher-level logic is responsible for validating proposals prior to storing here.
+//
+// Safe for concurrent use.
 type GenericPendingBlocks[T module.BufferedProposal] struct {
+	// TODO concurrency
 	forest *forest.LevelledForest
 }
 
-type PendingClusterBlocks = GenericPendingBlocks[*cluster.Proposal]
 type PendingBlocks = GenericPendingBlocks[*flow.Proposal]
+type PendingClusterBlocks = GenericPendingBlocks[*cluster.Proposal]
+
+var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
+var _ module.PendingClusterBlockBuffer = (*PendingClusterBlocks)(nil)
+
+// TODO: inject finalizedView
+func NewPendingBlocks() *PendingBlocks {
+	return &PendingBlocks{forest: forest.NewLevelledForest(1_000_000)}
+}
 
 func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return &PendingClusterBlocks{forest: forest.NewLevelledForest(1_000_000)}
-}
-
-func NewPendingBlocks() *PendingBlocks {
-	return &PendingBlocks{forest: forest.NewLevelledForest(1_000_000)}
 }
 
 // TODO remove bool return here
