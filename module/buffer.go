@@ -5,12 +5,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO: docs
+// BufferedProposal generically represents either a [cluster.Proposal] or [flow.Proposal].
 type BufferedProposal interface {
+	*cluster.Proposal | *flow.Proposal
 	ProposalHeader() *flow.ProposalHeader
 }
 
-// PendingBlockBuffer defines an interface for a cache of pending blocks that
+// GenericPendingBlockBuffer defines an interface for a cache of pending blocks that
 // cannot yet be processed because they do not connect to the rest of the chain
 // state. They are indexed by parent ID to enable processing all of a parent's
 // children once the parent is received.
@@ -30,6 +31,8 @@ type GenericPendingBlockBuffer[T BufferedProposal] interface {
 	Size() uint
 }
 
+// PendingBlockBuffer is the block buffer for consensus proposals.
 type PendingBlockBuffer = GenericPendingBlockBuffer[*flow.Proposal]
 
+// PendingClusterBlockBuffer is the block buffer for cluster proposals.
 type PendingClusterBlockBuffer = GenericPendingBlockBuffer[*cluster.Proposal]

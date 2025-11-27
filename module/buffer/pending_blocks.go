@@ -4,57 +4,98 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/forest"
 )
 
+// proposalVertex
+// TODO: docs
+//
+//structwrite:immutable
+type proposalVertex[T module.BufferedProposal] struct {
+	proposal flow.Slashable[T]
+	id       flow.Identifier
+}
+
+func (v proposalVertex[T]) header() *flow.Header {
+	return v.proposal.Message.ProposalHeader().Header
+}
+
+func newProposalVertex[T module.BufferedProposal](proposal flow.Slashable[T]) proposalVertex[T] {
+	return proposalVertex[T]{
+		proposal: proposal,
+		id:       proposal.Message.ProposalHeader().Header.ID(),
+	}
+}
+
+func (v proposalVertex[T]) VertexID() flow.Identifier {
+	return v.id
+}
+
+func (v proposalVertex[T]) Level() uint64 {
+	return v.header().View
+}
+
+func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
+	return v.header().ParentID, v.header().ParentView
+}
+
 type GenericPendingBlocks[T module.BufferedProposal] struct {
-	backend *backend[T]
+	forest *forest.LevelledForest
 }
 
 type PendingClusterBlocks = GenericPendingBlocks[*cluster.Proposal]
 type PendingBlocks = GenericPendingBlocks[*flow.Proposal]
 
 func NewPendingClusterBlocks() *PendingClusterBlocks {
-	return &PendingClusterBlocks{backend: newBackend[*cluster.Proposal]()}
+	return &PendingClusterBlocks{forest: forest.NewLevelledForest(1_000_000)}
 }
 
 func NewPendingBlocks() *PendingBlocks {
-	return &PendingBlocks{backend: newBackend[*flow.Proposal]()}
+	return &PendingBlocks{forest: forest.NewLevelledForest(1_000_000)}
 }
 
+// TODO remove bool return here
 func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) bool {
-	return b.backend.add(block)
+	b.forest.AddVertex(newProposalVertex(block))
+	return true
 }
 
 func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[T], bool) {
-	item, ok := b.backend.byID(blockID)
+	vertex, ok := b.forest.GetVertex(blockID)
 	if !ok {
 		return flow.Slashable[T]{}, false
 	}
-	return item.block, true
+	return vertex.(proposalVertex[T]).proposal, true
 }
 
 func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[T], bool) {
-	items, ok := b.backend.byParentID(parentID)
-	if !ok {
+	n := b.forest.GetNumberOfChildren(parentID)
+	if n == 0 {
 		return nil, false
 	}
 
-	proposals := make([]flow.Slashable[T], 0, len(items))
-	for _, item := range items {
-		proposals = append(proposals, item.block)
+	children := make([]flow.Slashable[T], 0, n)
+	iterator := b.forest.GetChildren(parentID)
+	for iterator.HasNext() {
+		vertex := iterator.NextVertex()
+		children = append(children, vertex.(proposalVertex[T]).proposal)
 	}
-	return proposals, true
+
+	return children, true
 }
 
+// TODO: remove this
 func (b *GenericPendingBlocks[T]) DropForParent(parentID flow.Identifier) {
-	b.backend.dropForParent(parentID)
+	//b.forest.
+	//b.backend.dropForParent(parentID)
 }
 
 // PruneByView prunes any pending cluster blocks with views less or equal to the given view.
 func (b *GenericPendingBlocks[T]) PruneByView(view uint64) {
-	b.backend.pruneByView(view)
+	err := b.forest.PruneUpToLevel(view - 1) // TODO: OBO here
+	_ = err                                  // TODO: deal with error here
 }
 
 func (b *GenericPendingBlocks[T]) Size() uint {
-	return b.backend.size()
+	return uint(b.forest.GetSize())
 }
