@@ -1,58 +1,60 @@
 package buffer
 
 import (
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
-// PendingBlocks is a mempool for holding blocks. Furthermore, given a block ID, we can
-// query all children that are currently stored in the mempool. The mempool's backend
-// is intended to work generically for consensus blocks as well as cluster blocks.
-type PendingBlocks struct {
-	backend *backend[*flow.Proposal]
+type GenericPendingBlocks[T module.BufferedProposal] struct {
+	backend *backend[T]
 }
 
-var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
+type PendingClusterBlocks = GenericPendingBlocks[*cluster.Proposal]
+type PendingBlocks = GenericPendingBlocks[*flow.Proposal]
+
+func NewPendingClusterBlocks() *PendingClusterBlocks {
+	return &PendingClusterBlocks{backend: newBackend[*cluster.Proposal]()}
+}
 
 func NewPendingBlocks() *PendingBlocks {
-	b := &PendingBlocks{backend: newBackend[*flow.Proposal]()}
-	return b
+	return &PendingBlocks{backend: newBackend[*flow.Proposal]()}
 }
 
-func (b *PendingBlocks) Add(block flow.Slashable[*flow.Proposal]) bool {
+func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) bool {
 	return b.backend.add(block)
 }
 
-func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Proposal], bool) {
+func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[T], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*flow.Proposal]{}, false
+		return flow.Slashable[T]{}, false
 	}
 	return item.block, true
 }
 
-func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool) {
+func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[T], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	proposals := make([]flow.Slashable[*flow.Proposal], 0, len(items))
+	proposals := make([]flow.Slashable[T], 0, len(items))
 	for _, item := range items {
 		proposals = append(proposals, item.block)
 	}
 	return proposals, true
 }
 
-func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {
+func (b *GenericPendingBlocks[T]) DropForParent(parentID flow.Identifier) {
 	b.backend.dropForParent(parentID)
 }
 
-// PruneByView prunes any pending blocks with views less or equal to the given view.
-func (b *PendingBlocks) PruneByView(view uint64) {
+// PruneByView prunes any pending cluster blocks with views less or equal to the given view.
+func (b *GenericPendingBlocks[T]) PruneByView(view uint64) {
 	b.backend.pruneByView(view)
 }
 
-func (b *PendingBlocks) Size() uint {
+func (b *GenericPendingBlocks[T]) Size() uint {
 	return b.backend.size()
 }
