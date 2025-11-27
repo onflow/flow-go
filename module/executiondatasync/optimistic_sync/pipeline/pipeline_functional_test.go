@@ -54,7 +54,7 @@ type PipelineFunctionalSuite struct {
 	headers                       *store.Headers
 	results                       *store.ExecutionResults
 	persistentLatestSealedResult  *store.LatestPersistedSealedResult
-	core                          *CoreImpl
+	core                          *Core
 	block                         *flow.Block
 	executionResult               *flow.ExecutionResult
 	metrics                       module.CacheMetrics
@@ -467,7 +467,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 		{
 			name: "from StatePending",
 			config: PipelineConfig{
-				beforePipelineRun: func(pipeline *PipelineImpl) {
+				beforePipelineRun: func(pipeline *Pipeline) {
 					pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned)
 				},
 				parentState: optimistic_sync.StateAbandoned,
@@ -478,7 +478,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 		{
 			name: "from StateProcessing",
 			config: PipelineConfig{
-				beforePipelineRun: func(pipeline *PipelineImpl) {
+				beforePipelineRun: func(pipeline *Pipeline) {
 					p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(func(ctx context.Context) (*execution_data.BlockExecutionData, error) {
 						pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned) // abandon during processing step
 						return p.expectedExecutionData, nil
@@ -504,7 +504,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 		{
 			name: "from StateWaitingPersist",
 			config: PipelineConfig{
-				beforePipelineRun: func(pipeline *PipelineImpl) {
+				beforePipelineRun: func(pipeline *Pipeline) {
 					p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 					p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 				},
@@ -539,7 +539,7 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 }
 
 type PipelineConfig struct {
-	beforePipelineRun func(pipeline *PipelineImpl)
+	beforePipelineRun func(pipeline *Pipeline)
 	parentState       optimistic_sync.State
 }
 
@@ -552,7 +552,7 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 ) {
 	var err error
 
-	p.core, err = NewCoreImpl(
+	p.core, err = NewCore(
 		p.logger,
 		p.executionResult,
 		p.block,
