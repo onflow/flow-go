@@ -66,7 +66,11 @@ func (f *ComplianceEngineFactory) Create(
 	validator hotstuff.Validator,
 ) (*compliance.Engine, error) {
 
-	cache := buffer.NewPendingClusterBlocks()
+	final, err := clusterState.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized header: %w", err)
+	}
+	cache := buffer.NewPendingClusterBlocks(final.View)
 	core, err := compliance.NewCore(
 		f.log,
 		f.engMetrics,

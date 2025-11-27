@@ -805,7 +805,7 @@ func main() {
 		}).
 		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
+			proposals := buffer.NewPendingBlocks(node.LastFinalizedHeader.View)
 
 			logger := createLogger(node.Logger, node.RootChainID)
 			complianceCore, err := compliance.NewCore(

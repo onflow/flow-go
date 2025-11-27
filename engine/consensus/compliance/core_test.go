@@ -584,7 +584,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 
 	// replace the engine buffer with the real one
-	cs.core.pending = real.NewPendingBlocks()
+	cs.core.pending = real.NewPendingBlocks(cs.head.View)
 
 	// check that we request the ancestor block each time
 	cs.sync.On("RequestBlock", missingBlock.ID(), missingBlock.Height).Times(len(proposals))

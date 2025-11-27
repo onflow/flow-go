@@ -514,11 +514,11 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	// initialize the pending blocks cache
-	cache := buffer.NewPendingBlocks()
-
 	rootHeader, err := rootSnapshot.Head()
 	require.NoError(t, err)
+
+	// initialize the pending blocks cache
+	cache := buffer.NewPendingBlocks(rootHeader.View)
 
 	rootQC, err := rootSnapshot.QuorumCertificate()
 	require.NoError(t, err)

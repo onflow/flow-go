@@ -31,7 +31,7 @@ type GenericPendingBlockBuffer[T BufferedProposal] interface {
 }
 
 // PendingBlockBuffer is the block buffer for consensus proposals.
-type PendingBlockBuffer = GenericPendingBlockBuffer[*flow.Proposal]
+type PendingBlockBuffer GenericPendingBlockBuffer[*flow.Proposal]
 
 // PendingClusterBlockBuffer is the block buffer for cluster proposals.
-type PendingClusterBlockBuffer = GenericPendingBlockBuffer[*cluster.Proposal]
+type PendingClusterBlockBuffer GenericPendingBlockBuffer[*cluster.Proposal]

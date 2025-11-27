@@ -62,13 +62,12 @@ type PendingClusterBlocks = GenericPendingBlocks[*cluster.Proposal]
 var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 var _ module.PendingClusterBlockBuffer = (*PendingClusterBlocks)(nil)
 
-// TODO: inject finalizedView
-func NewPendingBlocks() *PendingBlocks {
-	return &PendingBlocks{forest: forest.NewLevelledForest(1_000_000)}
+func NewPendingBlocks(finalizedView uint64) *PendingBlocks {
+	return &PendingBlocks{forest: forest.NewLevelledForest(finalizedView)}
 }
 
-func NewPendingClusterBlocks() *PendingClusterBlocks {
-	return &PendingClusterBlocks{forest: forest.NewLevelledForest(1_000_000)}
+func NewPendingClusterBlocks(finalizedView uint64) *PendingClusterBlocks {
+	return &PendingClusterBlocks{forest: forest.NewLevelledForest(finalizedView)}
 }
 
 func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) {
