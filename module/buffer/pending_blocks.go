@@ -70,10 +70,14 @@ func NewPendingClusterBlocks(finalizedView uint64) *PendingClusterBlocks {
 	return &PendingClusterBlocks{forest: forest.NewLevelledForest(finalizedView)}
 }
 
+// Add adds the input block to the block buffer.
+// If the block already exists, or is below the finalized view, this is a no-op.
 func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) {
 	b.forest.AddVertex(newProposalVertex(block))
 }
 
+// ByID returns the block with the given ID, if it exists.
+// Otherwise returns (nil, false)
 func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[T], bool) {
 	vertex, ok := b.forest.GetVertex(blockID)
 	if !ok {
@@ -82,6 +86,8 @@ func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[
 	return vertex.(proposalVertex[T]).proposal, true
 }
 
+// ByParentID returns all direct children of the given block.
+// If no children with the given parent exist, returns (nil, false)
 func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[T], bool) {
 	n := b.forest.GetNumberOfChildren(parentID)
 	if n == 0 {
@@ -98,12 +104,15 @@ func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.S
 	return children, true
 }
 
-// PruneByView prunes any pending cluster blocks with views less or equal to the given view.
-func (b *GenericPendingBlocks[T]) PruneByView(view uint64) {
-	err := b.forest.PruneUpToLevel(view - 1) // TODO: OBO here
-	_ = err                                  // TODO: deal with error here
+// PruneByView prunes all pending blocks with views less or equal to the given view.
+// Errors returns:
+//   - mempool.BelowPrunedThresholdError if input level is below the lowest retained view (finalized view)
+func (b *GenericPendingBlocks[T]) PruneByView(view uint64) error {
+	// PruneUpToLevel prunes up to be EXCLUDING the input view, so add 1 here
+	return b.forest.PruneUpToLevel(view + 1)
 }
 
+// Size returns the number of blocks in the buffer.
 func (b *GenericPendingBlocks[T]) Size() uint {
 	return uint(b.forest.GetSize())
 }
