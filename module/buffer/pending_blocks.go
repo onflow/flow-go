@@ -1,6 +1,8 @@
 package buffer
 
 import (
+	"sync"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -52,7 +54,7 @@ func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
 //
 // Safe for concurrent use.
 type GenericPendingBlocks[T module.BufferedProposal] struct {
-	// TODO concurrency
+	lock   *sync.Mutex
 	forest *forest.LevelledForest
 }
 
@@ -63,22 +65,32 @@ var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 var _ module.PendingClusterBlockBuffer = (*PendingClusterBlocks)(nil)
 
 func NewPendingBlocks(finalizedView uint64) *PendingBlocks {
-	return &PendingBlocks{forest: forest.NewLevelledForest(finalizedView)}
+	return &PendingBlocks{
+		lock:   new(sync.Mutex),
+		forest: forest.NewLevelledForest(finalizedView),
+	}
 }
 
 func NewPendingClusterBlocks(finalizedView uint64) *PendingClusterBlocks {
-	return &PendingClusterBlocks{forest: forest.NewLevelledForest(finalizedView)}
+	return &PendingClusterBlocks{
+		lock:   new(sync.Mutex),
+		forest: forest.NewLevelledForest(finalizedView),
+	}
 }
 
 // Add adds the input block to the block buffer.
 // If the block already exists, or is below the finalized view, this is a no-op.
 func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	b.forest.AddVertex(newProposalVertex(block))
 }
 
 // ByID returns the block with the given ID, if it exists.
 // Otherwise returns (nil, false)
 func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[T], bool) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	vertex, ok := b.forest.GetVertex(blockID)
 	if !ok {
 		return flow.Slashable[T]{}, false
@@ -89,6 +101,8 @@ func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[
 // ByParentID returns all direct children of the given block.
 // If no children with the given parent exist, returns (nil, false)
 func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[T], bool) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	n := b.forest.GetNumberOfChildren(parentID)
 	if n == 0 {
 		return nil, false
@@ -108,11 +122,15 @@ func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.S
 // Errors returns:
 //   - mempool.BelowPrunedThresholdError if input level is below the lowest retained view (finalized view)
 func (b *GenericPendingBlocks[T]) PruneByView(view uint64) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	// PruneUpToLevel prunes up to be EXCLUDING the input view, so add 1 here
 	return b.forest.PruneUpToLevel(view + 1)
 }
 
 // Size returns the number of blocks in the buffer.
 func (b *GenericPendingBlocks[T]) Size() uint {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return uint(b.forest.GetSize())
 }
