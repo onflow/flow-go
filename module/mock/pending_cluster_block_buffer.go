@@ -90,11 +90,6 @@ func (_m *PendingClusterBlockBuffer) ByParentID(parentID flow.Identifier) ([]flo
 	return r0, r1
 }
 
-// DropForParent provides a mock function with given fields: parentID
-func (_m *PendingClusterBlockBuffer) DropForParent(parentID flow.Identifier) {
-	_m.Called(parentID)
-}
-
 // PruneByView provides a mock function with given fields: view
 func (_m *PendingClusterBlockBuffer) PruneByView(view uint64) {
 	_m.Called(view)

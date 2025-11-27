@@ -99,12 +99,6 @@ func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.S
 	return children, true
 }
 
-// TODO: remove this
-func (b *GenericPendingBlocks[T]) DropForParent(parentID flow.Identifier) {
-	//b.forest.
-	//b.backend.dropForParent(parentID)
-}
-
 // PruneByView prunes any pending cluster blocks with views less or equal to the given view.
 func (b *GenericPendingBlocks[T]) PruneByView(view uint64) {
 	err := b.forest.PruneUpToLevel(view - 1) // TODO: OBO here

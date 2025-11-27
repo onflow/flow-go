@@ -219,7 +219,6 @@ func (cs *CommonSuite) SetupTest() {
 			return ok
 		},
 	)
-	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
 	cs.pending.On("PruneByView", mock.Anything).Return()
 
@@ -565,9 +564,6 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 		Message:  proposal0,
 	})
 	require.NoError(cs.T(), err, "should pass handling children")
-
-	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {

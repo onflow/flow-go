@@ -88,11 +88,6 @@ func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slash
 	return r0, r1
 }
 
-// DropForParent provides a mock function with given fields: parentID
-func (_m *PendingBlockBuffer) DropForParent(parentID flow.Identifier) {
-	_m.Called(parentID)
-}
-
 // PruneByView provides a mock function with given fields: view
 func (_m *PendingBlockBuffer) PruneByView(view uint64) {
 	_m.Called(view)

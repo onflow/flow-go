@@ -24,8 +24,6 @@ type GenericPendingBlockBuffer[T BufferedProposal] interface {
 
 	ByParentID(parentID flow.Identifier) ([]flow.Slashable[T], bool)
 
-	DropForParent(parentID flow.Identifier)
-
 	// PruneByView prunes any pending blocks with views less or equal to the given view.
 	PruneByView(view uint64)
 

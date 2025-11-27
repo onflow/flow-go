@@ -288,9 +288,6 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Propo
 		}
 	}
 
-	// drop all the children that should have been processed now
-	c.pending.DropForParent(blockID)
-
 	return nil
 }
 
