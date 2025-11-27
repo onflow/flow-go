@@ -1,4 +1,4 @@
-package optimistic_sync
+package pipeline
 
 import (
 	"testing"
