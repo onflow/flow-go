@@ -46,11 +46,11 @@ type ObserverIndexerEnabledSuite struct {
 
 func (s *ObserverIndexerEnabledSuite) TestObserverIndexerEnabled() {
 	s.T().Run("Observer indexed RPCs happy path", func(t *testing.T) {
-		s.testObserverIndexedRPCsHappyPath()
+		s.testObserverIndexedRPCsHappyPath(t)
 	})
 
 	s.T().Run("All observer indexed RPCs happy path", func(t *testing.T) {
-		s.testAllObserverIndexedRPCsHappyPath()
+		s.testAllObserverIndexedRPCsHappyPath(t)
 	})
 }
 
@@ -154,13 +154,11 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 // testObserverIndexedRPCsHappyPath tests RPCs that are handled by the observer by using a dedicated indexer for the events.
 // To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
 // returns success for valid requests and errors for invalid ones.
-func (s *ObserverIndexerEnabledSuite) testObserverIndexedRPCsHappyPath() {
-	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky")
+func (s *ObserverIndexerEnabledSuite) testObserverIndexedRPCsHappyPath(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	t := s.T()
 
 	// prepare environment to create a new account
 	serviceAccountClient, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
@@ -298,11 +296,9 @@ func (s *ObserverIndexerEnabledSuite) testObserverIndexedRPCsHappyPath() {
 // -GetTransaction
 // -GetTransactionResult
 // -GetTransactionResultByIndex
-func (s *ObserverIndexerEnabledSuite) testAllObserverIndexedRPCsHappyPath() {
+func (s *ObserverIndexerEnabledSuite) testAllObserverIndexedRPCsHappyPath(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	t := s.T()
 
 	// prepare environment to create a new account
 	serviceAccountClient, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()

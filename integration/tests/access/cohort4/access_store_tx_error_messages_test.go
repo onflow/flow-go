@@ -120,12 +120,12 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 //
 // NOTE: This test is intentionally separate from TestBackfillTxErrorMessages and should
 // NOT be combined into a single test method. The reason is:
-//   1. Database Access Requirement: fetchTxErrorMessages() needs exclusive database access,
-//      which requires stopping containers (otherwise: "lock held by current process" error)
-//   2. Network State Loss: Stopping and restarting containers causes loss of blockchain state
-//      (blocks, transactions, receipts), making it impossible for subsequent tests to continue
-//   3. Complexity: Restarting containers would require re-establishing ghost client tracking,
-//      waiting for network readiness, and rebuilding in-memory state
+//  1. Database Access Requirement: fetchTxErrorMessages() needs exclusive database access,
+//     which requires stopping containers (otherwise: "lock held by current process" error)
+//  2. Network State Loss: Stopping and restarting containers causes loss of blockchain state
+//     (blocks, transactions, receipts), making it impossible for subsequent tests to continue
+//  3. Complexity: Restarting containers would require re-establishing ghost client tracking,
+//     waiting for network readiness, and rebuilding in-memory state
 //
 // Each test gets its own fresh network via SetupTest/TearDownTest, ensuring clean state
 // and avoiding the complexity of container restart/state recovery.

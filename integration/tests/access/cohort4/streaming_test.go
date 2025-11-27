@@ -229,15 +229,15 @@ func (s *StreamingSuite) testGrpcEventStreaming() {
 
 			testANRecv := rpc.call(s.ctx, sdkClientTestAN, startValue, &executiondata.EventFilter{})
 			testANEvents, testANErrs, err := SubscribeHandler(s.ctx, testANRecv, eventsResponseHandler)
-			s.Require().NoError(err)
+			require.NoError(t, err)
 
 			controlANRecv := rpc.call(s.ctx, sdkClientControlAN, startValue, &executiondata.EventFilter{})
 			controlANEvents, controlANErrs, err := SubscribeHandler(s.ctx, controlANRecv, eventsResponseHandler)
-			s.Require().NoError(err)
+			require.NoError(t, err)
 
 			testONRecv := rpc.call(s.ctx, sdkClientTestON, startValue, &executiondata.EventFilter{})
 			testONEvents, testONErrs, err := SubscribeHandler(s.ctx, testONRecv, eventsResponseHandler)
-			s.Require().NoError(err)
+			require.NoError(t, err)
 
 			if rpc.generateEvents {
 				// generate events
@@ -268,30 +268,30 @@ func (s *StreamingSuite) testGrpcEventStreaming() {
 			for {
 				select {
 				case err := <-testANErrs:
-					s.Require().NoErrorf(err, "unexpected test AN error")
+					require.NoErrorf(t, err, "unexpected test AN error")
 				case err := <-controlANErrs:
-					s.Require().NoErrorf(err, "unexpected control AN error")
+					require.NoErrorf(t, err, "unexpected control AN error")
 				case err := <-testONErrs:
-					s.Require().NoErrorf(err, "unexpected test ON error")
+					require.NoErrorf(t, err, "unexpected test ON error")
 				case event := <-testANEvents:
 					if has(event.Events, targetEvent) {
-						s.T().Logf("adding access test events: %d %d %v", event.Height, len(event.Events), event.Events)
-						r.Add(s.T(), event.Height, "access_test", event)
+						t.Logf("adding access test events: %d %d %v", event.Height, len(event.Events), event.Events)
+						r.Add(t, event.Height, "access_test", event)
 						foundANTxTestCount++
 					}
 				case event := <-controlANEvents:
 					if has(event.Events, targetEvent) {
 						if ok := messageIndex.Set(event.MessageIndex); !ok {
-							s.Require().NoErrorf(err, "messageIndex isn`t sequential")
+							require.NoErrorf(t, err, "messageIndex isn`t sequential")
 						}
-						s.T().Logf("adding control events: %d %d %v", event.Height, len(event.Events), event.Events)
-						r.Add(s.T(), event.Height, "access_control", event)
+						t.Logf("adding control events: %d %d %v", event.Height, len(event.Events), event.Events)
+						r.Add(t, event.Height, "access_control", event)
 						foundANTxControlCount++
 					}
 				case event := <-testONEvents:
 					if has(event.Events, targetEvent) {
-						s.T().Logf("adding observer test events: %d %d %v", event.Height, len(event.Events), event.Events)
-						r.Add(s.T(), event.Height, "observer_test", event)
+						t.Logf("adding observer test events: %d %d %v", event.Height, len(event.Events), event.Events)
+						r.Add(t, event.Height, "observer_test", event)
 						foundONTxCount++
 					}
 				}
@@ -335,11 +335,11 @@ func (s *StreamingSuite) testGrpcBlockStreaming() {
 
 			accessRecv := rpc.call(s.ctx, accessClient, startValue)
 			accessBlocks, accessBlockErrs, err := SubscribeHandler(s.ctx, accessRecv, blockResponseHandler)
-			s.Require().NoError(err)
+			require.NoError(t, err)
 
 			observerRecv := rpc.call(s.ctx, observerClient, startValue)
 			observerBlocks, observerBlockErrs, err := SubscribeHandler(s.ctx, observerRecv, blockResponseHandler)
-			s.Require().NoError(err)
+			require.NoError(t, err)
 
 			foundANTxCount := 0
 			foundONTxCount := 0
@@ -349,16 +349,16 @@ func (s *StreamingSuite) testGrpcBlockStreaming() {
 			for {
 				select {
 				case err := <-accessBlockErrs:
-					s.Require().NoErrorf(err, "unexpected AN error")
+					require.NoErrorf(t, err, "unexpected AN error")
 				case err := <-observerBlockErrs:
-					s.Require().NoErrorf(err, "unexpected ON error")
+					require.NoErrorf(t, err, "unexpected ON error")
 				case block := <-accessBlocks:
-					s.T().Logf("AN block received: height: %d", block.Height)
-					r.Add(s.T(), block.Height, "access", block)
+					t.Logf("AN block received: height: %d", block.Height)
+					r.Add(t, block.Height, "access", block)
 					foundANTxCount++
 				case block := <-observerBlocks:
-					s.T().Logf("ON block received: height: %d", block.Height)
-					s.addObserverBlock(block, r, rpc.name, &foundONTxCount)
+					t.Logf("ON block received: height: %d", block.Height)
+					s.addObserverBlock(t, block, r, rpc.name, &foundONTxCount)
 				}
 
 				if foundANTxCount >= txCount && foundONTxCount >= txCount {
@@ -398,8 +398,8 @@ func (s *StreamingSuite) testRestEventStreaming() {
 				err := client.ReadJSON(resp)
 				if err != nil {
 					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-						s.T().Logf("unexpected close error: %v", err)
-						require.NoError(s.T(), err)
+						t.Logf("unexpected close error: %v", err)
+						require.NoError(t, err)
 					}
 					close(eventChan) // Close the event channel when the client connection is closed
 					return
@@ -422,11 +422,13 @@ func (s *StreamingSuite) testRestEventStreaming() {
 // and increments the transaction count for that node.
 //
 // Parameters:
+//   - t: The testing context from the subtest.
 //   - block: The block received from the node.
 //   - responseTracker: The response tracker to which the block should be added.
 //   - rpcCallName: The name of the rpc subscription call which is testing.
 //   - txCount: A pointer to an integer that tracks the number of transactions received from the node.
 func (s *StreamingSuite) addObserverBlock(
+	t *testing.T,
 	block *flow.Block,
 	responseTracker *ResponseTracker[*flow.Block],
 	rpcCallName string,
@@ -441,7 +443,7 @@ func (s *StreamingSuite) addObserverBlock(
 		return
 	}
 
-	responseTracker.Add(s.T(), block.Height, "observer", block)
+	responseTracker.Add(t, block.Height, "observer", block)
 	*txCount++
 }
 
