@@ -200,7 +200,7 @@ func (cs *CommonSuite) SetupTest() {
 
 	// set up pending module mock
 	cs.pending = &module.PendingBlockBuffer{}
-	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
+	cs.pending.On("Add", mock.Anything, mock.Anything)
 	cs.pending.On("ByID", mock.Anything).Return(
 		func(blockID flow.Identifier) flow.Slashable[*flow.Proposal] {
 			return cs.pendingDB[blockID]

@@ -18,7 +18,7 @@ type BufferedProposal interface {
 // TODO paste doc from impl
 // Safe for concurrent use.
 type GenericPendingBlockBuffer[T BufferedProposal] interface {
-	Add(block flow.Slashable[T]) bool
+	Add(block flow.Slashable[T])
 
 	ByID(blockID flow.Identifier) (flow.Slashable[T], bool)
 

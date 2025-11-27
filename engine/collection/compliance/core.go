@@ -193,7 +193,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 	_, found := c.pending.ByID(block.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(proposal)
+		c.pending.Add(proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		return nil
@@ -207,7 +207,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		_ = c.pending.Add(proposal)
+		c.pending.Add(proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		c.sync.RequestBlock(block.ParentID, block.Height-1)

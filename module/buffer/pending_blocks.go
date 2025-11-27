@@ -71,10 +71,8 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return &PendingClusterBlocks{forest: forest.NewLevelledForest(1_000_000)}
 }
 
-// TODO remove bool return here
-func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) bool {
+func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) {
 	b.forest.AddVertex(newProposalVertex(block))
-	return true
 }
 
 func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[T], bool) {

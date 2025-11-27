@@ -124,7 +124,7 @@ func (cs *CommonSuite) SetupTest() {
 
 	// set up pending module mock
 	cs.pending = &module.PendingClusterBlockBuffer{}
-	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
+	cs.pending.On("Add", mock.Anything, mock.Anything)
 	cs.pending.On("ByID", mock.Anything).Return(
 		func(blockID flow.Identifier) flow.Slashable[*cluster.Proposal] {
 			return cs.pendingDB[blockID]
