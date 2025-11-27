@@ -561,7 +561,7 @@ func TestGetRegisterValues(t *testing.T) {
 			ExecutorIDs:       unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution)).NodeIDs(),
 		}
 
-		api.On("GetRegisterValues", testIds, testHeight, mock.Anything).Return(testValues, metadata, nil).Once()
+		api.On("GetRegisterValues", ctx, testIds, testHeight, mock.Anything).Return(testValues, metadata, nil).Once()
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
@@ -588,7 +588,7 @@ func TestGetRegisterValues(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.NotFound, "could not get register values: %v", storage.ErrNotFound)
 
-		api.On("GetRegisterValues", invalidIDs, testHeight, mock.Anything).Return(nil, nil, expectedErr).Once()
+		api.On("GetRegisterValues", ctx, invalidIDs, testHeight, mock.Anything).Return(nil, nil, expectedErr).Once()
 
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
@@ -610,7 +610,7 @@ func TestGetRegisterValues(t *testing.T) {
 	t.Run("wrong height", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.OutOfRange, "could not get register values: %v", storage.ErrHeightNotIndexed)
-		api.On("GetRegisterValues", testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr).Once()
+		api.On("GetRegisterValues", ctx, testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr).Once()
 
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
@@ -632,7 +632,7 @@ func TestGetRegisterValues(t *testing.T) {
 	t.Run("failed to get height", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.FailedPrecondition, "could not get register values:: %v", indexer.ErrIndexNotInitialized)
-		api.On("GetRegisterValues", testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr).Once()
+		api.On("GetRegisterValues", ctx, testIds, testHeight+1, mock.Anything).Return(nil, nil, expectedErr).Once()
 		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
