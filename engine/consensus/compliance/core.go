@@ -404,6 +404,7 @@ func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) error {
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	return nil
 }
 
 // checkForAndLogOutdatedInputError checks whether error is an `engine.OutdatedInputError`.
