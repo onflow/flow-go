@@ -100,7 +100,10 @@ func NewCore(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialized finalized boundary cache: %w", err)
 	}
-	c.ProcessFinalizedBlock(final)
+	err = c.ProcessFinalizedBlock(final)
+	if err != nil {
+		return nil, fmt.Errorf("could not process finalized block: %w", err)
+	}
 
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
@@ -389,9 +392,13 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 
 // ProcessFinalizedBlock performs pruning of stale data based on finalization event
 // removes pending blocks below the finalized view
-func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) {
+// No errors are expected during normal operation.
+func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) error {
 	// remove all pending blocks at or below the finalized view
-	c.pending.PruneByView(finalized.View)
+	err := c.pending.PruneByView(finalized.View)
+	if err != nil {
+		return err
+	}
 	c.finalizedHeight.Set(finalized.Height)
 	c.finalizedView.Set(finalized.View)
 
