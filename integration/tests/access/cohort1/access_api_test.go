@@ -96,22 +96,48 @@ type AccessAPISuite struct {
 	serviceClient *testnet.Client
 }
 
-func (s *AccessAPISuite) TestAllAccessAPIs() {
+func (s *AccessAPISuite) TestAccessAPIs() {
 	// Deploy the test contract once for both AN1 and AN2 tests
 	_ = s.deployContract(lib.CounterContract, false)
 	txResult := s.deployCounter()
 	targetHeight := txResult.BlockHeight + 1
 	s.waitUntilIndexed(targetHeight)
 
-	s.testScriptExecutionAndGetAccountsAN1(targetHeight)
-	s.testScriptExecutionAndGetAccountsAN2(targetHeight)
-	s.testMVPScriptExecutionLocalStorage()
-	s.testSendAndSubscribeTransactionStatuses()
-	s.testContractUpdate()
-	s.testTransactionSignaturePlainExtensionData()
-	s.testTransactionSignatureWebAuthnExtensionData()
-	s.testExtensionDataPreservation()
-	s.testRejectedInvalidSignatureFormat()
+	s.T().Run("Script execution and get accounts on AN1", func(t *testing.T) {
+		s.testScriptExecutionAndGetAccountsAN1(targetHeight)
+	})
+
+	s.T().Run("Script execution and get accounts on AN2", func(t *testing.T) {
+		s.testScriptExecutionAndGetAccountsAN2(targetHeight)
+	})
+
+	s.T().Run("MVP script execution with local storage", func(t *testing.T) {
+		s.testMVPScriptExecutionLocalStorage()
+	})
+
+	s.T().Run("Send and subscribe transaction statuses", func(t *testing.T) {
+		s.testSendAndSubscribeTransactionStatuses()
+	})
+
+	s.T().Run("Contract update", func(t *testing.T) {
+		s.testContractUpdate()
+	})
+
+	s.T().Run("Transaction signature with plain extension data", func(t *testing.T) {
+		s.testTransactionSignaturePlainExtensionData()
+	})
+
+	s.T().Run("Transaction signature with WebAuthn extension data", func(t *testing.T) {
+		s.testTransactionSignatureWebAuthnExtensionData()
+	})
+
+	s.T().Run("Extension data preservation", func(t *testing.T) {
+		s.testExtensionDataPreservation()
+	})
+
+	s.T().Run("Rejected invalid signature format", func(t *testing.T) {
+		s.testRejectedInvalidSignatureFormat()
+	})
 }
 
 func (s *AccessAPISuite) TearDownTest() {

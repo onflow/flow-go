@@ -156,9 +156,9 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 }
 
-// TestBadgerDBHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
+// TestPebbleDBHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
 // successfully sync the data to badger DB
-func (s *ExecutionStateSyncSuite) TestBadgerDBHappyPath() {
+func (s *ExecutionStateSyncSuite) TestPebbleDBHappyPath() {
 	s.executionStateSyncTest()
 }
 
