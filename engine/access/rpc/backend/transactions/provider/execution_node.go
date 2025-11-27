@@ -153,7 +153,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		ByHeight(block.Height).
 		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return nil, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	return append(transactions, systemCollection.Transactions...), nil
@@ -747,7 +747,7 @@ func (e *ENTransactionProvider) getTransactionIDByIndex(ctx context.Context, blo
 		ByHeight(block.Height).
 		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
-		return flow.ZeroID, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return flow.ZeroID, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	for _, tx := range systemCollection.Transactions {
