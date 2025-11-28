@@ -116,7 +116,13 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 		startBlockID = blockID
 	}
 
-	sub := h.api.SubscribeExecutionData(stream.Context(), startBlockID, request.GetStartBlockHeight())
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeExecutionData(
+		stream.Context(),
+		startBlockID,
+		request.GetStartBlockHeight(),
+		criteria,
+	)
 
 	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
@@ -143,7 +149,8 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockID(request *executiondata.
 		return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
 	}
 
-	sub := h.api.SubscribeExecutionDataFromStartBlockID(stream.Context(), startBlockID)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeExecutionDataFromStartBlockID(stream.Context(), startBlockID, criteria)
 
 	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
@@ -164,7 +171,12 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockHeight(request *executiond
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	sub := h.api.SubscribeExecutionDataFromStartBlockHeight(stream.Context(), request.GetStartBlockHeight())
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeExecutionDataFromStartBlockHeight(
+		stream.Context(),
+		request.GetStartBlockHeight(),
+		criteria,
+	)
 
 	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
@@ -185,7 +197,8 @@ func (h *Handler) SubscribeExecutionDataFromLatest(request *executiondata.Subscr
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	sub := h.api.SubscribeExecutionDataFromLatest(stream.Context())
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeExecutionDataFromLatest(stream.Context(), criteria)
 
 	return HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
