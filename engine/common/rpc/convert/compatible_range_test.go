@@ -38,4 +38,21 @@ func TestConvertCompatibleRange(t *testing.T) {
 		msg := convert.CompatibleRangeToMessage(comparableRange)
 		assert.Equal(t, msg, expected)
 	})
+
+	t.Run("roundtrip conversion", func(t *testing.T) {
+		t.Parallel()
+
+		startHeight := uint64(rand.Uint32())
+		endHeight := uint64(rand.Uint32())
+
+		original := &accessmodel.CompatibleRange{
+			StartHeight: startHeight,
+			EndHeight:   endHeight,
+		}
+
+		msg := convert.CompatibleRangeToMessage(original)
+		converted := convert.MessageToCompatibleRange(msg)
+
+		assert.Equal(t, original, converted)
+	})
 }

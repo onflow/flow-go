@@ -280,21 +280,9 @@ func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
 func CcfEventsToJsonEvents(events []flow.Event) ([]flow.Event, error) {
 	convertedEvents := make([]flow.Event, len(events))
 	for i, e := range events {
-		payload, err := CcfPayloadToJsonPayload(e.Payload)
+		convertedEvent, err := CcfEventToJsonEvent(e)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert event payload for event %d: %w", i, err)
-		}
-		convertedEvent, err := flow.NewEvent(
-			flow.UntrustedEvent{
-				Type:             e.Type,
-				TransactionID:    e.TransactionID,
-				TransactionIndex: e.TransactionIndex,
-				EventIndex:       e.EventIndex,
-				Payload:          payload,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not construct event: %w", err)
+			return nil, err
 		}
 		convertedEvents[i] = *convertedEvent
 	}
