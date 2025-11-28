@@ -188,13 +188,15 @@ func (s *StreamingSuite) Ghost() *client.GhostClient {
 
 // TestStreamingAPIs runs all streaming API tests with a shared network setup to minimize initialization time.
 func (s *StreamingSuite) TestStreamingAPIs() {
-	s.testGrpcEventStreaming()
 	s.testGrpcBlockStreaming()
 	s.testRestEventStreaming()
+	s.testGrpcEventStreaming()
 }
 
 // testGrpcEventStreaming tests gRPC event streaming APIs (ExecutionDataAPI).
 func (s *StreamingSuite) testGrpcEventStreaming() {
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY,
+		"flaky tests: https://github.com/onflow/flow-go/issues/5825 - this task is fixed, but the problem still exists here")
 	testAN := s.net.ContainerByName(testnet.PrimaryAN)
 	sdkClientTestAN := getExecutionDataClient(s.T(), testAN)
 
