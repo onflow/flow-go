@@ -621,7 +621,9 @@ func (rf *ResultsForest) extendSealedFork(childResult *ExecutionResultContainer)
 	// abandon all forks orphaned by adding the new sealed result.
 	for sibling := range rf.iterateChildren(parentID) {
 		if sibling.ResultID() != childResult.ResultID() {
-			rf.abandonFork(sibling)
+			if err := rf.abandonFork(sibling); err != nil {
+				return fmt.Errorf("failed to abandon fork: %w", err)
+			}
 		}
 	}
 
@@ -865,7 +867,9 @@ func (rf *ResultsForest) OnBlockFinalized(finalized *flow.Block) error {
 					container.ResultID(), container.BlockView(), finalized.View)
 			}
 
-			rf.abandonFork(container)
+			if err := rf.abandonFork(container); err != nil {
+				return fmt.Errorf("failed to abandon fork: %w", err)
+			}
 		}
 	}
 
