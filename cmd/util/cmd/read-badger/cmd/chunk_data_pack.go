@@ -35,8 +35,9 @@ var chunkDataPackCmd = &cobra.Command{
 
 			metrics := metrics.NewNoopCollector()
 			collections := store.NewCollections(db, store.NewTransactions(metrics, db))
+			storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, db, 1)
 			chunkDataPacks := store.NewChunkDataPacks(metrics,
-				db, collections, 1)
+				db, storedChunkDataPacks, collections, 1)
 
 			log.Info().Msgf("getting chunk data pack by chunk id: %v", chunkID)
 			chunkDataPack, err := chunkDataPacks.ByChunkID(chunkID)

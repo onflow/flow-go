@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -69,6 +70,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -154,7 +156,6 @@ type ObserverServiceConfig struct {
 	logTxTimeToSealed                    bool
 	executionDataSyncEnabled             bool
 	executionDataIndexingEnabled         bool
-	executionDataDBMode                  string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	executionDataPruningInterval         time.Duration
@@ -234,7 +235,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		logTxTimeToSealed:                    false,
 		executionDataSyncEnabled:             false,
 		executionDataIndexingEnabled:         false,
-		executionDataDBMode:                  execution_data.ExecutionDataDBModePebble.String(),
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -301,6 +301,7 @@ type ObserverServiceBuilder struct {
 	// storage
 	events                  storage.Events
 	lightTransactionResults storage.LightTransactionResults
+	scheduledTransactions   storage.ScheduledTransactions
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -519,14 +520,13 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			builder.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.
-			AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
@@ -552,12 +552,12 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
 			spamConfig,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
-		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return builder.SyncEng, nil
 	})
@@ -712,10 +712,9 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
-		flags.StringVar(&builder.executionDataDBMode,
-			"execution-data-db",
-			defaultConfig.executionDataDBMode,
-			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+
+		var builderExecutionDataDBMode string
+		flags.StringVar(&builderExecutionDataDBMode, "execution-data-db", "pebble", "[deprecated] the DB type for execution datastore.")
 
 		// Execution data pruner
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
@@ -1110,7 +1109,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
-	var executionDataDBMode execution_data.ExecutionDataDBMode
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -1129,20 +1127,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return err
 			}
 
-			executionDataDBMode, err = execution_data.ParseExecutionDataDBMode(builder.executionDataDBMode)
+			builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+				node.Logger.With().Str("pebbledb", "endata").Logger(),
+				datastoreDir, nil)
 			if err != nil {
-				return fmt.Errorf("could not parse execution data DB mode: %w", err)
-			}
-
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
-					node.Logger.With().Str("pebbledb", "endata").Logger(),
-					datastoreDir, nil)
-				if err != nil {
-					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
-				}
-			} else {
-				return fmt.Errorf("datastore with badger has been deprecated, please use pebble instead")
+				return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 			}
 			ds = builder.ExecutionDatastoreManager.Datastore()
 
@@ -1308,13 +1297,12 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Headers,
 				builder.executionDataConfig,
 				execDataDistributor,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
 			}
 			builder.ExecutionDataRequester = r
-
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
 			// to wait for the requester to be ready before starting.
@@ -1361,6 +1349,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
 			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
+			return nil
+		}).Module("scheduled transactions storage", func(node *cmd.NodeConfig) error {
+			builder.scheduledTransactions = store.NewScheduledTransactions(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			return nil
 		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Note: using a DependableComponent here to ensure that the indexer does not block
@@ -1447,8 +1438,33 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, fmt.Errorf("could not create derived chain data: %w", err)
 			}
 
+			rootBlockHeight := node.State.Params().FinalizedRoot().Height
+			progress, err := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not create last full block height consumer progress: %w", err)
+			}
+
+			lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
+			if err != nil {
+				return nil, fmt.Errorf("could not create last full block height counter: %w", err)
+			}
+
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
-			indexerCore, err := indexer.New(
+			collectionIndexer, err := collections.NewIndexer(
+				builder.Logger,
+				builder.ProtocolDB,
+				collectionExecutedMetric,
+				builder.State,
+				builder.Storage.Blocks,
+				builder.Storage.Collections,
+				lastFullBlockHeight,
+				builder.StorageLockMgr,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create collection indexer: %w", err)
+			}
+
+			builder.ExecutionIndexerCore = indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
 				builder.ProtocolDB,
@@ -1458,22 +1474,20 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
 				builder.lightTransactionResults,
-				builder.RootChainID.Chain(),
+				builder.scheduledTransactions,
+				builder.RootChainID,
 				indexerDerivedChainData,
+				collectionIndexer,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
 			)
-			if err != nil {
-				return nil, err
-			}
-			builder.ExecutionIndexerCore = indexerCore
 
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(
 				builder.Logger,
 				registers.FirstHeight(),
 				registers,
-				indexerCore,
+				builder.ExecutionIndexerCore,
 				executionDataStoreCache,
 				builder.ExecutionDataRequester.HighestConsecutiveHeight,
 				indexedBlockHeight,
@@ -1921,7 +1935,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// handles block-related operations.
 		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
-			builder.FinalizedRootBlock.Height,
+			builder.SealedRootBlock.Height,
 			node.Storage.Headers,
 			broadcaster,
 		)
@@ -1975,25 +1989,26 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 
 		backendParams := backend.Params{
-			State:                node.State,
-			Blocks:               node.Storage.Blocks,
-			Headers:              node.Storage.Headers,
-			Collections:          node.Storage.Collections,
-			Transactions:         node.Storage.Transactions,
-			ExecutionReceipts:    node.Storage.Receipts,
-			ExecutionResults:     node.Storage.Results,
-			ChainID:              node.RootChainID,
-			AccessMetrics:        accessMetrics,
-			ConnFactory:          connFactory,
-			RetryEnabled:         false,
-			MaxHeightRange:       backendConfig.MaxHeightRange,
-			Log:                  node.Logger,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			BlockTracker:         blockTracker,
-			ScriptExecutionMode:  scriptExecMode,
-			EventQueryMode:       eventQueryMode,
-			TxResultQueryMode:    txResultQueryMode,
+			State:                 node.State,
+			Blocks:                node.Storage.Blocks,
+			Headers:               node.Storage.Headers,
+			Collections:           node.Storage.Collections,
+			Transactions:          node.Storage.Transactions,
+			ExecutionReceipts:     node.Storage.Receipts,
+			ExecutionResults:      node.Storage.Results,
+			Seals:                 node.Storage.Seals,
+			ScheduledTransactions: builder.scheduledTransactions,
+			ChainID:               node.RootChainID,
+			AccessMetrics:         accessMetrics,
+			ConnFactory:           connFactory,
+			MaxHeightRange:        backendConfig.MaxHeightRange,
+			Log:                   node.Logger,
+			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+			Communicator:          node_communicator.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			BlockTracker:          blockTracker,
+			ScriptExecutionMode:   scriptExecMode,
+			EventQueryMode:        eventQueryMode,
+			TxResultQueryMode:     txResultQueryMode,
 			SubscriptionHandler: subscription.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,
@@ -2047,6 +2062,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
 			indexReporter,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, err
@@ -2074,7 +2090,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
 	})
 

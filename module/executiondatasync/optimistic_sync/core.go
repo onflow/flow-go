@@ -2,44 +2,65 @@ package optimistic_sync
 
 import (
 	"context"
-
-	"github.com/onflow/flow-go/model/flow"
+	"fmt"
 )
 
-// CoreFactory is a factory for creating new Core instances.
-type CoreFactory interface {
-	NewCore(result *flow.ExecutionResult) Core
-}
+// ErrResultAbandoned is returned when calling one of the methods after the result has been abandoned.
+// Not exported because this is not an expected error condition.
+var ErrResultAbandoned = fmt.Errorf("result abandoned")
 
-// Core implements the core logic for execution data processing. It exposes methods for each of the
-// processing steps, which must be called sequentially in the order: Download, Index, Persist.
-// Abandon may be called at any time to abort processing and cleanup working data.
-// The Core instance cannot be used after Abandon is called, and will return [pipeline.ErrAbandoned].
+// <component_spec>
+// Core defines the interface for pipelined execution result processing. There are 3 main steps which
+// must be completed sequentially and exactly once.
+// 1. Download the BlockExecutionData and TransactionResultErrorMessages for the execution result.
+// 2. Index the downloaded data into mempools.
+// 3. Persist the indexed data to into persisted storage.
+//
+// If the protocol abandons the execution result, Abandon() is called to signal to the Core instance
+// that processing will stop and any data accumulated may be discarded. Abandon() may be called at
+// any time, but may block until in-progress operations are complete.
+// </component_spec>
+//
+// All exported methods are safe for concurrent use.
 type Core interface {
-	// Download retrieves execution data and transaction results error for the block.
+	// Download retrieves all necessary data for processing from the network.
+	// Download will block until the data is successfully downloaded, and has not internal timeout.
+	// When Aboandon is called, the caller must cancel the context passed in to shutdown the operation
+	// otherwise it may block indefinitely.
 	//
-	// Expected error returns during normal operations:
-	// - context.Canceled: if the provided context was canceled before completion
-	// - [ErrAbandoned]: if the core is already abandoned
+	// The method may only be called once. Calling it multiple times will return an error.
+	// Calling Download after Abandon is called will return an error.
+	//
+	// Expected error returns during normal operation:
+	//   - [context.Canceled]: if the provided context was canceled before completion
+	//   - [ErrResultAbandoned]: if the core is already abandoned
 	Download(ctx context.Context) error
 
-	// Index processes the downloaded execution data and transaction results error messages and
-	// indexes them into in-memory storage.
+	// Index processes the downloaded data and stores it into in-memory indexes.
+	// Must be called after Download.
 	//
-	// Expected error returns during normal operations:
-	// - ErrAbandoned: if the core is already abandoned
+	// The method may only be called once. Calling it multiple times will return an error.
+	// Calling Index after Abandon is called will return an error.
+	//
+	// Expected error returns during normal operation:
+	//   - [ErrResultAbandoned]: if the core is already abandoned
 	Index() error
 
-	// Persist stores the indexed data into permanent storage.
+	// Persist stores the indexed data in permanent storage.
+	// Must be called after Index.
 	//
-	// Expected error returns during normal operations:
-	// - ErrAbandoned: if the core is already abandoned
+	// The method may only be called once. Calling it multiple times will return an error.
+	// Calling Persist after Abandon is called will return an error.
+	//
+	// Expected error returns during normal operation:
+	//   - [ErrResultAbandoned]: if the core is already abandoned
 	Persist() error
 
 	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 	// and any data dropped.
+	// This method will block until other in-progress operations are complete. If Download is in progress,
+	// the caller should cancel its context to ensure the operation completes in a timely manner.
 	//
-	// Expected error returns during normal operations:
-	// - ErrAbandoned: if the core is already abandoned
-	Abandon() error
+	// The method is idempotent. Calling it multiple times has no effect.
+	Abandon()
 }

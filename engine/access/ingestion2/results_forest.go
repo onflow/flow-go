@@ -1045,7 +1045,8 @@ func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bo
 // abandonFork recursively abandons a container and all its descendants.
 // NOT CONCURRENCY SAFE!
 func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
-	container.Abandon()
+	// TODO: handle this error
+	_ = container.Abandon()
 	for child := range rf.iterateChildren(container.ResultID()) {
 		rf.abandonFork(child)
 	}

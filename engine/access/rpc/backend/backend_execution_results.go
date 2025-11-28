@@ -10,10 +10,18 @@ import (
 
 type backendExecutionResults struct {
 	executionResults storage.ExecutionResults
+	seals            storage.Seals
 }
 
 func (b *backendExecutionResults) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	result, err := b.executionResults.ByBlockID(blockID)
+	// Query seal by blockID
+	seal, err := b.seals.FinalizedSealForBlock(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	// Query result by seal.ResultID
+	result, err := b.executionResults.ByID(seal.ResultID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}

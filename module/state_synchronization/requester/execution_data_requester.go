@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -44,7 +45,7 @@ import (
 //
 // The requester is made up of 3 subcomponents:
 //
-// * OnBlockFinalized:     receives block finalized events from the finalization distributor and
+// * OnBlockFinalized:     receives block finalized events from the finalization registrar and
 //                         forwards them to the blockConsumer.
 //
 // * blockConsumer:        is a jobqueue that receives block finalization events. On each event,
@@ -151,6 +152,7 @@ func New(
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
 	distributor *ExecutionDataDistributor,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
@@ -240,16 +242,21 @@ func New(
 		return nil, fmt.Errorf("failed to create notification consumer: %w", err)
 	}
 
+	e.metrics.ExecutionDataFetchFinished(0, true, e.blockConsumer.LastProcessedIndex())
+
 	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.runBlockConsumer).
 		AddWorker(e.runNotificationConsumer).
 		Build()
 
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
+
 	return e, nil
 }
 
-// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
-func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
+// onBlockFinalized accepts block finalization notifications from the FollowerDistributor
+func (e *executionDataRequester) onBlockFinalized(*model.Block) {
 	e.finalizationNotifier.Notify()
 }
 
@@ -382,7 +389,9 @@ func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.Sig
 
 	execData, err := e.execDataCache.ByBlockID(ctx, blockID)
 
-	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
+	// use the last processed index to ensure the metrics reflect the highest _consecutive_ height.
+	// this makes it easier to see when downloading gets stuck at a height.
+	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, e.blockConsumer.LastProcessedIndex())
 
 	if isInvalidBlobError(err) {
 		// This means an execution result was sealed with an invalid execution data id (invalid data).
@@ -406,7 +415,7 @@ func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.Sig
 		parentCtx.Throw(err)
 	}
 
-	logger.Info().
+	logger.Debug().
 		Hex("execution_data_id", logging.ID(execData.ExecutionDataID)).
 		Msg("execution data fetched")
 
