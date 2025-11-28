@@ -108,7 +108,7 @@ func demo() {
 		}
 
 		// creates consensus cache for follower engine, and registers size method of backend for metrics
-		pendingBlocks := buffer.NewPendingBlocks()
+		pendingBlocks := buffer.NewPendingBlocks(0)
 		err = mc.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
 		if err != nil {
 			panic(err)

@@ -220,7 +220,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByView", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return(nil)
 
 	// set up hotstuff module mock
 	cs.hotstuff = module.NewHotStuff(cs.T())

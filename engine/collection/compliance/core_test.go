@@ -144,7 +144,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByView", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return(nil)
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
