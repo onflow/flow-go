@@ -38,6 +38,7 @@ var NoHeight = uint64(0)
 // IMPORTANT: only add versions to this list if you are certain that the cadence and fvm changes
 // deployed during the HCU are backwards compatible for scripts.
 var defaultCompatibilityOverrides = map[string]struct{}{
+	"0.37.11": {}, // mainnet, testnet
 	"0.37.17": {}, // mainnet, testnet
 	"0.37.18": {}, // testnet only
 	"0.37.20": {}, // mainnet, testnet
@@ -51,6 +52,7 @@ var defaultCompatibilityOverrides = map[string]struct{}{
 	"0.41.4":  {}, // mainnet, testnet
 	"0.42.0":  {}, // mainnet, testnet
 	"0.42.1":  {}, // mainnet, testnet
+	"0.42.3":  {}, // mainnet, testnet
 	"0.43.1":  {}, // testnet only
 	"0.44.0":  {}, // mainnet, testnet
 }
@@ -213,9 +215,16 @@ func (v *VersionControl) initBoundaries(
 			}
 
 			if ver.Compare(*v.nodeVersion) <= 0 {
-				v.startHeight.Store(boundary.BlockHeight)
+				start := boundary.BlockHeight
+
+				// enforce sealedRootBlockHeight as the lowest when version boundary height is lower than sealedRootBlockHeight
+				if start < sealedRootBlockHeight {
+					start = sealedRootBlockHeight
+				}
+
+				v.startHeight.Store(start)
 				v.log.Info().
-					Uint64("startHeight", boundary.BlockHeight).
+					Uint64("startHeight", start).
 					Msg("Found start block height")
 				// This is the lowest compatible height for this node version, stop search immediately
 				return nil
