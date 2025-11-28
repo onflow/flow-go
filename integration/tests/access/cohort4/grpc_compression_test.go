@@ -38,6 +38,18 @@ func (s *AccessGRPCSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
+// SetupTest initializes the test suite with a minimal network configuration for testing GRPC compression.
+//
+// Network Configuration:
+//   - 1 Access node (with GRPC compression enabled --grpc-compressor=gzip)
+//   - 1 Collection node (with 100ms proposal duration)
+//   - 3 Consensus nodes (ghosts - lightweight, unused)
+//   - 1 Execution node (standard configuration)
+//   - 1 Verification node (ghost - lightweight, unused)
+//
+// This is the most minimal setup in cohort4, using ghost nodes for consensus and verification to reduce
+// overhead. The access node is configured with gzip compression to test that compressed GRPC responses
+// are properly handled by clients.
 func (s *AccessGRPCSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
