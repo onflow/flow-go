@@ -754,19 +754,20 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 }
 
 // IterateChildren returns an [iter.Seq] that iterates over all children of the given result ID
-// TODO: this is currently not concurrency safe because the lock is only held while constructing the
-// iterator, not during iteration. Fix this to make it concurrency safe.
-// func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
-// 	rf.mu.RLock()
-// 	defer rf.mu.RUnlock()
-// 	return rf.iterateChildren(resultID)
-// }
+func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	return rf.iterateChildren(resultID)
+}
 
 // iterateChildren returns an [iter.Seq] that iterates over all children of the given result ID
 // NOT CONCURRENCY SAFE!
 func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
+	// capture the iterator outside of the closure to ensure that the iterator is created synchronously.
+	// this allows the caller to lock the forest while creating the iterator, ensuring safe concurrent
+	// access to the forest without holding the lock during iteration.
+	siblings := rf.forest.GetChildren(resultID)
 	return func(yield func(*ExecutionResultContainer) bool) {
-		siblings := rf.forest.GetChildren(resultID)
 		for siblings.HasNext() {
 			sibling := siblings.NextVertex().(*ExecutionResultContainer)
 			if !yield(sibling) {
@@ -777,19 +778,20 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*Exe
 }
 
 // IterateView returns an [iter.Seq] that iterates over all containers whose executed block has the given view
-// TODO: this is currently not concurrency safe because the lock is only held while constructing the
-// iterator, not during iteration. Fix this to make it concurrency safe.
-// func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
-// 	rf.mu.RLock()
-// 	defer rf.mu.RUnlock()
-// 	return rf.iterateView(view)
-// }
+func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	return rf.iterateView(view)
+}
 
 // iterateView returns an [iter.Seq] that iterates over all containers whose executed block has the given view
 // NOT CONCURRENCY SAFE!
 func (rf *ResultsForest) iterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
+	// capture the iterator outside of the closure to ensure that the iterator is created synchronously.
+	// this allows the caller to lock the forest while creating the iterator, ensuring safe concurrent
+	// access to the forest without holding the lock during iteration.
+	containers := rf.forest.GetVerticesAtLevel(view)
 	return func(yield func(*ExecutionResultContainer) bool) {
-		containers := rf.forest.GetVerticesAtLevel(view)
 		for containers.HasNext() {
 			container := containers.NextVertex().(*ExecutionResultContainer)
 			if !yield(container) {
@@ -910,14 +912,10 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 		return
 	}
 
-	rf.mu.RLock()
-
 	// send state update to all children.
-	for child := range rf.iterateChildren(resultID) {
+	for child := range rf.IterateChildren(resultID) {
 		child.Pipeline().OnParentStateUpdated(newState)
 	}
-
-	rf.mu.RUnlock()
 
 	// process completed pipelines
 	if newState == optimistic_sync.StateComplete {
