@@ -73,29 +73,19 @@ func (suite *PendingBlocksSuite) TestAddDuplicate() {
 
 // TestAddBelowFinalizedView verifies that adding blocks below finalized view is a no-op.
 func (suite *PendingBlocksSuite) TestAddBelowFinalizedView() {
-	finalizedView := uint64(100)
+	finalizedView := uint64(1000)
 	buffer := NewPendingBlocks(finalizedView)
 
 	// Create a block with view below finalized
-	parent := unittest.BlockHeaderFixture()
-	parent.View = finalizedView - 10
-	block := suite.blockWithParent(parent)
-	// Note: Block views are set when creating the block, we can't modify them directly
-	// This test verifies the behavior when a block below finalized view is added
-	// The forest should reject it during Add
+	block := suite.block()
+	block.Message.Block.ParentView = finalizedView - 10
+	block.Message.Block.View = finalizedView - 5
 
 	buffer.Add(block)
 
-	// Block should not be added if its view is below finalized
-	// Note: The actual behavior depends on the forest implementation
-	// If the block was created with view >= finalizedView, it will be added
-	// We'll verify the behavior is correct
 	_, ok := buffer.ByID(block.Message.Block.ID())
-	// If view is below finalized, it should not be added
-	if block.Message.Block.View < finalizedView {
-		suite.Assert().False(ok)
-		suite.Assert().Equal(uint(0), buffer.Size())
-	}
+	suite.Assert().False(ok)
+	suite.Assert().Equal(uint(0), buffer.Size())
 }
 
 // TestByID tests retrieving blocks by ID.
@@ -136,19 +126,12 @@ func (suite *PendingBlocksSuite) TestByParentID() {
 	suite.Assert().Len(children, 2)
 
 	// Verify correct children are returned
-	childIDs := make(map[flow.Identifier]bool)
+	retrievedChildIDs := make(map[flow.Identifier]bool)
 	for _, child := range children {
-		childIDs[child.Message.Block.ID()] = true
+		retrievedChildIDs[child.Message.Block.ID()] = true
 	}
-	suite.Assert().True(childIDs[child1.Message.Block.ID()])
-	suite.Assert().True(childIDs[child2.Message.Block.ID()])
-	suite.Assert().False(childIDs[grandchild.Message.Block.ID()]) // grandchild is not direct child
-
-	// Test retrieving children of child1
-	grandchildren, ok := suite.buffer.ByParentID(child1.Message.Block.ID())
-	suite.Assert().True(ok)
-	suite.Assert().Len(grandchildren, 1)
-	suite.Assert().Equal(grandchild.Message.Block.ID(), grandchildren[0].Message.Block.ID())
+	suite.Assert().True(retrievedChildIDs[child1.Message.Block.ID()])
+	suite.Assert().True(retrievedChildIDs[child2.Message.Block.ID()])
 
 	// Test retrieving children of non-existent parent
 	nonExistentParentID := unittest.IdentifierFixture()
@@ -255,6 +238,7 @@ func (suite *PendingBlocksSuite) TestPruneByViewMultipleTimes() {
 
 	// Create children - views will be automatically set to be greater than parent
 	child1 := suite.blockWithParent(parent.Message.Block.ToHeader())
+	child1.Message.Block.View++
 	suite.buffer.Add(child1)
 
 	child2 := suite.blockWithParent(parent.Message.Block.ToHeader())
@@ -265,24 +249,13 @@ func (suite *PendingBlocksSuite) TestPruneByViewMultipleTimes() {
 	child1View := child1.Message.Block.View
 	child2View := child2.Message.Block.View
 
-	// Find minimum child view to ensure we prune between parent and children
-	minChildView := child1View
-	if child2View < minChildView {
-		minChildView = child2View
-	}
-
-	// Prune at a view between parent and children (should remove parent only)
-	// Use parentView + 1 to ensure we're above parent but below children
-	pruneView1 := parentView + 1
-	if pruneView1 >= minChildView {
-		// If children are too close to parent, use a view just below the minimum child view
-		pruneView1 = minChildView - 1
-	}
+	// Prune at the parent's view (should remove parent only)
+	pruneView1 := parentView
 	err := suite.buffer.PruneByView(pruneView1)
 	suite.Assert().NoError(err)
-	suite.Assert().False(suite.buffer.Size() == 0) // children should remain
 
 	// Verify parent is pruned but children remain
+	suite.Assert().Equal(uint(2), suite.buffer.Size())
 	_, ok := suite.buffer.ByID(parent.Message.Block.ID())
 	suite.Assert().False(ok)
 	_, ok = suite.buffer.ByID(child1.Message.Block.ID())
@@ -291,11 +264,9 @@ func (suite *PendingBlocksSuite) TestPruneByViewMultipleTimes() {
 	suite.Assert().True(ok)
 
 	// Prune at a view that removes all remaining blocks
-	maxView := child1View
-	if child2View > maxView {
-		maxView = child2View
-	}
-	err = suite.buffer.PruneByView(maxView)
+	pruneView2 := max(child1View, child2View)
+
+	err = suite.buffer.PruneByView(pruneView2)
 	suite.Assert().NoError(err)
 	suite.Assert().Equal(uint(0), suite.buffer.Size())
 }
@@ -320,11 +291,12 @@ func (suite *PendingBlocksSuite) TestSize() {
 }
 
 // TestConcurrentAccess tests that the buffer is safe for concurrent access.
+// NOTE: correctness here depends on [PendingBlockSuite.block] not returning duplicates.
 func (suite *PendingBlocksSuite) TestConcurrentAccess() {
 	const numGoroutines = 10
 	const blocksPerGoroutine = 10
 
-	var wg sync.WaitGroup
+	wg := new(sync.WaitGroup)
 	wg.Add(numGoroutines)
 
 	// Concurrently add blocks
@@ -337,79 +309,10 @@ func (suite *PendingBlocksSuite) TestConcurrentAccess() {
 			}
 		}()
 	}
-
 	wg.Wait()
 
-	// Verify all blocks were added (accounting for potential duplicates)
-	suite.Assert().GreaterOrEqual(suite.buffer.Size(), uint(numGoroutines*blocksPerGoroutine/2))
-}
-
-// TestConcurrentReadWrite tests concurrent reads and writes.
-func (suite *PendingBlocksSuite) TestConcurrentReadWrite() {
-	const numWriters = 5
-	const numReaders = 5
-	const blocksPerWriter = 10
-
-	var wg sync.WaitGroup
-
-	// Start writers
-	for i := 0; i < numWriters; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < blocksPerWriter; j++ {
-				block := suite.block()
-				suite.buffer.Add(block)
-			}
-		}()
-	}
-
-	// Start readers
-	for i := 0; i < numReaders; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < blocksPerWriter; j++ {
-				suite.buffer.Size()
-				suite.buffer.ByID(unittest.IdentifierFixture())
-			}
-		}()
-	}
-
-	wg.Wait()
-	// Test should complete without race conditions
-}
-
-// TestChildIndexing verifies that child indexing works correctly with multiple children.
-func (suite *PendingBlocksSuite) TestChildIndexing() {
-	parent := suite.block()
-	suite.buffer.Add(parent)
-
-	child1 := suite.blockWithParent(parent.Message.Block.ToHeader())
-	child2 := suite.blockWithParent(parent.Message.Block.ToHeader())
-	grandchild := suite.blockWithParent(child1.Message.Block.ToHeader())
-	unrelated := suite.block()
-
-	suite.buffer.Add(child1)
-	suite.buffer.Add(child2)
-	suite.buffer.Add(grandchild)
-	suite.buffer.Add(unrelated)
-
-	// Verify parent has correct children
-	children, ok := suite.buffer.ByParentID(parent.Message.Block.ID())
-	suite.Assert().True(ok)
-	suite.Assert().Len(children, 2)
-	suite.Assert().Contains(
-		[]flow.Identifier{children[0].Message.Block.ID(), children[1].Message.Block.ID()},
-		child1.Message.Block.ID(),
-	)
-	suite.Assert().Contains(
-		[]flow.Identifier{children[0].Message.Block.ID(), children[1].Message.Block.ID()},
-		child2.Message.Block.ID(),
-	)
-
-	// Verify unrelated block is not a child of parent
-	suite.Assert().NotEqual(unrelated.Message.Block.ParentID, parent.Message.Block.ID())
+	// Verify all blocks were added
+	suite.Assert().Equal(uint(numGoroutines*blocksPerGoroutine), suite.buffer.Size())
 }
 
 // TestEmptyBufferOperations tests operations on an empty buffer.
@@ -432,9 +335,7 @@ func (suite *PendingBlocksSuite) TestEmptyBufferOperations() {
 // TestAddAfterPrune verifies that blocks can be added after pruning.
 func (suite *PendingBlocksSuite) TestAddAfterPrune() {
 	// Add and prune a block
-	parentHeader := unittest.BlockHeaderFixture()
-	parentHeader.View = 10
-	block1 := suite.blockWithParent(parentHeader)
+	block1 := suite.block()
 	suite.buffer.Add(block1)
 
 	err := suite.buffer.PruneByView(block1.Message.Block.View)
@@ -444,10 +345,8 @@ func (suite *PendingBlocksSuite) TestAddAfterPrune() {
 	_, ok := suite.buffer.ByID(block1.Message.Block.ID())
 	suite.Assert().False(ok)
 
-	// Add a new block after pruning
-	parentHeader2 := unittest.BlockHeaderFixture()
-	parentHeader2.View = 20
-	block2 := suite.blockWithParent(parentHeader2)
+	// Add a new block after pruning with view above pruned view
+	block2 := suite.blockWithParent(block1.Message.Block.ToHeader())
 	suite.buffer.Add(block2)
 
 	// Verify new block is added
