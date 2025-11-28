@@ -53,8 +53,8 @@ func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler 
 // specific block.
 //
 // Expected errors during normal operation:
-// - codes.InvalidArgument - if invalid block ID provided.
-// - codes.Internal - if failed to get execution data the execution node or failed to convert execution data event payloads to JSON.
+// - [codes.InvalidArgument]: If invalid block ID provided.
+// - [codes.Internal]: If failed to get execution data the execution node or failed to convert execution data event payloads to JSON.
 func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *executiondata.GetExecutionDataByBlockIDRequest) (*executiondata.GetExecutionDataByBlockIDResponse, error) {
 	blockID, err := convert.BlockID(request.GetBlockId())
 	if err != nil {
@@ -447,7 +447,14 @@ func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
-func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If invalid register IDs provided.
+//   - [codes.Internal]: If failed to get register values data.
+//   - [codes.NotFound]: If result cannot be provided by storage due to the absence of data..
+//   - [codes.OutOfRange]: If data required to process the request is outside the available range.
+//   - [codes.FailedPrecondition]: If register's database isn't initialized yet.
+func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
 	// Convert data
 	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds(), h.chain)
 	if err != nil {
@@ -457,9 +464,9 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	executionState := request.GetExecutionStateQuery()
 
 	// get payload from store
-	values, executorMetadata, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight(), convert.NewCriteria(executionState))
+	values, executorMetadata, err := h.api.GetRegisterValues(ctx, registerIDs, request.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, rpc.ConvertError(err, "could not get register values", codes.Internal)
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	response := &executiondata.GetRegisterValuesResponse{
