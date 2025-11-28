@@ -166,6 +166,8 @@ func (e *Engine) processOnFinalizedBlock(block *model.Block) error {
 	if err != nil { // no expected errors
 		return fmt.Errorf("could not get finalized header: %w", err)
 	}
-	e.core.ProcessFinalizedBlock(finalHeader)
+	if err := e.core.ProcessFinalizedBlock(finalHeader); err != nil {
+		return fmt.Errorf("could not process finalized block: %w", err)
+	}
 	return nil
 }

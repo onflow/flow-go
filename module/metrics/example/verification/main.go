@@ -173,7 +173,7 @@ func demo() {
 
 			tryRandomCall(func() {
 				proposal := unittest.ProposalFixture()
-				pendingBlocks.Add(flow.Slashable[*flow.Proposal]{
+				_ = pendingBlocks.Add(flow.Slashable[*flow.Proposal]{
 					OriginID: unittest.IdentifierFixture(),
 					Message:  proposal,
 				})

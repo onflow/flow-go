@@ -172,7 +172,7 @@ func (suite *PendingBlocksSuite) TestByID() {
 // TestByParentID tests retrieving blocks by parent ID.
 func (suite *PendingBlocksSuite) TestByParentID() {
 	parent := suite.block()
-	suite.buffer.Add(parent)
+	suite.Require().NoError(suite.buffer.Add(parent))
 
 	// Create multiple children of the parent
 	child1 := suite.blockWithParent(parent.Message.Block.ToHeader())
@@ -180,10 +180,10 @@ func (suite *PendingBlocksSuite) TestByParentID() {
 	grandchild := suite.blockWithParent(child1.Message.Block.ToHeader())
 	unrelated := suite.block()
 
-	suite.buffer.Add(child1)
-	suite.buffer.Add(child2)
-	suite.buffer.Add(grandchild)
-	suite.buffer.Add(unrelated)
+	suite.Require().NoError(suite.buffer.Add(child1))
+	suite.Require().NoError(suite.buffer.Add(child2))
+	suite.Require().NoError(suite.buffer.Add(grandchild))
+	suite.Require().NoError(suite.buffer.Add(unrelated))
 
 	// Test retrieving children of parent
 	children, ok := suite.buffer.ByParentID(parent.Message.Block.ID())
@@ -207,13 +207,13 @@ func (suite *PendingBlocksSuite) TestByParentID() {
 // TestByParentIDOnlyDirectChildren verifies that ByParentID only returns direct children.
 func (suite *PendingBlocksSuite) TestByParentIDOnlyDirectChildren() {
 	parent := suite.block()
-	suite.buffer.Add(parent)
+	suite.Require().NoError(suite.buffer.Add(parent))
 
 	child := suite.blockWithParent(parent.Message.Block.ToHeader())
 	grandchild := suite.blockWithParent(child.Message.Block.ToHeader())
 
-	suite.buffer.Add(child)
-	suite.buffer.Add(grandchild)
+	suite.Require().NoError(suite.buffer.Add(child))
+	suite.Require().NoError(suite.buffer.Add(grandchild))
 
 	// Parent should only have child, not grandchild
 	children, ok := suite.buffer.ByParentID(parent.Message.Block.ID())
@@ -299,15 +299,15 @@ func (suite *PendingBlocksSuite) TestPruneByViewMultipleTimes() {
 	parentHeader := unittest.BlockHeaderFixture()
 	parentHeader.View = 10
 	parent := suite.blockWithParent(parentHeader)
-	suite.buffer.Add(parent)
+	suite.Require().NoError(suite.buffer.Add(parent))
 
 	// Create children - views will be automatically set to be greater than parent
 	child1 := suite.blockWithParent(parent.Message.Block.ToHeader())
 	child1.Message.Block.View++
-	suite.buffer.Add(child1)
+	suite.Require().NoError(suite.buffer.Add(child1))
 
 	child2 := suite.blockWithParent(parent.Message.Block.ToHeader())
-	suite.buffer.Add(child2)
+	suite.Require().NoError(suite.buffer.Add(child2))
 
 	// Get actual views
 	parentView := parent.Message.Block.View
@@ -343,15 +343,15 @@ func (suite *PendingBlocksSuite) TestSize() {
 
 	// Add blocks and verify size increases
 	block1 := suite.block()
-	suite.buffer.Add(block1)
+	suite.Require().NoError(suite.buffer.Add(block1))
 	suite.Assert().Equal(uint(1), suite.buffer.Size())
 
 	block2 := suite.block()
-	suite.buffer.Add(block2)
+	suite.Require().NoError(suite.buffer.Add(block2))
 	suite.Assert().Equal(uint(2), suite.buffer.Size())
 
 	// Adding duplicate should not increase size
-	suite.buffer.Add(block1)
+	suite.Require().NoError(suite.buffer.Add(block1))
 	suite.Assert().Equal(uint(2), suite.buffer.Size())
 }
 
@@ -401,7 +401,7 @@ func (suite *PendingBlocksSuite) TestEmptyBufferOperations() {
 func (suite *PendingBlocksSuite) TestAddAfterPrune() {
 	// Add and prune a block
 	block1 := suite.block()
-	suite.buffer.Add(block1)
+	suite.Require().NoError(suite.buffer.Add(block1))
 
 	err := suite.buffer.PruneByView(block1.Message.Block.View)
 	suite.Assert().NoError(err)
@@ -412,7 +412,7 @@ func (suite *PendingBlocksSuite) TestAddAfterPrune() {
 
 	// Add a new block after pruning with view above pruned view
 	block2 := suite.blockWithParent(block1.Message.Block.ToHeader())
-	suite.buffer.Add(block2)
+	suite.Require().NoError(suite.buffer.Add(block2))
 
 	// Verify new block is added
 	retrieved, ok := suite.buffer.ByID(block2.Message.Block.ID())
