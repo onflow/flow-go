@@ -757,6 +757,10 @@ func (rf *ResultsForest) getContainer(resultID flow.Identifier) (*ExecutionResul
 func (rf *ResultsForest) IterateChildren(resultID flow.Identifier) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
+
+	// the returned iterator is safe for concurrent access after `iterateChildren` returns because it
+	// internally contains a slice of containers which is append-only. See documentation for `VertexIterator`
+	// for more details.
 	return rf.iterateChildren(resultID)
 }
 
@@ -781,6 +785,10 @@ func (rf *ResultsForest) iterateChildren(resultID flow.Identifier) iter.Seq[*Exe
 func (rf *ResultsForest) IterateView(view uint64) iter.Seq[*ExecutionResultContainer] {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
+
+	// the returned iterator is safe for concurrent access after `iterateView` returns because it
+	// internally contains a slice of containers which is append-only. See documentation for `VertexIterator`
+	// for more details.
 	return rf.iterateView(view)
 }
 
