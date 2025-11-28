@@ -9,6 +9,8 @@ type FifoMessageStore struct {
 	*fifoqueue.FifoQueue
 }
 
+// NewFifoMessageStore creates a FifoMessageStore backed by a fifoqueue.FifoQueue.
+// No errors are expected during normal operations.
 func NewFifoMessageStore(maxCapacity int) (*FifoMessageStore, error) {
 	queue, err := fifoqueue.NewFifoQueue(maxCapacity)
 	if err != nil {
