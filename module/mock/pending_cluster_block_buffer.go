@@ -78,8 +78,21 @@ func (_m *PendingClusterBlockBuffer) ByParentID(parentID flow.Identifier) ([]flo
 }
 
 // PruneByView provides a mock function with given fields: view
-func (_m *PendingClusterBlockBuffer) PruneByView(view uint64) {
-	_m.Called(view)
+func (_m *PendingClusterBlockBuffer) PruneByView(view uint64) error {
+	ret := _m.Called(view)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PruneByView")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(view)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Size provides a mock function with no fields
