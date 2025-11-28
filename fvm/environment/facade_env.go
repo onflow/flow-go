@@ -348,7 +348,6 @@ func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location comm
 
 func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 	_ interpreter.AccountCapabilityGetValidationContext,
-	_ interpreter.LocationRange,
 	_ interpreter.AddressValue,
 	_ interpreter.PathValue,
 	wantedBorrowType *sema.ReferenceType,
@@ -357,9 +356,7 @@ func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 	_, hasEntitlements := wantedBorrowType.Authorization.(sema.EntitlementSetAccess)
 	if hasEntitlements {
 		// TODO: maybe abort
-		//return false, interpreter.GetCapabilityError{
-		//	LocationRange: locationRange,
-		//}
+		//return false, &interpreter.GetCapabilityError{}
 		return false, nil
 	}
 	return true, nil
@@ -367,7 +364,6 @@ func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 
 func (env *facadeEnvironment) ValidateAccountCapabilitiesPublish(
 	_ interpreter.AccountCapabilityPublishValidationContext,
-	_ interpreter.LocationRange,
 	_ interpreter.AddressValue,
 	_ interpreter.PathValue,
 	capabilityBorrowType *interpreter.ReferenceStaticType,

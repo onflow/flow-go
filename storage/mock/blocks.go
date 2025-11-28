@@ -16,6 +16,24 @@ type Blocks struct {
 	mock.Mock
 }
 
+// BatchIndexBlockContainingCollectionGuarantees provides a mock function with given fields: lctx, rw, blockID, guaranteeIDs
+func (_m *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
+	ret := _m.Called(lctx, rw, blockID, guaranteeIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchIndexBlockContainingCollectionGuarantees")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, []flow.Identifier) error); ok {
+		r0 = rf(lctx, rw, blockID, guaranteeIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // BatchStore provides a mock function with given fields: lctx, rw, proposal
 func (_m *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *flow.Proposal) error {
 	ret := _m.Called(lctx, rw, proposal)
@@ -152,24 +170,6 @@ func (_m *Blocks) ByView(view uint64) (*flow.Block, error) {
 	}
 
 	return r0, r1
-}
-
-// IndexBlockContainingCollectionGuarantees provides a mock function with given fields: blockID, collIDs
-func (_m *Blocks) IndexBlockContainingCollectionGuarantees(blockID flow.Identifier, collIDs []flow.Identifier) error {
-	ret := _m.Called(blockID, collIDs)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IndexBlockContainingCollectionGuarantees")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.Identifier) error); ok {
-		r0 = rf(blockID, collIDs)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // ProposalByHeight provides a mock function with given fields: height

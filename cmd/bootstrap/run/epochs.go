@@ -349,7 +349,7 @@ func ConstructClusterRootQCsFromVotes(log zerolog.Logger, clusterList flow.Clust
 		clusterBlock := clusterBlocks[i]
 		clusterVotes := votes[i]
 		signers := filterClusterSigners(clusterMembers, nodeInfos)
-		log.Info().Msgf("producing QC for cluster (index: %d, size: %d) from %d votes", i, len(clusterMembers), len(votes))
+		log.Info().Msgf("producing QC for cluster (index: %d, size: %d) from %d votes", i, len(clusterMembers), len(clusterVotes))
 
 		qc, err := GenerateClusterRootQCFromVotes(signers, clusterMembers, clusterBlock, clusterVotes)
 		if err != nil {

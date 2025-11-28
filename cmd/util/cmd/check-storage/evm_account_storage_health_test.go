@@ -112,7 +112,7 @@ func createEVMStorage(t *testing.T, ledger atree.Ledger, address common.Address)
 
 func createCadenceStorage(t *testing.T, ledger atree.Ledger, address common.Address) {
 
-	storage := runtime.NewStorage(ledger, nil, runtime.StorageConfig{})
+	storage := runtime.NewStorage(ledger, nil, nil, runtime.StorageConfig{})
 
 	inter, err := interpreter.NewInterpreter(
 		nil,

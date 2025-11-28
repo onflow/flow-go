@@ -1,0 +1,58 @@
+name: "CodeQL Analysis"
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: '0 0 * * *'
+jobs:
+  analyze-code:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      pull-requests: write
+    
+    env:
+      GOPRIVATE: "github.com/onflow, github.com/axiomzen"
+     # ORG_READER_PAT: ${{ secrets.ORG_READER_PAT }}
+     # ORG_READER_USERNAME: ${{ secrets.ORG_READER_USERNAME }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        languages: ['go']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+            go-version-file: ./go.mod
+
+     # - name: set credentials for private repos
+     #   run: rm -f ~/.gitconfig && git config --global url.https://$ORG_READER_USERNAME:$ORG_READER_PAT@github.com/.insteadOf https://github.com/ && cat ~/.gitconfig
+
+      - name: Tidy Go and mod vendor
+        run: go mod tidy && go mod vendor
+
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.languages}}
+          queries: security-extended
+
+      - name: Build
+        run: CGO_ENABLED=0 go build -mod=vendor -tags=no_cgo ./... 
+
+      - name: CodeQL Analyze 
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.languages}}"
+          # need org username and pat to access private libraries

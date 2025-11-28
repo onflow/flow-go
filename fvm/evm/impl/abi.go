@@ -104,7 +104,6 @@ type abiEncodingContext interface {
 
 func reportABIEncodingComputation(
 	context abiEncodingContext,
-	locationRange interpreter.LocationRange,
 	values *interpreter.ArrayValue,
 	evmTypeIDs evmSpecialTypeIDs,
 	reportComputation func(intensity uint64),
@@ -156,7 +155,7 @@ func reportABIEncodingComputation(
 
 				case evmTypeIDs.BytesTypeID:
 					computation := uint64(2 * abiEncodingByteSize)
-					valueMember := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
+					valueMember := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
 					bytesArray, ok := valueMember.(*interpreter.ArrayValue)
 					if !ok {
 						panic(abiEncodingError{
@@ -192,7 +191,6 @@ func reportABIEncodingComputation(
 				reportComputation(computation)
 				reportABIEncodingComputation(
 					context,
-					locationRange,
 					value,
 					evmTypeIDs,
 					reportComputation,
@@ -208,7 +206,6 @@ func reportABIEncodingComputation(
 			return true
 		},
 		false,
-		locationRange,
 	)
 }
 
@@ -224,7 +221,6 @@ func newInternalEVMTypeEncodeABIFunction(
 		stdlib.InternalEVMTypeEncodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get `values` argument
 
@@ -235,7 +231,6 @@ func newInternalEVMTypeEncodeABIFunction(
 
 			reportABIEncodingComputation(
 				context,
-				locationRange,
 				valuesArray,
 				evmSpecialTypeIDs,
 				func(intensity uint64) {
@@ -259,7 +254,6 @@ func newInternalEVMTypeEncodeABIFunction(
 				func(element interpreter.Value) (resume bool) {
 					value, ty, err := encodeABI(
 						context,
-						locationRange,
 						element,
 						element.StaticType(context),
 						evmSpecialTypeIDs,
@@ -275,7 +269,6 @@ func newInternalEVMTypeEncodeABIFunction(
 					return true
 				},
 				false,
-				locationRange,
 			)
 
 			encodedValues, err := arguments.Pack(values...)
@@ -495,7 +488,6 @@ func goType(
 
 func encodeABI(
 	context abiEncodingContext,
-	locationRange interpreter.LocationRange,
 	value interpreter.Value,
 	staticType interpreter.StaticType,
 	evmTypeIDs evmSpecialTypeIDs,
@@ -601,48 +593,32 @@ func encodeABI(
 	case *interpreter.CompositeValue:
 		switch value.TypeID() {
 		case evmTypeIDs.AddressTypeID:
-			addressBytesArrayValue := value.GetMember(context, locationRange, stdlib.EVMAddressTypeBytesFieldName)
-			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				context,
-				addressBytesArrayValue,
-				locationRange,
-			)
+			addressBytesArrayValue := value.GetMember(context, stdlib.EVMAddressTypeBytesFieldName)
+			bytes, err := interpreter.ByteArrayValueToByteSlice(context, addressBytesArrayValue)
 			if err != nil {
 				panic(err)
 			}
 			return gethCommon.Address(bytes), gethTypeAddress, nil
 
 		case evmTypeIDs.BytesTypeID:
-			bytesValue := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
-			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				context,
-				bytesValue,
-				locationRange,
-			)
+			bytesValue := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
 				panic(err)
 			}
 			return bytes, gethTypeBytes, nil
 
 		case evmTypeIDs.Bytes4TypeID:
-			bytesValue := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
-			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				context,
-				bytesValue,
-				locationRange,
-			)
+			bytesValue := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
 				panic(err)
 			}
 			return [stdlib.EVMBytes4Length]byte(bytes), gethTypeBytes4, nil
 
 		case evmTypeIDs.Bytes32TypeID:
-			bytesValue := value.GetMember(context, locationRange, stdlib.EVMBytesTypeValueFieldName)
-			bytes, err := interpreter.ByteArrayValueToByteSlice(
-				context,
-				bytesValue,
-				locationRange,
-			)
+			bytesValue := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
 				panic(err)
 			}
@@ -683,7 +659,6 @@ func encodeABI(
 
 				arrayElement, _, err := encodeABI(
 					context,
-					locationRange,
 					element,
 					element.StaticType(context),
 					evmTypeIDs,
@@ -700,7 +675,6 @@ func encodeABI(
 				return true
 			},
 			false,
-			locationRange,
 		)
 
 		return result.Interface(), arrayGethABIType, nil
@@ -721,7 +695,6 @@ func newInternalEVMTypeDecodeABIFunction(
 		stdlib.InternalEVMTypeDecodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get `types` argument
 
@@ -745,7 +718,7 @@ func newInternalEVMTypeDecodeABIFunction(
 				},
 			)
 
-			data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue, locationRange)
+			data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue)
 			if err != nil {
 				panic(err)
 			}
@@ -779,7 +752,6 @@ func newInternalEVMTypeDecodeABIFunction(
 					return true
 				},
 				false,
-				locationRange,
 			)
 
 			decodedValues, err := arguments.Unpack(data)
@@ -802,7 +774,6 @@ func newInternalEVMTypeDecodeABIFunction(
 
 					value, err := decodeABI(
 						context,
-						locationRange,
 						decodedValues[index],
 						staticType,
 						location,
@@ -820,7 +791,6 @@ func newInternalEVMTypeDecodeABIFunction(
 					return true
 				},
 				false,
-				locationRange,
 			)
 
 			arrayType := interpreter.NewVariableSizedStaticType(
@@ -833,7 +803,6 @@ func newInternalEVMTypeDecodeABIFunction(
 
 			return interpreter.NewArrayValue(
 				context,
-				locationRange,
 				arrayType,
 				common.ZeroAddress,
 				values...,
@@ -849,7 +818,6 @@ type memberAccessibleArrayCreationContext interface {
 
 func decodeABI(
 	context memberAccessibleArrayCreationContext,
-	locationRange interpreter.LocationRange,
 	value any,
 	staticType interpreter.StaticType,
 	location common.AddressLocation,
@@ -1008,7 +976,6 @@ func decodeABI(
 
 				result, err := decodeABI(
 					context,
-					locationRange,
 					element,
 					elementStaticType,
 					location,
@@ -1036,7 +1003,6 @@ func decodeABI(
 			copy(address[:], addr.Bytes())
 			return NewEVMAddress(
 				context,
-				locationRange,
 				location,
 				address,
 			), nil
@@ -1048,7 +1014,6 @@ func decodeABI(
 			}
 			return NewEVMBytes(
 				context,
-				locationRange,
 				location,
 				bytes,
 			), nil
@@ -1060,7 +1025,6 @@ func decodeABI(
 			}
 			return NewEVMBytes4(
 				context,
-				locationRange,
 				location,
 				bytes,
 			), nil
@@ -1072,7 +1036,6 @@ func decodeABI(
 			}
 			return NewEVMBytes32(
 				context,
-				locationRange,
 				location,
 				bytes,
 			), nil

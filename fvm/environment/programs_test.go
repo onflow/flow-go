@@ -147,6 +147,8 @@ func getTestContract(
 }
 
 func Test_Programs(t *testing.T) {
+	t.Parallel()
+
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 

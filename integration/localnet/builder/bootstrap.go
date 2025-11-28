@@ -558,8 +558,8 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
 		},
 		Labels: map[string]string{
-			"com.dapperlabs.role": role,
-			"com.dapperlabs.num":  num,
+			"org.flowfoundation.role": role,
+			"org.flowfoundation.num":  num,
 		},
 	}
 

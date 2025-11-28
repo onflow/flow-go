@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/jordanschalm/lockctx"
@@ -19,13 +20,36 @@ const (
 	// The reason they are combined is because insertion process reads some data updated by finalization process,
 	// in order to prevent dirty reads, we need to acquire the lock for both operations.
 	LockInsertOrFinalizeClusterBlock = "lock_insert_or_finalize_cluster_block"
-	// LockInsertOwnReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
+	// LockInsertEvent protects the insertion of events.
+	// This lock is reused by both EN storing its own receipt and AN indexing execution data
+	LockInsertEvent = "lock_insert_event"
+	// LockInsertServiceEvent protects the insertion of service events.
+	LockInsertServiceEvent = "lock_insert_service_event"
+	// LockInsertMyReceipt is intended for Execution Nodes to ensure that they never publish different receipts for the same block.
 	// Specifically, with this lock we prevent accidental overwrites of the index `executed block ID` ➜ `Receipt ID`.
-	LockInsertOwnReceipt = "lock_insert_own_receipt"
+	LockInsertMyReceipt        = "lock_insert_my_receipt"
+	LockIndexExecutionResult   = "lock_index_execution_result"
+	LockIndexStateCommitment   = "lock_index_state_commitment"
+	LockInsertAndIndexTxResult = "lock_insert_and_index_tx_result"
 	// LockInsertCollection protects the insertion of collections.
 	LockInsertCollection = "lock_insert_collection"
-	// LockBootstrapping protects data that is *exclusively* written during bootstrapping.
-	LockBootstrapping = "lock_bootstrapping"
+	// LockInsertInstanceParams protects data describing from which block on this node locally stores blockchain history.
+	// These values are *exclusively* written during bootstrapping and (currently) immutable throughout the lifetime of
+	// the node. Hence, this lock should only ever be used during bootstrapping.
+	LockInsertInstanceParams          = "lock_insert_instance_params"
+	LockIndexBlockByPayloadGuarantees = "lock_index_block_by_payload_guarantees"
+	// LockIndexChunkDataPackByChunkID protects the insertion of chunk data packs
+	LockIndexChunkDataPackByChunkID = "lock_index_chunk_data_pack_by_chunk_id"
+	// LockInsertTransactionResultErrMessage protects the insertion of transaction result error messages
+	LockInsertTransactionResultErrMessage = "lock_insert_transaction_result_message"
+	// LockInsertLightTransactionResult protects the insertion of light transaction results
+	LockInsertLightTransactionResult = "lock_insert_light_transaction_result"
+	// LockInsertExecutionForkEvidence protects the insertion of execution fork evidence
+	LockInsertExecutionForkEvidence = "lock_insert_execution_fork_evidence"
+	LockInsertSafetyData            = "lock_insert_safety_data"
+	LockInsertLivenessData          = "lock_insert_liveness_data"
+	// LockIndexScheduledTransaction protects the indexing of scheduled transactions.
+	LockIndexScheduledTransaction = "lock_index_scheduled_transaction"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -35,13 +59,83 @@ func Locks() []string {
 		LockFinalizeBlock,
 		LockIndexResultApproval,
 		LockInsertOrFinalizeClusterBlock,
-		LockInsertOwnReceipt,
+		LockInsertEvent,
+		LockInsertServiceEvent,
+		LockInsertMyReceipt,
+		LockIndexExecutionResult,
+		LockIndexStateCommitment,
+		LockInsertAndIndexTxResult,
 		LockInsertCollection,
-		LockBootstrapping,
+		LockInsertLightTransactionResult,
+		LockInsertInstanceParams,
+		LockIndexBlockByPayloadGuarantees,
+		LockIndexChunkDataPackByChunkID,
+		LockInsertTransactionResultErrMessage,
+		LockInsertLightTransactionResult,
+		LockInsertExecutionForkEvidence,
+		LockInsertSafetyData,
+		LockInsertLivenessData,
+		LockIndexScheduledTransaction,
 	}
 }
 
 type LockManager = lockctx.Manager
+
+var LockGroupAccessStateSyncIndexBlockData = []string{
+	LockInsertEvent,
+	LockInsertLightTransactionResult,
+	LockIndexScheduledTransaction,
+}
+
+var LockGroupExecutionBootstrap = []string{
+	LockIndexExecutionResult,
+	LockIndexStateCommitment,
+}
+
+var LockGroupExecutionSaveExecutionResult = []string{
+	LockIndexChunkDataPackByChunkID,
+	LockInsertEvent,
+	LockInsertServiceEvent,
+	LockInsertAndIndexTxResult,
+	LockInsertMyReceipt,
+	LockIndexExecutionResult,
+	LockIndexStateCommitment,
+}
+
+var LockGroupAccessFinalizingBlock = []string{
+	LockIndexBlockByPayloadGuarantees,
+	LockIndexExecutionResult,
+}
+
+var LockGroupAccessOptimisticSyncBlockPersist = []string{
+	LockInsertCollection,
+	LockInsertEvent,
+	LockInsertLightTransactionResult,
+	LockInsertTransactionResultErrMessage,
+}
+
+var LockGroupCollectionBootstrapClusterState = []string{
+	LockInsertOrFinalizeClusterBlock,
+	LockInsertSafetyData,
+	LockInsertLivenessData,
+}
+
+var LockGroupProtocolStateBootstrap = []string{
+	LockInsertInstanceParams,
+	LockIndexExecutionResult,
+	LockInsertBlock,
+	LockFinalizeBlock,
+	LockInsertSafetyData,
+	LockInsertLivenessData,
+}
+
+// addLocks adds a chain of locks to the builder in the order they appear in the locks slice.
+// This creates a directed acyclic graph where each lock can be acquired after the previous one.
+func addLocks(builder lockctx.DAGPolicyBuilder, locks []string) {
+	for i := 0; i < len(locks)-1; i++ {
+		builder.Add(locks[i], locks[i+1])
+	}
+}
 
 // makeLockPolicy constructs the policy used by the storage layer to prevent deadlocks.
 // We use a policy defined by a directed acyclic graph, where vertices represent named locks.
@@ -58,10 +152,17 @@ type LockManager = lockctx.Manager
 //
 // This function will panic if a policy is created which does not prevent deadlocks.
 func makeLockPolicy() lockctx.Policy {
-	return lockctx.NewDAGPolicyBuilder().
-		Add(LockInsertBlock, LockFinalizeBlock).
-		Add(LockFinalizeBlock, LockBootstrapping).
-		Build()
+	builder := lockctx.NewDAGPolicyBuilder()
+
+	addLocks(builder, LockGroupAccessFinalizingBlock)
+	addLocks(builder, LockGroupAccessStateSyncIndexBlockData)
+	addLocks(builder, LockGroupAccessOptimisticSyncBlockPersist)
+	addLocks(builder, LockGroupExecutionBootstrap)
+	addLocks(builder, LockGroupExecutionSaveExecutionResult)
+	addLocks(builder, LockGroupCollectionBootstrapClusterState)
+	addLocks(builder, LockGroupProtocolStateBootstrap)
+
+	return builder.Build()
 }
 
 var makeLockManagerOnce sync.Once
@@ -109,4 +210,44 @@ func MakeSingletonLockManager() lockctx.Manager {
 // Unlike MakeSingletonLockManager, this function may be called multiple times.
 func NewTestingLockManager() lockctx.Manager {
 	return lockctx.NewManager(Locks(), makeLockPolicy())
+}
+
+// HeldOneLock checks that exactly one of the two specified locks is held in the provided lock context.
+func HeldOneLock(lctx lockctx.Proof, lockA string, lockB string) (bool, string) {
+	heldLockA := lctx.HoldsLock(lockA)
+	heldLockB := lctx.HoldsLock(lockB)
+	if heldLockA {
+		if heldLockB {
+			return false, fmt.Sprintf("epxect to hold only one lock, but actually held both locks: %s and %s", lockA, lockB)
+		} else {
+			return true, ""
+		}
+	} else {
+		if heldLockB {
+			return true, ""
+		} else {
+			return false, fmt.Sprintf("expect to hold one of the locks: %s or %s, but actually held none", lockA, lockB)
+		}
+	}
+}
+
+// WithLock is a helper function that creates a new lock context, acquires the specified lock,
+// and executes the provided function within that context.
+// This function passes through any errors returned by fn.
+func WithLock(manager lockctx.Manager, lockID string, fn func(lctx lockctx.Context) error) error {
+	return WithLocks(manager, []string{lockID}, fn)
+}
+
+// WithLocks is a helper function that creates a new lock context, acquires the specified locks,
+// and executes the provided function within that context.
+// This function passes through any errors returned by fn.
+func WithLocks(manager lockctx.Manager, lockIDs []string, fn func(lctx lockctx.Context) error) error {
+	lctx := manager.NewContext()
+	defer lctx.Release()
+	for _, lockID := range lockIDs {
+		if err := lctx.AcquireLock(lockID); err != nil {
+			return err
+		}
+	}
+	return fn(lctx)
 }
