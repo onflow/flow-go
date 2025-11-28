@@ -547,7 +547,9 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, resultStatus
 	// missing, which connects R to the abandoned fork. Once the missing ancestor(s) is/are added, the information about the fork being orphaned
 	// is propagated along the fork by the logic below to all reachable descending results, including R.
 	if rf.isAbandonedFork(container) {
-		rf.abandonFork(container)
+		if err := rf.abandonFork(container); err != nil {
+			return false, fmt.Errorf("failed to abandon fork: %w", err)
+		}
 	}
 
 	return added > 0, nil
@@ -1044,12 +1046,18 @@ func (rf *ResultsForest) isAbandonedFork(container *ExecutionResultContainer) bo
 
 // abandonFork recursively abandons a container and all its descendants.
 // NOT CONCURRENCY SAFE!
-func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) {
-	// TODO: handle this error
-	_ = container.Abandon()
-	for child := range rf.iterateChildren(container.ResultID()) {
-		rf.abandonFork(child)
+//
+// No error returns are expected during normal operation.
+func (rf *ResultsForest) abandonFork(container *ExecutionResultContainer) error {
+	if err := container.Abandon(); err != nil {
+		return fmt.Errorf("failed to abandon container: %w", err)
 	}
+	for child := range rf.iterateChildren(container.ResultID()) {
+		if err := rf.abandonFork(child); err != nil {
+			return fmt.Errorf("failed to abandon child: %w", err)
+		}
+	}
+	return nil
 }
 
 // safeForestInsert inserts the provided candidate result into the ResultsForest if and only if the
