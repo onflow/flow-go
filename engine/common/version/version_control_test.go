@@ -188,8 +188,14 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "start and end version set, start ignored due to override",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.3",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.1": {}},
 			expectedStart: sealedRootBlockHeight,
@@ -199,8 +205,14 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "start and end version set, end ignored due to override",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.3",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.3": {}},
 			expectedStart: sealedRootBlockHeight + 12,
@@ -210,9 +222,18 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "start and end version set, middle envent ignored due to override",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
-				VersionBeaconEvent(latestBlockHeight-3, flow.VersionBoundary{BlockHeight: latestBlockHeight - 1, Version: "0.0.3"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.4"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1",
+				}),
+				VersionBeaconEvent(latestBlockHeight-3, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 1,
+					Version:     "0.0.3",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.4",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.3": {}},
 			expectedStart: sealedRootBlockHeight + 12,
@@ -222,12 +243,31 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "pre-release version matches overrides",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1-pre-release.0"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1-pre-release.0",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.3",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.1": {}},
 			expectedStart: sealedRootBlockHeight,
 			expectedEnd:   latestBlockHeight - 9,
+		},
+		{
+			name:        "version boundary height is lower than spork root height",
+			nodeVersion: "0.0.2",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight - 10,
+					Version:     "0.0.1",
+				}),
+			},
+			overrides:     map[string]struct{}{},
+			expectedStart: sealedRootBlockHeight,
+			expectedEnd:   latestBlockHeight,
 		},
 	}
 
