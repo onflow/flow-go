@@ -30,6 +30,12 @@ const (
 )
 
 type Executor interface {
+	// ExecuteScript executes the provided script at the requested block.
+	//
+	// Expected error returns during normal operation:
+	//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
+	//   - [context.Canceled]: If the context was canceled during the request.
+	//   - [fvmerrors.CodedError]: If the FVM failed to execute the script.
 	ExecuteScript(
 		ctx context.Context,
 		script []byte,
@@ -42,6 +48,10 @@ type Executor interface {
 		error,
 	)
 
+	// GetAccount returns an account by address.
+	//
+	// Expected error returns during normal operation:
+	//   - [fvmerrors.CodedError]: If the FVM failed to get a Flow account by address.
 	GetAccount(
 		ctx context.Context,
 		addr flow.Address,
@@ -52,6 +62,10 @@ type Executor interface {
 		error,
 	)
 
+	// GetAccountBalance returns the balance of a Flow account at the given block height by address.
+	//
+	// Expected error returns during normal operation:
+	//   - [fvmerrors.CodedError]: If the FVM failed to get balance of a Flow account at the given block height.
 	GetAccountBalance(
 		ctx context.Context,
 		addr flow.Address,
@@ -62,6 +76,10 @@ type Executor interface {
 		error,
 	)
 
+	// GetAccountAvailableBalance returns an account available balance by address.
+	//
+	// Expected error returns during normal operation:
+	//   - [fvmerrors.CodedError]: If the FVM failed to get available balance of a Flow account by address.
 	GetAccountAvailableBalance(
 		ctx context.Context,
 		addr flow.Address,
@@ -72,6 +90,10 @@ type Executor interface {
 		error,
 	)
 
+	// GetAccountKeys returns account public keys by the provided address.
+	//
+	// Expected error returns during normal operation:
+	//   - [fvmerrors.CodedError]: If the FVM failed to get account keys.
 	GetAccountKeys(
 		ctx context.Context,
 		addr flow.Address,
@@ -82,6 +104,10 @@ type Executor interface {
 		error,
 	)
 
+	// GetAccountKey returns account public key by the provided address and key index .
+	//
+	// Expected error returns during normal operation:
+	//   - [fvmerrors.CodedError]: If the FVM failed to get account key for the given address and key index.
 	GetAccountKey(
 		ctx context.Context,
 		addr flow.Address,
@@ -147,6 +173,12 @@ func NewQueryExecutor(
 	}
 }
 
+// ExecuteScript executes the provided script at the requested block.
+//
+// Expected error returns during normal operation:
+//   - [context.DeadlineExceeded]: If the fetching time exceeded the fetchTimeout duration.
+//   - [context.Canceled]: If the context was canceled during the request.
+//   - [fvmerrors.CodedError]: If the FVM failed to execute the script.
 func (e *QueryExecutor) ExecuteScript(
 	ctx context.Context,
 	script []byte,
@@ -260,6 +292,10 @@ func summarizeLog(log string, limit int) string {
 	return log
 }
 
+// GetAccount returns an account by address.
+//
+// Expected error returns during normal operation:
+//   - [fvmerrors.CodedError]: If the FVM failed to get a Flow account by address.
 func (e *QueryExecutor) GetAccount(
 	_ context.Context,
 	address flow.Address,
@@ -291,6 +327,10 @@ func (e *QueryExecutor) GetAccount(
 	return account, nil
 }
 
+// GetAccountBalance returns the balance of a Flow account at the given block height by address.
+//
+// Expected error returns during normal operation:
+//   - [fvmerrors.CodedError]: If the FVM failed to get balance of a Flow account at the given block height.
 func (e *QueryExecutor) GetAccountBalance(
 	_ context.Context,
 	address flow.Address,
@@ -321,6 +361,10 @@ func (e *QueryExecutor) GetAccountBalance(
 	return accountBalance, nil
 }
 
+// GetAccountAvailableBalance returns an account available balance by address.
+//
+// Expected error returns during normal operation:
+//   - [fvmerrors.CodedError]: If the FVM failed to get available balance of a Flow account by address.
 func (e *QueryExecutor) GetAccountAvailableBalance(
 	_ context.Context,
 	address flow.Address,
@@ -351,6 +395,10 @@ func (e *QueryExecutor) GetAccountAvailableBalance(
 	return accountAvailableBalance, nil
 }
 
+// GetAccountKeys returns account public keys by the provided address.
+//
+// Expected error returns during normal operation:
+//   - [fvmerrors.CodedError]: If the FVM failed to get account keys.
 func (e *QueryExecutor) GetAccountKeys(
 	_ context.Context,
 	address flow.Address,
@@ -378,6 +426,10 @@ func (e *QueryExecutor) GetAccountKeys(
 	return accountKeys, nil
 }
 
+// GetAccountKey returns account public key by the provided address and key index .
+//
+// Expected error returns during normal operation:
+//   - [fvmerrors.CodedError]: If the FVM failed to get account key for the given address and key index.
 func (e *QueryExecutor) GetAccountKey(
 	_ context.Context,
 	address flow.Address,

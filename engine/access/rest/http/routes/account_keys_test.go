@@ -13,10 +13,10 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
+	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/model/access"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -47,7 +47,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 			Once()
 
 		backend.On("GetAccountKeyAtBlockHeight", mock.Anything, account.Address, keyIndex, height, mock.Anything).
-			Return(keyByIndex, &access.ExecutorMetadata{}, nil).
+			Return(keyByIndex, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedAccountKeyResponse(account, nil)
@@ -69,7 +69,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 			Once()
 
 		backend.On("GetAccountKeyAtBlockHeight", mock.Anything, account.Address, keyIndex, height, mock.Anything).
-			Return(keyByIndex, &access.ExecutorMetadata{}, nil).
+			Return(keyByIndex, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedAccountKeyResponse(account, nil)
@@ -86,7 +86,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
 		backend.On("GetAccountKeyAtBlockHeight", mock.Anything, account.Address, keyIndex, height, mock.Anything).
-			Return(keyByIndex, &access.ExecutorMetadata{}, nil).
+			Return(keyByIndex, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedAccountKeyResponse(account, nil)
@@ -100,7 +100,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
-		metadata := &access.ExecutorMetadata{
+		metadata := &accessmodel.ExecutorMetadata{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutorIDs:       unittest.IdentifierListFixture(2),
 		}
@@ -121,10 +121,10 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 //
 // Test cases:
 //  1. A request with an invalid account address returns http.StatusBadRequest.
-//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusNotFound.
-//  3. A request where GetAccountKeyAtBlockHeight fails for a valid block height returns http.StatusNotFound.
-
-// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
+//  2. Simulated failure when fetching the latest block header for a "sealed" height
+//     to ensure that any propagated errors are correctly returned as http.StatusInternalServerError.
+//
+// 3. A request where GetAccountKeyAtBlockHeight fails for a valid block height returns http.StatusNotFound.
 func TestGetAccountByIndexErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
@@ -147,22 +147,22 @@ func TestGetAccountByIndexErrors(t *testing.T) {
 			url:  accountKeyURL(t, unittest.AddressFixture().String(), "0", router.SealedHeightQueryParam, "2", []string{}, "false"),
 			setup: func() {
 				backend.On("GetLatestBlockHeader", mock.Anything, true).
-					Return(nil, flow.BlockStatusUnknown, fmt.Errorf("backend error")).
+					Return(nil, flow.BlockStatusUnknown, access.NewInternalError(fmt.Errorf("internal server error"))).
 					Once()
 			},
-			status: http.StatusNotFound,
-			out:    fmt.Sprintf(`{"code":404, "message":"block with height: %d does not exist"}`, request.SealedHeight),
+			status: http.StatusInternalServerError,
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
 		},
 		{
 			name: "GetAccountKeyAtBlockHeight fails for valid height",
 			url:  accountKeyURL(t, unittest.AddressFixture().String(), "2", "100", "2", []string{}, "false"),
 			setup: func() {
 				backend.On("GetAccountKeyAtBlockHeight", mock.Anything, mock.Anything, uint32(2), uint64(100), mock.Anything).
-					Return(nil, nil, fmt.Errorf("database error")).
+					Return(nil, nil, access.NewDataNotFoundError("block", fmt.Errorf("not found"))).
 					Once()
 			},
 			status: http.StatusNotFound,
-			out:    `{"code":404, "message":"failed to get account key with index: 2, reason: database error"}`,
+			out:    `{"code":404,  "message":"Flow resource not found: data not found for block: not found"}`,
 		},
 	}
 
@@ -200,7 +200,7 @@ func TestGetAccountKeys(t *testing.T) {
 			Once()
 
 		backend.On("GetAccountKeysAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
-			Return(account.Keys, &access.ExecutorMetadata{}, nil).
+			Return(account.Keys, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedAccountKeysResponse(account, nil)
@@ -219,7 +219,7 @@ func TestGetAccountKeys(t *testing.T) {
 			Once()
 
 		backend.On("GetAccountKeysAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
-			Return(account.Keys, &access.ExecutorMetadata{}, nil).
+			Return(account.Keys, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedAccountKeysResponse(account, nil)
@@ -232,7 +232,7 @@ func TestGetAccountKeys(t *testing.T) {
 		req := getAccountKeysRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "false")
 
 		backend.On("GetAccountKeysAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
-			Return(account.Keys, &access.ExecutorMetadata{}, nil).
+			Return(account.Keys, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedAccountKeysResponse(account, nil)
@@ -244,7 +244,7 @@ func TestGetAccountKeys(t *testing.T) {
 		var height uint64 = 100
 		req := getAccountKeysRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "true")
 
-		metadata := &access.ExecutorMetadata{
+		metadata := &accessmodel.ExecutorMetadata{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutorIDs:       unittest.IdentifierListFixture(2),
 		}
@@ -263,10 +263,10 @@ func TestGetAccountKeys(t *testing.T) {
 //
 // Test cases:
 //  1. A request with an invalid account address returns http.StatusBadRequest.
-//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusNotFound.
-//  3. A request where GetAccountKeysAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+//  2. Simulated failure when fetching the latest block header for a "sealed" height
+//     to ensure that any propagated errors are correctly returned as http.StatusInternalServerError.
 //
-// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
+// 3. A request where GetAccountKeysAtBlockHeight fails for a valid block height returns http.StatusNotFound.
 func TestGetAccountKeysErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
@@ -289,22 +289,22 @@ func TestGetAccountKeysErrors(t *testing.T) {
 			url:  accountKeysURL(t, unittest.AddressFixture().String(), router.SealedHeightQueryParam, "2", []string{}, "false"),
 			setup: func() {
 				backend.On("GetLatestBlockHeader", mock.Anything, true).
-					Return(nil, flow.BlockStatusUnknown, fmt.Errorf("latest block header error")).
+					Return(nil, flow.BlockStatusUnknown, access.NewInternalError(fmt.Errorf("internal server error"))).
 					Once()
 			},
-			status: http.StatusNotFound,
-			out:    fmt.Sprintf(`{"code":404, "message":"block with height: %d does not exist"}`, request.SealedHeight),
+			status: http.StatusInternalServerError,
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
 		},
 		{
 			name: "GetAccountKeysAtBlockHeight fails for valid height",
 			url:  accountKeysURL(t, unittest.AddressFixture().String(), "100", "2", []string{}, "false"),
 			setup: func() {
 				backend.On("GetAccountKeysAtBlockHeight", mock.Anything, mock.Anything, uint64(100), mock.Anything).
-					Return(nil, nil, fmt.Errorf("database error")).
+					Return(nil, nil, access.NewDataNotFoundError("block", fmt.Errorf("not found"))).
 					Once()
 			},
 			status: http.StatusNotFound,
-			out:    `{"code":404, "message":"failed to get account keys, reason: database error"}`,
+			out:    `{"code":404, "message":"Flow resource not found: data not found for block: not found"}`,
 		},
 	}
 
@@ -421,7 +421,7 @@ func getAccountKeysRequest(
 	return req
 }
 
-func expectedAccountKeyResponse(account *flow.Account, metadata *access.ExecutorMetadata) string {
+func expectedAccountKeyResponse(account *flow.Account, metadata *accessmodel.ExecutorMetadata) string {
 	metadataSection := expectedMetadata(metadata)
 
 	return fmt.Sprintf(`
@@ -441,7 +441,7 @@ func expectedAccountKeyResponse(account *flow.Account, metadata *access.Executor
 
 // expectedAccountKeysResponse returns the expected JSON response string.
 // If metadata is provided, it includes metadata fields under each key.
-func expectedAccountKeysResponse(account *flow.Account, metadata *access.ExecutorMetadata) string {
+func expectedAccountKeysResponse(account *flow.Account, metadata *accessmodel.ExecutorMetadata) string {
 	metadataSection := expectedMetadata(metadata)
 
 	return fmt.Sprintf(`
