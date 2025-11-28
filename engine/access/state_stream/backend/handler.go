@@ -452,7 +452,7 @@ func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_
 //   - [codes.InvalidArgument]: If invalid register IDs provided.
 //   - [codes.Internal]: If failed to get register values data.
 //   - [codes.NotFound]: If result cannot be provided by storage due to the absence of data..
-//   - [codes.OutOfRange]: If data required to process the request is outside the available range..
+//   - [codes.OutOfRange]: If data required to process the request is outside the available range.
 //   - [codes.FailedPrecondition]: If register's database isn't initialized yet.
 func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
 	// Convert data
