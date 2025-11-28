@@ -448,7 +448,7 @@ func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
 //
-// Expected errors during normal operation:
+// Expected error returns during normal operation:
 //   - [codes.InvalidArgument]: If invalid register IDs provided.
 //   - [codes.Internal]: If failed to get register values data.
 //   - [codes.NotFound]: If result cannot be provided by storage due to the absence of data..
