@@ -28,18 +28,18 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`removed 0 internal partner nodes` +
 	`checking constraints on consensus nodes` +
 	`assembling network and staking keys` +
-	`wrote file \S+/node-infos.pub.json` +
+	`reading votes for collection node cluster root blocks` +
+	`read vote .+` +
+	`constructing root blocks for collection node clusters` +
+	`constructing root QCs for collection node clusters` +
+	`producing QC for cluster .*` +
+	`producing QC for cluster .*` +
 	`running DKG for consensus nodes` +
 	`read \d+ node infos for DKG` +
 	`will run DKG` +
 	`finished running DKG` +
 	`.+/random-beacon.priv.json` +
 	`wrote file \S+/root-dkg-data.priv.json` +
-	`computing collection node clusters` +
-	`constructing root blocks for collection node clusters` +
-	`constructing root QCs for collection node clusters` +
-	`producing QC for cluster .*` +
-	`producing QC for cluster .*` +
 	`constructing root header` +
 	`constructing intermediary bootstrapping data` +
 	`wrote file \S+/intermediary-bootstrapping-data.json` +
@@ -59,11 +59,14 @@ func setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, c
 	flagPartnerWeights = partnerWeights
 	flagInternalNodePrivInfoDir = internalPrivDir
 
+	flagIntermediaryClusteringDataPath = filepath.Join(bootDir, model.PathClusteringData)
+	flagRootClusterBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
+	flagEpochCounter = 0
+
 	flagRootParent = hex.EncodeToString(rootParent[:])
 	flagRootChain = "main"
 	flagRootHeight = 12332
 	flagRootView = 1000
-	flagEpochCounter = 0
 	flagNumViewsInEpoch = 100_000
 	flagNumViewsInStakingAuction = 50_000
 	flagNumViewsInDKGPhase = 2_000
@@ -80,6 +83,10 @@ func setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, c
 func TestRootBlock_HappyPath(t *testing.T) {
 	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 		setupHappyPathFlags(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath)
+
+		// clusterAssignment will generate the collector clusters
+		// In addition, it also generates votes from internal collector nodes
+		clusterAssignment(clusterAssignmentCmd, nil)
 
 		// KV store values (epoch extension view count and finalization safety threshold) must be explicitly set for mainnet
 		require.NoError(t, rootBlockCmd.Flags().Set("kvstore-finalization-safety-threshold", "1000"))
