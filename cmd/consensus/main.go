@@ -544,7 +544,7 @@ func main() {
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
 
-			return util.MergeReadyDone(e, receiptRequester), err
+			return e, err
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			core := ingestion.NewCore(
