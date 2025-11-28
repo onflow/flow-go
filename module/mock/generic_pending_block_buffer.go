@@ -15,8 +15,21 @@ type GenericPendingBlockBuffer[T module.BufferedProposal] struct {
 }
 
 // Add provides a mock function with given fields: block
-func (_m *GenericPendingBlockBuffer[T]) Add(block flow.Slashable[T]) {
-	_m.Called(block)
+func (_m *GenericPendingBlockBuffer[T]) Add(block flow.Slashable[T]) error {
+	ret := _m.Called(block)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Add")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Slashable[T]) error); ok {
+		r0 = rf(block)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // ByID provides a mock function with given fields: blockID

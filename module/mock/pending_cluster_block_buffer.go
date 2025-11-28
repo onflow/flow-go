@@ -15,8 +15,21 @@ type PendingClusterBlockBuffer struct {
 }
 
 // Add provides a mock function with given fields: block
-func (_m *PendingClusterBlockBuffer) Add(block flow.Slashable[*cluster.Proposal]) {
-	_m.Called(block)
+func (_m *PendingClusterBlockBuffer) Add(block flow.Slashable[*cluster.Proposal]) error {
+	ret := _m.Called(block)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Add")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Slashable[*cluster.Proposal]) error); ok {
+		r0 = rf(block)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // ByID provides a mock function with given fields: blockID

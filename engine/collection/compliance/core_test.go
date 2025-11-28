@@ -542,7 +542,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 
 	// replace the engine buffer with the real one
-	cs.core.pending = realbuffer.NewPendingClusterBlocks(cs.head.Block.View)
+	cs.core.pending = realbuffer.NewPendingClusterBlocks(cs.head.Block.View, 100_000)
 
 	// process all of the descendants
 	for _, proposal := range proposals {

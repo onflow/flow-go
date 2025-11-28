@@ -518,7 +518,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the pending blocks cache
-	cache := buffer.NewPendingBlocks(rootHeader.View)
+	cache := buffer.NewPendingBlocks(rootHeader.View, modulecompliance.DefaultConfig().SkipNewProposalsThreshold)
 
 	rootQC, err := rootSnapshot.QuorumCertificate()
 	require.NoError(t, err)

@@ -196,7 +196,15 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 	_, found := c.pending.ByID(block.ParentID)
 	if found {
 		// add the block to the cache
-		c.pending.Add(proposal)
+		if err := c.pending.Add(proposal); err != nil {
+			if mempool.IsBeyondActiveRangeError(err) {
+				// In general we expect the block buffer to use SkipNewProposalsThreshold,
+				// however since it is instantiated outside this component, we allow the thresholds to differ
+				log.Debug().Err(err).Msg("dropping block beyond block buffer active range")
+				return nil
+			}
+			return fmt.Errorf("could not add proposal to pending buffer: %w", err)
+		}
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		return nil
@@ -210,7 +218,15 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		c.pending.Add(proposal)
+		if err := c.pending.Add(proposal); err != nil {
+			if mempool.IsBeyondActiveRangeError(err) {
+				// In general we expect the block buffer to use SkipNewProposalsThreshold,
+				// however since it is instantiated outside this component, we allow the thresholds to differ
+				log.Debug().Err(err).Msg("dropping block beyond block buffer active range")
+				return nil
+			}
+			return fmt.Errorf("could not add proposal to pending buffer: %w", err)
+		}
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		c.sync.RequestBlock(block.ParentID, block.Height-1)

@@ -20,7 +20,9 @@ type BufferedProposal interface {
 type GenericPendingBlockBuffer[T BufferedProposal] interface {
 	// Add adds the input block to the block buffer.
 	// If the block already exists, or is below the finalized view, this is a no-op.
-	Add(block flow.Slashable[T])
+	// Errors returns:
+	//   - mempool.BlockViewTooFarAheadError if block.View > finalizedView + activeViewRangeSize (when activeViewRangeSize > 0)
+	Add(block flow.Slashable[T]) error
 
 	// ByID returns the block with the given ID, if it exists.
 	// Otherwise returns (nil, false)

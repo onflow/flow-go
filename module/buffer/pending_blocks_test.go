@@ -22,8 +22,9 @@ func TestPendingBlocksSuite(t *testing.T) {
 }
 
 func (suite *PendingBlocksSuite) SetupTest() {
-	// Initialize with finalized view 0
-	suite.buffer = NewPendingBlocks(0)
+	// Initialize with finalized view 0 and no view range limitation (0 = no limit)
+	// Individual tests that need the limitation will create their own buffers
+	suite.buffer = NewPendingBlocks(0, 0)
 }
 
 // block creates a new block proposal wrapped as Slashable.
@@ -41,7 +42,7 @@ func (suite *PendingBlocksSuite) blockWithParent(parent *flow.Header) flow.Slash
 // TestAdd tests adding blocks to the buffer.
 func (suite *PendingBlocksSuite) TestAdd() {
 	block := suite.block()
-	suite.buffer.Add(block)
+	suite.Require().NoError(suite.buffer.Add(block))
 
 	// Verify block can be retrieved by ID
 	retrieved, ok := suite.buffer.ByID(block.Message.Block.ID())
@@ -59,8 +60,8 @@ func (suite *PendingBlocksSuite) TestAdd() {
 // TestAddDuplicate verifies that adding the same block twice is a no-op.
 func (suite *PendingBlocksSuite) TestAddDuplicate() {
 	block := suite.block()
-	suite.buffer.Add(block)
-	suite.buffer.Add(block) // Add again
+	suite.Require().NoError(suite.buffer.Add(block))
+	suite.Require().NoError(suite.buffer.Add(block)) // Add again
 
 	// Should still only have one block
 	suite.Assert().Equal(uint(1), suite.buffer.Size())
@@ -74,24 +75,88 @@ func (suite *PendingBlocksSuite) TestAddDuplicate() {
 // TestAddBelowFinalizedView verifies that adding blocks below finalized view is a no-op.
 func (suite *PendingBlocksSuite) TestAddBelowFinalizedView() {
 	finalizedView := uint64(1000)
-	buffer := NewPendingBlocks(finalizedView)
+	buffer := NewPendingBlocks(finalizedView, 100_000)
 
 	// Create a block with view below finalized
 	block := suite.block()
 	block.Message.Block.ParentView = finalizedView - 10
 	block.Message.Block.View = finalizedView - 5
 
-	buffer.Add(block)
+	suite.Require().NoError(buffer.Add(block))
 
 	_, ok := buffer.ByID(block.Message.Block.ID())
 	suite.Assert().False(ok)
 	suite.Assert().Equal(uint(0), buffer.Size())
 }
 
+// TestAddExceedsActiveViewRangeSize verifies that adding blocks that exceed the active view range size returns an error.
+func (suite *PendingBlocksSuite) TestAddExceedsActiveViewRangeSize() {
+	finalizedView := uint64(1000)
+	activeViewRangeSize := uint64(100)
+	buffer := NewPendingBlocks(finalizedView, activeViewRangeSize)
+
+	// Create a parent header and then a block that exceeds the active view range size
+	parentHeader := unittest.BlockHeaderFixture()
+	parentHeader.View = finalizedView + 50
+	block := suite.blockWithParent(parentHeader)
+	block.Message.Block.View = finalizedView + activeViewRangeSize + 1
+
+	err := buffer.Add(block)
+	suite.Assert().Error(err)
+	suite.Assert().True(mempool.IsBeyondActiveRangeError(err))
+
+	// Verify block was not added
+	_, ok := buffer.ByID(block.Message.Block.ID())
+	suite.Assert().False(ok)
+	suite.Assert().Equal(uint(0), buffer.Size())
+}
+
+// TestAddWithinActiveViewRangeSize verifies that adding blocks within the active view range size succeeds.
+func (suite *PendingBlocksSuite) TestAddWithinActiveViewRangeSize() {
+	finalizedView := uint64(1000)
+	activeViewRangeSize := uint64(100)
+	buffer := NewPendingBlocks(finalizedView, activeViewRangeSize)
+
+	// Create a parent header and then a block that is exactly at the limit
+	parentHeader := unittest.BlockHeaderFixture()
+	parentHeader.View = finalizedView + 50
+	block := suite.blockWithParent(parentHeader)
+	block.Message.Block.View = finalizedView + activeViewRangeSize
+
+	err := buffer.Add(block)
+	suite.Assert().NoError(err)
+
+	// Verify block was added
+	_, ok := buffer.ByID(block.Message.Block.ID())
+	suite.Assert().True(ok)
+	suite.Assert().Equal(uint(1), buffer.Size())
+}
+
+// TestAddWithZeroActiveViewRangeSize verifies that when activeViewRangeSize is 0, there's no limitation.
+func (suite *PendingBlocksSuite) TestAddWithZeroActiveViewRangeSize() {
+	finalizedView := uint64(1000)
+	activeViewRangeSize := uint64(0) // No limitation
+	buffer := NewPendingBlocks(finalizedView, activeViewRangeSize)
+
+	// Create a parent header and then a block that is very far ahead
+	parentHeader := unittest.BlockHeaderFixture()
+	parentHeader.View = finalizedView + 500_000
+	block := suite.blockWithParent(parentHeader)
+	block.Message.Block.View = finalizedView + 1_000_000
+
+	err := buffer.Add(block)
+	suite.Assert().NoError(err)
+
+	// Verify block was added
+	_, ok := buffer.ByID(block.Message.Block.ID())
+	suite.Assert().True(ok)
+	suite.Assert().Equal(uint(1), buffer.Size())
+}
+
 // TestByID tests retrieving blocks by ID.
 func (suite *PendingBlocksSuite) TestByID() {
 	block := suite.block()
-	suite.buffer.Add(block)
+	suite.Require().NoError(suite.buffer.Add(block))
 
 	// Test retrieving existing block
 	retrieved, ok := suite.buffer.ByID(block.Message.Block.ID())
@@ -173,7 +238,7 @@ func (suite *PendingBlocksSuite) TestPruneByView() {
 		// 10% of the time, add a new unrelated block
 		if i%10 == 0 {
 			block := suite.block()
-			suite.buffer.Add(block)
+			suite.Require().NoError(suite.buffer.Add(block))
 			blocks = append(blocks, block)
 			continue
 		}
@@ -182,7 +247,7 @@ func (suite *PendingBlocksSuite) TestPruneByView() {
 		if i%2 == 1 && len(blocks) > 0 {
 			parent := blocks[rand.Intn(len(blocks))]
 			block := suite.blockWithParent(parent.Message.Block.ToHeader())
-			suite.buffer.Add(block)
+			suite.Require().NoError(suite.buffer.Add(block))
 			blocks = append(blocks, block)
 		}
 	}
@@ -210,13 +275,13 @@ func (suite *PendingBlocksSuite) TestPruneByView() {
 // TestPruneByViewBelowFinalizedView verifies that pruning below finalized view returns an error.
 func (suite *PendingBlocksSuite) TestPruneByViewBelowFinalizedView() {
 	finalizedView := uint64(100)
-	buffer := NewPendingBlocks(finalizedView)
+	buffer := NewPendingBlocks(finalizedView, 100_000)
 
 	// Add some blocks above finalized view
 	parent := unittest.BlockHeaderFixture()
 	parent.View = finalizedView + 10
 	block := suite.blockWithParent(parent)
-	buffer.Add(block)
+	suite.Require().NoError(buffer.Add(block))
 
 	// Prune at finalized view should succeed
 	err := buffer.PruneByView(finalizedView)
@@ -305,7 +370,7 @@ func (suite *PendingBlocksSuite) TestConcurrentAccess() {
 			defer wg.Done()
 			for j := 0; j < blocksPerGoroutine; j++ {
 				block := suite.block()
-				suite.buffer.Add(block)
+				suite.Require().NoError(suite.buffer.Add(block))
 			}
 		}()
 	}

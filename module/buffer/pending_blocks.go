@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/forest"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // proposalVertex implements [forest.Vertex] for generic block proposals.
@@ -51,8 +52,9 @@ func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
 //
 // Safe for concurrent use.
 type GenericPendingBlocks[T module.BufferedProposal] struct {
-	lock   *sync.Mutex
-	forest *forest.LevelledForest
+	lock                *sync.Mutex
+	forest              *forest.LevelledForest
+	activeViewRangeSize uint64
 }
 
 type PendingBlocks = GenericPendingBlocks[*flow.Proposal]
@@ -61,26 +63,45 @@ type PendingClusterBlocks = GenericPendingBlocks[*cluster.Proposal]
 var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 var _ module.PendingClusterBlockBuffer = (*PendingClusterBlocks)(nil)
 
-func NewPendingBlocks(finalizedView uint64) *PendingBlocks {
+func NewPendingBlocks(finalizedView uint64, activeViewRangeSize uint64) *PendingBlocks {
 	return &PendingBlocks{
-		lock:   new(sync.Mutex),
-		forest: forest.NewLevelledForest(finalizedView),
+		lock: new(sync.Mutex),
+		// LevelledForest's lowestLevel is inclusive, so add 1 here
+		forest:              forest.NewLevelledForest(finalizedView + 1),
+		activeViewRangeSize: activeViewRangeSize,
 	}
 }
 
-func NewPendingClusterBlocks(finalizedView uint64) *PendingClusterBlocks {
+func NewPendingClusterBlocks(finalizedView uint64, activeViewRangeSize uint64) *PendingClusterBlocks {
 	return &PendingClusterBlocks{
-		lock:   new(sync.Mutex),
-		forest: forest.NewLevelledForest(finalizedView),
+		lock:                new(sync.Mutex),
+		forest:              forest.NewLevelledForest(finalizedView),
+		activeViewRangeSize: activeViewRangeSize,
 	}
 }
 
 // Add adds the input block to the block buffer.
 // If the block already exists, or is below the finalized view, this is a no-op.
-func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) {
+// Errors returns:
+//   - mempool.BeyondActiveRangeError if block.View > finalizedView + activeViewRangeSize (when activeViewRangeSize > 0)
+func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
+
+	blockView := block.Message.ProposalHeader().Header.View
+	finalizedView := b.highestPrunedView()
+
+	// Check if block view exceeds the active view range size
+	// If activeViewRangeSize is 0, there's no limitation
+	if b.activeViewRangeSize > 0 && blockView > finalizedView+b.activeViewRangeSize {
+		return mempool.NewBeyondActiveRangeError(
+			"block view %d exceeds active view range size: finalized view %d + range size %d = %d",
+			blockView, finalizedView, b.activeViewRangeSize, finalizedView+b.activeViewRangeSize,
+		)
+	}
+
 	b.forest.AddVertex(newProposalVertex(block))
+	return nil
 }
 
 // ByID returns the block with the given ID, if it exists.
@@ -130,4 +151,11 @@ func (b *GenericPendingBlocks[T]) Size() uint {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	return uint(b.forest.GetSize())
+}
+
+// highestPrunedView returns the highest pruned view (finalized view).
+// CAUTION: Caller must acquire the lock.
+func (b *GenericPendingBlocks[T]) highestPrunedView() uint64 {
+	// LevelledForest.LowestLevel is the lowest UNPRUNED view, so subtract 1 here
+	return b.forest.LowestLevel - 1
 }
