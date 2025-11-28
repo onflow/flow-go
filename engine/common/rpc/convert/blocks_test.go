@@ -3,7 +3,9 @@ package convert_test
 import (
 	"bytes"
 	"testing"
+	"time"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -75,4 +77,147 @@ func TestConvertRootBlock(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, block.ID(), converted.ID())
+}
+
+// TestConvertBlockStatus tests converting protobuf BlockStatus messages to flow.BlockStatus.
+func TestConvertBlockStatus(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		pbStatus entities.BlockStatus
+		expected flow.BlockStatus
+	}{
+		{"Unknown", entities.BlockStatus_BLOCK_UNKNOWN, flow.BlockStatusUnknown},
+		{"Finalized", entities.BlockStatus_BLOCK_FINALIZED, flow.BlockStatusFinalized},
+		{"Sealed", entities.BlockStatus_BLOCK_SEALED, flow.BlockStatusSealed},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			converted := convert.MessageToBlockStatus(tc.pbStatus)
+			assert.Equal(t, tc.expected, converted)
+		})
+	}
+}
+
+// TestConvertBlockSeal tests converting a flow.Seal to and from a protobuf BlockSeal message.
+func TestConvertBlockSeal(t *testing.T) {
+	t.Parallel()
+
+	seal := unittest.Seal.Fixture()
+
+	msg := convert.BlockSealToMessage(seal)
+	converted, err := convert.MessageToBlockSeal(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, seal.BlockID, converted.BlockID)
+	assert.Equal(t, seal.ResultID, converted.ResultID)
+	assert.Equal(t, seal.FinalState, converted.FinalState)
+	assert.Equal(t, seal.AggregatedApprovalSigs, converted.AggregatedApprovalSigs)
+}
+
+// TestConvertBlockSeals tests converting multiple flow.Seal to and from protobuf BlockSeal messages.
+func TestConvertBlockSeals(t *testing.T) {
+	t.Parallel()
+
+	seals := []*flow.Seal{
+		unittest.Seal.Fixture(),
+		unittest.Seal.Fixture(),
+		unittest.Seal.Fixture(),
+	}
+
+	msgs := convert.BlockSealsToMessages(seals)
+	require.Len(t, msgs, len(seals))
+
+	converted, err := convert.MessagesToBlockSeals(msgs)
+	require.NoError(t, err)
+	require.Len(t, converted, len(seals))
+
+	for i, seal := range seals {
+		assert.Equal(t, seal.BlockID, converted[i].BlockID)
+		assert.Equal(t, seal.ResultID, converted[i].ResultID)
+		assert.Equal(t, seal.FinalState, converted[i].FinalState)
+		assert.Equal(t, seal.AggregatedApprovalSigs, converted[i].AggregatedApprovalSigs)
+	}
+}
+
+// TestConvertPayloadFromMessage tests converting a protobuf Block message to a flow.Payload.
+func TestConvertPayloadFromMessage(t *testing.T) {
+	t.Parallel()
+
+	block := unittest.FullBlockFixture()
+	signerIDs := unittest.IdentifierListFixture(5)
+
+	msg, err := convert.BlockToMessage(block, signerIDs)
+	require.NoError(t, err)
+
+	payload, err := convert.PayloadFromMessage(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, block.Payload.Guarantees, payload.Guarantees)
+	assert.Equal(t, block.Payload.Seals, payload.Seals)
+	assert.Equal(t, block.Payload.Receipts, payload.Receipts)
+	assert.Equal(t, block.Payload.Results, payload.Results)
+	assert.Equal(t, block.Payload.ProtocolStateID, payload.ProtocolStateID)
+}
+
+// TestConvertBlockTimestamp2ProtobufTime tests converting block timestamps to protobuf Timestamp format.
+func TestConvertBlockTimestamp2ProtobufTime(t *testing.T) {
+	t.Parallel()
+
+	t.Run("convert current timestamp", func(t *testing.T) {
+		t.Parallel()
+
+		// Use current time in unix milliseconds
+		now := time.Now()
+		timestampMillis := uint64(now.UnixMilli())
+
+		pbTime := convert.BlockTimestamp2ProtobufTime(timestampMillis)
+		require.NotNil(t, pbTime)
+
+		// Convert back and verify
+		convertedTime := pbTime.AsTime()
+		assert.Equal(t, timestampMillis, uint64(convertedTime.UnixMilli()))
+	})
+
+	t.Run("convert zero timestamp", func(t *testing.T) {
+		t.Parallel()
+
+		pbTime := convert.BlockTimestamp2ProtobufTime(0)
+		require.NotNil(t, pbTime)
+
+		convertedTime := pbTime.AsTime()
+		assert.Equal(t, uint64(0), uint64(convertedTime.UnixMilli()))
+	})
+
+	t.Run("convert various timestamps", func(t *testing.T) {
+		t.Parallel()
+
+		testTimestamps := []uint64{
+			1609459200000, // 2021-01-01 00:00:00 UTC
+			1640995200000, // 2022-01-01 00:00:00 UTC
+			1672531200000, // 2023-01-01 00:00:00 UTC
+		}
+
+		for _, ts := range testTimestamps {
+			pbTime := convert.BlockTimestamp2ProtobufTime(ts)
+			require.NotNil(t, pbTime)
+
+			convertedTime := pbTime.AsTime()
+			assert.Equal(t, ts, uint64(convertedTime.UnixMilli()))
+		}
+	})
+
+	t.Run("roundtrip conversion with block", func(t *testing.T) {
+		t.Parallel()
+
+		block := unittest.FullBlockFixture()
+		msg := convert.BlockToMessageLight(block)
+
+		assert.Equal(t, block.Timestamp, uint64(msg.Timestamp.AsTime().UnixMilli()))
+	})
 }
