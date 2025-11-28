@@ -15,9 +15,6 @@ type BufferedProposal interface {
 // because they do not connect to the rest of the chain state.
 // They are indexed by parent ID to enable processing all of a parent's children once the parent is received.
 // They are also indexed by view to support pruning.
-// The size of this mempool is partly limited by the enforcement of an allowed view range, however
-// a strong size limit also requires that stored proposals are validated to ensure we store only
-// one proposal per view. Higher-level logic is responsible for validating proposals prior to storing here.
 //
 // Safe for concurrent use.
 type GenericPendingBlockBuffer[T BufferedProposal] interface {
