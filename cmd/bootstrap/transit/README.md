@@ -2,7 +2,8 @@
 
 The transit script is an utility used by node operators to upload and download relevant data before and after a Flow spork.
 It is used to download the root snapshot after a spork.
-Additionally, for a consensus node, it is used to upload transit keys and to submit root block votes.
+Additionally, for a consensus node, it is used to upload transit keys and to submit root block votes,
+and for a collection node, it is used to submit cluster root block votes.
 
 ## Server token
 
@@ -94,11 +95,11 @@ $ transit generate-cluster-block-vote -t ${server-token} -d ${bootstrap-dir}
 $ transit push-cluster-block-vote -t ${server-token} -d ${bootstrap-dir} -v ${vote-file}
 ```
 
-### Pull Clustering
+### Pull Cluster Assignment
 
-Running `transit pull-clustering` will:
+Running `transit pull-clustering` will perform the following actions:
 
-1. Fetch the collection cluster assignment for the upcoming spork and write it to `<bootstrap-dir>/public-root-information/root-clustering.json`
+1. Fetch the assignment of collection nodes to clusters for the upcoming spork and write it to `<bootstrap-dir>/public-root-information/root-clustering.json`
 
 ### Sign Cluster Root Block
 
@@ -141,4 +142,3 @@ ansible-playbook -i inventories/mainnet/mainnet26.yml/ vote_on_root_block.yml \
     -e "output_directory=/var/flow/bootstrap" \
     -e force_repull_transit=true \ 
 ```
-
