@@ -30,6 +30,7 @@ func TestRequesterEngine(t *testing.T) {
 	suite.Run(t, new(RequesterEngineSuite))
 }
 
+// RequesterEngineSuite is a test suite for the requester engine that holds minimal state for testing.
 type RequesterEngineSuite struct {
 	suite.Suite
 	con   *mocknetwork.Conduit

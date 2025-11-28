@@ -63,11 +63,13 @@ type Engine struct {
 	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
 }
 
+var _ component.Component = (*Engine)(nil)
 var _ network.MessageProcessor = (*Engine)(nil)
 
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
+// No errors are expected during normal operations.
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
@@ -209,6 +211,8 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	return nil
 }
 
+// processQueuedRequestsShovellerWorker runs as a dedicated worker for [component.ComponentManager].
+// It tracks when there is available work and performs dispatch of incoming messages.
 func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -225,6 +229,8 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 	}
 }
 
+// processAvailableMessages is called when there are messages in the queue that are ready to be processed.
+// All unexpected errors are reported to the SignalerContext.
 func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
@@ -246,7 +252,6 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 			ctx.Throw(fmt.Errorf("invalid message type in entity request queue: %T", msg.Payload))
 		}
 
-		// TODO(yuraolex): check error handling, some errors are sentinels
 		err := e.onEntityResponse(msg.OriginID, res)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
