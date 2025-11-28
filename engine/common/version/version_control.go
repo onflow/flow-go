@@ -213,9 +213,16 @@ func (v *VersionControl) initBoundaries(
 			}
 
 			if ver.Compare(*v.nodeVersion) <= 0 {
-				v.startHeight.Store(boundary.BlockHeight)
+				start := boundary.BlockHeight
+
+				// enforce sealedRootBlockHeight as the lowest when version boundary height is lower than sealedRootBlockHeight
+				if start < sealedRootBlockHeight {
+					start = sealedRootBlockHeight
+				}
+
+				v.startHeight.Store(start)
 				v.log.Info().
-					Uint64("startHeight", boundary.BlockHeight).
+					Uint64("startHeight", start).
 					Msg("Found start block height")
 				// This is the lowest compatible height for this node version, stop search immediately
 				return nil
