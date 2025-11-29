@@ -3037,7 +3037,6 @@ func TestEVM(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
@@ -3242,7 +3241,6 @@ func TestEVM(t *testing.T) {
 			txBody, err := txBodyBuilder.Build()
 			require.NoError(t, err)
 
-			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
@@ -3304,7 +3302,6 @@ func TestVMBridge(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
@@ -4197,7 +4194,6 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 	t.Run("block hash list write on push", newVMTest().
 		withContextOptions(
 			fvm.WithChain(chain),
-			fvm.WithEVMEnabled(true),
 		).
 		run(func(
 			t *testing.T,

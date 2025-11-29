@@ -1022,9 +1022,9 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fu
 	if err != nil {
 		panic(fmt.Sprintf("failed to build EVM transaction %s", err.Error()))
 	}
-	// WithEVMEnabled should only be used after we create an account for storage
+
 	txError, err := b.invokeMetaTransaction(
-		NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+		b.ctx,
 		Transaction(txBody, 0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
@@ -1076,7 +1076,6 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	ctx := NewContextFromParent(b.ctx,
 		WithBlockHeader(b.rootHeader),
 		WithEntropyProvider(stubEntropyProvider{}),
-		WithEVMEnabled(true),
 	)
 
 	txIndex := uint32(0)
