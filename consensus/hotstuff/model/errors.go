@@ -307,8 +307,9 @@ func IsByzantineThresholdExceededError(err error) bool {
 	return errors.As(err, &target)
 }
 
-// DoubleVoteError indicates that a consensus replica has voted for two different
-// blocks, or has provided two semantically different votes for the same block.
+// DoubleVoteError indicates that a consensus replica has voted for two different blocks
+// in the same view, or has provided two semantically different votes for the same block.
+// This is a PROTOCOL VIOLATION (slashable equivocation attack).
 type DoubleVoteError struct {
 	FirstVote       *Vote
 	ConflictingVote *Vote
@@ -340,6 +341,9 @@ func (e DoubleVoteError) Unwrap() error {
 	return e.err
 }
 
+// NewDoubleVoteErrorf creates an error signalling that a consensus replica has voted for two different
+// blocks in the same view, or has provided two semantically different votes for the same block.
+// This is a PROTOCOL VIOLATION (slashable equivocation attack).
 func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...interface{}) error {
 	return DoubleVoteError{
 		FirstVote:       firstVote,
@@ -370,7 +374,7 @@ func IsDuplicatedSignerError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// InvalidSignatureIncludedError indicates that some signatures, included via TrustedAdd, are invalid
+// InvalidSignatureIncludedError indicates that some signatures are invalid
 type InvalidSignatureIncludedError struct {
 	err error
 }
