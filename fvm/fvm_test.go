@@ -3037,14 +3037,12 @@ func TestEVM(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
 	}
 
 	t.Run("successful transaction", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3103,7 +3101,6 @@ func TestEVM(t *testing.T) {
 
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3141,7 +3138,6 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the EVM error is correctly returned as an error and has a correct type
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3196,7 +3192,6 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3246,7 +3241,6 @@ func TestEVM(t *testing.T) {
 			txBody, err := txBodyBuilder.Build()
 			require.NoError(t, err)
 
-			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
@@ -3308,7 +3302,6 @@ func TestVMBridge(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
@@ -3316,7 +3309,7 @@ func TestVMBridge(t *testing.T) {
 	}
 
 	t.Run("successful FT Type Onboarding and Bridging", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withBootstrapProcedureOptions(fvm.WithSetupVMBridgeEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3554,7 +3547,7 @@ func TestVMBridge(t *testing.T) {
 	)
 
 	t.Run("successful NFT Type Onboarding and Bridging", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withBootstrapProcedureOptions(fvm.WithSetupVMBridgeEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -4201,7 +4194,6 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 	t.Run("block hash list write on push", newVMTest().
 		withContextOptions(
 			fvm.WithChain(chain),
-			fvm.WithEVMEnabled(true),
 		).
 		run(func(
 			t *testing.T,

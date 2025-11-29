@@ -381,7 +381,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("system chunk transaction should not fail", func(t *testing.T) {
 		// include all fees. System chunk should ignore them
 		contextOptions := []fvm.Option{
-			fvm.WithEVMEnabled(true),
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithBlocks(&environment.NoopBlockFinder{}),
@@ -1231,7 +1230,6 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
-		fvm.WithEVMEnabled(true),
 		fvm.WithChain(flow.Localnet.Chain()),
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)

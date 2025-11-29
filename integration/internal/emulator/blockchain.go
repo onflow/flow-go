@@ -133,7 +133,6 @@ func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 				runtime.Config{}),
 		),
 		fvm.WithEntropyProvider(b.entropyProvider),
-		fvm.WithEVMEnabled(true),
 		fvm.WithAuthorizationChecksEnabled(b.conf.TransactionValidationEnabled),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(b.conf.TransactionValidationEnabled),
 	)

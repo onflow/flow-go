@@ -170,7 +170,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 				runtime.Config{},
 			),
 		),
-		fvm.WithEVMEnabled(true),
 	}
 	fvmContext := fvm.NewContext(opts...)
 

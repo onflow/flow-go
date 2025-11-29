@@ -232,7 +232,6 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCall
 				runtime.Config{},
 			),
 		),
-		fvm.WithEVMEnabled(true),
 		fvm.WithScheduledTransactionsEnabled(scheduleCallbacksEnabled),
 	}
 
