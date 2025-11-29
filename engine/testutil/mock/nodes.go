@@ -243,6 +243,7 @@ func (en ExecutionNode) Ready(t *testing.T, ctx context.Context) {
 	en.FollowerCore.Start(irctx)
 	en.FollowerEngine.Start(irctx)
 	en.SyncEngine.Start(irctx)
+	en.RequestEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,
