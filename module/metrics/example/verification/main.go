@@ -108,7 +108,7 @@ func demo() {
 		}
 
 		// creates consensus cache for follower engine, and registers size method of backend for metrics
-		pendingBlocks := buffer.NewPendingBlocks()
+		pendingBlocks := buffer.NewPendingBlocks(0, 100_000)
 		err = mc.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
 		if err != nil {
 			panic(err)
@@ -173,7 +173,7 @@ func demo() {
 
 			tryRandomCall(func() {
 				proposal := unittest.ProposalFixture()
-				pendingBlocks.Add(flow.Slashable[*flow.Proposal]{
+				_ = pendingBlocks.Add(flow.Slashable[*flow.Proposal]{
 					OriginID: unittest.IdentifierFixture(),
 					Message:  proposal,
 				})
