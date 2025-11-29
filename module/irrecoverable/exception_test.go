@@ -1,4 +1,4 @@
-package irrecoverable_test
+package irrecoverable
 
 import (
 	"errors"
@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // IsIrrecoverableException returns true if and only of the provided error is
@@ -25,7 +23,9 @@ import (
 // Hence, PROTOCOL BUSINESS LOGIC should NEVER CHECK whether an error is an
 // IRRECOVERABLE EXCEPTION. This function is for TESTING ONLY.
 func IsIrrecoverableException(err error) bool {
-	var e = irrecoverable.NewExceptionf("")
+	// The Go build system specifically handles `_test.go` files, treating them as part of
+	// the test suite and not including them in the final production binary using go build.
+	var e = new(exception)
 	return errors.As(err, &e)
 }
 
@@ -41,11 +41,11 @@ func TestWrapSentinelVar(t *testing.T) {
 	assert.ErrorIs(t, err, sentinelVar)
 
 	// wrapping sentinel directly should not be unwrappable
-	exception := irrecoverable.NewException(sentinelVar)
+	exception := NewException(sentinelVar)
 	assert.NotErrorIs(t, exception, sentinelVar)
 
 	// wrapping wrapped sentinel should not be unwrappable
-	exception = irrecoverable.NewException(err)
+	exception = NewException(err)
 	assert.NotErrorIs(t, exception, sentinelVar)
 }
 
@@ -55,10 +55,10 @@ func TestWrapSentinelType(t *testing.T) {
 	assert.ErrorAs(t, err, &sentinelType{})
 
 	// wrapping sentinel directly should not be unwrappable
-	exception := irrecoverable.NewException(sentinelType{})
+	exception := NewException(sentinelType{})
 	assert.False(t, errors.As(exception, &sentinelType{}))
 
 	// wrapping wrapped sentinel should not be unwrappable
-	exception = irrecoverable.NewException(err)
+	exception = NewException(err)
 	assert.False(t, errors.As(exception, &sentinelType{}))
 }

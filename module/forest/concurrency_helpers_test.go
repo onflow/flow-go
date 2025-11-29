@@ -29,7 +29,7 @@ func Test_SlicePrimitives(t *testing.T) {
 	v := NewVertexMock("v", 3, "C", 2)
 	vContainer := &vertexContainer{id: unittest.IdentifierFixture(), level: 3, vertex: v}
 
-	t.Run(fmt.Sprintf("nil slice"), func(t *testing.T) {
+	t.Run("nil slice", func(t *testing.T) {
 		// Prepare vertex list that, representing the slice of children held by the
 		var vertexList VertexList // nil zero value
 
@@ -43,7 +43,7 @@ func Test_SlicePrimitives(t *testing.T) {
 		assert.Equal(t, len(vertexList), len(iterator.data)+1)
 	})
 
-	t.Run(fmt.Sprintf("empty slice of zero capacity"), func(t *testing.T) {
+	t.Run("empty slice of zero capacity", func(t *testing.T) {
 		// Prepare vertex list that, representing the slice of children held by the
 		var vertexList VertexList = []*vertexContainer{}
 
@@ -58,7 +58,7 @@ func Test_SlicePrimitives(t *testing.T) {
 		assert.Equal(t, len(vertexList), len(iterator.data)+1)
 	})
 
-	t.Run(fmt.Sprintf("empty slice of zero capacity (len = 0, cap = 2)"), func(t *testing.T) {
+	t.Run("empty slice of with capacity 2 (len = 0, cap = 2)", func(t *testing.T) {
 		// Prepare vertex list that, representing the slice of children held by the
 		var vertexList VertexList = make(VertexList, 0, 2)
 
@@ -74,7 +74,7 @@ func Test_SlicePrimitives(t *testing.T) {
 		assert.Equal(t, len(vertexList), len(iterator.data)+1)
 	})
 
-	t.Run(fmt.Sprintf("empty slice of zero capacity (len = 1, cap = 2)"), func(t *testing.T) {
+	t.Run("non-empty slice with larger capacity (len = 1, cap = 2)", func(t *testing.T) {
 		// Prepare vertex list that, representing the slice of children held by the
 		var vertexList VertexList = make(VertexList, 1, 2)
 		_v := NewVertexMock("v", 3, "C", 2)
@@ -92,9 +92,10 @@ func Test_SlicePrimitives(t *testing.T) {
 		assert.Equal(t, len(vertexList), len(iterator.data)+1)
 	})
 
-	t.Run(fmt.Sprintf("empty slice of zero capacity (len = 10, cap = 10)"), func(t *testing.T) {
+	t.Run(fmt.Sprintf("fully filled non-empty slice (len = 10, cap = 10)"), func(t *testing.T) {
 		// Prepare vertex list that, representing the slice of children held by the
-		var vertexList VertexList = make(VertexList, 10, 10)
+		//nolint:S1019
+		var vertexList VertexList = make(VertexList, 10, 10) // we want to explicitly state the capacity here for clarity
 		for i := 0; i < cap(vertexList); i++ {
 			_v := NewVertexMock(fmt.Sprintf("v%d", i), 3, "C", 2)
 			vertexList[i] = &vertexContainer{id: unittest.IdentifierFixture(), level: 3, vertex: _v}
@@ -142,7 +143,8 @@ func Test_VertexIteratorConcurrencySafe(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			// add additional child vertex of [C]
 			var v Vertex = NewVertexMock(fmt.Sprintf("v%03d", i), 3, "C", 2)
-			forest.VerifyAndAddVertex(&v)
+			err := forest.VerifyAndAddVertex(&v)
+			assert.NoError(t, err)
 			time.Sleep(500 * time.Microsecond) // sleep 0.5ms -> in total 0.5s
 		}
 		close(done1)
