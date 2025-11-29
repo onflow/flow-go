@@ -63,7 +63,7 @@ type VoteCollector interface {
 	// It returns other error if there is exception processing the block.
 	ProcessBlock(block *model.SignedProposal) error
 
-	// AddVote adds a vote to current vote collector. The vote must be for the `VoteCollector`'s view (otherwise,
+	// AddVote adds a vote to the vote collector. The vote must be for the `VoteCollector`'s view (otherwise,
 	// an exception is returned). When enough votes have been added to produce a QC, the QC will be created
 	// asynchronously, and passed to EventLoop through a callback.
 	// All byzantine edge cases are handled internally via callbacks to notifier.
@@ -103,13 +103,13 @@ type VoteProcessor interface {
 	Status() VoteCollectorStatus
 }
 
-// VerifyingVoteProcessor is a VoteProcessor that attempts to construct a QC for a specific given block
+// VerifyingVoteProcessor is a VoteProcessor that attempts to construct a QC for a specific block
 // (provided at construction time).
 //
 // IMPORTANT: The VerifyingVoteProcessor provides the final defense against any vote-equivocation attacks
 // for its specific block. These attacks typically aim at multiple votes from the same node being counted
-// towards the supermajority threshold. This must cover attacks by the leader concurrently utilizing
-// stand-alone votes and votes embedded into the proposal.
+// towards the supermajority threshold. The VerifyingVoteProcessor must withstand attacks by the
+// leader concurrently utilizing stand-alone votes and votes embedded into the proposal.
 type VerifyingVoteProcessor interface {
 	VoteProcessor
 

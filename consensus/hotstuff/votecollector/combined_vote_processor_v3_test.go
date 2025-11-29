@@ -1059,8 +1059,8 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 }
 
 // TestCombinedVoteProcessorV3_DoubleVoting tests that CombinedVoteProcessorV3 is able to
-// detect a situation where a consensus participant is sending two different votes, first vote is signed with the staking
-// key only and the other one is signed with the random beacon key.
+// detect a situation where a consensus participant is sending two different votes, first vote is
+// signed with the staking key only and the other one is signed with the random beacon key.
 // This is a form of vote equivocation where a node sends a different vote from the one it has submitted previously.
 // CombinedVoteProcessorV3 has to detect that the vote from given participant has been already processed and return a respective error.
 //
@@ -1114,7 +1114,7 @@ func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
 	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
 	// construct another vote for this block but using staking key this time.
-	// this will result in inconsistent voting.
+	// While both votes are individually valid, the voter violates the protocol by publishing inconsistent votes.
 	leaderDifferentVote, err := stakingSigner.CreateVote(block)
 	require.NoError(t, err)
 

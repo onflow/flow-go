@@ -17,7 +17,7 @@ var (
 	RepeatedVoteErr = errors.New("duplicated vote")
 )
 
-// voteContainer container stores the vote and in index representing
+// voteContainer container stores the vote and an index representing
 // the order in which the votes were received
 type voteContainer struct {
 	*model.Vote
@@ -43,8 +43,8 @@ type voteContainer struct {
 type VotesCache struct {
 	// CAUTION: In the VoteCollector's liveness proof, we utilized that reading the `VotesCache` happens before writing to it. It is important to
 	// emphasize that only locks are agnostic to the performed operation being a read or a write. In contrast, atomic variables only establish a
-	// 'happens before' relation when a preceding write is observed by a subsequent read. However, the VoteProcessor first reads and then writes.
-	// For atomic variables, this order of operations does not induce any synchronization guarantees according to Go Memory Model
+	// 'synchronized before' relation when a preceding write is observed by a subsequent read. However, the VoteProcessor first reads and then
+	// writes. For atomic variables, this order of operations does not induce any synchronization guarantees according to Go Memory Model
 	// ( https://go.dev/ref/mem ). Hence, the VotesCache utilizing locks is critical for the correctness of the `VoteCollector`.
 	lock sync.RWMutex
 
@@ -106,7 +106,8 @@ func (vc *VotesCache) AddVote(vote *model.Vote) error {
 			// voting in the same view for different blocks => vote equivocation
 			return model.NewDoubleVoteErrorf(firstVote.Vote, vote, "replica %v voted for different blocks in view %d", vote.SignerID, vc.view)
 		}
-		// voting for the same block but supplying different signatures => vote equivocation
+		// Intentionally votes to not contain any auxiliary information that the voter can vary. Hence, the
+		// sender is voting for the same block but supplying different signatures => vote equivocation
 		return model.NewDoubleVoteErrorf(firstVote.Vote, vote, "detected vote equivocation at view: %d", vc.view)
 	}
 

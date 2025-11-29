@@ -130,8 +130,8 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	// NOTE: We delegate the handling of duplicate signatures to the underlying [signature.SignatureAggregatorSameMessage].
 	// This is valid only because [signature.SignatureAggregatorSameMessage] does not support signatures with multiplicity
 	// higher than 1, i.e. each signer is allowed to sign at most once. Should this constraint every be relaxed in
-	// [signature.SignatureAggregatorSameMessage], we should update the `WeightedSignatureAggregator` here, because in
-	// the context of HotStuff each consensus replica is allowed to vote at most once.
+	// [signature.SignatureAggregatorSameMessage], we need to implement it here in the `WeightedSignatureAggregator`,
+	// because in the context of HotStuff each consensus replica is allowed to vote at most once.
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
 		if signature.IsDuplicatedSignerIdxError(err) {

@@ -138,10 +138,12 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
 
-// Process performs processing of single vote in concurrent safe way. This function is implemented to be
-// called by multiple goroutines at the same time. Supports processing of both staking and random beacon signatures.
-// Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
-// and submit it via callback for further processing.
+// Process ingests a single vote. It can be called by multiple goroutines at the same time. While all valid
+// votes must carry a staking signature, most nodes should also include their random beacon signatures as
+// part of their vote (but technically it's optional).
+// Design of this function is event driven: as soon as we collect enough signatures to create a QC, we will
+// immediately do so and submit it via callback for further processing. However, due to concurrency, a few
+// more than the minimum required signatures might be container in the QC (permitted by the protocol).
 //
 // IMPORTANT: The VerifyingVoteProcessor provides the final defense against any vote-equivocation attacks
 // for its specific block. These attacks typically aim at multiple votes from the same node being counted

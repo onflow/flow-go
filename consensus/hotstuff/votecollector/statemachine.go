@@ -28,14 +28,14 @@ type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.Si
 // On the happy path, the VoteCollector generates a QC when enough votes have been ingested.
 // We internally delegate the vote-format specific processing to the VoteProcessor.
 type VoteCollector struct {
-	sync.Mutex
+	sync.RWMutex
 	log                      zerolog.Logger
 	workers                  hotstuff.Workers
 	notifier                 hotstuff.VoteAggregationConsumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
 	// Byzantine nodes might mount the following attacks on the vote-processing logic:
-	//  1. The leader might send block proposal and equivocate by sending a different conflicting vote.
+	//  1. The leader might send block proposal and equivocate by sending a different conflicting vote as an independent message.
 	//  2. The leader might send a block proposal and (repeatedly) send the same vote again as an independent message.
 	//  3. Any byzantine replica might send multiple individual vote messages (repeated identical votes, or equivocating with different votes).
 	// These are resource exhaustion attacks (if frequent), but can also be attempts by byzantine nodes to have their votes repeatedly
@@ -52,7 +52,7 @@ type VoteCollector struct {
 	//  * In the current implementation, the `votesCache` does not catch leader attacks 1. and 2., which exploit the fact that stand-alone
 	//    votes and votes embedded in proposals are processed concurrently through different code paths. We emphasize that attack vectors
 	//    1. and 2. are only available to a byzantine leader as long as the leader has not (yet) equivocated for the current view. Once
-	//    the VoteCollector notices that the leader equivocates, it immediately stops accepting proposals for the view, thereby closing
+	//    the VoteCollector notices that the _leader_ equivocates, it immediately stops accepting proposals for the view, thereby closing
 	//    attack vectors 1. and 2. Hence, it is sufficient for the [VerifyingVoteProcessor] to catch _all_ equivocation attacks,
 	//    including attacks 1. and 2.
 	//
@@ -111,13 +111,13 @@ func NewStateMachine(
 	return sm
 }
 
-// AddVote adds a vote to current vote collector. The vote must be for the `VoteCollector`'s view (otherwise,
+// AddVote adds a vote to the vote collector. The vote must be for the `VoteCollector`'s view (otherwise,
 // an exception is returned). When enough votes have been added to produce a QC, the QC will be created
 // asynchronously, and passed to EventLoop through a callback.
 // All byzantine edge cases are handled internally via callbacks to notifier.
 // Under normal execution, only exceptions are propagated to caller.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
-	// Cache vote
+	// Cache vote; only the first vote from any specific signer will pass this step
 	unique, err := m.ensureVoteUnique(vote)
 	if err != nil {
 		return err
@@ -134,15 +134,17 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	return nil
 }
 
-// ensureVoteUnique caches the vote in the votesCache. Additionally, it's responsible for reporting byzantine behavior when
-// byzantine leader or replica has provided an equivocating vote. All votes that are different from the original one(by same signer)
-// are reported as equivocation attempt.
-// ATTENTION: In order to guarantee that all equivocation attempts will be caught this function needs to be called before
-// processing individual votes and block proposals.
+// ensureVoteUnique caches the vote in the votesCache (or rejects it) - implemented as a concurrency safe, atomic operation.
+// This function is responsible for reporting byzantine behavior when byzantine leader or replica has sent an equivocating vote.
+// All votes that are different from the original one(by same signer) are reported as equivocation attempts.
+//
+// ATTENTION: In order to guarantee that all equivocation attempts will be caught, this function needs to be
+// called consistently before processing individual votes _and_ block proposals.
+//
 // Possible return values:
-//   - (true, nil) - provided vote was first from given signer ID
-//   - (false, nil) - there is another vote in the cache that was previously added by given signer ID
-//   - (false, error) - exception during processing.
+//   - (true, nil) if vote is first from given signer ID
+//   - (false, nil) if there is another vote in the cache that was previously added by given signer ID
+//   - (false, error) if exception during processing.
 //
 // No errors are expected during normal operations.
 func (m *VoteCollector) ensureVoteUnique(vote *model.Vote) (bool, error) {
@@ -172,7 +174,7 @@ func (m *VoteCollector) ensureVoteUnique(vote *model.Vote) (bool, error) {
 // emitting votes with inconsistent signatures for the same block), because such votes were
 // already filtered out by the cache.
 //
-// All byzantine edge cases are handled internally  via callbacks to notifier. Under normal
+// All byzantine edge cases are handled internally via callbacks to notifier. Under normal
 // execution, only exceptions are propagated to caller.
 func (m *VoteCollector) processVote(vote *model.Vote) error {
 	for {
@@ -228,7 +230,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		//    Then, the `vote` is added directly to the [VerifyingVoteProcessor]. Informally, the state transition has happened before we retrieved
 		//    the Vote Processor via `m.atomicLoadProcessor()` above.
 		//  * Case (b): `currentState` = [VoteCollectorStatusCaching] = `m.Status()`
-		//    We note the following happens-before relations (i) and (ii), which are guaranteed by sequential execution _within_ a goroutine:
+		//    We note the following 'happens before' relations (i) and (ii), which are guaranteed by sequential execution _within_ a goroutine:
 		//    In goroutine A1 performing the state transition, (i) we write to `votesProcessor` before we read all cached votes from `votesCache`
 		//    (acquiring `votesCache`s lock). In goroutine A2, (ii) we have added the vote to the `votesCache` (also acquiring `votesCache`s lock)
 		//    before we read `votesProcessor`s status below and confirm its status still being [VoteCollectorStatusCaching].
@@ -250,8 +252,9 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		//
 		// CAUTION: In the proof, we utilized that reading the `votesCache` happens before writing to it (case b). It is important to emphasize that
 		// only locks are agnostic to the performed operation being a read or a write. In contrast, atomic variables only establish a 'happens before'
-		// relation when a preceding write is observed by a subsequent read. However, in our case, we first read and then write - an order of operation
-		// which does not induce any synchronization guarantees according to Go Memory Model. Hence, the `votesCache` utilizing locks is
+		// relation when a preceding write is observed by a subsequent read (consult go memory model https://go.dev/ref/mem, specifically the
+		//'synchronized before', and its generalized "happens before" relation). However, in our case, we first read and then write - an order of
+		// operations which does not induce any synchronization guarantees according to Go Memory Model. Hence, the `votesCache` utilizing locks is
 		// critical for the correctness of the `VoteCollector`.
 		if currentState != m.Status() {
 			continue
@@ -272,7 +275,7 @@ func (m *VoteCollector) View() uint64 {
 	return m.votesCache.View()
 }
 
-// ProcessBlock performs validation of block signature and processes block with respected collector.
+// ProcessBlock validates the block signature, and adds it as the proposer's vote.
 // In case we have received double proposal, we will stop attempting to build a QC for this view,
 // because we don't want to build on any proposal from an equivocating primary. Note: slashing challenges
 // for proposal equivocation are triggered by hotstuff.Forks, so we don't have to do anything else here.

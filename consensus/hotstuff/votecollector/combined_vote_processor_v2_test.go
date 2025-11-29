@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	mSig "github.com/onflow/flow-go/module/signature"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -981,8 +982,8 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 }
 
 // TestCombinedVoteProcessorV2_DoubleVoting tests that CombinedVoteProcessorV2 is able to
-// detect a situation where a consensus participant is sending two different votes, first vote is signed with the staking
-// key only and the other one is signed with the random beacon key.
+// detect a situation where a consensus participant is sending two different votes:
+// first vote is signed with the staking key only and the other one is signed with the random beacon key.
 // This is a form of vote equivocation where a node sends a different vote from the one it has submitted previously.
 // CombinedVoteProcessorV2 has to detect that the vote from given participant has been already processed and return a respective error.
 //
@@ -1032,12 +1033,13 @@ func TestCombinedVoteProcessorV2_DoubleVoting(t *testing.T) {
 
 	// create and sign proposal
 	leaderVote, err := rbSigner.CreateVote(block)
+	require.Equal(t, 2*mSig.SigLen, len(leaderVote.SigData), "sanity check failed: need a compound staking + beacon signature in the vote for this test")
 	require.NoError(t, err)
 	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
 	// construct another vote for this block but using staking key this time.
 	// this will result in inconsistent voting.
-	leaderDifferentVote, err := stakingSigner.CreateVote(block)
+	leaderDifferentVote, err := stakingSigner.CreateVote(block) // this vote has only staking sig; while individually valid, it is different from `leaderVote`
 	require.NoError(t, err)
 
 	// construct an equivocating vote, same view, but different block ID

@@ -110,9 +110,9 @@ func (p *StakingVoteProcessor) Status() hotstuff.VoteCollectorStatus {
 // stand-alone votes and votes embedded into the proposal.
 //
 // Expected error returns during normal operations:
-// * [VoteForIncompatibleBlockError] - submitted vote for incompatible block
-// * [VoteForIncompatibleViewError] - submitted vote for incompatible view
-// * [model.InvalidVoteError] - submitted vote with invalid signature
+// * [VoteForIncompatibleBlockError] if vote is for incompatible block
+// * [VoteForIncompatibleViewError] if vote is for incompatible view
+// * [model.InvalidVoteError] if vote has invalid signature
 // All other errors should be treated as exceptions.
 func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)

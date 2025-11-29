@@ -230,19 +230,21 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	processor.AssertExpectations(s.T())
 }
 
-// Byzantine Leader might mount the following attacks:
-// 1. Vote-equivocation attack: send block proposal and equivocate by sending a different conflicting vote.
-// 2. Spamming attack: send a block proposal and (repeatedly) send the same vote again as an independent message.
-// 3. Leader might send multiple individual vote messages (repeated identical votes, or equivocating with different votes)
-// Attacks 1. and 2. are only available to the leader, because these attacks exploit the fact that stand-alone votes and
-// proposals are processed through different code paths: while stand-alone votes always hit the cache in the VoteCollector,
-// the vote embedded into the proposal is processed with priority (potentially concurrently to other incoming stand-alone votes).
-// Attack 3. can be mounted also by replicas
-// In next section we perform testing of those scenarios.
+/* ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ * CONTEXT: Byzantine Leader might mount the following attacks:
+ * 1. Vote-equivocation attack: send block proposal and equivocate by sending a different conflicting vote.
+ * 2. Spamming attack: send a block proposal and (repeatedly) send the same vote again as an independent message.
+ * 3. Leader might send multiple individual vote messages (repeated identical votes, or equivocating with different votes)
+ * Attacks 1. and 2. are only available to the leader, because these attacks exploit the fact that stand-alone votes and
+ * proposals are processed through different code paths: while stand-alone votes always hit the cache in the VoteCollector,
+ * the vote embedded into the proposal is processed with priority (potentially concurrently to other incoming stand-alone votes).
+ * Attack 3. can be mounted also by replicas
+ * In following section of tests, we verify correct handling of those scenarios.
+ * ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 // TestProcessBlock_ByzantineLeaderEquivocation_ProposalBeforeVote tests a specific attack scenario mounted by byzantine leader:
 // Attack 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
-// Case (1.a): proposal arriving first, stand-alone vote arriving later:
+// Case (1.a): proposal arriving first, stand-alone vote arriving later.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_ProposalBeforeVote() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -250,10 +252,10 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_Pro
 	require.NoError(s.T(), err)
 	_ = s.prepareMockedProcessor(proposal)
 
-	equivocatingVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(proposalVote.SignerID))
 	err = s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 
+	equivocatingVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(proposalVote.SignerID))
 	s.notifier.On("OnDoubleVotingDetected", proposalVote, equivocatingVote).Once()
 	err = s.collector.AddVote(equivocatingVote)
 	require.NoError(s.T(), err)
@@ -263,7 +265,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_Pro
 
 // TestProcessBlock_ByzantineLeaderEquivocation_ProposalAfterVote tests a specific attack scenario mounted by byzantine leader:
 // Attack 1. send block proposal and equivocate by sending a different conflicting vote. We test both orders of arrival:
-// Case (1.b): stand-alone vote arriving first, proposal arriving second:
+// Case (1.b): stand-alone vote arriving first, proposal arriving second.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_ProposalAfterVote() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -287,7 +289,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_Pro
 
 // TestProcessBlock_ByzantineLeaderSpamming_ProposalBeforeVote tests a specific attack scenario mounted by byzantine leader:
 // Attack 2. send block proposal and try to spam with the same vote. We test both orders of arrival:
-// Case (2.a): proposal arriving first, stand-alone vote arriving later:
+// Case (2.a): proposal arriving first, stand-alone vote arriving later.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalBeforeVote() {
 	proposal := makeSignedProposalWithView(s.view)
 	_ = s.prepareMockedProcessor(proposal)
@@ -305,7 +307,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_Proposa
 
 // TestProcessBlock_ByzantineLeaderSpamming_ProposalAfterVote tests a specific attack scenario mounted by byzantine leader:
 // Attack 2. send block proposal and try to spam with the same vote. We test both orders of arrival:
-// Case (2.b): stand-alone vote arriving first, proposal arriving second:
+// Case (2.b): stand-alone vote arriving first, proposal arriving second.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalAfterVote() {
 	proposal := makeSignedProposalWithView(s.view)
 	_ = s.prepareMockedProcessor(proposal)
@@ -324,7 +326,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_Proposa
 
 // TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
 // Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
-// Case (3.a): equivocation: both votes arrive before receiving a proposal.
+// Case (3.a): equivocating votes arrive before receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -350,7 +352,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_Be
 
 // TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
 // Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
-// Case (3.b): equivocation: both votes arrive after receiving a proposal.
+// Case (3.b): equivocating votes arrive after receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_AfterProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -375,7 +377,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_Af
 
 // TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
 // Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
-// Case (3.c): spamming: both votes arrive before receiving a proposal.
+// Case (3.c): spamming: identical votes arrive before receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_BeforeProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
@@ -399,7 +401,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_Before
 
 // TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal tests a specific attack scenario mounted by byzantine replica:
 // Attack 3. send multiple votes trying to spam the leader or equivocate. We test both orders of arrival:
-// Case (3.d): spamming: both votes arrive after receiving a proposal.
+// Case (3.d): spamming: identical votes arrive after receiving a proposal.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_AfterProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block

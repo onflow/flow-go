@@ -101,7 +101,7 @@ func NewCombinedVoteProcessorFactory(committee hotstuff.DynamicCommittee, onQCCr
 // Intended use: only for BOOTSTRAPPING. During bootstrapping, we aggregate votes for the genesis/root block,
 // which does not have a proposer signature/vote. Therefore, we can't use the regular factories, which require
 // a full [model.SignedProposal] (including proposer vote) to instantiate the [hotstuff.VerifyingVoteProcessor].
-// UNSAFE: a proposer vote for `block` is _not_ covered here
+// UNSAFE: a proposer vote for `block` is _not_ included here
 func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.DynamicCommittee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
 	factory := &combinedVoteProcessorFactoryBaseV2{
 		committee:   committee,
@@ -116,7 +116,7 @@ func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.Dy
 // Intended use: only for BOOTSTRAPPING. During bootstrapping, we aggregate votes for the genesis/root block,
 // which does not have a proposer signature/vote. Therefore, we can't use the regular factories, which require
 // a full [model.SignedProposal] (including proposer vote) to instantiate the [hotstuff.VerifyingVoteProcessor].
-// UNSAFE: the proposer vote for `block` is _not_ covered here
+// UNSAFE: the proposer vote for `block` is _not_ included here
 func NewBootstrapStakingVoteProcessor(log zerolog.Logger, committee hotstuff.DynamicCommittee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
 	factory := &stakingVoteProcessorFactoryBase{
 		committee:   committee,
