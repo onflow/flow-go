@@ -42,6 +42,8 @@ ARG TAGS="netgo,osusergo"
 ARG CC=""
 # CGO_FLAG uses ADX instructions by default, flag can be overwritten to build without ADX
 ARG CGO_FLAG=""
+# CADENCE_VM_TAG should be empty to disable the Cadene VM, or "cadence_vm" to enable it
+ARG CADENCE_VM_TAG=""
 
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
@@ -51,7 +53,7 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     # We evaluate the SSH agent to safely pass in a key for cloning dependencies
     # We explicitly use ";" rather than && as we want to safely pass if it is unavailable
     eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - ; \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_CFLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_CFLAGS="${CGO_FLAG}" go build --tags "${TAGS},${CADENCE_VM_TAG}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -o ./app ${TARGET}
 
@@ -69,8 +71,18 @@ ENTRYPOINT ["/bin/app"]
 FROM build-env as build-debug
 WORKDIR /app
 ARG GOARCH=amd64
+
+# TAGS can be overriden to modify the go build tags (e.g. build without netgo)
+ARG TAGS="netgo,osusergo"
+# CC flag can be overwritten to specify a C compiler
 ARG CC=""
+# CGO_FLAG uses ADX instructions by default, flag can be overwritten to build without ADX
 ARG CGO_FLAG=""
+# CADENCE_VM_TAG should be empty to disable the Cadene VM, or "cadence_vm" to enable it
+ARG CADENCE_VM_TAG=""
+
+# Keep Go's build cache between builds.
+# https://github.com/golang/go/issues/27719#issuecomment-514747274
 RUN --mount=type=ssh \
     --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -78,7 +90,7 @@ RUN --mount=type=ssh \
     # We evaluate the SSH agent to safely pass in a key for cloning dependencies
     # We explicitly use ";" rather than && as we want to safely pass if it is unavailable
     eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - ; \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_CFLAGS="${CGO_FLAG}" go build --tags "netgo" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_CFLAGS="${CGO_FLAG}" go build --tags "${TAGS},${CADENCE_VM_TAG}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -gcflags="all=-N -l" -o ./app ${TARGET}
 
