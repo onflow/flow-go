@@ -18,7 +18,7 @@ type Worker interface {
 }
 
 type Consumer struct {
-	mu  sync.Mutex
+	mu  sync.RWMutex
 	log zerolog.Logger
 
 	// Storage
@@ -124,16 +124,16 @@ func (c *Consumer) Stop() {
 
 // Size returns number of in-memory jobs that consumer is processing.
 func (c *Consumer) Size() uint {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	return uint(len(c.processings))
 }
 
 // LastProcessedIndex returns the last processed job index
 func (c *Consumer) LastProcessedIndex() uint64 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	return c.processedIndex
 }
