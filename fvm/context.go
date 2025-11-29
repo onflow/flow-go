@@ -22,10 +22,6 @@ const (
 	DefaultComputationLimit   = 100_000 // 100K
 	DefaultMemoryLimit        = math.MaxUint64
 	DefaultMaxInteractionSize = 20_000_000 // ~20MB
-
-	// DefaultScheduledTransactionsEnabled is the default value for the scheduled transactions enabled flag
-	// used by Execution, Verification, and Access nodes.
-	DefaultScheduledTransactionsEnabled = true
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
@@ -34,7 +30,6 @@ type Context struct {
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
 	EVMEnabled                        bool
-	ScheduledTransactionsEnabled      bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
@@ -407,17 +402,4 @@ func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option
 		ctx = WithExecutionVersionProvider(environment.NewVersionBeaconExecutionVersionProvider(snapshot.VersionBeacon))(ctx)
 		return ctx
 	}
-}
-
-// WithScheduledTransactionsEnabled enables execution of scheduled transactions.
-func WithScheduledTransactionsEnabled(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.ScheduledTransactionsEnabled = enabled
-		return ctx
-	}
-}
-
-// Deprecated: WithScheduleCallbacksEnabled is deprecated, use WithScheduledTransactionsEnabled instead.
-func WithScheduleCallbacksEnabled(enabled bool) Option {
-	return WithScheduledTransactionsEnabled(enabled)
 }

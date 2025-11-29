@@ -881,7 +881,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	require.NoError(t, err)
 
 	txResults := returnedComputationResult.AllTransactionResults()
-	require.Len(t, txResults, 4) // 2 txs + 1 system tx
+	require.Len(t, txResults, 5) // 3 txs + 1 process scheduled transactions tx + 1 system tx
 
 	require.Empty(t, txResults[0].ErrorMessage)
 	require.Contains(t, txResults[1].ErrorMessage, "I failed encoding")

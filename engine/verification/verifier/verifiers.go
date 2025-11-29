@@ -40,9 +40,8 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledTransactionsEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledTransactionsEnabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -96,9 +95,8 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledTransactionsEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledTransactionsEnabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -227,7 +225,6 @@ func initStorages(
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
-	scheduledTransactionsEnabled bool,
 ) (
 	func() error,
 	*store.All,
@@ -257,7 +254,7 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		db, storedChunkDataPacks, storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledTransactionsEnabled)
+	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -330,7 +327,6 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
-	scheduledTransactionsEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -350,7 +346,6 @@ func makeVerifier(
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			scheduledTransactionsEnabled,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)

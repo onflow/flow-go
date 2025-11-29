@@ -10,21 +10,19 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/verification/verifier"
-	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
 var (
-	flagLastK                        uint64
-	flagDatadir                      string
-	flagChunkDataPackDir             string
-	flagChain                        string
-	flagFromTo                       string
-	flagWorkerCount                  uint // number of workers to verify the blocks concurrently
-	flagStopOnMismatch               bool
-	flagtransactionFeesDisabled      bool
-	flagScheduledTransactionsEnabled bool
+	flagLastK                   uint64
+	flagDatadir                 string
+	flagChunkDataPackDir        string
+	flagChain                   string
+	flagFromTo                  string
+	flagWorkerCount             uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch          bool
+	flagtransactionFeesDisabled bool
 )
 
 // # verify the last 100 sealed blocks
@@ -60,7 +58,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
-	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
+	var unusedScheduledCallbacksEnabled bool // todo remove after deprecation period
+	Cmd.Flags().BoolVar(&unusedScheduledCallbacksEnabled, "scheduled_callbacks_enabled", true, "[deprecated] enable scheduled transactions")
+	_ = Cmd.Flags().MarkDeprecated("scheduled_callbacks_enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
 }
 
 func run(*cobra.Command, []string) {
@@ -95,14 +95,14 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(lockManager, from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledTransactionsEnabled)
+		err = verifier.VerifyRange(lockManager, from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
 		lg.Info().Msgf("finished verified range from %d to %d", from, to)
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(lockManager, flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled, flagScheduledTransactionsEnabled)
+		err := verifier.VerifyLastKHeight(lockManager, flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch, flagtransactionFeesDisabled)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}
