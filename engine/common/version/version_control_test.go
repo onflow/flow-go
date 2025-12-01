@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 
 	"github.com/coreos/go-semver/semver"
@@ -258,7 +260,7 @@ func TestVersionControlInitialization(t *testing.T) {
 		},
 		{
 			name:        "version boundary height is lower than spork root height",
-			nodeVersion: "0.0.2",
+			nodeVersion: "0.0.1",
 			versionEvents: []*flow.SealedVersionBeacon{
 				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
 					BlockHeight: sealedRootBlockHeight - 10,
@@ -316,6 +318,39 @@ func TestVersionControlInitialization(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestVersionControlStartHeight verifies that StartHeight correctly resolves the
+// effective starting block height based on an optional start boundary and the
+// sealed root block height.
+//
+// Test cases:
+//  1. When no start boundary is set, the sealed root block height is returned.
+//  2. When the start boundary is higher than the sealed root, the start boundary is used.
+//  3. When the start boundary is lower than the sealed root, the result is clamped to the sealed root.
+func TestVersionControlStartHeight(t *testing.T) {
+	vc := &VersionControl{}
+
+	t.Run("no start boundary → sealed root returned", func(t *testing.T) {
+		vc.startHeight = atomic.NewUint64(NoHeight)
+		vc.sealedRootBlockHeight = atomic.NewUint64(1000)
+
+		require.Equal(t, uint64(1000), vc.StartHeight())
+	})
+
+	t.Run("start boundary above sealed root", func(t *testing.T) {
+		vc.startHeight = atomic.NewUint64(1200)
+		vc.sealedRootBlockHeight = atomic.NewUint64(1000)
+
+		require.Equal(t, uint64(1200), vc.StartHeight())
+	})
+
+	t.Run("start boundary below sealed root → clamp to sealed root", func(t *testing.T) {
+		vc.startHeight = atomic.NewUint64(900)
+		vc.sealedRootBlockHeight = atomic.NewUint64(1000)
+
+		require.Equal(t, uint64(1000), vc.StartHeight())
+	})
 }
 
 // TestVersionControlInitializationWithErrors tests the initialization process of the VersionControl component with error cases

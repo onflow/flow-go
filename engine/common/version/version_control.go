@@ -215,16 +215,9 @@ func (v *VersionControl) initBoundaries(
 			}
 
 			if ver.Compare(*v.nodeVersion) <= 0 {
-				start := boundary.BlockHeight
-
-				// enforce sealedRootBlockHeight as the lowest when version boundary height is lower than sealedRootBlockHeight
-				if start < sealedRootBlockHeight {
-					start = sealedRootBlockHeight
-				}
-
-				v.startHeight.Store(start)
+				v.startHeight.Store(boundary.BlockHeight)
 				v.log.Info().
-					Uint64("startHeight", start).
+					Uint64("startHeight", boundary.BlockHeight).
 					Msg("Found start block height")
 				// This is the lowest compatible height for this node version, stop search immediately
 				return nil
@@ -398,13 +391,14 @@ func (v *VersionControl) blockFinalized(
 // Start height is the sealed root block if there is no start boundary in the current spork.
 func (v *VersionControl) StartHeight() uint64 {
 	startHeight := v.startHeight.Load()
+	sealedRootHeight := v.sealedRootBlockHeight.Load()
 
 	// in case no start boundary in the current spork
 	if startHeight == NoHeight {
-		startHeight = v.sealedRootBlockHeight.Load()
+		startHeight = sealedRootHeight
 	}
 
-	return startHeight
+	return max(startHeight, sealedRootHeight)
 }
 
 // EndHeight return the last block that the version supports.
