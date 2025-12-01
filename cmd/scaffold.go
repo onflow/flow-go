@@ -1186,8 +1186,29 @@ func (fnb *FlowNodeBuilder) initStorageLockManager() error {
 	return nil
 }
 
+func (fnb *FlowNodeBuilder) determineChainID() error {
+	if ok, _ := badgerState.IsBootstrapped(fnb.ProtocolDB); ok {
+		chainID, err := badgerState.GetChainIDFromLatestFinalizedHeader(fnb.ProtocolDB)
+		if err == nil {
+			fnb.RootChainID = chainID
+			return nil
+		}
+	}
+	// could not read from DB; try reading root snapshot from disk
+	fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
+	rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+	if err != nil {
+		return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
+	}
+	// set root snapshot fields (including RootChainID)
+	if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (fnb *FlowNodeBuilder) initStorage() error {
-	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB)
+	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.RootChainID)
 	guarantees := store.NewGuarantees(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.BaseConfig.guaranteesCacheSize,
 		store.DefaultCacheSize)
 	seals := store.NewSeals(fnb.Metrics.Cache, fnb.ProtocolDB)
@@ -2078,6 +2099,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initMetrics(); err != nil {
+		return err
+	}
+
+	if err := fnb.determineChainID(); err != nil {
 		return err
 	}
 

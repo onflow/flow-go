@@ -41,7 +41,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 	error,
 ) {
 
-	headers := store.NewHeaders(f.metrics, f.db)
+	headers := store.NewHeaders(f.metrics, f.db, stateRoot.ClusterID())
 	payloads := store.NewClusterPayloads(f.metrics, f.db)
 	blocks := store.NewClusterBlocks(f.db, stateRoot.ClusterID(), headers, payloads)
 

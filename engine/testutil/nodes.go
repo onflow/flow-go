@@ -238,7 +238,7 @@ func CompleteStateFixture(
 	pdb := unittest.TypedPebbleDB(t, publicDBDir, pebble.Open)
 	db := pebbleimpl.ToDB(pdb)
 	lockManager := storage.NewTestingLockManager()
-	s := store.InitAll(metric, db)
+	s := store.InitAll(metric, db, flow.Emulator)
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storagebadger.InitSecret)
 	consumer := events.NewDistributor()
 
@@ -560,7 +560,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	receipts := store.NewExecutionReceipts(node.Metrics, db, results, storagebadger.DefaultCacheSize)
 	myReceipts := store.NewMyExecutionReceipts(node.Metrics, db, receipts)
 	versionBeacons := store.NewVersionBeacons(db)
-	headersStorage := store.NewHeaders(node.Metrics, db)
+	headersStorage := store.NewHeaders(node.Metrics, db, chainID)
 
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())

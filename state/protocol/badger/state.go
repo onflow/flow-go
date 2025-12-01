@@ -989,6 +989,36 @@ func IsBootstrapped(db storage.DB) (bool, error) {
 	return true, nil
 }
 
+func GetChainIDFromLatestFinalizedHeader(db storage.DB) (flow.ChainID, error) {
+	h, err := GetLatestFinalizedHeader(db)
+	if err != nil {
+		return "", err
+	}
+	return h.ChainID, nil
+}
+
+// GetLatestFinalizedHeader attempts to retrieve the latest finalized header
+// without going through the storage.Headers interface.
+func GetLatestFinalizedHeader(db storage.DB) (*flow.Header, error) {
+	var finalized uint64
+	r := db.Reader()
+	err := operation.RetrieveFinalizedHeight(r, &finalized)
+	if err != nil {
+		return nil, err
+	}
+	var id flow.Identifier
+	err = operation.LookupBlockHeight(r, finalized, &id)
+	if err != nil {
+		return nil, err
+	}
+	var header flow.Header
+	err = operation.RetrieveHeader(r, id, &header)
+	if err != nil {
+		return nil, err
+	}
+	return &header, nil
+}
+
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
 func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {

@@ -21,7 +21,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		headers := all.Headers
 		blocks := all.Blocks
 
@@ -55,7 +55,7 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		headers := all.Headers
 		blocks := all.Blocks
 
@@ -88,7 +88,7 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 func TestHeaderRetrieveWithoutStore(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		headers := store.NewHeaders(metrics, db)
+		headers := store.NewHeaders(metrics, db, flow.Emulator)
 
 		header := unittest.BlockHeaderFixture()
 
@@ -106,7 +106,7 @@ func TestHeadersByParentID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		headers := all.Headers
 		blocks := all.Blocks
 
@@ -172,7 +172,7 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		headers := all.Headers
 		blocks := all.Blocks
 

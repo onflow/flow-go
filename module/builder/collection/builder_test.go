@@ -95,7 +95,7 @@ func (suite *BuilderSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
 
-	all := store.InitAll(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db, flow.Emulator) // TODO(4204) - handle cluster and non-cluster blocks?
 	consumer := events.NewNoop()
 
 	suite.headers = all.Headers
@@ -1488,7 +1488,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		all := store.InitAll(metrics, suite.db)
+		all := store.InitAll(metrics, suite.db, flow.Emulator)
 		suite.headers = all.Headers
 		suite.blocks = all.Blocks
 		suite.payloads = store.NewClusterPayloads(metrics, suite.db)

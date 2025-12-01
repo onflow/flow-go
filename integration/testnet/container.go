@@ -385,7 +385,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	}
 	metrics := metrics.NewNoopCollector()
 	index := store.NewIndex(metrics, db)
-	headers := store.NewHeaders(metrics, db)
+	headers := store.NewHeaders(metrics, db, c.net.Root().ChainID)
 	seals := store.NewSeals(metrics, db)
 	results := store.NewExecutionResults(metrics, db)
 	receipts := store.NewExecutionReceipts(metrics, db, results, store.DefaultCacheSize)

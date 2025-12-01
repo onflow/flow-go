@@ -11,6 +11,7 @@ import (
 	commonFuncs "github.com/onflow/flow-go/cmd/util/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 )
@@ -56,7 +57,11 @@ func init() {
 func runSnapshotE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
 	return common.WithStorage(flagDatadir, func(db storage.DB) error {
-		storages := common.InitStorages(db)
+		chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+		if err != nil {
+			return err
+		}
+		storages := common.InitStorages(db, chainID)
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
 			return fmt.Errorf("could not init protocol state")

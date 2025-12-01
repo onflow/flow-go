@@ -56,7 +56,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	all := store.InitAll(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db, flow.Emulator) // TODO(4204) - handle cluster and non-cluster blocks?
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))

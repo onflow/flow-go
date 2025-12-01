@@ -7,6 +7,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -20,7 +21,7 @@ func TestFinalizedReader(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		// prepare the storage.Headers instance
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		blocks := all.Blocks
 		headers := all.Headers
 		proposal := unittest.ProposalFixture()

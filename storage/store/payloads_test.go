@@ -6,6 +6,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -18,7 +19,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		payloads := all.Payloads
 		blocks := all.Blocks
 

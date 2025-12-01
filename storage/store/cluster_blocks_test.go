@@ -17,7 +17,7 @@ import (
 func TestClusterBlocks(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		chain := unittest.ClusterBlockFixtures(5)
+		chain := unittest.ClusterBlockFixtures(5) // TODO(4204) set an appropriate cluster chainID on blocks
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent and mark its height as the latest finalized block
@@ -55,7 +55,7 @@ func TestClusterBlocks(t *testing.T) {
 		clusterBlocks := NewClusterBlocks(
 			db,
 			blocks[0].ChainID,
-			NewHeaders(metrics.NewNoopCollector(), db),
+			NewHeaders(metrics.NewNoopCollector(), db, blocks[0].ChainID),
 			NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 

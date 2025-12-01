@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -23,7 +24,11 @@ var guaranteesCmd = &cobra.Command{
 	Short: "get guarantees by collection ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			storages := common.InitStorages(db)
+			chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+			if err != nil {
+				return err
+			}
+			storages := common.InitStorages(db, chainID) // TODO(4204) - header storage not used
 
 			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)

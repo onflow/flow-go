@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -59,7 +60,11 @@ func runE(*cobra.Command, []string) error {
 	}
 
 	return common.WithStorage(flagDatadir, func(db storage.DB) error {
-		storages := common.InitStorages(db)
+		chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+		if err != nil {
+			return err
+		}
+		storages := common.InitStorages(db, chainID) // TODO(4204) - clean up duplicated storage types
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
 			return fmt.Errorf("could not open protocol states: %w", err)
@@ -75,7 +80,7 @@ func runE(*cobra.Command, []string) error {
 		results := store.NewExecutionResults(metrics, db)
 		receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
-		headers := store.NewHeaders(metrics, db)
+		headers := store.NewHeaders(metrics, db, chainID)
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
 		transactions := store.NewTransactions(metrics, db)

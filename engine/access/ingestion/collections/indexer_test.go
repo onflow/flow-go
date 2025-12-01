@@ -392,7 +392,7 @@ func newBlockchain(t *testing.T, pdb *pebble.DB) *blockchain {
 	db := pebbleimpl.ToDB(pdb)
 	lockManager := storage.NewTestingLockManager()
 
-	all := store.InitAll(metrics, db)
+	all := store.InitAll(metrics, db, flow.Emulator)
 	transactions := store.NewTransactions(metrics, db)
 	collections := store.NewCollections(db, transactions)
 

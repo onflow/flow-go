@@ -56,7 +56,7 @@ func TestReadClusterRange(t *testing.T) {
 		clusterBlocks := store.NewClusterBlocks(
 			db,
 			blocks[0].ChainID,
-			store.NewHeaders(metrics.NewNoopCollector(), db),
+			store.NewHeaders(metrics.NewNoopCollector(), db, blocks[0].ChainID),
 			store.NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 

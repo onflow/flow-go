@@ -6,6 +6,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -19,7 +20,7 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		cacheMetrics := &metrics.NoopCollector{}
 		// verify after storing a block should be able to retrieve it back
-		blocks := store.InitAll(cacheMetrics, db).Blocks
+		blocks := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
@@ -46,7 +47,7 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 
 		// verify after a restart, the block stored in the database is the same
 		// as the original
-		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
+		blocksAfterRestart := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)
@@ -57,7 +58,7 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		cacheMetrics := &metrics.NoopCollector{}
-		blocks := store.InitAll(cacheMetrics, db).Blocks
+		blocks := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
@@ -102,7 +103,7 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// Verify after a restart, the block indexed by height is still retrievable
-		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
+		blocksAfterRestart := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)
@@ -113,7 +114,7 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		cacheMetrics := &metrics.NoopCollector{}
-		blocks := store.InitAll(cacheMetrics, db).Blocks
+		blocks := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
@@ -153,7 +154,7 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// Verify after a restart, the block indexed by view is still retrievable
-		blocksAfterRestart := store.InitAll(cacheMetrics, db).Blocks
+		blocksAfterRestart := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByView(block.View)
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)

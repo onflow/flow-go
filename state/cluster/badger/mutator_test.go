@@ -68,7 +68,7 @@ func (suite *MutatorSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := store.InitAll(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db, suite.chainID) // TODO(4204) - handle cluster and non-cluster blocks?
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference

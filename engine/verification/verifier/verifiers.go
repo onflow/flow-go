@@ -241,7 +241,7 @@ func initStorages(
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not init storage database: %w", err)
 	}
 
-	storages := common.InitStorages(db)
+	storages := common.InitStorages(db, chainID)
 	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %w", err)
