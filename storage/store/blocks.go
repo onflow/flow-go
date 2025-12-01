@@ -216,7 +216,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the 
+// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the
 // given collection (the collection guarantee such that `CollectionGuarantee.CollectionID == collID`).
 // This function returns the finalized _consensus_ block including the specified collection, not the cluster
 // block which defines the collection.
