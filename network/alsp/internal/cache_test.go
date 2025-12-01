@@ -539,7 +539,6 @@ func TestSpamRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 	// initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
-		originID := originID // capture range variable
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -612,7 +611,6 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 
 	// Initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
-		originID := originID // capture range variable
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -684,7 +682,6 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 
 	// initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
-		originID := originID
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -695,7 +692,6 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 
 	// remove spam records concurrently
 	for _, originID := range originIDsToRemove {
-		originID := originID
 		go func() {
 			defer wg.Done()
 			cache.Remove(originID)
@@ -704,7 +700,6 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 
 	// adjust spam records concurrently
 	for _, originID := range originIDsToAdjust {
-		originID := originID
 		go func() {
 			defer wg.Done()
 			_, err := cache.AdjustWithInit(originID, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
@@ -773,7 +768,6 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 
 	// initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
-		originID := originID
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -787,7 +781,6 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 
 	// remove spam records concurrently
 	for _, originID := range originIDsToRemove {
-		originID := originID
 		go func() {
 			defer wg.Done()
 			require.True(t, cache.Remove(originID))

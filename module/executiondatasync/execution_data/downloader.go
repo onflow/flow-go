@@ -105,8 +105,6 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 	var mu sync.Mutex
 
 	for i, chunkDataID := range edRoot.ChunkExecutionDataIDs {
-		i := i
-		chunkDataID := chunkDataID
 
 		g.Go(func() error {
 			ced, cids, err := d.getChunkExecutionData(

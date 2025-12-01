@@ -264,7 +264,6 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 
 	// launch workers
 	for _, worker := range c.workers {
-		worker := worker
 		go func() {
 			defer workersDone.Done()
 			var readyOnce sync.Once

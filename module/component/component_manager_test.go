@@ -531,8 +531,6 @@ func (c *ComponentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 	}
 
 	for i, workerId := range st.workerIDs {
-		i := i
-		workerId := workerId
 		addTransition(func() {
 			wst := st.workerTransitions[i]
 			t.Logf("executing worker %v transition: %v\n", workerId, wst)
