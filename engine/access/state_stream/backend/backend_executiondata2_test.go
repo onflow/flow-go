@@ -225,16 +225,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 						nil,
 					).
 					Once()
-
-				s.headers.
-					On("ByBlockID", mock.Anything).
-					Return(func(ID flow.Identifier) (*flow.Header, error) {
-						block, ok := s.blocksIDToBlockMap[ID]
-						if !ok {
-							return nil, storage.ErrNotFound
-						}
-						return block.ToHeader(), nil
-					})
 			},
 		},
 		{
@@ -256,16 +246,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 						nil,
 					).
 					Once()
-
-				s.headers.
-					On("ByBlockID", mock.Anything).
-					Return(func(ID flow.Identifier) (*flow.Header, error) {
-						block, ok := s.blocksIDToBlockMap[ID]
-						if !ok {
-							return nil, storage.ErrNotFound
-						}
-						return block.ToHeader(), nil
-					})
 			},
 		},
 		{
@@ -285,16 +265,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 						nil,
 					).
 					Once()
-
-				s.headers.
-					On("ByBlockID", mock.Anything).
-					Return(func(ID flow.Identifier) (*flow.Header, error) {
-						block, ok := s.blocksIDToBlockMap[ID]
-						if !ok {
-							return nil, storage.ErrNotFound
-						}
-						return block.ToHeader(), nil
-					})
 			},
 		},
 	}
@@ -474,16 +444,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 						nil,
 					).
 					Once()
-
-				s.headers.
-					On("ByBlockID", mock.Anything).
-					Return(func(ID flow.Identifier) (*flow.Header, error) {
-						block, ok := s.blocksIDToBlockMap[ID]
-						if !ok {
-							return nil, storage.ErrNotFound
-						}
-						return block.ToHeader(), nil
-					})
 			},
 		},
 		{
@@ -504,16 +464,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 						nil,
 					).
 					Once()
-
-				s.headers.
-					On("ByBlockID", mock.Anything).
-					Return(func(ID flow.Identifier) (*flow.Header, error) {
-						block, ok := s.blocksIDToBlockMap[ID]
-						if !ok {
-							return nil, storage.ErrNotFound
-						}
-						return block.ToHeader(), nil
-					})
 			},
 		},
 		{
@@ -532,16 +482,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 						nil,
 					).
 					Once()
-
-				s.headers.
-					On("ByBlockID", mock.Anything).
-					Return(func(ID flow.Identifier) (*flow.Header, error) {
-						block, ok := s.blocksIDToBlockMap[ID]
-						if !ok {
-							return nil, storage.ErrNotFound
-						}
-						return block.ToHeader(), nil
-					})
 			},
 		},
 	}
@@ -680,6 +620,14 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 			name:        "block is not finalized",
 			expectedErr: storage.ErrNotFound,
 			mockState: func(s *BackendExecutionDataSuite2) {
+				// stream the first 2 blocks for each subtest with no errors
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(1)
+
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
@@ -692,6 +640,14 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 			name:        "block not found",
 			expectedErr: optimistic_sync.ErrBlockNotFound,
 			mockState: func(s *BackendExecutionDataSuite2) {
+				// stream the first 2 blocks for each subtest with no errors
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(1)
+
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
@@ -704,6 +660,14 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 			name:        "fork abandoned",
 			expectedErr: optimistic_sync.ErrForkAbandoned,
 			mockState: func(s *BackendExecutionDataSuite2) {
+				// stream the first block normally, then stream an error
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(1)
+
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
@@ -716,6 +680,14 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 			name:        "unexpected error",
 			expectedErr: assert.AnError,
 			mockState: func(s *BackendExecutionDataSuite2) {
+				// stream the first 2 blocks for each subtest with no errors
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(1)
+
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
@@ -759,14 +731,6 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 			}, nil
 		})
 
-	// stream the first 2 blocks for each subtest with no errors
-	s.executionResultProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-			return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
-		}).
-		Times(2 * len(tests))
-
 	s.executionDataTracker.
 		On("GetStartHeightFromBlockID", mock.AnythingOfType("flow.Identifier")).
 		Return(
@@ -800,15 +764,13 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 			wg := &sync.WaitGroup{}
 			wg.Add(2)
 
-			// writer sends 2 blocks
 			go func() {
 				defer wg.Done()
 
-				for range 3 {
+				// stream 2 blocks. 1 is served normally, 1 is served with an error
+				for range 2 {
 					s.executionDataBroadcaster.Publish()
 				}
-
-				cancel()
 			}()
 
 			go s.reader(wg, sub, firstExpectedBlockHeight, test.expectedErr)
@@ -858,10 +820,15 @@ func (s *BackendExecutionDataSuite2) writer(wg *sync.WaitGroup, cancel context.C
 // reader reads the execution data from the subscription and compares it with the expected execution data
 // for the particular block. As the subscription is height based, we expect execution data to come in the
 // block height order.
-func (s *BackendExecutionDataSuite2) reader(wg *sync.WaitGroup, sub subscription.Subscription, firstHeight uint64, expectedErr error) {
+func (s *BackendExecutionDataSuite2) reader(
+	wg *sync.WaitGroup,
+	sub subscription.Subscription,
+	firstExpectedHeight uint64,
+	expectedErr error,
+) {
 	defer wg.Done()
 
-	currentHeight := firstHeight
+	currentHeight := firstExpectedHeight
 
 	for value := range sub.Channel() {
 		actualExecutionData, ok := value.(*ExecutionDataResponse)

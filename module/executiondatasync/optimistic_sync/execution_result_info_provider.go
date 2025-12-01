@@ -21,7 +21,7 @@ type Criteria struct {
 
 // DefaultCriteria is the operator's default criteria for execution result queries.
 var DefaultCriteria = Criteria{
-	AgreeingExecutorsCount: 2,
+	AgreeingExecutorsCount: 1,
 }
 
 // OverrideWith overrides the original criteria with the incoming criteria, returning a new Criteria object.
