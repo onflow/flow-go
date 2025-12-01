@@ -103,11 +103,11 @@ func (s *AccessAPISuite) TestAccessAPIs() {
 	targetHeight := txResult.BlockHeight + 1
 	s.waitUntilIndexed(targetHeight)
 
-	s.T().Run("Script execution and get accounts on AN1", func(t *testing.T) {
+	s.T().Run("Script execution and get accounts using execution nodes", func(t *testing.T) {
 		s.testScriptExecutionAndGetAccountsAN1(targetHeight)
 	})
 
-	s.T().Run("Script execution and get accounts on AN2", func(t *testing.T) {
+	s.T().Run("Script execution and get accounts using local data", func(t *testing.T) {
 		s.testScriptExecutionAndGetAccountsAN2(targetHeight)
 	})
 

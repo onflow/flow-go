@@ -45,13 +45,8 @@ type ObserverIndexerEnabledSuite struct {
 }
 
 func (s *ObserverIndexerEnabledSuite) TestObserverIndexerEnabled() {
-	s.T().Run("Observer indexed RPCs happy path", func(t *testing.T) {
-		s.testObserverIndexedRPCsHappyPath(t)
-	})
-
-	s.T().Run("All observer indexed RPCs happy path", func(t *testing.T) {
-		s.testAllObserverIndexedRPCsHappyPath(t)
-	})
+	s.T().Run("Observer indexed RPCs happy path", s.testObserverIndexedRPCsHappyPath)
+	s.T().Run("All observer indexed RPCs happy path", s.testAllObserverIndexedRPCsHappyPath)
 }
 
 // SetupTest sets up the test suite by starting the network and preparing the observers client.

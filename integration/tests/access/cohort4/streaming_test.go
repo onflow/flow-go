@@ -196,7 +196,7 @@ func (s *StreamingSuite) TestStreamingAPIs() {
 // testGrpcEventStreaming tests gRPC event streaming APIs (ExecutionDataAPI).
 func (s *StreamingSuite) testGrpcEventStreaming() {
 	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY,
-		"flaky tests: https://github.com/onflow/flow-go/issues/5825 - this task is fixed, but the problem still exists here")
+		"flaky test: https://github.com/onflow/flow-go/issues/8212")
 	testAN := s.net.ContainerByName(testnet.PrimaryAN)
 	sdkClientTestAN := getExecutionDataClient(s.T(), testAN)
 
