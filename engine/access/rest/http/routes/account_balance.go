@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -24,8 +22,7 @@ func GetAccountBalance(r *common.Request, backend access.API, _ commonmodels.Lin
 	if isFinal || isSealed {
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
 		if err != nil {
-			err := fmt.Errorf("block with height: %d does not exist", req.Height)
-			return nil, common.NewNotFoundError(err.Error(), err)
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.Height = header.Height
 	}
@@ -33,8 +30,7 @@ func GetAccountBalance(r *common.Request, backend access.API, _ commonmodels.Lin
 	executionState := req.ExecutionState
 	balance, executorMetadata, err := backend.GetAccountBalanceAtBlockHeight(r.Context(), req.Address, req.Height, models.NewCriteria(executionState))
 	if err != nil {
-		err = fmt.Errorf("failed to get account balance, reason: %w", err)
-		return nil, common.NewNotFoundError(err.Error(), err)
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	response := models.NewAccountBalance(balance, executorMetadata, executionState.IncludeExecutorMetadata)

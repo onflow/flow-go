@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/model/access"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,7 +46,7 @@ func TestAccessGetAccount(t *testing.T) {
 			Once()
 
 		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
-			Return(account, &access.ExecutorMetadata{}, nil).
+			Return(account, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedExpandedResponse(account, nil)
@@ -63,7 +64,7 @@ func TestAccessGetAccount(t *testing.T) {
 			Return(block, flow.BlockStatusFinalized, nil).
 			Once()
 		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
-			Return(account, &access.ExecutorMetadata{}, nil).
+			Return(account, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedExpandedResponse(account, nil)
@@ -77,7 +78,7 @@ func TestAccessGetAccount(t *testing.T) {
 		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "false", expandableFieldKeys, expandableFieldContracts)
 
 		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
-			Return(account, &access.ExecutorMetadata{}, nil).
+			Return(account, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedExpandedResponse(account, nil)
@@ -91,7 +92,7 @@ func TestAccessGetAccount(t *testing.T) {
 		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "false")
 
 		backend.On("GetAccountAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
-			Return(account, &access.ExecutorMetadata{}, nil).
+			Return(account, &accessmodel.ExecutorMetadata{}, nil).
 			Once()
 
 		expected := expectedCondensedResponse(account, nil)
@@ -103,7 +104,7 @@ func TestAccessGetAccount(t *testing.T) {
 		account, err := unittest.AccountFixture()
 		require.NoError(t, err)
 
-		metadata := &access.ExecutorMetadata{
+		metadata := &accessmodel.ExecutorMetadata{
 			ExecutionResultID: unittest.IdentifierFixture(),
 			ExecutorIDs:       unittest.IdentifierListFixture(2),
 		}
@@ -124,10 +125,10 @@ func TestAccessGetAccount(t *testing.T) {
 //
 // Test cases:
 //  1. A request with an invalid account address returns http.StatusBadRequest.
-//  2. A request where GetLatestBlockHeader fails for the "sealed" height returns http.StatusInternalServerError.
-//  3. A request where GetAccountAtBlockHeight fails for a valid block height returns http.StatusInternalServerError.
+//  2. Simulated failure when fetching the latest block header for a "sealed" height
+//     to ensure that any propagated errors are correctly returned as http.StatusInternalServerError.
 //
-// TODO(#7650): These tests will be updated in https://github.com/onflow/flow-go/pull/8141
+// 3. A request where GetAccountAtBlockHeight fails for a valid block height returns http.StatusNotFound.
 func TestGetAccountErrors(t *testing.T) {
 	backend := accessmock.NewAPI(t)
 
@@ -150,22 +151,22 @@ func TestGetAccountErrors(t *testing.T) {
 			url:  accountURL(t, unittest.AddressFixture().String(), router.SealedHeightQueryParam, "2", []string{}, "false"),
 			setup: func() {
 				backend.On("GetLatestBlockHeader", mock.Anything, true).
-					Return(nil, flow.BlockStatusUnknown, fmt.Errorf("latest block header error")).
+					Return(nil, flow.BlockStatusUnknown, access.NewInternalError(fmt.Errorf("internal server error"))).
 					Once()
 			},
 			status: http.StatusInternalServerError,
-			out:    `{"code":500, "message":"internal server error"}`,
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
 		},
 		{
 			name: "GetAccountAtBlockHeight fails for valid height",
 			url:  accountURL(t, unittest.AddressFixture().String(), "100", "2", []string{}, "false"),
 			setup: func() {
 				backend.On("GetAccountAtBlockHeight", mock.Anything, mock.Anything, uint64(100), mock.Anything).
-					Return(nil, nil, fmt.Errorf("database error")).
+					Return(nil, nil, access.NewDataNotFoundError("block", fmt.Errorf("not found"))).
 					Once()
 			},
-			status: http.StatusInternalServerError,
-			out:    `{"code":500, "message":"internal server error"}`,
+			status: http.StatusNotFound,
+			out:    `{"code":404, "message":"Flow resource not found: data not found for block: not found"}`,
 		},
 	}
 
@@ -181,7 +182,7 @@ func TestGetAccountErrors(t *testing.T) {
 	}
 }
 
-func expectedExpandedResponse(account *flow.Account, metadata *access.ExecutorMetadata) string {
+func expectedExpandedResponse(account *flow.Account, metadata *accessmodel.ExecutorMetadata) string {
 	metadataSection := expectedMetadata(metadata)
 
 	return fmt.Sprintf(`{
@@ -204,7 +205,7 @@ func expectedExpandedResponse(account *flow.Account, metadata *access.ExecutorMe
 			}`, account.Address, account.Keys[0].PublicKey.String(), account.Address, metadataSection)
 }
 
-func expectedCondensedResponse(account *flow.Account, metadata *access.ExecutorMetadata) string {
+func expectedCondensedResponse(account *flow.Account, metadata *accessmodel.ExecutorMetadata) string {
 	metadataSection := expectedMetadata(metadata)
 
 	return fmt.Sprintf(`{

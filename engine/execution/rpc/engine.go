@@ -714,6 +714,13 @@ func (h *handler) eventResult(
 	}, nil
 }
 
+// GetAccountAtBlockID returns the account details at the given block ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request fails due to invalid arguments.
+//   - [codes.NotFound]: If the requested data are not found.
+//   - [codes.Internal]: If the block state commitment cannot be retrieved due to internal errors.
+//   - [codes.OutOfRange]: If the state for block is not available.
 func (h *handler) GetAccountAtBlockID(
 	ctx context.Context,
 	req *execution.GetAccountAtBlockIDRequest,

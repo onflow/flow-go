@@ -12,16 +12,143 @@ import (
 )
 
 type AccountsAPI interface {
+	// GetAccount returns the account details at the latest sealed block.
+	// Alias for GetAccountAtLatestBlock.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccount(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
+	// GetAccountAtLatestBlock returns the account details at the latest sealed block.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	// As documented in the [access.API], which we partially implement with this function
+	//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
+	// GetAccountAtBlockHeight returns the account details at the given block height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (*flow.Account, *accessmodel.ExecutorMetadata, error)
-
+	// GetAccountBalanceAtLatestBlock returns the account balance at the latest sealed block.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (uint64, *accessmodel.ExecutorMetadata, error)
+	// GetAccountBalanceAtBlockHeight returns the account balance at the given block height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (uint64, *accessmodel.ExecutorMetadata, error)
 
+	// GetAccountKeyAtLatestBlock returns the account public key at the latest sealed block.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32, criteria optimistic_sync.Criteria) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
+	// GetAccountKeyAtBlockHeight returns the account public key by key index at the given block height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, criteria optimistic_sync.Criteria) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
+	// GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
+	// GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
+	//
+	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+	//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+	//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+	//
+	// Expected error returns during normal operation:
+	//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+	//   - [access.DataNotFoundError]: If data is not found.
+	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+	//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+	//   - [access.RequestCanceledError]: If the request is canceled.
+	//   - [access.RequestTimedOutError]: If the request times out.
+	//   - [access.InternalError]: For internal failures or index conversion errors.
 	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error)
 }
 
