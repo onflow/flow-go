@@ -26,8 +26,7 @@ func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 	}
 }
 
-// Checks constraints about the number of partner and internal nodes.
-//   - Internal nodes must comprise >2/3 of each collector cluster.
+// Checks constraints about the weights of partner and internal nodes.
 //   - for all roles R:
 //     all node with role R must have the same weight
 func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
