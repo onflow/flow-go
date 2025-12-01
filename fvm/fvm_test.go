@@ -991,7 +991,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
 
-			address := flow.ConvertAddress(
+			address := flow.Address(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
 					cadenceStdlib.AccountEventAddressParameter.Identifier,
@@ -2432,7 +2432,7 @@ func TestInteractionLimit(t *testing.T) {
 				return snapshotTree, err
 			}
 
-			address = flow.ConvertAddress(
+			address = flow.Address(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
 					cadenceStdlib.AccountEventAddressParameter.Identifier,
