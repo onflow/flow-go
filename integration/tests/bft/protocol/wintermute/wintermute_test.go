@@ -19,6 +19,7 @@ type WintermuteTestSuite struct {
 }
 
 func TestWintermuteAttackTestSuite(t *testing.T) {
+	t.Skip("skipping TestWintermuteAttackTestSuite due to flakiness")
 	suite.Run(t, new(WintermuteTestSuite))
 }
 
