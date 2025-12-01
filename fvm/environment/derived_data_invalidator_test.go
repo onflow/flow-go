@@ -28,7 +28,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	// ```
 
 	addressA := flow.HexToAddress("0xa")
-	cAddressA := common.MustBytesToAddress(addressA.Bytes())
+	cAddressA := common.Address(addressA)
 	programALoc := common.AddressLocation{Address: cAddressA, Name: "A"}
 	programA2Loc := common.AddressLocation{Address: cAddressA, Name: "A2"}
 	programA := &derived.Program{
@@ -38,7 +38,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	}
 
 	addressB := flow.HexToAddress("0xb")
-	cAddressB := common.MustBytesToAddress(addressB.Bytes())
+	cAddressB := common.Address(addressB)
 	programBLoc := common.AddressLocation{Address: cAddressB, Name: "B"}
 	programBDep := derived.NewProgramDependencies()
 	programBDep.Add(programALoc)
@@ -51,7 +51,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	}
 
 	addressD := flow.HexToAddress("0xd")
-	cAddressD := common.MustBytesToAddress(addressD.Bytes())
+	cAddressD := common.Address(addressD)
 	programDLoc := common.AddressLocation{Address: cAddressD, Name: "D"}
 	programD := &derived.Program{
 		Program: nil,
@@ -60,7 +60,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	}
 
 	addressC := flow.HexToAddress("0xc")
-	cAddressC := common.MustBytesToAddress(addressC.Bytes())
+	cAddressC := common.Address(addressC)
 	programCLoc := common.AddressLocation{Address: cAddressC, Name: "C"}
 	programC := &derived.Program{
 		Program: nil,
