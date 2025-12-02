@@ -217,7 +217,7 @@ func (c *balanceProcessor) reportAccountData(indx uint64) {
 		return
 	}
 
-	runtimeAddress := common.MustBytesToAddress(address.Bytes())
+	runtimeAddress := common.Address(address)
 
 	u, err := c.env.GetStorageUsed(runtimeAddress)
 	if err != nil {
