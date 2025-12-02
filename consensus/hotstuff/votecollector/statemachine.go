@@ -383,6 +383,8 @@ func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error 
 	return nil
 }
 
+// terminateVoteProcessing terminates vote processing by moving the processor into VoteCollectorStatusInvalid state.
+// It utilizes atomic CAS(Compare-And-Swap) operation in a loop to ensure that eventually we enter invalid state.
 func (m *VoteCollector) terminateVoteProcessing() {
 	newProcWrapper := &atomicValueWrapper{
 		processor: NewNoopCollector(hotstuff.VoteCollectorStatusInvalid),
