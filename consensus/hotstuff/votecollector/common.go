@@ -46,23 +46,23 @@ func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 	return nil
 }
 
-// ConcurrentIdentifierSet implements a simple set for tracking unique entries by identifier.
+// AppendOnlyIdentifierSet implements a simple set for tracking unique entries by identifier.
 // Removal of set elements is not supported, we want to provide append-only guarantees.
 // Concurrency safe.
-type ConcurrentIdentifierSet struct {
+type AppendOnlyIdentifierSet struct {
 	set  map[flow.Identifier]struct{}
 	lock sync.Mutex
 }
 
 // NewConcurrentIdentifierSet creates new identifier set, with strict append-only characteristics.
-func NewConcurrentIdentifierSet() *ConcurrentIdentifierSet {
-	return &ConcurrentIdentifierSet{
+func NewConcurrentIdentifierSet() *AppendOnlyIdentifierSet {
+	return &AppendOnlyIdentifierSet{
 		set: make(map[flow.Identifier]struct{}),
 	}
 }
 
 // Add adds identifier to the internal set, returns true when added, otherwise returns false.
-func (s *ConcurrentIdentifierSet) Add(identifier flow.Identifier) bool {
+func (s *AppendOnlyIdentifierSet) Add(identifier flow.Identifier) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	_, exists := s.set[identifier]

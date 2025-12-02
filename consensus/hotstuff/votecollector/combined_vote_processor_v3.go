@@ -131,7 +131,7 @@ type CombinedVoteProcessorV3 struct {
 	rbRector          hotstuff.RandomBeaconReconstructor
 	onQCCreated       hotstuff.OnQCCreated
 	packer            hotstuff.Packer
-	votesCache        *ConcurrentIdentifierSet
+	votesCache        *AppendOnlyIdentifierSet
 	minRequiredWeight uint64
 	done              atomic.Bool
 }
