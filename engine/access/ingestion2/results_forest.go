@@ -990,11 +990,6 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 		return
 	}
 
-	// send state update to all children.
-	for child := range rf.IterateChildren(resultID) {
-		child.Pipeline().OnParentStateUpdated(newState)
-	}
-
 	// process completed pipelines
 	if newState == optimistic_sync.StateComplete {
 		rf.mu.Lock()
@@ -1005,6 +1000,11 @@ func (rf *ResultsForest) OnStateUpdated(resultID flow.Identifier, newState optim
 			rf.log.Fatal().Err(err).Msg("irrecoverable exception: failed to process completed pipeline")
 			return
 		}
+	}
+
+	// send state update to all children.
+	for child := range rf.IterateChildren(resultID) {
+		child.Pipeline().OnParentStateUpdated(newState)
 	}
 }
 
