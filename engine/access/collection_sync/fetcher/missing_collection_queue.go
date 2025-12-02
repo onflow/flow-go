@@ -56,6 +56,15 @@ func NewMissingCollectionQueue() *MissingCollectionQueue {
 	}
 }
 
+// pickOne returns an arbitrary key from the given map.
+// The map must be non-empty. The selection is non-deterministic due to Go's map iteration order.
+func pickOne(m map[flow.Identifier]struct{}) flow.Identifier {
+	for id := range m {
+		return id
+	}
+	return flow.ZeroID
+}
+
 // EnqueueMissingCollections registers missing collections for a block height along with a callback
 // that will be invoked when all collections for that height have been received and indexed.
 //
@@ -116,12 +125,14 @@ func (mcq *MissingCollectionQueue) EnqueueMissingCollections(
 // The collection parameter should be the actual collection object received from the requester.
 //
 // Returns:
-//   - (collections, height, true) if the block height became complete
-//   - (nil, 0, false) if no block height became complete
+//   - (collections, height, missingCollectionID, true) if the block height became complete
+//   - (nil, 0, missingCollectionID, false) if no block height became complete
+//     missingCollectionID is an arbitrary ID from the remaining missing collections, or ZeroID if none.
 func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	collection *flow.Collection,
-) ([]*flow.Collection, uint64, bool) {
+) ([]*flow.Collection, uint64, flow.Identifier, bool) {
 	collectionID := collection.ID()
+	missingCol := flow.ZeroID
 
 	mcq.mu.Lock()
 	defer mcq.mu.Unlock()
@@ -130,21 +141,29 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	height, ok := mcq.collectionToHeight[collectionID]
 	if !ok {
 		// No block is waiting for this collection.
-		return nil, 0, false
+		return nil, 0, missingCol, false
 	}
 
 	jobState, exists := mcq.blockJobs[height]
 	if !exists {
 		// Job was already completed/removed.
 		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
-		return nil, 0, false
+		return nil, 0, missingCol, false
+	}
+
+	if len(jobState.missingCollections) > 0 {
+		// pick a random missing collection to return
+		// useful for logging/debugging purposes
+		// in case fetching is stuck, it's useful to know which collections are still missing
+		// we don't need to return all missing collections, just one is enough
+		missingCol = pickOne(jobState.missingCollections)
 	}
 
 	// Check if this collection was still missing for this block.
 	if _, wasMissing := jobState.missingCollections[collectionID]; !wasMissing {
 		// Collection was already received or wasn't part of this block's missing set.
 		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
-		return nil, 0, false
+		return nil, 0, missingCol, false
 	}
 
 	// Remove from missing set and add to received collections.
@@ -155,16 +174,16 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	// Don't delete from collectionToHeight - the mapping is kept until OnIndexedForBlock cleans it up.
 
 	// Check if the block is now complete (all collections received).
-	if len(jobState.missingCollections) == 0 {
-		// Return all received collections for this block.
-		collections := make([]*flow.Collection, 0, len(jobState.receivedCollections))
-		for _, col := range jobState.receivedCollections {
-			collections = append(collections, col)
-		}
-		return collections, height, true
+	if len(jobState.missingCollections) > 0 {
+		return nil, 0, missingCol, false
 	}
 
-	return nil, 0, false
+	// Return all received collections for this block.
+	collections := make([]*flow.Collection, 0, len(jobState.receivedCollections))
+	for _, col := range jobState.receivedCollections {
+		collections = append(collections, col)
+	}
+	return collections, height, flow.ZeroID, true
 }
 
 // IsHeightQueued returns true if the given height has queued collections
@@ -257,11 +276,10 @@ func (mcq *MissingCollectionQueue) cleanupCollectionMappingsForHeight(
 	return jobState, true
 }
 
-// Size returns the number of missing collections currently in the queue.
-// This is the total number of collections across all block heights that are still missing.
+// Size returns the number of incomplete jobs currently in the queue.
 func (mcq *MissingCollectionQueue) Size() uint {
 	mcq.mu.RLock()
 	defer mcq.mu.RUnlock()
 
-	return uint(len(mcq.collectionToHeight))
+	return uint(len(mcq.blockJobs))
 }

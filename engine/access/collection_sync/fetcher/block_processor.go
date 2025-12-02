@@ -83,10 +83,11 @@ func (bp *BlockProcessor) FetchCollections(
 	}
 
 	// Enqueue missing collections with notifyJobCompletion
-	// When all collections are received and indexed, mark the job as done
+	// When all collections are received and indexed, the notifyJobCompletion callback
+	// will be returned in the OnIndexedForBlock method, calling it will notify the job
+	// queue that the job is complete.
 	notifyJobCompletion := done
 
-	// the notifyJobCompletion callback will be returned in the OnReceiveCollection method
 	err = bp.mcq.EnqueueMissingCollections(blockHeight, collectionIDs, notifyJobCompletion)
 	if err != nil {
 		return fmt.Errorf("failed to enqueue missing collections for block height %d: %w", blockHeight, err)
@@ -109,7 +110,7 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 	collectionID := collection.ID()
 
 	// Pass collection to MCQ
-	collections, height, complete := bp.mcq.OnReceivedCollection(collection)
+	collections, height, missingCol, complete := bp.mcq.OnReceivedCollection(collection)
 
 	// Log collection receipt and whether it completes a block
 	if complete {
@@ -123,11 +124,17 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 		bp.log.Debug().
 			Hex("collection_id", collectionID[:]).
 			Hex("origin_id", originID[:]).
+			// there might be multiple missing collections, just log one of them
+			Hex("missing_col", missingCol[:]).
+			Uint64("block_height", height).
 			Msg("received collection (block not yet complete)")
 	}
 
+	// OnReceiveCollection might be called multiple times for the same collection
+	// but complete will only be true once per block height.
 	if !complete {
 		// Block is not complete yet, nothing more to do
+		// or block is complete, but another thread is indexing it
 		return nil
 	}
 

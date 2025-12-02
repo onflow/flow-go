@@ -46,7 +46,8 @@ var _ component.Component = (*Fetcher)(nil)
 // No error returns are expected during normal operation.
 func NewFetcher(
 	log zerolog.Logger,
-	blockProcessor collection_sync.BlockProcessor, progressInitializer storage.ConsumerProgressInitializer,
+	blockProcessor collection_sync.BlockProcessor,
+	progressInitializer storage.ConsumerProgressInitializer,
 	state protocol.State,
 	blocks storage.Blocks,
 	maxProcessing uint64, // max number of blocks to fetch collections concurrently

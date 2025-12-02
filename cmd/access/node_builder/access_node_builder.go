@@ -40,6 +40,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
+	"github.com/onflow/flow-go/engine/access/collection_sync/factory"
 	collection_syncfactory "github.com/onflow/flow-go/engine/access/collection_sync/factory"
 	collsyncindexer "github.com/onflow/flow-go/engine/access/collection_sync/indexer"
 	"github.com/onflow/flow-go/engine/access/finalized_indexer"
@@ -292,8 +293,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
-		collectionFetcherMaxProcessing:       10,
-		collectionFetcherMaxSearchAhead:      20,
+		collectionFetcherMaxProcessing:       factory.DefaultMaxProcessing,
+		collectionFetcherMaxSearchAhead:      factory.DefaultMaxSearchAhead,
 		collectionSync:                       collection_syncfactory.CollectionSyncModeExecutionAndCollection,
 	}
 }

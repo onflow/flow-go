@@ -17,9 +17,10 @@ type MissingCollectionQueue interface {
 	OnIndexedForBlock(blockHeight uint64) (func(), bool)
 
 	// On receipt of a collection, MCQ updates internal state and, if a block
-	// just became complete, returns: (collections, height, true).
-	// Otherwise, returns (nil, 0, false).
-	OnReceivedCollection(collection *flow.Collection) ([]*flow.Collection, uint64, bool)
+	// just became complete, returns: (collections, height, missingCollectionID, true).
+	// Otherwise, returns (nil, height, missingCollectionID, false).
+	// missingCollectionID is an arbitrary ID from the remaining missing collections, or ZeroID if none.
+	OnReceivedCollection(collection *flow.Collection) ([]*flow.Collection, uint64, flow.Identifier, bool)
 
 	// PruneUpToHeight removes all tracked heights up to and including the given height.
 	PruneUpToHeight(height uint64) (callbacks []func())

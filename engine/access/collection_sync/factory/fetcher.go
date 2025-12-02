@@ -19,14 +19,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// CreateFetcherConfig holds configuration parameters for creating a Fetcher.
-type CreateFetcherConfig struct {
-	// MaxProcessing is the maximum number of jobs to process concurrently.
-	MaxProcessing uint64
-	// MaxSearchAhead is the maximum number of jobs beyond processedIndex to process. 0 means no limit.
-	MaxSearchAhead uint64
-}
-
 // createFetcher creates a new Fetcher component with all its dependencies.
 //
 // Parameters:
@@ -125,6 +117,8 @@ func createFetcher(
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create fetcher: %w", err)
 	}
+
+	accessMetrics.UpdateLastFullBlockHeight(lastFullBlockHeight.ProcessedHeight())
 
 	distributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
 		collectionFetcher.OnFinalizedBlock()
