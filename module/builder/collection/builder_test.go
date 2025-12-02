@@ -39,18 +39,7 @@ import (
 )
 
 var signer = func(*flow.Header) ([]byte, error) { return unittest.SignatureFixture(), nil }
-var setter = func(h *flow.HeaderBodyBuilder) error {
-	h.WithHeight(42).
-		WithChainID(flow.Emulator).
-		WithParentID(unittest.IdentifierFixture()).
-		WithView(1337).
-		WithParentView(1336).
-		WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
-		WithParentVoterSigData(unittest.QCSigDataFixture()).
-		WithProposerID(unittest.IdentifierFixture())
-
-	return nil
-}
+var setter func(*flow.HeaderBodyBuilder) error
 
 type BuilderSuite struct {
 	suite.Suite
@@ -85,6 +74,18 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.genesis, err = unittest.ClusterBlock.Genesis()
 	require.NoError(suite.T(), err)
 	suite.chainID = suite.genesis.ChainID
+	setter = func(h *flow.HeaderBodyBuilder) error {
+		h.WithHeight(42).
+			WithChainID(suite.chainID).
+			WithParentID(unittest.IdentifierFixture()).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
 
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
