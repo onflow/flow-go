@@ -164,7 +164,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return nil, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	return append(transactions, sysCollection.Transactions...), nil
@@ -319,7 +319,7 @@ func (e *ENTransactionProvider) SystemTransaction(
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return nil, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	for _, tx := range sysCollection.Transactions {
@@ -479,7 +479,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 
 	sysCollection, err := blueprints.SystemCollection(e.chainID.Chain(), events)
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to construct system collection", codes.Internal)
+		return nil, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	var systemTxIDs []flow.Identifier
