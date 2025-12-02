@@ -58,6 +58,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	all := store.InitAll(metrics, suite.db, flow.Emulator) // TODO(4204) - handle cluster and non-cluster blocks?
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
+	clusterHeaders := store.NewHeaders(metrics, suite.db, suite.chainID)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
@@ -84,7 +85,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Require().NoError(err)
 	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
-	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, clusterHeaders, colPayloads, all.Headers)
 	suite.Require().NoError(err)
 }
 

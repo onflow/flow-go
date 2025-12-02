@@ -2,6 +2,7 @@ package epochmgr
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/state/cluster"
@@ -16,9 +17,10 @@ type EpochComponentsFactory interface {
 	// be used either for an ongoing epoch (for example, after a restart) or
 	// for an epoch that will start soon. It is safe to call multiple times for
 	// a given epoch counter.
+	// ChainID refers to the consensus chain, from which reference blocks are used.
 	//
 	// Must return ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
-	Create(epoch protocol.CommittedEpoch) (
+	Create(epoch protocol.CommittedEpoch, chainID flow.ChainID) (
 		state cluster.State,
 		proposal component.Component,
 		sync module.ReadyDoneAware,

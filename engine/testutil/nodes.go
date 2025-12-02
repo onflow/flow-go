@@ -238,7 +238,7 @@ func CompleteStateFixture(
 	pdb := unittest.TypedPebbleDB(t, publicDBDir, pebble.Open)
 	db := pebbleimpl.ToDB(pdb)
 	lockManager := storage.NewTestingLockManager()
-	s := store.InitAll(metric, db, flow.Emulator)
+	s := store.InitAll(metric, db, rootSnapshot.Params().ChainID())
 	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storagebadger.InitSecret)
 	consumer := events.NewDistributor()
 

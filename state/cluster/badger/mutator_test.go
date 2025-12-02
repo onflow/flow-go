@@ -68,7 +68,8 @@ func (suite *MutatorSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := store.InitAll(metrics, suite.db, suite.chainID) // TODO(4204) - handle cluster and non-cluster blocks?
+	all := store.InitAll(metrics, suite.db, flow.Emulator)
+	clusterHeaders := store.NewHeaders(metrics, suite.db, suite.chainID)
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
@@ -135,7 +136,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, clusterHeaders, colPayloads, all.Headers)
 	suite.Assert().Nil(err)
 }
 
