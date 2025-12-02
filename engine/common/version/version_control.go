@@ -38,6 +38,7 @@ var NoHeight = uint64(0)
 // IMPORTANT: only add versions to this list if you are certain that the cadence and fvm changes
 // deployed during the HCU are backwards compatible for scripts.
 var defaultCompatibilityOverrides = map[string]struct{}{
+	"0.37.11": {}, // mainnet, testnet
 	"0.37.17": {}, // mainnet, testnet
 	"0.37.18": {}, // testnet only
 	"0.37.20": {}, // mainnet, testnet
@@ -51,6 +52,7 @@ var defaultCompatibilityOverrides = map[string]struct{}{
 	"0.41.4":  {}, // mainnet, testnet
 	"0.42.0":  {}, // mainnet, testnet
 	"0.42.1":  {}, // mainnet, testnet
+	"0.42.3":  {}, // mainnet, testnet
 	"0.43.1":  {}, // testnet only
 	"0.44.0":  {}, // mainnet, testnet
 }
@@ -389,13 +391,14 @@ func (v *VersionControl) blockFinalized(
 // Start height is the sealed root block if there is no start boundary in the current spork.
 func (v *VersionControl) StartHeight() uint64 {
 	startHeight := v.startHeight.Load()
+	sealedRootHeight := v.sealedRootBlockHeight.Load()
 
 	// in case no start boundary in the current spork
 	if startHeight == NoHeight {
-		startHeight = v.sealedRootBlockHeight.Load()
+		startHeight = sealedRootHeight
 	}
 
-	return startHeight
+	return max(startHeight, sealedRootHeight)
 }
 
 // EndHeight return the last block that the version supports.
