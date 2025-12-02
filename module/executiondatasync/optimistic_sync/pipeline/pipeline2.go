@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
-//	Pipeline2 represents a pipelined state machine for a processing single ExecutionResult.
+// Pipeline2 represents a pipelined state machine for a processing single ExecutionResult.
 //
 // The state machine is initialized in the Pending state.
 //
@@ -36,28 +36,27 @@ import (
 //                                                 ┗━━━━━━━━━━━━━━━┛
 //
 // Trigger condition (1):
-// * parent must be Downloading or Indexing or WaitingPersist or Complete
+// • parent must be Downloading or Indexing or WaitingPersist or Complete
 //
 // This can be implement as listening to the `OnParentStateUpdated` event:
 // (assuming no state change was missed, when pipeline was added to forest
 //
 // Trigger condition (2):
-// * The download is completed.
+// • The download is completed.
 // As we have a single routine executing the downloading task, this routine should always be able to perform the state transition,
 // barring the processing being abandoned.
 //
-//
-//
 // Trigger condition (3):
-// * pipeline must represent sealed result
-// * and parent's state must be completed
-// * This can be implement as listening to the following events:
-//    * OnParentStateUpdated
-//    * SetSealed
+// • pipeline must represent sealed result
+// • and parent's state must be completed
+// • This can be implement as listening to the following events:
+//    - OnParentStateUpdated
+//    - SetSealed
 //   each must have been called once, the latter (atomically) can trigger the task `Persisting`
 //
 // CAUTION:
-// All tasks are executed at most once. Trigger conditions being satisfied must not be missed.
+//  • All tasks are executed at most once.
+//  • Trigger conditions being satisfied must not be missed.
 //
 // We must enforce that _all_ parent updated notifications are delivered this required a "and-and-subscribe + catchup trigger"
 
