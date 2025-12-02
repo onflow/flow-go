@@ -287,6 +287,8 @@ func (m *VoteCollector) View() uint64 {
 //	CachingVotes   → VerifyingVotes
 //	CachingVotes   → Invalid
 //	VerifyingVotes → Invalid
+//
+// No errors are expected during normal operation (Byzantine edge cases handled via notifications internally).
 func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
 	proposerVote, err := proposal.ProposerVote()
 	if err != nil {
