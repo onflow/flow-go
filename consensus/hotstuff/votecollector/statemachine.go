@@ -3,7 +3,6 @@ package votecollector
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -28,7 +27,6 @@ type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.Si
 // On the happy path, the VoteCollector generates a QC when enough votes have been ingested.
 // We internally delegate the vote-format specific processing to the VoteProcessor.
 type VoteCollector struct {
-	sync.RWMutex
 	log                      zerolog.Logger
 	workers                  hotstuff.Workers
 	notifier                 hotstuff.VoteAggregationConsumer
@@ -373,27 +371,30 @@ func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error 
 	}
 	newProcWrapper := &atomicValueWrapper{processor: newProc}
 
-	m.Lock()
-	defer m.Unlock()
-	proc := m.atomicLoadProcessor()
-	if proc.Status() != hotstuff.VoteCollectorStatusCaching {
-		return fmt.Errorf("processors's current state is %s: %w", proc.Status().String(), ErrDifferentCollectorState)
+	currentState := m.Status()
+	if currentState != hotstuff.VoteCollectorStatusCaching {
+		return fmt.Errorf("processors's current state is %s: %w", currentState.String(), ErrDifferentCollectorState)
 	}
 	m.votesProcessor.Store(newProcWrapper)
+	if newState := m.Status(); newState != hotstuff.VoteCollectorStatusVerifying {
+		return fmt.Errorf("CAS failed in between, processors's current state is %s: %w", newState.String(), ErrDifferentCollectorState)
+	}
+
 	return nil
 }
 
 func (m *VoteCollector) terminateVoteProcessing() {
-	if m.Status() == hotstuff.VoteCollectorStatusInvalid {
-		return
-	}
 	newProcWrapper := &atomicValueWrapper{
 		processor: NewNoopCollector(hotstuff.VoteCollectorStatusInvalid),
 	}
 
-	m.Lock()
-	defer m.Unlock()
-	m.votesProcessor.Store(newProcWrapper)
+	for {
+		currentState := m.Status()
+		if currentState == hotstuff.VoteCollectorStatusInvalid {
+			return
+		}
+		m.votesProcessor.Store(newProcWrapper)
+	}
 }
 
 // processCachedVotes feeds all cached votes into the VoteProcessor
