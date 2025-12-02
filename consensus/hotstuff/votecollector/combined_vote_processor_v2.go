@@ -157,38 +157,22 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 //   - [model.DuplicatedSignerError] if the same vote from the same signer has been already added
 //
 // All other errors should be treated as exceptions.
-//
-// Impossibility of vote double-counting: Our signature scheme requires _every_ vote to supply a
-// staking signature. Therefore, the `stakingSigAggtor` has the set of _all_ signerIDs that have
-// provided a valid vote. Hence, the `stakingSigAggtor` guarantees that only a single vote can
-// be successfully added for each `signerID`, i.e. double-counting votes is impossible.
-// Additionally, all votes before being counted by the aggregator are first deduplicated using a dedicated [VotesCache]
-// which detects double voting and stops further processing of the vote.
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
 		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
 	}
 
-	// Add vote to a local cache to track repeated and double votes before processing them by specific aggregators.
-	// Consensus committee member can provide vote in two forms: a staking signature and a random beacon signature.
-	// Therefore, we might receive two votes from one node, where the first vote gets processed by the StakingSigAggregator and second one by RBSigAggregator.
-	// Since each of the aggregators tracks votes by signer ID, they cannot detect duplicated or repeated votes if they were provided
-	// only one to each aggregator. It's impossible to deduplicate votes without relying on external components to do the job.
-	// To increase modularity and BFT resilience of this component we are introducing a votesCache which tracks votes by signer ID.
-	// Using votesCache we can guarantee that we will process at most one vote per signer, which guarantees correctness of the QCs we produce without relying on
-	// external conditions.
-	//
-	// The way votesCache is used introduces some weak consistency between cache and aggregators, on happy path it's completely
-	// straightforward approach. Adding a vote to the votesCache acts like a trapdoor for competing threads, only single competing
-	// thread will pass through it and succeed in adding the vote to the aggregator.
-	// It gets more interesting when any of the operations fail after we add the vote to the cache. The way this logic is structured
-	// it results in the following rule: _only the very first vote that was added to the votesCache from the same signer will be processed by the component_.
-	// It means that if the vote was invalid by any reason from the point of view of the aggregator the second vote won't be processed at all
-	// even if it might be correct from the pointer of view of the aggregator.
-	// Since all honest replicas must provide valid votes at all times then this behavior of producing one invalid and one valid vote
-	// is accounted for byzantine behavior and affects the liveness threshold _f_ of the consensus algorithm.
-	// If this component receives _f+1_ invalid votes then we won't be able to produce a QC for this particular view.
+	// Impossibility of vote double-counting: Our signature scheme requires _every_ vote to include a staking signature.
+	// Therefore, the `stakingSigAggtor` has the set of _all_ signerIDs that have provided a valid vote. Only a single
+	// competing thread for any specific voter can pass through `stakingSigAggtor` and succeed in adding a vote (validation
+	// front-loaded). Only threads that pass the `stakingSigAggtor` can reach the random beacon reconstructor. Therefore,
+	// the `stakingSigAggtor` acts like a trapdoor for competing threads, guaranteeing that only a single vote per signerID
+	// is accepted by the CombinedVoteProcessorV2.
+	// However, note that we *must prevalidate votes*  to avoid detecting ann invalid vote only after having added its
+	// staking signature to the `stakingSigAggtor`. This performance overhead makes the `CombinedVoteProcessorV2` vulnerable
+	// to resource exhaustion attacks. We therefore include a dedicated `votesCache` to reject all votes beyond the first
+	// before we run the expensive cryptographic validation.
 	if !p.votesCache.Add(vote.SignerID) {
 		return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
 	}
