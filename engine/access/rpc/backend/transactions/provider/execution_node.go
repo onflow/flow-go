@@ -456,7 +456,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 		ByHeight(blockHeight).
 		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to construct system collection", codes.Internal)
+		return nil, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	var systemTxIDs []flow.Identifier
