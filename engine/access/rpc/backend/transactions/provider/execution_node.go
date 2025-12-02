@@ -550,11 +550,6 @@ func (e *ENTransactionProvider) getTransactionResultFromAnyExeNode(
 	return resp, errToReturn
 }
 
-// getTransactionResultsByBlockIDFromAnyExeNode get transaction results by block ID from the execution node.
-//
-// Expected error returns during normal operation:
-//   - [codes.Unavailable]: If no nodes are available or a connection to an execution node cannot be established.
-//   - [status.Error]: If the execution node returns a gRPC error.
 func (e *ENTransactionProvider) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -687,11 +682,6 @@ func (e *ENTransactionProvider) tryGetTransactionResult(
 	return resp, nil
 }
 
-// tryGetTransactionResultsByBlockID attempts to get transaction results by block ID from the given execution node.
-//
-// Expected error returns during normal operation:
-//   - [codes.Unavailable]: If a connection to an execution node cannot be established.
-//   - [status.Error]: If the execution node returns a gRPC error.
 func (e *ENTransactionProvider) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
