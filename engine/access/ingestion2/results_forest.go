@@ -519,13 +519,21 @@ func (rf *ResultsForest) AddReceipt(receipt *flow.ExecutionReceipt, resultStatus
 	}
 	receiptAdded := added > 0
 
-	// if the updated status is either the same or older than the current status, no further action is needed
+	// exit early if the updated status is either the same or older than the current status.
+	// It is expected that we will receive several receipts for each result, so most calls will not
+	// have a new status update. Run this check before aquiring the lock to optimize for the common case.
 	if isStaleResultStatusUpdate(container.ResultStatus(), resultStatus) {
 		return receiptAdded, nil
 	}
 
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+
+	// double check that the status update is new while holding the lock to ensure the update wasn't
+	// processed while waiting.
+	if isStaleResultStatusUpdate(container.ResultStatus(), resultStatus) {
+		return receiptAdded, nil
+	}
 
 	if resultStatus == ResultSealed {
 		// On the one hand, `AddReceipt` requires that sealed results are given in ancestor first order. To make this easy for the caller,
