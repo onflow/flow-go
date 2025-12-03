@@ -307,7 +307,7 @@ func New(params Params) (*Backend, error) {
 		params.BlockTracker,
 	)
 
-	executionResultsBackend := execution_results.NewExecutionResults(params.ExecutionResults)
+	executionResultsBackend := execution_results.NewExecutionResults(params.ExecutionResults, params.Seals)
 
 	networkBackend := network.NewNetwork(
 		params.State,

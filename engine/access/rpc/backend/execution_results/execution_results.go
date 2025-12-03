@@ -15,9 +15,10 @@ type ExecutionResults struct {
 }
 
 // NewExecutionResults creates a new ExecutionResults instance.
-func NewExecutionResults(executionResults storage.ExecutionResults) *ExecutionResults {
+func NewExecutionResults(executionResults storage.ExecutionResults, seals storage.Seals) *ExecutionResults {
 	return &ExecutionResults{
 		executionResults: executionResults,
+		seals:            seals,
 	}
 }
 
