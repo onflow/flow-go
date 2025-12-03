@@ -74,6 +74,8 @@ func TestBackendExecutionDataSuite2(t *testing.T) {
 }
 
 func (s *BackendExecutionDataSuite2) SetupTest() {
+	s.log = unittest.Logger()
+
 	s.fixtureGenerator = fixtures.NewGeneratorSuite(
 		fixtures.WithChainID(flow.Testnet),
 		fixtures.WithSeed(42),
@@ -81,6 +83,8 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 
 	// blocks and execution data for the tests
 	s.blocks = s.fixtureGenerator.Blocks().List(5)
+	s.log.Info().Msgf("first block height: %d, last block height: %d", s.blocks[0].Height, s.blocks[len(s.blocks)-1].Height)
+
 	s.sporkRootBlock = s.blocks[0]
 	s.blocksHeightToBlockMap = make(map[uint64]*flow.Block)
 	s.blocksIDToBlockMap = make(map[flow.Identifier]*flow.Block)
@@ -120,13 +124,17 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 		receipt1 := unittest.ReceiptForBlockFixture(block)
 		receipt2 := unittest.ReceiptForBlockFixture(block)
 
-		// make both executors agree on the same execution result for this block
-		receipt2.ExecutionResult = receipt1.ExecutionResult
-
 		// link this block's result to the previous block's result to form a fork (chain)
 		if i > 0 {
 			receipt1.ExecutionResult.PreviousResultID = prevResultID
 		}
+
+		// make both executors agree on the same execution result for this block,
+		// including the correct PreviousResultID set above. We must perform this
+		// assignment AFTER updating PreviousResultID to ensure both receipts carry
+		// an identical, properly linked execution result. Otherwise, depending on
+		// receipt order, optimistic sync may consider the fork abandoned.
+		receipt2.ExecutionResult = receipt1.ExecutionResult
 		prevResultID = receipt1.ExecutionResult.ID()
 
 		receipt1.ExecutorID = s.fixedExecutionNodes[0].NodeID
@@ -142,7 +150,6 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 			Maybe()
 	}
 
-	s.log = unittest.Logger()
 	s.snapshot = protocolmock.NewSnapshot(s.T())
 	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Maybe()
 	s.snapshot.On("SealedResult").Return(s.executionResults[0], nil, nil).Maybe() // seal is not used
@@ -177,7 +184,7 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 		s.executionDataBroadcaster,
 		subscription.DefaultSendTimeout,
 		subscription.DefaultResponseLimit,
-		subscription.DefaultSendBufferSize,
+		1,
 	)
 
 	// optimistic sync stuff
@@ -206,14 +213,14 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 		backfilledBlocks int
 		startID          flow.Identifier
 		startHeight      uint64
-		mockState        func(s *BackendExecutionDataSuite2)
+		mockState        func()
 	}{
 		{
 			name:             "no backfill",
 			backfilledBlocks: 0,
 			startID:          s.sporkRootBlock.ID(),
 			startHeight:      0, // either ID or height must be provided
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -232,7 +239,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 			backfilledBlocks: 2,
 			startID:          s.sporkRootBlock.ID(),
 			startHeight:      0, // either ID or height must be provided
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				require.Greater(s.T(), len(s.blocks), 2) // ensure there are enough blocks for partial backfill
 
 				s.mockDataProviderFuncState()
@@ -253,7 +260,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 			backfilledBlocks: len(s.blocks),
 			startID:          s.sporkRootBlock.ID(),
 			startHeight:      0, // either ID or height must be provided
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -274,7 +281,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			test.mockState(s)
+			test.mockState()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -287,7 +294,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 			)
 
 			wg := &sync.WaitGroup{}
-
 			wg.Add(2)
 			go s.writer(wg, cancel, test.backfilledBlocks)
 			go s.reader(wg, sub, firstExpectedBlockHeight, context.Canceled)
@@ -302,13 +308,13 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 		name             string
 		backfilledBlocks int
 		startHeight      uint64
-		mockState        func(s *BackendExecutionDataSuite2)
+		mockState        func()
 	}{
 		{
 			name:             "no backfill",
 			backfilledBlocks: 0,
 			startHeight:      s.sporkRootBlock.Height,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -337,7 +343,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 			name:             "partial backfill",
 			backfilledBlocks: 2,
 			startHeight:      s.sporkRootBlock.Height,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				require.Greater(s.T(), len(s.blocks), 2) // make sure there are enough blocks for partial backfill
 
 				s.mockDataProviderFuncState()
@@ -368,7 +374,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 			name:             "full backfill",
 			backfilledBlocks: len(s.blocks),
 			startHeight:      s.sporkRootBlock.Height,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -400,7 +406,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			test.mockState(s)
+			test.mockState()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -426,13 +432,13 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 		name             string
 		backfilledBlocks int
 		startID          flow.Identifier
-		mockState        func(s *BackendExecutionDataSuite2)
+		mockState        func()
 	}{
 		{
 			name:             "no backfill",
 			backfilledBlocks: 0,
 			startID:          s.sporkRootBlock.ID(),
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -450,7 +456,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 			name:             "partial backfill",
 			backfilledBlocks: 2,
 			startID:          s.sporkRootBlock.ID(),
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				require.Greater(s.T(), len(s.blocks), 2) // ensure there are enough blocks
 
 				s.mockDataProviderFuncState()
@@ -470,7 +476,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 			name:             "full backfill",
 			backfilledBlocks: len(s.blocks),
 			startID:          s.sporkRootBlock.ID(),
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -491,7 +497,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			test.mockState(s)
+			test.mockState()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -517,12 +523,12 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 	tests := []struct {
 		name             string
 		backfilledBlocks int
-		mockState        func(s *BackendExecutionDataSuite2)
+		mockState        func()
 	}{
 		{
 			name:             "no backfill",
 			backfilledBlocks: 0,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -539,7 +545,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 		{
 			name:             "partial backfill",
 			backfilledBlocks: 2,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				require.Greater(s.T(), len(s.blocks), 2) // ensure enough blocks for partial backfill
 
 				s.mockDataProviderFuncState()
@@ -558,7 +564,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 		{
 			name:             "full backfill",
 			backfilledBlocks: len(s.blocks),
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				s.mockDataProviderFuncState()
 
 				s.executionDataTracker.
@@ -579,7 +585,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			test.mockState(s)
+			test.mockState()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -614,12 +620,12 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 	tests := []struct {
 		name        string
 		expectedErr error
-		mockState   func(s *BackendExecutionDataSuite2)
+		mockState   func()
 	}{
 		{
 			name:        "block is not finalized",
 			expectedErr: storage.ErrNotFound,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				// stream the first 2 blocks for each subtest with no errors
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -639,7 +645,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 		{
 			name:        "block not found",
 			expectedErr: optimistic_sync.ErrBlockNotFound,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				// stream the first 2 blocks for each subtest with no errors
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -659,7 +665,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 		{
 			name:        "fork abandoned",
 			expectedErr: optimistic_sync.ErrForkAbandoned,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				// stream the first block normally, then stream an error
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -679,7 +685,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 		{
 			name:        "unexpected error",
 			expectedErr: assert.AnError,
-			mockState: func(s *BackendExecutionDataSuite2) {
+			mockState: func() {
 				// stream the first 2 blocks for each subtest with no errors
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -754,7 +760,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			test.mockState(s)
+			test.mockState()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -797,16 +803,19 @@ func (s *BackendExecutionDataSuite2) createExecutionDataBackend() *ExecutionData
 // subscription. it also skips notifying for the backfilled blocks.
 func (s *BackendExecutionDataSuite2) writer(wg *sync.WaitGroup, cancel context.CancelFunc, backfilledBlocks int) {
 	defer wg.Done()
-	defer cancel() // cancel streamer/subscription context
+	defer cancel() // cancel streamer/subscription context to stop the subscription
 
-	i := 0
+	j := 0
 
-	for _, execData := range s.executionDataList {
-		s.log.Info().Msgf("publishing execution data %v for block ID %d", execData, execData.BlockID)
+	// TODO: we actually, have to only publish once because streamer sends all available data once get notified.
+	// What's more, it starts sending data itself on the start, so we actually don't have to publish anything!
+	for i := 0; i < len(s.blocks); i++ {
+		s.log.Info().Msgf("publishing execution data %v for block ID %d",
+			s.executionDataList[i], s.executionDataList[i].BlockID)
 
 		// don't publish anything, emulating the current block has been backfilled before
-		if i < backfilledBlocks {
-			i += 1
+		if j < backfilledBlocks {
+			j += 1
 			continue
 		}
 
