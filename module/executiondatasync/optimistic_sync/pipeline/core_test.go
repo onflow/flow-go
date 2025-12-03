@@ -1,4 +1,4 @@
-package optimistic_sync
+package pipeline
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -20,8 +21,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
-// CoreImplSuite is a test suite for testing the CoreImpl.
-type CoreImplSuite struct {
+// CoreSuite is a test suite for testing the Core.
+type CoreSuite struct {
 	suite.Suite
 	execDataRequester             *reqestermock.ExecutionDataRequester
 	txResultErrMsgsRequester      *txerrmsgsmock.Requester
@@ -36,12 +37,12 @@ type CoreImplSuite struct {
 	latestPersistedSealedResult   *storagemock.LatestPersistedSealedResult
 }
 
-func TestCoreImplSuiteSuite(t *testing.T) {
+func TestCoreSuiteSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(CoreImplSuite))
+	suite.Run(t, new(CoreSuite))
 }
 
-func (c *CoreImplSuite) SetupTest() {
+func (c *CoreSuite) SetupTest() {
 	t := c.T()
 
 	c.execDataRequester = reqestermock.NewExecutionDataRequester(t)
@@ -49,11 +50,11 @@ func (c *CoreImplSuite) SetupTest() {
 	c.txResultErrMsgsRequestTimeout = 100 * time.Millisecond
 }
 
-// createTestCoreImpl creates a CoreImpl instance with mocked dependencies for testing.
+// createTestCore creates a Core instance with mocked dependencies for testing.
 //
-// Returns a configured CoreImpl ready for testing.
-func (c *CoreImplSuite) createTestCoreImpl(tf *testFixture) *CoreImpl {
-	core, err := NewCoreImpl(
+// Returns a configured Core ready for testing.
+func (c *CoreSuite) createTestCore(tf *testFixture) *Core {
+	core, err := NewCore(
 		unittest.Logger(),
 		tf.exeResult,
 		tf.block,
@@ -129,12 +130,12 @@ func generateFixture(g *fixtures.GeneratorSuite) *testFixture {
 	}
 }
 
-func (c *CoreImplSuite) TestCoreImpl_Constructor() {
+func (c *CoreSuite) TestCore_Constructor() {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 
 	c.Run("happy path", func() {
-		core, err := NewCoreImpl(
+		core, err := NewCore(
 			unittest.Logger(),
 			executionResult,
 			block,
@@ -155,7 +156,7 @@ func (c *CoreImplSuite) TestCoreImpl_Constructor() {
 	})
 
 	c.Run("block ID mismatch", func() {
-		core, err := NewCoreImpl(
+		core, err := NewCore(
 			unittest.Logger(),
 			executionResult,
 			unittest.BlockFixture(),
@@ -176,9 +177,9 @@ func (c *CoreImplSuite) TestCoreImpl_Constructor() {
 	})
 }
 
-// TestCoreImpl_Download tests the Download method retrieves execution data and transaction error
+// TestCore_Download tests the Download method retrieves execution data and transaction error
 // messages.
-func (c *CoreImplSuite) TestCoreImpl_Download() {
+func (c *CoreSuite) TestCore_Download() {
 	ctx := context.Background()
 	g := fixtures.NewGeneratorSuite()
 
@@ -192,7 +193,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 	c.Run("successful download", func() {
 		tf := generateFixture(g)
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(tf.execData, nil).Once()
 		c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(tf.txErrMsgs, nil).Once()
@@ -210,7 +211,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 	c.Run("execution data request error", func() {
 		tf := generateFixture(g)
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		expectedErr := fmt.Errorf("test execution data request error")
 
@@ -230,7 +231,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 	c.Run("transaction result error messages request error", func() {
 		tf := generateFixture(g)
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		expectedErr := fmt.Errorf("test tx error messages request error")
 
@@ -250,7 +251,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 	c.Run("context cancellation", func() {
 		tf := generateFixture(g)
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -276,7 +277,7 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 	c.Run("txResultErrMsgsRequestTimeout expiration", func() {
 		tf := generateFixture(g)
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(tf.execData, nil).Once()
 
@@ -303,18 +304,18 @@ func (c *CoreImplSuite) TestCoreImpl_Download() {
 
 	c.Run("Download after Abandon returns an error", func() {
 		tf := generateFixture(g)
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		core.Abandon()
 		c.Nil(core.workingData)
 
 		err := core.Download(ctx)
-		c.ErrorIs(err, errResultAbandoned)
+		c.ErrorIs(err, optimistic_sync.ErrResultAbandoned)
 	})
 }
 
-// TestCoreImpl_Index tests the Index method which processes downloaded data.
-func (c *CoreImplSuite) TestCoreImpl_Index() {
+// TestCore_Index tests the Index method which processes downloaded data.
+func (c *CoreSuite) TestCore_Index() {
 	ctx := context.Background()
 	g := fixtures.NewGeneratorSuite()
 
@@ -323,7 +324,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(tf.txErrMsgs, nil)
 
 	c.Run("successful indexing", func() {
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		err := core.Download(ctx)
 		c.Require().NoError(err)
@@ -346,7 +347,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 
 	c.Run("indexer constructor error", func() {
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 		core.block = g.Blocks().Fixture()
 
 		err := core.Download(ctx)
@@ -358,7 +359,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 
 	c.Run("failed to index block", func() {
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		err := core.Download(ctx)
 		c.Require().NoError(err)
@@ -371,7 +372,7 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 
 	c.Run("failed to validate transaction result error messages", func() {
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		err := core.Download(ctx)
 		c.Require().NoError(err)
@@ -387,17 +388,17 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 
 	c.Run("Index after Abandon returns an error", func() {
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		core.Abandon()
 		c.Nil(core.workingData)
 
 		err := core.Index()
-		c.ErrorIs(err, errResultAbandoned)
+		c.ErrorIs(err, optimistic_sync.ErrResultAbandoned)
 	})
 
 	c.Run("Index before Download returns an error", func() {
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		err := core.Index()
 		c.ErrorContains(err, "downloading is not complete")
@@ -405,8 +406,8 @@ func (c *CoreImplSuite) TestCoreImpl_Index() {
 	})
 }
 
-// TestCoreImpl_Persist tests the Persist method which persists indexed data to storages and database.
-func (c *CoreImplSuite) TestCoreImpl_Persist() {
+// TestCore_Persist tests the Persist method which persists indexed data to storages and database.
+func (c *CoreSuite) TestCore_Persist() {
 	t := c.T()
 	ctx := context.Background()
 	g := fixtures.NewGeneratorSuite()
@@ -429,7 +430,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 	c.Run("successful persistence of empty data", func() {
 		resetMocks()
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		err := core.Download(ctx)
 		c.Require().NoError(err)
@@ -483,7 +484,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 		expectedErr := fmt.Errorf("test persisting registers failure")
 
 		resetMocks()
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		err := core.Download(ctx)
 		c.Require().NoError(err)
@@ -502,7 +503,7 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 		expectedErr := fmt.Errorf("test persisting events failure")
 
 		resetMocks()
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		err := core.Download(ctx)
 		c.Require().NoError(err)
@@ -529,18 +530,18 @@ func (c *CoreImplSuite) TestCoreImpl_Persist() {
 
 	c.Run("Persist after Abandon returns an error", func() {
 		resetMocks()
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 
 		core.Abandon()
 		c.Nil(core.workingData)
 
 		err := core.Persist()
-		c.ErrorIs(err, errResultAbandoned)
+		c.ErrorIs(err, optimistic_sync.ErrResultAbandoned)
 	})
 
 	c.Run("Persist before Index returns an error", func() {
 		resetMocks()
-		core := c.createTestCoreImpl(tf)
+		core := c.createTestCore(tf)
 		err := core.Persist()
 		c.ErrorContains(err, "indexing is not complete")
 	})
