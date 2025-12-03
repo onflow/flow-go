@@ -377,13 +377,27 @@ func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error 
 	}
 	newProcWrapper := &atomicValueWrapper{processor: newProc}
 
-	currentState := m.Status()
+	// We now have an optimistically-constructed `newProcWrapper` that represents the desired new state (happy path). We must ensure
+	// that writing the `newProcWrapper` to `m.votesProcessor` happens ATOMICALLY if and only if the current state is `CachingVotes`.
+	// The "Compare-And-Swap Loop" (CAS LOOP) is an efficient pattern to implement this logic:
+	//    (i) We first retrieve the current state and check whether it is `CachingVotes`.
+	//   (ii) If so, we attempt to compare-and-swap the current with the new state.
+	// Note that (i) and (ii) are separate operations. However, the CAS in (ii) ensures that the write only happens if the current state
+	// is still the same as what we observed in (i). If another thread changed the state in between (i) and (ii), we have worked with
+	// an outdated view of the current state, and should repeat the attempt to update the state (hence the "loop" in CAS LOOP).
+	//
+	// On our specific application here, putting (i) and (ii) in a loop is not necessary for the following reason: The state transition
+	// to `VoteCollectorStatusVerifying` is possible only if the current state is `VoteCollectorStatusCaching`. Once the state changed
+	// away from `VoteCollectorStatusCaching` it can never return to this state. I.e. if condition (i) failed once, it can never be
+	// satisfied later. Step (ii) failing implies that condition (i) was previously true, but no longer holds.
+	currentProcWrapper := m.votesProcessor.Load().(*atomicValueWrapper)
+	currentState := currentProcWrapper.processor.Status() // must use same object here as in CAS below (_not_ a fresh load from `m.Status()`)
 	if currentState != hotstuff.VoteCollectorStatusCaching {
 		return fmt.Errorf("processors's current state is %s: %w", currentState.String(), ErrDifferentCollectorState)
 	}
-	m.votesProcessor.Store(newProcWrapper)
-	if newState := m.Status(); newState != hotstuff.VoteCollectorStatusVerifying {
-		return fmt.Errorf("CAS failed in between, processors's current state is %s: %w", newState.String(), ErrDifferentCollectorState)
+	stateUpdateSuccessful := m.votesProcessor.CompareAndSwap(currentProcWrapper, newProcWrapper)
+	if !stateUpdateSuccessful {
+		return fmt.Errorf("CAS failed in between, processors's current state is %s: %w", m.Status(), ErrDifferentCollectorState)
 	}
 
 	return nil
