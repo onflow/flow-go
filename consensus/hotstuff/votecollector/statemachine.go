@@ -403,19 +403,37 @@ func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error 
 	return nil
 }
 
-// terminateVoteProcessing terminates vote processing by moving the processor into VoteCollectorStatusInvalid state.
-// It utilizes atomic CAS(Compare-And-Swap) operation in a loop to ensure that eventually we enter invalid state.
+// terminateVoteProcessing atomically transitions the VoteCollector into state
+// `VoteCollectorStatusInvalid`. if it wasn't already in this state.
 func (m *VoteCollector) terminateVoteProcessing() {
+	currentProcWrapper := m.votesProcessor.Load().(*atomicValueWrapper)
+	if currentProcWrapper.processor.Status() == hotstuff.VoteCollectorStatusInvalid {
+		return
+	}
+
 	newProcWrapper := &atomicValueWrapper{
 		processor: NewNoopCollector(hotstuff.VoteCollectorStatusInvalid),
 	}
 
+	// We now have an optimistically-constructed `newProcWrapper` that represents the desired new state (happy path). We must ensure
+	// that writing the `newProcWrapper` to `m.votesProcessor` happens ATOMICALLY if and only if the current state is not
+	// `VoteCollectorStatusInvalid`. The "Compare-And-Swap Loop" (CAS LOOP) is an efficient pattern to implement this:
+	//    (i) We first retrieved the current state (above) and checked whether it is different from `VoteCollectorStatusInvalid`.
+	//   (ii) If so, we attempt to compare-and-swap the current with the new state.
+	// Note that (i) and (ii) are separate operations. However, the CAS in (ii) ensures that the write only happens if the current state
+	// is still the same as what we observed in (i). If another thread changed the state in between (i) and (ii), we have worked with
+	// an outdated view of the current state, and should repeat the attempt to update the state (hence the "loop" in CAS LOOP).
 	for {
-		currentState := m.Status()
-		if currentState == hotstuff.VoteCollectorStatusInvalid {
+		stateUpdateSuccessful := m.votesProcessor.CompareAndSwap(currentProcWrapper, newProcWrapper)
+		if stateUpdateSuccessful {
 			return
 		}
-		m.votesProcessor.Store(newProcWrapper)
+		// the `currentProcWrapper` we worked with was stale:
+		// reload, check if invalid target state has already been reached, and repeat if not
+		currentProcWrapper = m.votesProcessor.Load().(*atomicValueWrapper)
+		if currentProcWrapper.processor.Status() == hotstuff.VoteCollectorStatusInvalid {
+			return
+		}
 	}
 }
 
