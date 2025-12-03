@@ -147,14 +147,14 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	if !exists {
 		// Job was already completed/removed.
 		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
-		return nil, 0, flow.ZeroID, false
+		return nil, height, flow.ZeroID, false
 	}
 
 	// Check if this collection was still missing for this block.
 	if _, wasMissing := jobState.missingCollections[collectionID]; !wasMissing {
 		// Collection was already received or wasn't part of this block's missing set.
 		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
-		return nil, 0, pickOne(jobState.missingCollections), false
+		return nil, height, pickOne(jobState.missingCollections), false
 	}
 
 	// Remove from missing set and add to received collections.
@@ -170,7 +170,7 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 		// useful for logging/debugging purposes
 		// in case fetching is stuck, it's useful to know which collections are still missing
 		// we don't need to return all missing collections, just one is enough
-		return nil, 0, pickOne(jobState.missingCollections), false
+		return nil, height, pickOne(jobState.missingCollections), false
 	}
 
 	// Return all received collections for this block.
