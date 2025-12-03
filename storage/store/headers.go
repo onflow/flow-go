@@ -60,6 +60,14 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 		return id, err
 	}
 
+	if isClusterChain(chainID) {
+		retrieveHeight = func(r storage.Reader, height uint64) (flow.Identifier, error) {
+			var id flow.Identifier
+			err := operation.LookupClusterBlockHeight(r, chainID, height, &id)
+			return id, err
+		}
+	}
+
 	retrieveView := func(r storage.Reader, view uint64) (flow.Identifier, error) {
 		var id flow.Identifier
 		err := operation.LookupCertifiedBlockByView(r, view, &id)
