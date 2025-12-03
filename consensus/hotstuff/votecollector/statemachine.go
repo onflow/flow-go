@@ -292,6 +292,12 @@ func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
 	if err != nil {
 		return model.NewInvalidProposalErrorf(proposal, "invalid proposer vote")
 	}
+	// We only abort here in case of an exception. No matter whether the vote is the first from the voter, an exact
+	// duplicate or an equivocation, we still proceed as long as the vote is individually valid. This is fine, because
+	// the VoteProcessor is robust against all byzantine edge cases. The VoteCollector's responsibility is to detect
+	// equivocation attempts and report them via the notifier, which is done inside `ensureVoteUnique`.
+	// We could additionally abort the vote collection here in case of equivocation, but this is not necessary for
+	// safety, as long as the offending proposer is eventually slashed, which only requires notifying about the equivocation.
 	_, err = m.ensureVoteUnique(proposerVote)
 	if err != nil {
 		return err
