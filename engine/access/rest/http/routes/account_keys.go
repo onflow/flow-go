@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -13,7 +11,7 @@ import (
 
 // GetAccountKeyByIndex handler retrieves an account key by address and index and returns the response
 func GetAccountKeyByIndex(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.GetAccountKeyRequest(r)
+	req, err := request.NewGetAccountKeyRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -24,26 +22,24 @@ func GetAccountKeyByIndex(r *common.Request, backend access.API, _ commonmodels.
 		isSealed := req.Height == request.SealedHeight
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
 		if err != nil {
-			err := fmt.Errorf("block with height: %d does not exist", req.Height)
-			return nil, common.NewNotFoundError(err.Error(), err)
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.Height = header.Height
 	}
 
-	accountKey, err := backend.GetAccountKeyAtBlockHeight(r.Context(), req.Address, req.Index, req.Height)
+	executionState := req.ExecutionState
+	accountKey, executorMetadata, err := backend.GetAccountKeyAtBlockHeight(r.Context(), req.Address, req.Index, req.Height, models.NewCriteria(executionState))
 	if err != nil {
-		err = fmt.Errorf("failed to get account key with index: %d, reason: %w", req.Index, err)
-		return nil, common.NewNotFoundError(err.Error(), err)
+		return nil, common.ErrorToStatusError(err)
 	}
 
-	var response models.AccountPublicKey
-	response.Build(*accountKey)
+	response := models.NewAccountPublicKey(*accountKey, executorMetadata, executionState.IncludeExecutorMetadata)
 	return response, nil
 }
 
 // GetAccountKeys handler retrieves an account keys by address and returns the response
 func GetAccountKeys(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.GetAccountKeysRequest(r)
+	req, err := request.NewGetAccountKeysRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -55,19 +51,17 @@ func GetAccountKeys(r *common.Request, backend access.API, _ commonmodels.LinkGe
 	if isFinalized || isSealed {
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
 		if err != nil {
-			err := fmt.Errorf("block with height: %d does not exist", req.Height)
-			return nil, common.NewNotFoundError(err.Error(), err)
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.Height = header.Height
 	}
 
-	accountKeys, err := backend.GetAccountKeysAtBlockHeight(r.Context(), req.Address, req.Height)
+	executionState := req.ExecutionState
+	accountKeys, executorMetadata, err := backend.GetAccountKeysAtBlockHeight(r.Context(), req.Address, req.Height, models.NewCriteria(executionState))
 	if err != nil {
-		err = fmt.Errorf("failed to get account keys, reason: %w", err)
-		return nil, common.NewNotFoundError(err.Error(), err)
+		return nil, common.ErrorToStatusError(err)
 	}
 
-	var response models.AccountPublicKeys
-	response.Build(accountKeys)
+	response := models.NewAccountPublicKeys(accountKeys, executorMetadata, executionState.IncludeExecutorMetadata)
 	return response, nil
 }

@@ -563,6 +563,16 @@ func (h *Handler) GetTransactionResultByIndex(
 }
 
 // GetAccount returns an account by address at the latest sealed block.
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccount(
 	ctx context.Context,
 	req *accessproto.GetAccountRequest,
@@ -577,14 +587,20 @@ func (h *Handler) GetAccount(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccount(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccount(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.GetAccountResponse{
@@ -594,6 +610,16 @@ func (h *Handler) GetAccount(
 }
 
 // GetAccountAtLatestBlock returns an account by address at the latest sealed block.
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountAtLatestBlockRequest,
@@ -608,14 +634,20 @@ func (h *Handler) GetAccountAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccountAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountResponse{
@@ -625,6 +657,16 @@ func (h *Handler) GetAccountAtLatestBlock(
 }
 
 // GetAccountAtBlockHeight returns an account by address at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountAtBlockHeightRequest,
@@ -639,14 +681,20 @@ func (h *Handler) GetAccountAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	account, executorMetadata, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountMsg, err := convert.AccountToMessage(account)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountResponse{
@@ -658,7 +706,14 @@ func (h *Handler) GetAccountAtBlockHeight(
 // GetAccountBalanceAtLatestBlock returns an account balance by address at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: Invalid account address provided.
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountBalanceAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountBalanceAtLatestBlockRequest,
@@ -673,9 +728,15 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	accountBalance, executorMetadata, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountBalanceResponse{
@@ -687,7 +748,14 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 // GetAccountBalanceAtBlockHeight returns an account balance by address at the given block height.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: Invalid account address provided.
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountBalanceAtBlockHeightRequest,
@@ -702,9 +770,15 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	accountBalance, executorMetadata, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountBalanceResponse{
@@ -716,7 +790,14 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 // GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: Invalid account address provided.
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountKeyAtLatestBlockRequest,
@@ -731,14 +812,20 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	keyByIndex, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, req.GetIndex())
+	executionState := req.GetExecutionStateQuery()
+
+	keyByIndex, executorMetadata, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, req.GetIndex(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountKeyResponse{
@@ -748,10 +835,16 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 }
 
 // GetAccountKeysAtLatestBlock returns an account public keys by address at the latest sealed block.
-// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: Invalid account address provided.
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeysAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetAccountKeysAtLatestBlockRequest,
@@ -766,9 +859,11 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountKeys, err := h.api.GetAccountKeysAtLatestBlock(ctx, address)
+	executionState := req.GetExecutionStateQuery()
+
+	accountKeys, executorMetadata, err := h.api.GetAccountKeysAtLatestBlock(ctx, address, convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	var publicKeys []*entities.AccountKey
@@ -782,6 +877,10 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 		publicKeys = append(publicKeys, accountKey)
 	}
 
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
+	}
+
 	return &accessproto.AccountKeysResponse{
 		AccountKeys: publicKeys,
 		Metadata:    metadata,
@@ -789,10 +888,16 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 }
 
 // GetAccountKeyAtBlockHeight returns an account public keys by address and key index at the given block height.
-// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: Invalid account address provided.
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountKeyAtBlockHeightRequest,
@@ -807,14 +912,26 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	keyByIndex, err := h.api.GetAccountKeyAtBlockHeight(ctx, address, req.GetIndex(), req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	keyByIndex, executorMetadata, err := h.api.GetAccountKeyAtBlockHeight(
+		ctx,
+		address,
+		req.GetIndex(),
+		req.GetBlockHeight(),
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	return &accessproto.AccountKeyResponse{
@@ -824,10 +941,16 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 }
 
 // GetAccountKeysAtBlockHeight returns an account public keys by address at the given block height.
-// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
 //
 // Expected error returns during normal operation:
-//   - [codes.InvalidArgument]: Invalid account address provided.
+//   - [codes.InvalidArgument]: If the request contains invalid arguments.
+//   - [codes.NotFound]: If the requested data is not available.
+//   - [codes.OutOfRange]: If the requested data is outside the available range.
+//   - [codes.FailedPrecondition]: If data for the requested block is not yet available.
+//   - [codes.Canceled]: If the request is canceled.
+//   - [codes.DeadlineExceeded]: If the request times out.
+//   - [codes.Unavailable]: If configured to use an external node and no upstream server is available.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.GetAccountKeysAtBlockHeightRequest,
@@ -842,9 +965,11 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountKeys, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, req.GetBlockHeight())
+	executionState := req.GetExecutionStateQuery()
+
+	accountKeys, executorMetadata, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, req.GetBlockHeight(), convert.NewCriteria(executionState))
 	if err != nil {
-		return nil, err
+		return nil, rpc.ErrorToStatus(err)
 	}
 
 	var publicKeys []*entities.AccountKey
@@ -858,6 +983,10 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 		publicKeys = append(publicKeys, accountKey)
 	}
 
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
+	}
+
 	return &accessproto.AccountKeysResponse{
 		AccountKeys: publicKeys,
 		Metadata:    metadata,
@@ -867,16 +996,16 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 // ExecuteScriptAtLatestBlock executes a script at the latest block.
 //
 // Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the script execution was canceled.
-//   - [codes.DeadlineExceeded] - if the script execution timed out.
-//   - [codes.Unavailable] - if configured to use an external node for script execution and
+//   - [codes.InvalidArgument]: If the request had invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [codes.NotFound]: If data required to process the request is not available.
+//   - [codes.OutOfRange]: If data required to process the request is outside the available range.
+//   - [codes.FailedPrecondition]: If data for block is not available.
+//   - [codes.Canceled]: If the script execution was canceled.
+//   - [codes.DeadlineExceeded]: If the script execution timed out.
+//   - [codes.Unavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	req *accessproto.ExecuteScriptAtLatestBlockRequest,
@@ -913,16 +1042,16 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 // ExecuteScriptAtBlockHeight executes a script at a specific block height.
 //
 // Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the script execution was canceled.
-//   - [codes.DeadlineExceeded] - if the script execution timed out.
-//   - [codes.Unavailable] - if configured to use an external node for script execution and
+//   - [codes.InvalidArgument]: If the request had invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [codes.NotFound]: If data required to process the request is not available.
+//   - [codes.OutOfRange]: If data required to process the request is outside the available range.
+//   - [codes.FailedPrecondition]: If data for block is not available.
+//   - [codes.Canceled]: If the script execution was canceled.
+//   - [codes.DeadlineExceeded]: If the script execution timed out.
+//   - [codes.Unavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	req *accessproto.ExecuteScriptAtBlockHeightRequest,
@@ -961,16 +1090,16 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 // ExecuteScriptAtBlockID executes a script at a specific block ID.
 //
 // Expected error returns during normal operations:
-//   - [codes.InvalidArgument] - if the request had invalid arguments.
-//   - [codes.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [codes.NotFound] - if data required to process the request is not available.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
-//   - [codes.FailedPrecondition] - if data for block is not available.
-//   - [codes.Canceled] - if the script execution was canceled.
-//   - [codes.DeadlineExceeded] - if the script execution timed out.
-//   - [codes.Unavailable] - if configured to use an external node for script execution and
+//   - [codes.InvalidArgument]: If the request had invalid arguments.
+//   - [codes.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [codes.NotFound]: If data required to process the request is not available.
+//   - [codes.OutOfRange]: If data required to process the request is outside the available range.
+//   - [codes.FailedPrecondition]: If data for block is not available.
+//   - [codes.Canceled]: If the script execution was canceled.
+//   - [codes.DeadlineExceeded]: If the script execution timed out.
+//   - [codes.Unavailable]: If configured to use an external node for script execution and
 //     no upstream server is available.
-//   - [codes.Internal] - for internal failures or index conversion errors.
+//   - [codes.Internal]: For internal failures or index conversion errors.
 func (h *Handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *accessproto.ExecuteScriptAtBlockIDRequest,
@@ -1641,8 +1770,8 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 // buildMetadataResponse builds and returns the metadata response object.
 //
 // Expected error returns during normal operation:
-//   - [codes.NotFound] - if result cannot be provided by storage due to the absence of data.
-//   - [codes.OutOfRange] - if data required to process the request is outside the available range.
+//   - [codes.NotFound]: If result cannot be provided by storage due to the absence of data.
+//   - [codes.OutOfRange]: If data required to process the request is outside the available range.
 func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()

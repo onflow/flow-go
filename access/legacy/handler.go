@@ -215,7 +215,7 @@ func (h *Handler) GetAccount(
 ) (*accessproto.GetAccountResponse, error) {
 	address := flow.BytesToAddress(req.GetAddress())
 
-	account, err := h.api.GetAccount(ctx, address)
+	account, _, err := h.api.GetAccount(ctx, address, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 ) (*accessproto.AccountResponse, error) {
 	address := flow.BytesToAddress(req.GetAddress())
 
-	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
+	account, _, err := h.api.GetAccountAtLatestBlock(ctx, address, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}

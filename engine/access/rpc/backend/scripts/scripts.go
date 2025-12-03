@@ -124,16 +124,16 @@ func NewScriptsBackend(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
+//   - [access.InvalidRequestError]: The combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (b *Scripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
@@ -185,16 +185,16 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
+//   - [access.InvalidRequestError]: The combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (b *Scripts) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -246,16 +246,16 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
 // Expected error returns during normal operation:
-//   - [access.InvalidRequestError] - the combined size (in bytes) of the script and arguments is greater than the max size or
+//   - [access.InvalidRequestError]: The combined size (in bytes) of the script and arguments is greater than the max size or
 //     if the script execution failed due to invalid arguments.
-//   - [access.ResourceExhausted] - if computation or memory limits were exceeded.
-//   - [access.DataNotFoundError] - if data required to process the request is not available.
-//   - [access.OutOfRangeError] - if the requested data is outside the available range.
-//   - [access.PreconditionFailedError] - if data for block is not available.
-//   - [access.RequestCanceledError] - if the script execution was canceled.
-//   - [access.RequestTimedOutError] - if the script execution timed out.
-//   - [access.ServiceUnavailable] - if no nodes are available or a connection to an execution node could not be established.
-//   - [access.InternalError] - for internal failures or index conversion errors.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If no nodes are available or a connection to an execution node could not be established.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (b *Scripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,

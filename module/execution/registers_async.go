@@ -41,9 +41,9 @@ func (r *RegistersAsyncStore) Initialize(registers storage.RegisterSnapshotReade
 // RegisterValues gets the register values from the underlying storage.RegisterSnapshotReader.
 //
 // Expected error returns during normal operation:
-//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
-//   - [storage.ErrHeightNotIndexed]  - if the requested height is below the first indexed height or above the latest indexed height.
-//   - [storage.ErrNotFound] - if the register does not exist at the height.
+//   - [indexer.ErrIndexNotInitialized]: If the storage is still bootstrapping.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is below the first indexed height or above the latest indexed height.
+//   - [storage.ErrNotFound]: If the register does not exist at the height.
 //
 // TODO: Refactor state stream backend to use snapshot.StorageSnapshot directly and remove this method.
 func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
@@ -70,7 +70,7 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 // RegisterSnapshotReader returns the underlying [storage.RegisterSnapshotReader] if it has been initialized.
 //
 // Expected error returns during normal operation:
-//   - [indexer.ErrIndexNotInitialized] - if the storage is still bootstrapping.
+//   - [indexer.ErrIndexNotInitialized]: If the storage is still bootstrapping.
 func (r *RegistersAsyncStore) RegisterSnapshotReader() (storage.RegisterSnapshotReader, error) {
 	registerSnapshotReader := r.registerSnapshotReader.Load()
 	if registerSnapshotReader == nil {

@@ -104,6 +104,50 @@ type AccessAPISuite struct {
 	serviceClient *testnet.Client
 }
 
+func (s *AccessAPISuite) TestAccessAPIs() {
+	// Deploy the test contract once for both AN1 and AN2 tests
+	_ = s.deployContract(lib.CounterContract, false)
+	txResult := s.deployCounter()
+	targetHeight := txResult.BlockHeight + 1
+	s.waitUntilIndexed(targetHeight)
+
+	s.T().Run("Script execution and get accounts using execution nodes", func(t *testing.T) {
+		s.testScriptExecutionAndGetAccountsAN1(targetHeight)
+	})
+
+	s.T().Run("Script execution and get accounts using local data", func(t *testing.T) {
+		s.testScriptExecutionAndGetAccountsAN2(targetHeight)
+	})
+
+	s.T().Run("MVP script execution with local storage", func(t *testing.T) {
+		s.testMVPScriptExecutionLocalStorage()
+	})
+
+	s.T().Run("Send and subscribe transaction statuses", func(t *testing.T) {
+		s.testSendAndSubscribeTransactionStatuses()
+	})
+
+	s.T().Run("Contract update", func(t *testing.T) {
+		s.testContractUpdate()
+	})
+
+	s.T().Run("Transaction signature with plain extension data", func(t *testing.T) {
+		s.testTransactionSignaturePlainExtensionData()
+	})
+
+	s.T().Run("Transaction signature with WebAuthn extension data", func(t *testing.T) {
+		s.testTransactionSignatureWebAuthnExtensionData()
+	})
+
+	s.T().Run("Extension data preservation", func(t *testing.T) {
+		s.testExtensionDataPreservation()
+	})
+
+	s.T().Run("Rejected invalid signature format", func(t *testing.T) {
+		s.testRejectedInvalidSignatureFormat()
+	})
+}
+
 func (s *AccessAPISuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
@@ -201,50 +245,38 @@ func (s *AccessAPISuite) SetupTest() {
 	}, 30*time.Second, 1*time.Second)
 }
 
-// TestScriptExecutionAndGetAccountsAN1 test the Access API endpoints for executing scripts and getting
+// testScriptExecutionAndGetAccountsAN1 test the Access API endpoints for executing scripts and getting
 // accounts using execution nodes.
 //
 // Note: not combining AN1, AN2 tests together because that causes a drastic increase in test run times. test cases are read-only
 // and should not interfere with each other.
-func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
-	// deploy the test contract
-	_ = s.deployContract(lib.CounterContract, false)
-	txResult := s.deployCounter()
-	targetHeight := txResult.BlockHeight + 1
-	s.waitUntilIndexed(targetHeight)
-
+func (s *AccessAPISuite) testScriptExecutionAndGetAccountsAN1(targetHeight uint64) {
 	// Run tests against Access 1, which uses the execution node
 	s.testGetAccount(s.an1Client)
 	s.testExecuteScriptWithSimpleScript(s.an1Client)
 	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
 }
 
-// TestScriptExecutionAndGetAccountsAN2 test the Access API endpoints for executing scripts and getting
+// testScriptExecutionAndGetAccountsAN2 test the Access API endpoints for executing scripts and getting
 // accounts using local storage.
 //
 // Note: not combining AN1, AN2 tests together because that causes a drastic increase in test run times. test cases are read-only
 // and should not interfere with each other.
-func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
-	// deploy the test contract
-	_ = s.deployContract(lib.CounterContract, false)
-	txResult := s.deployCounter()
-	targetHeight := txResult.BlockHeight + 1
-	s.waitUntilIndexed(targetHeight)
-
+func (s *AccessAPISuite) testScriptExecutionAndGetAccountsAN2(targetHeight uint64) {
 	// Run tests against Access 2, which uses local storage
 	s.testGetAccount(s.an2Client)
 	s.testExecuteScriptWithSimpleScript(s.an2Client)
 	s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
 }
 
-func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
+func (s *AccessAPISuite) testMVPScriptExecutionLocalStorage() {
 	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
 	// uses the provided access node to handle the Access API calls. there is an existing test that
 	// covers the default config, so we only need to test with local storage.
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
 }
 
-// TestSendAndSubscribeTransactionStatuses tests the functionality of sending and subscribing to transaction statuses.
+// testSendAndSubscribeTransactionStatuses tests the functionality of sending and subscribing to transaction statuses.
 //
 // This test verifies that a transaction can be created, signed, sent to the access API, and then the status of the transaction
 // can be subscribed to. It performs the following steps:
@@ -253,7 +285,7 @@ func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 // 3. Signs the transaction.
 // 4. Sends and subscribes to the transaction status using the access API.
 // 5. Verifies the received transaction statuses, ensuring they are received in order and the final status is "SEALED".
-func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
+func (s *AccessAPISuite) testSendAndSubscribeTransactionStatuses() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API
@@ -358,11 +390,20 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 
 	// Check, if the final transaction status is sealed.
 	s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
+
+	// Refresh the suite's service client to sync sequence number.
+	// This test created a fresh local serviceClient and submitted a transaction,
+	// which incremented the on-chain sequence number. The suite's s.serviceClient
+	// still has the old cached sequence number, so we refresh it here.
+	s.Require().Eventually(func() bool {
+		s.serviceClient, err = s.accessNode2.TestnetClient()
+		return err == nil
+	}, 30*time.Second, 1*time.Second)
 }
 
-// TestContractUpdate tests that the Access API can index contract updates, and that the program cache
+// testContractUpdate tests that the Access API can index contract updates, and that the program cache
 // is invalidated when a contract is updated.
-func (s *AccessAPISuite) TestContractUpdate() {
+func (s *AccessAPISuite) testContractUpdate() {
 	txResult := s.deployContract(OriginalContract, false)
 	targetHeight := txResult.BlockHeight + 1
 	s.waitUntilIndexed(targetHeight)
@@ -618,9 +659,9 @@ func convertToMessageSigWithExtensionData(sigs []sdk.TransactionSignature, exten
 	return msgSigs
 }
 
-// TestTransactionSignaturePlainExtensionData tests that the Access API properly handles the ExtensionData field
+// testTransactionSignaturePlainExtensionData tests that the Access API properly handles the ExtensionData field
 // in transaction signatures for different authentication schemes.
-func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
+func (s *AccessAPISuite) testTransactionSignaturePlainExtensionData() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API
@@ -765,8 +806,8 @@ func (s *AccessAPISuite) TestTransactionSignaturePlainExtensionData() {
 	}
 }
 
-// TestTransactionSignatureWebAuthnExtensionData tests the WebAuthn authentication scheme with properly constructed extension data.
-func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
+// testTransactionSignatureWebAuthnExtensionData tests the WebAuthn authentication scheme with properly constructed extension data.
+func (s *AccessAPISuite) testTransactionSignatureWebAuthnExtensionData() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API
@@ -928,9 +969,9 @@ func (s *AccessAPISuite) TestTransactionSignatureWebAuthnExtensionData() {
 	}
 }
 
-// TestExtensionDataPreservation tests that the ExtensionData field is properly preserved
+// testExtensionDataPreservation tests that the ExtensionData field is properly preserved
 // when transactions are submitted and retrieved through the Access API.
-func (s *AccessAPISuite) TestExtensionDataPreservation() {
+func (s *AccessAPISuite) testExtensionDataPreservation() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API
@@ -1071,9 +1112,9 @@ func (s *AccessAPISuite) TestExtensionDataPreservation() {
 	}
 }
 
-// TestInvalidTransactionSignature tests that the access API performs sanity checks
+// testRejectedInvalidSignatureFormat tests that the access API performs sanity checks
 // on the transaction signature format and rejects invalid formats
-func (s *AccessAPISuite) TestRejectedInvalidSignatureFormat() {
+func (s *AccessAPISuite) testRejectedInvalidSignatureFormat() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Establish a gRPC connection to the access API

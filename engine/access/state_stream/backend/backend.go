@@ -7,18 +7,20 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -185,21 +187,84 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
-func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.DataNotFoundError]: When data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: When the register's database isn't initialized yet.
+func (b *StateStreamBackend) GetRegisterValues(
+	ctx context.Context,
+	ids flow.RegisterIDs,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error) {
 	if len(ids) > b.registerRequestLimit {
-		return nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
+		return nil, nil, access.NewInvalidRequestError(
+			fmt.Errorf("number of register IDs exceeds limit of %d", b.registerRequestLimit))
 	}
 
-	values, err := b.registers.RegisterValues(ids, height)
+	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) {
-			return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
-		}
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
-		}
-		return nil, err
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to find header by height %d: %w", height, err)
+		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
-	return values, nil
+	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
+	if err != nil {
+		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		switch {
+		case errors.Is(err, storage.ErrNotFound):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsInsufficientExecutionReceipts(err):
+			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		default:
+			return nil, nil, access.RequireNoError(ctx, err)
+		}
+	}
+
+	executionResultID := execResultInfo.ExecutionResultID
+	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
+	if err != nil {
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		err = fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
+		return nil, nil, access.NewDataNotFoundError("snapshot", err)
+	}
+
+	registers, err := snapshot.Registers()
+	if err != nil {
+		err = access.RequireErrorIs(ctx, err, indexer.ErrIndexNotInitialized)
+		err = fmt.Errorf("failed to get registers storage from snapshot: %w", err)
+		return nil, nil, access.NewPreconditionFailedError(err)
+	}
+
+	result := make([]flow.RegisterValue, len(ids))
+	for i, regID := range ids {
+		val, err := registers.Get(regID, height)
+		if err != nil {
+			err = fmt.Errorf("failed to get register by the register ID at a given block height: %w", err)
+			switch {
+			case errors.Is(err, storage.ErrNotFound):
+				return nil, nil, access.NewDataNotFoundError("registers", err)
+			case errors.Is(err, storage.ErrHeightNotIndexed):
+				return nil, nil, access.NewOutOfRangeError(err)
+			default:
+				return nil, nil, access.RequireNoError(ctx, err)
+			}
+
+		}
+		result[i] = val
+	}
+
+	metadata := &accessmodel.ExecutorMetadata{
+		ExecutionResultID: executionResultID,
+		ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+	}
+
+	return result, metadata, nil
 }

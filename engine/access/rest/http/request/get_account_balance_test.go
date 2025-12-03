@@ -4,50 +4,142 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func Test_GetAccountBalance_InvalidParse(t *testing.T) {
-	var getAccountBalance GetAccountBalance
+// TestGetAccountBalance_InvalidParse verifies that parseGetAccountBalanceRequest correctly returns errors
+// for invalid input combinations and malformed request parameters.
+//
+// Test cases:
+//  1. A request with an empty account address.
+//  2. A request with a negative block height.
+//  3. A request with a non-numeric agreeingExecutorsCount value.
+//  4. A request with a negative agreeingExecutorsCount value.
+//  5. A request containing invalid executor IDs.
+//  6. A request with a non-boolean includeExecutorMetadata query.
+func TestGetAccountBalance_InvalidParse(t *testing.T) {
+	validAddress := flow.Localnet.Chain().ServiceAddress().String()
+	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2).Strings()
 
 	tests := []struct {
-		address string
-		height  string
-		err     string
+		name                    string
+		address                 string
+		height                  string
+		agreeingExecutorsCount  string
+		agreeingExecutorsIds    []string
+		includeExecutorMetadata string
+		err                     string
 	}{
-		{"", "", "invalid address"},
-		{"f8d6e0586b0a20c7", "-1", "invalid height format"},
+		{
+			"parse with invalid address",
+			"",
+			"",
+			"2",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid address",
+		},
+		{
+			"parse with invalid height format",
+			validAddress,
+			"-1",
+			"2",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid height format",
+		},
+		{
+			"parse with invalid agreeingExecutorCount value",
+			validAddress,
+			"",
+			"abc",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid agreeingExecutorCount",
+		},
+		{
+			"parse with invalid agreeingExecutorCount number",
+			validAddress,
+			"",
+			"-5",
+			validAgreeingExecutorsIds,
+			"false",
+			"invalid agreeingExecutorCount",
+		},
+		{
+			"parse with invalid agreeingExecutorsIds",
+			validAddress,
+			"",
+			"2",
+			[]string{"not-a-valid-id"},
+			"false",
+			"invalid ID format",
+		},
+		{
+			"parse with invalid includeExecutorMetadata",
+			validAddress,
+			"",
+			"2",
+			validAgreeingExecutorsIds,
+			"not-bool",
+			"invalid includeExecutorMetadata",
+		},
 	}
 
 	chain := flow.Localnet.Chain()
 	for i, test := range tests {
-		err := getAccountBalance.Parse(test.address, test.height, chain)
-		assert.EqualError(t, err, test.err, fmt.Sprintf("test #%d failed", i))
+		t.Run(test.name, func(t *testing.T) {
+			request, err := parseGetAccountBalanceRequest(
+				test.address,
+				test.height,
+				test.agreeingExecutorsCount,
+				test.agreeingExecutorsIds,
+				test.includeExecutorMetadata,
+				chain,
+			)
+			require.Nil(t, request)
+			require.ErrorContains(t, err, test.err, fmt.Sprintf("test #%d failed", i))
+		})
 	}
 }
 
-func Test_GetAccountBalance_ValidParse(t *testing.T) {
-
-	var getAccountBalance GetAccountBalance
-
-	addr := "f8d6e0586b0a20c7"
+// TestGetAccountBalance_ValidParse verifies that parseGetAccountBalanceRequest successfully parses
+// valid GetAccountBalance requests and populates the request fields as expected.
+//
+// Test cases:
+//  1. A request with a valid account address and no specified height (defaults to sealed height).
+//  2. A request with a valid block height.
+//  3. A request using the "sealed" as the block height.
+//  4. A request using the "final" as the block height.
+func TestGetAccountBalance_ValidParse(t *testing.T) {
+	validAddress := flow.Localnet.Chain().ServiceAddress().String()
+	validAgreeingExecutorsIds := unittest.IdentifierListFixture(2)
 	chain := flow.Localnet.Chain()
-	err := getAccountBalance.Parse(addr, "", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, getAccountBalance.Address.String(), addr)
-	assert.Equal(t, getAccountBalance.Height, SealedHeight)
+	agreeingExecutorsCount := uint64(2)
 
-	err = getAccountBalance.Parse(addr, "100", chain)
-	assert.NoError(t, err)
-	assert.Equal(t, getAccountBalance.Height, uint64(100))
+	agreeingExecutorsCountStr := fmt.Sprintf("%d", agreeingExecutorsCount)
+	validAgreeingExecutorsIdsStr := validAgreeingExecutorsIds.Strings()
 
-	err = getAccountBalance.Parse(addr, sealed, chain)
-	assert.NoError(t, err)
-	assert.Equal(t, getAccountBalance.Height, SealedHeight)
+	request, err := parseGetAccountBalanceRequest(validAddress, "", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "true", chain)
+	require.NoError(t, err)
+	require.Equal(t, request.Address.String(), validAddress)
+	require.Equal(t, request.Height, SealedHeight)
+	require.Equal(t, request.ExecutionState.AgreeingExecutorsCount, agreeingExecutorsCount)
+	require.EqualValues(t, request.ExecutionState.RequiredExecutorIDs, validAgreeingExecutorsIds)
+	require.True(t, request.ExecutionState.IncludeExecutorMetadata)
 
-	err = getAccountBalance.Parse(addr, final, chain)
-	assert.NoError(t, err)
-	assert.Equal(t, getAccountBalance.Height, FinalHeight)
+	request, err = parseGetAccountBalanceRequest(validAddress, "100", agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
+	require.NoError(t, err)
+	require.Equal(t, request.Height, uint64(100))
+
+	request, err = parseGetAccountBalanceRequest(validAddress, sealed, agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
+	require.NoError(t, err)
+	require.Equal(t, request.Height, SealedHeight)
+
+	request, err = parseGetAccountBalanceRequest(validAddress, final, agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, "false", chain)
+	require.NoError(t, err)
+	require.Equal(t, request.Height, FinalHeight)
 }

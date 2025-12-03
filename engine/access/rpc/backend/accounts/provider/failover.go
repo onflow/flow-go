@@ -5,10 +5,14 @@ import (
 
 	"github.com/rs/zerolog"
 
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// FailoverAccountProvider retrieves account data using local storage first,
+// then falls back to execution nodes if data is unavailable or a non-user error occurs.
 type FailoverAccountProvider struct {
 	log               zerolog.Logger
 	state             protocol.State
@@ -18,6 +22,7 @@ type FailoverAccountProvider struct {
 
 var _ AccountProvider = (*FailoverAccountProvider)(nil)
 
+// NewFailoverAccountProvider creates a new instance of FailoverAccountProvider.
 func NewFailoverAccountProvider(
 	log zerolog.Logger,
 	state protocol.State,
@@ -32,75 +37,107 @@ func NewFailoverAccountProvider(
 	}
 }
 
+// GetAccountAtBlock returns a Flow account for the given address and block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (f *FailoverAccountProvider) GetAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
-) (*flow.Account, error) {
-	localAccount, localErr := f.localRequester.GetAccountAtBlock(ctx, address, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	localAccount, localMetadata, localErr := f.localRequester.GetAccountAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localAccount, nil
+		return localAccount, localMetadata, nil
 	}
 
-	execNodeAccount, execNodeErr := f.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height)
-	return execNodeAccount, execNodeErr
+	return f.execNodeRequester.GetAccountAtBlock(ctx, address, blockID, height, executionResultInfo)
 }
 
+// GetAccountBalanceAtBlock returns the balance of a Flow account
+// at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (f *FailoverAccountProvider) GetAccountBalanceAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
-) (uint64, error) {
-	localBalance, localErr := f.localRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
+	localBalance, localMetadata, localErr := f.localRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localBalance, nil
+		return localBalance, localMetadata, nil
 	}
 
-	execNodeBalance, execNodeErr := f.execNodeRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height)
-	if execNodeErr != nil {
-		return 0, execNodeErr
-	}
-
-	return execNodeBalance, nil
+	return f.execNodeRequester.GetAccountBalanceAtBlock(ctx, address, blockID, height, executionResultInfo)
 }
 
+// GetAccountKeyAtBlock returns a specific public key of a Flow account
+// by its key index and block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.DataNotFoundError]: If data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (f *FailoverAccountProvider) GetAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	keyIndex uint32,
 	blockID flow.Identifier,
 	height uint64,
-) (*flow.AccountPublicKey, error) {
-	localKey, localErr := f.localRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	localKey, localMetadata, localErr := f.localRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localKey, nil
+		return localKey, localMetadata, nil
 	}
 
-	execNodeKey, execNodeErr := f.execNodeRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
-	if execNodeErr != nil {
-		return nil, execNodeErr
-	}
-
-	return execNodeKey, nil
+	return f.execNodeRequester.GetAccountKeyAtBlock(ctx, address, keyIndex, blockID, height, executionResultInfo)
 }
 
+// GetAccountKeysAtBlock returns all public keys associated with a Flow account
+// at the given block height.
+//
+// Expected error returns during normal operation:
+//   - [access.InvalidRequestError]: If the request fails due to invalid arguments or runtime errors.
+//   - [access.ResourceExhausted]: If computation or memory limits are exceeded.
+//   - [access.DataNotFoundError]: If data is not found.
+//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
+//   - [access.PreconditionFailedError]: If the registers storage is still bootstrapping.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (f *FailoverAccountProvider) GetAccountKeysAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
 	height uint64,
-) ([]flow.AccountPublicKey, error) {
-	localKeys, localErr := f.localRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	localKeys, localMetadata, localErr := f.localRequester.GetAccountKeysAtBlock(ctx, address, blockID, height, executionResultInfo)
 	if localErr == nil {
-		return localKeys, nil
+		return localKeys, localMetadata, nil
 	}
 
-	execNodeKeys, execNodeErr := f.execNodeRequester.GetAccountKeysAtBlock(ctx, address, blockID, height)
-	if execNodeErr != nil {
-		return nil, execNodeErr
-	}
-
-	return execNodeKeys, nil
+	return f.execNodeRequester.GetAccountKeysAtBlock(ctx, address, blockID, height, executionResultInfo)
 }

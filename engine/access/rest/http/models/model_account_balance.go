@@ -8,7 +8,12 @@
  */
 package models
 
+import (
+	"github.com/onflow/flow-go/engine/access/rest/common/models"
+)
+
 type AccountBalance struct {
 	// Flow balance of the account.
-	Balance string `json:"balance"`
+	Balance  string           `json:"balance"`
+	Metadata *models.Metadata `json:"metadata,omitempty"`
 }
