@@ -39,6 +39,8 @@ func NewNodeSelectorFactory(circuitBreakerEnabled bool) *NodeSelectorFactory {
 
 // SelectNodes selects the configured number of node identities from the provided list of nodes
 // and returns the node selector to iterate through them.
+//
+// No errors are expected during normal operation.
 func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentitySkeletonList) (NodeSelector, error) {
 	var err error
 	// If the circuit breaker is disabled, the legacy logic should be used, which selects only a specified number of nodes.

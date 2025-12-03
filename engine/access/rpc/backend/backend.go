@@ -96,6 +96,7 @@ type Params struct {
 	Seals                    storage.Seals
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
 	ScheduledTransactions    storage.ScheduledTransactionsReader
+	RegistersAsyncStore      *execution.RegistersAsyncStore
 	ChainID                  flow.ChainID
 	AccessMetrics            module.AccessMetrics
 	ConnFactory              connection.ConnectionFactory
@@ -157,6 +158,7 @@ func New(params Params) (*Backend, error) {
 		params.ScriptExecutionMode,
 		params.ScriptExecutor,
 		params.ExecNodeIdentitiesProvider,
+		params.RegistersAsyncStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounts: %w", err)
@@ -191,6 +193,8 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		loggedScripts,
 		params.MaxScriptAndArgumentSize,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scripts: %w", err)
@@ -212,6 +216,7 @@ func New(params Params) (*Backend, error) {
 			CheckPayerBalanceMode:        params.CheckPayerBalanceMode,
 		},
 		params.ScriptExecutor,
+		params.RegistersAsyncStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
@@ -404,10 +409,11 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVers
 	return nodeInfo, nil
 }
 
-// GetCollectionByID returns a light collection by its ID.
+// GetCollectionByID returns a light collection by its ID. The light collection contains only
+// transaction IDs, not the full transaction bodies.
 //
 // CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-// As documented in the [access.API], which we partially implement with this function
+// As documented in the [access.API], which we partially implement with this function:
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //
@@ -425,10 +431,11 @@ func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) 
 	return col, nil
 }
 
-// GetFullCollectionByID returns a full collection by its ID.
+// GetFullCollectionByID returns a full collection by its ID. The full collection contains the
+// complete transaction bodies for all transactions in the collection.
 //
 // CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
-// As documented in the [access.API], which we partially implement with this function
+// As documented in the [access.API], which we partially implement with this function:
 //   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
 //   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
 //

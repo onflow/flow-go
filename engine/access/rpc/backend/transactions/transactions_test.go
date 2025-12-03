@@ -9,6 +9,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -30,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -65,6 +67,7 @@ type Suite struct {
 	events                *storagemock.Events
 	txResultErrorMessages *storagemock.TransactionResultErrorMessages
 	scheduledTransactions *storagemock.ScheduledTransactions
+	registers             *storagemock.RegisterSnapshotReader
 	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	lastFullBlockHeight   *counters.PersistentStrictMonotonicCounter
 
@@ -113,6 +116,7 @@ func (suite *Suite) SetupTest() {
 	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
 	suite.results = storagemock.NewExecutionResults(suite.T())
 	suite.txResultErrorMessages = storagemock.NewTransactionResultErrorMessages(suite.T())
+	suite.registers = storagemock.NewRegisterSnapshotReader(suite.T())
 	suite.executionAPIClient = accessmock.NewExecutionAPIClient(suite.T())
 	suite.lightTxResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
@@ -193,6 +197,9 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	)
 
 	validatorBlocks := validator.NewProtocolStateBlocks(suite.state, suite.indexReporter)
+	registersAsync := execution.NewRegistersAsyncStore()
+	require.NoError(suite.T(), registersAsync.Initialize(suite.registers))
+
 	txValidator, err := validator.NewTransactionValidator(
 		validatorBlocks,
 		suite.chainID.Chain(),
@@ -209,6 +216,7 @@ func (suite *Suite) defaultTransactionsParams() Params {
 			CheckPayerBalanceMode:        validator.Disabled,
 		},
 		execmock.NewScriptExecutor(suite.T()),
+		registersAsync,
 	)
 	suite.Require().NoError(err)
 

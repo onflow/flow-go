@@ -94,18 +94,35 @@ func (u *UnimplementedAPI) GetEventsForBlockIDs(
 }
 
 // ExecuteScriptAtLatestBlock returns an unimplemented error.
-func (u *UnimplementedAPI) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
-	return nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtLatestBlock not implemented")
+func (u *UnimplementedAPI) ExecuteScriptAtLatestBlock(
+	ctx context.Context,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtLatestBlock not implemented")
 }
 
 // ExecuteScriptAtBlockHeight returns an unimplemented error.
-func (u *UnimplementedAPI) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
-	return nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockHeight not implemented")
+func (u *UnimplementedAPI) ExecuteScriptAtBlockHeight(
+	ctx context.Context,
+	blockHeight uint64,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockHeight not implemented")
 }
 
 // ExecuteScriptAtBlockID returns an unimplemented error.
-func (u *UnimplementedAPI) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
-	return nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockID not implemented")
+func (u *UnimplementedAPI) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockID not implemented")
 }
 
 // SendTransaction returns an unimplemented error.

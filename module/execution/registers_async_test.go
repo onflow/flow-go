@@ -29,7 +29,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("registersDB bootstrapped correct values returned", func(t *testing.T) {
 		registersAsync := NewRegistersAsyncStore()
-		registers := storagemock.NewRegisterIndex(t)
+		registers := storagemock.NewRegisterSnapshotReader(t)
 		registers.On("Get", registerID, firstHeight).Return(registerValue1, nil)
 		registers.On("Get", registerID, latestHeight).Return(registerValue2, nil)
 		registers.On("FirstHeight").Return(firstHeight)
@@ -47,7 +47,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("out of bounds height correct error returned", func(t *testing.T) {
 		registersAsync := NewRegistersAsyncStore()
-		registers := storagemock.NewRegisterIndex(t)
+		registers := storagemock.NewRegisterSnapshotReader(t)
 		registers.On("LatestHeight").Return(latestHeight)
 
 		require.NoError(t, registersAsync.Initialize(registers))
@@ -57,7 +57,7 @@ func TestInitialize(t *testing.T) {
 
 	t.Run("no register value available correct error returned", func(t *testing.T) {
 		registersAsync := NewRegistersAsyncStore()
-		registers := storagemock.NewRegisterIndex(t)
+		registers := storagemock.NewRegisterSnapshotReader(t)
 		registers.On("Get", invalidRegisterID, latestHeight).Return(nil, storage.ErrNotFound)
 		registers.On("FirstHeight").Return(firstHeight)
 		registers.On("LatestHeight").Return(latestHeight)
@@ -79,8 +79,8 @@ func TestRegisterValuesDataUnAvailable(t *testing.T) {
 
 func TestInitDataRepeatedCalls(t *testing.T) {
 	registersAsync := NewRegistersAsyncStore()
-	registers1 := storagemock.NewRegisterIndex(t)
-	registers2 := storagemock.NewRegisterIndex(t)
+	registers1 := storagemock.NewRegisterSnapshotReader(t)
+	registers2 := storagemock.NewRegisterSnapshotReader(t)
 
 	require.NoError(t, registersAsync.Initialize(registers1))
 	require.Error(t, registersAsync.Initialize(registers2))

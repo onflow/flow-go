@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/access/validator"
@@ -34,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	testutil "github.com/onflow/flow-go/module/executiondatasync/testutil"
 	"github.com/onflow/flow-go/module/metrics"
@@ -265,6 +265,7 @@ func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
 		metrics.NewNoopCollector(),
 		validator.TransactionValidationOptions{},
 		execmock.NewScriptExecutor(s.T()),
+		execution.NewRegistersAsyncStore(),
 	)
 	s.Require().NoError(err)
 
@@ -592,7 +593,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_ExecutionNode() {
 	txID := s.tf.ExpectedResults[1].TransactionID
 
 	accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(1, entities.EventEncodingVersion_CCF_V0))
-	nodeResponse := &execution.GetTransactionResultResponse{
+	nodeResponse := &execproto.GetTransactionResultResponse{
 		StatusCode:           accessResponse.StatusCode,
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
@@ -622,7 +623,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 	blockID := s.tf.Block.ID()
 
 	accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(1, entities.EventEncodingVersion_CCF_V0))
-	nodeResponse := &execution.GetTransactionResultResponse{
+	nodeResponse := &execproto.GetTransactionResultResponse{
 		StatusCode:           accessResponse.StatusCode,
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
@@ -652,10 +653,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 	blockID := s.tf.Block.ID()
 
 	expectedResults := make([]*accessmodel.TransactionResult, len(s.tf.ExpectedResults))
-	nodeResults := make([]*execution.GetTransactionResultResponse, len(s.tf.ExpectedResults))
+	nodeResults := make([]*execproto.GetTransactionResultResponse, len(s.tf.ExpectedResults))
 	for i := range s.tf.ExpectedResults {
 		accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(i, entities.EventEncodingVersion_CCF_V0))
-		nodeResults[i] = &execution.GetTransactionResultResponse{
+		nodeResults[i] = &execproto.GetTransactionResultResponse{
 			StatusCode:   accessResponse.StatusCode,
 			ErrorMessage: accessResponse.ErrorMessage,
 			Events:       accessResponse.Events,
@@ -663,7 +664,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
 	}
 
-	nodeResponse := &execution.GetTransactionResultsResponse{
+	nodeResponse := &execproto.GetTransactionResultsResponse{
 		TransactionResults:   nodeResults,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
@@ -716,8 +717,8 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 		}
 	}
 
-	nodeResponse := &execution.GetEventsForBlockIDsResponse{
-		Results: []*execution.GetEventsForBlockIDsResponse_Result{{
+	nodeResponse := &execproto.GetEventsForBlockIDsResponse{
+		Results: []*execproto.GetEventsForBlockIDsResponse_Result{{
 			BlockId:     blockID[:],
 			BlockHeight: block.Height,
 			Events:      events,
@@ -757,8 +758,8 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 		}
 	}
 
-	nodeResponse := &execution.GetEventsForBlockIDsResponse{
-		Results: []*execution.GetEventsForBlockIDsResponse_Result{{
+	nodeResponse := &execproto.GetEventsForBlockIDsResponse{
+		Results: []*execproto.GetEventsForBlockIDsResponse_Result{{
 			BlockId:     blockID[:],
 			BlockHeight: block.Height,
 			Events:      events,

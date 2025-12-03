@@ -410,22 +410,22 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 // is cancelled during this phase, the pipeline handles the cancellation gracefully
 // and transitions to the correct state.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResultErrMsgs() {
+	// This call marked as `Maybe()` because it may not be called depending on timing.
+	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
+
+	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(
+		func(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).Once()
+
 	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
-		// This call marked as `Maybe()` because it may not be called depending on timing.
-		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(nil, nil).Maybe()
-
-		p.txResultErrMsgsRequester.
-			On("Request", mock.Anything).
-			Return(func(ctx context.Context) ([]flow.TransactionResultErrorMessage, error) {
-				cancel()
-				<-ctx.Done()
-				return nil, ctx.Err()
-			}).
-			Once()
-
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing)
+
+		cancel()
+
 		waitForError(p.T(), errChan, context.Canceled)
 
 		p.Assert().Equal(optimistic_sync.StateProcessing, pipeline.GetState())
