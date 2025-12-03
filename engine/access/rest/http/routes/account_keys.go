@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -24,8 +22,7 @@ func GetAccountKeyByIndex(r *common.Request, backend access.API, _ commonmodels.
 		isSealed := req.Height == request.SealedHeight
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
 		if err != nil {
-			err := fmt.Errorf("block with height: %d does not exist", req.Height)
-			return nil, common.NewNotFoundError(err.Error(), err)
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.Height = header.Height
 	}
@@ -33,8 +30,7 @@ func GetAccountKeyByIndex(r *common.Request, backend access.API, _ commonmodels.
 	executionState := req.ExecutionState
 	accountKey, executorMetadata, err := backend.GetAccountKeyAtBlockHeight(r.Context(), req.Address, req.Index, req.Height, models.NewCriteria(executionState))
 	if err != nil {
-		err = fmt.Errorf("failed to get account key with index: %d, reason: %w", req.Index, err)
-		return nil, common.NewNotFoundError(err.Error(), err)
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	response := models.NewAccountPublicKey(*accountKey, executorMetadata, executionState.IncludeExecutorMetadata)
@@ -55,8 +51,7 @@ func GetAccountKeys(r *common.Request, backend access.API, _ commonmodels.LinkGe
 	if isFinalized || isSealed {
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
 		if err != nil {
-			err := fmt.Errorf("block with height: %d does not exist", req.Height)
-			return nil, common.NewNotFoundError(err.Error(), err)
+			return nil, common.ErrorToStatusError(err)
 		}
 		req.Height = header.Height
 	}
@@ -64,8 +59,7 @@ func GetAccountKeys(r *common.Request, backend access.API, _ commonmodels.LinkGe
 	executionState := req.ExecutionState
 	accountKeys, executorMetadata, err := backend.GetAccountKeysAtBlockHeight(r.Context(), req.Address, req.Height, models.NewCriteria(executionState))
 	if err != nil {
-		err = fmt.Errorf("failed to get account keys, reason: %w", err)
-		return nil, common.NewNotFoundError(err.Error(), err)
+		return nil, common.ErrorToStatusError(err)
 	}
 
 	response := models.NewAccountPublicKeys(accountKeys, executorMetadata, executionState.IncludeExecutorMetadata)

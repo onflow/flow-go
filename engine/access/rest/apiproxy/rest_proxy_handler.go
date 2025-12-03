@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -109,7 +110,7 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 	r.log("upstream", "GetCollectionByID", err)
 
 	if err != nil {
-		return nil, convertError(ctx, err, "collection")
+		return nil, convertError(ctx, err)
 	}
 
 	collection, err := convert.MessageToLightCollection(collectionResponse.Collection)
@@ -177,7 +178,6 @@ func (r *RestProxyHandler) GetTransactionResult(
 ) (*accessmodel.TransactionResult, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-
 		return nil, err
 	}
 	defer closer.Close()
@@ -199,12 +199,23 @@ func (r *RestProxyHandler) GetTransactionResult(
 	return convert.MessageToTransactionResult(transactionResultResponse)
 }
 
-// GetAccountAtBlockHeight returns account by account address and block height.
+// GetAccountAtBlockHeight returns the account by its address at a specific block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -218,7 +229,7 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	r.log("upstream", "GetAccountAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
 	account, err := convert.MessageToAccount(accountResponse.Account)
@@ -234,12 +245,23 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	return account, metadata, nil
 }
 
-// GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
+// GetAccountBalanceAtBlockHeight returns the account balance by its address at a specific block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account balance and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) (uint64, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -253,7 +275,7 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, a
 	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
 
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -262,15 +284,25 @@ func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, a
 	}
 
 	return accountBalanceResponse.GetBalance(), metadata, nil
-
 }
 
-// GetAccountKeys returns account keys by account address and block height.
+// GetAccountKeys returns the account keys by address at a specific block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account keys and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
 ) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -284,7 +316,7 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
 	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
@@ -293,7 +325,6 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 		if err != nil {
 			return nil, nil, err
 		}
-
 		accountKeys[i] = *accountKey
 	}
 
@@ -305,7 +336,18 @@ func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Addr
 	return accountKeys, metadata, nil
 }
 
-// GetAccountKeyByIndex returns account key by account address, key index and block height.
+// GetAccountKeyByIndex returns the account key by address, key index, and block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account key and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
 func (r *RestProxyHandler) GetAccountKeyByIndex(
 	ctx context.Context,
 	address flow.Address,
@@ -315,7 +357,7 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 ) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -330,7 +372,7 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
 	accountKey, err := convert.MessageToAccountKey(accountKeyResponse.GetAccountKey())
@@ -350,7 +392,6 @@ func (r *RestProxyHandler) GetAccountKeyByIndex(
 //
 // Expected sentinel errors providing details to clients about failed requests:
 //   - [access.InvalidRequestError]: If the request had invalid arguments.
-//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
 //   - [access.DataNotFoundError]: If data required to process the request is not available.
 //   - [access.OutOfRangeError]: If the requested data is outside the available range.
 //   - [access.PreconditionFailedError]: If data for block is not available.
@@ -375,7 +416,7 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -422,7 +463,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -469,7 +510,7 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, nil, convertError(ctx, err, "register")
+		return nil, nil, convertError(ctx, err)
 	}
 
 	var metadata *accessmodel.ExecutorMetadata
@@ -564,11 +605,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 // convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
 // to a local access sentinel error.
 // if conversion fails, an irrecoverable error is thrown.
-func convertError(ctx context.Context, err error, typeName string) error {
+func convertError(ctx context.Context, err error) error {
 	// this is a bit fragile since we're decoding error strings. it's only needed until we add support for execution data on the public network
 	switch status.Code(err) {
 	case codes.NotFound:
-		if sourceErrStr, ok := splitOnPrefix(err.Error(), fmt.Sprintf("data not found for %s: ", typeName)); ok {
+		if typeName, sourceErrStr, ok := splitNotFoundError(err.Error()); ok {
 			return access.NewDataNotFoundError(typeName, errors.New(sourceErrStr))
 		}
 	case codes.Internal:
@@ -624,6 +665,44 @@ func splitOnPrefix(original, prefix string) (string, bool) {
 		return parts[1], true
 	}
 	return "", false
+}
+
+// splitNotFoundError extracts the type name and the cleaned error message that follows the type name.
+//
+// Example:
+//
+//	input:  "code = NotFound desc = data not found for header: failed to find header by ID: could not lookup block id by height 1"
+//	output: typeName="header", errorStr="failed to find header by ID: could not lookup block id by height 1", ok=true
+func splitNotFoundError(original string) (string, string, bool) {
+	// isolate everything after the DataNotFoundPrefix.
+	afterPrefix, found := splitOnPrefix(original, access.DataNotFoundPrefix)
+	if !found {
+		return "", "", false
+	}
+
+	remaining := strings.TrimSpace(afterPrefix)
+	if remaining == "" {
+		return "", "", false
+	}
+
+	// Regex to capture:
+	//   1. Type name: any characters until a colon
+	//   2. The rest of the error message after the colon
+	re := regexp.MustCompile(`^(.+?):\s*(.*)$`)
+
+	matches := re.FindStringSubmatch(remaining)
+	if len(matches) != 3 {
+		return "", "", false
+	}
+
+	typeName := strings.TrimSpace(matches[1])
+	errStr := strings.TrimSpace(matches[2])
+
+	if typeName == "" || errStr == "" {
+		return "", "", false
+	}
+
+	return typeName, errStr, true
 }
 
 // executionStateQuery constructs an ExecutionStateQuery protobuf message from
