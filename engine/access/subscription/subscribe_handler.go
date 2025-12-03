@@ -57,8 +57,9 @@ func (h *SubscriptionHandler) Subscribe(
 	startHeight uint64,
 	getData GetDataByHeightFunc,
 ) Subscription {
-	sub := NewHeightBasedSubscription(h.sendBufferSize, startHeight, getData)
-	go NewStreamer(h.log, h.broadcaster, h.sendTimeout, h.responseLimit, sub).Stream(ctx)
+	sub := NewHeightBasedSubscription(h.sendBufferSize)
+	streamer := NewStreamer(h.log, h.broadcaster, h.sendTimeout, h.responseLimit, sub, getData, startHeight)
+	go streamer.Stream(ctx)
 
 	return sub
 }

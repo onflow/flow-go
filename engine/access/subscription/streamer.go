@@ -18,6 +18,13 @@ var ErrBlockNotReady = errors.New("block not ready")
 // ErrEndOfData represents an error indicating that no more data available for streaming.
 var ErrEndOfData = errors.New("end of data")
 
+// GetDataByHeightFunc is a callback used by subscriptions to retrieve data for a given height.
+// Expected errors:
+// - storage.ErrNotFound
+// - execution_data.BlobNotFoundError
+// All other errors are considered exceptions
+type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
+
 // Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
 	log         zerolog.Logger
@@ -25,6 +32,8 @@ type Streamer struct {
 	broadcaster *engine.Broadcaster
 	sendTimeout time.Duration
 	limiter     *rate.Limiter
+	getData     GetDataByHeightFunc
+	nextHeight  uint64
 }
 
 // NewStreamer creates a new Streamer instance.
@@ -34,6 +43,8 @@ func NewStreamer(
 	sendTimeout time.Duration,
 	limit float64,
 	sub Streamable,
+	getData GetDataByHeightFunc,
+	firstHeight uint64,
 ) *Streamer {
 	var limiter *rate.Limiter
 	if limit > 0 {
@@ -47,6 +58,8 @@ func NewStreamer(
 		sendTimeout: sendTimeout,
 		limiter:     limiter,
 		sub:         sub,
+		getData:     getData,
+		nextHeight:  firstHeight,
 	}
 }
 
@@ -106,7 +119,7 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			return fmt.Errorf("error waiting for response capacity: %w", err)
 		}
 
-		response, err := s.sub.Next(ctx)
+		response, err := s.Next(ctx)
 
 		if response == nil && err == nil {
 			continue
@@ -121,17 +134,22 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			return fmt.Errorf("could not get response: %w", err)
 		}
 
-		if ssub, ok := s.sub.(*HeightBasedSubscription); ok {
-			s.log.Trace().
-				Uint64("next_height", ssub.nextHeight).
-				Msg("sending response")
-		}
-
 		err = s.sub.Send(ctx, response, s.sendTimeout)
 		if err != nil {
 			return err
 		}
 	}
+}
+
+func (s *Streamer) Next(ctx context.Context) (any, error) {
+	v, err := s.getData(ctx, s.nextHeight)
+	if err != nil {
+		return nil, fmt.Errorf("could not get data for height %d: %w", s.nextHeight, err)
+	}
+
+	s.nextHeight++
+
+	return v, nil
 }
 
 // checkRateLimit checks the stream's rate limit and blocks until there is room to send a response.
