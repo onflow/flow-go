@@ -1,4 +1,4 @@
-package optimistic_sync
+package pipeline
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -22,27 +23,27 @@ func TestPipelineStateTransitions(t *testing.T) {
 		pipeline, mockCore, updateChan, parent := createPipeline(t)
 
 		pipeline.SetSealed()
-		parent.UpdateState(StateComplete, pipeline)
+		parent.UpdateState(optimistic_sync.StateComplete, pipeline)
 
 		mockCore.On("Download", mock.Anything).Return(nil)
 		mockCore.On("Index").Return(nil)
 		mockCore.On("Persist").Return(nil)
 
-		assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
+		assert.Equal(t, optimistic_sync.StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
 		go func() {
 			err := pipeline.Run(context.Background(), mockCore, parent.GetState())
 			require.NoError(t, err)
 		}()
 
-		for _, expected := range []State{StateProcessing, StateWaitingPersist, StateComplete} {
+		for _, expected := range []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist, optimistic_sync.StateComplete} {
 			synctest.Wait()
 			assertUpdate(t, updateChan, expected)
 		}
 
 		// wait for Run goroutine to finish
 		synctest.Wait()
-		assertNoUpdate(t, pipeline, updateChan, StateComplete)
+		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateComplete)
 	})
 }
 
@@ -52,7 +53,7 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		pipeline, mockCore, updateChan, parent := createPipeline(t)
 
-		assert.Equal(t, StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
+		assert.Equal(t, optimistic_sync.StatePending, pipeline.GetState(), "Pipeline should start in Pending state")
 
 		go func() {
 			err := pipeline.Run(context.Background(), mockCore, parent.GetState())
@@ -60,35 +61,35 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 		}()
 
 		// 1. Initial update - parent in Ready state
-		parent.UpdateState(StatePending, pipeline)
+		parent.UpdateState(optimistic_sync.StatePending, pipeline)
 
 		// Check that pipeline remains in Ready state
 		synctest.Wait()
-		assertNoUpdate(t, pipeline, updateChan, StatePending)
+		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StatePending)
 
 		// 2. Update parent to downloading
-		parent.UpdateState(StateProcessing, pipeline)
+		parent.UpdateState(optimistic_sync.StateProcessing, pipeline)
 
 		// Pipeline should now call Download and Index within the processing state, then progress to
 		// WaitingPersist and stop
 		mockCore.On("Download", mock.Anything).Return(nil)
 		mockCore.On("Index").Return(nil)
-		for _, expected := range []State{StateProcessing, StateWaitingPersist} {
+		for _, expected := range []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist} {
 			synctest.Wait()
 			assertUpdate(t, updateChan, expected)
 		}
-		assert.Equal(t, StateWaitingPersist, pipeline.GetState(), "Pipeline should be in StateWaitingPersist state")
+		assert.Equal(t, optimistic_sync.StateWaitingPersist, pipeline.GetState(), "Pipeline should be in StateWaitingPersist state")
 
 		// pipeline should remain in WaitingPersist state
 		synctest.Wait()
-		assertNoUpdate(t, pipeline, updateChan, StateWaitingPersist)
+		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateWaitingPersist)
 
 		// 3. Update parent to complete - should allow persisting when sealed
-		parent.UpdateState(StateComplete, pipeline)
+		parent.UpdateState(optimistic_sync.StateComplete, pipeline)
 
 		// this alone should not allow the pipeline to progress to any other state
 		synctest.Wait()
-		assertNoUpdate(t, pipeline, updateChan, StateWaitingPersist)
+		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateWaitingPersist)
 
 		// 4. Mark the execution result as sealed, this should allow the pipeline to progress to Complete state
 		pipeline.SetSealed()
@@ -96,11 +97,11 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 
 		// Wait for pipeline to complete
 		synctest.Wait()
-		assertUpdate(t, updateChan, StateComplete)
+		assertUpdate(t, updateChan, optimistic_sync.StateComplete)
 
 		// Run should complete without error
 		synctest.Wait()
-		assertNoUpdate(t, pipeline, updateChan, StateComplete)
+		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateComplete)
 	})
 }
 
@@ -122,24 +123,24 @@ func TestAbandoned(t *testing.T) {
 
 			// first state must be abandoned
 			synctest.Wait()
-			assertUpdate(t, updateChan, StateAbandoned)
+			assertUpdate(t, updateChan, optimistic_sync.StateAbandoned)
 
 			// wait for Run goroutine to finish
 			synctest.Wait()
-			assertNoUpdate(t, pipeline, updateChan, StateAbandoned)
+			assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateAbandoned)
 		})
 	})
 
 	// Test cases abandoning during different stages of processing
 	testCases := []struct {
 		name           string
-		setupMock      func(*PipelineImpl, *mockStateProvider, *osmock.Core)
-		onStateFns     map[State]func(*PipelineImpl, *mockStateProvider)
-		expectedStates []State
+		setupMock      func(*Pipeline, *mockStateProvider, *osmock.Core)
+		onStateFns     map[optimistic_sync.State]func(*Pipeline, *mockStateProvider)
+		expectedStates []optimistic_sync.State
 	}{
 		{
 			name: "Abandon during download",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.
 					On("Download", mock.Anything).
 					Return(func(ctx context.Context) error {
@@ -148,68 +149,68 @@ func TestAbandoned(t *testing.T) {
 						return ctx.Err()
 					})
 			},
-			expectedStates: []State{StateProcessing, StateAbandoned},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateAbandoned},
 		},
 		{
 			name: "Parent abandoned during download",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.
 					On("Download", mock.Anything).
 					Return(func(ctx context.Context) error {
-						parent.UpdateState(StateAbandoned, pipeline)
+						parent.UpdateState(optimistic_sync.StateAbandoned, pipeline)
 						<-ctx.Done() // abandon should cause context to be canceled
 						return ctx.Err()
 					})
 			},
-			expectedStates: []State{StateProcessing, StateAbandoned},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateAbandoned},
 		},
 		{
 			name: "Abandon during index",
 			// Note: indexing will complete, and the pipeline will transition to waiting persist
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
 					pipeline.Abandon()
 				}).Return(nil)
 			},
-			expectedStates: []State{StateProcessing, StateAbandoned},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateAbandoned},
 		},
 		{
 			name: "Parent abandoned during index",
 			// Note: indexing will complete, and the pipeline will transition to waiting persist
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
-					parent.UpdateState(StateAbandoned, pipeline)
+					parent.UpdateState(optimistic_sync.StateAbandoned, pipeline)
 				}).Return(nil)
 			},
-			expectedStates: []State{StateProcessing, StateAbandoned},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateAbandoned},
 		},
 		{
 			name: "Abandon during waiting to persist",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Return(nil)
 			},
-			onStateFns: map[State]func(*PipelineImpl, *mockStateProvider){
-				StateWaitingPersist: func(pipeline *PipelineImpl, parent *mockStateProvider) {
+			onStateFns: map[optimistic_sync.State]func(*Pipeline, *mockStateProvider){
+				optimistic_sync.StateWaitingPersist: func(pipeline *Pipeline, parent *mockStateProvider) {
 					pipeline.Abandon()
 				},
 			},
-			expectedStates: []State{StateProcessing, StateWaitingPersist, StateAbandoned},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist, optimistic_sync.StateAbandoned},
 		},
 		{
 			name: "Parent abandoned during waiting to persist",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Return(nil)
 			},
-			onStateFns: map[State]func(*PipelineImpl, *mockStateProvider){
-				StateWaitingPersist: func(pipeline *PipelineImpl, parent *mockStateProvider) {
-					parent.UpdateState(StateAbandoned, pipeline)
+			onStateFns: map[optimistic_sync.State]func(*Pipeline, *mockStateProvider){
+				optimistic_sync.StateWaitingPersist: func(pipeline *Pipeline, parent *mockStateProvider) {
+					parent.UpdateState(optimistic_sync.StateAbandoned, pipeline)
 				},
 			},
-			expectedStates: []State{StateProcessing, StateWaitingPersist, StateAbandoned},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist, optimistic_sync.StateAbandoned},
 		},
 		// Note: it does not make sense to abandon during persist, since it will only be run when:
 		// 1. the parent is already complete
@@ -231,7 +232,7 @@ func TestAbandoned(t *testing.T) {
 				}()
 
 				// Send parent update to start processing
-				parent.UpdateState(StateProcessing, pipeline)
+				parent.UpdateState(optimistic_sync.StateProcessing, pipeline)
 
 				for _, expected := range tc.expectedStates {
 					synctest.Wait()
@@ -244,7 +245,7 @@ func TestAbandoned(t *testing.T) {
 
 				// wait for Run goroutine to finish
 				synctest.Wait()
-				assertNoUpdate(t, pipeline, updateChan, StateAbandoned)
+				assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateAbandoned)
 			})
 		})
 	}
@@ -255,11 +256,11 @@ func TestPipelineContextCancellation(t *testing.T) {
 	// Test cases for different stages of processing
 	testCases := []struct {
 		name      string
-		setupMock func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context
+		setupMock func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context
 	}{
 		{
 			name: "Cancel before download starts",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				// no Core methods called
@@ -268,7 +269,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 		},
 		{
 			name: "Cancel during download",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				mockCore.On("Download", mock.Anything).Run(func(args mock.Arguments) {
 					cancel()
@@ -282,7 +283,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 		},
 		{
 			name: "Cancel between steps",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core) context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 
 				mockCore.On("Download", mock.Anything).Return(nil)
@@ -300,7 +301,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				pipeline, mockCore, _, parent := createPipeline(t)
 
-				parent.UpdateState(StateComplete, pipeline)
+				parent.UpdateState(optimistic_sync.StateComplete, pipeline)
 				pipeline.SetSealed()
 
 				ctx := tc.setupMock(pipeline, parent, mockCore)
@@ -323,39 +324,39 @@ func TestPipelineErrorHandling(t *testing.T) {
 	// Test cases for different stages of processing
 	testCases := []struct {
 		name           string
-		setupMock      func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error)
+		setupMock      func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error)
 		expectedErr    error
-		expectedStates []State
+		expectedStates []optimistic_sync.State
 	}{
 		{
 			name: "Download Error",
-			setupMock: func(pipeline *PipelineImpl, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
+			setupMock: func(pipeline *Pipeline, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
 				mockCore.On("Download", mock.Anything).Return(expectedErr)
 			},
 			expectedErr:    errors.New("download error"),
-			expectedStates: []State{StateProcessing},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing},
 		},
 		{
 			name: "Index Error",
-			setupMock: func(pipeline *PipelineImpl, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
+			setupMock: func(pipeline *Pipeline, _ *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Return(expectedErr)
 			},
 			expectedErr:    errors.New("index error"),
-			expectedStates: []State{StateProcessing},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing},
 		},
 		{
 			name: "Persist Error",
-			setupMock: func(pipeline *PipelineImpl, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
+			setupMock: func(pipeline *Pipeline, parent *mockStateProvider, mockCore *osmock.Core, expectedErr error) {
 				mockCore.On("Download", mock.Anything).Return(nil)
 				mockCore.On("Index").Run(func(args mock.Arguments) {
-					parent.UpdateState(StateComplete, pipeline)
+					parent.UpdateState(optimistic_sync.StateComplete, pipeline)
 					pipeline.SetSealed()
 				}).Return(nil)
 				mockCore.On("Persist").Return(expectedErr)
 			},
 			expectedErr:    errors.New("persist error"),
-			expectedStates: []State{StateProcessing, StateWaitingPersist},
+			expectedStates: []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist},
 		},
 	}
 
@@ -372,7 +373,7 @@ func TestPipelineErrorHandling(t *testing.T) {
 				}()
 
 				// Send parent update to trigger processing
-				parent.UpdateState(StateProcessing, pipeline)
+				parent.UpdateState(optimistic_sync.StateProcessing, pipeline)
 
 				for _, expected := range tc.expectedStates {
 					synctest.Wait()
@@ -399,15 +400,15 @@ func TestSetSealed(t *testing.T) {
 // TestValidateTransition verifies that the pipeline correctly validates state transitions.
 func TestValidateTransition(t *testing.T) {
 
-	allStates := []State{StatePending, StateProcessing, StateWaitingPersist, StateComplete, StateAbandoned}
+	allStates := []optimistic_sync.State{optimistic_sync.StatePending, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist, optimistic_sync.StateComplete, optimistic_sync.StateAbandoned}
 
 	// these are all of the valid transitions from a state to another state
-	validTransitions := map[State]map[State]bool{
-		StatePending:        {StateProcessing: true, StateAbandoned: true},
-		StateProcessing:     {StateWaitingPersist: true, StateAbandoned: true},
-		StateWaitingPersist: {StateComplete: true, StateAbandoned: true},
-		StateComplete:       {},
-		StateAbandoned:      {},
+	validTransitions := map[optimistic_sync.State]map[optimistic_sync.State]bool{
+		optimistic_sync.StatePending:        {optimistic_sync.StateProcessing: true, optimistic_sync.StateAbandoned: true},
+		optimistic_sync.StateProcessing:     {optimistic_sync.StateWaitingPersist: true, optimistic_sync.StateAbandoned: true},
+		optimistic_sync.StateWaitingPersist: {optimistic_sync.StateComplete: true, optimistic_sync.StateAbandoned: true},
+		optimistic_sync.StateComplete:       {},
+		optimistic_sync.StateAbandoned:      {},
 	}
 
 	// iterate through all possible transitions, and validate that the valid transitions succeed, and the invalid transitions fail
@@ -425,12 +426,12 @@ func TestValidateTransition(t *testing.T) {
 				continue
 			}
 
-			assert.ErrorIs(t, err, ErrInvalidTransition)
+			assert.ErrorIs(t, err, optimistic_sync.ErrInvalidTransition)
 		}
 	}
 }
 
-func assertNoUpdate(t *testing.T, pipeline Pipeline, updateChan <-chan State, existingState State) {
+func assertNoUpdate(t *testing.T, pipeline *Pipeline, updateChan <-chan optimistic_sync.State, existingState optimistic_sync.State) {
 	select {
 	case update := <-updateChan:
 		t.Errorf("Pipeline should remain in %s state, but transitioned to %s", existingState, update)
@@ -439,7 +440,7 @@ func assertNoUpdate(t *testing.T, pipeline Pipeline, updateChan <-chan State, ex
 	}
 }
 
-func assertUpdate(t *testing.T, updateChan <-chan State, expected State) {
+func assertUpdate(t *testing.T, updateChan <-chan optimistic_sync.State, expected optimistic_sync.State) {
 	select {
 	case update := <-updateChan:
 		assert.Equal(t, expected, update, "Pipeline should transition to %s state", expected)

@@ -55,7 +55,7 @@ func (reader *ContractReader) GetAccountContractNames(
 		return nil, fmt.Errorf("get account contract names failed: %w", err)
 	}
 
-	address := flow.ConvertAddress(runtimeAddress)
+	address := flow.Address(runtimeAddress)
 
 	return reader.accounts.GetContractNames(address)
 }
@@ -127,7 +127,7 @@ func ResolveLocation(
 			return nil, fmt.Errorf("no identifiers provided")
 		}
 
-		address := flow.ConvertAddress(addressLocation.Address)
+		address := flow.Address(addressLocation.Address)
 
 		contractNames, err := getContractNames(address)
 		if err != nil {
@@ -184,7 +184,7 @@ func (reader *ContractReader) getCode(
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
 
-	add, err := reader.accounts.GetContract(location.Name, flow.ConvertAddress(location.Address))
+	add, err := reader.accounts.GetContract(location.Name, flow.Address(location.Address))
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
