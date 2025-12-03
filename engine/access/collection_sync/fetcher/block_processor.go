@@ -99,6 +99,10 @@ func (bp *BlockProcessor) FetchCollections(
 	}
 
 	// Request collections from collection nodes
+	// Note: requester does not guarantee it will keep trying to fetch the collections,
+	// in fact, if a collection node is down, the request may fail permanently,
+	// so we need to have a retry mechanism in place (see RetryFetchingMissingCollections),
+	// which allows requester to retry with a different collection node.
 	err = bp.requester.RequestCollectionsByGuarantees(missingGuarantees)
 	if err != nil {
 		return fmt.Errorf("failed to request collections for block height %d: %w", blockHeight, err)
@@ -164,6 +168,7 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 
 // RetryFetchingMissingCollections retries fetching all missing collections currently in the queue.
 // It retrieves blocks for the heights with missing collections and extracts the corresponding guarantees.
+// Note, the caller is responsible to ensure this method is called periodically, and not concurrently.
 //
 // No error returns are expected during normal operation.
 func (bp *BlockProcessor) RetryFetchingMissingCollections() error {
@@ -200,36 +205,21 @@ func (bp *BlockProcessor) RetryFetchingMissingCollections() error {
 			continue
 		}
 
-		// Build a set of actually missing collection IDs for this block
-		actuallyMissingSet := make(map[flow.Identifier]struct{})
-		for _, guarantee := range actuallyMissingGuarantees {
-			actuallyMissingSet[guarantee.CollectionID] = struct{}{}
-			guarantees = append(guarantees, guarantee)
-		}
-
-		// Check if all collections for this block are now indexed
-		// If so, mark the block as done in MCQ
-		originalMissing := missingByHeight[height]
-		allIndexed := true
-		for _, collectionID := range originalMissing {
-			if _, stillMissing := actuallyMissingSet[collectionID]; stillMissing {
-				allIndexed = false
-				break
-			}
-		}
-
-		if allIndexed {
+		// If no collections are missing, all collections for this block are now indexed
+		if len(actuallyMissingGuarantees) == 0 {
 			// All collections for this block are now indexed, mark it as done
 			notifyJobCompletion, ok := bp.mcq.OnIndexedForBlock(height)
 			if ok {
-				// Call the callback to notify job completion
 				notifyJobCompletion()
 				bp.log.Info().
 					Uint64("block_height", height).
-					Int("collections_count", len(originalMissing)).
 					Msg("all collections for block are now indexed, marked block as done")
 			}
+			continue
 		}
+
+		// Add guarantees for collections that are still missing
+		guarantees = append(guarantees, actuallyMissingGuarantees...)
 	}
 
 	if len(guarantees) == 0 {
@@ -254,13 +244,4 @@ func (bp *BlockProcessor) RetryFetchingMissingCollections() error {
 // MissingCollectionQueueSize returns the number of missing collections currently in the queue.
 func (bp *BlockProcessor) MissingCollectionQueueSize() uint {
 	return bp.mcq.Size()
-}
-
-// PruneUpToHeight removes all tracked heights up to and including the given height.
-func (bp *BlockProcessor) PruneUpToHeight(height uint64) {
-	callbacks := bp.mcq.PruneUpToHeight(height)
-	// notify job completion
-	for _, cb := range callbacks {
-		cb()
-	}
 }

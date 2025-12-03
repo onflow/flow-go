@@ -225,23 +225,6 @@ func (mcq *MissingCollectionQueue) OnIndexedForBlock(blockHeight uint64) (func()
 	return jobState.callback, true
 }
 
-// PruneUpToHeight removes all block jobs and their collection mappings
-// for block heights less than or equal to the specified height.
-func (mcq *MissingCollectionQueue) PruneUpToHeight(height uint64) []func() {
-	mcq.mu.Lock()
-	defer mcq.mu.Unlock()
-
-	callbacks := make([]func(), 0, len(mcq.blockJobs))
-	for blockHeight := range mcq.blockJobs {
-		if blockHeight <= height {
-			jobState, _ := mcq.cleanupCollectionMappingsForHeight(blockHeight)
-			callbacks = append(callbacks, jobState.callback)
-		}
-	}
-
-	return callbacks
-}
-
 // cleanupCollectionMappingsForHeight removes all collection-to-height mappings for collections
 // belonging to the specified block height and removes the block job from tracking.
 // This includes both missing and received collections.

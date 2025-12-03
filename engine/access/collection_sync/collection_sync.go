@@ -22,9 +22,6 @@ type MissingCollectionQueue interface {
 	// missingCollectionID is an arbitrary ID from the remaining missing collections, or ZeroID if none.
 	OnReceivedCollection(collection *flow.Collection) ([]*flow.Collection, uint64, flow.Identifier, bool)
 
-	// PruneUpToHeight removes all tracked heights up to and including the given height.
-	PruneUpToHeight(height uint64) (callbacks []func())
-
 	// IsHeightQueued returns true if the given height is still being tracked (has not been indexed yet).
 	IsHeightQueued(height uint64) bool
 
