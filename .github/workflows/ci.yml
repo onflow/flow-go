@@ -62,6 +62,8 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
         with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.63
           args: "--no-config --disable-all" # set args so that no linters are actually run
       - name: Build custom linter binary
         if: steps.cache-linter.outputs.cache-hit != 'true'
