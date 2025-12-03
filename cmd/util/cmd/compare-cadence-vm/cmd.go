@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/kr/pretty"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -21,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/debug"
 )
 
@@ -124,6 +126,16 @@ func run(_ *cobra.Command, args []string) {
 			log.Fatal().Msg("either provide a single block ID and use --block-count, or provide multiple block IDs and do not use --block-count")
 		}
 
+		blockHeaderProgress := util.LogProgress(
+			log.Logger,
+			util.NewLogProgressConfig(
+				"fetching block headers",
+				flagBlockCount,
+				1*time.Second,
+				100/5, // log every 5%
+			),
+		)
+
 		blockID := blockIDs[0]
 		for i := 0; i < flagBlockCount; i++ {
 			header := debug_tx.FetchBlockHeader(blockID, flowClient)
@@ -133,8 +145,11 @@ func run(_ *cobra.Command, args []string) {
 				header: header,
 			})
 
+			blockHeaderProgress(1)
+
 			blockID = header.ParentID
 		}
+
 	} else {
 		for _, blockID := range blockIDs {
 			header := debug_tx.FetchBlockHeader(blockID, flowClient)
@@ -145,6 +160,16 @@ func run(_ *cobra.Command, args []string) {
 			})
 		}
 	}
+
+	blockProgress := util.LogProgress(
+		log.Logger,
+		util.NewLogProgressConfig(
+			"executing blocks",
+			flagBlockCount,
+			1*time.Second,
+			100/5, // log every 5%
+		),
+	)
 
 	var (
 		blocksMismatched int64
@@ -174,6 +199,8 @@ func run(_ *cobra.Command, args []string) {
 			} else {
 				atomic.AddInt64(&blocksMatched, 1)
 			}
+
+			blockProgress(1)
 
 			return nil
 		})
