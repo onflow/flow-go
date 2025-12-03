@@ -14,6 +14,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -112,7 +113,8 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 // CreateAndStartController creates and starts the BlockTimeController.
 // Should be called only once per test case.
 func (bs *BlockTimeControllerSuite) CreateAndStartController() {
-	ctl, err := NewBlockTimeController(unittest.Logger(), &bs.metrics, bs.config, &bs.state, bs.initialView)
+	followerDistributor := pubsub.NewFollowerDistributor()
+	ctl, err := NewBlockTimeController(unittest.Logger(), &bs.metrics, bs.config, &bs.state, bs.initialView, followerDistributor)
 	require.NoError(bs.T(), err)
 	bs.ctl = ctl
 	bs.ctl.Start(bs.ctx)

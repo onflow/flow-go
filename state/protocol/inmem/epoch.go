@@ -234,7 +234,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		return nil, fmt.Errorf("could not encode signer indices for rootQCVoteData.VoterIDs: %w", err)
 	}
 
-	rootBlock, err := cluster.CanonicalRootBlock(epochCounter, members)
+	rootBlock, err := cluster.CanonicalRootBlock(epochCounter, members.NodeIDs())
 	if err != nil {
 		return nil, fmt.Errorf("could not generate canonical root block: %w", err)
 	}

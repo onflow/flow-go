@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -1242,6 +1243,89 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
+			})
+	})
+
+	// run a batch of two transactions. The sum of their gas usage would overflow an uint46
+	// so the batch run should fail with an overflow error.
+	t.Run("Batch run evm gas overflow", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						execute {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				batchCount := 2
+				txBytes := make([]cadence.Value, batchCount)
+
+				tx := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "storeWithLog", big.NewInt(0)),
+					big.NewInt(0),
+					uint64(200_000),
+					big.NewInt(1),
+				)
+
+				txBytes[0] = cadence.NewArray(
+					unittest.BytesToCdcUInt8(tx),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				tx = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "storeWithLog", big.NewInt(1)),
+					big.NewInt(0),
+					math.MaxUint64-uint64(100_000),
+					big.NewInt(1),
+				)
+
+				txBytes[1] = cadence.NewArray(
+					unittest.BytesToCdcUInt8(tx),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				state, output, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(t, output.Err, "insufficient computation")
+				require.Empty(t, state.WriteSet)
 			})
 	})
 }
@@ -4048,7 +4132,7 @@ func RunWithNewEnvironment(
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				f(
-					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					ctx,
 					vm,
 					snapshotTree,
 					testContract,
@@ -4109,7 +4193,7 @@ func RunContractWithNewEnvironment(
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				f(
-					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					ctx,
 					vm,
 					snapshotTree,
 					testContract,

@@ -80,7 +80,7 @@ func createAccount(
 
 	event := data.(cadence.Event)
 
-	address := flow.ConvertAddress(
+	address := flow.Address(
 		cadence.SearchFieldByName(
 			event,
 			stdlib.AccountEventAddressParameter.Identifier,
@@ -401,7 +401,7 @@ func TestCreateAccount(t *testing.T) {
 
 				event := data.(cadence.Event)
 
-				address := flow.ConvertAddress(
+				address := flow.Address(
 					cadence.SearchFieldByName(
 						event,
 						stdlib.AccountEventAddressParameter.Identifier,
@@ -454,7 +454,7 @@ func TestCreateAccount(t *testing.T) {
 
 					event := data.(cadence.Event)
 
-					address := flow.ConvertAddress(
+					address := flow.Address(
 						cadence.SearchFieldByName(
 							event,
 							stdlib.AccountEventAddressParameter.Identifier,

@@ -128,6 +128,12 @@ func (e *ENTransactionProvider) TransactionResult(
 	}, nil
 }
 
+// TransactionsByBlockID returns the transaction for the given block ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: If the requested data is not found.
+//   - [codes.Unavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [codes.Internal]: If the system collection cannot be constructed.
 func (e *ENTransactionProvider) TransactionsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
@@ -153,7 +159,7 @@ func (e *ENTransactionProvider) TransactionsByBlockID(
 		ByHeight(block.Height).
 		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return nil, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	return append(transactions, systemCollection.Transactions...), nil
@@ -221,6 +227,12 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	}, nil
 }
 
+// TransactionResultsByBlockID get the transaction results by block ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: If the requested data is not found.
+//   - [codes.Unavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [codes.Internal]: For internal execution node failures.
 func (e *ENTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
@@ -295,8 +307,9 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 // execution node response.
 //
 // Expected error returns during normal operation:
-//   - [codes.Internal]: if the scheduled transactions cannot be constructed
-//   - [status.Error]: for any error returned by the execution node
+//   - [codes.Internal]: If the scheduled transactions cannot be constructed.
+//   - [codes.Unavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [status.Error]: For any error returned by the execution node.
 func (e *ENTransactionProvider) ScheduledTransactionsByBlockID(
 	ctx context.Context,
 	header *flow.Header,
@@ -443,7 +456,7 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 		ByHeight(blockHeight).
 		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to construct system collection", codes.Internal)
+		return nil, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	var systemTxIDs []flow.Identifier
@@ -454,6 +467,12 @@ func (e *ENTransactionProvider) systemTransactionIDs(
 	return systemTxIDs, nil
 }
 
+// getBlockEvents returns all events by the given block ID.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: If the requested data is not found.
+//   - [codes.Unavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [codes.Internal]: For internal execution node failures.
 func (e *ENTransactionProvider) getBlockEvents(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -609,6 +628,11 @@ func (e *ENTransactionProvider) getTransactionResultByIndexFromAnyExeNode(
 	return resp, errToReturn
 }
 
+// getBlockEventsByBlockIDsFromAnyExeNode get events by block ID from the execution node.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable]: If no nodes are available or a connection to an execution node cannot be established.
+//   - [status.Error]: If the execution node returns a gRPC error.
 func (e *ENTransactionProvider) getBlockEventsByBlockIDsFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
@@ -696,6 +720,11 @@ func (e *ENTransactionProvider) tryGetTransactionResultByIndex(
 	return resp, nil
 }
 
+// tryGetBlockEventsByBlockIDs attempts to get events by block ID from the given execution node.
+//
+// Expected error returns during normal operation:
+//   - [codes.Unavailable]: If a connection to an execution node cannot be established.
+//   - [status.Error]: If the execution node returns a gRPC error.
 func (e *ENTransactionProvider) tryGetBlockEventsByBlockIDs(
 	ctx context.Context,
 	execNode *flow.IdentitySkeleton,
@@ -720,6 +749,7 @@ func (e *ENTransactionProvider) tryGetBlockEventsByBlockIDs(
 //
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if the transaction is not found in the block.
+//   - [codes.Unavailable]: If no nodes are available or a connection to an execution node cannot be established.
 //   - [codes.Internal]: if the system collection cannot be constructed.
 func (e *ENTransactionProvider) getTransactionIDByIndex(ctx context.Context, block *flow.Block, index uint32) (flow.Identifier, error) {
 	i := uint32(0)
@@ -747,7 +777,7 @@ func (e *ENTransactionProvider) getTransactionIDByIndex(ctx context.Context, blo
 		ByHeight(block.Height).
 		SystemCollection(e.chainID.Chain(), eventProvider)
 	if err != nil {
-		return flow.ZeroID, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return flow.ZeroID, rpc.ConvertError(err, "could not construct system collection", codes.Internal)
 	}
 
 	for _, tx := range systemCollection.Transactions {

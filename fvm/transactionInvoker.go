@@ -189,15 +189,13 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	chainID := executor.ctx.Chain.ChainID()
 
 	// setup EVM
-	if executor.ctx.EVMEnabled {
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			executor.cadenceRuntime.TxRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
+	err := evm.SetupEnvironment(
+		chainID,
+		executor.env,
+		executor.cadenceRuntime.TxRuntimeEnv,
+	)
+	if err != nil {
+		return err
 	}
 
 	// get meter parameters
@@ -258,15 +256,13 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 	chainID := executor.ctx.Chain.ChainID()
 
 	// setup EVM
-	if executor.ctx.EVMEnabled {
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			executor.cadenceRuntime.TxRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
+	err := evm.SetupEnvironment(
+		chainID,
+		executor.env,
+		executor.cadenceRuntime.TxRuntimeEnv,
+	)
+	if err != nil {
+		return err
 	}
 
 	var invalidator derived.TransactionInvalidator

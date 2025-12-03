@@ -206,6 +206,10 @@ func TestLevelledForest_GetChildren(t *testing.T) {
 	// testing children for Block that is contained in Tree but no children are known
 	it = F.GetChildren(string2Identifier("D"))
 	assert.False(t, it.HasNext())
+
+	// testing children for Block that does not exist (and is not a parent of any existent vertices) (should return 0)
+	it = F.GetChildren(string2Identifier("NotAddedOrReferenced"))
+	assert.False(t, it.HasNext())
 }
 
 // TestLevelledForest_GetNumberOfChildren tests that children are returned properly
@@ -215,11 +219,14 @@ func TestLevelledForest_GetNumberOfChildren(t *testing.T) {
 	// testing children for Block that is contained in Tree
 	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifier("X")))
 
-	// testing children for referenced Block that is NOT contained in Tree
+	// testing children for referenced Block that is NOT contained in Tree (but is referenced as parent of existent vertices)
 	assert.Equal(t, 2, F.GetNumberOfChildren(string2Identifier("Genesis")))
 
 	// testing children for Block that is contained in Tree but no children are known
 	assert.Equal(t, 0, F.GetNumberOfChildren(string2Identifier("D")))
+
+	// testing children for Block that does not exist (and is not a parent of any existent vertices) (should return 0)
+	assert.Equal(t, 0, F.GetNumberOfChildren(string2Identifier("NotAddedOrReferenced")))
 }
 
 // TestLevelledForest_GetVerticesAtLevel tests that Vertex blob is returned properly

@@ -22,8 +22,7 @@ import (
 	"github.com/onflow/flow-go/storage/inmemory"
 )
 
-// TODO: DefaultTxResultErrMsgsRequestTimeout should be configured in future PR`s
-
+// DefaultTxResultErrMsgsRequestTimeout is the default timeout for requesting transaction result error messages.
 const DefaultTxResultErrMsgsRequestTimeout = 5 * time.Second
 
 // workingData encapsulates all components and temporary storage
@@ -59,13 +58,13 @@ type workingData struct {
 	persisted           bool
 }
 
-var _ optimistic_sync.Core = (*CoreImpl)(nil)
+var _ optimistic_sync.Core = (*Core)(nil)
 
-// CoreImpl implements the Core interface for processing execution data.
+// Core implements the Core interface for processing execution data.
 // It coordinates the download, indexing, and persisting of execution data.
 //
 // Safe for concurrent use.
-type CoreImpl struct {
+type Core struct {
 	log zerolog.Logger
 	mu  sync.Mutex
 
@@ -75,11 +74,11 @@ type CoreImpl struct {
 	block           *flow.Block
 }
 
-// NewCoreImpl creates a new CoreImpl with all necessary dependencies
+// NewCore creates a new Core with all necessary dependencies
 // Safe for concurrent use.
 //
 // No error returns are expected during normal operations
-func NewCoreImpl(
+func NewCore(
 	logger zerolog.Logger,
 	executionResult *flow.ExecutionResult,
 	block *flow.Block,
@@ -94,7 +93,7 @@ func NewCoreImpl(
 	latestPersistedSealedResult storage.LatestPersistedSealedResult,
 	protocolDB storage.DB,
 	lockManager storage.LockManager,
-) (*CoreImpl, error) {
+) (*Core, error) {
 	if block.ID() != executionResult.BlockID {
 		return nil, fmt.Errorf("header ID and execution result block ID must match")
 	}
@@ -106,7 +105,7 @@ func NewCoreImpl(
 		Uint64("height", block.Height).
 		Logger()
 
-	return &CoreImpl{
+	return &Core{
 		log:             coreLogger,
 		block:           block,
 		executionResult: executionResult,
@@ -138,7 +137,7 @@ func NewCoreImpl(
 //
 // Expected error returns during normal operation:
 // - [context.Canceled]: if the provided context was canceled before completion
-func (c *CoreImpl) Download(ctx context.Context) error {
+func (c *Core) Download(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.workingData == nil {
@@ -207,7 +206,7 @@ func (c *CoreImpl) Download(ctx context.Context) error {
 // Calling Index after Abandon is called will return an error.
 //
 // No error returns are expected during normal operations
-func (c *CoreImpl) Index() error {
+func (c *Core) Index() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.workingData == nil {
@@ -261,7 +260,7 @@ func (c *CoreImpl) Index() error {
 // Calling Persist after Abandon is called will return an error.
 //
 // No error returns are expected during normal operations
-func (c *CoreImpl) Persist() error {
+func (c *Core) Persist() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.workingData == nil {
@@ -318,7 +317,7 @@ func (c *CoreImpl) Persist() error {
 // the caller should cancel its context to ensure the operation completes in a timely manner.
 //
 // The method is idempotent. Calling it multiple times has no effect.
-func (c *CoreImpl) Abandon() {
+func (c *Core) Abandon() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
