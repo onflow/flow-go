@@ -33,6 +33,9 @@ type MissingCollectionQueue interface {
 
 	// GetMissingCollections returns all collection IDs that are currently missing across all block heights.
 	GetMissingCollections() []flow.Identifier
+
+	// GetMissingCollectionsByHeight returns a map of block height to collection IDs that are missing for that height.
+	GetMissingCollectionsByHeight() map[uint64][]flow.Identifier
 }
 
 // Requests collections by their guarantees.
@@ -60,6 +63,8 @@ type BlockProcessor interface {
 	MissingCollectionQueueSize() uint
 	// PruneUpToHeight removes all tracked heights up to and including the given height.
 	PruneUpToHeight(height uint64)
+	// RetryFetchingMissingCollections retries fetching all missing collections currently in the queue.
+	RetryFetchingMissingCollections() error
 }
 
 // Fetcher is a component that consumes finalized block jobs and processes them

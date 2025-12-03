@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/storage"
 )
 
 // BlockProcessor implements the job lifecycle for collection indexing.
@@ -17,6 +18,7 @@ type BlockProcessor struct {
 	mcq       collection_sync.MissingCollectionQueue
 	indexer   collection_sync.BlockCollectionIndexer
 	requester collection_sync.CollectionRequester
+	blocks    storage.Blocks
 }
 
 var _ collection_sync.BlockProcessor = (*BlockProcessor)(nil)
@@ -28,6 +30,7 @@ var _ collection_sync.BlockProcessor = (*BlockProcessor)(nil)
 //   - mcq: MissingCollectionQueue for tracking missing collections and callbacks
 //   - indexer: BlockCollectionIndexer for storing and indexing collections
 //   - requester: CollectionRequester for requesting collections from the network
+//   - blocks: Blocks storage for retrieving blocks to extract guarantees
 //
 // No error returns are expected during normal operation.
 func NewBlockProcessor(
@@ -35,12 +38,14 @@ func NewBlockProcessor(
 	mcq collection_sync.MissingCollectionQueue,
 	indexer collection_sync.BlockCollectionIndexer,
 	requester collection_sync.CollectionRequester,
+	blocks storage.Blocks,
 ) *BlockProcessor {
 	return &BlockProcessor{
 		log:       log.With().Str("coll_sync", "fetcher_processor").Logger(),
 		mcq:       mcq,
 		indexer:   indexer,
 		requester: requester,
+		blocks:    blocks,
 	}
 }
 
@@ -153,6 +158,67 @@ func (bp *BlockProcessor) OnReceiveCollection(originID flow.Identifier, collecti
 	if ok {
 		notifyJobCompletion()
 	}
+
+	return nil
+}
+
+// RetryFetchingMissingCollections retries fetching all missing collections currently in the queue.
+// It retrieves blocks for the heights with missing collections and extracts the corresponding guarantees.
+//
+// No error returns are expected during normal operation.
+func (bp *BlockProcessor) RetryFetchingMissingCollections() error {
+	// Get missing collections grouped by height
+	missingByHeight := bp.mcq.GetMissingCollectionsByHeight()
+	if len(missingByHeight) == 0 {
+		return nil
+	}
+
+	// Build a set of missing collection IDs for efficient lookup
+	missingCollectionSet := make(map[flow.Identifier]struct{})
+	for _, collectionIDs := range missingByHeight {
+		for _, collectionID := range collectionIDs {
+			// TODO: double check the collection is missing in storage
+			// maybe the execution data index has already indexed the collection
+			missingCollectionSet[collectionID] = struct{}{}
+		}
+	}
+
+	// Collect guarantees for missing collections by retrieving blocks
+	var guarantees []*flow.CollectionGuarantee
+	for height := range missingByHeight {
+		// Get block for this height
+		block, err := bp.blocks.ByHeight(height)
+		if err != nil {
+			bp.log.Fatal().
+				Uint64("block_height", height).
+				Err(err).
+				Msg("failed to retrieve block for retrying missing collections")
+			continue
+		}
+
+		// Extract guarantees for missing collections from this block
+		for _, guarantee := range block.Payload.Guarantees {
+			if _, isMissing := missingCollectionSet[guarantee.CollectionID]; isMissing {
+				guarantees = append(guarantees, guarantee)
+			}
+		}
+	}
+
+	if len(guarantees) == 0 {
+		bp.log.Debug().Msg("no guarantees found for missing collections")
+		return nil
+	}
+
+	// Request collections using the guarantees
+	err := bp.requester.RequestCollectionsByGuarantees(guarantees)
+	if err != nil {
+		return fmt.Errorf("failed to retry requesting collections: %w", err)
+	}
+
+	bp.log.Info().
+		Int("guarantees_count", len(guarantees)).
+		Int("heights_count", len(missingByHeight)).
+		Msg("retried fetching missing collections")
 
 	return nil
 }

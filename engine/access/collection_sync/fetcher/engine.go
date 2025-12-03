@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -24,11 +25,15 @@ type Fetcher struct {
 	blockProcessor collection_sync.BlockProcessor
 	workSignal     engine.Notifier
 	metrics        module.CollectionSyncMetrics
+	retryInterval  time.Duration
 }
 
 var _ collection_sync.Fetcher = (*Fetcher)(nil)
 var _ collection_sync.ProgressReader = (*Fetcher)(nil)
 var _ component.Component = (*Fetcher)(nil)
+
+// DefaultRetryInterval is the default interval for retrying missing collections.
+const DefaultRetryInterval = 30 * time.Second
 
 // NewFetcher creates a new Fetcher component.
 //
@@ -42,6 +47,7 @@ var _ component.Component = (*Fetcher)(nil)
 //   - maxSearchAhead: Maximum number of jobs beyond processedIndex to process. 0 means no limit
 //   - metrics: Optional metrics collector for reporting collection fetched height
 //   - onHeightUpdated: Optional callback to be called when processed height is updated
+//   - retryInterval: Interval for retrying missing collections. If 0, uses DefaultRetryInterval
 //
 // No error returns are expected during normal operation.
 func NewFetcher(
@@ -54,6 +60,7 @@ func NewFetcher(
 	maxSearchAhead uint64, // max number of blocks beyond the next unfullfilled height to fetch collections for
 	metrics module.CollectionSyncMetrics, // optional metrics collector
 	onHeightUpdated func(), // optional callback when processed height is updated
+	retryInterval time.Duration, // interval for retrying missing collections
 ) (*Fetcher, error) {
 	workSignal := engine.NewNotifier()
 
@@ -102,12 +109,16 @@ func NewFetcher(
 		return nil, fmt.Errorf("failed to create collection syncing consumer: %w", err)
 	}
 
+	if retryInterval == 0 {
+		retryInterval = DefaultRetryInterval
+	}
+
 	f := &Fetcher{
-		Component:      consumer,
 		consumer:       consumer,
 		blockProcessor: blockProcessor,
 		workSignal:     workSignal,
 		metrics:        metrics,
+		retryInterval:  retryInterval,
 	}
 
 	// Set up post-notifier to update metrics when a job is done
@@ -127,6 +138,28 @@ func NewFetcher(
 		onHeightUpdated()
 	}
 
+	// Create a ComponentManager that includes both the consumer and the retry worker
+	componentManager := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// Start the consumer component
+			consumer.Start(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-consumer.Ready():
+				ready()
+			}
+			<-consumer.Done()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// Retry worker that periodically retries missing collections
+			ready()
+			f.retryMissingCollectionsLoop(ctx, log)
+		}).
+		Build()
+
+	f.Component = componentManager
+
 	return f, nil
 }
 
@@ -145,4 +178,45 @@ func (s *Fetcher) ProcessedHeight() uint64 {
 // Optional methods, not required for operation but useful for monitoring.
 func (s *Fetcher) Size() uint {
 	return s.consumer.Size()
+}
+
+// retryMissingCollectionsLoop periodically retries fetching missing collections.
+func (f *Fetcher) retryMissingCollectionsLoop(ctx irrecoverable.SignalerContext, log zerolog.Logger) {
+	ticker := time.NewTicker(f.retryInterval)
+	defer ticker.Stop()
+
+	log.Info().
+		Dur("retry_interval", f.retryInterval).
+		Msg("starting missing collections retry worker")
+
+	// Wait for the consumer to be ready before starting retries
+	select {
+	case <-ctx.Done():
+		return
+	case <-f.consumer.Ready():
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info().Msg("missing collections retry worker shutting down")
+			return
+		case <-ticker.C:
+			err := f.blockProcessor.RetryFetchingMissingCollections()
+			if err != nil {
+				log.Error().
+					Err(err).
+					Msg("failed to retry fetching missing collections")
+				// Don't throw - this is a retry mechanism, failures are expected
+				// and we'll try again on the next interval
+			} else {
+				queueSize := f.blockProcessor.MissingCollectionQueueSize()
+				if queueSize > 0 {
+					log.Debug().
+						Uint("missing_collections", queueSize).
+						Msg("retried fetching missing collections")
+				}
+			}
+		}
+	}
 }

@@ -305,3 +305,29 @@ func (mcq *MissingCollectionQueue) GetMissingCollections() []flow.Identifier {
 
 	return missingCollections
 }
+
+// GetMissingCollectionsByHeight returns a map of block height to collection IDs that are missing for that height.
+//
+// Returns a map where keys are block heights and values are slices of collection identifiers
+// that are still missing for that height. Returns an empty map if there are no missing collections.
+func (mcq *MissingCollectionQueue) GetMissingCollectionsByHeight() map[uint64][]flow.Identifier {
+	mcq.mu.RLock()
+	defer mcq.mu.RUnlock()
+
+	// Build map of height -> collection IDs
+	missingByHeight := make(map[uint64][]flow.Identifier)
+
+	for height, jobState := range mcq.blockJobs {
+		if len(jobState.missingCollections) == 0 {
+			continue
+		}
+
+		collectionIDs := make([]flow.Identifier, 0, len(jobState.missingCollections))
+		for collectionID := range jobState.missingCollections {
+			collectionIDs = append(collectionIDs, collectionID)
+		}
+		missingByHeight[height] = collectionIDs
+	}
+
+	return missingByHeight
+}

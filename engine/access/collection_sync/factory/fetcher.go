@@ -82,6 +82,7 @@ func createFetcher(
 		mcq,
 		indexer,
 		collectionRequester,
+		blocks,
 	)
 
 	// Register handler for received collections
@@ -113,6 +114,7 @@ func createFetcher(
 			// Update last_full_finalized_block_height metric with the max of both heights
 			accessMetrics.UpdateLastFullBlockHeight(lastFullBlockHeight.ProcessedHeight())
 		},
+		config.RetryInterval,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create fetcher: %w", err)
