@@ -173,18 +173,11 @@ func (bp *BlockProcessor) RetryFetchingMissingCollections() error {
 		return nil
 	}
 
-	// Build a set of missing collection IDs for efficient lookup
-	missingCollectionSet := make(map[flow.Identifier]struct{})
-	for _, collectionIDs := range missingByHeight {
-		for _, collectionID := range collectionIDs {
-			// TODO: double check the collection is missing in storage
-			// maybe the execution data index has already indexed the collection
-			missingCollectionSet[collectionID] = struct{}{}
-		}
-	}
-
 	// Collect guarantees for missing collections by retrieving blocks
+	// Double-check that collections are actually missing in storage (they may have been
+	// indexed by execution data indexer or received from another source)
 	var guarantees []*flow.CollectionGuarantee
+
 	for height := range missingByHeight {
 		// Get block for this height
 		block, err := bp.blocks.ByHeight(height)
@@ -192,14 +185,49 @@ func (bp *BlockProcessor) RetryFetchingMissingCollections() error {
 			bp.log.Fatal().
 				Uint64("block_height", height).
 				Err(err).
-				Msg("failed to retrieve block for retrying missing collections")
+				Msg("failed to retrieve block for retrying missing collections, skipping")
 			continue
 		}
 
-		// Extract guarantees for missing collections from this block
-		for _, guarantee := range block.Payload.Guarantees {
-			if _, isMissing := missingCollectionSet[guarantee.CollectionID]; isMissing {
-				guarantees = append(guarantees, guarantee)
+		// Use indexer's GetMissingCollections to filter out collections that already exist
+		// This handles the case where execution data indexer may have already indexed them
+		actuallyMissingGuarantees, err := bp.indexer.GetMissingCollections(block)
+		if err != nil {
+			bp.log.Warn().
+				Uint64("block_height", height).
+				Err(err).
+				Msg("failed to check missing collections for block, skipping")
+			continue
+		}
+
+		// Build a set of actually missing collection IDs for this block
+		actuallyMissingSet := make(map[flow.Identifier]struct{})
+		for _, guarantee := range actuallyMissingGuarantees {
+			actuallyMissingSet[guarantee.CollectionID] = struct{}{}
+			guarantees = append(guarantees, guarantee)
+		}
+
+		// Check if all collections for this block are now indexed
+		// If so, mark the block as done in MCQ
+		originalMissing := missingByHeight[height]
+		allIndexed := true
+		for _, collectionID := range originalMissing {
+			if _, stillMissing := actuallyMissingSet[collectionID]; stillMissing {
+				allIndexed = false
+				break
+			}
+		}
+
+		if allIndexed {
+			// All collections for this block are now indexed, mark it as done
+			notifyJobCompletion, ok := bp.mcq.OnIndexedForBlock(height)
+			if ok {
+				// Call the callback to notify job completion
+				notifyJobCompletion()
+				bp.log.Info().
+					Uint64("block_height", height).
+					Int("collections_count", len(originalMissing)).
+					Msg("all collections for block are now indexed, marked block as done")
 			}
 		}
 	}
