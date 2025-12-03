@@ -99,6 +99,10 @@ func (bp *BlockProcessor) FetchCollections(
 		return fmt.Errorf("failed to request collections for block height %d: %w", blockHeight, err)
 	}
 
+	bp.log.Debug().Uint64("block_height", blockHeight).
+		Int("missing_collections_count", len(missingGuarantees)).
+		Msg("fetched collections for finalized block")
+
 	return nil
 }
 

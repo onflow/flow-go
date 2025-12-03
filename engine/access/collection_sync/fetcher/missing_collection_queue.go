@@ -132,7 +132,6 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	collection *flow.Collection,
 ) ([]*flow.Collection, uint64, flow.Identifier, bool) {
 	collectionID := collection.ID()
-	missingCol := flow.ZeroID
 
 	mcq.mu.Lock()
 	defer mcq.mu.Unlock()
@@ -141,29 +140,21 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 	height, ok := mcq.collectionToHeight[collectionID]
 	if !ok {
 		// No block is waiting for this collection.
-		return nil, 0, missingCol, false
+		return nil, 0, flow.ZeroID, false
 	}
 
 	jobState, exists := mcq.blockJobs[height]
 	if !exists {
 		// Job was already completed/removed.
 		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
-		return nil, 0, missingCol, false
-	}
-
-	if len(jobState.missingCollections) > 0 {
-		// pick a random missing collection to return
-		// useful for logging/debugging purposes
-		// in case fetching is stuck, it's useful to know which collections are still missing
-		// we don't need to return all missing collections, just one is enough
-		missingCol = pickOne(jobState.missingCollections)
+		return nil, 0, flow.ZeroID, false
 	}
 
 	// Check if this collection was still missing for this block.
 	if _, wasMissing := jobState.missingCollections[collectionID]; !wasMissing {
 		// Collection was already received or wasn't part of this block's missing set.
 		// Don't delete from collectionToHeight - cleanup happens in OnIndexedForBlock.
-		return nil, 0, missingCol, false
+		return nil, 0, pickOne(jobState.missingCollections), false
 	}
 
 	// Remove from missing set and add to received collections.
@@ -175,7 +166,11 @@ func (mcq *MissingCollectionQueue) OnReceivedCollection(
 
 	// Check if the block is now complete (all collections received).
 	if len(jobState.missingCollections) > 0 {
-		return nil, 0, missingCol, false
+		// pick a random missing collection to return
+		// useful for logging/debugging purposes
+		// in case fetching is stuck, it's useful to know which collections are still missing
+		// we don't need to return all missing collections, just one is enough
+		return nil, 0, pickOne(jobState.missingCollections), false
 	}
 
 	// Return all received collections for this block.
@@ -282,4 +277,31 @@ func (mcq *MissingCollectionQueue) Size() uint {
 	defer mcq.mu.RUnlock()
 
 	return uint(len(mcq.blockJobs))
+}
+
+// GetMissingCollections returns all collection IDs that are currently missing across all block heights.
+//
+// Returns a slice of collection identifiers that are still missing. The order is non-deterministic
+// due to map iteration order. Returns an empty slice if there are no missing collections.
+func (mcq *MissingCollectionQueue) GetMissingCollections() []flow.Identifier {
+	mcq.mu.RLock()
+	defer mcq.mu.RUnlock()
+
+	// Count total missing collections to pre-allocate slice
+	totalMissing := 0
+	for _, jobState := range mcq.blockJobs {
+		totalMissing += len(jobState.missingCollections)
+	}
+
+	// Pre-allocate slice with capacity
+	missingCollections := make([]flow.Identifier, 0, totalMissing)
+
+	// Collect all missing collection IDs from all block jobs
+	for _, jobState := range mcq.blockJobs {
+		for collectionID := range jobState.missingCollections {
+			missingCollections = append(missingCollections, collectionID)
+		}
+	}
+
+	return missingCollections
 }

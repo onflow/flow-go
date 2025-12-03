@@ -30,6 +30,9 @@ type MissingCollectionQueue interface {
 
 	// Size returns the number of missing collections currently in the queue.
 	Size() uint
+
+	// GetMissingCollections returns all collection IDs that are currently missing across all block heights.
+	GetMissingCollections() []flow.Identifier
 }
 
 // Requests collections by their guarantees.
