@@ -390,6 +390,7 @@ func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error 
 	// to `VoteCollectorStatusVerifying` is possible only if the current state is `VoteCollectorStatusCaching`. Once the state changed
 	// away from `VoteCollectorStatusCaching` it can never return to this state. I.e. if condition (i) failed once, it can never be
 	// satisfied later. Step (ii) failing implies that condition (i) was previously true, but no longer holds.
+	// Since we are storing a pointer in the atomic.Value the value compared will be the reference to the object.
 	currentProcWrapper := m.votesProcessor.Load().(*atomicValueWrapper)
 	currentState := currentProcWrapper.processor.Status() // must use same object here as in CAS below (_not_ a fresh load from `m.Status()`)
 	if currentState != hotstuff.VoteCollectorStatusCaching {
@@ -423,6 +424,7 @@ func (m *VoteCollector) terminateVoteProcessing() {
 	// Note that (i) and (ii) are separate operations. However, the CAS in (ii) ensures that the write only happens if the current state
 	// is still the same as what we observed in (i). If another thread changed the state in between (i) and (ii), we have worked with
 	// an outdated view of the current state, and should repeat the attempt to update the state (hence the "loop" in CAS LOOP).
+	// Since we are storing a pointer in the atomic.Value the value compared will be the reference to the object.
 	for {
 		stateUpdateSuccessful := m.votesProcessor.CompareAndSwap(currentProcWrapper, newProcWrapper)
 		if stateUpdateSuccessful {
