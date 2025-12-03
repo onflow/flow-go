@@ -445,8 +445,6 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 }
 
 func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
-	// TODO skipping as this isn't implemented yet
-	unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "skipping as this isn't implemented yet")
 	// set genesis from cluster chain as reference block
 	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(suite.genesis.ID()))
 	err := suite.state.Extend(&proposal)
