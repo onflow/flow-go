@@ -58,8 +58,6 @@ type BlockProcessor interface {
 	FetchCollections(ctx irrecoverable.SignalerContext, block *flow.Block, done func()) error
 	// MissingCollectionQueueSize returns the number of missing collections currently in the queue.
 	MissingCollectionQueueSize() uint
-	// PruneUpToHeight removes all tracked heights up to and including the given height.
-	PruneUpToHeight(height uint64)
 	// RetryFetchingMissingCollections retries fetching all missing collections currently in the queue.
 	RetryFetchingMissingCollections() error
 }

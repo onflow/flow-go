@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/collection_sync/factory"
 	collection_syncfactory "github.com/onflow/flow-go/engine/access/collection_sync/factory"
+	collection_syncfetcher "github.com/onflow/flow-go/engine/access/collection_sync/fetcher"
 	collsyncindexer "github.com/onflow/flow-go/engine/access/collection_sync/indexer"
 	"github.com/onflow/flow-go/engine/access/finalized_indexer"
 	"github.com/onflow/flow-go/engine/access/index"
@@ -185,6 +186,7 @@ type AccessNodeConfig struct {
 	registerDBPruneThreshold             uint64
 	collectionFetcherMaxProcessing       uint64
 	collectionFetcherMaxSearchAhead      uint64
+	collectionFetcherRetryInterval       time.Duration
 	collectionSync                       collection_syncfactory.CollectionSyncMode
 }
 
@@ -295,6 +297,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerDBPruneThreshold:             0,
 		collectionFetcherMaxProcessing:       factory.DefaultMaxProcessing,
 		collectionFetcherMaxSearchAhead:      factory.DefaultMaxSearchAhead,
+		collectionFetcherRetryInterval:       collection_syncfetcher.DefaultRetryInterval,
 		collectionSync:                       collection_syncfactory.CollectionSyncModeExecutionAndCollection,
 	}
 }
@@ -1207,6 +1210,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"collection-fetcher-max-search-ahead",
 			defaultConfig.collectionFetcherMaxSearchAhead,
 			"maximum number of blocks to search ahead when fetching collections")
+		flags.DurationVar(&builder.collectionFetcherRetryInterval,
+			"collection-fetcher-retry-interval",
+			defaultConfig.collectionFetcherRetryInterval,
+			"interval for retrying missing collections. default: 30s")
 		flags.StringVarP(&builder.ExecutionNodeAddress,
 			"script-addr",
 			"s",
@@ -2579,6 +2586,7 @@ func createCollectionSyncFetcher(builder *FlowAccessNodeBuilder) {
 				notNil(builder.CollectionSyncMetrics),
 				builder.collectionFetcherMaxProcessing,
 				builder.collectionFetcherMaxSearchAhead,
+				builder.collectionFetcherRetryInterval,
 				notNil(builder.lastFullBlockHeight),
 				notNil(builder.AccessMetrics),
 			)

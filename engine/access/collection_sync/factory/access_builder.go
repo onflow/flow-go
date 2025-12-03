@@ -2,6 +2,7 @@ package factory
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -223,6 +224,7 @@ type CollectionSyncFetcherComponentResult struct {
 //   - collectionSyncMetrics: Collection sync metrics
 //   - maxProcessing: Maximum number of concurrent processing jobs
 //   - maxSearchAhead: Maximum number of blocks to search ahead
+//   - retryInterval: Interval for retrying missing collections. If 0, uses DefaultRetryInterval
 //   - lastFullBlockHeight: Progress reader to register the fetcher with
 //   - accessMetrics: Access metrics for reporting last_full_finalized_block_height
 //
@@ -245,6 +247,7 @@ func CreateCollectionSyncFetcherComponent(
 	collectionSyncMetrics module.CollectionSyncMetrics,
 	maxProcessing uint64,
 	maxSearchAhead uint64,
+	retryInterval time.Duration,
 	lastFullBlockHeight *ProgressReader,
 	accessMetrics module.AccessMetrics,
 ) (*CollectionSyncFetcherComponentResult, error) {
@@ -295,6 +298,7 @@ func CreateCollectionSyncFetcherComponent(
 		CreateFetcherConfig{
 			MaxProcessing:  maxProcessing,
 			MaxSearchAhead: maxSearchAhead,
+			RetryInterval:  retryInterval,
 		},
 	)
 
