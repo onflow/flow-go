@@ -2,6 +2,7 @@ package factory
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -62,6 +63,9 @@ func createFetcher(
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity { return new(flow.Collection) },
+		requester.WithBatchInterval(60*time.Second),
+		requester.WithValidateStaking(false),
+		requester.WithRetryMaximum(10*time.Second),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create requester engine: %w", err)
