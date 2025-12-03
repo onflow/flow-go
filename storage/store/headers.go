@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -36,13 +37,18 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
 
+	isClusterChain := func(chainID flow.ChainID) bool {
+		return strings.HasPrefix(chainID.String(), "cluster")
+	}
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
 		var header flow.Header
 		err := operation.RetrieveHeader(r, blockID, &header)
 		if err != nil {
 			return nil, err
 		}
-		if header.ChainID != chainID {
+		// raise an error when the retrieved header is for a different chain than expected,
+		// except in the case of cluster chains where the previous epoch(=chain) can be checked for transaction deduplication
+		if header.ChainID != chainID && !(isClusterChain(chainID) && isClusterChain(header.ChainID)) {
 			return nil, fmt.Errorf("expected chain ID '%v', got '%v'", chainID, header.ChainID) // TODO(4204) error sentinel
 		}
 		return &header, err
