@@ -161,6 +161,9 @@ func compareNewBlocks(blockIDs []flow.Identifier, flowClient *client.Client, rem
 		if err == io.EOF {
 			return
 		}
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to receive new block header")
+		}
 
 		log.Info().Msgf("New sealed block received: %s (height %d)", header.ID(), header.Height)
 
