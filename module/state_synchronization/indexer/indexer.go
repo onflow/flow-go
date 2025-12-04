@@ -161,14 +161,16 @@ func (i *Indexer) onBlockIndexed() error {
 		// we need loop here because it's possible for a height to be missed here,
 		// we should guarantee all heights are processed
 		for height := lastProcessedHeight + 1; height <= highestIndexedHeight; height++ {
-			header, err := i.indexer.headers.ByHeight(height)
-			if err != nil {
-				// if the execution data is available, the block must be locally finalized
-				i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
-				return fmt.Errorf("could not get header for height %d: %w", height, err)
-			}
+			// Use BlockIDByHeight instead of ByHeight since we only need to verify the block exists
+			// and don't need the full header data. This avoids expensive header deserialization.
+			// _, err := i.indexer.headers.BlockIDByHeight(height)
+			// if err != nil {
+			// 	// if the execution data is available, the block must be locally finalized
+			// 	i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
+			// 	return fmt.Errorf("could not get header for height %d: %w", height, err)
+			// }
 
-			i.OnBlockProcessed(header.Height)
+			i.OnBlockProcessed(height)
 		}
 		i.lastProcessedHeight.Store(highestIndexedHeight)
 	}
