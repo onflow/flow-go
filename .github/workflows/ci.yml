@@ -58,9 +58,7 @@ jobs:
       - name: Install golangci-lint
         if: steps.cache-linter.outputs.cache-hit != 'true'
         uses: golangci/golangci-lint-action@v9
-        continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
         with:
-          install-only: true
           version: v2.7.1
 
   golangci:
