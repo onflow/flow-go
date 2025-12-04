@@ -55,6 +55,7 @@ var _ component.Component = (*blobService)(nil)
 type BlobServiceConfig struct {
 	ReprovideInterval time.Duration    // the interval at which the DHT provider entries are refreshed
 	BitswapOptions    []bitswap.Option // options to pass to the Bitswap service
+	SkipBloomCache    bool             // if true, skip the bloom cache and use plain blockstore
 }
 
 // WithReprovideInterval sets the interval at which DHT provider entries are refreshed
@@ -98,6 +99,15 @@ func WithRateLimit(r float64, b int) network.BlobServiceOption {
 	}
 }
 
+// WithSkipBloomCache disables the bloom cache, using a plain blockstore instead.
+// This avoids the CPU cost of building the bloom filter on startup by scanning all keys.
+// Pebble's built-in bloom filters (persisted in SSTables) are still used for efficient lookups.
+func WithSkipBloomCache(skip bool) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).config.SkipBloomCache = skip
+	}
+}
+
 // NewBlobService creates a new BlobService.
 func NewBlobService(
 	host host.Host,
@@ -109,25 +119,37 @@ func NewBlobService(
 	opts ...network.BlobServiceOption,
 ) (*blobService, error) {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
-	blockStore, err := blockstore.CachedBlockstore(
-		context.Background(),
-		blockstore.NewBlockstore(ds),
-		blockstore.DefaultCacheOpts(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
-	}
 	bs := &blobService{
 		prefix: prefix,
 		config: &BlobServiceConfig{
 			ReprovideInterval: DefaultReprovideInterval,
+			SkipBloomCache:    false, // default: use cached blockstore
 		},
-		blockStore: blockStore,
 	}
 
+	// Apply options before creating blockstore, as SkipBloomCache affects blockstore creation
 	for _, opt := range opts {
 		opt(bs)
 	}
+
+	// Create blockstore based on config
+	var blockStore blockstore.Blockstore
+	if bs.config.SkipBloomCache {
+		// Use plain blockstore - Pebble's built-in bloom filters are sufficient
+		blockStore = blockstore.NewBlockstore(ds)
+	} else {
+		// Use cached blockstore with bloom filter (default behavior)
+		cachedBlockStore, err := blockstore.CachedBlockstore(
+			context.Background(),
+			blockstore.NewBlockstore(ds),
+			blockstore.DefaultCacheOpts(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
+		}
+		blockStore = cachedBlockStore
+	}
+	bs.blockStore = blockStore
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
