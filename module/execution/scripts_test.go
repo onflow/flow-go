@@ -277,7 +277,7 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	s.Require().NoError(err)
 
-	return flow.ConvertAddress(
+	return flow.Address(
 		cadence.SearchFieldByName(
 			data.(cadence.Event),
 			stdlib.AccountEventAddressParameter.Identifier,

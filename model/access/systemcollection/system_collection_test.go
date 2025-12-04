@@ -20,6 +20,9 @@ const (
 
 	// testTestnetV1Height is the height at which Testnet transitions to Version1.
 	testTestnetV1Height = 290050888
+
+	// testTestnetV1Height is the height at which Testnet transitions to Version1.
+	testMainnetV1Height = 133408444
 )
 
 func TestDefault(t *testing.T) {
@@ -123,19 +126,17 @@ func TestVersioned_ByHeight(t *testing.T) {
 				testTestnetV1Height + 100: Version1,
 			},
 		},
-		// Uncomment and configure when Mainnet boundaries are defined:
-		// {
-		// 	chainID: flow.Mainnet,
-		// 	heightTests: map[uint64]access.Version{
-		// 		0:                          Version0,
-		// 		testMainnetV1Height - 100:  Version0,
-		// 		testMainnetV1Height:        Version1,
-		// 		testMainnetV1Height + 100:  Version1,
-		// 	},
-		// },
+		{
+			chainID: flow.Mainnet,
+			heightTests: map[uint64]access.Version{
+				0:                         Version0,
+				testMainnetV1Height - 100: Version0,
+				testMainnetV1Height:       Version1,
+				testMainnetV1Height + 100: Version1,
+			},
+		},
 
 		// Networks that always use the latest version (nil heightTests = always latest)
-		{chainID: flow.Mainnet},
 		{chainID: flow.Emulator},
 		{chainID: flow.Sandboxnet},
 		{chainID: flow.Previewnet},
@@ -206,11 +207,20 @@ func TestChainHeightVersions(t *testing.T) {
 		assert.Equal(t, Version1, testnetMapper.GetVersion(testTestnetV1Height))
 	})
 
+	t.Run("Mainnet uses explicit version boundaries", func(t *testing.T) {
+		mainnetMapper := ChainHeightVersions[flow.Mainnet]
+
+		// Mainnet should use V0 at height 0
+		assert.Equal(t, Version0, mainnetMapper.GetVersion(0))
+
+		// Mainnet should use V1 at testMainnetV1Height
+		assert.Equal(t, Version1, mainnetMapper.GetVersion(testMainnetV1Height))
+	})
+
 	t.Run("chains without explicit mappings use LatestBoundary via Default", func(t *testing.T) {
 		// These chains don't have explicit entries in ChainHeightVersions,
 		// so Default() will give them LatestBoundary
 		testNetworks := []flow.ChainID{
-			flow.Mainnet,
 			flow.Sandboxnet,
 			flow.Previewnet,
 			flow.Benchnet,
