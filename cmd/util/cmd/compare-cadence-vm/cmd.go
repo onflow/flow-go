@@ -39,6 +39,7 @@ var (
 	flagWriteTraces         bool
 	flagParallel            int
 	flagSubscribe           bool
+	flagSubscriptionDelay   time.Duration
 )
 
 var Cmd = &cobra.Command{
@@ -77,6 +78,8 @@ func init() {
 	Cmd.Flags().IntVar(&flagParallel, "parallel", 1, "number of blocks to process in parallel (default: 1)")
 
 	Cmd.Flags().BoolVar(&flagSubscribe, "subscribe", false, "subscribe to new sealed blocks and compare them as they arrive")
+
+	Cmd.Flags().DurationVar(&flagSubscriptionDelay, "subscription-delay", 1*time.Minute, "delay after receiving a new sealed block before comparing it")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -168,6 +171,8 @@ func compareNewBlocks(blockIDs []flow.Identifier, flowClient *client.Client, rem
 		log.Info().Msgf("New sealed block received: %s (height %d)", header.ID(), header.Height)
 
 		g.Go(func() error {
+
+			time.Sleep(flagSubscriptionDelay)
 
 			result := compareBlock(
 				header.ID(),
