@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
@@ -231,10 +232,7 @@ func (s *ObserverSuite) TestObserverRest() {
 				assert.NoError(t, observerErr)
 				assert.Equal(t, accessResp.Status, observerResp.Status)
 				assert.Equal(t, accessResp.StatusCode, observerResp.StatusCode)
-				assert.Contains(t, [...]int{
-					http.StatusNotFound,
-					http.StatusOK,
-				}, observerResp.StatusCode)
+				assertStatusCode(t, observerResp, http.StatusNotFound, http.StatusOK)
 			})
 		}
 	})
@@ -252,8 +250,7 @@ func (s *ObserverSuite) TestObserverRest() {
 			t.Run(endpoint.name, func(t *testing.T) {
 				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path, endpoint.body)
 				require.NoError(t, observerErr)
-				assert.Contains(t, [...]int{
-					http.StatusServiceUnavailable}, observerResp.StatusCode)
+				assertStatusCode(t, observerResp, http.StatusServiceUnavailable)
 			})
 		}
 	})
@@ -267,10 +264,21 @@ func (s *ObserverSuite) TestObserverRest() {
 			t.Run(endpoint.name, func(t *testing.T) {
 				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path, endpoint.body)
 				require.NoError(t, observerErr)
-				assert.Contains(t, [...]int{http.StatusNotFound, http.StatusOK}, observerResp.StatusCode)
+				assertStatusCode(t, observerResp, http.StatusNotFound, http.StatusOK)
 			})
 		}
 	})
+}
+
+func assertStatusCode(t *testing.T, resp *http.Response, statusCodes ...int) {
+	if assert.Contains(t, statusCodes, resp.StatusCode) {
+		return
+	}
+
+	// if check fails, log the body for debugging
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	t.Errorf("got status code: %d, body: %s", resp.StatusCode, body)
 }
 
 func (s *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {

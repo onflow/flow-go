@@ -2,13 +2,11 @@ package run_script
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -30,8 +27,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	modutil "github.com/onflow/flow-go/module/util"
 )
-
-var ErrNotImplemented = errors.New("not implemented")
 
 var (
 	flagPayloads        string
@@ -247,6 +242,7 @@ func runScript(
 }
 
 type api struct {
+	access.UnimplementedAPI
 	chainID         flow.ChainID
 	vm              *fvm.VirtualMachine
 	ctx             fvm.Context
@@ -263,163 +259,6 @@ func (a *api) GetNetworkParameters(_ context.Context) accessmodel.NetworkParamet
 	return accessmodel.NetworkParameters{
 		ChainID: a.chainID,
 	}
-}
-
-func (*api) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetLatestBlockHeader(_ context.Context, _ bool) (*flow.Header, flow.BlockStatus, error) {
-	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
-}
-
-func (*api) GetBlockHeaderByHeight(_ context.Context, _ uint64) (*flow.Header, flow.BlockStatus, error) {
-	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
-}
-
-func (*api) GetBlockHeaderByID(_ context.Context, _ flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
-	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
-}
-
-func (*api) GetLatestBlock(_ context.Context, _ bool) (*flow.Block, flow.BlockStatus, error) {
-	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
-}
-
-func (*api) GetBlockByHeight(_ context.Context, _ uint64) (*flow.Block, flow.BlockStatus, error) {
-	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
-}
-
-func (*api) GetBlockByID(_ context.Context, _ flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
-	return nil, flow.BlockStatusUnknown, errors.New("unimplemented")
-}
-
-func (*api) GetCollectionByID(_ context.Context, _ flow.Identifier) (*flow.LightCollection, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetFullCollectionByID(_ context.Context, _ flow.Identifier) (*flow.Collection, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) SendTransaction(_ context.Context, _ *flow.TransactionBody) error {
-	return errors.New("unimplemented")
-}
-
-func (*api) GetTransaction(_ context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetTransactionsByBlockID(_ context.Context, _ flow.Identifier) ([]*flow.TransactionBody, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetTransactionResult(
-	_ context.Context,
-	_ flow.Identifier,
-	_ flow.Identifier,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetTransactionResultByIndex(
-	_ context.Context,
-	_ flow.Identifier,
-	_ uint32,
-	_ entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetTransactionResultsByBlockID(
-	_ context.Context,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) ([]*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetSystemTransaction(
-	_ context.Context,
-	_ flow.Identifier,
-	_ flow.Identifier,
-) (*flow.TransactionBody, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetSystemTransactionResult(
-	_ context.Context,
-	_ flow.Identifier,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccount(_ context.Context, _ flow.Address, _ optimistic_sync.Criteria,
-) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountAtLatestBlock(_ context.Context, _ flow.Address, _ optimistic_sync.Criteria,
-) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountAtBlockHeight(_ context.Context, _ flow.Address, _ uint64, _ optimistic_sync.Criteria,
-) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountBalanceAtLatestBlock(_ context.Context, _ flow.Address, _ optimistic_sync.Criteria,
-) (uint64, *accessmodel.ExecutorMetadata, error) {
-	return 0, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountBalanceAtBlockHeight(
-	_ context.Context,
-	_ flow.Address,
-	_ uint64,
-	_ optimistic_sync.Criteria,
-) (uint64, *accessmodel.ExecutorMetadata, error) {
-	return 0, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountKeyAtLatestBlock(
-	_ context.Context,
-	_ flow.Address,
-	_ uint32,
-	_ optimistic_sync.Criteria,
-) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountKeyAtBlockHeight(
-	_ context.Context,
-	_ flow.Address,
-	_ uint32,
-	_ uint64,
-	_ optimistic_sync.Criteria,
-) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountKeysAtLatestBlock(
-	_ context.Context,
-	_ flow.Address,
-	_ optimistic_sync.Criteria,
-) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) GetAccountKeysAtBlockHeight(
-	_ context.Context,
-	_ flow.Address,
-	_ uint64,
-	_ optimistic_sync.Criteria,
-) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
 }
 
 func (a *api) ExecuteScriptAtLatestBlock(
@@ -440,149 +279,4 @@ func (a *api) ExecuteScriptAtLatestBlock(
 	}
 
 	return value, nil, err
-}
-
-func (*api) ExecuteScriptAtBlockHeight(
-	_ context.Context,
-	_ uint64,
-	_ []byte,
-	_ [][]byte,
-	_ optimistic_sync.Criteria,
-) ([]byte, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) ExecuteScriptAtBlockID(
-	_ context.Context,
-	_ flow.Identifier,
-	_ []byte,
-	_ [][]byte,
-	_ optimistic_sync.Criteria,
-) ([]byte, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (a *api) GetEventsForHeightRange(
-	_ context.Context,
-	_ string,
-	_, _ uint64,
-	_ entities.EventEncodingVersion,
-	_ optimistic_sync.Criteria,
-) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (a *api) GetEventsForBlockIDs(
-	_ context.Context,
-	_ string,
-	_ []flow.Identifier,
-	_ entities.EventEncodingVersion,
-	_ optimistic_sync.Criteria,
-) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
-	return nil, nil, errors.New("unimplemented")
-}
-
-func (*api) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetProtocolStateSnapshotByBlockID(_ context.Context, _ flow.Identifier) ([]byte, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetProtocolStateSnapshotByHeight(_ context.Context, _ uint64) ([]byte, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetExecutionResultForBlockID(_ context.Context, _ flow.Identifier) (*flow.ExecutionResult, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) GetExecutionResultByID(_ context.Context, _ flow.Identifier) (*flow.ExecutionResult, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (*api) SubscribeBlocksFromStartBlockID(
-	_ context.Context,
-	_ flow.Identifier,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlocksFromStartHeight(
-	_ context.Context,
-	_ uint64,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlocksFromLatest(
-	_ context.Context,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlockHeadersFromStartBlockID(
-	_ context.Context,
-	_ flow.Identifier,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlockHeadersFromStartHeight(
-	_ context.Context,
-	_ uint64,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlockHeadersFromLatest(
-	_ context.Context,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlockDigestsFromStartBlockID(
-	_ context.Context,
-	_ flow.Identifier,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlockDigestsFromStartHeight(
-	_ context.Context,
-	_ uint64,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (*api) SubscribeBlockDigestsFromLatest(
-	_ context.Context,
-	_ flow.BlockStatus,
-) subscription.Subscription {
-	return nil
-}
-
-func (a *api) SubscribeTransactionStatuses(
-	_ context.Context,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
-}
-
-func (a *api) SendAndSubscribeTransactionStatuses(
-	_ context.Context,
-	_ *flow.TransactionBody,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
 }

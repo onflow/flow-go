@@ -92,7 +92,7 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 	if rootBlock.ID() == blockID {
 		executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 		if err != nil {
-			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+			return nil, fmt.Errorf("failed to retreive execution IDs for root block %v: %w", blockID, err)
 		}
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
@@ -142,7 +142,7 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 	// choose from the preferred or fixed execution nodes
 	subsetENs, err := e.chooseExecutionNodes(executorIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+		return nil, fmt.Errorf("failed to select execution IDs for block ID %v: %w", blockID, err)
 	}
 
 	if len(subsetENs) == 0 {
@@ -169,7 +169,7 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForResultID(
 	if rootBlock.ID() == blockID {
 		executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 		if err != nil {
-			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+			return nil, fmt.Errorf("failed to retreive execution IDs for root block ID %v: %w", blockID, err)
 		}
 
 		executorIDs = append(executorIDs, executorIdentities.NodeIDs()...)

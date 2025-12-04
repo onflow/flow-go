@@ -193,7 +193,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -218,7 +218,6 @@ func TestDiffCadenceValues(t *testing.T) {
 
 			nestedArray := interpreter.NewArrayValue(
 				mr.Interpreter,
-				interpreter.EmptyLocationRange,
 				&interpreter.VariableSizedStaticType{
 					Type: interpreter.PrimitiveStaticTypeUInt64,
 				},
@@ -231,7 +230,6 @@ func TestDiffCadenceValues(t *testing.T) {
 				interpreter.StringStorageMapKey(fmt.Sprintf("key_%d", storageMap.Count())),
 				interpreter.NewArrayValue(
 					mr.Interpreter,
-					interpreter.EmptyLocationRange,
 					&interpreter.VariableSizedStaticType{
 						Type: interpreter.PrimitiveStaticTypeAnyStruct,
 					},
@@ -315,7 +313,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -340,7 +338,6 @@ func TestDiffCadenceValues(t *testing.T) {
 
 			nestedDict := interpreter.NewDictionaryValueWithAddress(
 				mr.Interpreter,
-				interpreter.EmptyLocationRange,
 				&interpreter.DictionaryStaticType{
 					KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
 					ValueType: interpreter.PrimitiveStaticTypeAnyStruct,
@@ -354,7 +351,6 @@ func TestDiffCadenceValues(t *testing.T) {
 				interpreter.StringStorageMapKey(fmt.Sprintf("key_%d", storageMap.Count())),
 				interpreter.NewArrayValue(
 					mr.Interpreter,
-					interpreter.EmptyLocationRange,
 					&interpreter.VariableSizedStaticType{
 						Type: interpreter.PrimitiveStaticTypeAnyStruct,
 					},
@@ -436,7 +432,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -467,7 +463,6 @@ func TestDiffCadenceValues(t *testing.T) {
 
 			nestedComposite := interpreter.NewCompositeValue(
 				mr.Interpreter,
-				interpreter.EmptyLocationRange,
 				common.StringLocation("test"),
 				"Test",
 				common.CompositeKindStructure,
@@ -480,7 +475,6 @@ func TestDiffCadenceValues(t *testing.T) {
 				interpreter.StringStorageMapKey(fmt.Sprintf("key_%d", storageMap.Count())),
 				interpreter.NewArrayValue(
 					mr.Interpreter,
-					interpreter.EmptyLocationRange,
 					&interpreter.VariableSizedStaticType{
 						Type: interpreter.PrimitiveStaticTypeAnyStruct,
 					},
@@ -568,7 +562,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -599,7 +593,6 @@ func TestDiffCadenceValues(t *testing.T) {
 
 			nestedComposite := interpreter.NewCompositeValue(
 				mr.Interpreter,
-				interpreter.EmptyLocationRange,
 				common.StringLocation("test"),
 				"Test",
 				common.CompositeKindStructure,
@@ -612,7 +605,6 @@ func TestDiffCadenceValues(t *testing.T) {
 				interpreter.StringStorageMapKey(fmt.Sprintf("key_%d", storageMap.Count())),
 				interpreter.NewArrayValue(
 					mr.Interpreter,
-					interpreter.EmptyLocationRange,
 					&interpreter.VariableSizedStaticType{
 						Type: interpreter.PrimitiveStaticTypeAnyStruct,
 					},
@@ -711,7 +703,7 @@ func createStorageMapRegisters(
 	accountStatus := environment.NewAccountStatus()
 	accountStatusPayload := ledger.NewPayload(
 		convert.RegisterIDToLedgerKey(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+			flow.AccountStatusRegisterID(flow.Address(address)),
 		),
 		accountStatus.ToBytes(),
 	)
@@ -767,7 +759,7 @@ func createTestRegisters(t *testing.T, address common.Address, domain common.Sto
 	accountStatus := environment.NewAccountStatus()
 	accountStatusPayload := ledger.NewPayload(
 		convert.RegisterIDToLedgerKey(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+			flow.AccountStatusRegisterID(flow.Address(address)),
 		),
 		accountStatus.ToBytes(),
 	)
@@ -841,7 +833,6 @@ func createTestRegisters(t *testing.T, address common.Address, domain common.Sto
 		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
 		interpreter.NewDictionaryValueWithAddress(
 			mr.Interpreter,
-			interpreter.EmptyLocationRange,
 			&interpreter.DictionaryStaticType{
 				KeyType:   interpreter.PrimitiveStaticTypeUInt64,
 				ValueType: interpreter.PrimitiveStaticTypeString,
@@ -857,7 +848,6 @@ func createTestRegisters(t *testing.T, address common.Address, domain common.Sto
 		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
 		interpreter.NewCompositeValue(
 			mr.Interpreter,
-			interpreter.EmptyLocationRange,
 			common.StringLocation("test"),
 			"Test",
 			common.CompositeKindStructure,
@@ -872,7 +862,6 @@ func createTestRegisters(t *testing.T, address common.Address, domain common.Sto
 	// Add Cadence DictionaryValue with nested CadenceArray
 	nestedArrayValue := interpreter.NewArrayValue(
 		mr.Interpreter,
-		interpreter.EmptyLocationRange,
 		&interpreter.VariableSizedStaticType{
 			Type: interpreter.PrimitiveStaticTypeUInt64,
 		},
@@ -885,7 +874,6 @@ func createTestRegisters(t *testing.T, address common.Address, domain common.Sto
 		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
 		interpreter.NewArrayValue(
 			mr.Interpreter,
-			interpreter.EmptyLocationRange,
 			&interpreter.VariableSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeAnyStruct,
 			},

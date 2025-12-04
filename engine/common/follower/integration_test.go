@@ -137,11 +137,10 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.Headers,
 			rootHeader,
 			followerCore,
+			consensusConsumer,
 			compliance.DefaultConfig(),
 		)
 		require.NoError(t, err)
-		// don't forget to subscribe for finalization notifications
-		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
 		// Create an [irrecoverable.SignalerContext] to consume any irrecoverable errors that might be thrown by
 		// hotstuff or follower engine. This mock will fail the test when `SignalerContext.Throw` is called.
