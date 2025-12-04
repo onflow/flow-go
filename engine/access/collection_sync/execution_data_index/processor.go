@@ -81,7 +81,8 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 				// to account for execution forks.
 				collections, err := edp.provider.GetExecutionDataByHeight(ctx, height)
 				if err != nil {
-					ctx.Throw(fmt.Errorf("failed to get execution data for height %d: %w", height, err))
+					ctx.Throw(fmt.Errorf("collection_sync execution data processor: failed to get execution data for height %d: %w",
+						height, err))
 					return
 				}
 
