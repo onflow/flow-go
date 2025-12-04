@@ -61,6 +61,7 @@ jobs:
         continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
         with:
           install-only: true
+          version: v2.7.1
       - name: Build custom linter binary
         if: steps.cache-linter.outputs.cache-hit != 'true'
         run: |
