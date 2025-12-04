@@ -326,10 +326,13 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 		return
 	}
 
-	// errors are thrown as irrecoverable errors except context cancellation, and invalid blobs
-	// invalid blobs are logged, and never completed, which will halt downloads after maxSearchAhead
-	// is reached.
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error encountered while processing block job")
+	// errors are thrown as irrecoverable errors except context cancellation, which is usually
+	// triggered by restart, and invalid blobs invalid blobs are logged, and never completed,
+	// which will halt downloads after maxSearchAhead is reached.
+	e.log.Error().Err(err).
+		Hex("block_id", logging.ID(header.ID())).
+		Uint64("height", header.Height).
+		Str("job_id", string(job.ID())).Msg("error encountered while processing block job")
 }
 
 // processSealedHeight downloads ExecutionData for the given block height.
