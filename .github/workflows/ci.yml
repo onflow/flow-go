@@ -59,7 +59,7 @@ jobs:
       # We provide args to disable all linters which results in the step immediately failing.
       - name: Install golangci-lint
         if: steps.cache-linter.outputs.cache-hit != 'true'
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
         with:
           args: "--no-config --disable-all" # set args so that no linters are actually run
