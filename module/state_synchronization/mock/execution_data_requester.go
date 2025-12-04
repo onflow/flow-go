@@ -3,7 +3,9 @@
 package mock
 
 import (
+	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -26,6 +28,26 @@ func (_m *ExecutionDataRequester) Done() <-chan struct{} {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// GetCachedStore provides a mock function with no fields
+func (_m *ExecutionDataRequester) GetCachedStore() execution_data.ExecutionDataCache {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCachedStore")
+	}
+
+	var r0 execution_data.ExecutionDataCache
+	if rf, ok := ret.Get(0).(func() execution_data.ExecutionDataCache); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(execution_data.ExecutionDataCache)
 		}
 	}
 
