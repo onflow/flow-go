@@ -55,14 +55,12 @@ jobs:
           path: tools/custom-gcl # path defined in .custom-gcl.yml
           lookup-only: 'true'    # if already cached, don't download here
       # We install the non-custom golangci-lint binary using the golangci-lint action.
-      # The action is set up to always install and run the linter - there isn't a way to only install.
-      # We provide args to disable all linters which results in the step immediately failing.
       - name: Install golangci-lint
         if: steps.cache-linter.outputs.cache-hit != 'true'
         uses: golangci/golangci-lint-action@v9
         continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
         with:
-          args: "--no-config --disable-all" # set args so that no linters are actually run
+          install-only: true
       - name: Build custom linter binary
         if: steps.cache-linter.outputs.cache-hit != 'true'
         run: |
