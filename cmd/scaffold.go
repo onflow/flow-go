@@ -213,6 +213,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"bitswap-reprovide-enabled",
 		defaultConfig.BitswapReprovideEnabled,
 		"[experimental] whether to enable bitswap reproviding. This is an experimental feature. Use with caution.")
+	fnb.flags.BoolVar(&fnb.BaseConfig.BitswapBloomCacheEnabled,
+		"bitswap-bloom-cache-enabled",
+		defaultConfig.BitswapBloomCacheEnabled,
+		"[experimental] whether to enable bitswap bloom cache. When disabled, uses a plain blockstore instead of cached blockstore, avoiding the CPU cost of building the bloom filter on startup. Pebble's built-in bloom filters (persisted in SSTables) are still used. This is an experimental feature. Use with caution.")
 
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey,
