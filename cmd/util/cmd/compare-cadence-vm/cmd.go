@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -37,6 +38,7 @@ var (
 	flagLogTraces           bool
 	flagWriteTraces         bool
 	flagParallel            int
+	flagSubscribe           bool
 )
 
 var Cmd = &cobra.Command{
@@ -65,7 +67,6 @@ func init() {
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
 	Cmd.Flags().StringVar(&flagBlockIDs, "block-ids", "", "block IDs, comma-separated. if --block-count > 1 is used, provide a single block ID")
-	_ = Cmd.MarkFlagRequired("block-id")
 
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1). if > 1, provide a single block ID with --block-ids")
 
@@ -74,6 +75,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagWriteTraces, "write-traces", false, "write traces for mismatched transactions")
 
 	Cmd.Flags().IntVar(&flagParallel, "parallel", 1, "number of blocks to process in parallel (default: 1)")
+
+	Cmd.Flags().BoolVar(&flagSubscribe, "subscribe", false, "subscribe to new sealed blocks and compare them as they arrive")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -106,6 +109,10 @@ func run(_ *cobra.Command, args []string) {
 
 	var blockIDs []flow.Identifier
 	for _, rawBlockID := range strings.Split(flagBlockIDs, ",") {
+		if rawBlockID == "" {
+			continue
+		}
+
 		blockID, err := flow.HexStringToIdentifier(rawBlockID)
 		if err != nil {
 			log.Fatal().Err(err).Str("ID", rawBlockID).Msg("failed to parse block ID")
@@ -114,6 +121,81 @@ func run(_ *cobra.Command, args []string) {
 		blockIDs = append(blockIDs, blockID)
 	}
 
+	if flagSubscribe {
+		if len(blockIDs) > 1 {
+			log.Fatal().Msg("when using --subscribe, provide a single block ID to start from, or none to start from latest")
+		}
+
+		compareNewBlocks(blockIDs, flowClient, remoteClient, chain)
+	} else {
+		if len(blockIDs) == 0 {
+			log.Fatal().Msg("at least one block ID must be provided")
+		}
+		compareBlocks(blockIDs, flowClient, remoteClient, chain)
+	}
+}
+
+func compareNewBlocks(blockIDs []flow.Identifier, flowClient *client.Client, remoteClient debug.RemoteClient, chain flow.Chain) {
+
+	const blockStatus = flow.BlockStatusSealed
+	var getBlockHeader func() (*flow.Header, error)
+	if len(blockIDs) > 1 {
+		getBlockHeader = debug_tx.SubscribeBlockHeadersFromStartBlockID(flowClient, blockIDs[0], blockStatus)
+	} else {
+		getBlockHeader = debug_tx.SubscribeBlockHeadersFromLatest(flowClient, blockStatus)
+	}
+
+	var (
+		blocksMismatched int64
+		blocksMatched    int64
+		txMismatched     int64
+		txMatched        int64
+	)
+
+	g, _ := errgroup.WithContext(context.Background())
+	g.SetLimit(flagParallel)
+
+	for {
+		log.Info().Msg("Waiting for new sealed block ...")
+		header, err := getBlockHeader()
+		if err == io.EOF {
+			return
+		}
+
+		log.Info().Msgf("New sealed block received: %s (height %d)", header.ID(), header.Height)
+
+		g.Go(func() error {
+
+			result := compareBlock(
+				header.ID(),
+				header,
+				remoteClient,
+				flowClient,
+				chain,
+			)
+
+			atomic.AddInt64(&txMismatched, int64(result.mismatches))
+			atomic.AddInt64(&txMatched, int64(result.matches))
+			if result.mismatches > 0 {
+				atomic.AddInt64(&blocksMismatched, 1)
+			} else {
+				atomic.AddInt64(&blocksMatched, 1)
+			}
+
+			log.Info().Msgf("Compared %d blocks: %d matched, %d mismatched", blocksMatched+blocksMismatched, blocksMatched, blocksMismatched)
+			log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
+
+			return nil
+		})
+	}
+}
+
+func compareBlocks(
+	blockIDs []flow.Identifier,
+	flowClient *client.Client,
+	remoteClient debug.RemoteClient,
+	chain flow.Chain,
+) {
 	type block struct {
 		id     flow.Identifier
 		header *flow.Header
