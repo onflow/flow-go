@@ -303,12 +303,12 @@ func DefaultBaseConfig() *BaseConfig {
 			Duration: 10 * time.Second,
 		},
 
-		HeroCacheMetricsEnable:  false,
-		SyncCoreConfig:          chainsync.DefaultConfig(),
-		CodecFactory:            codecFactory,
-		ComplianceConfig:        compliance.DefaultConfig(),
-		DhtSystemEnabled:        true,
-		BitswapReprovideEnabled: true,
+		HeroCacheMetricsEnable:   false,
+		SyncCoreConfig:           chainsync.DefaultConfig(),
+		CodecFactory:             codecFactory,
+		ComplianceConfig:         compliance.DefaultConfig(),
+		DhtSystemEnabled:         true,
+		BitswapReprovideEnabled:  true,
 		BitswapBloomCacheEnabled: true, // default: use cached blockstore
 	}
 }
