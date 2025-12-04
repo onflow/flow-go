@@ -158,7 +158,9 @@ func (i *Indexer) onBlockIndexed() error {
 	highestIndexedHeight := i.jobConsumer.LastProcessedIndex()
 
 	if lastProcessedHeight < highestIndexedHeight {
-		i.log.Info().Msgf("notifying processed heights from %d to %d", lastProcessedHeight+1, highestIndexedHeight)
+		if lastProcessedHeight+1000 < highestIndexedHeight {
+			i.log.Warn().Msgf("notifying processed heights from %d to %d", lastProcessedHeight+1, highestIndexedHeight)
+		}
 		// we need loop here because it's possible for a height to be missed here,
 		// we should guarantee all heights are processed
 		for height := lastProcessedHeight + 1; height <= highestIndexedHeight; height++ {
