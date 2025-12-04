@@ -106,7 +106,7 @@ jobs:
     - name: Add custom linter binary to path
       run: echo "$(pwd)/tools" >> $GITHUB_PATH
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v9
       with:
         install-mode: 'none' # looks for binary in path rather than downloading
         args: "-v"
