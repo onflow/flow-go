@@ -53,6 +53,8 @@ func NewExecutionResultInfoProvider(
 //   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
 //   - [storage.ErrNotFound]: If the request is for the spork root block and the node was bootstrapped
 //     from a newer block.
+//   - [common.RequiredExecutorsCountExceeded]: Required executor IDs count exceeds available executors.
+//   - [common.UnknownRequiredExecutor]: A required executor ID is not in the available set.
 func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
@@ -60,6 +62,11 @@ func (e *Provider) ExecutionResultInfo(
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
+	}
+
+	err = e.validateRequiredExecutors(criteria.RequiredExecutors, executorIdentities)
+	if err != nil {
+		return nil, fmt.Errorf("invalid required executors: %w", err)
 	}
 
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
@@ -112,12 +119,41 @@ func (e *Provider) ExecutionResultInfo(
 	}, nil
 }
 
+// validateRequiredExecutors verifies that the provided set of execution node
+// identities contains all nodes required for processing and that the requested
+// number of required executors does not exceed the available number.
+//
+// Expected errors during normal operations:
+//   - [common.RequiredExecutorsCountExceeded]: Required executor IDs count exceeds available executors.
+//   - [common.UnknownRequiredExecutor]: A required executor ID is not in the available set.
+func (e *Provider) validateRequiredExecutors(
+	required flow.IdentifierList,
+	available flow.IdentityList,
+) error {
+	if len(available) < len(required) {
+		return common.NewRequiredExecutorsCountExceeded(
+			len(required),
+			len(available),
+		)
+	}
+
+	lookup := available.Lookup()
+	for _, executorID := range required {
+		if _, ok := lookup[executorID]; !ok {
+			return common.NewUnknownRequiredExecutor(executorID)
+		}
+	}
+
+	return nil
+}
+
 // findResultAndExecutors returns a query response for a given block ID.
 // The result must match the provided criteria and have at least one acceptable executor. If multiple
 // results are found, then the result with the most executors is returned.
 //
 // Expected errors during normal operations:
-//   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
+//   - [common.MissingRequiredExecutor]: One or more required executors are not present.
+//   - [common.InsufficientExecutors]: The number of available executors is below the required minimum.
 func (e *Provider) findResultAndExecutors(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
