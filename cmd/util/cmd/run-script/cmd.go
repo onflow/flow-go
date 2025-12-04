@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	modutil "github.com/onflow/flow-go/module/util"
@@ -264,12 +265,18 @@ func (a *api) ExecuteScriptAtLatestBlock(
 	_ context.Context,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, error) {
-	return runScript(
+	_ optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	value, err := runScript(
 		a.vm,
 		a.ctx,
 		a.storageSnapshot,
 		script,
 		arguments,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return value, nil, err
 }

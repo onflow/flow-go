@@ -2,9 +2,13 @@ package apiproxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -16,18 +20,24 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
-// RestProxyHandler is a structure that represents the proxy algorithm for observer node.
-// It includes the local backend and forwards the methods which can't be handled locally to an upstream using gRPC API.
+// RestProxyHandler implements the access.API interface to provide backend functionality for the
+// REST API. It uses a local implementation for all data that is available locally on observer nodes,
+// and proxies the remaining methods to an upstream Access node using its grpc endpoints.
+// For proxied methods, the handler converts the grpc response and errors back to the local
+// representation and returns them to the caller.
 type RestProxyHandler struct {
 	access.API
 	*forwarder.Forwarder
-	Logger  zerolog.Logger
-	Metrics metrics.ObserverMetrics
-	Chain   flow.Chain
+	logger  zerolog.Logger
+	metrics metrics.ObserverMetrics
+	chain   flow.Chain
 }
+
+var _ access.API = (*RestProxyHandler)(nil)
 
 // NewRestProxyHandler returns a new rest proxy handler for observer node.
 func NewRestProxyHandler(
@@ -47,9 +57,9 @@ func NewRestProxyHandler(
 	}
 
 	restProxyHandler := &RestProxyHandler{
-		Logger:  log,
-		Metrics: metrics,
-		Chain:   chain,
+		logger:  log,
+		metrics: metrics,
+		chain:   chain,
 	}
 
 	restProxyHandler.API = api
@@ -60,9 +70,9 @@ func NewRestProxyHandler(
 
 func (r *RestProxyHandler) log(handler, rpc string, err error) {
 	code := status.Code(err)
-	r.Metrics.RecordRPC(handler, rpc, code)
+	r.metrics.RecordRPC(handler, rpc, code)
 
-	logger := r.Logger.With().
+	logger := r.logger.With().
 		Str("handler", handler).
 		Str("rest_method", rpc).
 		Str("rest_code", code.String()).
@@ -76,11 +86,19 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 	logger.Info().Msg("request succeeded")
 }
 
-// GetCollectionByID returns a collection by ID.
+// GetCollectionByID returns a light collection by its ID.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+//   - All errors returned are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.ServiceUnavailable]: If the configured upstream access client failed to respond.
+//   - [access.DataNotFoundError]: If the collection is not found.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
@@ -92,15 +110,17 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 	r.log("upstream", "GetCollectionByID", err)
 
 	if err != nil {
-		return nil, err
+		return nil, convertError(ctx, err)
 	}
 
-	transactions, err := convert.MessageToLightCollection(collectionResponse.Collection)
+	collection, err := convert.MessageToLightCollection(collectionResponse.Collection)
 	if err != nil {
-		return nil, err
+		// this is not fatal because the data is coming from the upstream AN, so a failure here
+		// does not imply inconsistent local state.
+		return nil, access.NewInternalError(fmt.Errorf("failed to convert collection response: %w", err))
 	}
 
-	return transactions, nil
+	return collection, nil
 }
 
 // SendTransaction sends already created transaction.
@@ -140,7 +160,7 @@ func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifie
 		return nil, err
 	}
 
-	transactionBody, err := convert.MessageToTransaction(transactionResponse.Transaction, r.Chain)
+	transactionBody, err := convert.MessageToTransaction(transactionResponse.Transaction, r.chain)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +178,6 @@ func (r *RestProxyHandler) GetTransactionResult(
 ) (*accessmodel.TransactionResult, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-
 		return nil, err
 	}
 	defer closer.Close()
@@ -180,176 +199,326 @@ func (r *RestProxyHandler) GetTransactionResult(
 	return convert.MessageToTransactionResult(transactionResultResponse)
 }
 
-// GetAccountAtBlockHeight returns account by account address and block height.
-func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+// GetAccountAtBlockHeight returns the account by its address at a specific block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
+func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	getAccountAtBlockHeightRequest := &accessproto.GetAccountAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountResponse, err := upstream.GetAccountAtBlockHeight(ctx, getAccountAtBlockHeightRequest)
 	r.log("upstream", "GetAccountAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
-	return convert.MessageToAccount(accountResponse.Account)
+	account, err := convert.MessageToAccount(accountResponse.Account)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return account, metadata, nil
 }
 
-// GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
-func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+// GetAccountBalanceAtBlockHeight returns the account balance by its address at a specific block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account balance and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
+func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return 0, err
+		return 0, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	getAccountBalanceAtBlockHeightRequest := &accessproto.GetAccountBalanceAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(ctx, getAccountBalanceAtBlockHeightRequest)
 	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
 
 	if err != nil {
-		return 0, err
+		return 0, nil, convertError(ctx, err)
 	}
 
-	return accountBalanceResponse.GetBalance(), nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountBalanceResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
 
+	return accountBalanceResponse.GetBalance(), metadata, nil
 }
 
-// GetAccountKeys returns account keys by account address and block height.
-func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+// GetAccountKeys returns the account keys by address at a specific block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account keys and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
+func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	getAccountKeysAtBlockHeightRequest := &accessproto.GetAccountKeysAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountKeyResponse, err := upstream.GetAccountKeysAtBlockHeight(ctx, getAccountKeysAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
 	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
 	for i, key := range accountKeyResponse.GetAccountKeys() {
 		accountKey, err := convert.MessageToAccountKey(key)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-
 		accountKeys[i] = *accountKey
 	}
 
-	return accountKeys, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountKeyResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountKeys, metadata, nil
 }
 
-// GetAccountKeyByIndex returns account key by account address, key index and block height.
-func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
+// GetAccountKeyByIndex returns the account key by address, key index, and block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request contains invalid arguments.
+//   - [access.DataNotFoundError]: If the data required to process the request is unavailable.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If the data for the block is unavailable.
+//   - [access.RequestCanceledError]: If the request is canceled.
+//   - [access.RequestTimedOutError]: If the request times out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for getting the account key and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
+func (r *RestProxyHandler) GetAccountKeyByIndex(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex uint32,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	getAccountKeyAtBlockHeightRequest := &accessproto.GetAccountKeyAtBlockHeightRequest{
-		Address:     address.Bytes(),
-		Index:       keyIndex,
-		BlockHeight: height,
+		Address:             address.Bytes(),
+		Index:               keyIndex,
+		BlockHeight:         height,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 
 	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(ctx, getAccountKeyAtBlockHeightRequest)
 	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
-	return convert.MessageToAccountKey(accountKeyResponse.AccountKey)
+	accountKey, err := convert.MessageToAccountKey(accountKeyResponse.GetAccountKey())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := accountKeyResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return accountKey, metadata, nil
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
-func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
+func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	executeScriptAtLatestBlockRequest := &accessproto.ExecuteScriptAtLatestBlockRequest{
-		Script:    script,
-		Arguments: arguments,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(ctx, executeScriptAtLatestBlockRequest)
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
-	return executeScriptAtLatestBlockResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtLatestBlockResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtLatestBlockResponse.Value, metadata, nil
 }
 
-// ExecuteScriptAtBlockHeight executes script at the given block height .
-func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
+// ExecuteScriptAtBlockHeight executes script at the given block height.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
+func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(
+	ctx context.Context,
+	blockHeight uint64,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	executeScriptAtBlockHeightRequest := &accessproto.ExecuteScriptAtBlockHeightRequest{
-		BlockHeight: blockHeight,
-		Script:      script,
-		Arguments:   arguments,
+		BlockHeight:         blockHeight,
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(ctx, executeScriptAtBlockHeightRequest)
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
-	return executeScriptAtBlockHeightResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockHeightResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtBlockHeightResponse.Value, metadata, nil
 }
 
-// ExecuteScriptAtBlockID executes script at the given block id .
-func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
+// ExecuteScriptAtBlockID executes script at the given block id.
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.InvalidRequestError]: If the request had invalid arguments.
+//   - [access.ResourceExhausted]: If computation or memory limits were exceeded.
+//   - [access.DataNotFoundError]: If data required to process the request is not available.
+//   - [access.OutOfRangeError]: If the requested data is outside the available range.
+//   - [access.PreconditionFailedError]: If data for block is not available.
+//   - [access.RequestCanceledError]: If the script execution was canceled.
+//   - [access.RequestTimedOutError]: If the script execution timed out.
+//   - [access.ServiceUnavailable]: If configured to use an external node for script execution and
+//     no upstream server is available.
+//   - [access.InternalError]: For internal failures or index conversion errors.
+func (r *RestProxyHandler) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, access.NewServiceUnavailable(err)
 	}
 	defer closer.Close()
 
 	executeScriptAtBlockIDRequest := &accessproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments,
+		BlockId:             blockID[:],
+		Script:              script,
+		Arguments:           arguments,
+		ExecutionStateQuery: executionStateQuery(criteria),
 	}
 	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(ctx, executeScriptAtBlockIDRequest)
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, convertError(ctx, err)
 	}
 
-	return executeScriptAtBlockIDResponse.Value, nil
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := executeScriptAtBlockIDResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return executeScriptAtBlockIDResponse.Value, metadata, nil
 }
 
 // GetEventsForHeightRange returns events by their name in the specified blocks heights.
@@ -358,10 +527,11 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
+	criteria optimistic_sync.Criteria,
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -370,15 +540,25 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
-
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results)
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return res, metadata, nil
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
@@ -387,10 +567,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
+	criteria optimistic_sync.Criteria,
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -400,56 +581,138 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 		Type:                 eventType,
 		BlockIds:             blockIds,
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
-
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessagesToBlockEvents(eventsResponse.Results)
+	res, err := convert.MessagesToBlockEvents(eventsResponse.Results)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := eventsResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return res, metadata, nil
 }
 
-// GetExecutionResultForBlockID gets execution result by provided block ID.
-func (r *RestProxyHandler) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	upstream, closer, err := r.FaultTolerantClient()
-	if err != nil {
-		return nil, err
+// convertError converts a serialized access error formatted as a grpc error returned from the upstream AN,
+// to a local access sentinel error.
+// if conversion fails, an irrecoverable error is thrown.
+func convertError(ctx context.Context, err error) error {
+	// this is a bit fragile since we're decoding error strings. it's only needed until we add support for execution data on the public network
+	switch status.Code(err) {
+	case codes.NotFound:
+		if typeName, sourceErrStr, ok := splitNotFoundError(err.Error()); ok {
+			return access.NewDataNotFoundError(typeName, errors.New(sourceErrStr))
+		}
+	case codes.Internal:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "internal error: "); ok {
+			return access.NewInternalError(errors.New(sourceErrStr))
+		}
+	case codes.OutOfRange:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "out of range: "); ok {
+			return access.NewOutOfRangeError(errors.New(sourceErrStr))
+		}
+	case codes.FailedPrecondition:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "precondition failed: "); ok {
+			return access.NewPreconditionFailedError(errors.New(sourceErrStr))
+		}
+	case codes.InvalidArgument:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "invalid argument: "); ok {
+			return access.NewInvalidRequestError(errors.New(sourceErrStr))
+		}
+	case codes.Canceled:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "request canceled: "); ok {
+			return access.NewRequestCanceledError(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewRequestCanceledError(err)
+	case codes.DeadlineExceeded:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "request timed out: "); ok {
+			return access.NewRequestTimedOutError(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewRequestTimedOutError(err)
+	case codes.Unavailable:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "service unavailable error: "); ok {
+			return access.NewServiceUnavailable(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewServiceUnavailable(err)
+	case codes.ResourceExhausted:
+		if sourceErrStr, ok := splitOnPrefix(err.Error(), "resource exhausted error: "); ok {
+			return access.NewResourceExhausted(errors.New(sourceErrStr))
+		}
+		// it's possible that this came from the client side, so wrap the original error directly.
+		return access.NewResourceExhausted(err)
 	}
-	defer closer.Close()
 
-	getExecutionResultForBlockID := &accessproto.GetExecutionResultForBlockIDRequest{
-		BlockId: blockID[:],
-	}
-	executionResultForBlockIDResponse, err := upstream.GetExecutionResultForBlockID(ctx, getExecutionResultForBlockID)
-	r.log("upstream", "GetExecutionResultForBlockID", err)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.MessageToExecutionResult(executionResultForBlockIDResponse.ExecutionResult)
+	// all methods MUST return an access sentinel error. if we couldn't successfully convert the error,
+	// then there is a bug. throw an irrecoverable exception.
+	return access.RequireNoError(ctx, fmt.Errorf("failed to convert upstream error: %w", err))
 }
 
-// GetExecutionResultByID gets execution result by its ID.
-func (r *RestProxyHandler) GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error) {
-	upstream, closer, err := r.FaultTolerantClient()
-	if err != nil {
-		return nil, err
+func splitOnPrefix(original, prefix string) (string, bool) {
+	parts := strings.Split(original, prefix)
+	if len(parts) == 2 {
+		return parts[1], true
 	}
-	defer closer.Close()
+	return "", false
+}
 
-	executionResultByIDRequest := &accessproto.GetExecutionResultByIDRequest{
-		Id: id[:],
+// splitNotFoundError extracts the type name and the cleaned error message that follows the type name.
+//
+// Example:
+//
+//	input:  "code = NotFound desc = data not found for header: failed to find header by ID: could not lookup block id by height 1"
+//	output: typeName="header", errorStr="failed to find header by ID: could not lookup block id by height 1", ok=true
+func splitNotFoundError(original string) (string, string, bool) {
+	// isolate everything after the DataNotFoundPrefix.
+	afterPrefix, found := splitOnPrefix(original, access.DataNotFoundPrefix)
+	if !found {
+		return "", "", false
 	}
 
-	executionResultByIDResponse, err := upstream.GetExecutionResultByID(ctx, executionResultByIDRequest)
-	r.log("upstream", "GetExecutionResultByID", err)
-
-	if err != nil {
-		return nil, err
+	remaining := strings.TrimSpace(afterPrefix)
+	if remaining == "" {
+		return "", "", false
 	}
 
-	return convert.MessageToExecutionResult(executionResultByIDResponse.ExecutionResult)
+	// Regex to capture:
+	//   1. Type name: any characters until a colon
+	//   2. The rest of the error message after the colon
+	re := regexp.MustCompile(`^(.+?):\s*(.*)$`)
+
+	matches := re.FindStringSubmatch(remaining)
+	if len(matches) != 3 {
+		return "", "", false
+	}
+
+	typeName := strings.TrimSpace(matches[1])
+	errStr := strings.TrimSpace(matches[2])
+
+	if typeName == "" || errStr == "" {
+		return "", "", false
+	}
+
+	return typeName, errStr, true
+}
+
+// executionStateQuery constructs an ExecutionStateQuery protobuf message from
+// the provided optimistic sync Criteria.
+// The IncludeExecutorMetadata field is set to true, allowing metadata to be included
+// in the response if needed.
+func executionStateQuery(criteria optimistic_sync.Criteria) *entities.ExecutionStateQuery {
+	return &entities.ExecutionStateQuery{
+		AgreeingExecutorsCount:  uint64(criteria.AgreeingExecutorsCount),
+		RequiredExecutorIds:     convert.IdentifiersToMessages(criteria.RequiredExecutors),
+		IncludeExecutorMetadata: true,
+	}
 }

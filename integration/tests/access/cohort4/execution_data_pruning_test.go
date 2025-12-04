@@ -57,6 +57,19 @@ func (s *ExecutionDataPruningSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
+// SetupTest initializes the test suite with a network configuration for testing execution data pruning.
+//
+// Network Configuration:
+//   - 1 Access node (with execution data sync and pruning enabled)
+//   - 1 Observer node (with matching pruning configuration)
+//   - 2 Collection nodes (standard configuration)
+//   - 3 Consensus nodes (with custom timing: 400ms proposal duration, reduced seal approvals)
+//   - 2 Execution nodes (standard configuration)
+//   - 1 Verification node (standard configuration)
+//
+// Both the access node and observer have identical pruning settings to verify that execution data
+// pruning works correctly on both node types. The test validates that old execution data is pruned
+// while maintaining the configured height range.
 func (s *ExecutionDataPruningSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")

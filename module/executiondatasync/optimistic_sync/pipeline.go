@@ -3,6 +3,8 @@ package optimistic_sync
 import (
 	"context"
 	"errors"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ErrInvalidTransition is returned when a state transition is invalid.
@@ -23,6 +25,11 @@ type PipelineStateConsumer interface {
 	OnStateUpdated(newState State)
 }
 
+// PipelineFactory is a factory object for creating new Pipeline instances.
+type PipelineFactory interface {
+	NewPipeline(result *flow.ExecutionResult, isSealed bool) Pipeline
+}
+
 // Pipeline represents a processing pipelined state machine for a single ExecutionResult.
 // The state machine is initialized in the Pending state.
 //
@@ -38,7 +45,7 @@ type Pipeline interface {
 	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 	Run(ctx context.Context, core Core, parentState State) error
 
-	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.
+	// SetSealed marks the pipeline's result as sealed, which enables transitioning from optimistic_sync.StateWaitingPersist to StatePersisting.
 	SetSealed()
 
 	// OnParentStateUpdated updates the pipeline's parent's state.

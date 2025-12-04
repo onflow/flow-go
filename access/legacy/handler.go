@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type Handler struct {
@@ -145,6 +146,9 @@ func (h *Handler) GetBlockByID(
 }
 
 // GetCollectionByID gets a collection by ID.
+//
+// Expected error returns during normal operation:
+//   - [access.DataNotFoundError]: If the collection is not found.
 func (h *Handler) GetCollectionByID(
 	ctx context.Context,
 	req *accessproto.GetCollectionByIDRequest,
@@ -211,7 +215,7 @@ func (h *Handler) GetAccount(
 ) (*accessproto.GetAccountResponse, error) {
 	address := flow.BytesToAddress(req.GetAddress())
 
-	account, err := h.api.GetAccount(ctx, address)
+	account, _, err := h.api.GetAccount(ctx, address, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +237,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 ) (*accessproto.AccountResponse, error) {
 	address := flow.BytesToAddress(req.GetAddress())
 
-	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
+	account, _, err := h.api.GetAccountAtLatestBlock(ctx, address, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +267,7 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 
-	value, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
+	value, _, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +286,7 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
 
-	value, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
+	value, _, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +305,7 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
-	value, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+	value, _, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments, optimistic_sync.Criteria{})
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +324,14 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, entities.EventEncodingVersion_JSON_CDC_V0)
+	results, _, err := h.api.GetEventsForHeightRange(
+		ctx,
+		eventType,
+		startHeight,
+		endHeight,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+		optimistic_sync.Criteria{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +349,13 @@ func (h *Handler) GetEventsForBlockIDs(
 	eventType := req.GetType()
 	blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, entities.EventEncodingVersion_JSON_CDC_V0)
+	results, _, err := h.api.GetEventsForBlockIDs(
+		ctx,
+		eventType,
+		blockIDs,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+		optimistic_sync.Criteria{},
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-	"io"
 	"testing"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -72,6 +72,9 @@ type IrrecoverableStateTestSuite struct {
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer
+
+	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
+	executionStateCache         *osyncmock.ExecutionStateCache
 }
 
 func (suite *IrrecoverableStateTestSuite) SetupTest() {
@@ -148,24 +151,29 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	blockHeader := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
 
+	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+
 	bnd, err := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		Seals:                suite.seals,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         node_communicator.NewNodeCommunicator(false),
-		BlockTracker:         nil,
-		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
-		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
+		State:                       suite.state,
+		CollectionRPC:               suite.collClient,
+		Blocks:                      suite.blocks,
+		Headers:                     suite.headers,
+		Collections:                 suite.collections,
+		Transactions:                suite.transactions,
+		Seals:                       suite.seals,
+		ChainID:                     suite.chainID,
+		AccessMetrics:               suite.metrics,
+		MaxHeightRange:              0,
+		Log:                         suite.log,
+		SnapshotHistoryLimit:        0,
+		Communicator:                node_communicator.NewNodeCommunicator(false),
+		BlockTracker:                nil,
+		EventQueryMode:              query_mode.IndexQueryModeExecutionNodesOnly,
+		ScriptExecutionMode:         query_mode.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:           query_mode.IndexQueryModeExecutionNodesOnly,
+		ExecutionResultInfoProvider: suite.executionResultInfoProvider,
+		ExecutionStateCache:         suite.executionStateCache,
 	})
 	suite.Require().NoError(err)
 
@@ -189,28 +197,9 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		followerDistributor,
 	)
 	assert.NoError(suite.T(), err)
+
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
-
-	err = fmt.Errorf("inconsistent node's state")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	suite.cancel = cancel
-
-	signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-	signalCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), ctx, signCtxErr)
-
-	suite.rpcEng.Start(signalCtx)
-
-	suite.secureGrpcServer.Start(signalCtx)
-	suite.unsecureGrpcServer.Start(signalCtx)
-
-	// wait for the servers to startup
-	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
-	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
-
-	// wait for the engine to startup
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }
 
 func (suite *IrrecoverableStateTestSuite) TearDownTest() {
@@ -226,14 +215,16 @@ func TestIrrecoverableState(t *testing.T) {
 
 // TestGRPCInconsistentNodeState tests the behavior when gRPC encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
-	err := fmt.Errorf("inconsistent node's state")
+	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
 
-	conn, err := grpc.Dial(
+	suite.startServers(suite.T(), irrecoverable.NewExceptionf("failed to lookup latest sealed header: %w", err))
+
+	conn, err := grpc.NewClient(
 		suite.unsecureGrpcServer.GRPCAddress().String(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(suite.T(), err)
-	defer io.Closer(conn).Close()
+	defer conn.Close()
 
 	client := accessproto.NewAccessAPIClient(conn)
 
@@ -260,8 +251,10 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	suite.blocks.On("ByID", block.ID()).Return(block, nil)
 	suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
-	err := fmt.Errorf("inconsistent node's state")
+	err := fmt.Errorf("inconsistent node state")
 	suite.snapshot.On("Head").Return(nil, err)
+
+	suite.startServers(suite.T(), fmt.Errorf("failed to lookup sealed header: %w", err))
 
 	config := restclient.NewConfiguration()
 	config.BasePath = fmt.Sprintf("http://%s/v1", suite.rpcEng.RestApiAddress().String())
@@ -281,4 +274,23 @@ func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
 		Expand:  optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
+}
+
+func (suite *IrrecoverableStateTestSuite) startServers(t *testing.T, expectedError error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
+
+	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), ctx, expectedError)
+
+	suite.rpcEng.Start(signalerCtx)
+
+	suite.secureGrpcServer.Start(signalerCtx)
+	suite.unsecureGrpcServer.Start(signalerCtx)
+
+	// wait for the servers to startup
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
+
+	// wait for the engine to startup
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }

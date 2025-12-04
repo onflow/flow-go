@@ -71,10 +71,6 @@ packages:
   github.com/onflow/flow-go/module/execution:
   github.com/onflow/flow-go/module/executiondatasync/execution_data:
   github.com/onflow/flow-go/module/executiondatasync/optimistic_sync:
-    config:
-      all: False
-    interfaces:
-      Core:
   github.com/onflow/flow-go/module/executiondatasync/tracker:
   github.com/onflow/flow-go/module/forest:
   github.com/onflow/flow-go/module/mempool:

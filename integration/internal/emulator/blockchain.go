@@ -208,6 +208,7 @@ func (b *Blockchain) configureTransactionValidator() error {
 			CheckPayerBalanceMode:        validator.Disabled,
 		},
 		nil,
+		nil,
 	)
 	if err != nil {
 		return err

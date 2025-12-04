@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -73,6 +74,7 @@ type TransactionStreamSuite struct {
 	transactionResults *storagemock.LightTransactionResults
 	events             *storagemock.Events
 	seals              *storagemock.Seals
+	registers          *storagemock.RegisterSnapshotReader
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -130,6 +132,7 @@ func (s *TransactionStreamSuite) SetupTest() {
 	s.receipts = storagemock.NewExecutionReceipts(s.T())
 	s.results = storagemock.NewExecutionResults(s.T())
 	s.seals = storagemock.NewSeals(s.T())
+	s.registers = storagemock.NewRegisterSnapshotReader(s.T())
 	s.colClient = access.NewAccessAPIClient(s.T())
 	s.archiveClient = access.NewAccessAPIClient(s.T())
 	s.execClient = access.NewExecutionAPIClient(s.T())
@@ -280,6 +283,9 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Return(s.finalizedBlock.ToHeader(), nil).
 		Maybe() // used for some tests
 
+	registersAsync := execution.NewRegistersAsyncStore()
+	require.NoError(s.T(), registersAsync.Initialize(s.registers))
+
 	txValidator, err := validator.NewTransactionValidator(
 		validatorBlocks,
 		s.chainID.Chain(),
@@ -289,6 +295,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 			MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 		},
 		execmock.NewScriptExecutor(s.T()),
+		registersAsync,
 	)
 	s.Require().NoError(err)
 
@@ -658,7 +665,10 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentFinali
 	s.addBlockWithTransaction(&transaction)
 
 	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
-	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending, flow.TransactionStatusFinalized})
+	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{
+		flow.TransactionStatusPending,
+		flow.TransactionStatusFinalized,
+	})
 
 	hasTransactionResultInStorage = true
 	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)

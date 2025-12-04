@@ -3,7 +3,14 @@ package optimistic_sync
 import (
 	"context"
 	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
+
+// CoreFactory is a factory object for creating new Core instances.
+type CoreFactory interface {
+	NewCore(result *flow.ExecutionResult) Core
+}
 
 // ErrResultAbandoned is returned when calling one of the methods after the result has been abandoned.
 // Not exported because this is not an expected error condition.

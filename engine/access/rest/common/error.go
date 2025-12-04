@@ -1,6 +1,12 @@
 package common
 
-import "net/http"
+import (
+	"errors"
+	"fmt"
+	"net/http"
+
+	"github.com/onflow/flow-go/access"
+)
 
 // StatusError provides custom error with http status.
 type StatusError interface {
@@ -55,4 +61,39 @@ func (e *Error) Status() int {
 
 func (e *Error) Error() string {
 	return e.err.Error()
+}
+
+// ErrorToStatusError converts an Access API error into a StatusError.
+// The input may either be a StatusError already, or an access sentinel error.
+// All generic errors are classified as `500 Internal Server Error`
+func ErrorToStatusError(err error) StatusError {
+	if err == nil {
+		return nil
+	}
+
+	var converted StatusError
+	if errors.As(err, &converted) {
+		return converted
+	}
+
+	switch {
+	case access.IsInvalidRequestError(err):
+		return NewBadRequestError(err)
+	case access.IsDataNotFoundError(err):
+		return NewNotFoundError(fmt.Sprintf("Flow resource not found: %v", err.Error()), err)
+	case access.IsPreconditionFailedError(err):
+		return NewRestError(http.StatusPreconditionFailed, err.Error(), err)
+	case access.IsOutOfRangeError(err):
+		return NewNotFoundError(err.Error(), err)
+	case access.IsInternalError(err):
+		return NewRestError(http.StatusInternalServerError, err.Error(), err)
+	case access.IsRequestCanceledError(err):
+		return NewRestError(http.StatusRequestTimeout, "Request canceled", err)
+	case access.IsRequestTimedOutError(err):
+		return NewRestError(http.StatusRequestTimeout, "Request deadline exceeded", err)
+	case access.IsServiceUnavailable(err):
+		return NewRestError(http.StatusServiceUnavailable, err.Error(), err)
+	default:
+		return NewRestError(http.StatusInternalServerError, err.Error(), err)
+	}
 }

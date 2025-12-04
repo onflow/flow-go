@@ -76,9 +76,10 @@ func newIndexerTest(t *testing.T, g *fixtures.GeneratorSuite, blocks []*flow.Blo
 		executionData: executionData,
 	}
 
+	registers.On("FirstHeight").Return(test.first().Height).Once()
+
 	test.worker, err = NewIndexer(
 		unittest.Logger(),
-		test.first().Height,
 		registers,
 		indexerCoreTest.indexer,
 		exeCache,
