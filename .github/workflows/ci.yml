@@ -62,10 +62,6 @@ jobs:
         with:
           install-only: true
           version: v2.7.1
-      - name: Build custom linter binary
-        if: steps.cache-linter.outputs.cache-hit != 'true'
-        run: |
-          golangci-lint custom
 
   golangci:
     strategy:
