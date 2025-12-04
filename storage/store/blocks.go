@@ -216,8 +216,10 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the given collection
-// (the collection guarantee such that `CollectionGuarantee.CollectionID == collID`).
+// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the
+// given collection (the collection guarantee such that `CollectionGuarantee.CollectionID == collID`).
+// This function returns the finalized _consensus_ block including the specified collection, not the cluster
+// block which defines the collection.
 // NOTE: This method is only available for collections included in finalized blocks.
 // While consensus nodes verify that collections are not repeated within the same fork,
 // each different fork can contain a recent collection once. Therefore, we must wait for

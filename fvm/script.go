@@ -202,15 +202,13 @@ func (executor *scriptExecutor) executeScript() error {
 
 	chainID := executor.ctx.Chain.ChainID()
 
-	if executor.ctx.EVMEnabled {
-		err := evm.SetupEnvironment(
-			chainID,
-			executor.env,
-			rt.ScriptRuntimeEnv,
-		)
-		if err != nil {
-			return err
-		}
+	err := evm.SetupEnvironment(
+		chainID,
+		executor.env,
+		rt.ScriptRuntimeEnv,
+	)
+	if err != nil {
+		return err
 	}
 
 	value, err := rt.ExecuteScript(
