@@ -19,4 +19,5 @@ type ExecutionDataIndexedHeight interface {
 type ExecutionDataRequester interface {
 	component.Component
 	ExecutionDataIndexedHeight
+	GetCachedStore() execution_data.ExecutionDataCache
 }

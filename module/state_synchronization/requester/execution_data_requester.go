@@ -274,6 +274,10 @@ func (e *executionDataRequester) HighestConsecutiveHeight() uint64 {
 	return e.blockConsumer.LastProcessedIndex()
 }
 
+func (e *executionDataRequester) GetCachedStore() execution_data.ExecutionDataCache {
+	return e.execDataCache
+}
+
 // runBlockConsumer runs the blockConsumer component
 func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	err := util.WaitClosed(ctx, e.downloader.Ready())
