@@ -28,8 +28,6 @@ import (
 
 	runtime "github.com/onflow/cadence/runtime"
 
-	sema "github.com/onflow/cadence/sema"
-
 	time "time"
 
 	trace "github.com/onflow/flow-go/module/trace"
@@ -1723,7 +1721,7 @@ func (_m *Environment) UpdateAccountContractCode(location common.AddressLocation
 }
 
 // ValidateAccountCapabilitiesGet provides a mock function with given fields: context, address, path, wantedBorrowType, capabilityBorrowType
-func (_m *Environment) ValidateAccountCapabilitiesGet(context interpreter.AccountCapabilityGetValidationContext, address interpreter.AddressValue, path interpreter.PathValue, wantedBorrowType *sema.ReferenceType, capabilityBorrowType *sema.ReferenceType) (bool, error) {
+func (_m *Environment) ValidateAccountCapabilitiesGet(context interpreter.AccountCapabilityGetValidationContext, address interpreter.AddressValue, path interpreter.PathValue, wantedBorrowType *interpreter.ReferenceStaticType, capabilityBorrowType *interpreter.ReferenceStaticType) (bool, error) {
 	ret := _m.Called(context, address, path, wantedBorrowType, capabilityBorrowType)
 
 	if len(ret) == 0 {
@@ -1732,16 +1730,16 @@ func (_m *Environment) ValidateAccountCapabilitiesGet(context interpreter.Accoun
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType, *interpreter.ReferenceStaticType) (bool, error)); ok {
 		return rf(context, address, path, wantedBorrowType, capabilityBorrowType)
 	}
-	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) bool); ok {
+	if rf, ok := ret.Get(0).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType, *interpreter.ReferenceStaticType) bool); ok {
 		r0 = rf(context, address, path, wantedBorrowType, capabilityBorrowType)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *sema.ReferenceType, *sema.ReferenceType) error); ok {
+	if rf, ok := ret.Get(1).(func(interpreter.AccountCapabilityGetValidationContext, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType, *interpreter.ReferenceStaticType) error); ok {
 		r1 = rf(context, address, path, wantedBorrowType, capabilityBorrowType)
 	} else {
 		r1 = ret.Error(1)
