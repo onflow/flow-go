@@ -127,6 +127,10 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -181,6 +185,10 @@ func (a *Accounts) GetAccountAtBlockHeight(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -231,6 +239,10 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return 0, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return 0, nil, access.NewInvalidRequestError(err)
 		default:
 			return 0, nil, access.RequireNoError(ctx, err)
 		}
@@ -285,6 +297,10 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return 0, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return 0, nil, access.NewInvalidRequestError(err)
 		default:
 			return 0, nil, access.RequireNoError(ctx, err)
 		}
@@ -339,6 +355,10 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -394,6 +414,10 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -447,6 +471,10 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -501,6 +529,10 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case common.IsInsufficientExecutionReceipts(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case common.IsRequiredExecutorsCountExceeded(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case common.IsUnknownRequiredExecutor(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
