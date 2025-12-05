@@ -64,6 +64,53 @@ func (g *GetTransaction) Build(r *common.Request) error {
 	return err
 }
 
+type GetTransactionsByBlockID struct {
+	GetByIDRequest
+	TransactionOptionals
+	ExpandsResult bool
+}
+
+// NewGetTransactionsByBlockIDRequest extracts necessary variables from the provided request,
+// builds a GetTransactions instance, and validates it.
+//
+// All errors indicate a malformed request.
+func NewGetTransactionsByBlockIDRequest(r *common.Request) (*GetTransactionsByBlockID, error) {
+	req, err := parseGetTransactionsByBlockID(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// parseGetTransactionsByBlockID parses raw query and body parameters from an incoming request
+// and constructs a validated GetTransactionsByBlockID instance.
+//
+// All errors indicate the request is invalid.
+func parseGetTransactionsByBlockID(r *common.Request) (*GetTransactionsByBlockID, error) {
+	var req GetTransactionsByBlockID
+	err := req.TransactionOptionals.Parse(r)
+	if err != nil {
+		return nil, err
+	}
+
+	err = req.GetByIDRequest.Build(r)
+	req.ExpandsResult = r.Expands(resultExpandable)
+
+	return &req, err
+}
+
+func (g *GetTransactionsByBlockID) Build(r *common.Request) error {
+	err := g.TransactionOptionals.Parse(r)
+	if err != nil {
+		return err
+	}
+
+	err = g.GetByIDRequest.Build(r)
+
+	return err
+}
+
 type GetTransactionResult struct {
 	GetByIDRequest
 	TransactionOptionals

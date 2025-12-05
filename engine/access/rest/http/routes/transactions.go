@@ -82,6 +82,59 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 	return response, nil
 }
 
+// GetTransactionsByBlockID gets transactions by requested blockID.
+func GetTransactionsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	req, err := request.NewGetTransactionsByBlockIDRequest(r)
+	if err != nil {
+		return nil, common.NewBadRequestError(err)
+	}
+
+	transactions, err := backend.GetTransactionsByBlockID(r.Context(), req.BlockID)
+	if err != nil {
+		return nil, err
+	}
+
+	var transactionsResponse commonmodels.Transactions
+	// only lookup result if transaction result is to be expanded
+	if req.ExpandsResult {
+		var response commonmodels.Transaction
+		for i, transaction := range transactions {
+			txr, err := backend.GetTransactionResult(
+				r.Context(),
+				transaction.ID(),
+				req.BlockID,
+				req.CollectionID,
+				entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			response.Build(transaction, txr, link)
+
+			transactionsResponse[i] = response
+		}
+	} else {
+		transactionsResponse.Build(transactions, link)
+	}
+
+	//backend.GetScheduledTransaction()
+	//backend.GetSystemTransaction()
+
+	return transactionsResponse, nil
+}
+
+//func (t *Transactions) Build(transactions []*flow.TransactionBody, link LinkGenerator) {
+//	txs := make([]Transaction, len(transactions))
+//	for i, tr := range transactions {
+//		var tx Transaction
+//		tx.Build(tr, nil, link)
+//		txs[i] = tx
+//	}
+//
+//	*t = txs
+//}
+
 // CreateTransaction creates a new transaction from provided payload.
 func CreateTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.CreateTransactionRequest(r)

@@ -148,6 +148,32 @@ func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifie
 	return &transactionBody, nil
 }
 
+// GetTransactionsByBlockID returns transactions by the block ID.
+func (r *RestProxyHandler) GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	getTransactionsRequest := &accessproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockID[:],
+	}
+	transactionsResponse, err := upstream.GetTransactionsByBlockID(ctx, getTransactionsRequest)
+	r.log("upstream", "GetTransactionsByBlockID", err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	transactionBody, err := convert.MessagesToTransactions(transactionsResponse.Transactions, r.Chain)
+	if err != nil {
+		return nil, err
+	}
+
+	return transactionBody, nil
+}
+
 // GetTransactionResult returns transaction result by the transaction ID.
 func (r *RestProxyHandler) GetTransactionResult(
 	ctx context.Context,

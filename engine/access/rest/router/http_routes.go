@@ -20,6 +20,11 @@ var Routes = []route{{
 	Name:    "getTransactionByID",
 	Handler: routes.GetTransactionByID,
 }, {
+	Method:  http.MethodGet,
+	Pattern: "/transactions",
+	Name:    "getTransactionsByBlockID",
+	Handler: routes.GetTransactionsByBlockID,
+}, {
 	Method:  http.MethodPost,
 	Pattern: "/transactions",
 	Name:    "createTransaction",
