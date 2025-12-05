@@ -35,6 +35,7 @@ type Machine struct {
 
 type CollectionRequester interface {
 	module.ReadyDoneAware
+	module.Startable
 	WithHandle(requester.HandleFunc)
 }
 
@@ -42,7 +43,6 @@ func NewMachine(
 	logger zerolog.Logger,
 	protocolEvents *events.Distributor,
 	collectionRequester CollectionRequester,
-
 	collectionFetcher CollectionFetcher,
 	headers storage.Headers,
 	blocks storage.Blocks,

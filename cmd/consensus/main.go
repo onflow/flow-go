@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
@@ -487,12 +488,17 @@ func main() {
 			return e, err
 		}).
 		Component("matching engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			fifoStore, err := engine.NewFifoMessageStore(requester.DefaultEntityRequestCacheSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester store: %w", err)
+			}
 			receiptRequester, err = requester.New(
 				node.Logger.With().Str("entity", "receipt").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
 				node.State,
+				fifoStore,
 				channels.RequestReceiptsByBlockID,
 				filter.HasRole[flow.Identity](flow.RoleExecution),
 				func() flow.Entity { return new(flow.ExecutionReceipt) },

@@ -1102,7 +1102,12 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		colFetcher = accessFetcher
 		exeNode.collectionRequester = accessFetcher
 	} else {
+		fifoStore, err := engine.NewFifoMessageStore(requester.DefaultEntityRequestCacheSize)
+		if err != nil {
+			return nil, fmt.Errorf("could not create requester store: %w", err)
+		}
 		reqEng, err := requester.New(node.Logger.With().Str("entity", "collection").Logger(), node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
+			fifoStore,
 			channels.RequestCollections,
 			filter.Any,
 			func() flow.Entity { return new(flow.Collection) },
