@@ -59,7 +59,8 @@ func TestStream(t *testing.T) {
 		return nil, subscription.ErrBlockNotReady
 	}
 
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub, getData, 0)
+	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub, dataProvider)
 
 	for _, d := range tests {
 		if d.err == nil {
@@ -99,7 +100,8 @@ func TestStreamRatelimited(t *testing.T) {
 				return "data", nil
 			}
 
-			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, getData, 0)
+			dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, dataProvider)
 
 			sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
 				sendCalls++
@@ -153,7 +155,8 @@ func TestLongStreamRatelimited(t *testing.T) {
 		return "data", nil
 	}
 
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, getData, 0)
+	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, dataProvider)
 
 	sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
 		sendCalls++
