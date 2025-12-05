@@ -258,7 +258,6 @@ func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
 	// verify that all peers have all topics; concurrently
 	allTopicsVerified := sync.WaitGroup{}
 	for _, pid := range peerIds {
-		pid := pid
 		allTopicsVerified.Add(1)
 		go func() {
 			defer allTopicsVerified.Done()
