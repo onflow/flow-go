@@ -36,7 +36,8 @@ func (b *AccountStatusesBackend) subscribe(
 	nextHeight uint64,
 	filter state_stream.AccountStatusFilter,
 ) subscription.Subscription {
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getAccountStatusResponseFactory(filter))
+	accountProvider := subscription.NewHeightByFuncProvider(nextHeight, b.getAccountStatusResponseFactory(filter))
+	return b.subscriptionHandler.Subscribe(ctx, accountProvider)
 }
 
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
