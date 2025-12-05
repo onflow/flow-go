@@ -283,19 +283,17 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 	// it was passed as an argument to the execution data tracker.
 	// should i add back this check here?
 
-	// advance height for the next call
-	defer func() {
-		e.height += 1
-	}()
-
 	// the spork root block will never have execution data available. If requested, return an empty result.
 	if e.height == e.state.Params().SporkRootBlockHeight() {
-		return &ExecutionDataResponse{
+		response := &ExecutionDataResponse{
 			Height: e.height,
 			ExecutionData: &execution_data.BlockExecutionData{
 				BlockID: e.state.Params().SporkRootBlock().ID(),
 			},
-		}, nil
+		}
+
+		e.height += 1
+		return response, nil
 	}
 
 	blockID, err := e.headers.BlockIDByHeight(e.height)
@@ -335,12 +333,15 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 	// update criteria for the next call
 	e.criteria.ParentExecutionResultID = executionResultID
 
-	return &ExecutionDataResponse{
+	response := &ExecutionDataResponse{
 		Height:        e.height,
 		ExecutionData: executionData.BlockExecutionData,
 		ExecutorMetadata: accessmodel.ExecutorMetadata{
 			ExecutionResultID: executionResultID,
 			ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 		},
-	}, nil
+	}
+
+	e.height += 1
+	return response, nil
 }

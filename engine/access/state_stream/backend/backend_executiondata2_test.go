@@ -183,7 +183,7 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 		s.executionDataBroadcaster,
 		subscription.DefaultSendTimeout,
 		subscription.DefaultResponseLimit,
-		1,
+		subscription.DefaultSendBufferSize,
 	)
 
 	// optimistic sync stuff
@@ -388,7 +388,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData() {
 	require.Equal(s.T(), expectedExecData, actualExecData)
 }
 
-func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
+func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 	tests := []struct {
 		name        string
 		expectedErr error
@@ -472,6 +472,62 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderFuncErrors() {
 						return nil, assert.AnError
 					}).
 					Once()
+			},
+		},
+		{
+			name:        "required executors not found",
+			expectedErr: storage.ErrNotFound,
+			mockState: func() {
+				// if this error is seen, we continue trying to fetch results until we get a result or other error.
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						// after an 'ignorable' error occures, the streamer goes to sleep waiting for the notification
+						// that the new data is available.
+						// since we are about to return an error, we notify the streamer in advance. this will cause it
+						// to wake up and try again with a new mock.
+						s.executionDataBroadcaster.Publish()
+
+						return nil, optimistic_sync.ErrRequiredExecutorNotFound
+					}).
+					Once()
+
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(len(s.blocks) - 1) // we expect storage.ErrNotFound to be returned for the unknown height
+				// Times is equal to `len(s.blocks)-1)` because the function is never called for the spork root block,
+				// as well as for the last block that is not found in storage.
+			},
+		},
+		{
+			name:        "not enough agreeing executors",
+			expectedErr: storage.ErrNotFound,
+			mockState: func() {
+				// if this error is seen, we continue trying to fetch results until we get a result or other error.
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						// after an 'ignorable' error occures, the streamer goes to sleep waiting for the notification
+						// that the new data is available.
+						// since we are about to return an error, we notify the streamer in advance. this will cause it
+						// to wake up and try again with a new mock.
+						s.executionDataBroadcaster.Publish()
+
+						return nil, optimistic_sync.ErrNotEnoughAgreeingExecutors
+					}).
+					Once()
+
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(len(s.blocks) - 1) // we expect storage.ErrNotFound to be returned for the unknown height
+				// Times is equal to `len(s.blocks)-1)` because the function is never called for the spork root block,
+				// as well as for the last block that is not found in storage.
 			},
 		},
 	}
