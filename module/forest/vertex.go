@@ -22,9 +22,13 @@ func VertexToString(v Vertex) string {
 	return fmt.Sprintf("<id=%x level=%d parent_id=%d parent_level=%d>", v.VertexID(), v.Level(), parentID, parentLevel)
 }
 
-// VertexIterator is a stateful iterator for VertexList.
+// VertexIterator is a single-use, stateful iterator for VertexList.
 // Internally operates directly on the Vertex Containers
 // It has one-element look ahead for skipping empty vertex containers.
+//
+// CAUTION: as LevelledForest, VertexIterator is NOT safe in CONCURRENT environments.
+// Even if the iterator itself is only accessed by a single go routine, it still
+// accesses data structures maintained and extended by the LevelledForest.
 type VertexIterator struct {
 	data VertexList
 	idx  int

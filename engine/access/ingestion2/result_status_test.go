@@ -1,0 +1,171 @@
+package ingestion2
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/slices"
+)
+
+var allStatuses = []ResultStatus{
+	// valid
+	ResultForCertifiedBlock,
+	ResultForFinalizedBlock,
+	ResultSealed,
+	ResultOrphaned,
+
+	// invalid (but permitted by the underlying `uint64` type
+	ResultStatus(0),
+	ResultStatus(ResultOrphaned + 1),
+}
+
+type isvalidTestCase struct {
+	name     string
+	status   ResultStatus
+	expected bool
+}
+
+type transitionTestCase struct {
+	name  string
+	from  ResultStatus
+	valid []ResultStatus
+}
+
+func isValidTests() []isvalidTestCase {
+	return []isvalidTestCase{
+		{
+			name:     "certified status is valid",
+			status:   ResultForCertifiedBlock,
+			expected: true,
+		},
+		{
+			name:     "finalized status is valid",
+			status:   ResultForFinalizedBlock,
+			expected: true,
+		},
+		{
+			name:     "sealed status is valid",
+			status:   ResultSealed,
+			expected: true,
+		},
+		{
+			name:     "orphaned status is valid",
+			status:   ResultOrphaned,
+			expected: true,
+		},
+		{
+			name:     "zero status is invalid",
+			status:   ResultStatus(0),
+			expected: false,
+		},
+		{
+			name:     "unknown status is invalid",
+			status:   ResultStatus(999),
+			expected: false,
+		},
+	}
+}
+
+// TestResultStatus_IsValid tests the IsValid method for ResultStatus
+func TestResultStatus_IsValid(t *testing.T) {
+	for _, tt := range isValidTests() {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.status.IsValid())
+		})
+	}
+}
+
+func TestNewResultStatusTracker_InvalidInitialState(t *testing.T) {
+	for _, tt := range isValidTests() {
+		tracker, err := NewResultStatusTracker(tt.status)
+		if tt.expected {
+			assert.NoError(t, err)
+			assert.Equal(t, tt.status, tracker.Value())
+		} else {
+			var zeroValue ResultStatus
+			assert.ErrorIs(t, err, InvalidStartingState)
+			assert.Equal(t, zeroValue, tracker.Value())
+		}
+	}
+}
+
+func transitionTests() []transitionTestCase {
+	return []transitionTestCase{
+		{
+			from: ResultForCertifiedBlock,
+			valid: []ResultStatus{
+				ResultForCertifiedBlock,
+				ResultForFinalizedBlock,
+				ResultSealed,
+				ResultOrphaned,
+			},
+		},
+		{
+			from: ResultForFinalizedBlock,
+			valid: []ResultStatus{
+				ResultForFinalizedBlock,
+				ResultSealed,
+				ResultOrphaned,
+			},
+		},
+		{
+			from: ResultSealed,
+			valid: []ResultStatus{
+				ResultSealed, // terminal state - sealed results cannot be orphaned
+			},
+		},
+		{
+			from: ResultOrphaned,
+			valid: []ResultStatus{
+				ResultOrphaned, // terminal state - cannot transition out of orphaned
+			},
+		},
+	}
+}
+
+// TestResultStatus_IsValidTransition tests the IsValidTransition method
+func TestResultStatus_IsValidTransition(t *testing.T) {
+	for _, tt := range transitionTests() {
+		validTransition := slices.ToMap(tt.valid)
+
+		for _, to := range allStatuses {
+			_, isValid := validTransition[to]
+
+			t.Run(fmt.Sprintf("%s -> %s (valid: %t)", tt.from, to, isValid), func(t *testing.T) {
+				assert.Equal(t, isValid, tt.from.IsValidTransition(to))
+			})
+		}
+	}
+}
+
+// TestResultStatusTracker_Set tests the Set only updates for valid transitions
+func TestResultStatusTracker_Set(t *testing.T) {
+	for _, tt := range transitionTests() {
+		validTransition := slices.ToMap(tt.valid)
+
+		for _, to := range allStatuses {
+			_, isValid := validTransition[to]
+
+			tracker, err := NewResultStatusTracker(tt.from)
+			require.NoError(t, err)
+
+			t.Run(fmt.Sprintf("%s -> %s (valid: %t)", tt.from, to, isValid), func(t *testing.T) {
+				success, oldValue := tracker.Set(to)
+				newValue := tracker.Value()
+
+				assert.Equal(t, isValid, success)
+				assert.Equal(t, tt.from, oldValue)
+				if isValid {
+					// successfully updated to the `to` status
+					assert.Equal(t, to, newValue)
+				} else {
+					// never updated, keeps original value
+					assert.Equal(t, tt.from, newValue)
+				}
+			})
+		}
+	}
+}

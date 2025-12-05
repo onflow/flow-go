@@ -28,25 +28,39 @@ type Core interface {
 	// When Aboandon is called, the caller must cancel the context passed in to shutdown the operation
 	// otherwise it may block indefinitely.
 	//
+	// The method may only be called once. Calling it multiple times will return an error.
+	// Calling Download after Abandon is called will return an error.
+	//
 	// Expected error returns during normal operation:
-	// - [context.Canceled]: if the provided context was canceled before completion
+	//   - [context.Canceled]: if the provided context was canceled before completion
+	//   - [ErrResultAbandoned]: if the core is already abandoned
 	Download(ctx context.Context) error
 
 	// Index processes the downloaded data and stores it into in-memory indexes.
 	// Must be called after Download.
 	//
-	// No error returns are expected during normal operations
+	// The method may only be called once. Calling it multiple times will return an error.
+	// Calling Index after Abandon is called will return an error.
+	//
+	// Expected error returns during normal operation:
+	//   - [ErrResultAbandoned]: if the core is already abandoned
 	Index() error
 
 	// Persist stores the indexed data in permanent storage.
 	// Must be called after Index.
 	//
-	// No error returns are expected during normal operations
+	// The method may only be called once. Calling it multiple times will return an error.
+	// Calling Persist after Abandon is called will return an error.
+	//
+	// Expected error returns during normal operation:
+	//   - [ErrResultAbandoned]: if the core is already abandoned
 	Persist() error
 
 	// Abandon indicates that the protocol has abandoned this state. Hence processing will be aborted
 	// and any data dropped.
 	// This method will block until other in-progress operations are complete. If Download is in progress,
 	// the caller should cancel its context to ensure the operation completes in a timely manner.
+	//
+	// The method is idempotent. Calling it multiple times has no effect.
 	Abandon()
 }
