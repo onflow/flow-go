@@ -32,10 +32,6 @@ const (
 	// VoteCollectorStatusVerifying is for the status when the block has been received,
 	// and is able to process all votes for it.
 	VoteCollectorStatusVerifying
-
-	// VoteCollectorStatusInvalid is for the status when the block has been verified and
-	// is invalid. All votes to this block will be collected to slash the voter.
-	VoteCollectorStatusInvalid
 )
 
 // VoteCollector collects votes for the same block, produces QC when enough votes are collected
