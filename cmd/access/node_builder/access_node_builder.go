@@ -2209,6 +2209,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.Logger,
 			builder.executionDataSyncEnabled,
 			builder.collectionSync,
+			notNil(builder.ExecutionDataCache),
 			notNil(builder.ExecutionDataRequester),
 			notNil(collectionIndexedHeight),
 			notNil(builder.blockCollectionIndexer),

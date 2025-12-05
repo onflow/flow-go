@@ -2,7 +2,6 @@ package execution_data_index
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
@@ -39,7 +38,7 @@ func (p *executionDataProvider) HighestIndexedHeight() uint64 {
 func (p *executionDataProvider) GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error) {
 	blockExecutionData, err := p.cache.ByHeight(ctx, height)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data for height %d: %w", height, err)
+		return nil, err
 	}
 
 	// TODO: to support processing data from unsealed blocks, we should check here that the collections

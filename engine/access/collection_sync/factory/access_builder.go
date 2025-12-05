@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
-	"github.com/onflow/flow-go/engine/access/collection_sync/execution_data_index"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -117,6 +116,7 @@ func CreateProcessedLastFullBlockHeightModule(
 //   - log: Logger for logging operations
 //   - executionDataSyncEnabled: Whether execution data sync is enabled
 //   - collectionSyncMode: The collection sync mode
+//   - executionDataCache: Execution data cache
 //   - executionDataRequester: Execution data requester
 //   - collectionIndexedHeight: Consumer progress for collection indexed height
 //   - blockCollectionIndexer: Block collection indexer
@@ -132,6 +132,7 @@ func CreateExecutionDataProcessorComponent(
 	log zerolog.Logger,
 	executionDataSyncEnabled bool,
 	collectionSyncMode CollectionSyncMode,
+	executionDataCache execution_data.ExecutionDataCache,
 	executionDataRequester state_synchronization.ExecutionDataRequester,
 	collectionIndexedHeight storage.ConsumerProgress,
 	blockCollectionIndexer collection_sync.BlockCollectionIndexer,
@@ -163,14 +164,15 @@ func CreateExecutionDataProcessorComponent(
 		Bool("execution_data_sync_enabled", executionDataSyncEnabled).
 		Msg("creating execution data processor")
 
-	executionDataProvider := execution_data_index.NewExecutionDataProvider(
-		executionDataRequester.GetCachedStore(),
-		executionDataRequester,
-	)
+	if executionDataCache == nil {
+		return nil, fmt.Errorf("ExecutionDataCache must be created before execution data processor")
+	}
+
 	// Create execution data processor
 	executionDataProcessor, err := createExecutionDataProcessor(
 		log,
-		executionDataProvider,
+		executionDataCache,
+		executionDataRequester,
 		collectionIndexedHeight,
 		blockCollectionIndexer,
 		func(indexedHeight uint64) {

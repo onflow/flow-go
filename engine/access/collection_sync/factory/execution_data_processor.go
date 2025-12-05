@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/collection_sync/execution_data_index"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -28,11 +30,15 @@ import (
 // No errors are expected during normal operation.
 func createExecutionDataProcessor(
 	log zerolog.Logger,
-	executionDataProvider collection_sync.ExecutionDataProvider,
+	cache execution_data.ExecutionDataCache,
+	executionDataIndexedHeight state_synchronization.ExecutionDataIndexedHeight,
 	processedHeight storage.ConsumerProgress,
 	indexer collection_sync.BlockCollectionIndexer,
 	onIndexedCallback func(uint64),
 ) (*execution_data_index.ExecutionDataProcessor, error) {
+	// Create execution data provider
+	executionDataProvider := execution_data_index.NewExecutionDataProvider(cache, executionDataIndexedHeight)
+
 	// Convert ConsumerProgress to PersistentStrictMonotonicCounter
 	processedHeightCounter, err := counters.NewPersistentStrictMonotonicCounter(processedHeight)
 	if err != nil {
