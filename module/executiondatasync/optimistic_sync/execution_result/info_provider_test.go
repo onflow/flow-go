@@ -211,7 +211,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				receipts[i] = r
 			}
 
-			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			// Require executors that didn't produce any receipts
