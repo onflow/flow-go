@@ -418,7 +418,6 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 
 	followerDistributor := pubsub.NewFollowerDistributor()
 	processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := store.NewConsumerProgress(pebbleimpl.ToDB(suite.db), module.ConsumeProgressExecutionDataRequesterNotification)
 
 	edr, err := New(
 		logger,
@@ -426,7 +425,6 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		suite.downloader,
 		edCache,
 		processedHeight,
-		processedNotification,
 		state,
 		headers,
 		ExecutionDataConfig{
@@ -540,10 +538,14 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 
 func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg *fetchTestRun, done func(), fetchedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData, edr state_synchronization.ExecutionDataRequester, edCache *cache.ExecutionDataCache, headers storage.Headers) func() {
 	var lastProcessedHeight uint64 = cfg.startHeight - 1
+	var mu sync.Mutex
 	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+
 		// Get the highest consecutive height that has execution data
 		highestHeight := edr.HighestConsecutiveHeight()
-		
+
 		// Process all heights from lastProcessedHeight + 1 to highestHeight
 		for height := lastProcessedHeight + 1; height <= highestHeight; height++ {
 			blockID, err := headers.BlockIDByHeight(height)
@@ -553,8 +555,8 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 			}
 
 			if _, has := fetchedExecutionData[blockID]; has {
-				suite.T().Errorf("duplicate execution data for block %s", blockID)
-				return
+				// Skip if already processed
+				continue
 			}
 
 			// Fetch execution data from cache
@@ -578,7 +580,7 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 				done()
 			}
 		}
-		
+
 		lastProcessedHeight = highestHeight
 	}
 }

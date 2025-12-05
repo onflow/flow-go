@@ -569,7 +569,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
-	var processedNotifications storage.ConsumerProgressInitializer
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -602,13 +601,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			db := builder.ExecutionDatastoreManager.DB()
 
 			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-			return nil
-		}).
-		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
-			// Note: progress is stored in the datastore's DB since that is where the jobqueue
-			// writes execution data to.
-			db := builder.ExecutionDatastoreManager.DB()
-			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
@@ -755,7 +747,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionDataDownloader,
 				executionDataCache,
 				processedBlockHeight,
-				processedNotifications,
 				builder.State,
 				builder.Storage.Headers,
 				builder.executionDataConfig,

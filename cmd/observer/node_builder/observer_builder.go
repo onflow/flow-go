@@ -1102,7 +1102,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var ds datastore.Batching
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
-	var processedNotifications storage.ConsumerProgressInitializer
 	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -1148,14 +1147,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			db := builder.ExecutionDatastoreManager.DB()
 
 			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-			return nil
-		}).
-		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
-			// Note: progress is stored in the datastore's DB since that is where the jobqueue
-			// writes execution data to.
-			db := builder.ExecutionDatastoreManager.DB()
-
-			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
@@ -1294,7 +1285,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.ExecutionDataDownloader,
 				executionDataCache,
 				processedBlockHeight,
-				processedNotifications,
 				builder.State,
 				builder.Storage.Headers,
 				builder.executionDataConfig,
