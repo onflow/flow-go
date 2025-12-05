@@ -71,6 +71,27 @@ func (e *UnknownRequiredExecutor) Error() string {
 }
 
 func IsUnknownRequiredExecutor(err error) bool {
-	var target *UnknownRequiredExecutor
-	return errors.As(err, &target)
+	var unknownRequiredExecutor *UnknownRequiredExecutor
+	return errors.As(err, &unknownRequiredExecutor)
+}
+
+// CriteriaNotMetError indicates that the execution result criteria could not be
+// satisfied for a given block, when the block is already sealed.
+type CriteriaNotMetError struct {
+	blockID flow.Identifier
+}
+
+func NewCriteriaNotMetError(blockID flow.Identifier) *CriteriaNotMetError {
+	return &CriteriaNotMetError{
+		blockID: blockID,
+	}
+}
+
+func (e *CriteriaNotMetError) Error() string {
+	return fmt.Sprintf("block %s is already sealed but the criteria is still not met,", e.blockID)
+}
+
+func IsCriteriaNotMetError(err error) bool {
+	var criteriaNotMetError *CriteriaNotMetError
+	return errors.As(err, &criteriaNotMetError)
 }

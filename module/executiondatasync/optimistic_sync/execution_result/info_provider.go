@@ -20,6 +20,7 @@ type Provider struct {
 	log zerolog.Logger
 
 	executionReceipts storage.ExecutionReceipts
+	headers           storage.Headers
 	state             protocol.State
 	rootBlockID       flow.Identifier
 	executionNodes    *ExecutionNodeSelector
@@ -33,12 +34,14 @@ func NewExecutionResultInfoProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	executionReceipts storage.ExecutionReceipts,
+	headers storage.Headers,
 	executionNodes *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
 ) *Provider {
 	return &Provider{
 		log:               log.With().Str("module", "execution_result_info").Logger(),
 		executionReceipts: executionReceipts,
+		headers:           headers,
 		state:             state,
 		executionNodes:    executionNodes,
 		rootBlockID:       state.Params().SporkRootBlock().ID(),
@@ -51,8 +54,7 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
-//   - [storage.ErrNotFound]: If the request is for the spork root block and the node was bootstrapped
-//     from a newer block.
+//   - [storage.ErrNotFound]: If the data was not found.
 //   - [common.RequiredExecutorsCountExceeded]: Required executor IDs count exceeds available executors.
 //   - [common.UnknownRequiredExecutor]: A required executor ID is not in the available set.
 func (e *Provider) ExecutionResultInfo(
@@ -99,6 +101,19 @@ func (e *Provider) ExecutionResultInfo(
 	subsetENs, err := e.executionNodes.SelectExecutionNodes(executors, criteria.RequiredExecutors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
+	}
+
+	sealedHeader, err := e.state.Sealed().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup sealed header: %w", err)
+	}
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header by block ID %v: %w", blockID, err)
+	}
+	// If block is sealed and criteria cannot be met return an error
+	if header.Height <= sealedHeader.Height && len(subsetENs) < len(criteria.RequiredExecutors) {
+		return nil, common.NewCriteriaNotMetError(blockID)
 	}
 
 	if len(subsetENs) == 0 {

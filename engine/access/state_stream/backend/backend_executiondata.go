@@ -65,6 +65,8 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 			return nil, nil, access.NewInvalidRequestError(err)
 		case common.IsUnknownRequiredExecutor(err):
 			return nil, nil, access.NewInvalidRequestError(err)
+		case common.IsCriteriaNotMetError(err):
+			return nil, nil, access.NewPreconditionFailedError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
