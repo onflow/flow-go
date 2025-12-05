@@ -53,7 +53,7 @@ func TestMissingCollectionQueue_CompleteBlockLifecycle(t *testing.T) {
 	// Step 4: Receiving one collection doesn't complete the block, IsHeightQueued still returns true
 	collectionsReturned, heightReturned, _, complete := mcq.OnReceivedCollection(collections[0])
 	assert.Nil(t, collectionsReturned, "should not return collections when block is not complete")
-	assert.Equal(t, uint64(0), heightReturned, "should not return height when block is not complete")
+	assert.Equal(t, blockHeight, heightReturned, "should return height even when block is not complete")
 	assert.False(t, complete, "block should not be complete with only one collection")
 	assert.True(t, mcq.IsHeightQueued(blockHeight), "height should still be queued after receiving one collection")
 
@@ -117,7 +117,7 @@ func TestMissingCollectionQueue_IndexBeforeBlockCompletion(t *testing.T) {
 	// Receive only one collection (block is not complete)
 	collectionsReturned, heightReturned, _, complete := mcq.OnReceivedCollection(collections[0])
 	assert.Nil(t, collectionsReturned, "should not return collections when block is not complete")
-	assert.Equal(t, uint64(0), heightReturned, "should not return height when block is not complete")
+	assert.Equal(t, blockHeight, heightReturned, "should return height even when block is not complete")
 	assert.False(t, complete, "block should not be complete with only one collection")
 	assert.True(t, mcq.IsHeightQueued(blockHeight), "height should still be queued")
 
