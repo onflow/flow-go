@@ -18,11 +18,13 @@ import (
 	"github.com/spf13/cobra"
 	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/debug"
 )
@@ -87,15 +89,17 @@ func run(_ *cobra.Command, args []string) {
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
 
-	config, err := grpcclient.NewFlowClientConfig(flagAccessAddress, "", flow.ZeroID, true)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create flow client config")
-	}
-
-	flowClient, err := grpcclient.FlowClient(config)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create client")
-	}
+	flowClient, err := client.NewClient(
+		flagAccessAddress,
+		client.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultAccessMaxResponseSize)),
+			//grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			//	Time:    10 * time.Second,
+			//	Timeout: 1 * time.Hour,
+			//}),
+		),
+	)
 
 	var remoteClient debug.RemoteClient
 	if flagUseExecutionDataAPI {
@@ -140,14 +144,6 @@ func run(_ *cobra.Command, args []string) {
 
 func compareNewBlocks(blockIDs []flow.Identifier, flowClient *client.Client, remoteClient debug.RemoteClient, chain flow.Chain) {
 
-	const blockStatus = flow.BlockStatusSealed
-	var getBlockHeader func() (*flow.Header, error)
-	if len(blockIDs) > 1 {
-		getBlockHeader = debug_tx.SubscribeBlockHeadersFromStartBlockID(flowClient, blockIDs[0], blockStatus)
-	} else {
-		getBlockHeader = debug_tx.SubscribeBlockHeadersFromLatest(flowClient, blockStatus)
-	}
-
 	var (
 		blocksMismatched int64
 		blocksMatched    int64
@@ -158,43 +154,63 @@ func compareNewBlocks(blockIDs []flow.Identifier, flowClient *client.Client, rem
 	g, _ := errgroup.WithContext(context.Background())
 	g.SetLimit(flagParallel)
 
+	var lastBlockID flow.Identifier
+
+	if len(blockIDs) > 0 {
+		lastBlockID = blockIDs[0]
+	}
+
+reconnect:
 	for {
-		log.Info().Msg("Waiting for new sealed block ...")
-		header, err := getBlockHeader()
-		if err == io.EOF {
-			return
+		const blockStatus = flow.BlockStatusSealed
+		var getBlockHeader func() (*flow.Header, error)
+		if lastBlockID != flow.ZeroID {
+			getBlockHeader = debug_tx.SubscribeBlockHeadersFromStartBlockID(flowClient, lastBlockID, blockStatus)
+		} else {
+			getBlockHeader = debug_tx.SubscribeBlockHeadersFromLatest(flowClient, blockStatus)
 		}
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to receive new block header")
-		}
 
-		log.Info().Msgf("New sealed block received: %s (height %d)", header.ID(), header.Height)
-
-		g.Go(func() error {
-
-			time.Sleep(flagSubscriptionDelay)
-
-			result := compareBlock(
-				header.ID(),
-				header,
-				remoteClient,
-				flowClient,
-				chain,
-			)
-
-			atomic.AddInt64(&txMismatched, int64(result.mismatches))
-			atomic.AddInt64(&txMatched, int64(result.matches))
-			if result.mismatches > 0 {
-				atomic.AddInt64(&blocksMismatched, 1)
-			} else {
-				atomic.AddInt64(&blocksMatched, 1)
+		for {
+			log.Info().Msg("Waiting for new sealed block ...")
+			header, err := getBlockHeader()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to receive new block header")
+				continue reconnect
 			}
 
-			log.Info().Msgf("Compared %d blocks: %d matched, %d mismatched", blocksMatched+blocksMismatched, blocksMatched, blocksMismatched)
-			log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
+			log.Info().Msgf("New sealed block received: %s (height %d)", header.ID(), header.Height)
 
-			return nil
-		})
+			lastBlockID = header.ID()
+
+			g.Go(func() error {
+
+				time.Sleep(flagSubscriptionDelay)
+
+				result := compareBlock(
+					header.ID(),
+					header,
+					remoteClient,
+					flowClient,
+					chain,
+				)
+
+				atomic.AddInt64(&txMismatched, int64(result.mismatches))
+				atomic.AddInt64(&txMatched, int64(result.matches))
+				if result.mismatches > 0 {
+					atomic.AddInt64(&blocksMismatched, 1)
+				} else {
+					atomic.AddInt64(&blocksMatched, 1)
+				}
+
+				log.Info().Msgf("Compared %d blocks: %d matched, %d mismatched", blocksMatched+blocksMismatched, blocksMatched, blocksMismatched)
+				log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
+
+				return nil
+			})
+		}
 	}
 }
 
