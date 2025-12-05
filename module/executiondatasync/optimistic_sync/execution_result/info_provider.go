@@ -167,8 +167,7 @@ func (e *Provider) validateRequiredExecutors(
 // results are found, then the result with the most executors is returned.
 //
 // Expected errors during normal operations:
-//   - [common.MissingRequiredExecutor]: One or more required executors are not present.
-//   - [common.InsufficientExecutors]: The number of available executors is below the required minimum.
+//   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
 func (e *Provider) findResultAndExecutors(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,

@@ -22,15 +22,14 @@ func NewRequiredExecutorsCountExceededError(requiredExecutorsCount int, availabl
 }
 
 func (e *RequiredExecutorsCountExceededError) Error() string {
-	return fmt.Sprintf(
-		"required executors count exceeded: required %d, available %d",
+	return fmt.Sprintf("required executors count exceeded: required %d, available %d",
 		e.requiredExecutorsCount, e.availableExecutorsCount,
 	)
 }
 
 func IsRequiredExecutorsCountExceededError(err error) bool {
-	var target *RequiredExecutorsCountExceededError
-	return errors.As(err, &target)
+	var requiredExecutorsCountExceededError *RequiredExecutorsCountExceededError
+	return errors.As(err, &requiredExecutorsCountExceededError)
 }
 
 // UnknownRequiredExecutorError indicates that a required executor ID is not present
