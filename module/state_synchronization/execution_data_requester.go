@@ -1,7 +1,6 @@
 package state_synchronization
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
@@ -13,9 +12,6 @@ type OnExecutionDataReceivedConsumer func(*execution_data.BlockExecutionDataEnti
 // a callback that is called when a new ExecutionData is received
 type ExecutionDataRequester interface {
 	component.Component
-
-	// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
-	OnBlockFinalized(*model.Block)
 
 	// HighestConsecutiveHeight returns the highest consecutive block height for which ExecutionData
 	// has been received.

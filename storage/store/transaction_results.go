@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -18,9 +20,9 @@ type IdentifierAndUint32 [flow.IdentifierLen + 4]byte
 
 type TransactionResults struct {
 	db         storage.DB
-	cache      *Cache[TwoIdentifier, flow.TransactionResult]       // Key: blockID + txID
-	indexCache *Cache[IdentifierAndUint32, flow.TransactionResult] // Key: blockID + txIndex
-	blockCache *Cache[flow.Identifier, []flow.TransactionResult]   // Key: blockID
+	cache      *GroupCache[flow.Identifier, TwoIdentifier, flow.TransactionResult]       // Key: blockID + txID
+	indexCache *GroupCache[flow.Identifier, IdentifierAndUint32, flow.TransactionResult] // Key: blockID + txIndex
+	blockCache *Cache[flow.Identifier, []flow.TransactionResult]                         // Key: blockID
 }
 
 func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) TwoIdentifier {
@@ -49,7 +51,15 @@ func KeyToBlockIDIndex(key IdentifierAndUint32) (flow.Identifier, uint32) {
 	return blockID, txIndex
 }
 
-func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) *TransactionResults {
+func FirstIDFromTwoIdentifier(key TwoIdentifier) flow.Identifier {
+	return flow.Identifier(key[:flow.IdentifierLen])
+}
+
+func IDFromIdentifierAndUint32(key IdentifierAndUint32) flow.Identifier {
+	return flow.Identifier(key[:flow.IdentifierLen])
+}
+
+func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) (*TransactionResults, error) {
 	retrieve := func(r storage.Reader, key TwoIdentifier) (flow.TransactionResult, error) {
 		blockID, txID := KeyToBlockIDTransactionID(key)
 
@@ -81,43 +91,55 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 		return txResults, nil
 	}
 
+	cache, err := newGroupCache(
+		collector,
+		metrics.ResourceTransactionResults,
+		FirstIDFromTwoIdentifier,
+		withLimit[TwoIdentifier, flow.TransactionResult](transactionResultsCacheSize),
+		withStore(noopStore[TwoIdentifier, flow.TransactionResult]),
+		withRetrieve(retrieve),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transaction results group cache: %w", err)
+	}
+
+	indexCache, err := newGroupCache(
+		collector,
+		metrics.ResourceTransactionResultIndices,
+		IDFromIdentifierAndUint32,
+		withLimit[IdentifierAndUint32, flow.TransactionResult](transactionResultsCacheSize),
+		withStore(noopStore[IdentifierAndUint32, flow.TransactionResult]),
+		withRetrieve(retrieveIndex),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transaction index group cache: %w", err)
+	}
+
 	return &TransactionResults{
-		db: db,
-		cache: newCache(collector, metrics.ResourceTransactionResults,
-			withLimit[TwoIdentifier, flow.TransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[TwoIdentifier, flow.TransactionResult]),
-			withRetrieve(retrieve),
-		),
-		indexCache: newCache(collector, metrics.ResourceTransactionResultIndices,
-			withLimit[IdentifierAndUint32, flow.TransactionResult](transactionResultsCacheSize),
-			withStore(noopStore[IdentifierAndUint32, flow.TransactionResult]),
-			withRetrieve(retrieveIndex),
-		),
-		blockCache: newCache(collector, metrics.ResourceTransactionResultIndices,
+		db:         db,
+		cache:      cache,
+		indexCache: indexCache,
+		blockCache: newCache(
+			collector,
+			metrics.ResourceTransactionResultIndices,
 			withLimit[flow.Identifier, []flow.TransactionResult](transactionResultsCacheSize),
 			withStore(noopStore[flow.Identifier, []flow.TransactionResult]),
 			withRetrieve(retrieveForBlock),
 		),
-	}
+	}, nil
 }
 
-// BatchStore will store the transaction results for the given block ID in a batch
-func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
-	w := batch.Writer()
-
-	for i, result := range transactionResults {
-		err := operation.InsertTransactionResult(w, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert tx result: %w", err)
-		}
-
-		err = operation.IndexTransactionResult(w, blockID, uint32(i), &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch index tx result: %w", err)
-		}
+// BatchStore will store the transaction results for the given block ID in a batch.
+// Conceptually, for a block this data should be written once and never changed. This is enforced by the
+// implementation, for which reason the caller must hold the [storage.LockInsertAndIndexTxResult] lock.
+// It returns [storage.ErrAlreadyExists] if transaction results for the block already exist.
+func (tr *TransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
+	err := operation.InsertAndIndexTransactionResults(lctx, rw, blockID, transactionResults)
+	if err != nil {
+		return fmt.Errorf("cannot batch insert and index tx results: %w", err)
 	}
 
-	storage.OnCommitSucceed(batch, func() {
+	storage.OnCommitSucceed(rw, func() {
 		for i, result := range transactionResults {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
@@ -170,33 +192,57 @@ func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 	})
 }
 
-// BatchRemoveByBlockID batch removes transaction results by block ID
+// BatchRemoveByBlockID batch removes transaction results by block ID.
 func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
-	// TODO: Remove records from tr.cache by prefix (blockID) and optimize removal.
-	//
-	// Currently, tr.cache can be out of sync with underlying database
-	// when transaction results are removed by this functions.
-	//
-	// Even though cache.RemoveFunc() is maybe fast enough for
-	// a 1000-item cache, using 10K-item cache size and pruning
-	// multiple blocks in one batch can slow down commit phase
-	// unless we optimize for that use case.
-	//
-	// To unblock PR onflow/flow-go#7324 which has several fixes,
-	// remove-by-prefix optimization will be tracked in separate issue/PR.
-	//
-	// Code fix (below) and test are commented out (not deleted) because
-	// we can use the code as a quick stop-gap fix if needed, and
-	// we can reuse the test even if a new (faster) approach is implemented.
-	/*
-		storage.OnCommitSucceed(batch, func() {
-			keyPrefix := KeyFromBlockID(blockID)
+	const batchDataKey = "TransactionResults.BatchRemoveByBlockID"
 
-			tr.cache.RemoveFunc(func(key string) bool {
-				return strings.HasPrefix(key, keyPrefix)
-			})
-		})
-	*/
+	// BatchRemoveByBlockID() receives ReaderBatchWriter and block ID to
+	// remove the given block from the database and memory cache.
+	// BatchRemoveByBlockID() can be called repeatedly with the same
+	// ReaderBatchWriter and different block IDs to remove multiple blocks.
+	//
+	// To avoid locking TransactionResults cache for every removed block ID,
+	// this function:
+	// - saves and aggregates the received blockID in the ReaderBatchWriter's scope data,
+	// - in the OnCommitSucceed callback, retrieves all saved block IDs and
+	//   removes all cached blocks by locking the cache just once
+	// After cache removal, the scoped block IDs in ReaderBatchWriter are removed.
 
-	return operation.BatchRemoveTransactionResultsByBlockID(blockID, batch)
+	storage.OnCommitSucceed(batch, func() {
+		batchData, _ := batch.ScopedValue(batchDataKey)
+
+		if batchData != nil {
+			batch.SetScopedValue(batchDataKey, nil)
+
+			blockIDs := batchData.(map[flow.Identifier]struct{})
+
+			if len(blockIDs) > 0 {
+				blockIDsInSlice := make([]flow.Identifier, 0, len(blockIDs))
+				for id := range blockIDs {
+					blockIDsInSlice = append(blockIDsInSlice, id)
+				}
+
+				tr.cache.RemoveGroups(blockIDsInSlice)
+			}
+		}
+	})
+
+	saveBlockIDInBatchData(batch, batchDataKey, blockID)
+
+	return operation.RemoveTransactionResultsByBlockID(blockID, batch)
+}
+
+func saveBlockIDInBatchData(batch storage.ReaderBatchWriter, batchDataKey string, blockID flow.Identifier) {
+	var blockIDs map[flow.Identifier]struct{}
+
+	batchValue, _ := batch.ScopedValue(batchDataKey)
+	if batchValue == nil {
+		blockIDs = make(map[flow.Identifier]struct{})
+	} else {
+		blockIDs = batchValue.(map[flow.Identifier]struct{})
+	}
+
+	blockIDs[blockID] = struct{}{}
+
+	batch.SetScopedValue(batchDataKey, blockIDs)
 }

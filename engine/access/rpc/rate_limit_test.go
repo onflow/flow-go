@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -64,6 +64,7 @@ type RateLimitTestSuite struct {
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
 	events       *storagemock.Events
+	seals        *storagemock.Seals
 
 	// test rate limit
 	rateLimit  int
@@ -82,7 +83,7 @@ type RateLimitTestSuite struct {
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -104,6 +105,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.collections = storagemock.NewCollections(suite.T())
 	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
+	suite.seals = storagemock.NewSeals(suite.T())
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -180,6 +182,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		Headers:                     suite.headers,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
+		Seals:                       suite.seals,
 		ChainID:                     suite.chainID,
 		AccessMetrics:               suite.metrics,
 		MaxHeightRange:              0,
@@ -195,6 +198,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 
 	stateStreamConfig := statestreambackend.Config{}
+	followerDistributor := pubsub.NewFollowerDistributor()
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,
 		suite.state,
@@ -210,6 +214,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		nil,
 		stateStreamConfig,
 		nil,
+		followerDistributor,
 	)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

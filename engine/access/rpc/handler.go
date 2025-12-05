@@ -468,6 +468,46 @@ func (h *Handler) GetSystemTransactionResult(
 	return message, nil
 }
 
+func (h *Handler) GetScheduledTransaction(
+	ctx context.Context,
+	req *accessproto.GetScheduledTransactionRequest,
+) (*accessproto.TransactionResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := h.api.GetScheduledTransaction(ctx, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+
+	return &accessproto.TransactionResponse{
+		Transaction: convert.TransactionToMessage(*tx),
+		Metadata:    metadata,
+	}, nil
+}
+
+func (h *Handler) GetScheduledTransactionResult(
+	ctx context.Context,
+	req *accessproto.GetScheduledTransactionResultRequest,
+) (*accessproto.TransactionResultResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.api.GetScheduledTransactionResult(ctx, req.GetId(), req.GetEventEncodingVersion())
+	if err != nil {
+		return nil, err
+	}
+
+	message := convert.TransactionResultToMessage(result)
+	message.Metadata = metadata
+
+	return message, nil
+}
+
 func (h *Handler) GetTransactionsByBlockID(
 	ctx context.Context,
 	req *accessproto.GetTransactionsByBlockIDRequest,
