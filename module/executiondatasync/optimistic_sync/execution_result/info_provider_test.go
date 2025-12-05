@@ -241,7 +241,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 		)
 		suite.Require().Error(err)
 		suite.Require().Nil(query)
-		suite.Require().True(common.IsRequiredExecutorsCountExceeded(err))
+		suite.Require().True(optimistic_sync.IsRequiredExecutorsCountExceededError(err))
 	})
 
 	suite.Run("unknown required executor returns error", func() {
@@ -261,7 +261,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 		)
 		suite.Require().Error(err)
 		suite.Require().Nil(query)
-		suite.Require().True(common.IsUnknownRequiredExecutor(err))
+		suite.Require().True(optimistic_sync.IsUnknownRequiredExecutorError(err))
 	})
 
 	suite.Run("criteria not met on sealed block returns error", func() {
@@ -289,7 +289,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 		)
 		suite.Require().Error(err)
 		suite.Require().Nil(query)
-		suite.Require().True(common.IsCriteriaNotMetError(err))
+		suite.Require().True(optimistic_sync.IsCriteriaNotMetError(err))
 	})
 }
 

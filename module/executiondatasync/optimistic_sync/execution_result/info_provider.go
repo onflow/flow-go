@@ -55,8 +55,8 @@ func NewExecutionResultInfoProvider(
 // Expected errors during normal operations:
 //   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
 //   - [storage.ErrNotFound]: If the data was not found.
-//   - [common.RequiredExecutorsCountExceeded]: Required executor IDs count exceeds available executors.
-//   - [common.UnknownRequiredExecutor]: A required executor ID is not in the available set.
+//   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
+//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
@@ -113,7 +113,7 @@ func (e *Provider) ExecutionResultInfo(
 	}
 	// If block is sealed and criteria cannot be met return an error
 	if header.Height <= sealedHeader.Height && len(subsetENs) < len(criteria.RequiredExecutors) {
-		return nil, common.NewCriteriaNotMetError(blockID)
+		return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
 	}
 
 	if len(subsetENs) == 0 {
@@ -139,14 +139,14 @@ func (e *Provider) ExecutionResultInfo(
 // number of required executors does not exceed the available number.
 //
 // Expected errors during normal operations:
-//   - [common.RequiredExecutorsCountExceeded]: Required executor IDs count exceeds available executors.
-//   - [common.UnknownRequiredExecutor]: A required executor ID is not in the available set.
+//   - [common.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
+//   - [common.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 func (e *Provider) validateRequiredExecutors(
 	required flow.IdentifierList,
 	available flow.IdentityList,
 ) error {
 	if len(available) < len(required) {
-		return common.NewRequiredExecutorsCountExceeded(
+		return optimistic_sync.NewRequiredExecutorsCountExceededError(
 			len(required),
 			len(available),
 		)
@@ -155,7 +155,7 @@ func (e *Provider) validateRequiredExecutors(
 	lookup := available.Lookup()
 	for _, executorID := range required {
 		if _, ok := lookup[executorID]; !ok {
-			return common.NewUnknownRequiredExecutor(executorID)
+			return optimistic_sync.NewUnknownRequiredExecutorError(executorID)
 		}
 	}
 
