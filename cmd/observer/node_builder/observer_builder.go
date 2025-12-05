@@ -1141,6 +1141,7 @@ func (builder *ObserverServiceBuilder) buildExecutionResultInfoProvider() *Obser
 			node.Logger,
 			node.State,
 			node.Storage.Receipts,
+			node.Storage.Headers,
 			execNodeSelector,
 			operatorCriteria,
 		)

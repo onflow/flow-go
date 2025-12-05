@@ -20,6 +20,7 @@ type Provider struct {
 	log zerolog.Logger
 
 	executionReceipts storage.ExecutionReceipts
+	headers           storage.Headers
 	state             protocol.State
 	rootBlockID       flow.Identifier
 	executionNodes    *ExecutionNodeSelector
@@ -33,12 +34,14 @@ func NewExecutionResultInfoProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	executionReceipts storage.ExecutionReceipts,
+	headers storage.Headers,
 	executionNodes *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
 ) *Provider {
 	return &Provider{
 		log:               log.With().Str("module", "execution_result_info").Logger(),
 		executionReceipts: executionReceipts,
+		headers:           headers,
 		state:             state,
 		executionNodes:    executionNodes,
 		rootBlockID:       state.Params().SporkRootBlock().ID(),
@@ -51,8 +54,9 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
-//   - [storage.ErrNotFound]: If the request is for the spork root block and the node was bootstrapped
-//     from a newer block.
+//   - [storage.ErrNotFound]: If the data was not found.
+//   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
+//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
@@ -60,6 +64,11 @@ func (e *Provider) ExecutionResultInfo(
 	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
+	}
+
+	err = e.validateRequiredExecutors(criteria.RequiredExecutors, executorIdentities)
+	if err != nil {
+		return nil, fmt.Errorf("invalid required executors: %w", err)
 	}
 
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
@@ -94,6 +103,19 @@ func (e *Provider) ExecutionResultInfo(
 		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
 	}
 
+	sealedHeader, err := e.state.Sealed().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup sealed header: %w", err)
+	}
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header by block ID %v: %w", blockID, err)
+	}
+	// If block is sealed and criteria cannot be met return an error
+	if header.Height <= sealedHeader.Height && len(subsetENs) < len(criteria.RequiredExecutors) {
+		return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
+	}
+
 	if len(subsetENs) == 0 {
 		// this is unexpected, and probably indicates there is a bug.
 		// There are only three ways that SelectExecutionNodes can return an empty list:
@@ -110,6 +132,34 @@ func (e *Provider) ExecutionResultInfo(
 		ExecutionResultID: result.ID(),
 		ExecutionNodes:    subsetENs,
 	}, nil
+}
+
+// validateRequiredExecutors verifies that the provided set of execution node
+// identities contains all nodes required for processing and that the requested
+// number of required executors does not exceed the available number.
+//
+// Expected errors during normal operations:
+//   - [common.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
+//   - [common.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+func (e *Provider) validateRequiredExecutors(
+	required flow.IdentifierList,
+	available flow.IdentityList,
+) error {
+	if len(available) < len(required) {
+		return optimistic_sync.NewRequiredExecutorsCountExceededError(
+			len(required),
+			len(available),
+		)
+	}
+
+	lookup := available.Lookup()
+	for _, executorID := range required {
+		if _, ok := lookup[executorID]; !ok {
+			return optimistic_sync.NewUnknownRequiredExecutorError(executorID)
+		}
+	}
+
+	return nil
 }
 
 // findResultAndExecutors returns a query response for a given block ID.
