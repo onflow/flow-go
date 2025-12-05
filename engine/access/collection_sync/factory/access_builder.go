@@ -193,7 +193,7 @@ func CreateExecutionDataProcessorComponent(
 	// Initialize last_full_finalized_block_height metric
 	accessMetrics.UpdateLastFullBlockHeight(lastFullBlockHeight.ProcessedHeight())
 
-	distributor.AddOnExecutionDataReceivedConsumer(func(executionData *execution_data.BlockExecutionDataEntity) {
+	distributor.AddOnExecutionDataReceivedConsumer(func() {
 		executionDataProcessor.OnNewExectuionData()
 	})
 

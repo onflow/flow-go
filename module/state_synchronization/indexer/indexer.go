@@ -211,7 +211,7 @@ func (i *Indexer) HighestIndexedHeight() (uint64, error) {
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
-func (i *Indexer) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
+func (i *Indexer) OnExecutionData() {
 	i.exeDataNotifier.Notify()
 }
 

@@ -440,7 +440,7 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 		Msgf("notifying for block")
 
 	// send notifications
-	e.distributor.OnExecutionDataReceived(entry.ExecutionData)
+	e.distributor.OnExecutionDataReceived()
 	jobComplete()
 
 	e.metrics.NotificationSent(entry.Height)

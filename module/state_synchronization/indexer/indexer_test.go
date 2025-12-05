@@ -107,7 +107,7 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 
 	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker)
 
-	w.worker.OnExecutionData(nil)
+	w.worker.OnExecutionData()
 
 	select {
 	case <-ctx.Done():

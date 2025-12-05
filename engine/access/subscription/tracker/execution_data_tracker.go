@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
@@ -57,7 +56,7 @@ type ExecutionDataTracker interface {
 	GetHighestHeight() uint64
 
 	// OnExecutionData is used to notify the tracker when a new execution data is received.
-	OnExecutionData(*execution_data.BlockExecutionDataEntity)
+	OnExecutionData()
 }
 
 var _ ExecutionDataTracker = (*ExecutionDataTrackerImpl)(nil)
@@ -221,7 +220,7 @@ func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
 }
 
 // OnExecutionData is used to notify the tracker when a new execution data is received.
-func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
+func (e *ExecutionDataTrackerImpl) OnExecutionData() {
 	e.broadcaster.Publish()
 }
 
