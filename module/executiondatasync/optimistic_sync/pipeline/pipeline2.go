@@ -17,50 +17,73 @@ import (
 //
 // The state machine is initialized in the Pending state.
 //
-//     Trigger condition: (1)▷┬┄┄┄┄┄┐                           ┌┄┄┐
-//             parent is      ┊    ╭∇─────────────────────────╮ ┊ ╭∇──────────────────────────╮ ┌?▻● Trigger condition (3):
-//           Downloading      ┊    │Task Downloading (once):  │ ┊ │Task Indexing (once):      │ ┊  ┊ sealed & parent completed
-//           or Indexing      ┊    │1. download               │ ┊ │1. build index from downl. │ ┊ ╭∇───────────────────────────╮
-//     or WaitingPersist      ┊    │3. add Task Indexing (2)▷┄│┄┘ │3. check trigger (3)  ▷?┄┄┄│┄┘ │Task Persisting (once):     │
-//           or Complete      ┊    │2. CAS state transition   │   │2. CAS state transition    │   │- database write            │
-//                            ┊    │   downloading → indexing │   │   indexing →WaitingPersist│   │- CAS state transition      │
-//                            ┊    │               ▷┄┄┄┄┄┄┐   │   │            ▷┄┄┄┄┐         │   │  WaitingPersist → Complete │
-//     ┏━━━━━━━━━━━━━━━━━━━┓  ┊  ┏━━━━━━━━━━━━━━━━┓       ┊  ┏━━━━━━━━━━━━━━━━━━━┓  ┊   ┏━━━━━━━━━━━━━━━━━━┓   ┏━━━━━━━━━━━━━━━━┓
-//     ┃       state       ┃  ┊  ┃     state      ┃       ┊  ┃      state        ┃  ┊   ┃       state      ┃   ┃      state     ┃
-//     ┃      Pending      ┃──●─►┃  Downloading   ┃───────●─►┃     Indexing      ┃──●──►┃  WaitingPersist  ┃──►┃     Complete   ┃
-//     ┗━━━━━━━━━━━━┯━━━━━━┛     ┗━━━━━━━┯━━━━━━━━┛          ┗━━━━━━━━━━━━┯━━━━━━┛      ┗━━━━━━━┯━━━━━━━━━━┛   ┗━━━━━━━━━━━━━━━━┛
-//                  ┃              ╰─────┃────────────────────╯   ╰───────┃───────────────────╯ ┃ ╰────────────────────────────╯
-//                  ┃                    ┃                                ┃                     ┃
-//                  ┃                    ┃         ┏━━━━━━━━━━━━━━━┓      ┃                     ┃
-//                  ┗━━━━━━━━━━━━━━━━━━━━┻━━━━━━━━━▷   Abandoned   ◁━━━━━━┻━━━━━━━━━━━━━━━━━━━━━┛
-//                                                 ┗━━━━━━━━━━━━━━━┛
+//	Trigger condition: (1)▷┬┄┄┄┄┄┐                           ┌┄┄┐
+//	        parent is      ┊    ╭∇─────────────────────────╮ ┊ ╭∇──────────────────────────╮ ┌?▻● Trigger condition (3):
+//	      Downloading      ┊    │Task Downloading (once):  │ ┊ │Task Indexing (once):      │ ┊  ┊ sealed & parent completed
+//	      or Indexing      ┊    │1. download               │ ┊ │1. build index from downl. │ ┊ ╭∇───────────────────────────╮
+//	or WaitingPersist      ┊    │3. add Task Indexing (2)▷┄│┄┘ │3. check trigger (3)  ▷?┄┄┄│┄┘ │Task Persisting (once):     │
+//	      or Complete      ┊    │2. CAS state transition   │   │2. CAS state transition    │   │- database write            │
+//	                       ┊    │   downloading → indexing │   │   indexing →WaitingPersist│   │- CAS state transition      │
+//	                       ┊    │               ▷┄┄┄┄┄┄┐   │   │            ▷┄┄┄┄┐         │   │  WaitingPersist → Complete │
+//	┏━━━━━━━━━━━━━━━━━━━┓  ┊  ┏━━━━━━━━━━━━━━━━┓       ┊  ┏━━━━━━━━━━━━━━━━━━━┓  ┊   ┏━━━━━━━━━━━━━━━━━━┓   ┏━━━━━━━━━━━━━━━━┓
+//	┃       state       ┃  ┊  ┃     state      ┃       ┊  ┃      state        ┃  ┊   ┃       state      ┃   ┃      state     ┃
+//	┃      Pending      ┃──●─►┃  Downloading   ┃───────●─►┃     Indexing      ┃──●──►┃  WaitingPersist  ┃──►┃     Complete   ┃
+//	┗━━━━━━━━━━━━┯━━━━━━┛     ┗━━━━━━━┯━━━━━━━━┛          ┗━━━━━━━━━━━━┯━━━━━━┛      ┗━━━━━━━┯━━━━━━━━━━┛   ┗━━━━━━━━━━━━━━━━┛
+//	             ┃              ╰─────┃────────────────────╯   ╰───────┃───────────────────╯ ┃ ╰────────────────────────────╯
+//	             ┃                    ┃                                ┃                     ┃
+//	             ┃                    ┃         ┏━━━━━━━━━━━━━━━┓      ┃                     ┃
+//	             ┗━━━━━━━━━━━━━━━━━━━━┻━━━━━━━━━▷   Abandoned   ◁━━━━━━┻━━━━━━━━━━━━━━━━━━━━━┛
+//	                                            ┗━━━━━━━━━━━━━━━┛
 //
 // Trigger condition (1):
-// • parent must be Downloading or Indexing or WaitingPersist or Complete
-//
-// This can be implement as listening to the `OnParentStateUpdated` event:
-// (assuming no state change was missed, when pipeline was added to forest
+// ▷ Parent must be Downloading or Indexing or WaitingPersist or Complete.
+// This can be implement as listening to the `OnParentStateUpdated` event
+// (assuming no state change was missed, when pipeline was added to forest)
 //
 // Trigger condition (2):
-// • The download is completed.
-// As we have a single routine executing the downloading task, this routine should always be able to perform the state transition,
-// barring the processing being abandoned.
+// ▷ The download is completed.
+// As we have a single routine executing the downloading task, this routine should always
+// be able to perform the state transition, barring the processing being abandoned.
 //
 // Trigger condition (3):
-// • pipeline must represent sealed result
-// • and parent's state must be completed
-// • This can be implement as listening to the following events:
-//    - OnParentStateUpdated
-//    - SetSealed
-//   each must have been called once, the latter (atomically) can trigger the task `Persisting`
+// ▷ Pipeline must represent a sealed result _and_ parent's state must be Complete.
+// This can be implement by listening to the events `OnParentStateUpdated` and `SetSealed`.
+// Each must have been called once, the latter event (atomically) triggers the task `Persisting`.
 //
-// CAUTION:
-//  • All tasks are executed at most once.
-//  • Trigger conditions being satisfied must not be missed.
+// REQUIREMENTS:
+// (i) All tasks are executed at most once.
+// (ii) Trigger conditions being satisfied must not be missed.
 //
-// We must enforce that _all_ parent updated notifications are delivered this required a "and-and-subscribe + catchup trigger"
-
-// The state machine is designed to be run in a single goroutine. The Run method must only be called once.
+// In a concurrent environment, there might be a "blind period" between a `Pipeline2` instance being created and it being subscribed
+// to the event sources emitting `OnParentStateUpdated` and `SetSealed` notifications. Notifications concurrently emitted during such
+// "blind period" might violate requirement (ii). Design patters to avoid a "blind period" for the higher-level business logic are:
+//   - Atomic instantiation-and-subscription:
+//     The `Pipeline2` instance is created and subscribed to the event sources within a single atomic operation. The result's own sealing
+//     status as well as the status of the parent result do not change during this atomic operation.
+//   - Instantiate-and-subscribe + Catchup:
+//     After successful instantiating a Pipeline2 object and subscribing it to `OnParentStateUpdated` plus `SetSealed`, the higher-level
+//     business logic does a second iteration over the result's sealing status and the parent result's status. It reads the status from
+//     the _sources directly_, not relying on notifications. This newest information about the most up-to-date status is then forwarded
+//     to the `Pipeline2` instance. When implementing this approach, we must follow an information-driven design:
+//     https://www.notion.so/flowfoundation/Reactive-State-Management-in-Distributed-Systems-A-Guide-to-Eventually-Consistent-Designs-22d1aee1232480b2ad05e95a7c48a32d
+//     Formally, you might think of the events as sets (of information), where the set relations defines a partial order.
+//     Pending ⊂ Downloading ⊂ Indexing ⊂ WaitingPersist ⊂ Complete
+//     (Pending ∪ Downloading ∪ Indexing ∪ WaitingPersist) ⊂ Abandoned
+//     This implies:
+//     (a) Pipeline2 must be idempotent with respect to `OnParentStateUpdated` and `SetSealed` invocations.
+//     (b) Pipeline2 must recognize old information as such, which is already reflected in its internal state, and ignore it. For example,
+//     the Pipeline bing in the state "Indexing" should be understood as "we should download the data and index it once we have it".
+//     Then being informed (old information) that we have progressed to a point where we should be downloading the data, should result
+//     in a no-op because we already know that (and more, namely that we should be indexing the data too once we have downloaded it).
+//     (c) Pipeline2 must recognize notifications as such, that deliver newer information but skipping some intermediate state transitions.
+//     Pipeline2 can't just silently discard that information. Either, we return a sentinel error, signalling to the caller that they need
+//     to re-deliver missing interim notifications. Or Pipeline2 could advance the state internally to be up-to-date with the newest
+//     information it received. This can happen as a race condition in a concurrent environment: for example, assume that Pipeline2 is in
+//     the "Pending" state. It missed the notification that its parent has progressed to "Indexing". While the higher-level business logic
+//     is just about the deliver the newer information, the parent transitions to Complete and emits a notification that arrives first.
+//
+// TODO: check if the following statement still applies after the refactoring:
+// Pipeline2 The state machine is designed to be run in a single goroutine. The Run method must only be called once.
 type Pipeline2 struct {
 	log                  zerolog.Logger
 	stateConsumer        optimistic_sync.PipelineStateConsumer
