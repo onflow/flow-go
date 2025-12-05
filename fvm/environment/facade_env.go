@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
-	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -351,10 +350,10 @@ func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 	_ interpreter.AccountCapabilityGetValidationContext,
 	_ interpreter.AddressValue,
 	_ interpreter.PathValue,
-	wantedBorrowType *sema.ReferenceType,
-	_ *sema.ReferenceType,
+	wantedBorrowType *interpreter.ReferenceStaticType,
+	_ *interpreter.ReferenceStaticType,
 ) (bool, error) {
-	_, hasEntitlements := wantedBorrowType.Authorization.(sema.EntitlementSetAccess)
+	_, hasEntitlements := wantedBorrowType.Authorization.(interpreter.EntitlementSetAuthorization)
 	if hasEntitlements {
 		// TODO: maybe abort
 		//return false, &interpreter.GetCapabilityError{}
