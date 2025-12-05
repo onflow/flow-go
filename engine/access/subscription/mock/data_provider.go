@@ -13,12 +13,12 @@ type DataProvider struct {
 	mock.Mock
 }
 
-// GetData provides a mock function with given fields: ctx
-func (_m *DataProvider) GetData(ctx context.Context) (any, error) {
+// NextData provides a mock function with given fields: ctx
+func (_m *DataProvider) NextData(ctx context.Context) (any, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetData")
+		panic("no return value specified for NextData")
 	}
 
 	var r0 any

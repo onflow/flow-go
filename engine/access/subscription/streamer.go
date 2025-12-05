@@ -27,13 +27,12 @@ type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, 
 
 // Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
-	log         zerolog.Logger
-	sub         Streamable
-	broadcaster *engine.Broadcaster
-	sendTimeout time.Duration
-	limiter     *rate.Limiter
-	getData     GetDataByHeightFunc
-	nextHeight  uint64
+	log          zerolog.Logger
+	sub          Streamable
+	broadcaster  *engine.Broadcaster
+	sendTimeout  time.Duration
+	limiter      *rate.Limiter
+	dataProvider DataProvider
 }
 
 // NewStreamer creates a new Streamer instance.
@@ -43,8 +42,7 @@ func NewStreamer(
 	sendTimeout time.Duration,
 	limit float64,
 	sub Streamable,
-	getData GetDataByHeightFunc,
-	firstHeight uint64,
+	dataProvider DataProvider,
 ) *Streamer {
 	var limiter *rate.Limiter
 	if limit > 0 {
@@ -53,13 +51,12 @@ func NewStreamer(
 	}
 
 	return &Streamer{
-		log:         log.With().Str("sub_id", sub.ID()).Logger(),
-		broadcaster: broadcaster,
-		sendTimeout: sendTimeout,
-		limiter:     limiter,
-		sub:         sub,
-		getData:     getData,
-		nextHeight:  firstHeight,
+		log:          log.With().Str("sub_id", sub.ID()).Logger(),
+		broadcaster:  broadcaster,
+		sendTimeout:  sendTimeout,
+		limiter:      limiter,
+		sub:          sub,
+		dataProvider: dataProvider,
 	}
 }
 
@@ -119,8 +116,7 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			return fmt.Errorf("error waiting for response capacity: %w", err)
 		}
 
-		response, err := s.Next(ctx)
-
+		response, err := s.dataProvider.NextData(ctx)
 		if response == nil && err == nil {
 			continue
 		}
@@ -139,17 +135,6 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			return err
 		}
 	}
-}
-
-func (s *Streamer) Next(ctx context.Context) (any, error) {
-	v, err := s.getData(ctx, s.nextHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not get data for height %d: %w", s.nextHeight, err)
-	}
-
-	s.nextHeight++
-
-	return v, nil
 }
 
 // checkRateLimit checks the stream's rate limit and blocks until there is room to send a response.

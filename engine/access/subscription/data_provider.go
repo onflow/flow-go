@@ -9,7 +9,7 @@ import (
 // TODO: can and should be generic rather than return `any`. though it requires lots of refactoring,
 // so it'll be done in a PR with the subscription package refactoring.
 type DataProvider interface {
-	GetData(ctx context.Context) (any, error)
+	NextData(ctx context.Context) (any, error)
 }
 
 // HeightByFuncProvider is a DataProvider that uses a GetDataByHeightFunc
@@ -28,7 +28,7 @@ func NewHeightByFuncProvider(startHeight uint64, getData GetDataByHeightFunc) *H
 
 var _ DataProvider = (*HeightByFuncProvider)(nil)
 
-func (p *HeightByFuncProvider) GetData(ctx context.Context) (any, error) {
+func (p *HeightByFuncProvider) NextData(ctx context.Context) (any, error) {
 	v, err := p.getData(ctx, p.nextHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not get data for height %d: %w", p.nextHeight, err)

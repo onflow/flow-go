@@ -125,10 +125,11 @@ func New(
 	)
 
 	eventsProvider := EventsProvider{
-		log:            logger,
-		headers:        headers,
-		useEventsIndex: useEventsIndex,
-		eventsIndex:    eventsIndex,
+		log:              logger,
+		headers:          headers,
+		useEventsIndex:   useEventsIndex,
+		eventsIndex:      eventsIndex,
+		getExecutionData: nil, //TODO: fix it in the events PR
 	}
 
 	b.EventsBackend = EventsBackend{

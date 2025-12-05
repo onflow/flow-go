@@ -52,13 +52,9 @@ func NewSubscriptionHandler(
 // - ctx: The context for the operation.
 // - startHeight: The height to start subscription from.
 // - getData: The function to retrieve data by height.
-func (h *SubscriptionHandler) Subscribe(
-	ctx context.Context,
-	startHeight uint64,
-	getData GetDataByHeightFunc,
-) Subscription {
+func (h *SubscriptionHandler) Subscribe(ctx context.Context, dataProvider DataProvider) Subscription {
 	sub := NewHeightBasedSubscription(h.sendBufferSize)
-	streamer := NewStreamer(h.log, h.broadcaster, h.sendTimeout, h.responseLimit, sub, getData, startHeight)
+	streamer := NewStreamer(h.log, h.broadcaster, h.sendTimeout, h.responseLimit, sub, dataProvider)
 	go streamer.Stream(ctx)
 
 	return sub
