@@ -97,12 +97,15 @@ func NewBaseTrackerImpl(
 // - codes.NotFound - if the block was not found in storage
 // - codes.Internal - for any other error
 func (b *BaseTrackerImpl) GetStartHeightFromBlockID(startBlockID flow.Identifier) (uint64, error) {
+	if startBlockID == b.state.Params().SporkRootBlock().ID() {
+		return b.rootBlockHeight, nil
+	}
+
 	header, err := b.headers.ByBlockID(startBlockID)
 	if err != nil {
 		return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for block %v: %w", startBlockID, err))
 	}
 
-	// ensure that the resolved start height is available
 	return header.Height, nil
 }
 
@@ -128,7 +131,6 @@ func (b *BaseTrackerImpl) GetStartHeightFromHeight(startHeight uint64) (uint64, 
 		return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
 	}
 
-	// ensure that the resolved start height is available
 	return header.Height, nil
 }
 
