@@ -25,7 +25,7 @@ type MissingCollectionQueue interface {
 	// IsHeightQueued returns true if the given height is still being tracked (has not been indexed yet).
 	IsHeightQueued(height uint64) bool
 
-	// Size returns the number of missing collections currently in the queue.
+	// Size returns the number of missing heights currently in the queue.
 	Size() uint
 
 	// GetMissingCollections returns all collection IDs that are currently missing across all block heights.
@@ -67,23 +67,32 @@ type BlockProcessor interface {
 type Fetcher interface {
 	component.Component
 	ProgressReader
+	// OnFinalizedBlock notifies the fetcher that a new block has been finalized.
 	OnFinalizedBlock()
+	// MissingCollectionQueueSize returns the number of missing height currently in the queue.
 	Size() uint
 }
 
 // ExecutionDataProvider provides the latest height for which execution data indexer has collections.
 // This can be nil if execution data indexing is disabled.
 type ExecutionDataProvider interface {
+	// HighestIndexedHeight returns the highest block height for which execution data is available.
+	// It garautnees that all heights below it also have execution data available to be called
+	// with GetExecutionDataByHeight.
 	HighestIndexedHeight() uint64
+
+	// It might return [execution_data.BlobNotFoundError] error, if some CID in the blob tree could not be found from the blobstore.
 	GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error)
 }
 
 // ExecutionDataProcessor processes execution data when new execution data is available.
 type ExecutionDataProcessor interface {
+	// OnNewExectuionData notifies the processor that new execution data is available for processing.
 	OnNewExectuionData()
 }
 
 // ProgressReader provides the current progress of collection fetching/indexing.
 type ProgressReader interface {
+	// ProcessedHeight returns the highest block height for which collections have been processed.
 	ProcessedHeight() uint64
 }

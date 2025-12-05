@@ -2,13 +2,16 @@ package execution_data_index
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
@@ -61,6 +64,66 @@ func (edp *ExecutionDataProcessor) OnNewExectuionData() {
 	edp.newExecutionDataIndexed.Notify()
 }
 
+// retryOnBlobNotFound executes the given function and retries it every 5 seconds
+// if it returns a BlobNotFoundError. Each retry attempt is logged.
+// Returns the result of the function call, or an error if retries fail or a non-BlobNotFoundError occurs.
+func retryOnBlobNotFound(
+	ctx irrecoverable.SignalerContext,
+	log zerolog.Logger,
+	height uint64,
+	fn func() ([]*flow.Collection, error),
+) ([]*flow.Collection, error) {
+	collections, err := fn()
+	if err == nil {
+		return collections, nil
+	}
+
+	// If the error is not BlobNotFoundError, return immediately
+	if !execution_data.IsBlobNotFoundError(err) {
+		return nil, err
+	}
+
+	retryTicker := time.NewTicker(5 * time.Second)
+	defer retryTicker.Stop()
+
+	attempt := 1
+	log.Error().
+		Uint64("height", height).
+		Err(err).
+		Int("attempt", attempt).
+		Msg("execution data not found, retrying every 5 seconds")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-retryTicker.C:
+			attempt++
+			collections, err = fn()
+			if err == nil {
+				log.Info().
+					Uint64("height", height).
+					Int("attempt", attempt).
+					Msg("successfully retrieved execution data after retry")
+				return collections, nil
+			}
+
+			// If error is still BlobNotFoundError, continue retrying
+			if execution_data.IsBlobNotFoundError(err) {
+				log.Error().
+					Uint64("height", height).
+					Err(err).
+					Int("attempt", attempt).
+					Msg("execution data still not found, retrying")
+				continue
+			}
+
+			// If error changed to something else, return it
+			return nil, err
+		}
+	}
+}
+
 func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -76,10 +139,17 @@ func (edp *ExecutionDataProcessor) workerLoop(ctx irrecoverable.SignalerContext,
 			lowestMissing := edp.processedHeight.Value() + 1
 
 			for height := lowestMissing; height <= highestAvailableHeight; height++ {
-				// TODO: This logic supports ingesting execution data from sealed blocks. Once support is
+				// TODO: This logic only supports ingesting execution data from sealed blocks. Once support is
 				// added for syncing execution data for unsealed results, this logic will need to be updated
 				// to account for execution forks.
-				collections, err := edp.provider.GetExecutionDataByHeight(ctx, height)
+				// Fetch execution data for this height. If the blob is not found (BlobNotFoundError),
+				// retryOnBlobNotFound will automatically retry every 5 seconds until it's available or a different error occurs.
+				// retry is not needed, because the provider is supposed to guarantee that all heights below
+				// HighestIndexedHeight have execution data available.
+				// this is for debugging purpose for now.
+				collections, err := retryOnBlobNotFound(ctx, edp.log, height, func() ([]*flow.Collection, error) {
+					return edp.provider.GetExecutionDataByHeight(ctx, height)
+				})
 				if err != nil {
 					ctx.Throw(fmt.Errorf("collection_sync execution data processor: failed to get execution data for height %d: %w",
 						height, err))

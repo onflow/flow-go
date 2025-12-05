@@ -35,6 +35,7 @@ func (p *executionDataProvider) HighestIndexedHeight() uint64 {
 }
 
 // GetExecutionDataByHeight returns the execution data for the given block height.
+// It might return [execution_data.BlobNotFoundError] error, if some CID in the blob tree could not be found from the blobstore.
 func (p *executionDataProvider) GetExecutionDataByHeight(ctx context.Context, height uint64) ([]*flow.Collection, error) {
 	blockExecutionData, err := p.cache.ByHeight(ctx, height)
 	if err != nil {
