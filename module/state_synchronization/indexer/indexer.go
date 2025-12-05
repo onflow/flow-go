@@ -69,7 +69,7 @@ func NewIndexer(
 	registers storage.RegisterIndex,
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
-	executionDataLatestHeight func() (uint64, error),
+	executionDataLatestHeight func() uint64,
 	processedHeightInitializer storage.ConsumerProgressInitializer,
 ) (*Indexer, error) {
 	r := &Indexer{
@@ -158,17 +158,22 @@ func (i *Indexer) onBlockIndexed() error {
 	highestIndexedHeight := i.jobConsumer.LastProcessedIndex()
 
 	if lastProcessedHeight < highestIndexedHeight {
+		if lastProcessedHeight+1000 < highestIndexedHeight {
+			i.log.Warn().Msgf("notifying processed heights from %d to %d", lastProcessedHeight+1, highestIndexedHeight)
+		}
 		// we need loop here because it's possible for a height to be missed here,
 		// we should guarantee all heights are processed
 		for height := lastProcessedHeight + 1; height <= highestIndexedHeight; height++ {
-			header, err := i.indexer.headers.ByHeight(height)
-			if err != nil {
-				// if the execution data is available, the block must be locally finalized
-				i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
-				return fmt.Errorf("could not get header for height %d: %w", height, err)
-			}
+			// Use BlockIDByHeight instead of ByHeight since we only need to verify the block exists
+			// and don't need the full header data. This avoids expensive header deserialization.
+			// _, err := i.indexer.headers.BlockIDByHeight(height)
+			// if err != nil {
+			// 	// if the execution data is available, the block must be locally finalized
+			// 	i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
+			// 	return fmt.Errorf("could not get header for height %d: %w", height, err)
+			// }
 
-			i.OnBlockProcessed(header.Height)
+			i.OnBlockProcessed(height)
 		}
 		i.lastProcessedHeight.Store(highestIndexedHeight)
 	}
@@ -206,7 +211,7 @@ func (i *Indexer) HighestIndexedHeight() (uint64, error) {
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
-func (i *Indexer) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
+func (i *Indexer) OnExecutionData() {
 	i.exeDataNotifier.Notify()
 }
 

@@ -1,7 +1,10 @@
 package requester
 
 import (
+	"fmt"
+	"math"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -485,4 +488,159 @@ func TestOriginValidation(t *testing.T) {
 
 	// handler are called async, but this should be extremely quick
 	unittest.AssertClosesBefore(t, called, time.Second)
+}
+
+// TestEntityByIDRetryWithDifferentNode tests that when a node in the selector group
+// always fails (Unicast returns error), the requester will eventually retry with a different node.
+func TestEntityByIDRetryWithDifferentNode(t *testing.T) {
+	identities := unittest.IdentityListFixture(3)
+	failingNodeID := identities[0].NodeID
+	workingNodeID := identities[1].NodeID
+
+	final := &protocol.Snapshot{}
+	final.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
+			return identities.Filter(selector)
+		},
+		nil,
+	)
+
+	state := &protocol.State{}
+	state.On("Final").Return(final)
+
+	// Use short retry intervals for faster test execution
+	cfg := Config{
+		BatchInterval:  50 * time.Millisecond,
+		BatchThreshold: 10,
+		RetryInitial:   50 * time.Millisecond,
+		RetryFunction:  RetryConstant(), // Keep retry interval constant for predictable timing
+		RetryAttempts:  math.MaxUint32,  // Don't give up
+		RetryMaximum:   100 * time.Millisecond,
+	}
+
+	// Track Unicast calls by node ID
+	unicastCalls := make(map[flow.Identifier][]*messages.EntityRequest)
+	var unicastMutex sync.Mutex
+
+	con := &mocknetwork.Conduit{}
+	con.On("Unicast", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.EntityRequest)
+			providerID := args.Get(1).(flow.Identifier)
+
+			unicastMutex.Lock()
+			unicastCalls[providerID] = append(unicastCalls[providerID], req)
+			unicastMutex.Unlock()
+		},
+	).Return(func(event interface{}, targetID flow.Identifier) error {
+		// Failing node always returns error
+		if targetID == failingNodeID {
+			return fmt.Errorf("node %s always fails", targetID)
+		}
+		// Working node succeeds
+		return nil
+	})
+
+	entityID := unittest.IdentifierFixture()
+
+	// Create engine with selector that includes both failing and working nodes
+	e := &Engine{
+		unit:                  engine.NewUnit(),
+		metrics:               metrics.NewNoopCollector(),
+		cfg:                   cfg,
+		state:                 state,
+		con:                   con,
+		items:                 make(map[flow.Identifier]*Item),
+		requests:              make(map[uint64]*messages.EntityRequest),
+		selector:              filter.Any, // Allow all nodes
+		create:                func() flow.Entity { return &flow.Collection{} },
+		handle:                func(flow.Identifier, flow.Entity) {}, // No-op handler for this test
+		forcedDispatchOngoing: atomic.NewBool(false),
+	}
+
+	// Request entity with selector that includes both nodes
+	selector := filter.Or(
+		filter.HasNodeID[flow.Identity](failingNodeID),
+		filter.HasNodeID[flow.Identity](workingNodeID),
+	)
+	e.EntityByID(entityID, selector)
+
+	// Force immediate dispatch - this may try either node first (random selection)
+	e.Force()
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify at least one node was tried
+	unicastMutex.Lock()
+	totalCalls := len(unicastCalls[failingNodeID]) + len(unicastCalls[workingNodeID])
+	unicastMutex.Unlock()
+	require.Greater(t, totalCalls, 0, "at least one node should have been tried")
+
+	// Keep retrying until working node succeeds
+	// Since Unicast failures don't count as attempts now, retries can happen immediately
+	maxRetries := 20
+	for i := 0; i < maxRetries; i++ {
+		unicastMutex.Lock()
+		workingCalls := len(unicastCalls[workingNodeID])
+		failingCalls := len(unicastCalls[failingNodeID])
+		unicastMutex.Unlock()
+
+		// If working node was tried and succeeded, we're done
+		// (successful Unicast means the request was sent, even if we don't simulate a response)
+		if workingCalls > 0 {
+			break
+		}
+
+		// If only failing node was tried, force immediate retry (no need to wait since failures don't update state)
+		// Otherwise wait a bit for the next dispatch cycle
+		if failingCalls > 0 && workingCalls == 0 {
+			// Failing node was tried, retry immediately since state wasn't updated
+			time.Sleep(10 * time.Millisecond)
+		} else {
+			// Wait a bit longer if no calls yet or both were tried
+			time.Sleep(50 * time.Millisecond)
+		}
+
+		// Force another dispatch - should retry and eventually try working node
+		e.Force()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Verify both nodes were eventually tried
+	unicastMutex.Lock()
+	failingCalls := len(unicastCalls[failingNodeID])
+	workingCalls := len(unicastCalls[workingNodeID])
+	unicastMutex.Unlock()
+
+	// At least one of the nodes should have been tried
+	// Due to random sampling, either node could be selected first
+	// But if failing node was tried, working node should eventually be tried
+	if failingCalls > 0 {
+		// Failing node was tried - verify working node was eventually tried
+		assert.Greater(t, workingCalls, 0, "if failing node was tried, working node should eventually be tried after failures")
+	} else {
+		// Working node was tried first and succeeded - that's fine too
+		assert.Greater(t, workingCalls, 0, "working node should have been tried")
+	}
+
+	// Verify that requests were sent to working node (which succeeded)
+	// The working node should have at least one successful Unicast call
+	unicastMutex.Lock()
+	workingRequests := unicastCalls[workingNodeID]
+	unicastMutex.Unlock()
+
+	assert.Greater(t, len(workingRequests), 0, "working node should have received requests")
+	// Verify the entity ID is in the requests sent to working node
+	foundEntity := false
+	for _, req := range workingRequests {
+		for _, id := range req.EntityIDs {
+			if id == entityID {
+				foundEntity = true
+				break
+			}
+		}
+		if foundEntity {
+			break
+		}
+	}
+	assert.True(t, foundEntity, "entity ID should be in requests sent to working node")
 }

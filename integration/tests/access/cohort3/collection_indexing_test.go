@@ -12,11 +12,10 @@ import (
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // This suite tests collection syncing using the ingestion engine and the indexer.
-
-const lastFullBlockMetric = "access_ingestion_last_full_finalized_block_height"
 
 func TestCollectionIndexing(t *testing.T) {
 	suite.Run(t, new(CollectionIndexingSuite))
@@ -114,7 +113,7 @@ func (s *CollectionIndexingSuite) Test() {
 func (s *CollectionIndexingSuite) getLastFullHeight(containerName string) (uint64, error) {
 	node := s.net.ContainerByName(containerName)
 	metricsURL := fmt.Sprintf("http://0.0.0.0:%s/metrics", node.Port(testnet.MetricsPort))
-	values := s.net.GetMetricFromContainer(s.T(), containerName, metricsURL, lastFullBlockMetric)
+	values := s.net.GetMetricFromContainer(s.T(), containerName, metricsURL, metrics.MetricsCollectionSyncedHeight)
 
 	if len(values) == 0 {
 		return 0, fmt.Errorf("no values found")

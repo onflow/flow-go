@@ -3,6 +3,7 @@ package jobqueue
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -28,7 +29,7 @@ func NewSealedBlockHeaderReader(state protocol.State, headers storage.Headers) *
 // The block header job at an index is just the finalized block header at that index (i.e., height).
 // Error returns:
 //   - storage.ErrNotFound if the provided index is not sealed
-func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
+func (r *SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
 	sealed, err := r.Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get last sealed block height: %w", err)
@@ -48,8 +49,13 @@ func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
 	return BlockHeaderToJob(header), nil
 }
 
+// ConvertJobToBlockHeader converts a job to a block header.
+func (r *SealedBlockHeaderReader) ConvertJobToBlockHeader(job module.Job) (*flow.Header, error) {
+	return JobToBlockHeader(job)
+}
+
 // Head returns the last sealed height as job index.
-func (r SealedBlockHeaderReader) Head() (uint64, error) {
+func (r *SealedBlockHeaderReader) Head() (uint64, error) {
 	header, err := r.state.Sealed().Head()
 	if err != nil {
 		return 0, fmt.Errorf("could not get header of last sealed block: %w", err)
