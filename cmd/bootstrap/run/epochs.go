@@ -13,7 +13,6 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
-	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -163,7 +162,7 @@ func GenerateRecoverTxArgsWithDKG(
 	// Filter internalNodes so it only contains nodes which are valid for inclusion in the epoch
 	// This is a safety measure: just in case subsequent functions don't properly account for additional nodes,
 	// we proactively remove them from consideration here.
-	internalNodes = slices.DeleteFunc(slices.Clone(internalNodes), func(info model.NodeInfo) bool {
+	internalNodes = slices.DeleteFunc(slices.Clone(internalNodes), func(info bootstrap.NodeInfo) bool {
 		_, isCurrentEligibleEpochParticipant := internalNodesMap[info.NodeID]
 		return !isCurrentEligibleEpochParticipant
 	})
@@ -364,11 +363,11 @@ func ConstructClusterRootQCsFromVotes(log zerolog.Logger, clusterList flow.Clust
 // Filters a list of nodes to include only nodes that will sign the QC for the
 // given cluster. The resulting list of nodes is only nodes that are in the
 // given cluster AND are not partner nodes (ie. we have the private keys).
-func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.NodeInfo) []model.NodeInfo {
-	var filtered []model.NodeInfo
+func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []bootstrap.NodeInfo) []bootstrap.NodeInfo {
+	var filtered []bootstrap.NodeInfo
 	for _, node := range nodeInfos {
 		_, isInCluster := cluster.ByNodeID(node.NodeID)
-		isPrivateKeyAvailable := node.Type() == model.NodeInfoTypePrivate
+		isPrivateKeyAvailable := node.Type() == bootstrap.NodeInfoTypePrivate
 
 		if isInCluster && isPrivateKeyAvailable {
 			filtered = append(filtered, node)

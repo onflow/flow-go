@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/google/go-cmp/cmp"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
@@ -26,9 +25,9 @@ func TestEncodeDecode(t *testing.T) {
 	setEpochExtensionViewCount := &flow.SetEpochExtensionViewCount{Value: uint64(rand.Uint32())}
 	ejectionEvent := &flow.EjectNode{NodeID: unittest.IdentifierFixture()}
 
-	comparePubKey := cmp.FilterValues(func(a, b crypto.PublicKey) bool {
+	comparePubKey := gocmp.FilterValues(func(a, b crypto.PublicKey) bool {
 		return true
-	}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
+	}, gocmp.Comparer(func(a, b crypto.PublicKey) bool {
 		if a == nil {
 			return b == nil
 		}
