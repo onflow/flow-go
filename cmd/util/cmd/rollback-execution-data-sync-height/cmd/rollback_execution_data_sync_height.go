@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
@@ -25,6 +26,7 @@ import (
 var (
 	flagHeight           uint64
 	flagExecutionDataDir string
+	flagWorkerCount      uint
 )
 
 var Cmd = &cobra.Command{
@@ -42,6 +44,9 @@ func init() {
 	Cmd.Flags().StringVar(&flagExecutionDataDir, "execution-data-dir", "/var/flow/data/execution_data",
 		"directory that stores the execution data blobstore")
 	_ = Cmd.MarkFlagRequired("execution-data-dir")
+
+	Cmd.Flags().UintVar(&flagWorkerCount, "worker-count", 1,
+		"number of workers to use for concurrent processing, default is 1")
 }
 
 func runE(*cobra.Command, []string) error {
@@ -51,7 +56,12 @@ func runE(*cobra.Command, []string) error {
 		Str("datadir", flagDatadir).
 		Str("execution-data-dir", flagExecutionDataDir).
 		Uint64("height", flagHeight).
+		Uint("worker-count", flagWorkerCount).
 		Msg("flags")
+
+	if flagWorkerCount < 1 {
+		return fmt.Errorf("worker count must be at least 1, but got %v", flagWorkerCount)
+	}
 
 	if flagHeight == 0 {
 		return fmt.Errorf("height must be above 0: %v", flagHeight)
@@ -123,7 +133,8 @@ func runE(*cobra.Command, []string) error {
 			seals,
 			results,
 			executionDataBlobstore,
-			removeFromHeight)
+			removeFromHeight,
+			flagWorkerCount)
 
 		if err != nil {
 			return fmt.Errorf("could not remove execution data from height %v: %w", removeFromHeight, err)
@@ -148,7 +159,7 @@ func runE(*cobra.Command, []string) error {
 }
 
 // removeExecutionDataFromHeight removes all execution data from the specified block height onward
-// to the latest finalized height.
+// to the latest finalized height using concurrent workers.
 func removeExecutionDataFromHeight(
 	ctx context.Context,
 	protoState protocol.State,
@@ -156,8 +167,12 @@ func removeExecutionDataFromHeight(
 	results storage.ExecutionResults,
 	blobstore blobs.Blobstore,
 	fromHeight uint64,
+	workerCount uint,
 ) error {
-	log.Info().Msgf("removing execution data for blocks from height: %v", fromHeight)
+	log.Info().
+		Uint64("from-height", fromHeight).
+		Uint("worker-count", workerCount).
+		Msg("removing execution data for blocks")
 
 	root := protoState.Params().FinalizedRoot()
 
@@ -174,29 +189,105 @@ func removeExecutionDataFromHeight(
 		return fmt.Errorf("could not remove execution data for unfinalized height: %v, finalized height: %v", fromHeight, final.Height)
 	}
 
-	finalRemoved := 0
 	total := int(final.Height-fromHeight) + 1
-
-	// removing for finalized blocks from highest to lowest
-	for height := final.Height; height >= fromHeight; height-- {
-		head, err := protoState.AtHeight(height).Head()
-		if err != nil {
-			return fmt.Errorf("could not get header at height: %w", err)
-		}
-
-		blockID := head.ID()
-
-		err = removeExecutionDataForBlock(ctx, blockID, seals, results, blobstore)
-		if err != nil {
-			return fmt.Errorf("could not remove execution data for finalized block: %v, %w", blockID, err)
-		}
-
-		finalRemoved++
-		log.Info().Msgf("execution data at height %v has been removed. progress (%v/%v)", height, finalRemoved, total)
+	if total <= 0 {
+		log.Info().Msg("no blocks to remove")
+		return nil
 	}
 
-	log.Info().Msgf("removed execution data from height %v. removed for %v finalized blocks",
-		fromHeight, finalRemoved)
+	// Create channel for heights to process
+	heights := make(chan uint64, int(workerCount))
+	workCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Shared state for progress tracking and error handling
+	var (
+		mu           sync.Mutex
+		removedCount int
+		firstErr     error
+	)
+
+	// Worker function
+	worker := func() {
+		for {
+			select {
+			case <-workCtx.Done():
+				return
+			case height, ok := <-heights:
+				if !ok {
+					return
+				}
+
+				head, err := protoState.AtHeight(height).Head()
+				if err != nil {
+					mu.Lock()
+					if firstErr == nil {
+						firstErr = fmt.Errorf("could not get header at height %v: %w", height, err)
+						cancel()
+					}
+					mu.Unlock()
+					return
+				}
+
+				blockID := head.ID()
+				err = removeExecutionDataForBlock(workCtx, blockID, seals, results, blobstore)
+				if err != nil {
+					mu.Lock()
+					if firstErr == nil {
+						firstErr = fmt.Errorf("could not remove execution data for finalized block %v at height %v: %w", blockID, height, err)
+						cancel()
+					}
+					mu.Unlock()
+					return
+				}
+
+				mu.Lock()
+				removedCount++
+				currentProgress := removedCount
+				mu.Unlock()
+
+				log.Info().
+					Uint64("height", height).
+					Int("progress", currentProgress).
+					Int("total", total).
+					Msg("execution data at height has been removed")
+			}
+		}
+	}
+
+	// Start workers
+	var wg sync.WaitGroup
+	for i := 0; i < int(workerCount); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			worker()
+		}()
+	}
+
+	// Send heights to workers (from highest to lowest)
+	go func() {
+		defer close(heights)
+		for height := final.Height; height >= fromHeight; height-- {
+			select {
+			case <-workCtx.Done():
+				return
+			case heights <- height:
+			}
+		}
+	}()
+
+	// Wait for all workers to complete
+	wg.Wait()
+
+	if firstErr != nil {
+		return firstErr
+	}
+
+	log.Info().
+		Uint64("from-height", fromHeight).
+		Int("removed-blocks", removedCount).
+		Msg("removed execution data from height")
 
 	return nil
 }
