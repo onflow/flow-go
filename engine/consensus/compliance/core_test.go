@@ -200,7 +200,7 @@ func (cs *CommonSuite) SetupTest() {
 
 	// set up pending module mock
 	cs.pending = &module.PendingBlockBuffer{}
-	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
+	cs.pending.On("Add", mock.Anything, mock.Anything)
 	cs.pending.On("ByID", mock.Anything).Return(
 		func(blockID flow.Identifier) flow.Slashable[*flow.Proposal] {
 			return cs.pendingDB[blockID]
@@ -219,9 +219,8 @@ func (cs *CommonSuite) SetupTest() {
 			return ok
 		},
 	)
-	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByView", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return(nil)
 
 	// set up hotstuff module mock
 	cs.hotstuff = module.NewHotStuff(cs.T())
@@ -565,9 +564,6 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 		Message:  proposal0,
 	})
 	require.NoError(cs.T(), err, "should pass handling children")
-
-	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {
@@ -588,7 +584,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 
 	// replace the engine buffer with the real one
-	cs.core.pending = real.NewPendingBlocks()
+	cs.core.pending = real.NewPendingBlocks(cs.head.View, 100_000)
 
 	// check that we request the ancestor block each time
 	cs.sync.On("RequestBlock", missingBlock.ID(), missingBlock.Height).Times(len(proposals))
