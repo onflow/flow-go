@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/epochs"
@@ -56,6 +57,7 @@ func NewEpochComponentsFactory(
 
 func (factory *EpochComponentsFactory) Create(
 	epoch protocol.CommittedEpoch,
+	consensusChainID flow.ChainID,
 ) (
 	state cluster.State,
 	compliance component.Component,
@@ -107,7 +109,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	var mutableState *badger.MutableState
-	mutableState, headers, payloads, blocks, err = factory.state.Create(stateRoot)
+	mutableState, headers, payloads, blocks, _, err = factory.state.Create(stateRoot, consensusChainID)
 	state = mutableState
 	if err != nil {
 		err = fmt.Errorf("could not create cluster state: %w", err)

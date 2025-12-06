@@ -386,7 +386,7 @@ func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *block
 	}
 
 	for _, blockID := range clusterBlockIDs {
-		header, err := b.clusterHeaders.ByBlockID(blockID)
+		header, err := b.clusterHeaders.ByBlockID(blockID) // TODO(4204) transaction deduplication crosses clusterHeaders epoch boundary
 		if err != nil {
 			return fmt.Errorf("could not retrieve cluster header (id=%x): %w", blockID, err)
 		}

@@ -60,7 +60,7 @@ func TestFindBlockTransactions(t *testing.T) {
 		)
 
 		// prepare dependencies
-		storages := common.InitStorages(db)
+		storages := common.InitStorages(db, b1.ChainID)
 		payloads, collections := storages.Payloads, storages.Collections
 		snap4 := &mock.Snapshot{}
 		snap4.On("Head").Return(b1.ToHeader(), nil)

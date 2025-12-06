@@ -34,12 +34,12 @@ var clusterBlocksCmd = &cobra.Command{
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
 			metrics := metrics.NewNoopCollector()
 
-			headers := store.NewHeaders(metrics, db)
-			clusterPayloads := store.NewClusterPayloads(metrics, db)
-
 			// get chain id
 			log.Info().Msgf("got flag chain name: %s", flagChainName)
 			chainID := flow.ChainID(flagChainName)
+
+			headers := store.NewHeaders(metrics, db, chainID)
+			clusterPayloads := store.NewClusterPayloads(metrics, db)
 			clusterBlocks := store.NewClusterBlocks(db, chainID, headers, clusterPayloads)
 
 			if flagClusterBlockID != "" && flagHeight != 0 {

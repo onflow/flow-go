@@ -108,35 +108,35 @@ type Suite struct {
 
 // MockFactoryCreate mocks the epoch factory to create epoch components for the given epoch.
 func (suite *Suite) MockFactoryCreate(arg any) {
-	suite.factory.On("Create", arg).
+	suite.factory.On("Create", arg, mock.Anything).
 		Run(func(args mock.Arguments) {
 			epoch, ok := args.Get(0).(realprotocol.CommittedEpoch)
 			suite.Require().Truef(ok, "invalid type %T", args.Get(0))
 			suite.components[epoch.Counter()] = newMockComponents(suite.T())
 		}).
 		Return(
-			func(epoch realprotocol.CommittedEpoch) realcluster.State {
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) realcluster.State {
 				return suite.ComponentsForEpoch(epoch).state
 			},
-			func(epoch realprotocol.CommittedEpoch) component.Component {
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) component.Component {
 				return suite.ComponentsForEpoch(epoch).prop
 			},
-			func(epoch realprotocol.CommittedEpoch) realmodule.ReadyDoneAware {
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) realmodule.ReadyDoneAware {
 				return suite.ComponentsForEpoch(epoch).sync
 			},
-			func(epoch realprotocol.CommittedEpoch) realmodule.HotStuff {
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) realmodule.HotStuff {
 				return suite.ComponentsForEpoch(epoch).hotstuff
 			},
-			func(epoch realprotocol.CommittedEpoch) hotstuff.VoteAggregator {
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) hotstuff.VoteAggregator {
 				return suite.ComponentsForEpoch(epoch).voteAggregator
 			},
-			func(epoch realprotocol.CommittedEpoch) hotstuff.TimeoutAggregator {
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) hotstuff.TimeoutAggregator {
 				return suite.ComponentsForEpoch(epoch).timeoutAggregator
 			},
-			func(epoch realprotocol.CommittedEpoch) component.Component {
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) component.Component {
 				return suite.ComponentsForEpoch(epoch).messageHub
 			},
-			func(epoch realprotocol.CommittedEpoch) error { return nil },
+			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) error { return nil },
 		).Maybe()
 }
 
@@ -164,6 +164,9 @@ func (suite *Suite) SetupTest() {
 
 	suite.state.On("Final").Return(suite.snap)
 	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap).Maybe()
+	params := protocol.NewParams(suite.T())
+	params.On("ChainID").Return(flow.ChainID("chain-id")).Maybe()
+	suite.state.On("Params").Return(params)
 	suite.snap.On("Epochs").Return(suite.epochQuery)
 	suite.snap.On("Head").Return(
 		func() *flow.Header { return suite.header },
@@ -274,7 +277,7 @@ func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 
 	suite.factory = epochmgr.NewEpochComponentsFactory(suite.T())
 	suite.factory.
-		On("Create", mock.MatchedBy(unauthorizedMatcher)).
+		On("Create", mock.MatchedBy(unauthorizedMatcher), mock.Anything).
 		Return(nil, nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
 	suite.MockFactoryCreate(mock.MatchedBy(authorizedMatcher))
 

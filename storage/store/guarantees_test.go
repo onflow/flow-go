@@ -26,7 +26,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		blocks := all.Blocks
 		guarantees := all.Guarantees
 
@@ -92,7 +92,7 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		blocks := all.Blocks
 		store1 := all.Guarantees
 		expected := unittest.CollectionGuaranteeFixture()
@@ -131,7 +131,7 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		blocks := all.Blocks
 		store1 := all.Guarantees
 		expected := unittest.CollectionGuaranteeFixture()

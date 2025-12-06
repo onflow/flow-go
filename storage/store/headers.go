@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -21,20 +22,35 @@ type Headers struct {
 	heightCache *Cache[uint64, flow.Identifier]
 	viewCache   *Cache[uint64, flow.Identifier]
 	sigs        *proposalSignatures
+	chainID     flow.ChainID
 }
 
 var _ storage.Headers = (*Headers)(nil)
 
 // NewHeaders creates a Headers instance, which stores block headers.
 // It supports storing, caching and retrieving by block ID and the additionally indexed by header height.
-func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
+func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
+		if header.ChainID != chainID {
+			return fmt.Errorf("expected chain ID %v, got %v", chainID, header.ChainID) // TODO(4204) error sentinel
+		}
 		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
 
+	isClusterChain := func(chainID flow.ChainID) bool {
+		return strings.HasPrefix(chainID.String(), "cluster")
+	}
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
 		var header flow.Header
 		err := operation.RetrieveHeader(r, blockID, &header)
+		if err != nil {
+			return nil, err
+		}
+		// raise an error when the retrieved header is for a different chain than expected,
+		// except in the case of cluster chains where the previous epoch(=chain) can be checked for transaction deduplication
+		if header.ChainID != chainID && !(isClusterChain(chainID) && isClusterChain(header.ChainID)) {
+			return nil, fmt.Errorf("expected chain ID '%v', got '%v'", chainID, header.ChainID) // TODO(4204) error sentinel
+		}
 		return &header, err
 	}
 
@@ -42,6 +58,14 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 		var id flow.Identifier
 		err := operation.LookupBlockHeight(r, height, &id)
 		return id, err
+	}
+
+	if isClusterChain(chainID) {
+		retrieveHeight = func(r storage.Reader, height uint64) (flow.Identifier, error) {
+			var id flow.Identifier
+			err := operation.LookupClusterBlockHeight(r, chainID, height, &id)
+			return id, err
+		}
 	}
 
 	retrieveView := func(r storage.Reader, view uint64) (flow.Identifier, error) {
@@ -65,7 +89,8 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withRetrieve(retrieveView)),
 
-		sigs: newProposalSignatures(collector, db),
+		sigs:    newProposalSignatures(collector, db),
+		chainID: chainID,
 	}
 
 	return h

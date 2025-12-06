@@ -33,7 +33,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 		ctx, cancel := context.WithCancel(context.Background())
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		headers := all.Headers
 		blockstore := all.Blocks
 		results := all.Results
