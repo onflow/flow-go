@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -51,12 +52,18 @@ import (
 // Each must have been called once, the latter event (atomically) triggers the task `Persisting`.
 //
 // REQUIREMENTS:
-// (i) All tasks are executed at most once.
-// (ii) Trigger conditions being satisfied must not be missed.
+// (I) All tasks are executed at most once.
+// (II) Trigger conditions being satisfied must not be missed.
+//
+// The only exceptions to rule (II) are:
+//   - Triggers can be missed if the pipeline reaches the Abandoned state. In this case, no further processing is required, so
+//     so interim triggers for processing work can be ignored.
+//   - The trigger to abandon processing can be missed (with low probability). In this case, we will do extra work but eventually
+//     the result will be garbage collected. Doing more work optimistically to improve latency than minimally necessary is acceptable.
 //
 // In a concurrent environment, there might be a "blind period" between a `Pipeline2` instance being created and it being subscribed
 // to the event sources emitting `OnParentStateUpdated` and `SetSealed` notifications. Notifications concurrently emitted during such
-// "blind period" might violate requirement (ii). Design patters to avoid a "blind period" for the higher-level business logic are:
+// "blind period" might violate requirement (II). Design patters to avoid a "blind period" for the higher-level business logic are:
 //   - Atomic instantiation-and-subscription:
 //     The `Pipeline2` instance is created and subscribed to the event sources within a single atomic operation. The result's own sealing
 //     status as well as the status of the parent result do not change during this atomic operation.
@@ -94,15 +101,21 @@ type Pipeline2 struct {
 	indexingWorkerPool    *workerpool.WorkerPool
 	persistingWorkerPool  *workerpool.WorkerPool
 
-	worker *worker
+	// TODO: This can likely be removed
+	mu sync.Mutex
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
-	state            *atomic.Int32
-	parentStateCache *atomic.Int32
-	isSealed         *atomic.Bool
-	isAbandoned      *atomic.Bool
-	isIndexed        *atomic.Bool
+	state              *optimistic_sync.State2Tracker // current state of the pipeline
+	parentStateTracker *optimistic_sync.State2Tracker // latest known state of the parent result; eventually consistent: might lag behind actual parent state!
+
+	// TODO: remove the following fields, if they are no longer used (?)
+
+	worker *worker // deprecated: to be removed
+
+	isSealed    *atomic.Bool // deprecated: to be removed
+	isAbandoned *atomic.Bool // deprecated: to be removed
+	isIndexed   *atomic.Bool // deprecated: to be removed
 }
 
 var _ optimistic_sync.Pipeline = (*Pipeline2)(nil)
@@ -116,19 +129,28 @@ func NewPipeline2(
 	persistingWorkerPool *workerpool.WorkerPool,
 	executionResult *flow.ExecutionResult,
 	stateReceiver optimistic_sync.PipelineStateConsumer,
-) *Pipeline2 {
+) (*Pipeline2, error) {
 	log = log.With().
 		Str("component", "pipeline").
 		Str("execution_result_id", executionResult.ExecutionDataID.String()).
 		Str("block_id", executionResult.BlockID.String()).
 		Logger()
 
+	myState, err := optimistic_sync.NewState2Tracker(optimistic_sync.State2Pending)
+	if err != nil {
+		return nil, fmt.Errorf("could not create pipeline state tracker: %w", err)
+	}
+	parentState, err := optimistic_sync.NewState2Tracker(optimistic_sync.State2Pending)
+	if err != nil {
+		return nil, fmt.Errorf("could not create pipeline state tracker: %w", err)
+	}
+
 	return &Pipeline2{
 		log:                   log,
 		stateConsumer:         stateReceiver,
 		worker:                newWorker(),
-		state:                 atomic.NewInt32(int32(optimistic_sync.StatePending)),
-		parentStateCache:      atomic.NewInt32(int32(optimistic_sync.StatePending)),
+		state:                 myState,
+		parentStateTracker:    parentState,
 		isSealed:              atomic.NewBool(false),
 		isAbandoned:           atomic.NewBool(false),
 		isIndexed:             atomic.NewBool(false),
@@ -136,85 +158,17 @@ func NewPipeline2(
 		downloadingWorkerPool: downloadingWorkerPool,
 		indexingWorkerPool:    indexingWorkerPool,
 		persistingWorkerPool:  persistingWorkerPool,
-	}
+	}, nil
 }
 
-// Run starts the pipeline processing and blocks until completion or context cancellation.
-// CAUTION: not concurrency safe! Run must only be called once.
-//
-// Expected error returns during normal operations:
-//   - context.Canceled: when the context is canceled
 func (p *Pipeline2) Run(ctx context.Context, core optimistic_sync.Core, parentState optimistic_sync.State) error {
-	panic("deprecated to be removed")
-}
-
-// loop implements the main event loop for state machine. It reacts on different events and performs operations upon
-// entering or leaving some state.
-// loop will perform a blocking operation until one of next things happens, whatever happens first:
-// 1. parent context signals that it is no longer valid.
-// 2. the worker thread has received an error. It's not safe to continue execution anymore, so this error needs to be propagated
-// to the caller.
-//  3. Pipeline2 has successfully entered terminal state.
-//     Pipeline2 won't and shouldn't perform any state transitions after returning from this function.
-//
-// Expected error returns during normal operations:
-//   - context.Canceled: when the context is canceled
-func (p *Pipeline2) loop(ctx context.Context) error {
-	// try to start processing in case we are able to.
-	p.stateChangedNotifier.Notify()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-p.worker.ErrChan():
-			return err
-		case <-p.stateChangedNotifier.Channel():
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			// if parent got abandoned no point to continue, and we just go to the abandoned state and perform cleanup logic.
-			if p.checkAbandoned() {
-				if err := p.transitionTo(optimistic_sync.StateAbandoned); err != nil {
-					return fmt.Errorf("could not transition to abandoned state: %w", err)
-				}
-			}
-
-			currentState := p.GetState()
-			switch currentState {
-			case optimistic_sync.StatePending:
-				if err := p.onStartProcessing(); err != nil {
-					return fmt.Errorf("could not process pending state: %w", err)
-				}
-			case optimistic_sync.StateProcessing:
-				if err := p.onProcessing(); err != nil {
-					return fmt.Errorf("could not process processing state: %w", err)
-				}
-			case optimistic_sync.StateWaitingPersist:
-				if err := p.onPersistChanges(); err != nil {
-					return fmt.Errorf("could not process waiting persist state: %w", err)
-				}
-			case optimistic_sync.StateAbandoned:
-				if err := p.core.Abandon(); err != nil {
-					return fmt.Errorf("could not process abandonded state: %w", err)
-				}
-				return nil
-			case optimistic_sync.StateComplete:
-				return nil // terminate
-			default:
-				return fmt.Errorf("invalid pipeline state: %s", currentState)
-			}
-		}
-	}
+	panic("Run is deprecated, implementation now utilizes `State2Tracker` for atomicity and workerpools for any work with non-vanishing runtime")
 }
 
 // onStartProcessing performs the initial state transitions depending on the parent state:
 // - Pending -> Processing
 // - Pending -> Abandoned
-// No errors are expected during normal operations.
+// No error returns are expected during normal operations.
 func (p *Pipeline2) onStartProcessing() error {
 	switch p.parentState() {
 	case optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist, optimistic_sync.StateComplete:
@@ -236,7 +190,7 @@ func (p *Pipeline2) onStartProcessing() error {
 
 // onProcessing performs the state transitions when the pipeline is in the Processing state.
 // When data has been successfully indexed, we can transition to StateWaitingPersist.
-// No errors are expected during normal operations.
+// No error returns are expected during normal operations.
 func (p *Pipeline2) onProcessing() error {
 	if p.isIndexed.Load() {
 		return p.transitionTo(optimistic_sync.StateWaitingPersist)
@@ -247,7 +201,7 @@ func (p *Pipeline2) onProcessing() error {
 // onPersistChanges performs the state transitions when the pipeline is in the WaitingPersist state.
 // When the execution result has been sealed and the parent has already transitioned to StateComplete then
 // we can persist the data and transition to StateComplete.
-// No errors are expected during normal operations.
+// No error returns are expected during normal operations.
 func (p *Pipeline2) onPersistChanges() error {
 	if p.isSealed.Load() && p.parentState() == optimistic_sync.StateComplete {
 		if err := p.core.Persist(); err != nil {
@@ -289,13 +243,75 @@ func (p *Pipeline2) SetSealed() {
 	}
 }
 
-// OnParentStateUpdated updates the pipeline's state based on the provided parent state.
-// If the parent state has changed, it will notify the state consumer and trigger a state change notification.
-func (p *Pipeline2) OnParentStateUpdated(parentState optimistic_sync.State) {
-	oldState := p.parentStateCache.Load()
-	if p.parentStateCache.CompareAndSwap(oldState, int32(parentState)) {
-		p.stateChangedNotifier.Notify()
+// OnParentStateUpdated atomically updates the pipeline's based on the provided information about the parent state.
+// This function follows an information-driven, eventually consistent design:
+//   - `parentState` tells us that the parent result has progressed to _at least_ that state
+//     (it might be further ahead, and we just haven't received information about it).
+//   - Idempotency: redundant (older) information is handled gracefully.
+//   - New information skipping intermediate states is handled gracefully.
+//
+// We assume that new information about the parent state changing can arrive through different algorithmic paths concurrently.
+// This means that one information source might already be telling us about the parent's most recent new state, while a second
+// information source could still be informing us about interim states that the parent has already passed through. This is the
+// most robust design, where the caller has to know the least about the internal state of the pipeline and its parent. The
+// caller can just feed us with all information they have about the parent's state, and the pipeline will incorporate it correctly.
+func (p *Pipeline2) OnParentStateUpdated(parentState optimistic_sync.State2) {
+	// Important: We assume that information (from different data sources) might arrive out of order or could be redundant.
+	// We utilize the atomic `State2Tracker` to optimistically attempt evolving the state. If the state's tracker accepts, we know
+	// exactly what state evolution has taken place (could be multiple state transitions at once, if we haven't heard about some
+	// intermediate state transitions yet). If the state's tracker rejects the update, we retrospectively analyze what whether
+	// this rejection was expected or is a symptom of a bug or state corruption (in the latter case safe continuation is impossible).
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	oldParentState, parentSuccess := p.parentStateTracker.Evolve(parentState)
+	if !parentSuccess {
+		panic("to be implemented")
 	}
+	// reaching the code below means we have successfully evolved the parent state's tracker from `oldParentState` to `parentState`
+
+	if oldParentState == parentState {
+		return // redundant information, no state change
+	}
+
+	p.checkTrigger1(parentState)
+	p.checkTrigger3(parentState)
+
+}
+
+// checkTrigger1 checks and handles Trigger Condition (1): parent is in `Downloading` or `Indexing` or `WaitingPersist` or `Complete`.
+// If this pipeline is in `Pending` state and (1) is satisfied, we transition to `Downloading` and schedule the downloading task.
+// Concurrency safe, idempotent and tolerates information to arrive out of order about the parent state changing.
+func (p *Pipeline2) checkTrigger1(parentState optimistic_sync.State2) {
+	// Check Trigger Condition (1): parent is in `Downloading` or `Indexing` or `WaitingPersist` or `Complete`
+	trigger1Satisfied := parentState == optimistic_sync.State2Downloading || parentState == optimistic_sync.State2Indexing ||
+		parentState == optimistic_sync.State2WaitingPersist || parentState == optimistic_sync.State2Complete
+	if !trigger1Satisfied {
+		return
+	}
+
+	// If and only if Pipeline is in `Pending` state, we atomically transition to `Downloading`. In a second (non-atomic) step, we schedule
+	// the downloading task. We must show that this satisfies requirement (I) and (II):
+	// (I) We attempt to atomically transition the pipeline state from `Pending` to `Downloading` with an atomic CompareAndSwap operation. At
+	// most one go-routine can apply this operation successfully and proceed to schedule the downloading task, which satisfies requirement (I).
+	// (II) We assume that notifications about the parent state changing are delivered eventually (no notifications are missed). Despite
+	// notifications arriving out of order or being late, we still will eventually learn that the parent has transitioned out of the pending
+	// state. Hence, condition (II) is satisfied if the parent is not abandoned. However, if the parent is abandoned, this pipeline is by
+	// definition also abandoned and the trigger can be missed (see exceptions to requirement (II) in the Pipeline2 struct specification).
+
+	_, success := p.state.CompareAndSwap(optimistic_sync.State2Pending, optimistic_sync.State2Downloading)
+	if !success {
+		// some other thread transitioned the pipeline out of Pending state already and should have scheduled the downloading task
+		return // noting more to do
+	}
+	panic("schedule task (1)")
+}
+
+// checkTrigger3 checks and handles Trigger Condition (3): sealed & parent completed
+// to arrive out of order about the parent state changing .
+func (p *Pipeline2) checkTrigger3(parentState optimistic_sync.State2) {
+
 }
 
 // Abandon marks the pipeline as abandoned
