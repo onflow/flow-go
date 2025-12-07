@@ -170,7 +170,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 				runtime.Config{},
 			),
 		),
-		fvm.WithEVMEnabled(true),
 	}
 	fvmContext := fvm.NewContext(opts...)
 
@@ -356,7 +355,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 					stdlib.AccountEventAddressParameter.Identifier,
 				).(cadence.Address)
 
-				addr = flow.ConvertAddress(address)
+				addr = flow.Address(address)
 				break
 			}
 		}

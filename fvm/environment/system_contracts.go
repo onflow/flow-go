@@ -44,9 +44,8 @@ func (sys *SystemContracts) Invoke(
 	error,
 ) {
 	contractLocation := common.AddressLocation{
-		Address: common.MustBytesToAddress(
-			spec.AddressFromChain(sys.chain).Bytes()),
-		Name: spec.LocationName,
+		Address: common.Address(spec.AddressFromChain(sys.chain)),
+		Name:    spec.LocationName,
 	}
 
 	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)

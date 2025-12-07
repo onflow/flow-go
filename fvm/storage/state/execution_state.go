@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/crypto/hash"
@@ -237,6 +238,19 @@ func (state *ExecutionState) ComputationAvailable(usage common.ComputationUsage)
 		return state.meter.ComputationAvailable(usage)
 	}
 	return true
+}
+
+// ComputationRemaining returns the remaining computation for the given kind.
+func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) uint64 {
+	if state.finalized {
+		// if state is finalized return false
+		return 0
+	}
+
+	if state.meteringEnabled {
+		return state.meter.ComputationRemaining(kind)
+	}
+	return math.MaxUint64
 }
 
 // TotalComputationUsed returns total computation used

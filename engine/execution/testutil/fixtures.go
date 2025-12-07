@@ -309,7 +309,7 @@ func CreateAccountsWithSimpleAddresses(
 					stdlib.AccountEventAddressParameter.Identifier,
 				).(cadence.Address)
 
-				addr = flow.ConvertAddress(address)
+				addr = flow.Address(address)
 				break
 			}
 		}

@@ -7,10 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var (
-	// ErrInvalidTransition is returned when a state transition is invalid.
-	ErrInvalidTransition = errors.New("invalid state transition")
-)
+// ErrInvalidTransition is returned when a state transition is invalid.
+var ErrInvalidTransition = errors.New("invalid state transition")
 
 // PipelineFactory is a factory object for creating new Pipeline instances.
 type PipelineFactory interface {

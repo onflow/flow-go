@@ -141,9 +141,12 @@ func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
 	return newVertexIterator(nil) // VertexIterator gracefully handles nil slices
 }
 
-// GetNumberOfChildren returns number of children of given vertex
+// GetNumberOfChildren returns the number of children of the given vertex that exist in the forest.
 func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
-	container := f.vertices[id] // if vertex does not exist, container is the default zero value for vertexContainer, which contains a nil-slice for its children
+	container, ok := f.vertices[id]
+	if !ok {
+		return 0
+	}
 	num := 0
 	for _, child := range container.children {
 		if child.vertex != nil {

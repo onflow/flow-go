@@ -44,16 +44,10 @@ type BlockTrackerImpl struct {
 
 // NewBlockTracker creates a new BlockTrackerImpl instance.
 //
-// Parameters:
-// - state: The protocol state used for retrieving block information.
-// - rootHeight: The root block height, serving as the baseline for calculating the start height.
-// - headers: The storage headers for accessing block headers.
-// - broadcaster: The engine broadcaster for publishing notifications.
-//
 // No errors are expected during normal operation.
 func NewBlockTracker(
 	state protocol.State,
-	rootHeight uint64,
+	sealedRootHeight uint64,
 	headers storage.Headers,
 	broadcaster *engine.Broadcaster,
 ) (*BlockTrackerImpl, error) {
@@ -70,7 +64,7 @@ func NewBlockTracker(
 	}
 
 	return &BlockTrackerImpl{
-		BaseTracker:            NewBaseTrackerImpl(rootHeight, state, headers),
+		BaseTracker:            NewBaseTrackerImpl(sealedRootHeight, state, headers),
 		state:                  state,
 		finalizedHighestHeight: counters.NewMonotonicCounter(lastFinalized.Height),
 		sealedHighestHeight:    counters.NewMonotonicCounter(lastSealed.Height),

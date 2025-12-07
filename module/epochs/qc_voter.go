@@ -99,7 +99,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.TentativeEpoc
 	log.Info().Msg("preparing to generate vote for cluster root qc")
 
 	// create the canonical root block for our cluster
-	root, err := clusterstate.CanonicalRootBlock(counter, cluster)
+	root, err := clusterstate.CanonicalRootBlock(counter, cluster.NodeIDs())
 	if err != nil {
 		return fmt.Errorf("could not create cluster root block: %w", err)
 	}

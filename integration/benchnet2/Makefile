@@ -56,6 +56,15 @@ gen-bootstrap:
 		-o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
+	cd flow-go-bootstrap/cmd/bootstrap && go run . cluster-assignment \
+		--epoch-counter 0 \
+		--collection-clusters 1 \
+		--clustering-random-seed 00000000000000000000000000000000000000000000000000000000deadbeef \
+		--config ../../../bootstrap/conf/node-config.json \
+		-o ../../../bootstrap/ \
+		--partner-dir ../../../bootstrap/partner-nodes \
+		--partner-weights ../../../bootstrap/conf/partner-stakes.json \
+		--internal-priv-dir ../../../bootstrap/keys/private-root-information
 	cd flow-go-bootstrap/cmd/bootstrap && go run . rootblock  \
 		--root-chain bench \
 		--root-height 0 \
@@ -65,12 +74,15 @@ gen-bootstrap:
 		--epoch-length $(EPOCH_LEN) \
 		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \
 		--epoch-dkg-phase-length $(DKG_PHASE_LEN) \
+		--random-seed 00000000000000000000000000000000000000000000000000000000deadbeef \
 		--kvstore-version=$(KVSTORE_VERSION) \
 		--kvstore-epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
 		--kvstore-finalization-safety-threshold=$(FINALIZATION_SAFETY_THRESHOLD)\
 		--collection-clusters 1 \
 		--protocol-version=0 \
 		--use-default-epoch-timing \
+		--intermediary-clustering-data ../../../bootstrap/public-root-information/root-clustering.json \
+		--cluster-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
 		--partner-dir ../../../bootstrap/partner-nodes \

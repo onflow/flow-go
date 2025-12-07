@@ -135,7 +135,8 @@ const (
 )
 
 func init() {
-	testingdock.Verbose = true
+	// Set to true to turn on logs from docker containers (logs will be prefixed with "DOCK:")
+	testingdock.Verbose = false
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
@@ -1419,7 +1420,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	participants := participantsUnsorted.Sort(flow.Canonical[flow.Identity])
 	collectors := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
-	clusters, err := factory.NewClusterList(assignments, collectors)
+	_, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
@@ -1427,27 +1428,27 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	rootBlocks := make([]*cluster.Block, 0, nClusters)
 	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
-	for _, cluster := range clusters {
+	for _, assignment := range assignments {
 		// generate root cluster block
-		block, err := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		block, err := clusterstate.CanonicalRootBlock(epochCounter, assignment)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to generate canonical root block: %w", err)
 		}
 
 		lookup := make(map[flow.Identifier]struct{})
-		for _, node := range cluster {
-			lookup[node.NodeID] = struct{}{}
+		for _, nodeID := range assignment {
+			lookup[nodeID] = struct{}{}
 		}
 
 		// gather cluster participants
-		clusterNodeInfos := make([]bootstrap.NodeInfo, 0, len(cluster))
+		clusterNodeInfos := make([]bootstrap.NodeInfo, 0, len(assignment))
 		for _, conf := range confs {
 			_, exists := lookup[conf.NodeID]
 			if exists {
 				clusterNodeInfos = append(clusterNodeInfos, conf.NodeInfo)
 			}
 		}
-		if len(cluster) != len(clusterNodeInfos) { // sanity check
+		if len(assignment) != len(clusterNodeInfos) { // sanity check
 			return nil, nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 

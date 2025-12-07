@@ -5,11 +5,10 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -18,12 +17,16 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
-
 	txID := transactionBody.ID()
+
+	suite.collections.
+		On("LightByTransactionID", txID).
+		Return(nil, storage.ErrNotFound)
+
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
 		On("ByID", txID).
-		Return(nil, status.Errorf(codes.NotFound, "not found on main node"))
+		Return(nil, storage.ErrNotFound)
 
 	accessEventReq := accessproto.GetTransactionRequest{
 		Id: txID[:],
@@ -74,7 +77,7 @@ func (suite *Suite) TestHistoricalTransaction() {
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
 		On("ByID", txID).
-		Return(nil, status.Errorf(codes.NotFound, "not found on main node"))
+		Return(nil, storage.ErrNotFound)
 
 	accessEventReq := accessproto.GetTransactionRequest{
 		Id: txID[:],
