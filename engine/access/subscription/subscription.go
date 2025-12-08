@@ -159,8 +159,6 @@ func NewFailedSubscription(err error, msg string) *SubscriptionImpl {
 
 var _ Subscription = (*HeightBasedSubscription)(nil)
 
-//var _ Streamable = (*HeightBasedSubscription)(nil)
-
 // HeightBasedSubscription is a subscription that retrieves data sequentially by block height
 type HeightBasedSubscription struct {
 	*SubscriptionImpl

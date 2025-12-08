@@ -94,8 +94,7 @@ func (s *Streamer) Stream(ctx context.Context) {
 				return
 			}
 
-			// TODO: i want to change it to return no error when the client disconnects (it is done in a new subscription PR)
-			// TODO: 2. fix these errors to match the new contract for a data provider func (with new result provider)
+			// TODO: Can we change it to return no error when a client disconnects (it is done in a new subscription PR)
 			if errors.Is(err, context.Canceled) {
 				s.sub.Fail(fmt.Errorf("client disconnected: %w", ctx.Err()))
 				return
