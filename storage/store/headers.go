@@ -32,7 +32,7 @@ var _ storage.Headers = (*Headers)(nil)
 func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
 		if header.ChainID != chainID {
-			return fmt.Errorf("expected chain ID %v, got %v", chainID, header.ChainID) // TODO(4204) error sentinel
+			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
 		}
 		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
@@ -49,7 +49,7 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 		// raise an error when the retrieved header is for a different chain than expected,
 		// except in the case of cluster chains where the previous epoch(=chain) can be checked for transaction deduplication
 		if header.ChainID != chainID && !(isClusterChain(chainID) && isClusterChain(header.ChainID)) {
-			return nil, fmt.Errorf("expected chain ID '%v', got '%v'", chainID, header.ChainID) // TODO(4204) error sentinel
+			return nil, fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
 		}
 		return &header, err
 	}
