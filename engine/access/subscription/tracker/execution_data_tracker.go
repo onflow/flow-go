@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -42,6 +43,9 @@ type ExecutionDataTracker interface {
 	// - codes.Internal        - if there is an internal error.
 	GetStartHeight(context.Context, flow.Identifier, uint64) (uint64, error)
 
+	// GetHighestAvailableFinalizedHeight returns the highest finalized block height for which execution data is available.
+	GetHighestAvailableFinalizedHeight() uint64
+
 	// OnExecutionData is used to notify the tracker when a new execution data is received.
 	OnExecutionData(*execution_data.BlockExecutionDataEntity)
 }
@@ -54,6 +58,9 @@ type ExecutionDataTrackerImpl struct {
 	log         zerolog.Logger
 	headers     storage.Headers
 	broadcaster *engine.Broadcaster
+
+	// contains the highest consecutive block height that we have consecutive execution data for
+	highestAvailableFinalizedHeight counters.StrictMonotonicCounter
 }
 
 // NewExecutionDataTracker creates a new ExecutionDataTrackerImpl instance.
@@ -76,12 +83,14 @@ func NewExecutionDataTracker(
 	rootHeight uint64,
 	headers storage.Headers,
 	broadcaster *engine.Broadcaster,
+	highestAvailableFinalizedHeight uint64,
 ) *ExecutionDataTrackerImpl {
 	return &ExecutionDataTrackerImpl{
-		BaseTrackerImpl: NewBaseTrackerImpl(rootHeight, state, headers),
-		log:             log,
-		headers:         headers,
-		broadcaster:     broadcaster,
+		BaseTrackerImpl:                 NewBaseTrackerImpl(rootHeight, state, headers),
+		log:                             log,
+		headers:                         headers,
+		broadcaster:                     broadcaster,
+		highestAvailableFinalizedHeight: counters.NewMonotonicCounter(highestAvailableFinalizedHeight),
 	}
 }
 
@@ -122,9 +131,25 @@ func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBloc
 	return e.GetStartHeightFromLatest(ctx)
 }
 
-// OnExecutionData is used to notify the tracker when a new execution data is received.
+// GetHighestAvailableFinalizedHeight returns the highest finalized block height for which execution data is available.
+func (e *ExecutionDataTrackerImpl) GetHighestAvailableFinalizedHeight() uint64 {
+	return e.highestAvailableFinalizedHeight.Value()
+}
+
+// OnExecutionData is used to notify the underlying broadcaster when new execution data is received.
+// Notification is not sent if the header storage hasn't received a block yet.
 func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
 	log := e.log.With().Hex("block_id", logging.ID(executionData.BlockID)).Logger()
 	log.Trace().Msg("received execution data")
+
+	// TODO: we want to avoid this pattern to silently log error and proceed.
+	header, err := e.headers.ByBlockID(executionData.BlockID)
+	if err != nil {
+		// if the execution data is available, the block must be locally finalized
+		log.Fatal().Err(err).Msg("failed to notify broadcaster that new execution data is available")
+		return
+	}
+	_ = e.highestAvailableFinalizedHeight.Set(header.Height)
+
 	e.broadcaster.Publish()
 }

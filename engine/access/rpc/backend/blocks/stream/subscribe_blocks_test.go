@@ -73,12 +73,14 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.state = new(protocol.State)
 	s.snapshot = new(protocol.Snapshot)
-	header := unittest.BlockHeaderFixture()
+
+	s.rootBlock = unittest.BlockFixture()
 
 	params := new(protocol.Params)
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("SporkRootBlockHeight").Return(header.Height, nil)
-	params.On("SealedRoot").Return(header, nil)
+	params.On("SporkRootBlockHeight").Return(s.rootBlock.Height, nil)
+	params.On("SporkRootBlock").Return(s.rootBlock, nil)
+	params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil)
 	s.state.On("Params").Return(params)
 
 	s.blocks = new(storagemock.Blocks)
@@ -91,7 +93,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.blocksArray = make([]*flow.Block, 0, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
-	s.rootBlock = unittest.BlockFixture()
 	parent := s.rootBlock.ToHeader()
 	s.blockMap[s.rootBlock.Height] = s.rootBlock
 

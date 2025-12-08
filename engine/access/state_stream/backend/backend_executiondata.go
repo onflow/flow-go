@@ -33,7 +33,7 @@ type ExecutionDataBackend struct {
 	state   protocol.State
 	headers storage.Headers
 
-	subscriptionHandler  *subscription.SubscriptionHandler
+	subscriptionFactory  *subscription.SubscriptionHandler
 	executionDataTracker tracker.ExecutionDataTracker
 
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
@@ -53,7 +53,7 @@ func NewExecutionDataBackend(
 		log:                     log.With().Str("module", "execution_data_backend").Logger(),
 		state:                   state,
 		headers:                 headers,
-		subscriptionHandler:     subscriptionHandler,
+		subscriptionFactory:     subscriptionHandler,
 		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
 		executionStateCache:     executionStateCache,
@@ -76,12 +76,14 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
 	// TODO: change error handling; it is obsolete.
 	if err != nil {
-		err = fmt.Errorf("failed to get execution result info for block: %w", err)
+		err = fmt.Errorf("failed to get execution result info for block %s: %w", blockID, err)
 		switch {
-		case errors.Is(err, storage.ErrNotFound):
+		case errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
+			errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) ||
+			errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
-			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case errors.Is(err, optimistic_sync.ErrForkAbandoned):
+			return nil, nil, access.NewPreconditionFailedError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -152,7 +154,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(
 		nextHeight,
 	)
 
-	return b.subscriptionHandler.Subscribe(ctx, executionDataProvider)
+	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
 }
 
 // SubscribeExecutionDataFromStartBlockID streams execution data for all blocks starting at the specified block ID
@@ -183,7 +185,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 		nextHeight,
 	)
 
-	return b.subscriptionHandler.Subscribe(ctx, executionDataProvider)
+	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
 }
 
 // SubscribeExecutionDataFromStartBlockHeight streams execution data for all blocks starting at the specified block height
@@ -200,8 +202,6 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	startBlockHeight uint64,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	// TODO: can use headers, though i need a check that startBlockHeight is not greater than the highest indexed height,
-	// i can pass this value to backend without having executionDataTracker
 	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start block height")
@@ -216,7 +216,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 		nextHeight,
 	)
 
-	return b.subscriptionHandler.Subscribe(ctx, executionDataProvider)
+	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
 }
 
 // SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
@@ -245,7 +245,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
 		nextHeight,
 	)
 
-	return b.subscriptionHandler.Subscribe(ctx, executionDataProvider)
+	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
 }
 
 type executionDataProvider struct {
@@ -298,6 +298,7 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 
 	blockID, err := e.headers.BlockIDByHeight(e.height)
 	if err != nil {
+		// TODO: I don't like this comment. Make it better
 		// this can only happen if a block is not finalized yet. however, we don't want to serve
 		// unfinalized blocks to clients, so we return an error instead.
 		return nil, fmt.Errorf("block %d might not be finalized yet: %w", e.height, err)

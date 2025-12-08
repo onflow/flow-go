@@ -174,6 +174,7 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 		s.sporkRootBlock.Height,
 		s.headers,
 		s.executionDataBroadcaster,
+		s.sporkRootBlock.Height,
 	)
 
 	s.executionDataTracker = trackermock.NewExecutionDataTracker(s.T())

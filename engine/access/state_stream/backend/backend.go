@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
@@ -75,9 +74,6 @@ type StateStreamBackend struct {
 	state                protocol.State
 	headers              storage.Headers
 	seals                storage.Seals
-	results              storage.ExecutionResults
-	execDataStore        execution_data.ExecutionDataStore
-	execDataCache        *cache.ExecutionDataCache
 	registers            *execution.RegistersAsyncStore
 	registerRequestLimit int
 }
@@ -87,9 +83,6 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
-	results storage.ExecutionResults,
-	execDataStore execution_data.ExecutionDataStore,
-	execDataCache *cache.ExecutionDataCache,
 	registers *execution.RegistersAsyncStore,
 	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
@@ -107,9 +100,6 @@ func New(
 		state:                state,
 		headers:              headers,
 		seals:                seals,
-		results:              results,
-		execDataStore:        execDataStore,
-		execDataCache:        execDataCache,
 		registers:            registers,
 		registerRequestLimit: registerIDsRequestLimit,
 	}
@@ -128,8 +118,8 @@ func New(
 		log:              logger,
 		headers:          headers,
 		useEventsIndex:   useEventsIndex,
-		eventsIndex:      eventsIndex,
-		getExecutionData: nil, //TODO: fix it in the events PR
+		eventsIndex:      eventsIndex, // TODO: event index should be removed (do it in events PR)
+		getExecutionData: nil,         //TODO: fix it in the events PR
 	}
 
 	b.EventsBackend = EventsBackend{

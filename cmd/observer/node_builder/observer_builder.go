@@ -1625,6 +1625,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
 			broadcaster := engine.NewBroadcaster()
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
@@ -1632,6 +1636,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
 				broadcaster,
+				highestAvailableHeight,
 			)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
@@ -1639,9 +1644,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
-				node.Storage.Results,
-				builder.ExecutionDataStore,
-				executionDataStoreCache,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
