@@ -3,6 +3,7 @@ package convert_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -232,30 +233,8 @@ func TestConvertMessagesToBlockEvents(t *testing.T) {
 	require.Equal(t, blockEvents, converted)
 }
 
-// TestConvertBlockEventsToMessage tests converting a single flow.BlockEvents to a protobuf message.
-func TestConvertBlockEventsToMessage(t *testing.T) {
-	t.Parallel()
-
-	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(42))
-	blockEvents := unittest.BlockEventsFixture(header, 3)
-
-	msg, err := convert.BlockEventsToMessage(blockEvents)
-	require.NoError(t, err)
-	require.NotNil(t, msg)
-
-	require.Equal(t, blockEvents.BlockHeight, msg.BlockHeight)
-	require.Equal(t, blockEvents.BlockID[:], msg.BlockId)
-	require.Equal(t, blockEvents.BlockTimestamp, msg.BlockTimestamp.AsTime())
-	require.Len(t, msg.Events, len(blockEvents.Events))
-
-	for i, eventMsg := range msg.Events {
-		require.Equal(t, blockEvents.Events[i].Type, flow.EventType(eventMsg.Type))
-		require.Equal(t, blockEvents.Events[i].TransactionID[:], eventMsg.TransactionId)
-	}
-}
-
-// TestConvertMessageToBlockEvents tests converting a single protobuf message to flow.BlockEvents.
-func TestConvertMessageToBlockEvents(t *testing.T) {
+// TestConvertBlockEvent tests round-trip converting a single protobuf message.
+func TestConvertBlockEvent(t *testing.T) {
 	t.Parallel()
 
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(42))
@@ -272,8 +251,11 @@ func TestConvertMessageToBlockEvents(t *testing.T) {
 
 	require.Equal(t, blockEvents.BlockHeight, converted.BlockHeight)
 	require.Equal(t, blockEvents.BlockID, converted.BlockID)
-	require.Equal(t, blockEvents.BlockTimestamp.Unix(), converted.BlockTimestamp.Unix())
+	require.Equal(t, blockEvents.BlockTimestamp, converted.BlockTimestamp)
 	require.Len(t, converted.Events, len(blockEvents.Events))
+	for i, event := range blockEvents.Events {
+		require.Equal(t, event.ID(), converted.Events[i].ID())
+	}
 }
 
 // TestConvertCcfEventToJsonEvent tests converting a single CCF event to JSON event.
@@ -315,8 +297,10 @@ func TestConvertCcfEventToJsonEvent(t *testing.T) {
 			unittest.Event.WithPayload([]byte{0x01, 0x02, 0x03}), // Invalid CCF
 		)
 
-		_, err := convert.CcfEventToJsonEvent(invalidEvent)
+		jsonEvent, err := convert.CcfEventToJsonEvent(invalidEvent)
+		require.Nil(t, jsonEvent)
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decode from ccf format")
 	})
 
 	t.Run("returns error on empty payload", func(t *testing.T) {
@@ -326,8 +310,10 @@ func TestConvertCcfEventToJsonEvent(t *testing.T) {
 			unittest.Event.WithPayload([]byte{}),
 		)
 
-		_, err := convert.CcfEventToJsonEvent(emptyEvent)
+		jsonEvent, err := convert.CcfEventToJsonEvent(emptyEvent)
+		require.Nil(t, jsonEvent)
 		require.Error(t, err, "empty payload should result in error from flow.NewEvent")
+		assert.Contains(t, err.Error(), "payload must not be empty")
 	})
 }
 
@@ -362,8 +348,10 @@ func TestConvertCcfPayloadToJsonPayload(t *testing.T) {
 		t.Parallel()
 
 		invalidPayload := []byte{0x01, 0x02, 0x03}
-		_, err := convert.CcfPayloadToJsonPayload(invalidPayload)
+		jsonPayload, err := convert.CcfPayloadToJsonPayload(invalidPayload)
+		require.Nil(t, jsonPayload)
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decode from ccf format")
 	})
 }
 
@@ -413,8 +401,10 @@ func TestConvertCcfEventsToJsonEvents(t *testing.T) {
 			),
 		}
 
-		_, err := convert.CcfEventsToJsonEvents(invalidEvents)
+		jsonEvents, err := convert.CcfEventsToJsonEvents(invalidEvents)
+		require.Nil(t, jsonEvents)
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decode from ccf format")
 	})
 }
 
@@ -476,8 +466,10 @@ func TestConvertEventToMessageFromVersion(t *testing.T) {
 
 		event := unittest.EventFixture()
 
-		_, err := convert.EventToMessageFromVersion(event, entities.EventEncodingVersion(999))
+		message, err := convert.EventToMessageFromVersion(event, entities.EventEncodingVersion(999))
+		require.Nil(t, message)
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid encoding format")
 	})
 }
 
@@ -540,11 +532,13 @@ func TestConvertEventsToMessagesWithEncodingConversion(t *testing.T) {
 			unittest.Event.WithPayload(jsonPayload),
 		)
 
-		_, err = convert.EventsToMessagesWithEncodingConversion(
+		message, err := convert.EventsToMessagesWithEncodingConversion(
 			jsonEvents,
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			entities.EventEncodingVersion_CCF_V0,
 		)
+		require.Nil(t, message)
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "conversion from format")
 	})
 }

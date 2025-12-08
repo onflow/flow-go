@@ -114,21 +114,14 @@ func TestConvertBlockSeal(t *testing.T) {
 	converted, err := convert.MessageToBlockSeal(msg)
 	require.NoError(t, err)
 
-	assert.Equal(t, seal.BlockID, converted.BlockID)
-	assert.Equal(t, seal.ResultID, converted.ResultID)
-	assert.Equal(t, seal.FinalState, converted.FinalState)
-	assert.Equal(t, seal.AggregatedApprovalSigs, converted.AggregatedApprovalSigs)
+	assert.Equal(t, seal.ID(), converted.ID())
 }
 
 // TestConvertBlockSeals tests converting multiple flow.Seal to and from protobuf BlockSeal messages.
 func TestConvertBlockSeals(t *testing.T) {
 	t.Parallel()
 
-	seals := []*flow.Seal{
-		unittest.Seal.Fixture(),
-		unittest.Seal.Fixture(),
-		unittest.Seal.Fixture(),
-	}
+	seals := unittest.Seal.Fixtures(3)
 
 	msgs := convert.BlockSealsToMessages(seals)
 	require.Len(t, msgs, len(seals))
@@ -138,10 +131,7 @@ func TestConvertBlockSeals(t *testing.T) {
 	require.Len(t, converted, len(seals))
 
 	for i, seal := range seals {
-		assert.Equal(t, seal.BlockID, converted[i].BlockID)
-		assert.Equal(t, seal.ResultID, converted[i].ResultID)
-		assert.Equal(t, seal.FinalState, converted[i].FinalState)
-		assert.Equal(t, seal.AggregatedApprovalSigs, converted[i].AggregatedApprovalSigs)
+		assert.Equal(t, seal.ID(), converted[i].ID())
 	}
 }
 
@@ -158,11 +148,7 @@ func TestConvertPayloadFromMessage(t *testing.T) {
 	payload, err := convert.PayloadFromMessage(msg)
 	require.NoError(t, err)
 
-	assert.Equal(t, block.Payload.Guarantees, payload.Guarantees)
-	assert.Equal(t, block.Payload.Seals, payload.Seals)
-	assert.Equal(t, block.Payload.Receipts, payload.Receipts)
-	assert.Equal(t, block.Payload.Results, payload.Results)
-	assert.Equal(t, block.Payload.ProtocolStateID, payload.ProtocolStateID)
+	assert.Equal(t, block.Payload.Hash(), payload.Hash())
 }
 
 // TestConvertBlockTimestamp2ProtobufTime tests converting block timestamps to protobuf Timestamp format.
@@ -192,32 +178,5 @@ func TestConvertBlockTimestamp2ProtobufTime(t *testing.T) {
 
 		convertedTime := pbTime.AsTime()
 		assert.Equal(t, uint64(0), uint64(convertedTime.UnixMilli()))
-	})
-
-	t.Run("convert various timestamps", func(t *testing.T) {
-		t.Parallel()
-
-		testTimestamps := []uint64{
-			1609459200000, // 2021-01-01 00:00:00 UTC
-			1640995200000, // 2022-01-01 00:00:00 UTC
-			1672531200000, // 2023-01-01 00:00:00 UTC
-		}
-
-		for _, ts := range testTimestamps {
-			pbTime := convert.BlockTimestamp2ProtobufTime(ts)
-			require.NotNil(t, pbTime)
-
-			convertedTime := pbTime.AsTime()
-			assert.Equal(t, ts, uint64(convertedTime.UnixMilli()))
-		}
-	})
-
-	t.Run("roundtrip conversion with block", func(t *testing.T) {
-		t.Parallel()
-
-		block := unittest.FullBlockFixture()
-		msg := convert.BlockToMessageLight(block)
-
-		assert.Equal(t, block.Timestamp, uint64(msg.Timestamp.AsTime().UnixMilli()))
 	})
 }

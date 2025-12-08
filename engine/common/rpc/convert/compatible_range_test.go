@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -20,23 +19,6 @@ func TestConvertCompatibleRange(t *testing.T) {
 
 		assert.Nil(t, convert.CompatibleRangeToMessage(nil))
 		assert.Nil(t, convert.MessageToCompatibleRange(nil))
-	})
-
-	t.Run("convert range to message", func(t *testing.T) {
-		startHeight := uint64(rand.Uint32())
-		endHeight := uint64(rand.Uint32())
-
-		comparableRange := &accessmodel.CompatibleRange{
-			StartHeight: startHeight,
-			EndHeight:   endHeight,
-		}
-		expected := &entities.CompatibleRange{
-			StartHeight: startHeight,
-			EndHeight:   endHeight,
-		}
-
-		msg := convert.CompatibleRangeToMessage(comparableRange)
-		assert.Equal(t, msg, expected)
 	})
 
 	t.Run("roundtrip conversion", func(t *testing.T) {

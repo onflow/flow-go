@@ -1,6 +1,7 @@
 package convert_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,6 +82,7 @@ func TestConvertStateCommitmentInvalidLength(t *testing.T) {
 
 	_, err := convert.MessageToStateCommitment(invalidMsg)
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid state commitment length")
 }
 
 // TestConvertAggregatedSignatures tests converting a slice of flow.AggregatedSignatures to and from
@@ -88,16 +90,7 @@ func TestConvertStateCommitmentInvalidLength(t *testing.T) {
 func TestConvertAggregatedSignatures(t *testing.T) {
 	t.Parallel()
 
-	aggSigs := []flow.AggregatedSignature{
-		{
-			SignerIDs:          unittest.IdentifierListFixture(3),
-			VerifierSignatures: unittest.SignaturesFixture(3),
-		},
-		{
-			SignerIDs:          unittest.IdentifierListFixture(5),
-			VerifierSignatures: unittest.SignaturesFixture(5),
-		},
-	}
+	aggSigs := unittest.Seal.AggregatedSignatureFixtures(2)
 
 	msgs := convert.AggregatedSignaturesToMessages(aggSigs)
 	converted := convert.MessagesToAggregatedSignatures(msgs)
@@ -121,39 +114,47 @@ func TestConvertAggregatedSignaturesEmpty(t *testing.T) {
 func TestConvertChainId(t *testing.T) {
 	t.Parallel()
 
-	testCases := []struct {
-		name    string
-		chainID string
-		valid   bool
-	}{
-		{"Mainnet", flow.Mainnet.String(), true},
-		{"Testnet", flow.Testnet.String(), true},
-		{"Emulator", flow.Emulator.String(), true},
-		{"Localnet", flow.Localnet.String(), true},
-		{"Sandboxnet", flow.Sandboxnet.String(), true},
-		{"Previewnet", flow.Previewnet.String(), true},
-		{"Benchnet", flow.Benchnet.String(), true},
-		{"BftTestnet", flow.BftTestnet.String(), true},
-		{"MonotonicEmulator", flow.MonotonicEmulator.String(), true},
-		{"Invalid", "invalid-chain", false},
-		{"Empty", "", false},
-	}
+	t.Run("valid chain IDs", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+		validChainIDs := []flow.ChainID{
+			flow.Mainnet,
+			flow.Testnet,
+			flow.Emulator,
+			flow.Localnet,
+			flow.Sandboxnet,
+			flow.Previewnet,
+			flow.Benchnet,
+			flow.BftTestnet,
+			flow.MonotonicEmulator,
+		}
 
-			result, err := convert.MessageToChainId(tc.chainID)
+		for _, chainID := range validChainIDs {
+			t.Run(chainID.String(), func(t *testing.T) {
+				t.Parallel()
 
-			if tc.valid {
+				result, err := convert.MessageToChainId(chainID.String())
 				require.NoError(t, err)
 				require.NotNil(t, result)
-				assert.Equal(t, tc.chainID, result.String())
-			} else {
+				assert.Equal(t, chainID, *result)
+			})
+		}
+	})
+
+	t.Run("invalid chain IDs", func(t *testing.T) {
+		t.Parallel()
+
+		invalid := []string{"invalid-chain", ""}
+
+		for _, chainID := range invalid {
+			t.Run(fmt.Sprintf("invalid_%q", chainID), func(t *testing.T) {
+				t.Parallel()
+
+				result, err := convert.MessageToChainId(chainID)
 				assert.Error(t, err)
 				assert.Nil(t, result)
-			}
-		})
-	}
+				assert.Contains(t, err.Error(), "invalid chainId")
+			})
+		}
+	})
 }

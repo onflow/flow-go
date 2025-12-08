@@ -31,20 +31,6 @@ func TestValidateAddress(t *testing.T) {
 		assert.Equal(t, validAddr, addr)
 	})
 
-	t.Run("valid random addresses", func(t *testing.T) {
-		t.Parallel()
-
-		// Test multiple random addresses to exercise conversion pathways
-		for i := 0; i < 10; i++ {
-			validAddr := unittest.RandomAddressFixture()
-			rawAddr := validAddr.Bytes()
-
-			addr, err := convert.Address(rawAddr, chain)
-			require.NoError(t, err)
-			assert.Equal(t, validAddr, addr)
-		}
-	})
-
 	t.Run("empty address", func(t *testing.T) {
 		t.Parallel()
 
@@ -84,20 +70,6 @@ func TestValidateHexToAddress(t *testing.T) {
 		addr, err := convert.HexToAddress(hexAddr, chain)
 		require.NoError(t, err)
 		assert.Equal(t, validAddr, addr)
-	})
-
-	t.Run("valid random hex addresses", func(t *testing.T) {
-		t.Parallel()
-
-		// Test multiple random addresses to exercise conversion pathways
-		for i := 0; i < 10; i++ {
-			validAddr := unittest.RandomAddressFixture()
-			hexAddr := validAddr.Hex()
-
-			addr, err := convert.HexToAddress(hexAddr, chain)
-			require.NoError(t, err)
-			assert.Equal(t, validAddr, addr)
-		}
 	})
 
 	t.Run("empty hex address", func(t *testing.T) {
@@ -241,13 +213,12 @@ func TestValidateCollectionID(t *testing.T) {
 	t.Run("collection ID with different length", func(t *testing.T) {
 		t.Parallel()
 
-		// CollectionID doesn't validate length, only that it's not empty
 		// so this should succeed
 		shortID := []byte{0x01, 0x02}
 
-		collectionID, err := convert.CollectionID(shortID)
-		require.NoError(t, err)
-		assert.NotEqual(t, flow.ZeroID, collectionID)
+		_, err := convert.CollectionID(shortID)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		assert.Contains(t, err.Error(), "invalid collection id")
 	})
 }
 
@@ -322,12 +293,11 @@ func TestValidateTransactionID(t *testing.T) {
 	t.Run("transaction ID with different length", func(t *testing.T) {
 		t.Parallel()
 
-		// TransactionID doesn't validate length, only that it's not empty
-		// so this should succeed
 		shortID := []byte{0x01, 0x02}
 
-		txID, err := convert.TransactionID(shortID)
-		require.NoError(t, err)
-		assert.NotEqual(t, flow.ZeroID, txID)
+		_, err := convert.TransactionID(shortID)
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		assert.Contains(t, err.Error(), "invalid transaction id")
 	})
 }

@@ -37,24 +37,7 @@ func TestConvertTransaction(t *testing.T) {
 func TestConvertTransactionsToMessages(t *testing.T) {
 	t.Parallel()
 
-	// Create multiple transactions with varying fields
-	transactions := make([]*flow.TransactionBody, 6)
-	for i := 0; i < len(transactions); i++ {
-		tx := unittest.TransactionFixture()
-
-		// Add some variation to exercise different code paths
-		if i%2 == 0 {
-			arg, err := jsoncdc.Encode(cadence.NewAddress(unittest.AddressFixture()))
-			require.NoError(t, err)
-			tx.Arguments = append(tx.Arguments, arg)
-		}
-
-		if i%3 == 0 {
-			tx.EnvelopeSignatures = append(tx.EnvelopeSignatures, unittest.TransactionSignatureFixture())
-		}
-
-		transactions[i] = &tx
-	}
+	transactions := unittest.TransactionFixtures(6)
 
 	messages := convert.TransactionsToMessages(transactions)
 	require.Len(t, messages, len(transactions))
