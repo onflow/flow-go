@@ -1,5 +1,5 @@
 # The version of golangci-lint used to build the custom binary
-version: v1.63.4
+version: v2.7.1
 
 # The name of the custom binary
 name: custom-gcl

@@ -41,7 +41,7 @@ func NewLocalScriptExecutor(
 	executionStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalScriptExecutor {
 	return &LocalScriptExecutor{
-		log:                 zerolog.New(log).With().Str("script_executor", "local").Logger(),
+		log:                 log.With().Str("script_executor", "local").Logger(),
 		metrics:             metrics,
 		scriptLogger:        scriptLogger,
 		scriptExecutor:      scriptExecutor,

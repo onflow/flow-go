@@ -1700,7 +1700,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
 
-		address := flow.ConvertAddress(
+		address := flow.Address(
 			cadence.SearchFieldByName(
 				data.(cadence.Event),
 				stdlib.AccountEventAddressParameter.Identifier,
@@ -1751,6 +1751,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 }
 
 func TestBlockContext_Random(t *testing.T) {
+	t.Parallel()
+
 	chain, vm := createChainAndVm(flow.Mainnet)
 	header := &flow.Header{HeaderBody: flow.HeaderBody{Height: 42}}
 	source := testutil.EntropyProviderFixture(nil)
@@ -1893,7 +1895,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 
-	address := flow.ConvertAddress(
+	address := flow.Address(
 		cadence.SearchFieldByName(
 			data.(cadence.Event),
 			stdlib.AccountEventAddressParameter.Identifier,
@@ -1906,6 +1908,8 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
+	t.Parallel()
+
 	getBalance := func(
 		vm fvm.VM,
 		chain flow.Chain,

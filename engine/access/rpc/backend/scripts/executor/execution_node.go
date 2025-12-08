@@ -46,7 +46,7 @@ func NewENScriptExecutor(
 	scriptLogger *ScriptLogger,
 ) *ENScriptExecutor {
 	return &ENScriptExecutor{
-		log:              zerolog.New(log).With().Str("script_executor", "execution_node").Logger(),
+		log:              log.With().Str("script_executor", "execution_node").Logger(),
 		metrics:          metrics,
 		nodeProvider:     nodeProvider,
 		nodeCommunicator: nodeCommunicator,

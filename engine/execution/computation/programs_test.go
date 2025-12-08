@@ -40,6 +40,8 @@ const (
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
+	t.Parallel()
+
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(fvm.WithChain(chain))
@@ -215,11 +217,12 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 //	        -> Block121 (emit event - version should be 2)
 //	            -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
+	t.Parallel()
+
 	block := unittest.BlockFixture()
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlockHeader(block.ToHeader()),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: block}}),
 		fvm.WithChain(chain))

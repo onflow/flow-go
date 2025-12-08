@@ -377,6 +377,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Log,
 		node.Me,
 		db,
+		node.LockManager,
 		node.State,
 		node.Metrics,
 		node.Metrics,
@@ -473,6 +474,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Seals,
 	)
 
+	notifier := pubsub.NewDistributor()
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
 		node.Tracer,
@@ -491,6 +493,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		assigner,
 		seals,
 		unittest.NewSealingConfigs(flow.DefaultRequiredApprovalsForSealConstruction),
+		notifier,
 	)
 	require.NoError(t, err)
 
@@ -521,6 +524,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		receiptsDB,
 		node.Index,
 		matchingCore,
+		notifier,
 	)
 	require.NoError(t, err)
 
@@ -547,9 +551,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	collectionsStorage := store.NewCollections(db, transactionsStorage)
 	eventsStorage := store.NewEvents(node.Metrics, db)
 	serviceEventsStorage := store.NewServiceEvents(node.Metrics, db)
-	txResultStorage := store.NewTransactionResults(node.Metrics, db, storagebadger.DefaultCacheSize)
+	txResultStorage, err := store.NewTransactionResults(node.Metrics, db, storagebadger.DefaultCacheSize)
+	require.NoError(t, err)
 	commitsStorage := store.NewCommits(node.Metrics, db)
-	chunkDataPackStorage := store.NewChunkDataPacks(node.Metrics, db, collectionsStorage, 100)
+	storedChunkDataPacks := store.NewStoredChunkDataPacks(node.Metrics, db, 100)
+	chunkDataPackStorage := store.NewChunkDataPacks(node.Metrics, db, storedChunkDataPacks, collectionsStorage, 100)
 	results := store.NewExecutionResults(node.Metrics, db)
 	receipts := store.NewExecutionReceipts(node.Metrics, db, results, storagebadger.DefaultCacheSize)
 	myReceipts := store.NewMyExecutionReceipts(node.Metrics, db, receipts)
@@ -799,6 +805,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Headers,
 		finalizedHeader,
 		core,
+		followerDistributor,
 		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
@@ -824,10 +831,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 			idCache,
 		),
 		spamConfig,
+		followerDistributor,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
-	followerDistributor.AddFinalizationConsumer(syncEngine)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
@@ -1117,14 +1124,17 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.BlockConsumer == nil {
+		followerDistributor := pubsub.NewFollowerDistributor()
 		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
 			collector,
 			node.ProcessedBlockHeight,
 			node.Blocks,
 			node.State,
 			node.AssignerEngine,
-			blockconsumer.DefaultBlockWorkers)
+			blockconsumer.DefaultBlockWorkers,
+			followerDistributor)
 		require.NoError(t, err)
+		node.FollowerDistributor = followerDistributor
 
 		err = mempoolCollector.Register(metrics.ResourceBlockConsumer, node.BlockConsumer.Size)
 		require.NoError(t, err)

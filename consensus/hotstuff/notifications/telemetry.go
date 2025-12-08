@@ -41,18 +41,22 @@ type TelemetryConsumer struct {
 // Telemetry implements consumers for _all happy-path_ interfaces in consensus/hotstuff/notifications/telemetry.go:
 var _ hotstuff.ParticipantConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.CommunicatorConsumer = (*TelemetryConsumer)(nil)
-var _ hotstuff.FinalizationConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.VoteCollectorConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.TimeoutCollectorConsumer = (*TelemetryConsumer)(nil)
 
 // NewTelemetryConsumer creates consumer that reports telemetry events using logger backend.
 // Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
-func NewTelemetryConsumer(log zerolog.Logger) *TelemetryConsumer {
+func NewTelemetryConsumer(log zerolog.Logger, registrar hotstuff.FinalizationRegistrar) *TelemetryConsumer {
 	pathHandler := NewPathHandler(log)
-	return &TelemetryConsumer{
+	t := &TelemetryConsumer{
 		pathHandler:  pathHandler,
 		noPathLogger: pathHandler.log,
 	}
+
+	registrar.AddOnBlockFinalizedConsumer(t.onFinalizedBlock)
+	registrar.AddOnBlockIncorporatedConsumer(t.onBlockIncorporated)
+
+	return t
 }
 
 func (t *TelemetryConsumer) OnStart(currentView uint64) {
@@ -138,13 +142,13 @@ func (t *TelemetryConsumer) OnStartingTimeout(info model.TimerInfo) {
 		Msg("OnStartingTimeout")
 }
 
-func (t *TelemetryConsumer) OnBlockIncorporated(block *model.Block) {
+func (t *TelemetryConsumer) onBlockIncorporated(block *model.Block) {
 	t.pathHandler.NextStep().
 		Hex("block_id", logging.ID(block.BlockID)).
 		Msg("OnBlockIncorporated")
 }
 
-func (t *TelemetryConsumer) OnFinalizedBlock(block *model.Block) {
+func (t *TelemetryConsumer) onFinalizedBlock(block *model.Block) {
 	t.pathHandler.NextStep().
 		Hex("block_id", logging.ID(block.BlockID)).
 		Msg("OnFinalizedBlock")

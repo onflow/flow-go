@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jordanschalm/lockctx"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -23,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -39,8 +42,9 @@ import (
 type TxErrorMessagesEngineSuite struct {
 	suite.Suite
 
-	log   zerolog.Logger
-	proto struct {
+	log     zerolog.Logger
+	metrics module.TransactionErrorMessagesMetrics
+	proto   struct {
 		state    *protocol.FollowerState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
@@ -53,6 +57,7 @@ type TxErrorMessagesEngineSuite struct {
 	reporter       *syncmock.IndexReporter
 	indexReporter  *index.Reporter
 	txResultsIndex *index.TransactionResultsIndex
+	lockManager    storage.LockManager
 
 	enNodeIDs   flow.IdentityList
 	execClient  *accessmock.ExecutionAPIClient
@@ -65,8 +70,9 @@ type TxErrorMessagesEngineSuite struct {
 	db    storage.DB
 	dbDir string
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	followerDistributor *pubsub.FollowerDistributor
 }
 
 // TestTxErrorMessagesEngine runs the test suite for the transaction error messages engine.
@@ -82,11 +88,16 @@ func (s *TxErrorMessagesEngineSuite) TearDownTest() {
 }
 
 func (s *TxErrorMessagesEngineSuite) SetupTest() {
-	s.log = zerolog.New(os.Stderr)
+	s.log = unittest.Logger()
+	s.metrics = metrics.NewNoopCollector()
 	s.ctx, s.cancel = context.WithCancel(context.Background())
+
+	// Initialize database and lock manager
 	pdb, dbDir := unittest.TempPebbleDB(s.T())
 	s.db = pebbleimpl.ToDB(pdb)
 	s.dbDir = dbDir
+	s.lockManager = storage.NewTestingLockManager()
+
 	// mock out protocol state
 	s.proto.state = protocol.NewFollowerState(s.T())
 	s.proto.snapshot = protocol.NewSnapshot(s.T())
@@ -174,16 +185,23 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		errorMessageProvider,
 		s.txErrorMessages,
 		execNodeIdentitiesProvider,
+		s.lockManager,
 	)
 
+	followerDistributor := pubsub.NewFollowerDistributor()
 	eng, err := New(
 		s.log,
+		s.metrics,
 		s.proto.state,
 		s.headers,
 		processedTxErrorMessagesBlockHeight,
 		txResultErrorMessagesCore,
+		followerDistributor,
 	)
 	require.NoError(s.T(), err)
+
+	// Store distributor for use in tests
+	s.followerDistributor = followerDistributor
 
 	eng.ComponentManager.Start(ctx)
 	<-eng.Ready()
@@ -241,16 +259,18 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 		expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
 
 		// Mock the storage of the fetched error messages into the protocol database.
-		s.txErrorMessages.On("Store", blockID, expectedStoreTxErrorMessages).Return(nil).
+		s.txErrorMessages.On("Store", mock.Anything, blockID, expectedStoreTxErrorMessages).Return(nil).
 			Run(func(args mock.Arguments) {
-				// Ensure the test does not complete its work faster than necessary
-				wg.Done()
+				lctx, ok := args[0].(lockctx.Proof)
+				require.True(s.T(), ok, "expecting lock proof, but cast failed")
+				require.True(s.T(), lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage))
+				wg.Done() // Ensure the test does not complete its work faster than necessary
 			}).Once()
 	}
 
-	eng := s.initEngine(irrecoverableCtx)
+	_ = s.initEngine(irrecoverableCtx)
 	// process the block through the finalized callback
-	eng.OnFinalizedBlock(&hotstuffBlock)
+	s.followerDistributor.OnFinalizedBlock(&hotstuffBlock)
 
 	// Verify that all transaction error messages were processed within the timeout.
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 2*time.Second, "expect to process new block before timeout")

@@ -1045,6 +1045,66 @@ func (_m *API) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight
 	return r0, r1
 }
 
+// GetScheduledTransaction provides a mock function with given fields: ctx, scheduledTxID
+func (_m *API) GetScheduledTransaction(ctx context.Context, scheduledTxID uint64) (*flow.TransactionBody, error) {
+	ret := _m.Called(ctx, scheduledTxID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransaction")
+	}
+
+	var r0 *flow.TransactionBody
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (*flow.TransactionBody, error)); ok {
+		return rf(ctx, scheduledTxID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) *flow.TransactionBody); ok {
+		r0 = rf(ctx, scheduledTxID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.TransactionBody)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
+		r1 = rf(ctx, scheduledTxID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetScheduledTransactionResult provides a mock function with given fields: ctx, scheduledTxID, encodingVersion
+func (_m *API) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
+	ret := _m.Called(ctx, scheduledTxID, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransactionResult")
+	}
+
+	var r0 *access.TransactionResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
+		return rf(ctx, scheduledTxID, encodingVersion)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, entities.EventEncodingVersion) *access.TransactionResult); ok {
+		r0 = rf(ctx, scheduledTxID, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, entities.EventEncodingVersion) error); ok {
+		r1 = rf(ctx, scheduledTxID, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSystemTransaction provides a mock function with given fields: ctx, txID, blockID
 func (_m *API) GetSystemTransaction(ctx context.Context, txID flow.Identifier, blockID flow.Identifier) (*flow.TransactionBody, error) {
 	ret := _m.Called(ctx, txID, blockID)

@@ -19,7 +19,8 @@ type Blocks struct {
 
 var _ storage.Blocks = (*Blocks)(nil)
 
-// NewBlocks ...
+// NewBlocks instantiates a storage abstraction combining [storage.Headers] and [storage.Payloads].
+// Caching is implemented by the constituent parts.
 func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
 		db:       db,
@@ -29,9 +30,14 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-// BatchStore stores a valid block in a batch.
+// BatchStore adds the provided block to the database write batch and populates all secondary storage indices
+// (maps from the block ID to some block-related information).
 //
-// Expected errors during normal operations:
+// CAUTION: Under the hood, `BatchStore` performs some prior database reads, which must happen atomically with
+// the subsequent database write in order to prevent accidental state corruption. Therefore, the caller must
+// acquire [storage.LockInsertBlock] and hold it until the database write has been committed.
+//
+// Expected error returns during normal operations:
 // - [storage.ErrAlreadyExists] if some block with the same ID has already been stored
 func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *flow.Proposal) error {
 	blockID := proposal.Block.ID()
@@ -48,8 +54,8 @@ func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, pr
 
 // retrieve returns the block with the given hash. It is available for
 // finalized and pending blocks.
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found
+// Expected error returns during normal operations:
+// - [storage.ErrNotFound] if no block is found
 func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 	header, err := b.headers.retrieveTx(blockID)
 	if err != nil {
@@ -80,8 +86,8 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 
 // retrieveProposal returns the proposal with the given block ID.
 // It is available for finalized and pending blocks.
-// Expected errors during normal operations:
-// - storage.ErrNotFound if no block is found
+// Expected error returns during normal operations:
+// - [storage.ErrNotFound] if no block is found
 func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, error) {
 	block, err := b.retrieve(blockID)
 	if err != nil {
@@ -203,36 +209,56 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
-	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
+	blockID, err := b.BlockIDByCollectionID(collID)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up guarantee: %w", err)
-	}
-	var blockID flow.Identifier
-	err = operation.LookupBlockContainingCollectionGuarantee(b.db.Reader(), guarantee.ID(), &blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not look up block: %w", err)
+		return nil, err
 	}
 	return b.ByID(blockID)
 }
 
-// IndexBlockContainingCollectionGuarantees populates an index `guaranteeID->blockID` for each guarantee
-// which appears in the block.
+// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the
+// given collection (the collection guarantee such that `CollectionGuarantee.CollectionID == collID`).
+// This function returns the finalized _consensus_ block including the specified collection, not the cluster
+// block which defines the collection.
+// NOTE: This method is only available for collections included in finalized blocks.
+// While consensus nodes verify that collections are not repeated within the same fork,
+// each different fork can contain a recent collection once. Therefore, we must wait for
+// finality.
+// CAUTION: this method is not backed by a cache and therefore comparatively slow!
+//
+// Error returns:
+//   - storage.ErrNotFound if no FINALIZED block exists containing the expected collection guarantee
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (b *Blocks) BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error) {
+	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not look up guarantee: %w", err)
+	}
+	var blockID flow.Identifier
+	err = operation.LookupBlockContainingCollectionGuarantee(b.db.Reader(), guarantee.ID(), &blockID)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not look up block: %w", err)
+	}
+	// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
+	// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
+	// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
+	// Hence, this function should be treated as a temporary solution, which requires generalization
+	// (one-to-many mapping) for soft finality and the mature protocol.
+	return blockID, nil
+}
+
+// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.
+// The caller must acquire [storage.LockIndexBlockByPayloadGuarantees] and hold it until the database write has been committed.
+//
 // CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 // assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
 // *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
 // Hence, this function should be treated as a temporary solution, which requires generalization
 // (one-to-many mapping) for soft finality and the mature protocol.
 //
-// Error returns:
-//   - generic error in case of unexpected failure from the database layer or encoding failure.
-func (b *Blocks) IndexBlockContainingCollectionGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
-	return b.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		for _, guaranteeID := range guaranteeIDs {
-			err := operation.IndexBlockContainingCollectionGuarantee(rw.Writer(), guaranteeID, blockID)
-			if err != nil {
-				return fmt.Errorf("could not index collection block (%x): %w", guaranteeID, err)
-			}
-		}
-		return nil
-	})
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
+func (b *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
+	return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, blockID, guaranteeIDs)
 }
