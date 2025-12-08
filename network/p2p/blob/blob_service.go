@@ -119,6 +119,9 @@ func NewBlobService(
 	opts ...network.BlobServiceOption,
 ) (*blobService, error) {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
+
+	blockStore := blockstore.NewBlockstore(ds)
+
 	bs := &blobService{
 		prefix: prefix,
 		config: &BlobServiceConfig{
@@ -132,16 +135,10 @@ func NewBlobService(
 		opt(bs)
 	}
 
-	// Create blockstore based on config
-	var blockStore blockstore.Blockstore
 	if bs.config.SkipBloomCache {
-		// Use plain blockstore - Pebble's built-in bloom filters are sufficient
-		blockStore = blockstore.NewBlockstore(ds)
-	} else {
-		// Use cached blockstore with bloom filter (default behavior)
 		cachedBlockStore, err := blockstore.CachedBlockstore(
 			context.Background(),
-			blockstore.NewBlockstore(ds),
+			blockStore,
 			blockstore.DefaultCacheOpts(),
 		)
 		if err != nil {
@@ -149,6 +146,7 @@ func NewBlobService(
 		}
 		blockStore = cachedBlockStore
 	}
+
 	bs.blockStore = blockStore
 
 	cm := component.NewComponentManagerBuilder().

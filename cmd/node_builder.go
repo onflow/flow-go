@@ -310,7 +310,7 @@ func DefaultBaseConfig() *BaseConfig {
 		ComplianceConfig:         compliance.DefaultConfig(),
 		DhtSystemEnabled:         true,
 		BitswapReprovideEnabled:  true,
-		BitswapBloomCacheEnabled: true, // default: use cached blockstore
+		BitswapBloomCacheEnabled: true, // default: use cached blockstore TODO leo: change default to false
 	}
 }
 
