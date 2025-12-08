@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/procedure"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 // ClusterPayloads implements storage of block payloads for collection node
@@ -23,7 +23,7 @@ var _ storage.ClusterPayloads = (*ClusterPayloads)(nil)
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db storage.DB) *ClusterPayloads {
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*cluster.Payload, error) {
 		var payload cluster.Payload
-		err := procedure.RetrieveClusterPayload(r, blockID, &payload)
+		err := operation.RetrieveClusterPayload(r, blockID, &payload)
 		return &payload, err
 	}
 

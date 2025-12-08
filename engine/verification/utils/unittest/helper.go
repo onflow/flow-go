@@ -16,6 +16,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
@@ -441,13 +442,14 @@ func NewVerificationHappyPathTest(t *testing.T,
 		blockConsumer *blockconsumer.BlockConsumer,
 		blocks []*flow.Block,
 		resultApprovalsWG *sync.WaitGroup,
-		chunkDataRequestWG *sync.WaitGroup) {
+		chunkDataRequestWG *sync.WaitGroup,
+		followerDistributor *pubsub.FollowerDistributor) {
 
 		for i := 0; i < len(blocks)*eventRepetition; i++ {
 			// consumer is only required to be "notified" that a new finalized block available.
 			// It keeps track of the last finalized block it has read, and read the next height upon
 			// getting notified as follows:
-			blockConsumer.OnFinalizedBlock(&model.Block{})
+			followerDistributor.OnFinalizedBlock(&model.Block{})
 		}
 
 		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(10*retry*blockCount)*time.Second,
@@ -469,7 +471,7 @@ func withConsumers(t *testing.T,
 	verCollector module.VerificationMetrics, // verification metrics collector
 	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
 	providerFunc MockChunkDataProviderFunc,
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup, *pubsub.FollowerDistributor),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := trace.NewNoopTracer()
@@ -581,7 +583,7 @@ func withConsumers(t *testing.T,
 		verNode.VerifierEngine)
 
 	// plays test scenario
-	withBlockConsumer(verNode.BlockConsumer, blocks, conWG, exeWG)
+	withBlockConsumer(verNode.BlockConsumer, blocks, conWG, exeWG, verNode.FollowerDistributor)
 
 	// tears down engines and nodes
 	unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")

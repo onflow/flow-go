@@ -51,8 +51,21 @@ func (s *AccessStoreTxErrorMessagesSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
-// SetupTest sets up the test suite by starting the network.
-// The access are started with correct parameters and store transaction error messages.
+// SetupTest initializes the test suite with a network configuration for testing transaction error message storage.
+//
+// Network Configuration:
+//   - 2 Access nodes:
+//     defaultAccess (access_1): Standard access node without error message storage
+//     storeTxAccess (access_2): Access node with --store-tx-result-error-messages=true and metrics server
+//   - 2 Collection nodes (standard configuration)
+//   - 3 Consensus nodes (with slower timing: 250ms proposal duration to slow block rate, reduced seal approvals)
+//   - 2 Execution nodes (standard configuration)
+//   - 1 Verification node (standard configuration)
+//   - NO Observer node
+//
+// The slower consensus timing (250ms vs typical 100ms) is intentional to compensate for faster BLS
+// operations in the crypto module, ensuring sufficient time for error message processing. The test
+// validates that transaction error messages are correctly stored in the database and can be backfilled.
 func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	defaultAccess := testnet.NewNodeConfig(
 		flow.RoleAccess,
@@ -63,7 +76,10 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	storeTxAccess := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlagf("--store-tx-result-error-messages=true"),
+		testnet.WithAdditionalFlag("--store-tx-result-error-messages=true"),
+		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
+		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
+		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithMetricsServer(),
 	)
 
@@ -104,15 +120,31 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 // TestAccessStoreTxErrorMessages verifies that transaction result error messages
 // are stored correctly in the database by sending a transaction, generating an error,
 // and checking if the error message is properly stored and retrieved from the database.
+//
+// NOTE: This test is intentionally separate from TestBackfillTxErrorMessages and should
+// NOT be combined into a single test method. The reason is:
+//  1. Database Access Requirement: fetchTxErrorMessages() needs exclusive database access,
+//     which requires stopping containers (otherwise: "lock held by current process" error)
+//  2. Network State Loss: Stopping and restarting containers causes loss of blockchain state
+//     (blocks, transactions, receipts), making it impossible for subsequent tests to continue
+//  3. Complexity: Restarting containers would require re-establishing ghost client tracking,
+//     waiting for network readiness, and rebuilding in-memory state
+//
+// Each test gets its own fresh network via SetupTest/TearDownTest, ensuring clean state
+// and avoiding the complexity of container restart/state recovery.
 func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
+	ctx, cancel := context.WithTimeout(s.ctx, 60*time.Second)
+	defer cancel()
+
 	// Create and send a transaction that will result in an error.
 	txResult := s.createAndSendTxWithTxError()
 
-	// Wait until execution receipts are handled, transaction error messages are stored.
-	s.Eventually(func() bool {
-		value, err := s.getMaxReceiptHeight(s.accessContainerName)
-		return err == nil && value > txResult.BlockHeight
-	}, 60*time.Second, 1*time.Second)
+	client, err := s.net.ContainerByName(s.accessContainerName).TestnetClient()
+	s.Require().NoError(err)
+
+	// wait until the node has indexed a few blocks past the transaction block height
+	err = client.WaitUntilIndexed(ctx, txResult.BlockHeight+10)
+	s.Require().NoError(err)
 
 	// Stop the network containers before checking the results.
 	s.net.StopContainers()
@@ -125,6 +157,10 @@ func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
 // TestBackfillTxErrorMessages verifies that transaction error messages are backfilled correctly
 // by creating a transaction that results in an error, running the backfill command, and checking
 // if the error message is stored and retrieved from the database.
+//
+// NOTE: This test is intentionally separate from TestAccessStoreTxErrorMessages (see that test's
+// comment for full explanation). These tests cannot be combined because accessing the database
+// requires stopping containers, which would disrupt the network state needed by subsequent tests.
 func (s *AccessStoreTxErrorMessagesSuite) TestBackfillTxErrorMessages() {
 	// Create and send a transactions that will result in an error.
 	transactionCount := 5
@@ -192,23 +228,6 @@ func (s *AccessStoreTxErrorMessagesSuite) createAndSendTxWithTxError() *sdk.Tran
 	s.Require().NoError(err)
 
 	return accountCreationTxRes
-}
-
-// getMaxReceiptHeight retrieves the maximum receipt height for a given container by
-// querying the metrics endpoint. This is used to confirm that the transaction receipts
-// have been processed.
-func (s *AccessStoreTxErrorMessagesSuite) getMaxReceiptHeight(containerName string) (uint64, error) {
-	node := s.net.ContainerByName(containerName)
-	metricsURL := fmt.Sprintf("http://0.0.0.0:%s/metrics", node.Port(testnet.MetricsPort))
-	values := s.net.GetMetricFromContainer(s.T(), containerName, metricsURL, maxReceiptHeightMetric)
-
-	// If no values are found in the metrics, return an error.
-	if len(values) == 0 {
-		return 0, fmt.Errorf("no values found")
-	}
-
-	// Return the first value found as the max receipt height.
-	return uint64(values[0].GetGauge().GetValue()), nil
 }
 
 // fetchTxErrorMessage retrieves the stored transaction error message for a given transaction result.

@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/onflow/crypto"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -45,10 +45,12 @@ import (
 // IrrecoverableStateTestSuite tests that Access node indicate an inconsistent or corrupted node state
 type IrrecoverableStateTestSuite struct {
 	suite.Suite
+	log    zerolog.Logger
+	cancel context.CancelFunc
+
 	state      *protocol.State
 	snapshot   *protocol.Snapshot
 	epochQuery *protocol.EpochQuery
-	log        zerolog.Logger
 	net        *mocknetwork.EngineRegistry
 	request    *module.Requester
 	collClient *accessmock.AccessAPIClient
@@ -65,6 +67,7 @@ type IrrecoverableStateTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+	seals        *storagemock.Seals
 
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
@@ -75,7 +78,7 @@ type IrrecoverableStateTestSuite struct {
 }
 
 func (suite *IrrecoverableStateTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = mocknetwork.NewEngineRegistry(suite.T())
 	suite.state = protocol.NewState(suite.T())
 	suite.snapshot = protocol.NewSnapshot(suite.T())
@@ -92,6 +95,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.transactions = storagemock.NewTransactions(suite.T())
 	suite.collections = storagemock.NewCollections(suite.T())
 	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
+	suite.seals = storagemock.NewSeals(suite.T())
 
 	suite.collClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.execClient = accessmock.NewExecutionAPIClient(suite.T())
@@ -157,6 +161,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		Headers:                     suite.headers,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
+		Seals:                       suite.seals,
 		ChainID:                     suite.chainID,
 		AccessMetrics:               suite.metrics,
 		MaxHeightRange:              0,
@@ -173,6 +178,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 
 	stateStreamConfig := statestreambackend.Config{}
+	followerDistributor := pubsub.NewFollowerDistributor()
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
 		suite.state,
@@ -188,10 +194,19 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		nil,
 		stateStreamConfig,
 		nil,
+		followerDistributor,
 	)
 	assert.NoError(suite.T(), err)
+
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
+}
+
+func (suite *IrrecoverableStateTestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
 func TestIrrecoverableState(t *testing.T) {
@@ -262,12 +277,15 @@ func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
 }
 
 func (suite *IrrecoverableStateTestSuite) startServers(t *testing.T, expectedError error) {
-	ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedError)
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
 
-	suite.rpcEng.Start(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), ctx, expectedError)
 
-	suite.secureGrpcServer.Start(ctx)
-	suite.unsecureGrpcServer.Start(ctx)
+	suite.rpcEng.Start(signalerCtx)
+
+	suite.secureGrpcServer.Start(signalerCtx)
+	suite.unsecureGrpcServer.Start(signalerCtx)
 
 	// wait for the servers to startup
 	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)

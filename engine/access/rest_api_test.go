@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
@@ -71,6 +71,7 @@ type RestAPITestSuite struct {
 	transactions     *storagemock.Transactions
 	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
+	seals            *storagemock.Seals
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -84,7 +85,7 @@ type RestAPITestSuite struct {
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.sealedSnaphost = new(protocol.Snapshot)
@@ -119,6 +120,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.executionResults = new(storagemock.ExecutionResults)
+	suite.seals = new(storagemock.Seals)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -184,6 +186,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
 		ExecutionResults:            suite.executionResults,
+		Seals:                       suite.seals,
 		ChainID:                     suite.chainID,
 		AccessMetrics:               suite.metrics,
 		MaxHeightRange:              0,
@@ -199,6 +202,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	stateStreamConfig := statestreambackend.Config{}
+	followerDistributor := pubsub.NewFollowerDistributor()
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
 		suite.state,
@@ -214,6 +218,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		stateStreamConfig,
 		nil,
+		followerDistributor,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -265,8 +270,15 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		testBlocks[i] = block
 		testBlockIDs[i] = block.ID().String()
 
-		execResult := unittest.ExecutionResultFixture()
-		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
+		execResult := unittest.ExecutionResultFixture(
+			unittest.WithExecutionResultBlockID(block.ID()),
+		)
+		seal := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block.ID()),
+			unittest.Seal.WithResult(execResult),
+		)
+		suite.seals.On("FinalizedSealForBlock", block.ID()).Return(seal, nil)
+		suite.executionResults.On("ByID", seal.ResultID).Return(execResult, nil)
 	}
 
 	suite.sealedBlock = testBlocks[len(testBlocks)-1].ToHeader()
@@ -419,6 +431,8 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		invalidBlockIndex := rand.Intn(len(testBlocks))
 		invalidID := unittest.IdentifierFixture()
 		suite.blocks.On("ByID", invalidID).Return(nil, storage.ErrNotFound).Once()
+		// Also mock seal lookup in case the block lookup succeeds but seal lookup fails
+		suite.seals.On("FinalizedSealForBlock", invalidID).Return(nil, storage.ErrNotFound).Maybe()
 		blockIDs := make([]string, len(testBlockIDs))
 		copy(blockIDs, testBlockIDs)
 		blockIDs[invalidBlockIndex] = invalidID.String()

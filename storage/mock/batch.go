@@ -73,6 +73,41 @@ func (_m *Batch) GlobalReader() storage.Reader {
 	return r0
 }
 
+// ScopedValue provides a mock function with given fields: key
+func (_m *Batch) ScopedValue(key string) (any, bool) {
+	ret := _m.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ScopedValue")
+	}
+
+	var r0 any
+	var r1 bool
+	if rf, ok := ret.Get(0).(func(string) (any, bool)); ok {
+		return rf(key)
+	}
+	if rf, ok := ret.Get(0).(func(string) any); ok {
+		r0 = rf(key)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) bool); ok {
+		r1 = rf(key)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
+// SetScopedValue provides a mock function with given fields: key, value
+func (_m *Batch) SetScopedValue(key string, value any) {
+	_m.Called(key, value)
+}
+
 // Writer provides a mock function with no fields
 func (_m *Batch) Writer() storage.Writer {
 	ret := _m.Called()

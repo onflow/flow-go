@@ -48,20 +48,27 @@ type ExecutionStateSyncSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	net                 *testnet.FlowNetwork
-	executionDataDBMode execution_data.ExecutionDataDBMode
+	net *testnet.FlowNetwork
 }
 
+// SetupTest initializes the test suite with a network configuration for testing execution state sync.
+//
+// Network Configuration:
+//   - 1 Bridge Access node (supports-observer=true, execution-data-sync-enabled, public-network-sync-enabled, Pebble DB)
+//   - 1 Ghost Access node (lightweight, for tracking block state)
+//   - 1 Observer node (execution-data-sync-enabled, execution-data-indexing-enabled, event-query-mode=execution-nodes-only)
+//   - 2 Collection nodes (standard configuration)
+//   - 2 Execution nodes (standard configuration)
+//   - 3 Consensus nodes (with custom timing: 100ms proposal duration, reduced seal approvals)
+//   - 1 Verification node (standard configuration)
+//
+// The bridge access node and observer both sync execution data from execution nodes and verify that
+// execution state is properly synced and can be retrieved. Uses Pebble DB as the execution data store.
 func (s *ExecutionStateSyncSuite) SetupTest() {
-	s.setup(execution_data.ExecutionDataDBModePebble)
-}
-
-func (s *ExecutionStateSyncSuite) setup(executionDataDBMode execution_data.ExecutionDataDBMode) {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
-	s.executionDataDBMode = executionDataDBMode
 	s.buildNetworkConfig()
 
 	// start the network
@@ -95,7 +102,6 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-db=%s", s.executionDataDBMode.String())),
 	)
 
 	// add the ghost (access) node config
@@ -135,7 +141,6 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			"--execution-data-sync-enabled=true",
 			"--event-query-mode=execution-nodes-only",
-			fmt.Sprintf("--execution-data-db=%s", s.executionDataDBMode.String()),
 		},
 	}}
 
@@ -143,9 +148,9 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 }
 
-// TestBadgerDBHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
+// TestPebbleDBHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
 // successfully sync the data to badger DB
-func (s *ExecutionStateSyncSuite) TestBadgerDBHappyPath() {
+func (s *ExecutionStateSyncSuite) TestPebbleDBHappyPath() {
 	s.executionStateSyncTest()
 }
 
@@ -239,9 +244,7 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container
 	var err error
 	dsPath := filepath.Join(node.ExecutionDataDBPath(), "blobstore")
 
-	if s.executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-		ds, err = pebbleds.NewDatastore(dsPath, nil)
-	}
+	ds, err = pebbleds.NewDatastore(dsPath, nil)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)

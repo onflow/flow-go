@@ -57,16 +57,51 @@ const (
 	ComputationKindEVMDecodeABI
 )
 
-// MainnetExecutionEffortWeights are the execution effort weights as they are
-// on mainnet from crescendo spork
+// MainnetExecutionEffortWeights are the execution effort weights as they are on mainnet
 var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
-	common.ComputationKindStatement:          314,
-	common.ComputationKindLoop:               314,
-	common.ComputationKindFunctionInvocation: 314,
-	ComputationKindGetValue:                  162,
-	ComputationKindCreateAccount:             567534,
-	ComputationKindSetValue:                  153,
-	ComputationKindEVMGasUsage:               13,
+	ComputationKindCreateAccount:                      2143437,
+	ComputationKindBLSVerifyPOP:                       1538600,
+	ComputationKindGetAccountBalance:                  485476,
+	ComputationKindBLSAggregatePublicKeys:             402728,
+	ComputationKindGetStorageCapacity:                 397087,
+	ComputationKindGetAccountAvailableBalance:         375235,
+	ComputationKindUpdateAccountContractCode:          369407,
+	ComputationKindBLSAggregateSignatures:             325309,
+	ComputationKindGenerateAccountLocalID:             75507,
+	ComputationKindGetAccountContractNames:            32771,
+	ComputationKindGetStorageUsed:                     25416,
+	ComputationKindAccountKeysCount:                   24709,
+	ComputationKindAllocateSlabIndex:                  15372,
+	common.ComputationKindAtreeMapGet:                 8837,
+	common.ComputationKindAtreeMapRemove:              7373,
+	common.ComputationKindCreateArrayValue:            4364,
+	common.ComputationKindCreateDictionaryValue:       3818,
+	common.ComputationKindAtreeMapSet:                 3656,
+	common.ComputationKindAtreeArrayInsert:            3652,
+	common.ComputationKindAtreeMapReadIteration:       3325,
+	ComputationKindEncodeEvent:                        2911,
+	common.ComputationKindTransferCompositeValue:      2358,
+	common.ComputationKindAtreeArrayAppend:            1907,
+	common.ComputationKindStatement:                   1770,
+	common.ComputationKindAtreeArraySet:               1737,
+	common.ComputationKindFunctionInvocation:          1399,
+	common.ComputationKindAtreeMapPopIteration:        1210,
+	common.ComputationKindAtreeArrayPopIteration:      736,
+	ComputationKindRLPDecoding:                        516,
+	common.ComputationKindGraphemesIteration:          278,
+	common.ComputationKindUfixParse:                   257,
+	common.ComputationKindFixParse:                    223,
+	common.ComputationKindLoop:                        179,
+	common.ComputationKindAtreeArrayBatchConstruction: 177,
+	common.ComputationKindTransferDictionaryValue:     125,
+	common.ComputationKindBigIntParse:                 69,
+	common.ComputationKindTransferArrayValue:          48,
+	ComputationKindSetValue:                           48,
+	common.ComputationKindUintParse:                   31,
+	common.ComputationKindIntParse:                    28,
+	ComputationKindGetValue:                           23,
+	common.ComputationKindStringToLower:               5,
+	ComputationKindEVMGasUsage:                        3,
 }
 
 type Meter interface {
@@ -77,6 +112,7 @@ type Meter interface {
 
 	ComputationIntensities() meter.MeteredComputationIntensities
 	ComputationAvailable(common.ComputationUsage) bool
+	ComputationRemaining(kind common.ComputationKind) uint64
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
@@ -104,6 +140,10 @@ func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensi
 
 func (meter *meterImpl) ComputationAvailable(usage common.ComputationUsage) bool {
 	return meter.txnState.ComputationAvailable(usage)
+}
+
+func (meter *meterImpl) ComputationRemaining(kind common.ComputationKind) uint64 {
+	return meter.txnState.ComputationRemaining(kind)
 }
 
 func (meter *meterImpl) ComputationUsed() (uint64, error) {

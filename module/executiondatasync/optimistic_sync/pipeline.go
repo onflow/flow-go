@@ -2,9 +2,13 @@ package optimistic_sync
 
 import (
 	"context"
+	"errors"
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// ErrInvalidTransition is returned when a state transition is invalid.
+var ErrInvalidTransition = errors.New("invalid state transition")
 
 // PipelineStateProvider is an interface that provides a pipeline's state.
 type PipelineStateProvider interface {
