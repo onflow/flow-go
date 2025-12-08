@@ -56,7 +56,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	all := store.InitAll(metrics, suite.db, flow.Emulator) // TODO(4204) - handle cluster and non-cluster blocks?
+	all := store.InitAll(metrics, suite.db, flow.Emulator)
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 	clusterHeaders := store.NewHeaders(metrics, suite.db, suite.chainID)
 

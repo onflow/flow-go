@@ -21,9 +21,9 @@ func TestIterateHeight(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		// create blocks with siblings
-		b1 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 1}}
-		b2 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 2}}
-		b3 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 3}}
+		b1 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 1, ChainID: flow.Emulator}}
+		b2 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 2, ChainID: flow.Emulator}}
+		b3 := &flow.Header{HeaderBody: flow.HeaderBody{Height: 3, ChainID: flow.Emulator}}
 		bs := []*flow.Header{b1, b2, b3}
 
 		// index height
@@ -41,7 +41,7 @@ func TestIterateHeight(t *testing.T) {
 		// create iterator
 		// b0 is the root block, iterate from b1 to b3
 		iterRange := module.IteratorRange{Start: b1.Height, End: b3.Height}
-		headers := store.NewHeaders(&metrics.NoopCollector{}, db, "") // TODO(4204) set chainID in this test?
+		headers := store.NewHeaders(&metrics.NoopCollector{}, db, flow.Emulator)
 		getBlockIDByIndex := func(height uint64) (flow.Identifier, bool, error) {
 			blockID, err := headers.BlockIDByHeight(height)
 			if err != nil {

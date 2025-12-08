@@ -97,7 +97,7 @@ func (suite *BuilderSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
 
-	all := store.InitAll(metrics, suite.db, flow.Emulator) // TODO(4204) - handle cluster and non-cluster blocks?
+	all := store.InitAll(metrics, suite.db, flow.Emulator)
 	consumer := events.NewNoop()
 
 	suite.headers = store.NewHeaders(metrics, suite.db, suite.chainID)
