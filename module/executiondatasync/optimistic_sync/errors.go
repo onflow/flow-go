@@ -90,7 +90,7 @@ type CriteriaNotMetError struct {
 
 func NewCriteriaNotMetError(blockID flow.Identifier) *CriteriaNotMetError {
 	return &CriteriaNotMetError{
-		err: fmt.Errorf("block %s is already sealed but the criteria is still not met", blockID),
+		err: fmt.Errorf("the criteria for block %s is not met", blockID),
 	}
 }
 
@@ -105,4 +105,30 @@ func (e CriteriaNotMetError) Unwrap() error {
 func IsCriteriaNotMetError(err error) bool {
 	var criteriaNotMetError *CriteriaNotMetError
 	return errors.As(err, &criteriaNotMetError)
+}
+
+// BlockFinalityMismatchError indicates that the requested block does not match
+// the finalized block at the same height. This means the block cannot belong
+// to the canonical finalized chain.
+type BlockFinalityMismatchError struct {
+	err error
+}
+
+func NewBlockFinalityMismatchError(blockID flow.Identifier, actualBlockID flow.Identifier) *BlockFinalityMismatchError {
+	return &BlockFinalityMismatchError{
+		err: fmt.Errorf("block %s is not the finalized block at its height (finalized block is %s)", blockID, actualBlockID),
+	}
+}
+
+func (e BlockFinalityMismatchError) Error() string {
+	return e.err.Error()
+}
+
+func (e BlockFinalityMismatchError) Unwrap() error {
+	return e.err
+}
+
+func IsBlockFinalityMismatchError(err error) bool {
+	var blockFinalityMismatchError *BlockFinalityMismatchError
+	return errors.As(err, &blockFinalityMismatchError)
 }

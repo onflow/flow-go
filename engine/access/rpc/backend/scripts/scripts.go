@@ -171,6 +171,8 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
 			return nil, nil, access.NewPreconditionFailedError(err)
+		case optimistic_sync.IsBlockFinalityMismatchError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -237,6 +239,8 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
 			return nil, nil, access.NewPreconditionFailedError(err)
+		case optimistic_sync.IsBlockFinalityMismatchError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -308,6 +312,8 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
 			return nil, nil, access.NewPreconditionFailedError(err)
+		case optimistic_sync.IsBlockFinalityMismatchError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}

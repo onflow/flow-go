@@ -104,16 +104,8 @@ func (e *Provider) ExecutionResultInfo(
 		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
 	}
 
-	sealedHeader, err := e.state.Sealed().Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup sealed header: %w", err)
-	}
-	header, err := e.headers.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get header by block ID %v: %w", blockID, err)
-	}
-	// If block is sealed and criteria cannot be met return an error
-	if header.Height <= sealedHeader.Height && len(subsetENs) < len(criteria.RequiredExecutors) {
+	// If criteria cannot be met, return an error
+	if len(subsetENs) < len(criteria.RequiredExecutors) {
 		return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
 	}
 
@@ -127,6 +119,20 @@ func (e *Provider) ExecutionResultInfo(
 		// criteria is met, then there must be at least one acceptable executor. If this is not true,
 		// then the criteria check must fail.
 		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
+	}
+
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header by block ID %v: %w", blockID, err)
+	}
+	// Lookup the finalized block ID at the height of the requested block
+	blockIDFinalized, err := e.headers.BlockIDByHeight(header.Height)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup finalized block ID at height %d: %w", header.Height, err)
+	}
+	// If the requested block conflicts with finalized block, return error
+	if blockIDFinalized != blockID {
+		return nil, optimistic_sync.NewBlockFinalityMismatchError(blockID, blockIDFinalized)
 	}
 
 	return &optimistic_sync.ExecutionResultInfo{

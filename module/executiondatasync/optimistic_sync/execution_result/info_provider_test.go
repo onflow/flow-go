@@ -107,8 +107,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 
 			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
 			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-			suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			// Require specific executors (first two nodes)
@@ -155,8 +154,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 			suite.setupIdentitiesMock(allExecutionNodes)
 			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
 			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-			suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
 
 			query, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
@@ -280,7 +278,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 		suite.Require().True(optimistic_sync.IsUnknownRequiredExecutorError(err))
 	})
 
-	suite.Run("criteria not met on sealed block returns error", func() {
+	suite.Run("criteria not met returns error", func() {
 		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
@@ -291,9 +289,6 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 			receipts[i] = r
 		}
 		suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
-		suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-		suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-		suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
 		suite.setupIdentitiesMock(allExecutionNodes)
 
 		// Require all executors, but only one produces receipts
@@ -307,6 +302,35 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 		suite.Require().Nil(query)
 		suite.Require().True(optimistic_sync.IsCriteriaNotMetError(err))
 	})
+
+	suite.Run("requested block conflicts with a finalized, returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		receipts := make(flow.ExecutionReceiptList, totalReceipts)
+		for i := 0; i < totalReceipts; i++ {
+			r := unittest.ReceiptForBlockFixture(block)
+			r.ExecutorID = allExecutionNodes[i].NodeID
+			r.ExecutionResult = *executionResult
+			receipts[i] = r
+		}
+		suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
+		suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
+		finalizedBlockID := unittest.IdentifierFixture()
+		suite.headers.On("BlockIDByHeight", block.Height).Return(finalizedBlockID, nil).Once()
+		suite.setupIdentitiesMock(allExecutionNodes)
+
+		// Require all executors, but only one produces receipts
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: 1,
+				RequiredExecutors:      allExecutionNodes.NodeIDs(),
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsBlockFinalityMismatchError(err))
+	})
+
 }
 
 // TestRootBlockHandling tests the special case handling for root blocks.
@@ -371,8 +395,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 	suite.Run(
 		"with default optimistic_sync.Criteria", func() {
 			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-			suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
@@ -392,8 +415,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 	suite.Run(
 		"with operator preferred executors", func() {
 			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-			suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			provider := suite.createProvider(
@@ -417,8 +439,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 	suite.Run(
 		"with operator required executors", func() {
 			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-			suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			provider := suite.createProvider(
@@ -443,8 +464,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 	suite.Run(
 		"with both: operator preferred & required executors", func() {
 			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-			suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			provider := suite.createProvider(
@@ -472,8 +492,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 	suite.Run(
 		"with client preferred executors", func() {
 			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-			suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			provider := suite.createProvider(
