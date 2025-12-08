@@ -4132,7 +4132,7 @@ func RunWithNewEnvironment(
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				f(
-					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					ctx,
 					vm,
 					snapshotTree,
 					testContract,
@@ -4193,7 +4193,7 @@ func RunContractWithNewEnvironment(
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				f(
-					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					ctx,
 					vm,
 					snapshotTree,
 					testContract,

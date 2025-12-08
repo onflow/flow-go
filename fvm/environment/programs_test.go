@@ -25,21 +25,21 @@ var (
 	addressC = flow.HexToAddress("0c")
 
 	contractALocation = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Address: common.Address(addressA),
 		Name:    "A",
 	}
 	contractA2Location = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Address: common.Address(addressA),
 		Name:    "A2",
 	}
 
 	contractBLocation = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressB.Bytes()),
+		Address: common.Address(addressB),
 		Name:    "B",
 	}
 
 	contractCLocation = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressC.Bytes()),
+		Address: common.Address(addressC),
 		Name:    "C",
 	}
 

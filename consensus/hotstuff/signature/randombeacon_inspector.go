@@ -5,15 +5,18 @@ import (
 
 	"github.com/onflow/crypto"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// randomBeaconInspector implements hotstuff.RandomBeaconInspector interface.
+// randomBeaconInspector implements [hotstuff.RandomBeaconInspector] interface.
 // All methods of this structure are concurrency-safe.
 type randomBeaconInspector struct {
 	inspector crypto.ThresholdSignatureInspector
 }
+
+var _ hotstuff.RandomBeaconInspector = (*randomBeaconInspector)(nil)
 
 // NewRandomBeaconInspector instantiates a new randomBeaconInspector.
 // The constructor errors with a `model.ConfigurationError` in any of the following cases
@@ -50,8 +53,8 @@ func NewRandomBeaconInspector(
 // execute the business logic, without interfering with each other).
 // It allows concurrent verification of the given signature.
 // Returns :
-//   - model.InvalidSignerError if signerIndex is invalid
-//   - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//   - [model.InvalidSignerError] if signerIndex is invalid
+//   - [model.ErrInvalidSignature] if signerID is valid but signature is cryptographically invalid
 //   - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
 	valid, err := r.inspector.VerifyShare(signerIndex, share)
@@ -75,14 +78,14 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 // are returned) through a post-check (verifying the threshold signature
 // _after_ reconstruction before returning it).
 // The function is thread-safe but locks its internal state, thereby permitting only
-// one routine at a time to add a signature.
+// one routine at a time to add a signature (inherited from the underlying inspector).
 // Returns:
 //   - (true, nil) if the signature has been added, and enough shares have been collected.
 //   - (false, nil) if the signature has been added, but not enough shares were collected.
 //
 // The following errors are expected during normal operations:
-//   - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
-//   - model.DuplicatedSignerError if the signer has been already added
+//   - [model.InvalidSignerError] if signerIndex is invalid (out of the valid range)
+//   - [model.DuplicatedSignerError] if the signer has been already added
 //   - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (bool, error) {
 	// Trusted add to the crypto layer
@@ -112,8 +115,8 @@ func (r *randomBeaconInspector) EnoughShares() bool {
 //
 // Returns:
 //   - (signature, nil) if no error occurred
-//   - (nil, model.InsufficientSignaturesError) if not enough shares were collected
-//   - (nil, model.InvalidSignatureIncluded) if at least one collected share does not serialize to a valid BLS signature,
+//   - (nil, [model.InsufficientSignaturesError]) if not enough shares were collected
+//   - (nil, [model.InvalidSignatureIncluded]) if at least one collected share does not serialize to a valid BLS signature,
 //     or if the constructed signature failed to verify against the group public key and stored message. This post-verification
 //     is required  for safety, as `TrustedAdd` allows adding invalid signatures.
 //   - (nil, error) for any other unexpected error.
