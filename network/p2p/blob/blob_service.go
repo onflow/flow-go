@@ -119,12 +119,30 @@ func NewBlobService(
 	opts ...network.BlobServiceOption,
 ) (*blobService, error) {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
+
+	// Create blockstore based on config
+	// var blockStore blockstore.Blockstore
+	// if bs.config.SkipBloomCache {
+	// 	// Use plain blockstore - Pebble's built-in bloom filters are sufficient
+	// 	blockStore = blockstore.NewBlockstore(ds)
+	// } else {
+	// Use cached blockstore with bloom filter (default behavior)
+	cachedBlockStore, err := blockstore.CachedBlockstore(
+		context.Background(),
+		blockstore.NewBlockstore(ds),
+		blockstore.DefaultCacheOpts(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
+	}
+
 	bs := &blobService{
 		prefix: prefix,
 		config: &BlobServiceConfig{
 			ReprovideInterval: DefaultReprovideInterval,
 			SkipBloomCache:    false, // default: use cached blockstore
 		},
+		blockStore: cachedBlockStore,
 	}
 
 	// Apply options before creating blockstore, as SkipBloomCache affects blockstore creation
@@ -132,24 +150,9 @@ func NewBlobService(
 		opt(bs)
 	}
 
-	// Create blockstore based on config
-	var blockStore blockstore.Blockstore
-	if bs.config.SkipBloomCache {
-		// Use plain blockstore - Pebble's built-in bloom filters are sufficient
-		blockStore = blockstore.NewBlockstore(ds)
-	} else {
-		// Use cached blockstore with bloom filter (default behavior)
-		cachedBlockStore, err := blockstore.CachedBlockstore(
-			context.Background(),
-			blockstore.NewBlockstore(ds),
-			blockstore.DefaultCacheOpts(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
-		}
-		blockStore = cachedBlockStore
-	}
-	bs.blockStore = blockStore
+	// blockStore = cachedBlockStore
+	// }
+	// bs.blockStore = blockStore
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
