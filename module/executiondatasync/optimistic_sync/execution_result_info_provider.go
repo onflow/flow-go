@@ -58,5 +58,9 @@ type ExecutionResultInfoProvider interface {
 	//   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
 	//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 	//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+	//   - [optimistic_sync.CriteriaNotMetError]: Returned when the execution result
+	//     criteria cannot be satisfied for the requested block.
+	//   - [optimistic_sync.BlockFinalityMismatchError]: Returned when the requested
+	//     block does not match the canonical finalized block at its height.
 	ExecutionResultInfo(blockID flow.Identifier, criteria Criteria) (*ExecutionResultInfo, error)
 }
