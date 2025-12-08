@@ -74,7 +74,6 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	criteria optimistic_sync.Criteria,
 ) (*execution_data.BlockExecutionData, *accessmodel.ExecutorMetadata, error) {
 	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(blockID, criteria)
-	// TODO: change error handling; it is obsolete.
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block %s: %w", blockID, err)
 		switch {
@@ -148,6 +147,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(
 	executionDataProvider := newExecutionDataProvider(
 		b.state,
 		b.headers,
+		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,
@@ -179,6 +179,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 	executionDataProvider := newExecutionDataProvider(
 		b.state,
 		b.headers,
+		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,
@@ -210,6 +211,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	executionDataProvider := newExecutionDataProvider(
 		b.state,
 		b.headers,
+		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,
@@ -239,6 +241,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
 	executionDataProvider := newExecutionDataProvider(
 		b.state,
 		b.headers,
+		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,
@@ -251,6 +254,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
 type executionDataProvider struct {
 	state                   protocol.State
 	headers                 storage.Headers
+	executionDataTracker    tracker.ExecutionDataTracker
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	executionStateCache     optimistic_sync.ExecutionStateCache
 	criteria                optimistic_sync.Criteria
@@ -260,6 +264,7 @@ type executionDataProvider struct {
 func newExecutionDataProvider(
 	state protocol.State,
 	headers storage.Headers,
+	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 	nextCriteria optimistic_sync.Criteria,
@@ -268,6 +273,7 @@ func newExecutionDataProvider(
 	return &executionDataProvider{
 		state:                   state,
 		headers:                 headers,
+		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
 		executionStateCache:     executionStateCache,
 		criteria:                nextCriteria,
@@ -278,10 +284,12 @@ func newExecutionDataProvider(
 var _ subscription.DataProvider = (*executionDataProvider)(nil)
 
 func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
-	// TODO: there was a check like if height > highestAvailableHeight { return err }
-	// highest height were produced by the execution data downloader in the access_node_builder.go
-	// it was passed as an argument to the execution data tracker.
-	// should i add back this check here?
+	if e.executionDataTracker.GetHighestAvailableFinalizedHeight() > e.height {
+		// fail early if no notification has been received for the given block height.
+		// note: it's possible for the data to exist in the data store before the notification is
+		// received. this ensures a consistent view is available to all streams.
+		return nil, subscription.ErrBlockNotReady
+	}
 
 	// the spork root block will never have execution data available. If requested, return an empty result.
 	if e.height == e.state.Params().SporkRootBlockHeight() {
@@ -298,9 +306,8 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 
 	blockID, err := e.headers.BlockIDByHeight(e.height)
 	if err != nil {
-		// TODO: I don't like this comment. Make it better
-		// this can only happen if a block is not finalized yet. however, we don't want to serve
-		// unfinalized blocks to clients, so we return an error instead.
+		// this function is called after the headers are updated, so if we didn't find the block header in the storage,
+		// we treat it as an exception
 		return nil, fmt.Errorf("block %d might not be finalized yet: %w", e.height, err)
 	}
 
