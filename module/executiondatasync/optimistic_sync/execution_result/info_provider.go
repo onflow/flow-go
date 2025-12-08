@@ -61,7 +61,7 @@ func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) (*optimistic_sync.ExecutionResultInfo, error) {
-	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	executorIdentities, err := e.state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
 	}

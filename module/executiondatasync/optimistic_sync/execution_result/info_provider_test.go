@@ -52,7 +52,6 @@ func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	suite.state.On("SealedResult", rootBlockID).Return(flow.ExecutionReceiptList{}).Maybe()
 	suite.params.On("SporkRootBlock").Return(suite.rootBlock)
 	suite.state.On("Params").Return(suite.params)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
 }
 
