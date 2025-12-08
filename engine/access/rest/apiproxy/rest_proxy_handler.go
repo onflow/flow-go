@@ -206,6 +206,29 @@ func (r *RestProxyHandler) GetTransactionResult(
 	return convert.MessageToTransactionResult(transactionResultResponse)
 }
 
+// GetTransactionResultsByBlockID returns transaction results by the block ID.
+func (r *RestProxyHandler) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	getTransactionResultsRequest := &accessproto.GetTransactionsByBlockIDRequest{
+		BlockId:              blockID[:],
+		EventEncodingVersion: requiredEventEncodingVersion,
+	}
+
+	transactionResultsResponse, err := upstream.GetTransactionResultsByBlockID(ctx, getTransactionResultsRequest)
+	r.log("upstream", "GetTransactionResultsByBlockID", err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return convert.MessageToTransactionResults(transactionResultsResponse)
+}
+
 // GetAccountAtBlockHeight returns account by account address and block height.
 func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	upstream, closer, err := r.FaultTolerantClient()

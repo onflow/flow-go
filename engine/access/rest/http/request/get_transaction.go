@@ -64,13 +64,15 @@ func (g *GetTransaction) Build(r *common.Request) error {
 	return err
 }
 
+// GetTransactionsByBlockID represents a request to get transactions by
+// a block ID, and contains the parsed and validated input parameters.
 type GetTransactionsByBlockID struct {
 	TransactionOptionals
 	ExpandsResult bool
 }
 
 // NewGetTransactionsByBlockIDRequest extracts necessary variables from the provided request,
-// builds a GetTransactions instance, and validates it.
+// builds a GetTransactionsByBlockID instance, and validates it.
 //
 // All errors indicate a malformed request.
 func NewGetTransactionsByBlockIDRequest(r *common.Request) (*GetTransactionsByBlockID, error) {
@@ -98,15 +100,6 @@ func parseGetTransactionsByBlockID(r *common.Request) (*GetTransactionsByBlockID
 	return &req, err
 }
 
-func (g *GetTransactionsByBlockID) Build(r *common.Request) error {
-	err := g.TransactionOptionals.Parse(r)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
 type GetTransactionResult struct {
 	GetByIDRequest
 	TransactionOptionals
@@ -131,6 +124,39 @@ func (g *GetTransactionResult) Build(r *common.Request) error {
 	err = g.GetByIDRequest.Build(r)
 
 	return err
+}
+
+// GetTransactionResultsByBlockID represents a request to get transaction results by
+// block ID, and contains the parsed and validated input parameters.
+type GetTransactionResultsByBlockID struct {
+	TransactionOptionals
+}
+
+// NewGetTransactionResultsByBlockIDRequest extracts necessary variables from the provided request,
+// builds a GetTransactionResultsByBlockID instance, and validates it.
+//
+// All errors indicate a malformed request.
+func NewGetTransactionResultsByBlockIDRequest(r *common.Request) (*GetTransactionResultsByBlockID, error) {
+	req, err := parseGetTransactionResultsByBlockID(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// parseGetTransactionResultsByBlockID parses raw query and body parameters from an incoming request
+// and constructs a validated GetTransactionResultsByBlockID instance.
+//
+// All errors indicate the request is invalid.
+func parseGetTransactionResultsByBlockID(r *common.Request) (*GetTransactionResultsByBlockID, error) {
+	var req GetTransactionResultsByBlockID
+	err := req.TransactionOptionals.Parse(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return &req, err
 }
 
 // GetScheduledTransaction represents a request to get a scheduled transaction by its scheduled

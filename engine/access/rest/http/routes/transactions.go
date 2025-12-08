@@ -121,6 +121,28 @@ func GetTransactionsByBlockID(r *common.Request, backend access.API, link common
 	return transactionsResponse, nil
 }
 
+// GetTransactionResultsByBlockID gets transaction results by requested blockID.
+func GetTransactionResultsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	req, err := request.NewGetTransactionResultsByBlockIDRequest(r)
+	if err != nil {
+		return nil, common.NewBadRequestError(err)
+	}
+
+	transactionResults, err := backend.GetTransactionResultsByBlockID(r.Context(), req.BlockID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []commonmodels.TransactionResult
+	var txr commonmodels.TransactionResult
+	for i, transactionResult := range transactionResults {
+		txr.Build(transactionResult, transactionResult.TransactionID, link)
+		response[i] = txr
+	}
+
+	return response, nil
+}
+
 // CreateTransaction creates a new transaction from provided payload.
 func CreateTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.CreateTransactionRequest(r)

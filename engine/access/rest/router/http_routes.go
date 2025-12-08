@@ -36,6 +36,11 @@ var Routes = []route{{
 	Handler: routes.GetTransactionResultByID,
 }, {
 	Method:  http.MethodGet,
+	Pattern: "/transaction_results",
+	Name:    "getTransactionResultsByBlockID",
+	Handler: routes.GetTransactionResultsByBlockID,
+}, {
+	Method:  http.MethodGet,
 	Pattern: "/blocks/{id}",
 	Name:    "getBlocksByIDs",
 	Handler: routes.GetBlocksByIDs,
