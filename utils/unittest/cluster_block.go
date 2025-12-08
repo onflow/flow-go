@@ -17,6 +17,7 @@ func ClusterBlockFixture(opts ...func(*cluster.Block)) *cluster.Block {
 		HeaderBody: HeaderBodyFixture(),
 		Payload:    *ClusterPayloadFixture(3),
 	}
+	block.ChainID = "cluster"
 	for _, opt := range opts {
 		opt(block)
 	}
