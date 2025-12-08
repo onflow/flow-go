@@ -243,6 +243,23 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 		suite.Require().True(optimistic_sync.IsRequiredExecutorsCountExceededError(err))
 	})
 
+	suite.Run("agreeing executors count is greater than available executors count returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		suite.setupIdentitiesMock(allExecutionNodes)
+		requiredExecutors := allExecutionNodes.NodeIDs()
+
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: uint(len(allExecutionNodes) + 1),
+				RequiredExecutors:      requiredExecutors,
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsAgreeingExecutorsCountExceededError(err))
+	})
+
 	suite.Run("unknown required executor returns error", func() {
 		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 

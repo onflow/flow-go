@@ -225,6 +225,8 @@ func (b *StateStreamBackend) GetRegisterValues(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsRequiredExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):

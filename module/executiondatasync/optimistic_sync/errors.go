@@ -32,6 +32,31 @@ func IsRequiredExecutorsCountExceededError(err error) bool {
 	return errors.As(err, &requiredExecutorsCountExceededError)
 }
 
+// AgreeingExecutorsCountExceededError indicates that the requested number of agreeing executors
+// exceeds the total available execution nodes.
+type AgreeingExecutorsCountExceededError struct {
+	err error
+}
+
+func NewAgreeingExecutorsCountExceededError(agreeingExecutorsCount uint, availableExecutorsCount int) *AgreeingExecutorsCountExceededError {
+	return &AgreeingExecutorsCountExceededError{
+		err: fmt.Errorf("agreeing executors count exceeded: provided %d, available %d", agreeingExecutorsCount, availableExecutorsCount),
+	}
+}
+
+func (e AgreeingExecutorsCountExceededError) Error() string {
+	return e.err.Error()
+}
+
+func (e AgreeingExecutorsCountExceededError) Unwrap() error {
+	return e.err
+}
+
+func IsAgreeingExecutorsCountExceededError(err error) bool {
+	var agreeingExecutorsCountExceededError *AgreeingExecutorsCountExceededError
+	return errors.As(err, &agreeingExecutorsCountExceededError)
+}
+
 // UnknownRequiredExecutorError indicates that a required executor ID is not present
 // in the list of active execution nodes.
 type UnknownRequiredExecutorError struct {

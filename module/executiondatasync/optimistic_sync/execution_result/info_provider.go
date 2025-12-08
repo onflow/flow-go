@@ -56,6 +56,7 @@ func NewExecutionResultInfoProvider(
 //   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
 //   - [storage.ErrNotFound]: If the data was not found.
 //   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
+//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 //   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
@@ -66,7 +67,7 @@ func (e *Provider) ExecutionResultInfo(
 		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
 	}
 
-	err = e.validateRequiredExecutors(criteria.RequiredExecutors, executorIdentities)
+	err = e.validateCriteria(criteria, executorIdentities)
 	if err != nil {
 		return nil, fmt.Errorf("invalid required executors: %w", err)
 	}
@@ -134,26 +135,37 @@ func (e *Provider) ExecutionResultInfo(
 	}, nil
 }
 
-// validateRequiredExecutors verifies that the provided set of execution node
-// identities contains all nodes required for processing and that the requested
-// number of required executors does not exceed the available number.
+// validateCriteria verifies that the provided optimistic sync criteria can be
+// satisfied by the currently available execution nodes.
+//
+// The validation ensures that the required executor IDs do not exceed the number
+// of available executors, that the requested AgreeingExecutorsCount is feasible,
+// and that every required executor ID is present in the available set.
 //
 // Expected errors during normal operations:
-//   - [common.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
-//   - [common.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
-func (e *Provider) validateRequiredExecutors(
-	required flow.IdentifierList,
-	available flow.IdentityList,
+//   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
+//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
+//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+func (e *Provider) validateCriteria(
+	criteria optimistic_sync.Criteria,
+	availableExecutors flow.IdentityList,
 ) error {
-	if len(available) < len(required) {
+	requiredExecutors := criteria.RequiredExecutors
+	if len(availableExecutors) < len(requiredExecutors) {
 		return optimistic_sync.NewRequiredExecutorsCountExceededError(
-			len(required),
-			len(available),
+			len(requiredExecutors),
+			len(availableExecutors),
+		)
+	}
+	if uint(len(availableExecutors)) < criteria.AgreeingExecutorsCount {
+		return optimistic_sync.NewAgreeingExecutorsCountExceededError(
+			criteria.AgreeingExecutorsCount,
+			len(availableExecutors),
 		)
 	}
 
-	lookup := available.Lookup()
-	for _, executorID := range required {
+	lookup := availableExecutors.Lookup()
+	for _, executorID := range requiredExecutors {
 		if _, ok := lookup[executorID]; !ok {
 			return optimistic_sync.NewUnknownRequiredExecutorError(executorID)
 		}
