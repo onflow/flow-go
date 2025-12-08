@@ -118,22 +118,8 @@ func GetTransactionsByBlockID(r *common.Request, backend access.API, link common
 		transactionsResponse.Build(transactions, link)
 	}
 
-	//backend.GetScheduledTransaction()
-	//backend.GetSystemTransaction()
-
 	return transactionsResponse, nil
 }
-
-//func (t *Transactions) Build(transactions []*flow.TransactionBody, link LinkGenerator) {
-//	txs := make([]Transaction, len(transactions))
-//	for i, tr := range transactions {
-//		var tx Transaction
-//		tx.Build(tr, nil, link)
-//		txs[i] = tx
-//	}
-//
-//	*t = txs
-//}
 
 // CreateTransaction creates a new transaction from provided payload.
 func CreateTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {

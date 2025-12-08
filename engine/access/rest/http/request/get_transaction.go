@@ -65,7 +65,6 @@ func (g *GetTransaction) Build(r *common.Request) error {
 }
 
 type GetTransactionsByBlockID struct {
-	GetByIDRequest
 	TransactionOptionals
 	ExpandsResult bool
 }
@@ -94,7 +93,6 @@ func parseGetTransactionsByBlockID(r *common.Request) (*GetTransactionsByBlockID
 		return nil, err
 	}
 
-	err = req.GetByIDRequest.Build(r)
 	req.ExpandsResult = r.Expands(resultExpandable)
 
 	return &req, err
@@ -105,8 +103,6 @@ func (g *GetTransactionsByBlockID) Build(r *common.Request) error {
 	if err != nil {
 		return err
 	}
-
-	err = g.GetByIDRequest.Build(r)
 
 	return err
 }
