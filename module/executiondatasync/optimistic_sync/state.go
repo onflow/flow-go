@@ -54,13 +54,13 @@ var ErrInvalidPipelineState = errors.New("invalid pipeline state")
 //
 // State Transitions (see Pipeline2 spec):
 //
-//	┏━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━┓
-//	┃  Pending  ┃───►┃ Downloading  ┃───►┃ Indexing  ┃───►┃ WaitingPersist ┃───►┃ Complete  ┃
-//	┗━━━━━┯━━━━━┛    ┗━━━━━━┯━━━━━━━┛    ┗━━━━━┯━━━━━┛    ┗━━━━━━━┯━━━━━━━━┛    ┗━━━━━━━━━━━┛
-//	      │                 │                  │                  │
-//	      └─────────────────┴──────────────────┴──────────────────┴──────►┏━━━━━━━━━━━┓
-//	                                                                      ┃ Abandoned ┃
-//	                                                                      ┗━━━━━━━━━━━┛
+//	┏━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━┓    ┏━━━━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━┓    ┏━━━━━━━━━━┓
+//	┃ Pending ┃───►┃ Downloading ┃───►┃ Indexing ┃───►┃ WaitingPersist ┃───►┃ Persisting ┃───►┃ Complete ┃
+//	┗━━━━┯━━━━┛    ┗━━━━━━┯━━━━━━┛    ┗━━━━━┯━━━━┛    ┗━━━━━━━┯━━━━━━━━┛    ┗━━━━━━━━━━━━┛    ┗━━━━━━━━━━┛
+//	     │                │                 │                 │
+//	     └────────────────┴─────────────────┴─────────────────┴────►┏━━━━━━━━━━━┓
+//	                                                                ┃ Abandoned ┃
+//	                                                                ┗━━━━━━━━━━━┛
 //
 // Properties of our state transition function:
 //   - reflexive: transitioning to the same state is allowed (no-op) for *valid* states
@@ -75,6 +75,8 @@ const (
 	State2Indexing
 	// State2WaitingPersist represents the state where all data is indexed, but conditions to persist are not met.
 	State2WaitingPersist
+	// State2Persisting represents the state where the conditions to persist are met, but the persisting process hasn't finished.
+	State2Persisting
 	// State2Complete represents the terminal state where all data is persisted to storage.
 	State2Complete
 	// State2Abandoned represents the terminal state where processing was aborted.
@@ -92,6 +94,8 @@ func (s State2) String() string {
 		return "indexing"
 	case State2WaitingPersist:
 		return "waiting2persist"
+	case State2Persisting:
+		return "persisting"
 	case State2Complete:
 		return "complete"
 	case State2Abandoned:
@@ -109,7 +113,7 @@ func (s State2) IsTerminal() bool {
 // IsValid returns true if the state is a valid State2 value.
 func (s State2) IsValid() bool {
 	switch s {
-	case State2Pending, State2Downloading, State2Indexing, State2WaitingPersist, State2Complete, State2Abandoned:
+	case State2Pending, State2Downloading, State2Indexing, State2WaitingPersist, State2Persisting, State2Complete, State2Abandoned:
 		return true
 	default:
 		return false
@@ -126,17 +130,19 @@ func (s State2) CanReach(to State2) bool {
 		return true
 	}
 	// State2Complete and State2Abandoned are terminal states, only allowing self-transitions, which are covered
-	// above. Hence, in the following, we only need to handle `State2Pending` up to `State2WaitingPersist`.
+	// above. Hence, in the following, we only need to handle `State2Pending` up to `State2Persisting`.
 
 	switch s {
 	case State2Pending:
-		return to == State2Downloading || to == State2Indexing || to == State2WaitingPersist || to == State2Complete || to == State2Abandoned
+		return to == State2Downloading || to == State2Indexing || to == State2WaitingPersist || to == State2Persisting || to == State2Complete || to == State2Abandoned
 	case State2Downloading:
-		return to == State2Indexing || to == State2WaitingPersist || to == State2Complete || to == State2Abandoned
+		return to == State2Indexing || to == State2WaitingPersist || to == State2Persisting || to == State2Complete || to == State2Abandoned
 	case State2Indexing:
-		return to == State2WaitingPersist || to == State2Complete || to == State2Abandoned
+		return to == State2WaitingPersist || to == State2Persisting || to == State2Complete || to == State2Abandoned
 	case State2WaitingPersist:
-		return to == State2Complete || to == State2Abandoned
+		return to == State2Persisting || to == State2Complete || to == State2Abandoned
+	case State2Persisting:
+		return to == State2Complete
 	default:
 		return false
 	}
@@ -161,7 +167,9 @@ func (s State2) IsValidTransition(to State2) bool {
 	case State2Indexing:
 		return to == State2WaitingPersist || to == State2Abandoned
 	case State2WaitingPersist:
-		return to == State2Complete || to == State2Abandoned
+		return to == State2Persisting || to == State2Abandoned
+	case State2Persisting:
+		return to == State2Complete
 	default:
 		return false
 	}

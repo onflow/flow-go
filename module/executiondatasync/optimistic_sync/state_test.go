@@ -13,8 +13,9 @@ var allValidState2Values = []State2{
 	State2Downloading,    // 1
 	State2Indexing,       // 2
 	State2WaitingPersist, // 3
-	State2Complete,       // 4
-	State2Abandoned,      // 5
+	State2Persisting,     // 4
+	State2Complete,       // 5
+	State2Abandoned,      // 6
 }
 
 // allState2Values includes all valid State2 values plus some invalid ones
@@ -32,6 +33,7 @@ func TestState2_IsValid(t *testing.T) {
 	assert.True(t, State2Downloading.IsValid())
 	assert.True(t, State2Indexing.IsValid())
 	assert.True(t, State2WaitingPersist.IsValid())
+	assert.True(t, State2Persisting.IsValid())
 	assert.True(t, State2Complete.IsValid())
 	assert.True(t, State2Abandoned.IsValid())
 
@@ -46,6 +48,7 @@ func TestState2_String(t *testing.T) {
 	assert.Equal(t, "downloading", State2Downloading.String())
 	assert.Equal(t, "indexing", State2Indexing.String())
 	assert.Equal(t, "waiting2persist", State2WaitingPersist.String())
+	assert.Equal(t, "persisting", State2Persisting.String())
 	assert.Equal(t, "complete", State2Complete.String())
 	assert.Equal(t, "abandoned", State2Abandoned.String())
 
@@ -60,6 +63,7 @@ func TestState2_IsTerminal(t *testing.T) {
 	assert.False(t, State2Downloading.IsTerminal())
 	assert.False(t, State2Indexing.IsTerminal())
 	assert.False(t, State2WaitingPersist.IsTerminal())
+	assert.False(t, State2Persisting.IsTerminal())
 
 	// Valid terminal states
 	assert.True(t, State2Complete.IsTerminal())
@@ -73,12 +77,15 @@ func TestState2_IsTerminal(t *testing.T) {
 // TestState2_IsValidTransition tests the [State2.IsValidTransition] method.
 // Valid transitions are defined as follows:
 //
-//	┏━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━┓
-//	┃  Pending  ┃───►┃ Downloading  ┃───►┃ Indexing  ┃───►┃ WaitingPersist ┃───►┃ Complete  ┃
-//	┗━━━━━┯━━━━━┛    ┗━━━━━━┯━━━━━━━┛    ┗━━━━━┯━━━━━┛    ┗━━━━━━━┯━━━━━━━━┛    ┗━━━━━━━━━━━┛
+//	┏━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━┓    ┏━━━━━━━━━━━┓
+//	┃  Pending  ┃───►┃ Downloading  ┃───►┃ Indexing  ┃───►┃ WaitingPersist ┃───►┃ Persisting ┃───►┃ Complete  ┃
+//	┗━━━━━┯━━━━━┛    ┗━━━━━━┯━━━━━━━┛    ┗━━━━━┯━━━━━┛    ┗━━━━━━━┯━━━━━━━━┛    ┗━━━━━━━━━━━━┛    ┗━━━━━━━━━━━┛
 //	      │                 │                  │                  │       ┏━━━━━━━━━━━┓
 //	      └─────────────────┴──────────────────┴──────────────────┴──────►┃ Abandoned ┃
 //	                                                                      ┗━━━━━━━━━━━┛
+//
+// NOTE: Persisting can ONLY transition to Complete (not Abandoned). Once we start persisting,
+// we cannot abort the operation. This is an intentional design choice.
 //
 // Within this test, we also verify that:
 // * Our state transition function is reflexive, i.e. self-transitions from the state to itself are allowed (no-op) for valid states
@@ -89,57 +96,74 @@ func TestState2_IsValidTransition(t *testing.T) {
 
 	t.Run("state transitions from `State2Pending`", func(t *testing.T) {
 		from := State2Pending
+		// Pending can transition to: itself (reflexive), Downloading (happy path), Abandoned (abort)
 		for _, toValid := range []State2{State2Pending, State2Downloading, State2Abandoned} {
-			assert.True(t, from.IsValidTransition(toValid))
+			assert.True(t, from.IsValidTransition(toValid), "%s -> %s should be valid", from, toValid)
 		}
-		for _, toInvalid := range []State2{State2Indexing, State2WaitingPersist, State2Complete, State2Abandoned + 1, 999} {
-			assert.False(t, from.IsValidTransition(toInvalid))
+		for _, toInvalid := range []State2{State2Indexing, State2WaitingPersist, State2Persisting, State2Complete, State2Abandoned + 1, 999} {
+			assert.False(t, from.IsValidTransition(toInvalid), "%s -> %s should be invalid", from, toInvalid)
 		}
 	})
 
 	t.Run("state transitions from `State2Downloading`", func(t *testing.T) {
 		from := State2Downloading
+		// Downloading can transition to: itself (reflexive), Indexing (happy path), Abandoned (abort)
 		for _, toValid := range []State2{State2Downloading, State2Indexing, State2Abandoned} {
-			assert.True(t, from.IsValidTransition(toValid))
+			assert.True(t, from.IsValidTransition(toValid), "%s -> %s should be valid", from, toValid)
 		}
-		for _, toInvalid := range []State2{State2Pending, State2WaitingPersist, State2Complete, State2Abandoned + 1, 999} {
-			assert.False(t, from.IsValidTransition(toInvalid))
+		for _, toInvalid := range []State2{State2Pending, State2WaitingPersist, State2Persisting, State2Complete, State2Abandoned + 1, 999} {
+			assert.False(t, from.IsValidTransition(toInvalid), "%s -> %s should be invalid", from, toInvalid)
 		}
 	})
 
 	t.Run("state transitions from `State2Indexing`", func(t *testing.T) {
 		from := State2Indexing
+		// State2Indexing can transition to: itself (reflexive), WaitingPersist (happy path), Abandoned (abort)
 		for _, toValid := range []State2{State2Indexing, State2WaitingPersist, State2Abandoned} {
-			assert.True(t, from.IsValidTransition(toValid))
+			assert.True(t, from.IsValidTransition(toValid), "%s -> %s should be valid", from, toValid)
 		}
-		for _, toInvalid := range []State2{State2Pending, State2Downloading, State2Complete, State2Abandoned + 1, 999} {
-			assert.False(t, from.IsValidTransition(toInvalid))
+		for _, toInvalid := range []State2{State2Pending, State2Downloading, State2Persisting, State2Complete, State2Abandoned + 1, 999} {
+			assert.False(t, from.IsValidTransition(toInvalid), "%s -> %s should be invalid", from, toInvalid)
 		}
 	})
 
 	t.Run("state transitions from `State2WaitingPersist`", func(t *testing.T) {
 		from := State2WaitingPersist
-		for _, toValid := range []State2{State2Complete, State2Abandoned} {
-			assert.True(t, from.IsValidTransition(toValid))
+		// WaitingPersist can transition to: itself (reflexive), Persisting (happy path), Abandoned (abort)
+		for _, toValid := range []State2{State2WaitingPersist, State2Persisting, State2Abandoned} {
+			assert.True(t, from.IsValidTransition(toValid), "%s -> %s should be valid", from, toValid)
 		}
-		for _, toInvalid := range []State2{State2Pending, State2Downloading, State2Indexing, State2Abandoned + 1, 999} {
-			assert.False(t, from.IsValidTransition(toInvalid))
+		for _, toInvalid := range []State2{State2Pending, State2Downloading, State2Indexing, State2Complete, State2Abandoned + 1, 999} {
+			assert.False(t, from.IsValidTransition(toInvalid), "%s -> %s should be invalid", from, toInvalid)
+		}
+	})
+
+	t.Run("state transitions from `State2Persisting`", func(t *testing.T) {
+		from := State2Persisting
+		// Persisting can ONLY transition to: itself (reflexive) and Complete (happy path)
+		// NOTE: Persisting CANNOT transition to Abandoned - this is intentional.
+		// Once we start the database write, we have committed to the specific result we are persisting.
+		for _, toValid := range []State2{State2Persisting, State2Complete} {
+			assert.True(t, from.IsValidTransition(toValid), "%s -> %s should be valid", from, toValid)
+		}
+		for _, toInvalid := range []State2{State2Pending, State2Downloading, State2Indexing, State2WaitingPersist, State2Abandoned, State2Abandoned + 1, 999} {
+			assert.False(t, from.IsValidTransition(toInvalid), "%s -> %s should be invalid", from, toInvalid)
 		}
 	})
 
 	t.Run("states `Complete` and `Abandoned` are terminal", func(t *testing.T) {
 		// terminal states only allow self-transitions
-		for _, toInvalid := range allState2Values {
-			assert.Equal(t, State2Complete == toInvalid, State2Complete.IsValidTransition(toInvalid), "%s -> %s is not a valid transition", State2Complete, toInvalid)
-			assert.Equal(t, State2Abandoned == toInvalid, State2Abandoned.IsValidTransition(toInvalid), "%s -> %s is not a valid transition", State2Abandoned, toInvalid)
+		for _, to := range allState2Values {
+			assert.Equal(t, State2Complete == to, State2Complete.IsValidTransition(to), "validity status of %s -> %s does not match expectation", State2Complete, to)
+			assert.Equal(t, State2Abandoned == to, State2Abandoned.IsValidTransition(to), "validity status of %s -> %s does not match expectation", State2Abandoned, to)
 		}
 	})
 
 	t.Run("states transitions involving invalid states should always be considered invalid", func(t *testing.T) {
 		for _, invalid := range []State2{State2Abandoned + 1, 999} {
 			for _, s := range allState2Values {
-				assert.False(t, s.IsValidTransition(invalid), "%s -> %s is not a valid transition", s, invalid)
-				assert.False(t, invalid.IsValidTransition(s), "%s -> %s is not a valid transition", invalid, s)
+				assert.False(t, s.IsValidTransition(invalid), "%s -> %s should be invalid (target is invalid state)", s, invalid)
+				assert.False(t, invalid.IsValidTransition(s), "%s -> %s should be invalid (source is invalid state)", invalid, s)
 			}
 		}
 	})
@@ -203,8 +227,12 @@ func TestState2Tracker_RejectsInvalidStartingStates(t *testing.T) {
 	})
 }
 
-// InitializeAndTransitionTo_HappyPath is a utility method. It initializes a State2Tracker
-// and transitions it to the specified target state along the HAPPY PATH
+// initializeAndTransitionTo_HappyPath is a utility method. It initializes a State2Tracker
+// and transitions it to the specified target state along the HAPPY PATH:
+//
+//	Pending → Downloading → Indexing → WaitingPersist → Persisting → Complete
+//
+// For Abandoned state, the shortest route (Pending → Abandoned) is used.
 func initializeAndTransitionTo_HappyPath(t *testing.T, target State2) *State2Tracker {
 	// recursively initialize and forward
 	var prior State2
@@ -220,9 +248,11 @@ func initializeAndTransitionTo_HappyPath(t *testing.T, target State2) *State2Tra
 		prior = State2Downloading
 	case State2WaitingPersist: // Indexing -> WaitingPersist
 		prior = State2Indexing
-	case State2Complete: // WaitingPersist -> Complete
+	case State2Persisting: // WaitingPersist -> Persisting
 		prior = State2WaitingPersist
-	case State2Abandoned: // can be reached from any state except `Complete`; we choose the shortest route
+	case State2Complete: // Persisting -> Complete
+		prior = State2Persisting
+	case State2Abandoned: // can be reached from any state except `Complete` and `Persisting`; we choose the shortest route
 		prior = State2Pending
 	default:
 		t.Fatalf("invalid target state %s", target)
@@ -309,6 +339,14 @@ func TestState2Tracker_Set(t *testing.T) {
 			tracker := initializeAndTransitionTo_HappyPath(t, State2WaitingPersist) // correctness verified in prior test `TestState2Tracker_HappyPath`
 			expectedValidity := State2WaitingPersist.IsValidTransition(to)          // assumed to be correct, as tested above
 			verifyStateTransition(t, tracker, State2WaitingPersist, to, expectedValidity)
+		}
+	})
+
+	t.Run("transitions from Persisting", func(t *testing.T) {
+		for _, to := range allState2Values {
+			tracker := initializeAndTransitionTo_HappyPath(t, State2Persisting) // correctness verified in prior test `TestState2Tracker_HappyPath`
+			expectedValidity := State2Persisting.IsValidTransition(to)          // assumed to be correct, as tested above
+			verifyStateTransition(t, tracker, State2Persisting, to, expectedValidity)
 		}
 	})
 
