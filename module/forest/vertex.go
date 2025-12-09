@@ -31,7 +31,7 @@ func VertexToString(v Vertex) string {
 // This vertex iterator does NOT COPY the provided list of vertices for
 // efficiency reasons. For APPEND_ONLY `VertexList`s, the `VertexIterator`
 // can be wrapped into a VertexIteratorConcurrencySafe to make it concurrency
-// safe. By design, the ResultForest guarantees this. Hence, construction
+// safe. By design, the LevelledForest guarantees this. Hence, construction
 // of these vertex iterators is private to the `forest` package.
 type VertexIterator struct {
 	// CAUTION: to support concurrency-safe iterators, the `VertexIterator` *must* maintain its own slice descriptor.
@@ -85,7 +85,7 @@ func (it *VertexIterator) HasNext() bool {
 // Even if the Levelled Forest makes additions to the input slice, we maintain our own notion of
 // length and backing slice.
 // CAUTION:
-//   - we NOT COPY the list's containers for efficiency.
+//   - we do NOT COPY the list's containers for efficiency.
 //   - Package-private, as usage must be limited to APPEND-ONLY `VertexList`
 //     Without append-only guarantees, we would break the `VertexIteratorConcurrencySafe`
 //     and generally a lot of conceptual challenges arise for iteration in concurrent
