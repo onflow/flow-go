@@ -287,6 +287,14 @@ func TestRemoveDiskUsage(t *testing.T) {
 	})
 }
 
+// TestRemoveDiskUsageBadger verifies that Badger does not reclaim disk space after deletions,
+// === RUN   TestRemoveDiskUsageBadger
+//
+//	writes_test.go:340: Badger - Size after initial write and GC: 7140099
+//	writes_test.go:361: Badger - Size after delete and GC: 7640128
+//	writes_test.go:362: Badger - Size difference: 500029 bytes (7.00%)
+//
+// --- PASS: TestRemoveDiskUsageBadger (0.13s)
 func TestRemoveDiskUsageBadger(t *testing.T) {
 	const count = 10000
 
@@ -665,32 +673,26 @@ func getFolderSize(t testing.TB, dir string) int64 {
 // The following test result shows an example output where Pebble compression works
 // as expected, but Badger compression does not achieve the expected size reduction.
 //
-// go test -run=TestCompressionVerification/ -v
 // === RUN   TestCompressionVerification
 // === RUN   TestCompressionVerification/PebbleCompression
 //
-//	writes_test.go:665: Pebble - Size with compression: 10825774 bytes
-//	writes_test.go:666: Pebble - Size without compression: 20560724 bytes
-//	writes_test.go:667: Pebble - Compression ratio: 52.65%
+//	writes_test.go:785: Pebble - Size with compression: 10825774 bytes
+//	writes_test.go:786: Pebble - Size without compression: 20560724 bytes
+//	writes_test.go:787: Pebble - Compression ratio: 52.65%
 //
 // === RUN   TestCompressionVerification/BadgerCompression
 //
-//	writes_test.go:736: Badger - Size with compression: 10264989 bytes
-//	writes_test.go:737: Badger - Size without compression: 10264989 bytes
-//	writes_test.go:738: Badger - Compression ratio: 100.00%
-//	writes_test.go:743:
-//	            Error:          "1" is not less than "0.7"
-//	            Test:           TestCompressionVerification/BadgerCompression
-//	            Messages:       compressed database should be at least 30%% smaller than uncompressed
+//	writes_test.go:856: Badger - Size with compression: 10264989 bytes
+//	writes_test.go:857: Badger - Size without compression: 10264989 bytes
+//	writes_test.go:858: Badger - Compression ratio: 100.00%
 //
-// --- FAIL: TestCompressionVerification (0.40s)
+// --- PASS: TestCompressionVerification (0.43s)
 //
-//	--- PASS: TestCompressionVerification/PebbleCompression (0.31s)
-//	--- FAIL: TestCompressionVerification/BadgerCompression (0.09s)
+//	--- PASS: TestCompressionVerification/PebbleCompression (0.33s)
+//	--- PASS: TestCompressionVerification/BadgerCompression (0.10s)
 //
-// FAIL
-// exit status 1
-// FAIL    github.com/onflow/flow-go/storage/operation     1.191s
+// PASS
+// ok      github.com/onflow/flow-go/storage/operation     1.455s
 func TestCompressionVerification(t *testing.T) {
 	const (
 		keyCount     = 1000
@@ -849,10 +851,11 @@ func TestCompressionVerification(t *testing.T) {
 			t.Logf("Badger - Size without compression: %d bytes", sizeNoCompression)
 			t.Logf("Badger - Compression ratio: %.2f%%", float64(sizeWithCompression)/float64(sizeNoCompression)*100)
 
-			// Verify that compressed database is significantly smaller
-			// For highly compressible data, we expect at least 30% reduction
+			// Verify that Badger does NOT compress data even when compression is enabled
+			// The compression ratio should be close to 1.0 (no compression), proving that
+			// Badger's compression setting has no effect
 			compressionRatio := float64(sizeWithCompression) / float64(sizeNoCompression)
-			require.Less(t, compressionRatio, 0.7, "compressed database should be at least 30%% smaller than uncompressed")
+			require.GreaterOrEqual(t, compressionRatio, 0.95, "Badger does not compress data even when compression is enabled. compression ratio: %.2f%%", compressionRatio*100)
 		})
 	})
 }
