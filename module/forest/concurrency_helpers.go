@@ -13,7 +13,7 @@ import (
  */
 
 // VertexIteratorConcurrencySafe wraps the Vertex Iterator to make it concurrency safe. Effectively,
-// the behaviour is like iterating on a snapshot at the time of iterator construction.
+// the behaviour is like iterating on a SNAPSHOT at the time of iterator construction.
 // Under concurrent recalls, the iterator delivers each item once across all concurrent callers.
 // Items are delivered in order and `NextVertex` establishes a 'synchronized before' relation as
 // defined in the go memory model https://go.dev/ref/mem.
