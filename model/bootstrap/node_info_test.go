@@ -84,13 +84,15 @@ func TestNodeInfoPubEncodingJSON(t *testing.T) {
 	// New we test decoding of NodeInfoPub with the old format - we use hard-coded JSONs
 	// But first, lets do a santiy check that we have a valid JSON representing the new format:
 	t.Run("santiy check decoding of hard-coded JSON struct representing the new format", func(t *testing.T) {
-		enc := []byte(`{"Role":"consensus",` +
-			`"Address":"7a996e29e2020e0164686f7b7763ae3483bce36171247e0f0581a5798d2c4ce2@flow.com:1234",` +
-			`"NodeID":"7a996e29e2020e0164686f7b7763ae3483bce36171247e0f0581a5798d2c4ce2",` +
-			`"Weight":1011,` +
-			`"NetworkPubKey":"9e1ce27613e5c16f0201d7a87ce44e7477d83fb8e13465c2a753e0e2d35e10065a0e6016d86b06281c2f5f33576199adb85519df0ba664ab5e16de547b76fcb9",` +
-			`"StakingPubKey":"b8bb00d806172bae514a7d82a457045dc03d75451866747fc2d2a3290122f24a3348db1f0505c9128811a42eb0ae706b116cf91a88541888502b3cf2c60acafd4248406913b9a4f700f51181858087ffabec68b1aadd384dab50f500afe5d931",` +
-			`"StakingPoP":"8bcc848f14c4c572b020de7cd5af0d74d69e25ceb7ecb5d09ec07681c95e25c597399597e29a10820913e927ab2882d9"}`)
+		enc := []byte(`{
+			"Role":"consensus",
+			"Address":"7a996e29e2020e0164686f7b7763ae3483bce36171247e0f0581a5798d2c4ce2@flow.com:1234",
+			"NodeID":"7a996e29e2020e0164686f7b7763ae3483bce36171247e0f0581a5798d2c4ce2",
+			"Weight":1011,
+			"NetworkPubKey":"9e1ce27613e5c16f0201d7a87ce44e7477d83fb8e13465c2a753e0e2d35e10065a0e6016d86b06281c2f5f33576199adb85519df0ba664ab5e16de547b76fcb9",
+			"StakingPubKey":"b8bb00d806172bae514a7d82a457045dc03d75451866747fc2d2a3290122f24a3348db1f0505c9128811a42eb0ae706b116cf91a88541888502b3cf2c60acafd4248406913b9a4f700f51181858087ffabec68b1aadd384dab50f500afe5d931",
+			"StakingPoP":"8bcc848f14c4c572b020de7cd5af0d74d69e25ceb7ecb5d09ec07681c95e25c597399597e29a10820913e927ab2882d9"
+		}`)
 
 		var dec bootstrap.NodeInfoPub
 		err := json.Unmarshal(enc, &dec)
