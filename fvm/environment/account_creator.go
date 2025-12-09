@@ -266,10 +266,10 @@ func (creator *accountCreator) CreateAccount(
 	// don't enforce limit during account creation
 	var address flow.Address
 	creator.txnState.RunWithMeteringDisabled(func() {
-		address, err = creator.createAccount(flow.ConvertAddress(runtimePayer))
+		address, err = creator.createAccount(flow.Address(runtimePayer))
 	})
 
-	return common.MustBytesToAddress(address.Bytes()), err
+	return common.Address(address), err
 }
 
 func (creator *accountCreator) createAccount(

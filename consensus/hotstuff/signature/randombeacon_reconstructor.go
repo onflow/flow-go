@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// RandomBeaconReconstructor implements hotstuff.RandomBeaconReconstructor.
-// The implementation wraps the hotstuff.RandomBeaconInspector and translates the signer identity into signer index.
+// RandomBeaconReconstructor implements [hotstuff.RandomBeaconReconstructor].
+// The implementation wraps the [hotstuff.RandomBeaconInspector] and translates the signer identity into signer index.
 // It has knowledge about DKG to be able to map signerID to signerIndex
 type RandomBeaconReconstructor struct {
 	hotstuff.RandomBeaconInspector              // a stateful object for this epoch. It's used for both verifying all sig shares and reconstructing the threshold signature.
@@ -33,8 +33,8 @@ func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstu
 // execute the business logic, without interfering with each other).
 // It allows concurrent verification of the given signature.
 // Returns :
-//   - model.InvalidSignerError if signerID is invalid
-//   - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+//   - [model.InvalidSignerError] if signerID is invalid
+//   - [model.ErrInvalidSignature] if signerID is valid but signature is cryptographically invalid
 //   - other error if there is an unexpected exception.
 func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	signerIndex, err := r.dkg.Index(signerID)
@@ -60,8 +60,8 @@ func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.
 //   - (false, nil) if the signature has been added, but not enough shares were collected.
 //
 // The following errors are expected during normal operations:
-//   - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
-//   - model.DuplicatedSignerError if the signer has been already added
+//   - [model.InvalidSignerError] if signerIndex is invalid (out of the valid range)
+//   - [model.DuplicatedSignerError] if the signer has been already added
 //   - other error if there is an unexpected exception.
 func (r *RandomBeaconReconstructor) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
 	signerIndex, err := r.dkg.Index(signerID)

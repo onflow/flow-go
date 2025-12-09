@@ -51,6 +51,8 @@ import (
 var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
+	t.Parallel()
+
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.NewVirtualMachine()
@@ -180,6 +182,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
+	t.Parallel()
 
 	noopCollector := &metrics.NoopCollector{}
 
@@ -230,6 +233,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 }
 
 func TestExecuteScript(t *testing.T) {
+	t.Parallel()
 
 	logger := zerolog.Nop()
 
@@ -296,6 +300,7 @@ func TestExecuteScript(t *testing.T) {
 // Balance script used to swallow errors, which meant that even if the view was empty, a script that did nothing but get
 // the balance of an account would succeed and return 0.
 func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
+	t.Parallel()
 
 	logger := zerolog.Nop()
 
@@ -361,6 +366,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 }
 
 func TestExecuteScripPanicsAreHandled(t *testing.T) {
+	t.Parallel()
 
 	ctx := fvm.NewContext()
 
@@ -411,6 +417,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 }
 
 func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
+	t.Parallel()
 
 	ctx := fvm.NewContext()
 
@@ -464,6 +471,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 }
 
 func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
+	t.Parallel()
 
 	ctx := fvm.NewContext()
 
@@ -647,6 +655,7 @@ func (f *FakeBlockComputer) ExecuteBlock(
 }
 
 func TestExecuteScriptTimeout(t *testing.T) {
+	t.Parallel()
 
 	timeout := 1 * time.Millisecond
 	manager, err := New(
@@ -694,6 +703,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 }
 
 func TestExecuteScriptCancelled(t *testing.T) {
+	t.Parallel()
 
 	timeout := 30 * time.Second
 	manager, err := New(
@@ -750,6 +760,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 }
 
 func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
+	t.Parallel()
 
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
@@ -908,6 +919,7 @@ func (e *testingEventEncoder) Encode(event cadence.Event) ([]byte, error) {
 }
 
 func TestScriptStorageMutationsDiscarded(t *testing.T) {
+	t.Parallel()
 
 	timeout := 10 * time.Second
 	chain := flow.Mainnet.Chain()

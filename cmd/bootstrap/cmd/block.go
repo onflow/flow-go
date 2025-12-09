@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/crypto/random"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,7 +58,10 @@ func constructRootEpochEvents(
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.ThresholdKeySet,
 	dkgIndexMap flow.DKGIndexMap,
+	rng random.Rand,
 ) (*flow.EpochSetup, *flow.EpochCommit, error) {
+	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+	rng.Read(randomSource)
 	epochSetup, err := flow.NewEpochSetup(
 		flow.UntrustedEpochSetup{
 			Counter:            flagEpochCounter,
@@ -67,7 +72,7 @@ func constructRootEpochEvents(
 			FinalView:          firstView + flagNumViewsInEpoch - 1,
 			Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
 			Assignments:        assignments,
-			RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+			RandomSource:       randomSource,
 			TargetDuration:     flagEpochTimingDuration,
 			TargetEndTime:      rootEpochTargetEndTime(),
 		},
