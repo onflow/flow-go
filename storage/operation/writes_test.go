@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -283,6 +284,88 @@ func TestRemoveDiskUsage(t *testing.T) {
 		}, 30*time.Second, 200*time.Millisecond,
 			"expected disk usage to be reduced after compaction. before: %d, after: %d",
 			sizeBefore, getFolderSize(t, dir))
+	})
+}
+
+func TestRemoveDiskUsageBadger(t *testing.T) {
+	const count = 10000
+
+	unittest.RunWithTempDir(t, func(dir string) {
+		opts := badger.DefaultOptions(dir).
+			WithKeepL0InMemory(true).
+			WithLogger(nil)
+		db, err := badger.Open(opts)
+		require.NoError(t, err)
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+
+		withWriter := func(writing func(storage.Writer) error) error {
+			return badgerimpl.ToDB(db).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return writing(rw.Writer())
+			})
+		}
+
+		prefix := []byte{1}
+		getKey := func(c *flow.ChunkDataPack) []byte {
+			return append(prefix, c.ChunkID[:]...)
+		}
+
+		items := make([]*flow.ChunkDataPack, count)
+		for i := 0; i < count; i++ {
+			chunkID := unittest.IdentifierFixture()
+			chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+			items[i] = chunkDataPack
+		}
+
+		// 1. Insert 10000 entities.
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Upsert(getKey(items[i]), items[i])(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// 2. Sync and run GC to get a stable state.
+		require.NoError(t, db.Sync())
+		err = db.RunValueLogGC(0.5)
+		if err != nil && err != badger.ErrNoRewrite {
+			require.NoError(t, err)
+		}
+
+		// 3. Get sizeBefore.
+		sizeBefore := getFolderSize(t, dir)
+		t.Logf("Badger - Size after initial write and GC: %d", sizeBefore)
+
+		// 4. Remove all entities
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Remove(getKey(items[i]))(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// 5. Sync and run GC again.
+		require.NoError(t, db.Sync())
+		err = db.RunValueLogGC(0.5)
+		if err != nil && err != badger.ErrNoRewrite {
+			require.NoError(t, err)
+		}
+
+		// 6. Verify the disk usage is NOT reduced (Badger doesn't reclaim disk space).
+		sizeAfter := getFolderSize(t, dir)
+		t.Logf("Badger - Size after delete and GC: %d", sizeAfter)
+		t.Logf("Badger - Size difference: %d bytes (%.2f%%)", sizeAfter-sizeBefore, float64(sizeAfter-sizeBefore)/float64(sizeBefore)*100)
+
+		// Badger does not reclaim disk space after deletions, so sizeAfter should be >= sizeBefore
+		// (or at least not significantly less)
+		require.GreaterOrEqual(t, sizeAfter, sizeBefore,
+			"Badger does not reclaim disk space after deletions. before: %d, after: %d",
+			sizeBefore, sizeAfter)
 	})
 }
 
@@ -579,11 +662,40 @@ func getFolderSize(t testing.TB, dir string) int64 {
 
 // TestCompressionVerification verifies that data compression is actually working
 // by comparing the on-disk size of databases with compression enabled vs disabled.
+// The following test result shows an example output where Pebble compression works
+// as expected, but Badger compression does not achieve the expected size reduction.
+//
+// go test -run=TestCompressionVerification/ -v
+// === RUN   TestCompressionVerification
+// === RUN   TestCompressionVerification/PebbleCompression
+//
+//	writes_test.go:665: Pebble - Size with compression: 10825774 bytes
+//	writes_test.go:666: Pebble - Size without compression: 20560724 bytes
+//	writes_test.go:667: Pebble - Compression ratio: 52.65%
+//
+// === RUN   TestCompressionVerification/BadgerCompression
+//
+//	writes_test.go:736: Badger - Size with compression: 10264989 bytes
+//	writes_test.go:737: Badger - Size without compression: 10264989 bytes
+//	writes_test.go:738: Badger - Compression ratio: 100.00%
+//	writes_test.go:743:
+//	            Error:          "1" is not less than "0.7"
+//	            Test:           TestCompressionVerification/BadgerCompression
+//	            Messages:       compressed database should be at least 30%% smaller than uncompressed
+//
+// --- FAIL: TestCompressionVerification (0.40s)
+//
+//	--- PASS: TestCompressionVerification/PebbleCompression (0.31s)
+//	--- FAIL: TestCompressionVerification/BadgerCompression (0.09s)
+//
+// FAIL
+// exit status 1
+// FAIL    github.com/onflow/flow-go/storage/operation     1.191s
 func TestCompressionVerification(t *testing.T) {
 	const (
 		keyCount     = 1000
 		valueSize    = 10 << 10 // 10 KB per value
-		compressible = true      // Use highly compressible data (repeated patterns)
+		compressible = true     // Use highly compressible data (repeated patterns)
 	)
 
 	// Create highly compressible test data (repeated patterns compress well)
