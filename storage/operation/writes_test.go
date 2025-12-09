@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -573,6 +575,174 @@ func getFolderSize(t testing.TB, dir string) int64 {
 	}))
 
 	return size
+}
+
+// TestCompressionVerification verifies that data compression is actually working
+// by comparing the on-disk size of databases with compression enabled vs disabled.
+func TestCompressionVerification(t *testing.T) {
+	const (
+		keyCount     = 1000
+		valueSize    = 10 << 10 // 10 KB per value
+		compressible = true      // Use highly compressible data (repeated patterns)
+	)
+
+	// Create highly compressible test data (repeated patterns compress well)
+	createCompressibleValue := func(size int) []byte {
+		pattern := []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+		value := make([]byte, size)
+		for i := 0; i < size; i++ {
+			value[i] = pattern[i%len(pattern)]
+		}
+		return value
+	}
+
+	// Test with Pebble
+	t.Run("PebbleCompression", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			// Create database with compression enabled (default is Snappy)
+			optsWithCompression := &pebble.Options{
+				FormatMajorVersion: pebble.FormatNewest,
+				Levels:             make([]pebble.LevelOptions, 7),
+			}
+			for i := range optsWithCompression.Levels {
+				optsWithCompression.Levels[i].Compression = func() pebble.Compression {
+					return pebble.DefaultCompression // DefaultCompression uses Snappy
+				}
+				optsWithCompression.Levels[i].EnsureDefaults()
+			}
+			optsWithCompression.EnsureDefaults()
+
+			dbWithCompression, err := pebble.Open(filepath.Join(dir, "compressed"), optsWithCompression)
+			require.NoError(t, err)
+			defer dbWithCompression.Close()
+
+			// Create database with compression disabled
+			optsNoCompression := &pebble.Options{
+				FormatMajorVersion: pebble.FormatNewest,
+				Levels:             make([]pebble.LevelOptions, 7),
+			}
+			for i := range optsNoCompression.Levels {
+				optsNoCompression.Levels[i].Compression = func() pebble.Compression {
+					return pebble.NoCompression
+				}
+				optsNoCompression.Levels[i].EnsureDefaults()
+			}
+			optsNoCompression.EnsureDefaults()
+
+			dbNoCompression, err := pebble.Open(filepath.Join(dir, "uncompressed"), optsNoCompression)
+			require.NoError(t, err)
+			defer dbNoCompression.Close()
+
+			// Write the same data to both databases
+			testValue := createCompressibleValue(valueSize)
+			writeData := func(db *pebble.DB) error {
+				batch := db.NewBatch()
+				defer batch.Close()
+
+				for i := 0; i < keyCount; i++ {
+					key := []byte(fmt.Sprintf("key-%d", i))
+					if err := batch.Set(key, testValue, nil); err != nil {
+						return err
+					}
+				}
+				return batch.Commit(pebble.Sync)
+			}
+
+			require.NoError(t, writeData(dbWithCompression))
+			require.NoError(t, writeData(dbNoCompression))
+
+			// Flush and compact both databases to ensure data is written to disk
+			require.NoError(t, dbWithCompression.Flush())
+			require.NoError(t, dbNoCompression.Flush())
+
+			require.NoError(t, dbWithCompression.Compact([]byte{0x00}, []byte{0xff}, true))
+			require.NoError(t, dbNoCompression.Compact([]byte{0x00}, []byte{0xff}, true))
+
+			// Measure on-disk sizes
+			sizeWithCompression := getFolderSize(t, filepath.Join(dir, "compressed"))
+			sizeNoCompression := getFolderSize(t, filepath.Join(dir, "uncompressed"))
+
+			t.Logf("Pebble - Size with compression: %d bytes", sizeWithCompression)
+			t.Logf("Pebble - Size without compression: %d bytes", sizeNoCompression)
+			t.Logf("Pebble - Compression ratio: %.2f%%", float64(sizeWithCompression)/float64(sizeNoCompression)*100)
+
+			// Verify that compressed database is significantly smaller
+			// For highly compressible data, we expect at least 30% reduction
+			compressionRatio := float64(sizeWithCompression) / float64(sizeNoCompression)
+			require.Less(t, compressionRatio, 0.7, "compressed database should be at least 30%% smaller than uncompressed")
+		})
+	})
+
+	// Test with Badger
+	t.Run("BadgerCompression", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			// Create database with compression enabled (ZSTD)
+			optsWithCompression := badger.DefaultOptions(filepath.Join(dir, "compressed")).
+				WithCompression(options.ZSTD).
+				WithZSTDCompressionLevel(3).
+				WithKeepL0InMemory(true).
+				WithLogger(nil)
+
+			dbWithCompression, err := badger.Open(optsWithCompression)
+			require.NoError(t, err)
+			defer dbWithCompression.Close()
+
+			// Create database with compression disabled
+			optsNoCompression := badger.DefaultOptions(filepath.Join(dir, "uncompressed")).
+				WithCompression(options.None).
+				WithKeepL0InMemory(true).
+				WithLogger(nil)
+
+			dbNoCompression, err := badger.Open(optsNoCompression)
+			require.NoError(t, err)
+			defer dbNoCompression.Close()
+
+			// Write the same data to both databases
+			testValue := createCompressibleValue(valueSize)
+			writeData := func(db *badger.DB) error {
+				return db.Update(func(txn *badger.Txn) error {
+					for i := 0; i < keyCount; i++ {
+						key := []byte(fmt.Sprintf("key-%d", i))
+						if err := txn.Set(key, testValue); err != nil {
+							return err
+						}
+					}
+					return nil
+				})
+			}
+
+			require.NoError(t, writeData(dbWithCompression))
+			require.NoError(t, writeData(dbNoCompression))
+
+			// Force flush to ensure data is written to disk
+			require.NoError(t, dbWithCompression.Sync())
+			require.NoError(t, dbNoCompression.Sync())
+
+			// Run value log GC to ensure data is compacted
+			// This helps ensure we're measuring the actual on-disk size
+			err = dbWithCompression.RunValueLogGC(0.5)
+			if err != nil && err != badger.ErrNoRewrite {
+				require.NoError(t, err)
+			}
+			err = dbNoCompression.RunValueLogGC(0.5)
+			if err != nil && err != badger.ErrNoRewrite {
+				require.NoError(t, err)
+			}
+
+			// Measure on-disk sizes
+			sizeWithCompression := getFolderSize(t, filepath.Join(dir, "compressed"))
+			sizeNoCompression := getFolderSize(t, filepath.Join(dir, "uncompressed"))
+
+			t.Logf("Badger - Size with compression: %d bytes", sizeWithCompression)
+			t.Logf("Badger - Size without compression: %d bytes", sizeNoCompression)
+			t.Logf("Badger - Compression ratio: %.2f%%", float64(sizeWithCompression)/float64(sizeNoCompression)*100)
+
+			// Verify that compressed database is significantly smaller
+			// For highly compressible data, we expect at least 30% reduction
+			compressionRatio := float64(sizeWithCompression) / float64(sizeNoCompression)
+			require.Less(t, compressionRatio, 0.7, "compressed database should be at least 30%% smaller than uncompressed")
+		})
+	})
 }
 
 func TestBatchValue(t *testing.T) {
