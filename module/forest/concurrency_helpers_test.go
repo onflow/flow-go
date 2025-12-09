@@ -92,7 +92,7 @@ func Test_SlicePrimitives(t *testing.T) {
 		assert.Equal(t, len(vertexList), len(iterator.data)+1)
 	})
 
-	t.Run(fmt.Sprintf("fully filled non-empty slice (len = 10, cap = 10)"), func(t *testing.T) {
+	t.Run("fully filled non-empty slice (len = 10, cap = 10)", func(t *testing.T) {
 		// Prepare vertex list that, representing the slice of children held by the
 		//nolint:S1019
 		var vertexList VertexList = make(VertexList, 10, 10) // we want to explicitly state the capacity here for clarity
