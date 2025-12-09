@@ -13,7 +13,7 @@ type PendingBlockBuffer struct {
 }
 
 // Add provides a mock function with given fields: block
-func (_m *PendingBlockBuffer) Add(block flow.Slashable[*flow.Proposal]) error {
+func (_m *PendingBlockBuffer) Add(block flow.Slashable[*flow.GenericProposal[flow.Payload]]) error {
 	ret := _m.Called(block)
 
 	if len(ret) == 0 {
@@ -21,7 +21,7 @@ func (_m *PendingBlockBuffer) Add(block flow.Slashable[*flow.Proposal]) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Slashable[*flow.Proposal]) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Slashable[*flow.GenericProposal[flow.Payload]]) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)
@@ -31,22 +31,22 @@ func (_m *PendingBlockBuffer) Add(block flow.Slashable[*flow.Proposal]) error {
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Proposal], bool) {
+func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[*flow.GenericProposal[flow.Payload]], bool) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
 	}
 
-	var r0 flow.Slashable[*flow.Proposal]
+	var r0 flow.Slashable[*flow.GenericProposal[flow.Payload]]
 	var r1 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.Slashable[*flow.Proposal], bool)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.Slashable[*flow.GenericProposal[flow.Payload]], bool)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[*flow.Proposal]); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[*flow.GenericProposal[flow.Payload]]); ok {
 		r0 = rf(blockID)
 	} else {
-		r0 = ret.Get(0).(flow.Slashable[*flow.Proposal])
+		r0 = ret.Get(0).(flow.Slashable[*flow.GenericProposal[flow.Payload]])
 	}
 
 	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
@@ -59,23 +59,23 @@ func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[*flo
 }
 
 // ByParentID provides a mock function with given fields: parentID
-func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool) {
+func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[flow.Payload]], bool) {
 	ret := _m.Called(parentID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByParentID")
 	}
 
-	var r0 []flow.Slashable[*flow.Proposal]
+	var r0 []flow.Slashable[*flow.GenericProposal[flow.Payload]]
 	var r1 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[flow.Payload]], bool)); ok {
 		return rf(parentID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[*flow.Proposal]); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[*flow.GenericProposal[flow.Payload]]); ok {
 		r0 = rf(parentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Slashable[*flow.Proposal])
+			r0 = ret.Get(0).([]flow.Slashable[*flow.GenericProposal[flow.Payload]])
 		}
 	}
 
