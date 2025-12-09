@@ -94,7 +94,7 @@ func Test_SlicePrimitives(t *testing.T) {
 
 	t.Run("fully filled non-empty slice (len = 10, cap = 10)", func(t *testing.T) {
 		// Prepare vertex list that, representing the slice of children held by the
-		var vertexList VertexList = make(VertexList, 10, 10) //nolint:S1019 // we want to explicitly state the capacity here for clarity
+		var vertexList VertexList = make(VertexList, 10)
 		for i := 0; i < cap(vertexList); i++ {
 			_v := NewVertexMock(fmt.Sprintf("v%d", i), 3, "C", 2)
 			vertexList[i] = &vertexContainer{id: unittest.IdentifierFixture(), level: 3, vertex: _v}
