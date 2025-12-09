@@ -27,6 +27,7 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -550,7 +551,7 @@ func (t *Transactions) lookupTransactionResult(
 	header *flow.Header,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
-	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion)
+	txResult, err := t.txProvider.TransactionResult(ctx, header, txID, requiredEventEncodingVersion, optimistic_sync.Criteria{})
 	if err != nil {
 		// if either the storage or execution node reported no results or there were not enough execution results
 		if status.Code(err) == codes.NotFound {

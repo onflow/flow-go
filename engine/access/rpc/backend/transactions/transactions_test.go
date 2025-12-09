@@ -45,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
@@ -96,6 +97,10 @@ type Suite struct {
 	txResultsIndex *index.TransactionResultsIndex
 
 	errorMessageProvider error_messages.Provider
+
+	execResultInfoProvider *optimisticsyncmock.ExecutionResultInfoProvider
+	execStateCache         *optimisticsyncmock.ExecutionStateCache
+	execStateSnapshot      *optimisticsyncmock.Snapshot
 
 	chainID                           flow.ChainID
 	systemTx                          *flow.TransactionBody
@@ -151,6 +156,10 @@ func (suite *Suite) SetupTest() {
 	suite.Require().NoError(err)
 	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
+
+	suite.execResultInfoProvider = optimisticsyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.execStateCache = optimisticsyncmock.NewExecutionStateCache(suite.T())
+	suite.execStateSnapshot = optimisticsyncmock.NewSnapshot(suite.T())
 
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	suite.Require().NoError(err)
@@ -601,25 +610,25 @@ func (suite *Suite) TestGetSystemTransaction_Local_HappyPath() {
 		suite.state,
 		suite.collections,
 		suite.blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		suite.systemTx.ID(),
 		params.TxStatusDeriver,
 		suite.chainID,
 		true,
+		suite.execResultInfoProvider,
+		suite.execStateCache,
 	)
 	disabledProvider := provider.NewLocalTransactionProvider(
 		suite.state,
 		suite.collections,
 		suite.blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		suite.systemTx.ID(),
 		params.TxStatusDeriver,
 		suite.chainID,
 		false,
+		suite.execResultInfoProvider,
+		suite.execStateCache,
 	)
 
 	suite.params.On("FinalizedRoot").Unset()
@@ -888,13 +897,13 @@ func (suite *Suite) TestGetSystemTransactionResult_Local_HappyPath() {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
+		suite.execResultInfoProvider,
+		suite.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1073,13 +1082,13 @@ func (suite *Suite) TestGetTransactionResult_FromStorage() {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
+		suite.execResultInfoProvider,
+		suite.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1166,13 +1175,13 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
+		suite.execResultInfoProvider,
+		suite.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -1283,13 +1292,13 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		params.SystemTxID,
 		params.TxStatusDeriver,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
+		suite.execResultInfoProvider,
+		suite.execStateCache,
 	)
 	txBackend, err := NewTransactionsBackend(params)
 	suite.Require().NoError(err)
@@ -1375,13 +1384,13 @@ func (suite *Suite) TestGetTransactionsByBlockID() {
 			params.State,
 			params.Collections,
 			params.Blocks,
-			params.EventsIndex,
-			params.TxResultsIndex,
 			params.TxErrorMessageProvider,
 			params.SystemTxID,
 			params.TxStatusDeriver,
 			params.ChainID,
 			params.ScheduledCallbacksEnabled,
+			suite.execResultInfoProvider,
+			suite.execStateCache,
 		)
 
 		txBackend, err := NewTransactionsBackend(params)

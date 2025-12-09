@@ -15,11 +15,12 @@ type TransactionStatusesResponse struct {
 func NewTransactionStatusesResponse(
 	linkGenerator commonmodels.LinkGenerator,
 	txResult *accessmodel.TransactionResult,
+	metadata *accessmodel.ExecutorMetadata,
 	index uint64,
 ) *TransactionStatusesResponse {
 	var transactionResult commonmodels.TransactionResult
 	txID := txResult.TransactionID
-	transactionResult.Build(txResult, txID, linkGenerator)
+	transactionResult.BuildWithMetadata(txResult, metadata, txID, linkGenerator)
 
 	return &TransactionStatusesResponse{
 		TransactionResult: &transactionResult,

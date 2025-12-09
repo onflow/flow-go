@@ -227,13 +227,13 @@ func New(params Params) (*Backend, error) {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		systemTxID,
 		txStatusDeriver,
 		params.ChainID,
 		params.ScheduledCallbacksEnabled,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,

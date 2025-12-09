@@ -7,6 +7,7 @@ import (
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 type FailoverTransactionProvider struct {
@@ -28,13 +29,14 @@ func (f *FailoverTransactionProvider) TransactionResult(
 	header *flow.Header,
 	txID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, error) {
-	localResult, localErr := f.localProvider.TransactionResult(ctx, header, txID, encodingVersion)
+	localResult, localErr := f.localProvider.TransactionResult(ctx, header, txID, encodingVersion, criteria)
 	if localErr == nil {
 		return localResult, nil
 	}
 
-	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion)
+	execNodeResult, execNodeErr := f.execNodeProvider.TransactionResult(ctx, header, txID, encodingVersion, criteria)
 	return execNodeResult, execNodeErr
 }
 

@@ -79,6 +79,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	block *flow.Header,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	// create an execution API request for events at blockID and transactionID
@@ -343,7 +344,7 @@ func (e *ENTransactionProvider) SystemTransactionResult(
 			return nil, status.Errorf(codes.NotFound, "system transaction not found")
 		}
 	}
-	return e.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion)
+	return e.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion, optimistic_sync.Criteria{})
 
 }
 

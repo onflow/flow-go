@@ -9,19 +9,22 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	httpmodels "github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
 type transactionStatusesArguments struct {
-	TxID flow.Identifier `json:"tx_id"` // ID of the transaction to monitor.
+	TxID                flow.Identifier                  `json:"tx_id"`                  // ID of the transaction to monitor.
+	ExecutionStateQuery *httpmodels.ExecutionStateQuery `json:"execution_state_query"` // Optional execution state query for selecting execution results.
 }
 
 // TransactionStatusesDataProvider is responsible for providing tx statuses
@@ -84,7 +87,8 @@ func (p *TransactionStatusesDataProvider) Run() error {
 // No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) sendResponse(txResults []*accessmodel.TransactionResult) error {
 	for i := range txResults {
-		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], p.messageIndex.Value())
+		// TODO: Add executor metadata when available from subscription response
+		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], nil, p.messageIndex.Value())
 		response := models.BaseDataProvidersResponse{
 			SubscriptionID: p.ID(),
 			Topic:          p.Topic(),
@@ -103,7 +107,12 @@ func (p *TransactionStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args transactionStatusesArguments,
 ) subscription.Subscription {
-	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
+	// Extract criteria from the execution state query if provided
+	var criteria optimistic_sync.Criteria
+	if args.ExecutionStateQuery != nil {
+		criteria = httpmodels.NewCriteria(*args.ExecutionStateQuery)
+	}
+	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0, criteria)
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
@@ -111,7 +120,8 @@ func parseTransactionStatusesArguments(
 	arguments wsmodels.Arguments,
 ) (transactionStatusesArguments, error) {
 	allowedFields := map[string]struct{}{
-		"tx_id": {},
+		"tx_id":                  {},
+		"execution_state_query": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -143,5 +153,15 @@ func parseTransactionStatusesArguments(
 
 	// Assign the validated transaction ID to the args
 	args.TxID = parsedTxID.Flow()
+
+	// Parse execution_state_query if provided (optional)
+	if rawQuery, exists := arguments["execution_state_query"]; exists && rawQuery != nil {
+		query, err := parseExecutionStateQuery(rawQuery)
+		if err != nil {
+			return transactionStatusesArguments{}, fmt.Errorf("invalid 'execution_state_query': %w", err)
+		}
+		args.ExecutionStateQuery = &query
+	}
+
 	return args, nil
 }

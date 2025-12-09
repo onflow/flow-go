@@ -148,7 +148,7 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
+		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, nil, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   topic,
 			Payload: expectedResponsePayload,

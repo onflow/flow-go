@@ -86,6 +86,10 @@ func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 }
 
 func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.Identifier, link LinkGenerator) {
+	t.BuildWithMetadata(txr, nil, txID, link)
+}
+
+func (t *TransactionResult) BuildWithMetadata(txr *accessmodel.TransactionResult, metadata *accessmodel.ExecutorMetadata, txID flow.Identifier, link LinkGenerator) {
 	var status TransactionStatus
 	status.Build(txr.Status)
 
@@ -106,6 +110,7 @@ func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.
 	t.ErrorMessage = txr.ErrorMessage
 	t.ComputationUsed = util.FromUint(uint64(0)) // todo: define this
 	t.Events = NewEvents(txr.Events)
+	t.Metadata = NewMetadata(metadata)
 
 	self, _ := SelfLink(txID, link.TransactionResultLink)
 	t.Links = self
