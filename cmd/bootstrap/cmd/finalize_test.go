@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	cryptoRand "crypto/rand"
 	"encoding/hex"
 	"math/rand"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -66,12 +68,19 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
+		flagIntermediaryClusteringDataPath = filepath.Join(bootDir, model.PathClusteringData)
+		flagRootClusterBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
+		flagEpochCounter = epochCounter
+
+		// clusterAssignment will generate the collector clusters
+		// In addition, it also generates votes from internal collector nodes
+		clusterAssignment(clusterAssignmentCmd, nil)
+
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
 		flagRootView = 1_000
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagEpochCounter = epochCounter
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
@@ -113,20 +122,29 @@ func TestClusterAssignment(t *testing.T) {
 	// Happy path (limit set-up, can't have one less internal node)
 	partnersLen := 7
 	internalLen := 22
+	// clusters are assigned with ratios (partner:internal) [2:5, 2:5, 1:4, 1:4, 1:4]
 	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
 	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
+	// use a random seed
+	seed := make([]byte, 32)
+	_, err := cryptoRand.Read(seed)
+	require.NoError(t, err)
+	prng, err := prg.New(seed, prg.BootstrapClusterAssignment, nil)
+	require.NoError(t, err)
+
 	log := zerolog.Nop()
 	// should not error
-	_, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
+	_, _, canConstructQCs, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
 	require.NoError(t, err)
-	require.True(t, checkClusterConstraint(clusters, partners, internals))
+	require.True(t, canConstructQCs)
 
 	// unhappy Path
-	internals = internals[:21] // reduce one internal node
-	// should error
-	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
-	require.Error(t, err)
+	internals = internals[:len(internals)-1] // reduce one internal node
+	// should no longer be able to construct QCs using only votes from internal nodes
+	_, _, canConstructQCs, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters), prng)
+	require.NoError(t, err)
+	require.False(t, canConstructQCs)
 	// revert the flag value
 	flagCollectionClusters = tmp
 }
@@ -172,28 +190,6 @@ func TestEpochTimingConfig(t *testing.T) {
 			*flag = rand.Uint64()%100 + 1 // set the flag back to a non-zero value
 		}
 	})
-}
-
-// Check about the number of internal/partner nodes in each cluster. The identites
-// in each cluster do not matter for this check.
-func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.NodeInfo, internalsInfo []model.NodeInfo) bool {
-	partners := model.ToIdentityList(partnersInfo)
-	internals := model.ToIdentityList(internalsInfo)
-	for _, cluster := range clusters {
-		var clusterPartnerCount, clusterInternalCount int
-		for _, node := range cluster {
-			if _, exists := partners.ByNodeID(node.NodeID); exists {
-				clusterPartnerCount++
-			}
-			if _, exists := internals.ByNodeID(node.NodeID); exists {
-				clusterInternalCount++
-			}
-		}
-		if clusterInternalCount <= clusterPartnerCount*2 {
-			return false
-		}
-	}
-	return true
 }
 
 func TestMergeNodeInfos(t *testing.T) {

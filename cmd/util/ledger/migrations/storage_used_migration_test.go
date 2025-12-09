@@ -32,7 +32,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 	sizeOfTheStatusPayload := uint64(
 		environment.RegisterSize(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+			flow.AccountStatusRegisterID(flow.Address(address)),
 			environment.NewAccountStatus().ToBytes(),
 		),
 	)
@@ -210,7 +210,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 		dataRegisterSize := uint64(environment.RegisterSize(
 			flow.RegisterID{
-				Owner: string(flow.ConvertAddress(address).Bytes()),
+				Owner: string(flow.Address(address).Bytes()),
 				Key:   "1",
 			},
 			make([]byte, 100),
