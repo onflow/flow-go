@@ -165,9 +165,8 @@ type NodeInfoPub struct {
 	StakingPoP    encodable.StakingKeyPoP
 }
 
-// decodableNodeInfoPub provides backward-compatible decoding of old models
-// which use the Stake field in place of Weight.
-type decodableNodeInfoPub struct {
+// encodableNodeInfoPub provides the canonical structure for encoding public node info
+type encodableNodeInfoPub struct {
 	Role          flow.Role
 	Address       string
 	NodeID        flow.Identifier
@@ -175,6 +174,13 @@ type decodableNodeInfoPub struct {
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
 	StakingPoP    encodable.StakingKeyPoP
+}
+
+// decodableNodeInfoPub provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableNodeInfoPub struct {
+	encodableNodeInfoPub
+
 	// Stake previously was used in place of the Weight field.
 	// Deprecated: supported in decoding for backward-compatibility
 	Stake uint64
@@ -219,15 +225,7 @@ func (info *NodeInfoPub) Equals(other *NodeInfoPub) bool {
 }
 
 func (info *NodeInfoPub) MarshalJSON() ([]byte, error) {
-	enc := struct {
-		Role          flow.Role // role is public
-		Address       string
-		NodeID        flow.Identifier // node ID is public
-		Weight        uint64
-		NetworkPubKey encodable.NetworkPubKey
-		StakingPubKey encodable.StakingPubKey
-		StakingPoP    encodable.StakingKeyPoP
-	}{
+	enc := encodableNodeInfoPub{
 		Role:          info.role,
 		Address:       info.Address,
 		NodeID:        info.nodeID,
