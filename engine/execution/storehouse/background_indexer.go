@@ -35,7 +35,7 @@ func NewBackgroundIndexer(
 	}
 }
 
-func (b *BackgroundIndexer) IndexToLatest(ctx context.Context) error {
+func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx context.Context) error {
 	startHeight := b.registerStore.LastFinalizedAndExecutedHeight()
 	latestFinalized, err := b.state.Final().Head()
 	if err != nil {
@@ -56,6 +56,8 @@ func (b *BackgroundIndexer) IndexToLatest(ctx context.Context) error {
 		}
 
 		if !executed {
+			// if the finalized block has not been executed, then we finish indexing
+			// it happens when the execution node is catching up.
 			return nil
 		}
 
