@@ -187,7 +187,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.SyncResponse)
-			assert.Equal(ss.T(), ss.head.Height, res.Height, "response should contain head height")
+			assert.Equal(ss.T(), ss.head.Height, res.Header.Height, "response should contain head height")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
@@ -204,13 +204,15 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 func (ss *SyncSuite) TestOnSyncResponse() {
 	// generate origin ID and response message
 	originID := unittest.IdentifierFixture()
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(rand.Uint64()))
 	res := &flow.SyncResponse{
-		Nonce:  rand.Uint64(),
-		Height: rand.Uint64(),
+		Nonce:        rand.Uint64(),
+		Header:       header,
+		CertifyingQC: unittest.CertifyBlock(header),
 	}
 
 	// the height should be handled
-	ss.core.On("HandleHeight", ss.head, res.Height)
+	ss.core.On("HandleHeight", ss.head, res.Header.Height)
 	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
@@ -559,11 +561,13 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(1000 + i)))
 		msg := &flow.SyncResponse{
-			Nonce:  uint64(i),
-			Height: uint64(1000 + i),
+			Nonce:        uint64(i),
+			Header:       header,
+			CertifyingQC: unittest.CertifyBlock(header),
 		}
-		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
+		ss.core.On("HandleHeight", mock.Anything, msg.Header.Height).Once()
 		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
 		ss.metrics.On("MessageReceived", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
 		ss.metrics.On("MessageHandled", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()

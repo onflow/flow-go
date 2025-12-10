@@ -12,8 +12,9 @@ type SyncRequest struct {
 // to a synchronization request that contains the latest finalized block height
 // of the responding node.
 type SyncResponse struct {
-	Nonce  uint64
-	Height uint64
+	Nonce        uint64
+	Header       *Header
+	CertifyingQC *QuorumCertificate
 }
 
 // BatchRequest is part of the synchronization protocol and represents an active

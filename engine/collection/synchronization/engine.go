@@ -287,7 +287,7 @@ func (e *Engine) onSyncResponse(_ flow.Identifier, res *flow.SyncResponse) {
 		e.log.Error().Err(err).Msg("could not get last finalized header")
 		return
 	}
-	e.core.HandleHeight(final, res.Height)
+	e.core.HandleHeight(final, res.Header.Height)
 }
 
 // onBlockResponse processes a slice of requested block proposals.

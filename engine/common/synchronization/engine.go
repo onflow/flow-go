@@ -296,7 +296,7 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *flow.SyncResponse) {
 	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
 	final := e.finalizedHeaderCache.Get()
-	e.core.HandleHeight(final, res.Height)
+	e.core.HandleHeight(final, res.Header.Height)
 }
 
 // onBlockResponse processes a structurally validated block proposal containing a specifically requested block response.

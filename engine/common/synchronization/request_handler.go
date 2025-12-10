@@ -171,9 +171,11 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *flow.SyncR
 	}
 
 	// if we're sufficiently ahead of the requester, send a response
+	//protocol.Snapshot().Final() // TODO sync
 	res := &messages.SyncResponse{
-		Height: finalizedHeader.Height,
 		Nonce:  req.Nonce,
+		Header: finalizedHeader,
+		//CertifyingQC: state.QuorumCertificate(),
 	}
 	err := r.responseSender.SendResponse(res, originID)
 	if err != nil {
