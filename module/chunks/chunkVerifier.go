@@ -10,6 +10,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -273,6 +274,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		err = chunkState.Merge(executionSnapshot)
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge: %d (%w)", i, err)
+		}
+
+		// NOTE: Ignore verification of whole chunk if any transaction failed due to computation limit exceeded,
+		// as computation metering differs between Cadence VM and interpreter.
+		if output.Err != nil && output.Err.Code() == fvmErrors.ErrCodeComputationLimitExceededError {
+			return nil, nil
 		}
 
 		txResults[i] = flow.LightTransactionResult{
