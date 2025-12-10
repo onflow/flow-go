@@ -8,7 +8,7 @@ import (
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
@@ -130,9 +130,7 @@ func LoadBackgroundIndexerEngine(
 	state protocol.State,
 	headers storageerr.Headers,
 	blockExecutedNotifier BlockExecutedNotifier, // optional: notifier for block executed events
-	followerDistributor interface { // optional: notifier for block finalized events
-		AddOnBlockFinalizedConsumer(consumer func(block *model.Block))
-	},
+	followerDistributor *pubsub.FollowerDistributor,
 ) (*BackgroundIndexerEngine, error) {
 	// Only create background indexer engine if storehouse is not enabled
 	// and background indexing is enabled
