@@ -77,7 +77,8 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block %s: %w", blockID, err)
 		switch {
-		case errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
+		case errors.Is(err, storage.ErrNotFound) ||
+			errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
 			errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) ||
 			errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
@@ -284,7 +285,8 @@ func newExecutionDataProvider(
 var _ subscription.DataProvider = (*executionDataProvider)(nil)
 
 func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
-	if e.executionDataTracker.GetHighestAvailableFinalizedHeight() > e.height {
+	availableFinalizedHeight := e.executionDataTracker.GetHighestAvailableFinalizedHeight()
+	if e.height > availableFinalizedHeight {
 		// fail early if no notification has been received for the given block height.
 		// note: it's possible for the data to exist in the data store before the notification is
 		// received. this ensures a consistent view is available to all streams.

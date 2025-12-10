@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -19,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/execution_result"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -68,10 +71,12 @@ type BackendExecutionDataSuite2 struct {
 	preferredExecutionNodeIDs flow.IdentifierList
 }
 
+// TestBackendExecutionDataSuite2 runs the BackendExecutionDataSuite2 test suite.
 func TestBackendExecutionDataSuite2(t *testing.T) {
 	suite.Run(t, new(BackendExecutionDataSuite2))
 }
 
+// SetupTest initializes the test suite with necessary mocks and fixtures.
 func (s *BackendExecutionDataSuite2) SetupTest() {
 	s.log = unittest.Logger()
 
@@ -207,6 +212,9 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 	)
 }
 
+// TestSubscribeExecutionData verifies that the subscription to execution data works correctly
+// starting from the spork root block ID. It ensures that the execution data is received
+// sequentially and matches the expected data.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 	s.mockDataProviderState()
 
@@ -233,6 +241,11 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 		s.criteria,
 	)
 
+	// cancel after we have received all expected blocks to avoid waiting for
+	// streamer/provider to hit the "block not ready" or missing height path.
+	received := 0
+	expected := len(s.blocks)
+
 	for value := range sub.Channel() {
 		actualExecutionData, ok := value.(*ExecutionDataResponse)
 		require.True(s.T(), ok, "expected *ExecutionDataResponse on the channel")
@@ -243,11 +256,20 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 		require.Equal(s.T(), expectedExecutionData, actualExecutionData.ExecutionData)
 
 		currentHeight += 1
+
+		received++
+		if received == expected {
+			// We’ve validated enough; stop the stream.
+			cancel()
+		}
 	}
 
-	require.ErrorIs(s.T(), sub.Err(), storage.ErrNotFound)
+	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
+// TestSubscribeExecutionDataFromStartHeight verifies that the subscription can start from a specific
+// block height. It ensures that the correct block header is retrieved and data streaming starts
+// from the correct block.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight() {
 	s.mockDataProviderState()
 
@@ -284,6 +306,11 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 		s.criteria,
 	)
 
+	// cancel after we have received all expected blocks to avoid waiting for
+	// streamer/provider to hit the "block not ready" or missing height path.
+	received := 0
+	expected := len(s.blocks)
+
 	for value := range sub.Channel() {
 		actualExecutionData, ok := value.(*ExecutionDataResponse)
 		require.True(s.T(), ok, "expected *ExecutionDataResponse on the channel")
@@ -294,11 +321,20 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 		require.Equal(s.T(), expectedExecutionData, actualExecutionData.ExecutionData)
 
 		currentHeight += 1
+
+		received++
+		if received == expected {
+			// We’ve validated enough; stop the stream.
+			cancel()
+		}
 	}
 
-	require.ErrorIs(s.T(), sub.Err(), storage.ErrNotFound)
+	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
+// TestSubscribeExecutionDataFromStartID verifies that the subscription can start from a specific
+// block ID. It checks that the start height is correctly resolved from the block ID and data
+// streaming proceeds.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 	s.mockDataProviderState()
 
@@ -324,6 +360,11 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 		s.criteria,
 	)
 
+	// cancel after we have received all expected blocks to avoid waiting for
+	// streamer/provider to hit the "block not ready" or missing height path.
+	received := 0
+	expected := len(s.blocks)
+
 	for value := range sub.Channel() {
 		actualExecutionData, ok := value.(*ExecutionDataResponse)
 		require.True(s.T(), ok, "expected *ExecutionDataResponse on the channel")
@@ -334,11 +375,20 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 		require.Equal(s.T(), expectedExecutionData, actualExecutionData.ExecutionData)
 
 		currentHeight += 1
+
+		received++
+		if received == expected {
+			// We’ve validated enough; stop the stream.
+			cancel()
+		}
 	}
 
-	require.ErrorIs(s.T(), sub.Err(), storage.ErrNotFound)
+	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
+// TestSubscribeExecutionDataFromLatest verifies that the subscription can start from the latest
+// available finalized block. It ensures that the start height is correctly determined and data
+// streaming begins.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 	s.mockDataProviderState()
 
@@ -360,6 +410,11 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 	sub := backend.SubscribeExecutionDataFromLatest(ctx, s.criteria)
 	currentHeight := s.sporkRootBlock.Height
 
+	// cancel after we have received all expected blocks to avoid waiting for
+	// streamer/provider to hit the "block not ready" or missing height path.
+	received := 0
+	expected := len(s.blocks)
+
 	for value := range sub.Channel() {
 		actualExecutionData, ok := value.(*ExecutionDataResponse)
 		require.True(s.T(), ok, "expected *ExecutionDataResponse on the channel")
@@ -370,11 +425,19 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 		require.Equal(s.T(), expectedExecutionData, actualExecutionData.ExecutionData)
 
 		currentHeight += 1
+
+		received++
+		if received == expected {
+			// We’ve validated enough; stop the stream.
+			cancel()
+		}
 	}
 
-	require.ErrorIs(s.T(), sub.Err(), storage.ErrNotFound)
+	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
+// TestGetExecutionData verifies the retrieval of execution data for a specific block ID.
+// It checks that the data and metadata are returned correctly.
 func (s *BackendExecutionDataSuite2) TestGetExecutionData() {
 	s.mockDataProviderState()
 
@@ -389,6 +452,198 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData() {
 	require.Equal(s.T(), expectedExecData, actualExecData)
 }
 
+// TestGetExecutionData_Errors verifies how GetExecutionDataByBlockID handles various error
+// conditions, such as missing data, block not found, fork abandoned, and unexpected system errors.
+func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
+	backend := s.createExecutionDataBackend()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	block := s.sporkRootBlock
+
+	s.Run("execution result info returns data not found", func() {
+		// provider returns storage.ErrNotFound which should map to access.DataNotFoundError
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("execution result info returns block not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, optimistic_sync.ErrBlockNotFound).
+			Once()
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("execution result info returns fork abandoned", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, optimistic_sync.ErrForkAbandoned).
+			Once()
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsPreconditionFailedError(err))
+	})
+
+	s.Run("execution result info returns unexpected error", func() {
+		// any unexpected error should be wrapped by access.RequireNoError, i.e., returned as-is
+		unexpected := assert.AnError
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, unexpected).
+			Once()
+
+		exception := fmt.Errorf("failed to get execution result info for block %s: %w", block.ID(), unexpected)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+
+	s.Run("snapshot returns data not found", func() {
+		// first return a valid exec result info
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+				info, err := s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+				return info, err
+			}).
+			Once()
+
+		// Snapshot not found maps to DataNotFoundError
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("snapshot returns unexpected error", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+				info, err := s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+				return info, err
+			}).
+			Once()
+
+		unexpected := assert.AnError
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(nil, unexpected).
+			Once()
+
+		// RequireErrorIs will treat this as irrecoverable; expect the same exception
+		exception := fmt.Errorf("%v", unexpected)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+
+	s.Run("missing exec data in reader (not found)", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+				info, err := s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+				return info, err
+			}).
+			Once()
+
+		// provide snapshot and reader that returns not found
+		reader := osyncmock.NewBlockExecutionDataReader(s.T())
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("reader returns unexpected error", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+				info, err := s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+				return info, err
+			}).
+			Once()
+
+		reader := osyncmock.NewBlockExecutionDataReader(s.T())
+		s.executionStateCache.
+			On("Snapshot", mock.Anything).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(nil, storage.ErrDataMismatch).
+			Once()
+
+		exception := fmt.Errorf("unexpected error getting execution data: %w", storage.ErrDataMismatch)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err :=
+			backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+}
+
+// TestExecutionDataProviderErrors tests the error handling capabilities of the execution data
+// provider used by the subscription. It simulates various error scenarios from the execution
+// result provider and storage to ensure the subscription terminates with the expected error.
 func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 	tests := []struct {
 		name        string
@@ -475,62 +730,6 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 					Once()
 			},
 		},
-		{
-			name:        "required executors not found",
-			expectedErr: storage.ErrNotFound,
-			mockState: func() {
-				// if this error is seen, we continue trying to fetch results until we get a result or other error.
-				s.executionResultProvider.
-					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-						// after an 'ignorable' error occures, the streamer goes to sleep waiting for the notification
-						// that the new data is available.
-						// since we are about to return an error, we notify the streamer in advance. this will cause it
-						// to wake up and try again with a new mock.
-						s.executionDataBroadcaster.Publish()
-
-						return nil, optimistic_sync.ErrRequiredExecutorNotFound
-					}).
-					Once()
-
-				s.executionResultProvider.
-					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
-					}).
-					Times(len(s.blocks) - 1) // we expect storage.ErrNotFound to be returned for the unknown height
-				// Times is equal to `len(s.blocks)-1)` because the function is never called for the spork root block,
-				// as well as for the last block that is not found in storage.
-			},
-		},
-		{
-			name:        "not enough agreeing executors",
-			expectedErr: storage.ErrNotFound,
-			mockState: func() {
-				// if this error is seen, we continue trying to fetch results until we get a result or other error.
-				s.executionResultProvider.
-					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-						// after an 'ignorable' error occures, the streamer goes to sleep waiting for the notification
-						// that the new data is available.
-						// since we are about to return an error, we notify the streamer in advance. this will cause it
-						// to wake up and try again with a new mock.
-						s.executionDataBroadcaster.Publish()
-
-						return nil, optimistic_sync.ErrNotEnoughAgreeingExecutors
-					}).
-					Once()
-
-				s.executionResultProvider.
-					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
-					}).
-					Times(len(s.blocks) - 1) // we expect storage.ErrNotFound to be returned for the unknown height
-				// Times is equal to `len(s.blocks)-1)` because the function is never called for the spork root block,
-				// as well as for the last block that is not found in storage.
-			},
-		},
 	}
 
 	s.headers.
@@ -542,6 +741,10 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			}
 			return block.ID(), nil
 		})
+
+	s.executionDataTracker.
+		On("GetHighestAvailableFinalizedHeight").
+		Return(s.blocks[len(s.blocks)-1].Height)
 
 	executionDataReader := osyncmock.NewBlockExecutionDataReader(s.T())
 	s.executionDataSnapshot.
@@ -613,6 +816,169 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 	}
 }
 
+// TestExecutionDataProviderIgnorableErrors verifies that the data provider handles temporary or
+// ignorable errors correctly. It ensures that the provider retries or waits when encountering
+// errors like missing required executors, rather than terminating the subscription immediately,
+// until the context is canceled.
+func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() {
+	tests := []struct {
+		name        string
+		expectedErr error
+		mockState   func()
+	}{
+		{
+			name:        "required executors not found",
+			expectedErr: context.Canceled,
+			mockState: func() {
+				// if this error is seen, we continue trying to fetch results until we get a result or other error.
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						// after an 'ignorable' error occures, the streamer goes to sleep waiting for the notification
+						// that the new data is available.
+						// since we are about to return an error, we notify the streamer in advance. this will cause it
+						// to wake up and try again with a new mock.
+						defer s.executionDataBroadcaster.Publish()
+
+						return nil, optimistic_sync.ErrRequiredExecutorNotFound
+					}).
+					Once()
+
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(len(s.blocks) - 1) // we expect storage.ErrNotFound to be returned for the unknown height
+				// Times is equal to `len(s.blocks)-1)` because the function is never called for the spork root block,
+				// as well as for the last block that is not found in storage.
+			},
+		},
+		{
+			name:        "not enough agreeing executors",
+			expectedErr: context.Canceled,
+			mockState: func() {
+				// if this error is seen, we continue trying to fetch results until we get a result or other error.
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						// after an 'ignorable' error occures, the streamer goes to sleep waiting for the notification
+						// that the new data is available.
+						// since we are about to return an error, we notify the streamer in advance. this will cause it
+						// to wake up and try again with a new mock.
+						defer s.executionDataBroadcaster.Publish()
+
+						return nil, optimistic_sync.ErrNotEnoughAgreeingExecutors
+					}).
+					Once()
+
+				s.executionResultProvider.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
+					}).
+					Times(len(s.blocks) - 1) // we expect storage.ErrNotFound to be returned for the unknown height
+				// Times is equal to `len(s.blocks)-1)` because the function is never called for the spork root block,
+				// as well as for the last block that is not found in storage.
+			},
+		},
+	}
+
+	s.headers.
+		On("BlockIDByHeight", mock.Anything).
+		Return(func(height uint64) (flow.Identifier, error) {
+			block, ok := s.blocksHeightToBlockMap[height]
+			if !ok {
+				return flow.ZeroID, storage.ErrNotFound
+			}
+			return block.ID(), nil
+		})
+
+	s.executionDataTracker.
+		On("GetHighestAvailableFinalizedHeight").
+		Return(s.blocks[len(s.blocks)-1].Height)
+
+	executionDataReader := osyncmock.NewBlockExecutionDataReader(s.T())
+	s.executionDataSnapshot.
+		On("BlockExecutionData").
+		Return(executionDataReader)
+
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionDataSnapshot, nil)
+
+	executionDataReader.
+		On("ByBlockID", mock.Anything, mock.Anything).
+		Return(func(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
+			ed, ok := s.blockIDToExecutionDataMap[blockID]
+			if !ok {
+				return nil, storage.ErrNotFound
+			}
+
+			return &execution_data.BlockExecutionDataEntity{
+				BlockExecutionData: ed,
+				ExecutionDataID:    unittest.IdentifierFixture(),
+			}, nil
+		})
+
+	s.executionDataTracker.
+		On("GetStartHeightFromBlockID", mock.AnythingOfType("flow.Identifier")).
+		Return(
+			func(ID flow.Identifier) (uint64, error) {
+				return s.executionDataTrackerReal.GetStartHeightFromBlockID(ID)
+			},
+			nil,
+		).
+		Times(len(tests))
+
+	backend := NewExecutionDataBackend(
+		s.log,
+		s.state,
+		s.headers,
+		s.subscriptionFactory,
+		s.executionDataTracker,
+		s.executionResultProvider,
+		s.executionStateCache,
+	)
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			test.mockState()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			currentHeight := s.sporkRootBlock.Height
+			sub := backend.SubscribeExecutionDataFromStartBlockID(ctx, s.sporkRootBlock.ID(), s.criteria)
+
+			// cancel after we have received all expected blocks to avoid waiting for
+			// streamer/provider to hit the "block not ready" or missing height path.
+			received := 0
+			expected := len(s.blocks)
+
+			for value := range sub.Channel() {
+				actualExecutionData, ok := value.(*ExecutionDataResponse)
+				require.True(s.T(), ok, "expected *ExecutionDataResponse on the channel")
+				require.NotNil(s.T(), actualExecutionData.ExecutionData, "expected non-nil execution data")
+
+				block := s.blocksHeightToBlockMap[currentHeight]
+				expectedExecutionData := s.blockIDToExecutionDataMap[block.ID()]
+				require.Equal(s.T(), expectedExecutionData, actualExecutionData.ExecutionData)
+
+				currentHeight += 1
+
+				received++
+				if received == expected {
+					// We’ve validated enough; stop the stream.
+					cancel()
+				}
+			}
+
+			require.ErrorIs(s.T(), sub.Err(), test.expectedErr)
+		})
+	}
+}
+
 func (s *BackendExecutionDataSuite2) createExecutionDataBackend() *ExecutionDataBackend {
 	b := NewExecutionDataBackend(
 		s.log,
@@ -647,6 +1013,11 @@ func (s *BackendExecutionDataSuite2) mockDataProviderState() {
 			}
 			return block.ID(), nil
 		}).
+		Maybe()
+
+	s.executionDataTracker.
+		On("GetHighestAvailableFinalizedHeight").
+		Return(s.blocks[len(s.blocks)-1].Height).
 		Maybe()
 
 	s.mockExecutionResultProvider()
