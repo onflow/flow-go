@@ -148,31 +148,32 @@ type ExecutionNode struct {
 	commitsReader   storageerr.CommitsReader
 	collections     storageerr.Collections
 
-	chunkDataPackDB        *pebble.DB
-	chunkDataPacks         storageerr.ChunkDataPacks
-	providerEngine         exeprovider.ProviderEngine
-	checkerEng             *checker.Engine
-	syncCore               *chainsync.Core
-	syncEngine             *synchronization.Engine
-	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
-	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
-	computationManager     *computation.Manager
-	collectionRequester    ingestion.CollectionRequester
-	scriptsEng             *scripts.Engine
-	followerDistributor    *pubsub.FollowerDistributor
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	diskWAL                *wal.DiskWAL
-	blockDataUploader      *uploader.Manager
-	executionDataStore     execution_data.ExecutionDataStore
-	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore execdatastorage.DatastoreManager
-	executionDataPruner    *pruner.Pruner
-	executionDataBlobstore blobs.Blobstore
-	executionDataTracker   tracker.Storage
-	blobService            network.BlobService
-	blobserviceDependable  *module.ProxiedReadyDoneAware
-	metricsProvider        txmetrics.TransactionExecutionMetricsProvider
+	chunkDataPackDB         *pebble.DB
+	chunkDataPacks          storageerr.ChunkDataPacks
+	providerEngine          exeprovider.ProviderEngine
+	checkerEng              *checker.Engine
+	syncCore                *chainsync.Core
+	syncEngine              *synchronization.Engine
+	followerCore            *hotstuff.FollowerLoop        // follower hotstuff logic
+	followerEng             *followereng.ComplianceEngine // to sync blocks from consensus nodes
+	computationManager      *computation.Manager
+	collectionRequester     ingestion.CollectionRequester
+	scriptsEng              *scripts.Engine
+	followerDistributor     *pubsub.FollowerDistributor
+	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
+	diskWAL                 *wal.DiskWAL
+	blockDataUploader       *uploader.Manager
+	executionDataStore      execution_data.ExecutionDataStore
+	toTriggerCheckpoint     *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl             *stop.StopControl // stop the node at given block height
+	executionDataDatastore  execdatastorage.DatastoreManager
+	executionDataPruner     *pruner.Pruner
+	executionDataBlobstore  blobs.Blobstore
+	executionDataTracker    tracker.Storage
+	blobService             network.BlobService
+	blobserviceDependable   *module.ProxiedReadyDoneAware
+	metricsProvider         txmetrics.TransactionExecutionMetricsProvider
+	backgroundIndexerEngine *storehouse.BackgroundIndexerEngine
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -259,7 +260,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
-		Component("grpc server", exeNode.LoadGrpcServer)
+		Component("grpc server", exeNode.LoadGrpcServer).
+		Component("background indexer engine", exeNode.LoadBackgroundIndexerEngine)
 }
 
 func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
@@ -1333,6 +1335,35 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.exeConf.apiRatelimits,
 		exeNode.exeConf.apiBurstlimits,
 	), nil
+}
+
+func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	logger := node.Logger.With().Str("component", "background_indexer_engine").Logger()
+	engine, err := storehouse.LoadBackgroundIndexerEngine(
+		logger,
+		exeNode.exeConf.enableStorehouse,
+		exeNode.exeConf.enableBackgroundStorehouseIndexing,
+		exeNode.registerStore,
+		exeNode.executionDataStore,
+		exeNode.resultsReader,
+		node.State,
+		node.Storage.Headers,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if engine == nil {
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	exeNode.backgroundIndexerEngine = engine
+	return engine, nil
 }
 
 func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {

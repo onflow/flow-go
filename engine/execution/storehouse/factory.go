@@ -8,9 +8,11 @@ import (
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -107,6 +109,65 @@ func LoadRegisterStore(
 	}
 
 	return registerStore, closer, nil
+}
+
+// LoadBackgroundIndexerEngine creates and initializes a BackgroundIndexerEngine.
+// It returns nil if background indexing is disabled or if storehouse is enabled.
+func LoadBackgroundIndexerEngine(
+	log zerolog.Logger,
+	enableStorehouse bool,
+	enableBackgroundStorehouseIndexing bool,
+	registerStore execution.RegisterStore,
+	executionDataStore execution_data.ExecutionDataGetter,
+	resultsReader storageerr.ExecutionResultsReader,
+	state protocol.State,
+	headers storageerr.Headers,
+) (*BackgroundIndexerEngine, error) {
+	// Only create background indexer engine if storehouse is not enabled
+	// and background indexing is enabled
+	if enableStorehouse {
+		log.Info().Msg("background indexer engine disabled (storehouse enabled)")
+		return nil, nil
+	}
+
+	if !enableBackgroundStorehouseIndexing {
+		log.Info().Msg("background indexer engine disabled")
+		return nil, nil
+	}
+
+	// Check that required dependencies are available
+	if registerStore == nil {
+		return nil, fmt.Errorf("register store is not initialized")
+	}
+	if executionDataStore == nil {
+		return nil, fmt.Errorf("execution data store is not initialized")
+	}
+	if resultsReader == nil {
+		return nil, fmt.Errorf("execution results reader is not initialized")
+	}
+
+	// Create the register updates provider
+	provider := NewExecutionDataRegisterUpdatesProvider(
+		executionDataStore,
+		resultsReader,
+		headers,
+	)
+
+	// Create the background indexer
+	backgroundIndexer := NewBackgroundIndexer(
+		provider,
+		registerStore,
+		state,
+		headers,
+	)
+
+	// Create the background indexer engine
+	backgroundIndexerEngine := NewBackgroundIndexerEngine(
+		log,
+		backgroundIndexer,
+	)
+
+	return backgroundIndexerEngine, nil
 }
 
 type pebbleDBCloser struct {
