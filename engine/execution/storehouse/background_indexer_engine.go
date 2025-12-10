@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -17,7 +18,8 @@ type BackgroundIndexerEngine struct {
 	component.Component
 	log                         zerolog.Logger
 	newBlockExecutedOrFinalized engine.Notifier
-	bootstrapper                func(ctx context.Context) (*BackgroundIndexer, error)
+	bootstrapper                func(ctx context.Context) (*BackgroundIndexer, io.Closer, error)
+	registerStoreCloser         io.Closer
 }
 
 func newFinalizedAndExecutedNotifier(
@@ -40,7 +42,7 @@ func newFinalizedAndExecutedNotifier(
 
 func NewBackgroundIndexerEngine(
 	log zerolog.Logger,
-	bootstrapper func(ctx context.Context) (*BackgroundIndexer, error),
+	bootstrapper func(ctx context.Context) (*BackgroundIndexer, io.Closer, error),
 	blockExecutedNotifier BlockExecutedNotifier,
 	followerDistributor *pubsub.FollowerDistributor,
 ) *BackgroundIndexerEngine {
@@ -68,18 +70,27 @@ func NewBackgroundIndexerEngine(
 func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	b.log.Info().Msgf("bootstrapping")
-	backgroundIndexer, err := b.bootstrapper(ctx)
+	b.log.Info().Msg("bootstrapping background indexer")
+	backgroundIndexer, closer, err := b.bootstrapper(ctx)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to bootstrap background indexer: %w", err))
 		return
 	}
 
-	b.log.Info().Msgf("starting background indexer worker loop")
+	// Store the closer to close it during shutdown
+	b.registerStoreCloser = closer
+
+	b.log.Info().Msg("starting background indexer worker loop")
 
 	for {
 		select {
 		case <-ctx.Done():
+			// Close the register store when shutting down
+			if b.registerStoreCloser != nil {
+				if err := b.registerStoreCloser.Close(); err != nil {
+					b.log.Error().Err(err).Msg("failed to close register store during shutdown")
+				}
+			}
 			return
 		case <-b.newBlockExecutedOrFinalized.Channel():
 			err := backgroundIndexer.IndexUpToLatestFinalizedAndExecutedHeight(ctx)
