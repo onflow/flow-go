@@ -8,6 +8,7 @@ import (
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
@@ -19,6 +20,18 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 )
+
+// BlockExecutedNotifier is an interface for components that can register consumers
+// to be notified when blocks are executed.
+type BlockExecutedNotifier interface {
+	AddConsumer(consumer BlockExecutedConsumer)
+}
+
+// BlockExecutedConsumer is an interface for components that need to be notified
+// when blocks are executed.
+type BlockExecutedConsumer interface {
+	OnExecuted()
+}
 
 type ImportRegistersFromCheckpoint func(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, pdb *pebble.DB, workerCount int) error
 
@@ -122,6 +135,10 @@ func LoadBackgroundIndexerEngine(
 	resultsReader storageerr.ExecutionResultsReader,
 	state protocol.State,
 	headers storageerr.Headers,
+	blockExecutedNotifier BlockExecutedNotifier, // optional: notifier for block executed events
+	followerDistributor interface { // optional: notifier for block finalized events
+		AddOnBlockFinalizedConsumer(consumer func(block *model.Block))
+	},
 ) (*BackgroundIndexerEngine, error) {
 	// Only create background indexer engine if storehouse is not enabled
 	// and background indexing is enabled
@@ -165,6 +182,8 @@ func LoadBackgroundIndexerEngine(
 	backgroundIndexerEngine := NewBackgroundIndexerEngine(
 		log,
 		backgroundIndexer,
+		blockExecutedNotifier,
+		followerDistributor,
 	)
 
 	return backgroundIndexerEngine, nil
