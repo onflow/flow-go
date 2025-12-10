@@ -1,6 +1,8 @@
 package storehouse
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/engine"
@@ -11,6 +13,7 @@ import (
 
 type BackgroundIndexerEngine struct {
 	component.Component
+	log               zerolog.Logger
 	newBlockExecuted  engine.Notifier
 	backgroundIndexer *BackgroundIndexer
 }
@@ -21,6 +24,7 @@ func NewBackgroundIndexerEngine(
 ) *BackgroundIndexerEngine {
 
 	b := &BackgroundIndexerEngine{
+		log:               log,
 		backgroundIndexer: backgroundIndexer,
 		newBlockExecuted:  engine.NewNotifier(),
 	}
@@ -51,7 +55,15 @@ func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, 
 		case <-b.newBlockExecuted.Channel():
 			err := b.backgroundIndexer.IndexToLatest(ctx)
 			if err != nil {
-				// TODO: only throw if is cancellation due to termination
+				// If the error is context.Canceled and the parent context is also done,
+				// it's likely due to termination/shutdown, so handle gracefully.
+				// Otherwise, throw the error as it indicates a real problem.
+				if errors.Is(err, context.Canceled) && ctx.Err() != nil {
+					// Cancellation due to termination - handle gracefully
+					b.log.Warn().Msg("background indexer worker loop terminating due to context cancellation")
+					return
+				}
+				// All other errors (including unexpected cancellations) should be thrown
 				ctx.Throw(fmt.Errorf("background indexer failed to index to latest: %w", err))
 				return
 			}
