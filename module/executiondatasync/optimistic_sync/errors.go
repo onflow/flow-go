@@ -7,31 +7,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RequiredExecutorsCountExceededError indicates that the requested number of required executors
-// exceeds the total available execution nodes.
-type RequiredExecutorsCountExceededError struct {
-	requiredExecutorsCount  int
-	availableExecutorsCount int
-}
-
-func NewRequiredExecutorsCountExceededError(requiredExecutorsCount int, availableExecutorsCount int) *RequiredExecutorsCountExceededError {
-	return &RequiredExecutorsCountExceededError{
-		requiredExecutorsCount:  requiredExecutorsCount,
-		availableExecutorsCount: availableExecutorsCount,
-	}
-}
-
-func (e *RequiredExecutorsCountExceededError) Error() string {
-	return fmt.Sprintf("required executors count exceeded: required %d, available %d",
-		e.requiredExecutorsCount, e.availableExecutorsCount,
-	)
-}
-
-func IsRequiredExecutorsCountExceededError(err error) bool {
-	var requiredExecutorsCountExceededError *RequiredExecutorsCountExceededError
-	return errors.As(err, &requiredExecutorsCountExceededError)
-}
-
 // AgreeingExecutorsCountExceededError indicates that the requested number of agreeing executors
 // exceeds the total available execution nodes.
 type AgreeingExecutorsCountExceededError struct {

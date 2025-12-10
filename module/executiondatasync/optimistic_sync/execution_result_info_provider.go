@@ -55,7 +55,6 @@ type ExecutionResultInfoProvider interface {
 	// Expected error returns during normal operation:
 	//   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
 	//   - [storage.ErrNotFound]: If the data was not found.
-	//   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
 	//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 	//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 	//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already

@@ -55,7 +55,6 @@ func NewExecutionResultInfoProvider(
 // Expected errors during normal operations:
 //   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
 //   - [storage.ErrNotFound]: If the data was not found.
-//   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
 //   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 //   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 //   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
@@ -161,25 +160,16 @@ func (e *Provider) ExecutionResultInfo(
 // validateCriteria verifies that the provided optimistic sync criteria can be
 // satisfied by the currently available execution nodes.
 //
-// The validation ensures that the required executor IDs do not exceed the number
-// of available executors, that the requested AgreeingExecutorsCount is feasible,
+// The validation ensures that the requested AgreeingExecutorsCount is feasible,
 // and that every required executor ID is present in the available set.
 //
 // Expected errors during normal operations:
-//   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
 //   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 //   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 func (e *Provider) validateCriteria(
 	criteria optimistic_sync.Criteria,
 	availableExecutors flow.IdentityList,
 ) error {
-	requiredExecutors := criteria.RequiredExecutors
-	if len(availableExecutors) < len(requiredExecutors) {
-		return optimistic_sync.NewRequiredExecutorsCountExceededError(
-			len(requiredExecutors),
-			len(availableExecutors),
-		)
-	}
 	if uint(len(availableExecutors)) < criteria.AgreeingExecutorsCount {
 		return optimistic_sync.NewAgreeingExecutorsCountExceededError(
 			criteria.AgreeingExecutorsCount,
@@ -188,7 +178,7 @@ func (e *Provider) validateCriteria(
 	}
 
 	lookup := availableExecutors.Lookup()
-	for _, executorID := range requiredExecutors {
+	for _, executorID := range criteria.RequiredExecutors {
 		if _, ok := lookup[executorID]; !ok {
 			return optimistic_sync.NewUnknownRequiredExecutorError(executorID)
 		}
