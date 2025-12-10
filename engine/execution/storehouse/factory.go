@@ -21,16 +21,10 @@ import (
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 )
 
-// BlockExecutedNotifier is an interface for components that can register consumers
+// BlockExecutedNotifier is an interface for components that can register callbacks
 // to be notified when blocks are executed.
 type BlockExecutedNotifier interface {
-	AddConsumer(consumer BlockExecutedConsumer)
-}
-
-// BlockExecutedConsumer is an interface for components that need to be notified
-// when blocks are executed.
-type BlockExecutedConsumer interface {
-	OnExecuted()
+	AddConsumer(callback func())
 }
 
 type ImportRegistersFromCheckpoint func(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, pdb *pebble.DB, workerCount int) error

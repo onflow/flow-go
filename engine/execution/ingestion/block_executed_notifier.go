@@ -7,9 +7,9 @@ import (
 )
 
 // BlockExecutedNotifier is a thread-safe event distributor that notifies subscribers
-// when blocks have been executed. It allows multiple consumers to subscribe to block execution events.
+// when blocks have been executed. It allows multiple callbacks to subscribe to block execution events.
 type BlockExecutedNotifier struct {
-	consumers []storehouse.BlockExecutedConsumer
+	callbacks []func()
 	mu        sync.RWMutex
 }
 
@@ -21,20 +21,20 @@ func NewBlockExecutedNotifier() *BlockExecutedNotifier {
 	return &BlockExecutedNotifier{}
 }
 
-// AddConsumer adds a consumer to be notified when blocks are executed.
+// AddConsumer adds a callback to be notified when blocks are executed.
 // This method is thread-safe.
-func (n *BlockExecutedNotifier) AddConsumer(consumer storehouse.BlockExecutedConsumer) {
+func (n *BlockExecutedNotifier) AddConsumer(callback func()) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.consumers = append(n.consumers, consumer)
+	n.callbacks = append(n.callbacks, callback)
 }
 
-// OnExecuted notifies all registered consumers that a block has been executed.
+// OnExecuted notifies all registered callbacks that a block has been executed.
 // This method is thread-safe and should be called from the ingestion machine.
 func (n *BlockExecutedNotifier) OnExecuted() {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	for _, consumer := range n.consumers {
-		consumer.OnExecuted()
+	for _, callback := range n.callbacks {
+		callback()
 	}
 }

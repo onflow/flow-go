@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -19,32 +20,41 @@ type BackgroundIndexerEngine struct {
 	backgroundIndexer           *BackgroundIndexer
 }
 
+func newFinalizedAndExecutedNotifier(
+	blockExecutedNotifier BlockExecutedNotifier,
+	followerDistributor *pubsub.FollowerDistributor,
+) engine.Notifier {
+	notifier := engine.NewNotifier()
+
+	blockExecutedNotifier.AddConsumer(func() {
+		notifier.Notify()
+	})
+
+	// Subscribe to block finalized events from the follower distributor
+	followerDistributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
+		notifier.Notify()
+	})
+
+	return notifier
+}
+
 func NewBackgroundIndexerEngine(
 	log zerolog.Logger,
 	backgroundIndexer *BackgroundIndexer,
 	blockExecutedNotifier BlockExecutedNotifier,
-	followerDistributor interface { // optional: notifier for block finalized events
-		AddOnBlockFinalizedConsumer(consumer func(block *model.Block))
-	},
+	followerDistributor *pubsub.FollowerDistributor,
 ) *BackgroundIndexerEngine {
+	finalizedOrExecutedNotifier := newFinalizedAndExecutedNotifier(blockExecutedNotifier, followerDistributor)
 
 	b := &BackgroundIndexerEngine{
 		log:                         log,
 		backgroundIndexer:           backgroundIndexer,
-		newBlockExecutedOrFinalized: engine.NewNotifier(),
+		newBlockExecutedOrFinalized: finalizedOrExecutedNotifier,
 	}
-
-	// Subscribe to block executed events from the notifier
-	blockExecutedNotifier.AddConsumer(b)
-
-	// Subscribe to block finalized events from the follower distributor
-	followerDistributor.AddOnBlockFinalizedConsumer(func(_ *model.Block) {
-		b.newBlockExecutedOrFinalized.Notify()
-	})
 
 	// Initialize the notifier so that even if no new data comes in,
 	// the worker loop can still be triggered to process any existing data.
-	b.newBlockExecutedOrFinalized.Notify()
+	finalizedOrExecutedNotifier.Notify()
 
 	// Build component manager with worker loop
 	cm := component.NewComponentManagerBuilder().
@@ -54,15 +64,6 @@ func NewBackgroundIndexerEngine(
 	b.Component = cm
 	return b
 }
-
-// OnExecuted implements BlockExecutedConsumer interface.
-// It is called by the BlockExecutedNotifier when a block has been executed.
-func (b *BackgroundIndexerEngine) OnExecuted() {
-	b.newBlockExecutedOrFinalized.Notify()
-}
-
-// Ensure BackgroundIndexerEngine implements BlockExecutedConsumer
-var _ BlockExecutedConsumer = (*BackgroundIndexerEngine)(nil)
 
 func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
