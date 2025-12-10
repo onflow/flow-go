@@ -674,7 +674,7 @@ docker-push-execution-with-adx:
 
 .PHONY: docker-push-execution-cadence-vm
 docker-push-execution-cadence-vm:
-	docker push "$(CONTAINER_REGISTRY)/execution-cadence-vm:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_CADENCE_VM)"
 
 .PHONY: docker-push-execution-corrupt
 docker-push-execution-corrupt:
