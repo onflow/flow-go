@@ -68,7 +68,6 @@ import (
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
-	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -80,7 +79,6 @@ import (
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	execdatastorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
-	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
@@ -861,77 +859,25 @@ func (exeNode *ExecutionNode) LoadStopControl(
 func (exeNode *ExecutionNode) LoadRegisterStore(
 	node *NodeConfig,
 ) error {
-	if !exeNode.exeConf.enableStorehouse {
-		node.Logger.Info().Msg("register store disabled")
-		return nil
-	}
-
-	node.Logger.Info().
-		Str("pebble_db_path", exeNode.exeConf.registerDir).
-		Msg("register store enabled")
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(
-		node.Logger.With().Str("pebbledb", "registers").Logger(),
-		exeNode.exeConf.registerDir)
-
-	if err != nil {
-		return fmt.Errorf("could not create disk register store: %w", err)
-	}
-
-	// close pebble db on shut down
-	exeNode.builder.ShutdownFunc(func() error {
-		err := pebbledb.Close()
-		if err != nil {
-			return fmt.Errorf("could not close register store: %w", err)
-		}
-		return nil
-	})
-
-	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
-	if err != nil {
-		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
-	}
-
-	node.Logger.Info().Msgf("register store bootstrapped: %v", bootstrapped)
-
-	if !bootstrapped {
-		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		sealedRoot := node.State.Params().SealedRoot()
-
-		rootSeal := node.State.Params().Seal()
-
-		if sealedRoot.ID() != rootSeal.BlockID {
-			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
-		}
-
-		checkpointHeight := sealedRoot.Height
-		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
-
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
-		if err != nil {
-			return fmt.Errorf("could not import registers from checkpoint: %w", err)
-		}
-	}
-	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.PruningDisabled)
-	if err != nil {
-		return fmt.Errorf("could not create registers storage: %w", err)
-	}
-
-	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
-	node.ProtocolEvents.AddConsumer(reader)
-	notifier := storehouse.NewRegisterStoreMetrics(exeNode.collector)
-
-	// report latest finalized and executed height as metrics
-	notifier.OnFinalizedAndExecutedHeightUpdated(diskStore.LatestHeight())
-
-	registerStore, err := storehouse.NewRegisterStore(
-		diskStore,
-		nil, // TODO: replace with real WAL
-		reader,
+	registerStore, closer, err := storehouse.LoadRegisterStore(
 		node.Logger,
-		notifier,
+		node.State,
+		node.Storage.Headers,
+		node.ProtocolEvents,
+		node.LastFinalizedHeader.Height,
+		exeNode.collector,
+		exeNode.exeConf.enableStorehouse,
+		exeNode.exeConf.registerDir,
+		exeNode.exeConf.triedir,
+		exeNode.exeConf.importCheckpointWorkerCount,
+		bootstrap.ImportRegistersFromCheckpoint,
 	)
 	if err != nil {
 		return err
+	}
+
+	if closer != nil {
+		exeNode.builder.ShutdownFunc(closer.Close)
 	}
 
 	exeNode.registerStore = registerStore
