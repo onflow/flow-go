@@ -1442,3 +1442,43 @@ func deployNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAccount)
 
 	owner.DeployContract(b, be, "NonFungibleToken", nftContract)
 }
+
+func BenchmarkScriptNoop(b *testing.B) {
+
+	ctx := fvm.NewContext(
+		fvm.WithChain(flow.Testnet.Chain()),
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				computation.ReusableCadenceRuntimePoolSize,
+				runtime.Config{},
+			),
+		),
+	)
+
+	vm := fvm.NewVirtualMachine()
+
+	snapshotTree := snapshot.NewSnapshotTree(nil)
+
+	executionSnapshot, _, err := vm.Run(
+		ctx,
+		fvm.Bootstrap(
+			unittest.ServiceAccountPublicKey,
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		),
+		snapshotTree,
+	)
+	require.NoError(b, err)
+
+	snapshotTree = snapshotTree.Append(executionSnapshot)
+
+	script := fvm.Script([]byte("access(all) fun main() {}"))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, output, err := vm.Run(ctx, script, snapshotTree)
+		require.NoError(b, err)
+		require.NoError(b, output.Err)
+	}
+}
