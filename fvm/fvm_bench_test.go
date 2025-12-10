@@ -1444,8 +1444,11 @@ func deployNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAccount)
 }
 
 func BenchmarkScriptNoop(b *testing.B) {
+	derivedChainData, err := derived.NewDerivedChainData(1)
+	require.NoError(b, err)
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
+	blockID := flow.Identifier{1}
+	derivedBlockData := derivedChainData.GetOrCreateDerivedBlockData(blockID, flow.ZeroID)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(flow.Testnet.Chain()),
@@ -1480,7 +1483,15 @@ func BenchmarkScriptNoop(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, output, err := vm.Run(ctx, script, snapshotTree)
+		derivedBlockData = derivedChainData.NewDerivedBlockDataForScript(blockID)
+
+		scriptCtx := fvm.NewContextFromParent(
+			ctx,
+			fvm.WithAllowProgramCacheWritesInScriptsEnabled(true),
+			fvm.WithDerivedBlockData(derivedBlockData),
+		)
+
+		_, output, err := vm.Run(scriptCtx, script, snapshotTree)
 		require.NoError(b, err)
 		require.NoError(b, output.Err)
 	}
