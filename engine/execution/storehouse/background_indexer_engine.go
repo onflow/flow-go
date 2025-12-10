@@ -17,7 +17,7 @@ type BackgroundIndexerEngine struct {
 	component.Component
 	log                         zerolog.Logger
 	newBlockExecutedOrFinalized engine.Notifier
-	backgroundIndexer           *BackgroundIndexer
+	bootstrapper                func(ctx context.Context) (*BackgroundIndexer, error)
 }
 
 func newFinalizedAndExecutedNotifier(
@@ -40,7 +40,7 @@ func newFinalizedAndExecutedNotifier(
 
 func NewBackgroundIndexerEngine(
 	log zerolog.Logger,
-	backgroundIndexer *BackgroundIndexer,
+	bootstrapper func(ctx context.Context) (*BackgroundIndexer, error),
 	blockExecutedNotifier BlockExecutedNotifier,
 	followerDistributor *pubsub.FollowerDistributor,
 ) *BackgroundIndexerEngine {
@@ -48,7 +48,7 @@ func NewBackgroundIndexerEngine(
 
 	b := &BackgroundIndexerEngine{
 		log:                         log,
-		backgroundIndexer:           backgroundIndexer,
+		bootstrapper:                bootstrapper,
 		newBlockExecutedOrFinalized: finalizedOrExecutedNotifier,
 	}
 
@@ -67,12 +67,22 @@ func NewBackgroundIndexerEngine(
 
 func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+
+	b.log.Info().Msgf("bootstrapping")
+	backgroundIndexer, err := b.bootstrapper(ctx)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to bootstrap background indexer: %w", err))
+		return
+	}
+
+	b.log.Info().Msgf("starting background indexer worker loop")
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-b.newBlockExecutedOrFinalized.Channel():
-			err := b.backgroundIndexer.IndexUpToLatestFinalizedAndExecutedHeight(ctx)
+			err := backgroundIndexer.IndexUpToLatestFinalizedAndExecutedHeight(ctx)
 			if err != nil {
 				// If the error is context.Canceled and the parent context is also done,
 				// it's likely due to termination/shutdown, so handle gracefully.
