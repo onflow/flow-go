@@ -16,12 +16,12 @@ type ExecutionDataTracker struct {
 	mock.Mock
 }
 
-// GetHighestHeight provides a mock function with no fields
-func (_m *ExecutionDataTracker) GetHighestHeight() uint64 {
+// GetHighestAvailableFinalizedHeight provides a mock function with no fields
+func (_m *ExecutionDataTracker) GetHighestAvailableFinalizedHeight() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetHighestHeight")
+		panic("no return value specified for GetHighestAvailableFinalizedHeight")
 	}
 
 	var r0 uint64

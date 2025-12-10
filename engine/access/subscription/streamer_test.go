@@ -39,10 +39,30 @@ func TestStream(t *testing.T) {
 	tests = append(tests, testData{"", testErr})
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+
+	// return test data sequentially by height. heights will start from 0 for this test
+	dataByHeight := map[uint64]testData{}
+	for i, d := range tests {
+		dataByHeight[uint64(i)] = d
+	}
+
+	getData := func(ctx context.Context, height uint64) (interface{}, error) {
+		if td, ok := dataByHeight[height]; ok {
+			// when error is non-nil, return error (no data)
+			if td.err != nil {
+				return nil, td.err
+			}
+			return td.data, nil
+		}
+
+		// default to block not ready once we run out of prepared data
+		return nil, subscription.ErrBlockNotReady
+	}
+
+	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub, dataProvider)
 
 	for _, d := range tests {
-		sub.On("Next", mock.Anything).Return(d.data, d.err).Once()
 		if d.err == nil {
 			sub.On("Send", mock.Anything, d.data, timeout).Return(nil).Once()
 		} else {
@@ -73,12 +93,16 @@ func TestStreamRatelimited(t *testing.T) {
 			sub.On("ID").Return(uuid.NewString())
 
 			broadcaster := engine.NewBroadcaster()
-			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 			var nextCalls, sendCalls int
-			sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {
+			getData := func(ctx context.Context, height uint64) (interface{}, error) {
 				nextCalls++
-			})
+				return "data", nil
+			}
+
+			dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, dataProvider)
+
 			sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
 				sendCalls++
 			})
@@ -124,12 +148,16 @@ func TestLongStreamRatelimited(t *testing.T) {
 	sub.On("ID").Return(uuid.NewString())
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 	var nextCalls, sendCalls int
-	sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {
+	getData := func(ctx context.Context, height uint64) (interface{}, error) {
 		nextCalls++
-	})
+		return "data", nil
+	}
+
+	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, dataProvider)
+
 	sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
 		sendCalls++
 	})

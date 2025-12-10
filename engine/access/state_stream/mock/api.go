@@ -243,17 +243,17 @@ func (_m *API) SubscribeEventsFromStartHeight(ctx context.Context, startHeight u
 	return r0
 }
 
-// SubscribeExecutionData provides a mock function with given fields: ctx, startBlockID, startBlockHeight
-func (_m *API) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, startBlockHeight)
+// SubscribeExecutionData provides a mock function with given fields: ctx, startBlockID, startBlockHeight, criteria
+func (_m *API) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, startBlockHeight, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeExecutionData")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, startBlockHeight)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, startBlockHeight, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -263,17 +263,17 @@ func (_m *API) SubscribeExecutionData(ctx context.Context, startBlockID flow.Ide
 	return r0
 }
 
-// SubscribeExecutionDataFromLatest provides a mock function with given fields: ctx
-func (_m *API) SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription {
-	ret := _m.Called(ctx)
+// SubscribeExecutionDataFromLatest provides a mock function with given fields: ctx, criteria
+func (_m *API) SubscribeExecutionDataFromLatest(ctx context.Context, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeExecutionDataFromLatest")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context) subscription.Subscription); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -283,17 +283,17 @@ func (_m *API) SubscribeExecutionDataFromLatest(ctx context.Context) subscriptio
 	return r0
 }
 
-// SubscribeExecutionDataFromStartBlockHeight provides a mock function with given fields: ctx, startBlockHeight
-func (_m *API) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockHeight)
+// SubscribeExecutionDataFromStartBlockHeight provides a mock function with given fields: ctx, startBlockHeight, criteria
+func (_m *API) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockHeight, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeExecutionDataFromStartBlockHeight")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, uint64) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockHeight)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockHeight, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -303,17 +303,17 @@ func (_m *API) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, s
 	return r0
 }
 
-// SubscribeExecutionDataFromStartBlockID provides a mock function with given fields: ctx, startBlockID
-func (_m *API) SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID)
+// SubscribeExecutionDataFromStartBlockID provides a mock function with given fields: ctx, startBlockID, criteria
+func (_m *API) SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeExecutionDataFromStartBlockID")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

@@ -1073,8 +1073,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.Storage.Headers,
 				broadcaster,
 				highestAvailableHeight,
-				builder.EventsIndex,
-				useIndex,
 			)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
@@ -1082,9 +1080,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
-				node.Storage.Results,
-				builder.ExecutionDataStore,
-				notNil(builder.ExecutionDataCache),
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,

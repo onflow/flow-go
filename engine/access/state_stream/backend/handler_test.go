@@ -38,7 +38,7 @@ func TestHeartbeatResponseSuite(t *testing.T) {
 }
 
 type HandlerTestSuite struct {
-	BackendExecutionDataSuite
+	LegacyBackendExecutionDataSuite
 	handler *Handler
 }
 
@@ -62,7 +62,7 @@ func (fake *fakeReadServerImpl) Send(response *executiondata.SubscribeEventsResp
 }
 
 func (s *HandlerTestSuite) SetupTest() {
-	s.BackendExecutionDataSuite.SetupTest()
+	s.LegacyBackendExecutionDataSuite.SetupTest()
 	chain := flow.MonotonicEmulator.Chain()
 	s.handler = NewHandler(s.backend, chain, makeConfig(5))
 }

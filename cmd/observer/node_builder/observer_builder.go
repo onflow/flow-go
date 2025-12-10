@@ -1629,12 +1629,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-			broadcaster := engine.NewBroadcaster()
-
 			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse event query mode: %w", err)
@@ -1645,6 +1639,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
 
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+			broadcaster := engine.NewBroadcaster()
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
@@ -1652,8 +1651,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				node.Storage.Headers,
 				broadcaster,
 				highestAvailableHeight,
-				builder.EventsIndex,
-				useIndex,
 			)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
@@ -1661,9 +1658,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
-				node.Storage.Results,
-				builder.ExecutionDataStore,
-				executionDataStoreCache,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,

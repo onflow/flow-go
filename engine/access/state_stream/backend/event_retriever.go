@@ -26,7 +26,7 @@ type EventsResponse struct {
 type EventsProvider struct {
 	log              zerolog.Logger
 	headers          storage.Headers
-	getExecutionData GetExecutionDataFunc
+	getExecutionData GetExecutionDataFunc //TODO: this func was removed. tests fail. fix it in the events PR
 	eventsIndex      *index.EventsIndex
 	useEventsIndex   bool
 }

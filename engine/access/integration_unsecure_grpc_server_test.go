@@ -280,8 +280,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.headers,
 		nil,
 		rootBlock.Height,
-		eventIndexer,
-		false,
 	)
 
 	stateStreamBackend, err := statestreambackend.New(
@@ -289,9 +287,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.state,
 		suite.headers,
 		suite.seals,
-		suite.results,
-		nil,
-		suite.execDataCache,
 		suite.registers,
 		eventIndexer,
 		false,
