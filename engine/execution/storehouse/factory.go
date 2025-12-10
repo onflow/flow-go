@@ -1,6 +1,7 @@
 package storehouse
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path"
@@ -9,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module"
@@ -124,11 +124,17 @@ func LoadBackgroundIndexerEngine(
 	log zerolog.Logger,
 	enableStorehouse bool,
 	enableBackgroundStorehouseIndexing bool,
-	registerStore execution.RegisterStore,
-	executionDataStore execution_data.ExecutionDataGetter,
-	resultsReader storageerr.ExecutionResultsReader,
 	state protocol.State,
 	headers storageerr.Headers,
+	protocolEvents *events.Distributor,
+	lastFinalizedHeight uint64,
+	collector module.ExecutionMetrics,
+	registerDir string,
+	triedir string,
+	importCheckpointWorkerCount int,
+	importFunc ImportRegistersFromCheckpoint,
+	executionDataStore execution_data.ExecutionDataGetter,
+	resultsReader storageerr.ExecutionResultsReader,
 	blockExecutedNotifier BlockExecutedNotifier, // optional: notifier for block executed events
 	followerDistributor *pubsub.FollowerDistributor,
 ) (*BackgroundIndexerEngine, error) {
@@ -145,9 +151,6 @@ func LoadBackgroundIndexerEngine(
 	}
 
 	// Check that required dependencies are available
-	if registerStore == nil {
-		return nil, fmt.Errorf("register store is not initialized")
-	}
 	if executionDataStore == nil {
 		return nil, fmt.Errorf("execution data store is not initialized")
 	}
@@ -155,25 +158,52 @@ func LoadBackgroundIndexerEngine(
 		return nil, fmt.Errorf("execution results reader is not initialized")
 	}
 
-	// Create the register updates provider
-	provider := NewExecutionDataRegisterUpdatesProvider(
-		executionDataStore,
-		resultsReader,
-		headers,
-	)
+	// Create bootstrapper function that will load the register store and create the background indexer
+	bootstrapper := func(ctx context.Context) (*BackgroundIndexer, io.Closer, error) {
+		// Load register store for background indexing
+		registerStore, closer, err := LoadRegisterStore(
+			log,
+			state,
+			headers,
+			protocolEvents,
+			lastFinalizedHeight,
+			collector,
+			true, // enableStorehouse - always true for background indexing
+			registerDir,
+			triedir,
+			importCheckpointWorkerCount,
+			importFunc,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to load register store: %w", err)
+		}
 
-	// Create the background indexer
-	backgroundIndexer := NewBackgroundIndexer(
-		provider,
-		registerStore,
-		state,
-		headers,
-	)
+		if registerStore == nil {
+			return nil, nil, fmt.Errorf("register store is nil after loading")
+		}
+
+		// Create the register updates provider
+		provider := NewExecutionDataRegisterUpdatesProvider(
+			executionDataStore,
+			resultsReader,
+			headers,
+		)
+
+		// Create the background indexer
+		backgroundIndexer := NewBackgroundIndexer(
+			provider,
+			registerStore,
+			state,
+			headers,
+		)
+
+		return backgroundIndexer, closer, nil
+	}
 
 	// Create the background indexer engine
 	backgroundIndexerEngine := NewBackgroundIndexerEngine(
 		log,
-		backgroundIndexer,
+		bootstrapper,
 		blockExecutedNotifier,
 		followerDistributor,
 	)
