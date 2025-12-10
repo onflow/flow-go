@@ -1445,8 +1445,11 @@ func deployNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAccount)
 
 func BenchmarkScriptNoop(b *testing.B) {
 
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
+
 	ctx := fvm.NewContext(
 		fvm.WithChain(flow.Testnet.Chain()),
+		fvm.WithDerivedBlockData(derivedBlockData),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
