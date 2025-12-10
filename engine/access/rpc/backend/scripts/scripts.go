@@ -170,8 +170,6 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -238,8 +236,6 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -311,8 +307,6 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)

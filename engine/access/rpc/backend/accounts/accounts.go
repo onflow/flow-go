@@ -134,8 +134,6 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -198,8 +196,6 @@ func (a *Accounts) GetAccountAtBlockHeight(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -258,8 +254,6 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return 0, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return 0, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return 0, nil, access.NewInvalidRequestError(err)
 		default:
 			return 0, nil, access.RequireNoError(ctx, err)
@@ -322,8 +316,6 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return 0, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return 0, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return 0, nil, access.NewInvalidRequestError(err)
 		default:
 			return 0, nil, access.RequireNoError(ctx, err)
@@ -386,8 +378,6 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -451,8 +441,6 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -514,8 +502,6 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
@@ -578,8 +564,6 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 		case optimistic_sync.IsUnknownRequiredExecutorError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, nil, access.NewPreconditionFailedError(err)
-		case optimistic_sync.IsBlockFinalityMismatchError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)

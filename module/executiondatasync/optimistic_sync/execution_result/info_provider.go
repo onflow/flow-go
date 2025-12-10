@@ -58,10 +58,8 @@ func NewExecutionResultInfoProvider(
 //   - [optimistic_sync.RequiredExecutorsCountExceededError]: Required executor IDs count exceeds available executors.
 //   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 //   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
-//   - [optimistic_sync.CriteriaNotMetError]: Returned when the execution result
-//     criteria cannot be satisfied for the requested block.
-//   - [optimistic_sync.BlockFinalityMismatchError]: Returned when the requested
-//     block does not match the canonical finalized block at its height.
+//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
+//     sealed but no execution result can satisfy the provided criteria.
 func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
@@ -97,20 +95,49 @@ func (e *Provider) ExecutionResultInfo(
 		}, nil
 	}
 
-	result, executorIDs, err := e.findResultAndExecutors(blockID, criteria)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
+	result, executorIDs, findResultErr := e.findResultAndExecutors(blockID, criteria)
+	if findResultErr != nil {
+		findResultErr = fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, findResultErr)
+		// We want to return a more specific error when no matching execution results were found.
+		// This helps callers understand that their criteria likely cannot be met — especially if the
+		// block is already sealed.
+
+		// Step 1: Get the block header
+		header, err := e.headers.ByBlockID(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get header by block ID %v: %w", blockID, findResultErr)
+		}
+
+		// Step 2a: Lookup the finalized block ID at this height
+		blockIDFinalized, err := e.headers.BlockIDByHeight(header.Height)
+		if err != nil {
+			return nil, fmt.Errorf("failed to lookup finalized block ID at height %d: %w", header.Height, findResultErr)
+		}
+
+		// Step 2b: Check if this block is finalized.
+		// If BlockIDByHeight returns an ID that doesn't match, not finalized.
+		isFinalized := blockIDFinalized == blockID
+
+		// Step 3: Check sealed status only if block finalized.
+		if isFinalized {
+			sealedHeader, err := e.state.Sealed().Head()
+			if err != nil {
+				return nil, fmt.Errorf("failed to lookup sealed header: %w", err)
+			}
+
+			// If block is sealed, and didn't find any matching results return an error
+			if header.Height <= sealedHeader.Height {
+				return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
+			}
+		}
+
+		return nil, findResultErr
 	}
 
 	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
 	subsetENs, err := e.executionNodes.SelectExecutionNodes(executors, criteria.RequiredExecutors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
-	}
-
-	// If criteria cannot be met, return an error
-	if len(subsetENs) < len(criteria.RequiredExecutors) {
-		return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
 	}
 
 	if len(subsetENs) == 0 {
@@ -123,20 +150,6 @@ func (e *Provider) ExecutionResultInfo(
 		// criteria is met, then there must be at least one acceptable executor. If this is not true,
 		// then the criteria check must fail.
 		return nil, fmt.Errorf("no execution nodes found for result %v (blockID: %v): %w", result.ID(), blockID, err)
-	}
-
-	header, err := e.headers.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get header by block ID %v: %w", blockID, err)
-	}
-	// Lookup the finalized block ID at the height of the requested block
-	blockIDFinalized, err := e.headers.BlockIDByHeight(header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup finalized block ID at height %d: %w", header.Height, err)
-	}
-	// If the requested block conflicts with finalized block, return error
-	if blockIDFinalized != blockID {
-		return nil, optimistic_sync.NewBlockFinalityMismatchError(blockID, blockIDFinalized)
 	}
 
 	return &optimistic_sync.ExecutionResultInfo{
