@@ -72,7 +72,7 @@ func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, 
 		case <-ctx.Done():
 			return
 		case <-b.newBlockExecutedOrFinalized.Channel():
-			err := b.backgroundIndexer.IndexToLatest(ctx)
+			err := b.backgroundIndexer.IndexUpToLatestFinalizedAndExecutedHeight(ctx)
 			if err != nil {
 				// If the error is context.Canceled and the parent context is also done,
 				// it's likely due to termination/shutdown, so handle gracefully.
@@ -83,7 +83,7 @@ func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, 
 					return
 				}
 				// All other errors (including unexpected cancellations) should be thrown
-				ctx.Throw(fmt.Errorf("background indexer failed to index to latest: %w", err))
+				ctx.Throw(fmt.Errorf("background indexer failed to index up to latest finalized and executed height: %w", err))
 				return
 			}
 		}
