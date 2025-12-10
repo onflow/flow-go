@@ -19,6 +19,7 @@ type BackgroundIndexer struct {
 	registerStore execution.RegisterStore
 	state         protocol.State
 	headers       storage.Headers
+	bootstrap     func(ctx context.Context) error
 }
 
 func NewBackgroundIndexer(
@@ -33,6 +34,10 @@ func NewBackgroundIndexer(
 		state:         state,
 		headers:       headers,
 	}
+}
+
+func (b *BackgroundIndexer) Bootstrap(ctx context.Context) error {
+	return b.bootstrap(ctx)
 }
 
 func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx context.Context) error {
