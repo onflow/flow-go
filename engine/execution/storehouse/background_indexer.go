@@ -21,6 +21,20 @@ type BackgroundIndexer struct {
 	headers       storage.Headers
 }
 
+func NewBackgroundIndexer(
+	provider RegisterUpdatesProvider,
+	registerStore execution.RegisterStore,
+	state protocol.State,
+	headers storage.Headers,
+) *BackgroundIndexer {
+	return &BackgroundIndexer{
+		provider:      provider,
+		registerStore: registerStore,
+		state:         state,
+		headers:       headers,
+	}
+}
+
 func (b *BackgroundIndexer) IndexToLatest(ctx context.Context) error {
 	startHeight := b.registerStore.LastFinalizedAndExecutedHeight()
 	latestFinalized, err := b.state.Final().Head()
