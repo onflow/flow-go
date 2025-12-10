@@ -175,6 +175,7 @@ type ExecutionNode struct {
 	blobService             network.BlobService
 	blobserviceDependable   *module.ProxiedReadyDoneAware
 	metricsProvider         txmetrics.TransactionExecutionMetricsProvider
+	blockExecutedNotifier   *ingestion.BlockExecutedNotifier
 	backgroundIndexerEngine *storehouse.BackgroundIndexerEngine
 }
 
@@ -216,6 +217,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution storage", exeNode.LoadExecutionStorage).
 		Module("follower distributor", exeNode.LoadFollowerDistributor).
+		Module("block executed notifier", exeNode.LoadBlockExecutedNotifier).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
@@ -359,6 +361,11 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 func (exeNode *ExecutionNode) LoadFollowerDistributor(node *NodeConfig) error {
 	exeNode.followerDistributor = pubsub.NewFollowerDistributor()
 	exeNode.followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadBlockExecutedNotifier(node *NodeConfig) error {
+	exeNode.blockExecutedNotifier = ingestion.NewBlockExecutedNotifier()
 	return nil
 }
 
@@ -1126,6 +1133,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collectionRequester = reqEng
 	}
 
+	var blockExecutedCallback ingestion.BlockExecutedCallback
+	if exeNode.blockExecutedNotifier != nil {
+		blockExecutedCallback = exeNode.blockExecutedNotifier.OnExecuted
+	}
+
 	_, core, err := ingestion.NewMachine(
 		node.Logger,
 		node.ProtocolEvents,
@@ -1141,6 +1153,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.providerEngine,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
+		blockExecutedCallback,
 	)
 
 	return core, err
@@ -1407,6 +1420,8 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 		exeNode.resultsReader,
 		node.State,
 		node.Storage.Headers,
+		exeNode.blockExecutedNotifier,
+		exeNode.followerDistributor,
 	)
 	if err != nil {
 		return nil, err
