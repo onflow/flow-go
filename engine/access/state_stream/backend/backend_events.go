@@ -50,7 +50,9 @@ func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.I
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	provider := subscription.NewHeightByFuncProvider(nextHeight, b.getResponseFactory(filter))
+
+	return b.subscriptionHandler.Subscribe(ctx, provider)
 }
 
 // SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
@@ -74,7 +76,9 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(ctx context.Context, sta
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	provider := subscription.NewHeightByFuncProvider(nextHeight, b.getResponseFactory(filter))
+
+	return b.subscriptionHandler.Subscribe(ctx, provider)
 }
 
 // SubscribeEventsFromStartHeight streams events starting at the specified block height,
@@ -98,7 +102,9 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(ctx context.Context, star
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	provider := subscription.NewHeightByFuncProvider(nextHeight, b.getResponseFactory(filter))
+
+	return b.subscriptionHandler.Subscribe(ctx, provider)
 }
 
 // SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
@@ -121,7 +127,9 @@ func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter st
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+	provider := subscription.NewHeightByFuncProvider(nextHeight, b.getResponseFactory(filter))
+
+	return b.subscriptionHandler.Subscribe(ctx, provider)
 }
 
 // getResponseFactory returns a function that retrieves the event response for a given height.

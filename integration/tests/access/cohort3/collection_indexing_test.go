@@ -3,6 +3,7 @@ package cohort3
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -28,6 +29,20 @@ type CollectionIndexingSuite struct {
 	cancel context.CancelFunc
 }
 
+// SetupTest initializes the test suite with a network configuration for testing collection indexing.
+//
+// Network Configuration:
+//   - 2 Access nodes with different collection indexing strategies:
+//   - access_1: Uses ingestion engine for collection indexing (execution-data-sync-enabled=true, NO indexer)
+//   - access_2: Uses execution data indexer for collection indexing (execution-data-indexing-enabled=true)
+//   - 2 Collection nodes (standard configuration)
+//   - 2 Execution nodes (standard configuration)
+//   - 3 Consensus nodes (standard configuration)
+//   - 1 Verification node (standard configuration)
+//
+// This setup allows testing that both collection indexing approaches (ingestion engine vs dedicated indexer)
+// work correctly. The test verifies that access_2 can catch up on collections by syncing from the indexer
+// even when collection nodes are stopped.
 func (s *CollectionIndexingSuite) SetupTest() {
 	// access_1 is not running the indexer, so all collections are indexed using the ingestion engine
 	defaultAccessOpts := []func(config *testnet.NodeConfig){
@@ -82,7 +97,7 @@ func (s *CollectionIndexingSuite) Test() {
 	// start the network with access_2 disconnected.
 	// this simulates it falling behind on syncing collections
 	access2 := s.net.ContainerByName("access_2")
-	s.Require().NoError(access2.Disconnect())
+	s.Require().NoError(access2.Pause())
 
 	// wait for access_1 to sync collections
 	targetBlockCount := uint64(50)
@@ -98,7 +113,10 @@ func (s *CollectionIndexingSuite) Test() {
 	s.Require().NoError(s.net.ContainerByName("collection_2").Pause())
 
 	// now start access_2, and wait for it to catch up with collections
-	s.Require().NoError(access2.Connect())
+	s.Require().NoError(access2.Start())
+
+	// wait for access_2 to complete startup
+	s.waitForMetricsAPI("access_2")
 
 	s.Eventually(func() bool {
 		value, err := s.getLastFullHeight("access_2")
@@ -117,4 +135,14 @@ func (s *CollectionIndexingSuite) getLastFullHeight(containerName string) (uint6
 	}
 
 	return uint64(values[0].GetGauge().GetValue()), nil
+}
+
+func (s *CollectionIndexingSuite) waitForMetricsAPI(containerName string) {
+	node := s.net.ContainerByName(containerName)
+	metricsURL := fmt.Sprintf("http://0.0.0.0:%s/metrics", node.Port(testnet.MetricsPort))
+
+	s.Require().Eventually(func() bool {
+		_, err := http.Get(metricsURL)
+		return err == nil
+	}, 60*time.Second, 1*time.Second)
 }

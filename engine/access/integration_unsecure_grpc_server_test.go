@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -100,7 +100,7 @@ type SameGRPCPortTestSuite struct {
 }
 
 func (suite *SameGRPCPortTestSuite) SetupTest() {
-	suite.log = zerolog.New(os.Stdout)
+	suite.log = unittest.Logger()
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -203,6 +203,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		Headers:                     suite.headers,
 		Collections:                 suite.collections,
 		Transactions:                suite.transactions,
+		Seals:                       suite.seals,
 		ChainID:                     suite.chainID,
 		AccessMetrics:               suite.metrics,
 		MaxHeightRange:              0,
@@ -218,6 +219,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	stateStreamConfig := statestreambackend.Config{}
+	followerDistributor := pubsub.NewFollowerDistributor()
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -234,6 +236,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		stateStreamConfig,
 		nil,
+		followerDistributor,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -276,6 +279,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		rootBlock.Height,
 		suite.headers,
 		nil,
+		rootBlock.Height,
 	)
 
 	stateStreamBackend, err := statestreambackend.New(
@@ -283,9 +287,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.state,
 		suite.headers,
 		suite.seals,
-		suite.results,
-		nil,
-		suite.execDataCache,
 		suite.registers,
 		eventIndexer,
 		false,
@@ -323,6 +324,14 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 	// wait for the state stream engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Ready(), 2*time.Second)
+}
+
+func (suite *SameGRPCPortTestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Done(), 2*time.Second)
 }
 
 // TestEnginesOnTheSameGrpcPort verifies if both AccessAPI and ExecutionDataAPI client successfully connect and continue

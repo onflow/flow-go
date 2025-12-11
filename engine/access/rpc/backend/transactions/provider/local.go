@@ -15,8 +15,8 @@ import (
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -28,14 +28,15 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
 // LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
 type LocalTransactionProvider struct {
-	state                     protocol.State
-	collections               storage.Collections
-	blocks                    storage.Blocks
-	txErrorMessages           error_messages.Provider
-	systemTxID                flow.Identifier
-	txStatusDeriver           *txstatus.TxStatusDeriver
-	scheduledCallbacksEnabled bool
-	chainID                   flow.ChainID
+	state             protocol.State
+	collections       storage.Collections
+	blocks            storage.Blocks
+	eventsIndex       *index.EventsIndex
+	txResultsIndex    *index.TransactionResultsIndex
+	txErrorMessages   error_messages.Provider
+	systemCollections *systemcollection.Versioned
+	txStatusDeriver   *txstatus.TxStatusDeriver
+	chainID           flow.ChainID
 	execResultInfoProvider    optimistic_sync.ExecutionResultInfoProvider
 	execStateCache            optimistic_sync.ExecutionStateCache
 }
@@ -47,22 +48,22 @@ func NewLocalTransactionProvider(
 	collections storage.Collections,
 	blocks storage.Blocks,
 	txErrorMessages error_messages.Provider,
-	systemTxID flow.Identifier,
+	systemCollections *systemcollection.Versioned,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	chainID flow.ChainID,
-	scheduledCallbacksEnabled bool,
 	execResultInfoProvider optimistic_sync.ExecutionResultInfoProvider,
 	execStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
-		state:                     state,
-		collections:               collections,
-		blocks:                    blocks,
-		txErrorMessages:           txErrorMessages,
-		systemTxID:                systemTxID,
-		txStatusDeriver:           txStatusDeriver,
-		scheduledCallbacksEnabled: scheduledCallbacksEnabled,
-		chainID:                   chainID,
+		state:             state,
+		collections:       collections,
+		blocks:            blocks,
+		eventsIndex:       eventsIndex,
+		txResultsIndex:    txResultsIndex,
+		txErrorMessages:   txErrorMessages,
+		systemCollections: systemCollections,
+		txStatusDeriver:   txStatusDeriver,
+		chainID:           chainID,
 		execResultInfoProvider:    execResultInfoProvider,
 		execStateCache:            execStateCache,
 	}
@@ -75,16 +76,17 @@ func NewLocalTransactionProvider(
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResult(
 	ctx context.Context,
-	block *flow.Header,
+	header *flow.Header,
 	transactionID flow.Identifier,
+	collectionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, error) {
-
-	blockID := block.ID()
-	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(block.ID(), criteria)
+	blockID := header.ID()
+	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
 		// Execution result info is not available
+		// TODO: check error conversion
 		return nil, err
 	}
 
@@ -148,6 +150,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 	// Get events
 	events, err := eventsReader.ByBlockIDTransactionID(blockID, transactionID)
 	if err != nil {
+		// TODO: check err conversion
 		return nil, err
 	}
 
@@ -155,6 +158,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 	if encodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
+			// TODO: check err conversion
 			return nil, status.Errorf(codes.Internal, "failed to convert event payload: %v", err)
 		}
 	}
@@ -175,11 +179,13 @@ func (t *LocalTransactionProvider) TransactionResult(
 // Expected errors during normal operation:
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 //   - codes.Internal when event payload conversion failed.
+//   - storage.ErrHeightNotIndexed when data is unavailable.
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
 	index uint32,
+	collectionID flow.Identifier,
 	eventEncoding entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
@@ -249,20 +255,15 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	// Get events by index
 	events, err := eventsReader.ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertIndexError(err, blockHeight, "failed to get events")
 	}
 
 	// Events are encoded in CCF format in storage. Convert to JSON-CDC if requested
 	if eventEncoding == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to convert event payload: %v", err)
+			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
-	}
-
-	collectionID, err := t.lookupCollectionIDInBlock(block, lightTxResult.TransactionID)
-	if err != nil {
-		return nil, err
 	}
 
 	return &accessmodel.TransactionResult{
@@ -281,7 +282,10 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 // Expected errors during normal operation:
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 //   - codes.Internal when event payload conversion failed.
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+// getter or when deriving transaction status.
 func (t *LocalTransactionProvider) TransactionsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
@@ -296,15 +300,6 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 		}
 
 		transactions = append(transactions, collection.Transactions...)
-	}
-
-	if !t.scheduledCallbacksEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
-		if err != nil {
-			return nil, fmt.Errorf("failed to construct system chunk transaction: %w", err)
-		}
-
-		return append(transactions, systemTx), nil
 	}
 
 	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(blockID, optimistic_sync.Criteria{})
@@ -322,12 +317,14 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 	// Get events reader
 	eventsReader := snapshot.Events()
 
-	events, err := eventsReader.ByBlockID(blockID)
-	if err != nil {
-		return nil, err
+   // generate the system collection which includes scheduled transactions
+	eventProvider := func() (flow.EventsList, error) {
+		return eventsReader.ByBlockID(blockID)
 	}
 
-	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	sysCollection, err := t.systemCollections.
+		ByHeight(block.Height).
+		SystemCollection(t.chainID.Chain(), eventProvider)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
 	}
@@ -339,6 +336,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 // Expected errors during normal operation:
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 //   - codes.Internal when event payload conversion failed.
+//   - storage.ErrHeightNotIndexed when data is unavailable
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
@@ -452,27 +450,20 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	return results, nil
 }
 
-// SystemTransaction rebuilds the system transaction from storage
-func (t *LocalTransactionProvider) SystemTransaction(
+// ScheduledTransactionsByBlockID constructs the scheduled transaction bodies using events from the
+// local storage.
+//
+// Expected error returns during normal operation:
+//   - [codes.NotFound]: if the events are not found for the block ID.
+//   - [codes.OutOfRange]: if the events are not available for the block height.
+//   - [codes.FailedPrecondition]: if the events index is not initialized.
+//   - [codes.Internal]: if the scheduled transactions cannot be constructed.
+func (t *LocalTransactionProvider) ScheduledTransactionsByBlockID(
 	ctx context.Context,
-	block *flow.Block,
-	txID flow.Identifier,
-) (*flow.TransactionBody, error) {
-	blockID := block.ID()
+	header *flow.Header,
+) ([]*flow.TransactionBody, error) {
 
-	if txID == t.systemTxID || !t.scheduledCallbacksEnabled {
-		systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to construct system chunk transaction: %v", err)
-		}
-
-		if txID == systemTx.ID() {
-			return systemTx, nil
-		}
-		return nil, fmt.Errorf("transaction %s not found in block %s", txID, blockID)
-	}
-
-	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(blockID, optimistic_sync.Criteria{})
+	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(header.ID(), optimistic_sync.Criteria{})
 	if err != nil {
 		// Execution result info is not available
 		return nil, err
@@ -487,59 +478,20 @@ func (t *LocalTransactionProvider) SystemTransaction(
 	// Get events reader
 	eventsReader := snapshot.Events()
 
-	events, err := eventsReader.ByBlockID(blockID)
+   // generate the system collection which includes scheduled transactions
+	events, err := eventsReader.ByBlockID(header.ID())
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertIndexError(err, header.Height, "failed to get events to reconstruct scheduled transactions")
 	}
 
-	sysCollection, err := blueprints.SystemCollection(t.chainID.Chain(), events)
+	txs, err := t.systemCollections.
+		ByHeight(header.Height).
+		ExecuteCallbacksTransactions(t.chainID.Chain(), events)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not construct system collection: %v", err)
+		return nil, status.Errorf(codes.Internal, "could not construct scheduled transactions: %v", err)
 	}
 
-	for _, tx := range sysCollection.Transactions {
-		if tx.ID() == txID {
-			return tx, nil
-		}
-	}
-
-	return nil, status.Errorf(codes.NotFound, "system transaction not found")
-}
-
-func (t *LocalTransactionProvider) SystemTransactionResult(
-	ctx context.Context,
-	block *flow.Block,
-	txID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	// make sure the request is for a system transaction
-	if txID != t.systemTxID {
-		if _, err := t.SystemTransaction(ctx, block, txID); err != nil {
-			return nil, status.Errorf(codes.NotFound, "system transaction not found")
-		}
-	}
-	return t.TransactionResult(ctx, block.ToHeader(), txID, requiredEventEncodingVersion, optimistic_sync.Criteria{})
-}
-
-// lookupCollectionIDInBlock returns the collection ID based on the transaction ID.
-// The lookup is performed in block collections.
-func (t *LocalTransactionProvider) lookupCollectionIDInBlock(
-	block *flow.Block,
-	txID flow.Identifier,
-) (flow.Identifier, error) {
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := t.collections.LightByID(guarantee.CollectionID)
-		if err != nil {
-			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.CollectionID, err)
-		}
-
-		for _, collectionTxID := range collection.Transactions {
-			if collectionTxID == txID {
-				return guarantee.CollectionID, nil
-			}
-		}
-	}
-	return flow.ZeroID, ErrTransactionNotInBlock
+	return txs, nil
 }
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.

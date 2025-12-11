@@ -43,36 +43,6 @@ func (_m *Streamable) ID() string {
 	return r0
 }
 
-// Next provides a mock function with given fields: _a0
-func (_m *Streamable) Next(_a0 context.Context) (interface{}, error) {
-	ret := _m.Called(_a0)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Next")
-	}
-
-	var r0 interface{}
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (interface{}, error)); ok {
-		return rf(_a0)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) interface{}); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Send provides a mock function with given fields: _a0, _a1, _a2
 func (_m *Streamable) Send(_a0 context.Context, _a1 interface{}, _a2 time.Duration) error {
 	ret := _m.Called(_a0, _a1, _a2)

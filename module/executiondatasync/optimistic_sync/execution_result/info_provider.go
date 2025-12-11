@@ -52,6 +52,9 @@ func NewExecutionResultInfoProvider(
 // Expected errors during normal operations:
 //   - [optimistic_sync.ErrBlockNotFound]: If the request is for the spork root block, and the node was bootstrapped
 //     from a newer block.
+//   - [storage.ErrNotFound]: If the underlying storage does not yet contain data required to fulfill the request
+//     (e.g. receipts or result info for the given block ID are not found). This is a benign condition and callers
+//     should treat it as "data not available yet" and may retry later.
 //   - [optimistic_sync.NotEnoughAgreeingExecutorsError]: If no insufficient receipts are found for given block ID.
 //   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
 //     execution results was abandoned.

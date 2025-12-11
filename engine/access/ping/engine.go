@@ -95,6 +95,7 @@ func (e *Engine) pingLoop(ctx irrecoverable.SignalerContext, ready component.Rea
 	ticker := time.NewTicker(PingInterval)
 	defer ticker.Stop()
 
+	ready()
 	for {
 		select {
 		case <-ctx.Done():

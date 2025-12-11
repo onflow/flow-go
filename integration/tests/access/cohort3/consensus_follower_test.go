@@ -49,6 +49,20 @@ func (s *ConsensusFollowerSuite) TearDownTest() {
 	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
+// SetupTest initializes the test suite with a network configuration for testing consensus followers.
+//
+// Network Configuration:
+//   - 1 Staked Access node (supports-observer=true) that consensus followers connect to
+//   - 1 Standard Access node (standard configuration)
+//   - 2 Collection nodes (ghosts - lightweight, unused)
+//   - 3 Consensus nodes (with custom timing: 100ms proposal duration, reduced seal approvals)
+//   - 2 Consensus Followers (unstaked nodes with generated networking keys)
+//   - 2 Execution nodes (standard configuration)
+//   - 1 Verification node (standard configuration)
+//
+// The staked access node acts as the entry point for consensus followers. The two consensus followers
+// are configured to follow the chain through this staked node, allowing testing of chain following
+// and catch-up behavior.
 func (s *ConsensusFollowerSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")

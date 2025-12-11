@@ -175,8 +175,9 @@ func (t *TransactionStream) createSubscription(
 		t.txStatusDeriver,
 		criteria,
 	)
+	txProvider := subscription.NewHeightByFuncProvider(startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
 
-	return t.subscriptionHandler.Subscribe(ctx, startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
+	return t.subscriptionHandler.Subscribe(ctx, txProvider)
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status

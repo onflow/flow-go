@@ -17,10 +17,6 @@ type Address [AddressLength]byte
 // EmptyAddress is the default value of a variable of type Address
 var EmptyAddress = BytesToAddress(nil)
 
-func ConvertAddress(b [AddressLength]byte) Address {
-	return Address(b)
-}
-
 // HexToAddress converts a hex string to an Address.
 func HexToAddress(h string) Address {
 	addr, _ := StringToAddress(h)

@@ -18,13 +18,21 @@ var ErrBlockNotReady = errors.New("block not ready")
 // ErrEndOfData represents an error indicating that no more data available for streaming.
 var ErrEndOfData = errors.New("end of data")
 
+// GetDataByHeightFunc is a callback used by subscriptions to retrieve data for a given height.
+// Expected errors:
+// - storage.ErrNotFound
+// - execution_data.BlobNotFoundError
+// All other errors are considered exceptions
+type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
+
 // Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
-	log         zerolog.Logger
-	sub         Streamable
-	broadcaster *engine.Broadcaster
-	sendTimeout time.Duration
-	limiter     *rate.Limiter
+	log          zerolog.Logger
+	sub          Streamable
+	broadcaster  *engine.Broadcaster
+	sendTimeout  time.Duration
+	limiter      *rate.Limiter
+	dataProvider DataProvider
 }
 
 // NewStreamer creates a new Streamer instance.
@@ -34,6 +42,7 @@ func NewStreamer(
 	sendTimeout time.Duration,
 	limit float64,
 	sub Streamable,
+	dataProvider DataProvider,
 ) *Streamer {
 	var limiter *rate.Limiter
 	if limit > 0 {
@@ -42,11 +51,12 @@ func NewStreamer(
 	}
 
 	return &Streamer{
-		log:         log.With().Str("sub_id", sub.ID()).Logger(),
-		broadcaster: broadcaster,
-		sendTimeout: sendTimeout,
-		limiter:     limiter,
-		sub:         sub,
+		log:          log.With().Str("sub_id", sub.ID()).Logger(),
+		broadcaster:  broadcaster,
+		sendTimeout:  sendTimeout,
+		limiter:      limiter,
+		sub:          sub,
+		dataProvider: dataProvider,
 	}
 }
 
@@ -84,8 +94,7 @@ func (s *Streamer) Stream(ctx context.Context) {
 				return
 			}
 
-			// TODO: i want to change it to return no error when the client disconnects (it is done in a new subscription PR)
-			// TODO: 2. fix these errors to match the new contract for a data provider func (with new result provider)
+			// TODO: Can we change it to return no error when a client disconnects (it is done in a new subscription PR)
 			if errors.Is(err, context.Canceled) {
 				s.sub.Fail(fmt.Errorf("client disconnected: %w", ctx.Err()))
 				return
@@ -106,8 +115,7 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			return fmt.Errorf("error waiting for response capacity: %w", err)
 		}
 
-		response, err := s.sub.Next(ctx)
-
+		response, err := s.dataProvider.NextData(ctx)
 		if response == nil && err == nil {
 			continue
 		}
@@ -119,12 +127,6 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			}
 
 			return fmt.Errorf("could not get response: %w", err)
-		}
-
-		if ssub, ok := s.sub.(*HeightBasedSubscription); ok {
-			s.log.Trace().
-				Uint64("next_height", ssub.nextHeight).
-				Msg("sending response")
 		}
 
 		err = s.sub.Send(ctx, response, s.sendTimeout)

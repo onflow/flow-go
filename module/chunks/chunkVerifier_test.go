@@ -93,7 +93,7 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vmCtx := fvm.NewContext(
 		fvm.WithChain(testChain.Chain()),
-		fvm.WithScheduleCallbacksEnabled(true),
+		fvm.WithScheduledTransactionsEnabled(true),
 	)
 	vmMock := fvmmock.NewVM(s.T())
 
@@ -456,13 +456,13 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
 	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, err)
 }
 
-func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEvent() {
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledTransactionsReturningEvent() {
 	systemContracts := systemcontracts.SystemContractsForChain(testChain)
 
 	// create the event returned for processed callback
 	processedEventName := fmt.Sprintf(
 		"A.%s.FlowTransactionScheduler.PendingExecution",
-		systemContracts.FlowCallbackScheduler.Address,
+		systemContracts.FlowTransactionScheduler.Address,
 	)
 	callbackEventPayload, err := ccf.Encode(cadence.NewEvent(
 		[]cadence.Value{
@@ -545,9 +545,9 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	assert.NoError(s.T(), err)
 }
 
-// TestSystemChunkWithNoScheduledCallbacks tests verification of system chunks
-// when scheduled callbacks are enabled but no callbacks are actually scheduled
-func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledCallbacks() {
+// TestSystemChunkWithNoScheduledTransactions tests verification of system chunks
+// when scheduled transactions are enabled but no transactions are actually scheduled
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledTransactions() {
 	// Setup mock outputs for process callback transaction with no events
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
 		ComputationUsed: computationUsed,

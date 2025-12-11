@@ -38,17 +38,17 @@ func (_m *ProtocolKVStore) BatchIndex(lctx lockctx.Proof, rw storage.ReaderBatch
 	return r0
 }
 
-// BatchStore provides a mock function with given fields: lctx, rw, stateID, kvStore
-func (_m *ProtocolKVStore) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
-	ret := _m.Called(lctx, rw, stateID, kvStore)
+// BatchStore provides a mock function with given fields: rw, stateID, kvStore
+func (_m *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error {
+	ret := _m.Called(rw, stateID, kvStore)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, flow.Identifier, protocol.KVStoreReader) error); ok {
-		r0 = rf(lctx, rw, stateID, kvStore)
+	if rf, ok := ret.Get(0).(func(storage.ReaderBatchWriter, flow.Identifier, protocol.KVStoreReader) error); ok {
+		r0 = rf(rw, stateID, kvStore)
 	} else {
 		r0 = ret.Error(0)
 	}

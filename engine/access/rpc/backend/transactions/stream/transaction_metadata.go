@@ -247,6 +247,7 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		ctx,
 		t.blockWithTx,
 		t.txResult.TransactionID,
+		t.txResult.CollectionID,
 		t.eventEncodingVersion,
 		t.criteria,
 	)
@@ -263,8 +264,6 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 
 	// If transaction result was found, fully replace it in metadata. New transaction status already included in result.
 	if txResult != nil {
-		// Preserve the CollectionID to ensure it is not lost during the transaction result assignment.
-		txResult.CollectionID = t.txResult.CollectionID
 		t.txResult = txResult
 	}
 
