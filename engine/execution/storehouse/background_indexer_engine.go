@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/rs/zerolog"
 )
 
 type BackgroundIndexerEngine struct {
