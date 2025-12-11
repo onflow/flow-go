@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -87,19 +88,21 @@ func NewTransactionStreamBackend(
 //   - ctx: The context to manage the transaction sending and subscription lifecycle, including cancellation.
 //   - tx: The transaction body to be sent and monitored.
 //   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
+//   - criteria: The execution state query criteria for selecting execution results.
 //
 // If the transaction cannot be sent, the subscription will fail and return a failed subscription.
 func (t *TransactionStream) SendAndSubscribeTransactionStatuses(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	if err := t.sendTransaction(ctx, tx); err != nil {
 		t.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
-	return t.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
+	return t.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion, criteria)
 }
 
 // SubscribeTransactionStatuses subscribes to status updates for a given transaction ID.
@@ -112,10 +115,12 @@ func (t *TransactionStream) SendAndSubscribeTransactionStatuses(
 //   - ctx: The context to manage the subscription's lifecycle, including cancellation.
 //   - txID: The unique identifier of the transaction to monitor.
 //   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
+//   - criteria: The execution state query criteria for selecting execution results.
 func (t *TransactionStream) SubscribeTransactionStatuses(
 	ctx context.Context,
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	header, err := t.state.Sealed().Head()
 	if err != nil {
@@ -124,7 +129,7 @@ func (t *TransactionStream) SubscribeTransactionStatuses(
 		return subscription.NewFailedSubscription(err, "failed to lookup sealed block")
 	}
 
-	return t.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
+	return t.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion, criteria)
 }
 
 // createSubscription initializes a transaction subscription for monitoring status updates.
@@ -138,6 +143,7 @@ func (t *TransactionStream) SubscribeTransactionStatuses(
 //   - startBlockID: The ID of the block to start monitoring from.
 //   - referenceBlockID: The ID of the transaction's reference block.
 //   - requiredEventEncodingVersion: The required version of event encoding.
+//   - criteria: The execution state query criteria for selecting execution results.
 //
 // Returns:
 //   - subscription.Subscription: A subscription for monitoring transaction status updates.
@@ -149,6 +155,7 @@ func (t *TransactionStream) createSubscription(
 	startBlockID flow.Identifier,
 	referenceBlockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	// Determine the height of the block to start the subscription from.
 	startHeight, err := t.blockTracker.GetStartHeightFromBlockID(startBlockID)
@@ -166,6 +173,7 @@ func (t *TransactionStream) createSubscription(
 		requiredEventEncodingVersion,
 		t.txProvider,
 		t.txStatusDeriver,
+		criteria,
 	)
 	txProvider := subscription.NewHeightByFuncProvider(startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
 

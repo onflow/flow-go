@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -82,6 +83,10 @@ type Suite struct {
 	txResultsIndex *index.TransactionResultsIndex
 
 	errorMessageProvider error_messages.Provider
+
+	execResultInfoProvider *optimisticsyncmock.ExecutionResultInfoProvider
+	execStateCache         *optimisticsyncmock.ExecutionStateCache
+	execStateSnapshot      *optimisticsyncmock.Snapshot
 
 	chainID                              flow.ChainID
 	systemCollection                     *flow.Collection
@@ -134,6 +139,10 @@ func (suite *Suite) SetupTest() {
 	suite.Require().NoError(err)
 	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
+
+	suite.execResultInfoProvider = optimisticsyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.execStateCache = optimisticsyncmock.NewExecutionStateCache(suite.T())
+	suite.execStateSnapshot = optimisticsyncmock.NewSnapshot(suite.T())
 
 	suite.scheduledTransactionsEnabled = true
 
