@@ -65,13 +65,13 @@ type Indexer struct {
 // NewIndexer creates a new execution worker.
 func NewIndexer(
 	log zerolog.Logger,
-	initHeight uint64,
 	registers storage.RegisterIndex,
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeightInitializer storage.ConsumerProgressInitializer,
 ) (*Indexer, error) {
+	initHeight := registers.FirstHeight()
 	r := &Indexer{
 		log:                     log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier:         engine.NewNotifier(),

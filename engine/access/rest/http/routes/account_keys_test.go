@@ -2,255 +2,209 @@ package routes_test
 
 import (
 	"fmt"
-	"math"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	mocktestify "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
-	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/access"
+	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestGetAccountKeyByIndex tests local getAccountKeyByIndex request.
 //
-// Runs the following tests:
+// Test cases:
 // 1. Get key by address and index at latest sealed block.
 // 2. Get key by address and index at latest finalized block.
-// 3. Get missing key by address and index at latest sealed block.
-// 4. Get missing key by address and index at latest finalized block.
-// 5. Get key by address and index at height.
-// 6. Get key by address and index at missing block.
+// 3. Get key by address and index at height.
+// 4. Get key by address and index with executor metadata included.
 func TestGetAccountKeyByIndex(t *testing.T) {
-	backend := mock.NewAPI(t)
+	backend := accessmock.NewAPI(t)
 
 	t.Run("get key by address and index at latest sealed block", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
-		req := getAccountKeyByIndexRequest(t, account, "0", router.SealedHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, "0", router.SealedHeightQueryParam, "2", []string{}, "false")
 
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, true).
-			Return(block, flow.BlockStatusSealed, nil)
+		backend.On("GetLatestBlockHeader", mock.Anything, true).
+			Return(block, flow.BlockStatusSealed, nil).
+			Once()
 
-		backend.Mock.
-			On("GetAccountKeyAtBlockHeight", mocktestify.Anything, account.Address, keyIndex, height).
-			Return(keyByIndex, nil)
+		backend.On("GetAccountKeyAtBlockHeight", mock.Anything, account.Address, keyIndex, height, mock.Anything).
+			Return(keyByIndex, &accessmodel.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedAccountKeyResponse(account)
-
+		expected := expectedAccountKeyResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get key by address and index at latest finalized block", func(t *testing.T) {
-		account := accountFixture(t)
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
-		req := getAccountKeyByIndexRequest(t, account, "0", router.FinalHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, "0", router.FinalHeightQueryParam, "2", []string{}, "false")
 
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(block, flow.BlockStatusFinalized, nil)
+		backend.On("GetLatestBlockHeader", mock.Anything, false).
+			Return(block, flow.BlockStatusFinalized, nil).
+			Once()
 
-		backend.Mock.
-			On("GetAccountKeyAtBlockHeight", mocktestify.Anything, account.Address, keyIndex, height).
-			Return(keyByIndex, nil)
+		backend.On("GetAccountKeyAtBlockHeight", mock.Anything, account.Address, keyIndex, height, mock.Anything).
+			Return(keyByIndex, &accessmodel.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedAccountKeyResponse(account)
-
+		expected := expectedAccountKeyResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
-	})
-
-	t.Run("get missing key by address and index at latest sealed block", func(t *testing.T) {
-		account := accountFixture(t)
-		var height uint64 = 100
-		index := "2"
-		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-
-		req := getAccountKeyByIndexRequest(t, account, index, router.SealedHeightQueryParam)
-
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, true).
-			Return(block, flow.BlockStatusSealed, nil)
-
-		var keyIndex uint32 = 2
-		err := fmt.Errorf("failed to get account key with index: %d", keyIndex)
-		backend.Mock.
-			On("GetAccountKeyAtBlockHeight", mocktestify.Anything, account.Address, keyIndex, height).
-			Return(nil, err)
-
-		statusCode := 404
-		expected := fmt.Sprintf(`
-         {
-           "code": %d,
-           "message": "failed to get account key with index: %s, reason: failed to get account key with index: %s"
-         }
-		`, statusCode, index, index)
-
-		router.AssertResponse(t, req, statusCode, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
-	})
-
-	t.Run("get missing key by address and index at latest finalized block", func(t *testing.T) {
-		account := accountFixture(t)
-		var height uint64 = 100
-		index := "2"
-		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-
-		req := getAccountKeyByIndexRequest(t, account, index, router.FinalHeightQueryParam)
-
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(block, flow.BlockStatusFinalized, nil)
-
-		var keyIndex uint32 = 2
-		err := fmt.Errorf("failed to get account key with index: %d", keyIndex)
-		backend.Mock.
-			On("GetAccountKeyAtBlockHeight", mocktestify.Anything, account.Address, keyIndex, height).
-			Return(nil, err)
-
-		statusCode := 404
-		expected := fmt.Sprintf(`
-         {
-           "code": %d,
-           "message": "failed to get account key with index: %s, reason: failed to get account key with index: %s"
-         }
-		`, statusCode, index, index)
-
-		router.AssertResponse(t, req, statusCode, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get key by address and index at height", func(t *testing.T) {
-		var height uint64 = 1337
-		account := accountFixture(t)
-		req := getAccountKeyByIndexRequest(t, account, "0", "1337")
+		var height uint64 = 100
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+		req := getAccountKeyByIndexRequest(t, account, "0", fmt.Sprintf("%d", height), "2", []string{}, "false")
 
 		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
-		backend.Mock.
-			On("GetAccountKeyAtBlockHeight", mocktestify.Anything, account.Address, keyIndex, height).
-			Return(keyByIndex, nil)
+		backend.On("GetAccountKeyAtBlockHeight", mock.Anything, account.Address, keyIndex, height, mock.Anything).
+			Return(keyByIndex, &accessmodel.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedAccountKeyResponse(account)
-
+		expected := expectedAccountKeyResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
-	t.Run("get key by address and index at missing block", func(t *testing.T) {
-		backend := mock.NewAPI(t)
-		account := accountFixture(t)
-		const finalHeight uint64 = math.MaxUint64 - 2
+	t.Run("get key by address and index with executor metadata included", func(t *testing.T) {
+		account, err := unittest.AccountFixture()
+		require.NoError(t, err)
+		var height uint64 = 100
+		var keyIndex uint32 = 0
+		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
-		req := getAccountKeyByIndexRequest(t, account, "0", router.FinalHeightQueryParam)
+		metadata := &accessmodel.ExecutorMetadata{
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutorIDs:       unittest.IdentifierListFixture(2),
+		}
 
-		err := fmt.Errorf("block with height: %d does not exist", finalHeight)
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(nil, flow.BlockStatusUnknown, err)
+		req := getAccountKeyByIndexRequest(t, account, "0", fmt.Sprintf("%d", height), "2", []string{}, "true")
 
-		statusCode := 404
-		expected := fmt.Sprintf(`
-			  {
-				"code": %d,
-				"message": "block with height: %d does not exist"
-			  }
-			`, statusCode, finalHeight)
+		backend.On("GetAccountKeyAtBlockHeight", mock.Anything, account.Address, keyIndex, height, mock.Anything).
+			Return(keyByIndex, metadata, nil).
+			Once()
 
-		router.AssertResponse(t, req, statusCode, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
+		expected := expectedAccountKeyResponse(account, metadata)
+		router.AssertOKResponse(t, req, expected, backend)
 	})
+}
+
+// TestGetAccountByIndexErrors verifies that the GetAccountKeyByIndex endpoint
+// correctly returns appropriate HTTP error codes and messages in various failure scenarios.
+//
+// Test cases:
+//  1. A request with an invalid account address returns http.StatusBadRequest.
+//  2. Simulated failure when fetching the latest block header for a "sealed" height
+//     to ensure that any propagated errors are correctly returned as http.StatusInternalServerError.
+//
+// 3. A request where GetAccountKeyAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+func TestGetAccountByIndexErrors(t *testing.T) {
+	backend := accessmock.NewAPI(t)
 
 	tests := []struct {
-		name string
-		url  string
-		out  string
+		name   string
+		url    string
+		setup  func()
+		status int
+		out    string
 	}{
 		{
-			"get key with invalid address",
-			accountKeyURL(t, "123", "3", "100"),
-			`{"code":400, "message":"invalid address"}`,
+			name:   "invalid account address",
+			url:    accountKeyURL(t, "123", "3", "100", "2", []string{}, "false"),
+			setup:  func() {},
+			status: http.StatusBadRequest,
+			out:    `{"code":400, "message":"invalid address"}`,
 		},
 		{
-			"get key with invalid index",
-			accountKeyURL(
-				t,
-				unittest.AddressFixture().String(),
-				"foo",
-				"100",
-			),
-			`{"code":400, "message":"invalid key index: value must be an unsigned 32 bit integer"}`,
+			name: "GetLatestBlockHeader fails for sealed height",
+			url:  accountKeyURL(t, unittest.AddressFixture().String(), "0", router.SealedHeightQueryParam, "2", []string{}, "false"),
+			setup: func() {
+				backend.On("GetLatestBlockHeader", mock.Anything, true).
+					Return(nil, flow.BlockStatusUnknown, access.NewInternalError(fmt.Errorf("internal server error"))).
+					Once()
+			},
+			status: http.StatusInternalServerError,
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
 		},
 		{
-			"get key with invalid height",
-			accountKeyURL(
-				t,
-				unittest.AddressFixture().String(),
-				"2",
-				"-100",
-			),
-			`{"code":400, "message":"invalid height format"}`,
+			name: "GetAccountKeyAtBlockHeight fails for valid height",
+			url:  accountKeyURL(t, unittest.AddressFixture().String(), "2", "100", "2", []string{}, "false"),
+			setup: func() {
+				backend.On("GetAccountKeyAtBlockHeight", mock.Anything, mock.Anything, uint32(2), uint64(100), mock.Anything).
+					Return(nil, nil, access.NewDataNotFoundError("block", fmt.Errorf("not found"))).
+					Once()
+			},
+			status: http.StatusNotFound,
+			out:    `{"code":404,  "message":"Flow resource not found: data not found for block: not found"}`,
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			test.setup()
 			req, _ := http.NewRequest("GET", test.url, nil)
 			rr := router.ExecuteRequest(req, backend)
-			assert.Equal(t, http.StatusBadRequest, rr.Code)
-			assert.JSONEq(t, test.out, rr.Body.String())
+
+			require.Equal(t, test.status, rr.Code, fmt.Sprintf("test #%d failed: %v", i, test))
+			require.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
 		})
 	}
 }
 
-// TestGetAccountKeys tests local getAccountKeys request.
+// TestGetAccountKeys tests local GetAccountKeys request.
 //
-// Runs the following tests:
+// Test cases:
 // 1. Get keys by address at latest sealed block.
 // 2. Get keys by address at latest finalized block.
 // 3. Get keys by address at height.
-// 4. Get key by address and index at missing block.
+// 4. Get keys by address with executor metadata included in the response.
 func TestGetAccountKeys(t *testing.T) {
-	backend := mock.NewAPI(t)
+	backend := accessmock.NewAPI(t)
 
 	t.Run("get keys by address at latest sealed block", func(t *testing.T) {
 		account := accountWithKeysFixture(t)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeysRequest(t, account, router.SealedHeightQueryParam)
+		req := getAccountKeysRequest(t, account, router.SealedHeightQueryParam, "2", []string{}, "false")
 
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, true).
-			Return(block, flow.BlockStatusSealed, nil)
+		backend.On("GetLatestBlockHeader", mock.Anything, true).
+			Return(block, flow.BlockStatusSealed, nil).
+			Once()
 
-		backend.Mock.
-			On("GetAccountKeysAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account.Keys, nil)
+		backend.On("GetAccountKeysAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account.Keys, &accessmodel.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedAccountKeysResponse(account)
-
+		expected := expectedAccountKeysResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get keys by address at latest finalized block", func(t *testing.T) {
@@ -258,93 +212,122 @@ func TestGetAccountKeys(t *testing.T) {
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeysRequest(t, account, router.FinalHeightQueryParam)
+		req := getAccountKeysRequest(t, account, router.FinalHeightQueryParam, "2", []string{}, "false")
 
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(block, flow.BlockStatusFinalized, nil)
+		backend.On("GetLatestBlockHeader", mock.Anything, false).
+			Return(block, flow.BlockStatusFinalized, nil).
+			Once()
 
-		backend.Mock.
-			On("GetAccountKeysAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account.Keys, nil)
+		backend.On("GetAccountKeysAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account.Keys, &accessmodel.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedAccountKeysResponse(account)
-
+		expected := expectedAccountKeysResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get keys by address at height", func(t *testing.T) {
 		var height uint64 = 1337
 		account := accountWithKeysFixture(t)
-		req := getAccountKeysRequest(t, account, "1337")
+		req := getAccountKeysRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "false")
 
-		backend.Mock.
-			On("GetAccountKeysAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account.Keys, nil)
+		backend.On("GetAccountKeysAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account.Keys, &accessmodel.ExecutorMetadata{}, nil).
+			Once()
 
-		expected := expectedAccountKeysResponse(account)
-
+		expected := expectedAccountKeysResponse(account, nil)
 		router.AssertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
-	t.Run("get keys by address at missing block", func(t *testing.T) {
-		backend := mock.NewAPI(t)
+	t.Run("get keys by address with metadata", func(t *testing.T) {
 		account := accountWithKeysFixture(t)
-		const finalHeight uint64 = math.MaxUint64 - 2
+		var height uint64 = 100
+		req := getAccountKeysRequest(t, account, fmt.Sprintf("%d", height), "2", []string{}, "true")
 
-		req := getAccountKeysRequest(t, account, router.FinalHeightQueryParam)
+		metadata := &accessmodel.ExecutorMetadata{
+			ExecutionResultID: unittest.IdentifierFixture(),
+			ExecutorIDs:       unittest.IdentifierListFixture(2),
+		}
 
-		err := fmt.Errorf("block with height: %d does not exist", finalHeight)
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(nil, flow.BlockStatusUnknown, err)
+		backend.On("GetAccountKeysAtBlockHeight", mock.Anything, account.Address, height, mock.Anything).
+			Return(account.Keys, metadata, nil).
+			Once()
 
-		statusCode := 404
-		expected := fmt.Sprintf(`
-			  {
-				"code": %d,
-				"message": "block with height: %d does not exist"
-			  }
-			`, statusCode, finalHeight)
-
-		router.AssertResponse(t, req, statusCode, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
+		expected := expectedAccountKeysResponse(account, metadata)
+		router.AssertOKResponse(t, req, expected, backend)
 	})
+}
+
+// TestGetAccountKeysErrors verifies that the GetAccountKeys endpoint
+// correctly returns appropriate HTTP error codes and messages in various failure scenarios.
+//
+// Test cases:
+//  1. A request with an invalid account address returns http.StatusBadRequest.
+//  2. Simulated failure when fetching the latest block header for a "sealed" height
+//     to ensure that any propagated errors are correctly returned as http.StatusInternalServerError.
+//
+// 3. A request where GetAccountKeysAtBlockHeight fails for a valid block height returns http.StatusNotFound.
+func TestGetAccountKeysErrors(t *testing.T) {
+	backend := accessmock.NewAPI(t)
 
 	tests := []struct {
-		name string
-		url  string
-		out  string
+		name   string
+		url    string
+		setup  func()
+		status int
+		out    string
 	}{
 		{
-			"get keys with invalid address",
-			accountKeysURL(t, "123", "100"),
-			`{"code":400, "message":"invalid address"}`,
+			name:   "invalid account address",
+			url:    accountKeysURL(t, "123", "100", "2", []string{}, "false"),
+			setup:  func() {},
+			status: http.StatusBadRequest,
+			out:    `{"code":400, "message":"invalid address"}`,
 		},
 		{
-			"get keys with invalid height",
-			accountKeysURL(
-				t,
-				unittest.AddressFixture().String(),
-				"-100",
-			),
-			`{"code":400, "message":"invalid height format"}`,
+			name: "GetLatestBlockHeader fails for sealed height",
+			url:  accountKeysURL(t, unittest.AddressFixture().String(), router.SealedHeightQueryParam, "2", []string{}, "false"),
+			setup: func() {
+				backend.On("GetLatestBlockHeader", mock.Anything, true).
+					Return(nil, flow.BlockStatusUnknown, access.NewInternalError(fmt.Errorf("internal server error"))).
+					Once()
+			},
+			status: http.StatusInternalServerError,
+			out:    `{"code":500, "message":"internal error: internal server error"}`,
+		},
+		{
+			name: "GetAccountKeysAtBlockHeight fails for valid height",
+			url:  accountKeysURL(t, unittest.AddressFixture().String(), "100", "2", []string{}, "false"),
+			setup: func() {
+				backend.On("GetAccountKeysAtBlockHeight", mock.Anything, mock.Anything, uint64(100), mock.Anything).
+					Return(nil, nil, access.NewDataNotFoundError("block", fmt.Errorf("not found"))).
+					Once()
+			},
+			status: http.StatusNotFound,
+			out:    `{"code":404, "message":"Flow resource not found: data not found for block: not found"}`,
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			test.setup()
 			req, _ := http.NewRequest("GET", test.url, nil)
 			rr := router.ExecuteRequest(req, backend)
-			assert.Equal(t, http.StatusBadRequest, rr.Code)
-			assert.JSONEq(t, test.out, rr.Body.String())
+
+			require.Equal(t, test.status, rr.Code, fmt.Sprintf("test #%d failed: %v", i, test))
+			require.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
 		})
 	}
 }
 
-func accountKeyURL(t *testing.T, address string, index string, height string) string {
+func accountKeyURL(t *testing.T,
+	address string,
+	index string,
+	height string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
+) string {
 	u, err := url.ParseRequestURI(
 		fmt.Sprintf("/v1/accounts/%s/keys/%s", address, index),
 	)
@@ -355,11 +338,28 @@ func accountKeyURL(t *testing.T, address string, index string, height string) st
 		q.Add("block_height", height)
 	}
 
+	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+
+	if len(requiredExecutors) > 0 {
+		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	}
+
+	if len(includeExecutorMetadata) > 0 {
+		q.Add(router.IncludeExecutorMetadataQueryParam, includeExecutorMetadata)
+	}
+
 	u.RawQuery = q.Encode()
 	return u.String()
 }
 
-func accountKeysURL(t *testing.T, address string, height string) string {
+func accountKeysURL(
+	t *testing.T,
+	address string,
+	height string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
+) string {
 	u, err := url.ParseRequestURI(
 		fmt.Sprintf("/v1/accounts/%s/keys", address),
 	)
@@ -368,6 +368,16 @@ func accountKeysURL(t *testing.T, address string, height string) string {
 
 	if height != "" {
 		q.Add("block_height", height)
+	}
+
+	q.Add(router.AgreeingExecutorsCountQueryParam, agreeingExecutorsCount)
+
+	if len(requiredExecutors) > 0 {
+		q.Add(router.RequiredExecutorIdsQueryParam, strings.Join(requiredExecutors, ","))
+	}
+
+	if len(includeExecutorMetadata) > 0 {
+		q.Add(router.IncludeExecutorMetadataQueryParam, includeExecutorMetadata)
 	}
 
 	u.RawQuery = q.Encode()
@@ -379,10 +389,13 @@ func getAccountKeyByIndexRequest(
 	account *flow.Account,
 	index string,
 	height string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
 ) *http.Request {
 	req, err := http.NewRequest(
 		"GET",
-		accountKeyURL(t, account.Address.String(), index, height),
+		accountKeyURL(t, account.Address.String(), index, height, agreeingExecutorsCount, requiredExecutors, includeExecutorMetadata),
 		nil,
 	)
 	require.NoError(t, err)
@@ -394,10 +407,13 @@ func getAccountKeysRequest(
 	t *testing.T,
 	account *flow.Account,
 	height string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
 ) *http.Request {
 	req, err := http.NewRequest(
 		"GET",
-		accountKeysURL(t, account.Address.String(), height),
+		accountKeysURL(t, account.Address.String(), height, agreeingExecutorsCount, requiredExecutors, includeExecutorMetadata),
 		nil,
 	)
 	require.NoError(t, err)
@@ -405,47 +421,55 @@ func getAccountKeysRequest(
 	return req
 }
 
-func expectedAccountKeyResponse(account *flow.Account) string {
+func expectedAccountKeyResponse(account *flow.Account, metadata *accessmodel.ExecutorMetadata) string {
+	metadataSection := expectedMetadata(metadata)
+
 	return fmt.Sprintf(`
        {
-         "index":"0",
-         "public_key":"%s",
-         "signing_algorithm":"ECDSA_P256",
-         "hashing_algorithm":"SHA3_256",
-         "sequence_number":"0",
-         "weight":"1000",
-         "revoked":false
+         "index": "0",
+         "public_key": "%s",
+         "signing_algorithm": "ECDSA_P256",
+         "hashing_algorithm": "SHA3_256",
+         "sequence_number": "0",
+         "weight": "1000",
+         "revoked": false%s
        }`,
 		account.Keys[0].PublicKey.String(),
+		metadataSection,
 	)
 }
 
-func expectedAccountKeysResponse(account *flow.Account) string {
+// expectedAccountKeysResponse returns the expected JSON response string.
+// If metadata is provided, it includes metadata fields under each key.
+func expectedAccountKeysResponse(account *flow.Account, metadata *accessmodel.ExecutorMetadata) string {
+	metadataSection := expectedMetadata(metadata)
+
 	return fmt.Sprintf(`
-       {
-         "keys":[
-				  {
-					 "index":"0",
-					 "public_key":"%s",
-					 "signing_algorithm":"ECDSA_P256",
-					 "hashing_algorithm":"SHA3_256",
-					 "sequence_number":"0",
-					 "weight":"1000",
-					 "revoked":false
-				  },
-				  {
-					 "index":"1",
-					 "public_key":"%s",
-					 "signing_algorithm":"ECDSA_P256",
-					 "hashing_algorithm":"SHA3_256",
-					 "sequence_number":"0",
-					 "weight":"500",
-					 "revoked":false
-				  }
-			  ]
-       }`,
+	{
+		"keys": [
+			{
+				"index": "0",
+				"public_key": "%s",
+				"signing_algorithm": "ECDSA_P256",
+				"hashing_algorithm": "SHA3_256",
+				"sequence_number": "0",
+				"weight": "1000",
+				"revoked": false
+			},
+			{
+				"index": "1",
+				"public_key": "%s",
+				"signing_algorithm": "ECDSA_P256",
+				"hashing_algorithm": "SHA3_256",
+				"sequence_number": "0",
+				"weight": "500",
+				"revoked": false
+			}
+		]%s
+	}`,
 		account.Keys[0].PublicKey.String(),
 		account.Keys[1].PublicKey.String(),
+		metadataSection,
 	)
 }
 

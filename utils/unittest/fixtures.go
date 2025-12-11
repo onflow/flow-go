@@ -13,6 +13,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
@@ -39,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
@@ -1407,6 +1409,15 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
+// ExecutionResultInfo returns an ExecutionResultInfo object.
+func ExecutionResultInfo(executionNodeCount int) *optimistic_sync.ExecutionResultInfo {
+	executionNodes := IdentityListFixture(executionNodeCount, WithRole(flow.RoleExecution))
+	return &optimistic_sync.ExecutionResultInfo{
+		ExecutionResultID: IdentifierFixture(),
+		ExecutionNodes:    executionNodes.ToSkeleton(),
+	}
+}
+
 // DynamicIdentityEntryFixture returns the DynamicIdentityEntry object. The dynamic identity entry
 // can be customized (ie. set Ejected).
 func DynamicIdentityEntryFixture(opts ...func(*flow.DynamicIdentityEntry)) *flow.DynamicIdentityEntry {
@@ -1613,10 +1624,11 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	return tb
 }
 
-func TransactionBodyListFixture(n int) []flow.TransactionBody {
-	l := make([]flow.TransactionBody, n)
+func TransactionBodyListFixture(n int) []*flow.TransactionBody {
+	l := make([]*flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
-		l[i] = TransactionBodyFixture()
+		tx := TransactionBodyFixture()
+		l[i] = &tx
 	}
 
 	return l
@@ -3150,16 +3162,20 @@ func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers": auth,
-		"payload_signatures": []map[string]interface{}{{
-			"address":   tx.PayloadSignatures[0].Address.String(),
-			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
-			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
-		}},
-		"envelope_signatures": []map[string]interface{}{{
-			"address":   tx.EnvelopeSignatures[0].Address.String(),
-			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
-			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
-		}},
+		"payload_signatures": []map[string]interface{}{
+			{
+				"address":   tx.PayloadSignatures[0].Address.String(),
+				"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+				"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
+			},
+		},
+		"envelope_signatures": []map[string]interface{}{
+			{
+				"address":   tx.EnvelopeSignatures[0].Address.String(),
+				"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
+				"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
+			},
+		},
 	}
 }
 

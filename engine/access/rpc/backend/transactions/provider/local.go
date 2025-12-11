@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -72,9 +71,7 @@ func NewLocalTransactionProvider(
 //   - codes.Internal if event payload conversion failed.
 //   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
-//
-// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-// getter or when deriving transaction status.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResult(
 	ctx context.Context,
 	header *flow.Header,
@@ -108,12 +105,10 @@ func (t *LocalTransactionProvider) TransactionResult(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(header.Height, true)
+	txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(header.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		return nil, err
 	}
 
 	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, header.Height, transactionID)
@@ -147,9 +142,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 //   - codes.Internal when event payload conversion failed.
 //   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
-//
-// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-// getter or when deriving transaction status.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
 func (t *LocalTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
@@ -178,12 +171,10 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		return nil, err
 	}
 
 	events, err := t.eventsIndex.ByBlockIDTransactionIndex(blockID, block.Height, index)
@@ -287,12 +278,10 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to map tx to collection ID: %v", err)
 	}
 
-	txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return nil, rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
+		return nil, err
 	}
 
 	for _, txResult := range txResults {

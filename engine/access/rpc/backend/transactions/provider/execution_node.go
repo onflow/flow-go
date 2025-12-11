@@ -104,7 +104,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
 		// this is an executed transaction. If we can't derive transaction status something is very wrong.
 		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
@@ -203,7 +203,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
 		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 		return nil, err
@@ -259,7 +259,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
-	txStatus, err := e.txStatusDeriver.DeriveTransactionStatus(block.Height, true)
+	txStatus, err := e.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, true)
 	if err != nil {
 		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 		return nil, err

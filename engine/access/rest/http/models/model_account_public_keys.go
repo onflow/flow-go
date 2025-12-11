@@ -8,6 +8,11 @@
  */
 package models
 
+import (
+	"github.com/onflow/flow-go/engine/access/rest/common/models"
+)
+
 type AccountPublicKeys struct {
-	Keys []AccountPublicKey `json:"keys"`
+	Keys     []AccountPublicKey `json:"keys"`
+	Metadata *models.Metadata   `json:"metadata,omitempty"`
 }

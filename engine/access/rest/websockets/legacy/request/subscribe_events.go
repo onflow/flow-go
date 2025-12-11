@@ -57,8 +57,7 @@ func (g *SubscribeEvents) Parse(
 	rawContracts []string,
 	rawHeartbeatInterval string,
 ) error {
-	var startBlockID parser.ID
-	err := startBlockID.Parse(rawStartBlockID)
+	startBlockID, err := parser.NewID(rawStartBlockID)
 	if err != nil {
 		return err
 	}

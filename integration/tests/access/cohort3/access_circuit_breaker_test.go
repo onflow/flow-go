@@ -49,6 +49,18 @@ func (s *AccessCircuitBreakerSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
+// SetupTest initializes the test suite with a minimal network configuration for circuit breaker testing.
+//
+// Network Configuration:
+//   - 1 Access node with circuit breaker enabled (max-requests=1, max-failures=1, restore-timeout=6s, request-timeout=1.5s)
+//   - 1 Execution node (standard configuration)
+//   - 1 Verification node (ghost - lightweight, unused)
+//   - 1 Collection node (controllable, with 100ms proposal duration)
+//   - 3 Consensus nodes (ghosts - lightweight, unused)
+//
+// The access node is configured with aggressive circuit breaker settings to allow testing the breaker's
+// open/close behavior within a short test timeframe. The collection node can be disconnected to trigger
+// circuit breaker activation.
 func (s *AccessCircuitBreakerSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")

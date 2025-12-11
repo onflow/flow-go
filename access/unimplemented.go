@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // UnimplementedAPI provides an implementation of the access.API interface where all methods return
@@ -25,48 +26,90 @@ func NewUnimplementedAPI() *UnimplementedAPI {
 }
 
 // GetAccount returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
+func (u *UnimplementedAPI) GetAccount(
+	ctx context.Context,
+	address flow.Address,
+	criteria optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
 }
 
 // GetAccountAtLatestBlock returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccountAtLatestBlock not implemented")
+func (u *UnimplementedAPI) GetAccountAtLatestBlock(
+	ctx context.Context,
+	address flow.Address,
+	criteria optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetAccountAtLatestBlock not implemented")
 }
 
 // GetAccountAtBlockHeight returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccountAtBlockHeight not implemented")
+func (u *UnimplementedAPI) GetAccountAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (*flow.Account, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetAccountAtBlockHeight not implemented")
 }
 
 // GetAccountBalanceAtLatestBlock returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
-	return 0, status.Error(codes.Unimplemented, "method GetAccountBalanceAtLatestBlock not implemented")
+func (u *UnimplementedAPI) GetAccountBalanceAtLatestBlock(
+	ctx context.Context,
+	address flow.Address,
+	criteria optimistic_sync.Criteria,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
+	return 0, nil, status.Error(codes.Unimplemented, "method GetAccountBalanceAtLatestBlock not implemented")
 }
 
 // GetAccountBalanceAtBlockHeight returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
-	return 0, status.Error(codes.Unimplemented, "method GetAccountBalanceAtBlockHeight not implemented")
+func (u *UnimplementedAPI) GetAccountBalanceAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (uint64, *accessmodel.ExecutorMetadata, error) {
+	return 0, nil, status.Error(codes.Unimplemented, "method GetAccountBalanceAtBlockHeight not implemented")
 }
 
 // GetAccountKeyAtLatestBlock returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccountKeyAtLatestBlock not implemented")
+func (u *UnimplementedAPI) GetAccountKeyAtLatestBlock(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex uint32,
+	criteria optimistic_sync.Criteria,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetAccountKeyAtLatestBlock not implemented")
 }
 
 // GetAccountKeyAtBlockHeight returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccountKeyAtBlockHeight not implemented")
+func (u *UnimplementedAPI) GetAccountKeyAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex uint32,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) (*flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetAccountKeyAtBlockHeight not implemented")
 }
 
 // GetAccountKeysAtLatestBlock returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccountKeysAtLatestBlock not implemented")
+func (u *UnimplementedAPI) GetAccountKeysAtLatestBlock(
+	ctx context.Context,
+	address flow.Address,
+	criteria optimistic_sync.Criteria,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetAccountKeysAtLatestBlock not implemented")
 }
 
 // GetAccountKeysAtBlockHeight returns an unimplemented error.
-func (u *UnimplementedAPI) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccountKeysAtBlockHeight not implemented")
+func (u *UnimplementedAPI) GetAccountKeysAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	height uint64,
+	criteria optimistic_sync.Criteria,
+) ([]flow.AccountPublicKey, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetAccountKeysAtBlockHeight not implemented")
 }
 
 // GetEventsForHeightRange returns an unimplemented error.
@@ -76,8 +119,9 @@ func (u *UnimplementedAPI) GetEventsForHeightRange(
 	startHeight,
 	endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetEventsForHeightRange not implemented")
+	criteria optimistic_sync.Criteria,
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetEventsForHeightRange not implemented")
 }
 
 // GetEventsForBlockIDs returns an unimplemented error.
@@ -86,23 +130,41 @@ func (u *UnimplementedAPI) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetEventsForBlockIDs not implemented")
+	criteria optimistic_sync.Criteria,
+) ([]flow.BlockEvents, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetEventsForBlockIDs not implemented")
 }
 
 // ExecuteScriptAtLatestBlock returns an unimplemented error.
-func (u *UnimplementedAPI) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
-	return nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtLatestBlock not implemented")
+func (u *UnimplementedAPI) ExecuteScriptAtLatestBlock(
+	ctx context.Context,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtLatestBlock not implemented")
 }
 
 // ExecuteScriptAtBlockHeight returns an unimplemented error.
-func (u *UnimplementedAPI) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
-	return nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockHeight not implemented")
+func (u *UnimplementedAPI) ExecuteScriptAtBlockHeight(
+	ctx context.Context,
+	blockHeight uint64,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockHeight not implemented")
 }
 
 // ExecuteScriptAtBlockID returns an unimplemented error.
-func (u *UnimplementedAPI) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
-	return nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockID not implemented")
+func (u *UnimplementedAPI) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+	script []byte,
+	arguments [][]byte,
+	criteria optimistic_sync.Criteria,
+) ([]byte, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method ExecuteScriptAtBlockID not implemented")
 }
 
 // SendTransaction returns an unimplemented error.

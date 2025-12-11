@@ -46,6 +46,19 @@ func (s *AccessSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
+// SetupTest initializes the test suite with the simplest network configuration for testing basic Access API availability.
+//
+// Network Configuration:
+//   - 1 Access node
+//   - 2 Collection nodes
+//   - 3 Consensus nodes
+//   - 2 Execution nodes
+//   - 1 Verification node
+//   - NO Observer, NO Ghost nodes
+//
+// This is the simplest setup with no additional features enabled. It tests basic API
+// availability including HTTP proxy port connectivity, GRPC connection, and signer indices decoding.
+// This minimal configuration provides a baseline for verifying core access node functionality.
 func (s *AccessSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
