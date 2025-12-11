@@ -2194,12 +2194,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return builder.RpcEng, nil
 		}).
 		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			fifoStore, err := engine.NewFifoMessageStore(requester.DefaultEntityRequestCacheSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester store: %w", err)
+			}
 			requestEng, err := requester.New(
 				node.Logger.With().Str("entity", "collection").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
 				node.State,
+				fifoStore,
 				channels.RequestCollections,
 				filter.HasRole[flow.Identity](flow.RoleCollection),
 				func() flow.Entity { return new(flow.Collection) },
