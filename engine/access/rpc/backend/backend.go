@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
@@ -34,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
@@ -114,7 +114,8 @@ type Params struct {
 	EventsIndex                *index.EventsIndex
 	TxResultQueryMode          query_mode.IndexQueryMode
 	TxResultsIndex             *index.TransactionResultsIndex
-	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
+	CollectionIndexedHeight    storage.ConsumerProgress
+	LastFullBlockHeight        collection_sync.ProgressReader
 	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider

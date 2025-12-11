@@ -29,6 +29,11 @@ func (m *MockCollectionStore) ByID(id flow.Identifier) (*flow.Collection, error)
 	return c, nil
 }
 
+func (m *MockCollectionStore) ExistByID(id flow.Identifier) (bool, error) {
+	_, exists := m.byID[id]
+	return exists, nil
+}
+
 func (m *MockCollectionStore) Store(c *flow.Collection) (*flow.LightCollection, error) {
 	m.byID[c.ID()] = c
 	return c.Light(), nil

@@ -6,8 +6,6 @@ import (
 	context "context"
 
 	flow "github.com/onflow/flow-go/model/flow"
-	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -146,9 +144,9 @@ func (_m *ExecutionDataTracker) GetStartHeightFromLatest(_a0 context.Context) (u
 	return r0, r1
 }
 
-// OnExecutionData provides a mock function with given fields: _a0
-func (_m *ExecutionDataTracker) OnExecutionData(_a0 *execution_data.BlockExecutionDataEntity) {
-	_m.Called(_a0)
+// OnExecutionData provides a mock function with no fields
+func (_m *ExecutionDataTracker) OnExecutionData() {
+	_m.Called()
 }
 
 // NewExecutionDataTracker creates a new instance of ExecutionDataTracker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

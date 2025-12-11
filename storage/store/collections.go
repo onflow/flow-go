@@ -109,6 +109,14 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 	return &collection, nil
 }
 
+// ExistByID checks whether a collection with the given ID exists in storage.
+// Returns (true, nil) if it exists,
+// Returns (false, nil) if it does not exist.
+// No errors are expected during normal operation.
+func (c *Collections) ExistByID(colID flow.Identifier) (bool, error) {
+	return operation.CollectionExists(c.db.Reader(), colID)
+}
+
 // Remove removes a collection from the database, including all constituent transactions and
 // indices inserted by Store.
 // Remove does not error if the collection does not exist
@@ -179,11 +187,8 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 	light := collection.Light()
 	collectionID := light.ID()
 
-	err := operation.UpsertCollection(rw.Writer(), light)
-	if err != nil {
-		return nil, fmt.Errorf("could not insert collection: %w", err)
-	}
-
+	// First, check if all transactions are already indexed and consistent
+	someTransactionIndexed := false
 	for _, txID := range light.Transactions {
 		var differentColTxIsIn flow.Identifier
 		// The following is not BFT, because we can't handle the case where a transaction is included
@@ -209,6 +214,20 @@ func (c *Collections) BatchStoreAndIndexByTransaction(lctx lockctx.Proof, collec
 		if err != nil {
 			return nil, fmt.Errorf("could not insert transaction ID: %w", err)
 		}
+		someTransactionIndexed = true
+	}
+
+	if !someTransactionIndexed {
+		// All transactions are already indexed and point to this collection.
+		// Since the index is always added along with the collection and transactions,
+		// this means the collection and its transactions have already been stored.
+		// Abort early to avoid redundant database writes.
+		return light, nil
+	}
+
+	err := operation.UpsertCollection(rw.Writer(), light)
+	if err != nil {
+		return nil, fmt.Errorf("could not insert collection: %w", err)
 	}
 
 	// Store individual transactions
