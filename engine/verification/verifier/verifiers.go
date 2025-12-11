@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/initialize"
+	chunks2 "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification/convert"
 	"github.com/onflow/flow-go/module"
@@ -451,7 +452,10 @@ func verifyHeight(
 				)
 			} else {
 
-				if reCompareBlockWithRemoteDebugger(accessAddress, blockID, header, chain) {
+				var cfMissingRegisterTouchErr *chunks2.CFMissingRegisterTouch
+				if errors.As(err, &cfMissingRegisterTouchErr) &&
+					reCompareBlockWithRemoteDebugger(accessAddress, blockID, header, chain) {
+
 					log.Info().Msgf(
 						"verification of chunk failed, but re-comparison with remote debugger succeeded "+
 							"(index: %v, ID: %v) at block %v (%v)",
