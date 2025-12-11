@@ -22,6 +22,7 @@ endif
 IMAGE_TAG_NO_ADX := $(IMAGE_TAG)-without-adx
 IMAGE_TAG_NO_NETGO_NO_ADX := $(IMAGE_TAG)-without-netgo-without-adx
 IMAGE_TAG_ARM := $(IMAGE_TAG)-arm
+IMAGE_TAG_CADENCE_VM := $(IMAGE_TAG)-cadence-vm
 
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
@@ -358,6 +359,13 @@ docker-build-execution-with-adx:
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG)" \
 		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-execution-cadence-vm
+docker-build-execution-cadence-vm:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT) --build-arg CADENCE_VM_TAG=cadence_vm --build-arg VERSION=$(IMAGE_TAG_CADENCE_VM) --build-arg GOARCH=amd64 --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_CADENCE_VM)" \
+		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_CADENCE_VM)" .
+
 .PHONY: docker-build-execution-without-adx
 docker-build-execution-without-adx:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT) --build-arg CADENCE_VM_TAG=$(CADENCE_VM_TAG) --build-arg VERSION=$(IMAGE_TAG_NO_ADX) --build-arg GOARCH=amd64 --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
@@ -663,6 +671,10 @@ docker-push-consensus-latest: docker-push-consensus
 .PHONY: docker-push-execution-with-adx
 docker-push-execution-with-adx:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)"
+
+.PHONY: docker-push-execution-cadence-vm
+docker-push-execution-cadence-vm:
+	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_CADENCE_VM)"
 
 .PHONY: docker-push-execution-corrupt
 docker-push-execution-corrupt:

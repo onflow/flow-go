@@ -58,6 +58,7 @@ jobs:
           - docker-build-execution-without-adx docker-push-execution-without-adx 
           - docker-build-execution-without-netgo-without-adx docker-push-execution-without-netgo-without-adx 
           - docker-cross-build-execution-arm docker-push-execution-arm 
+          - docker-build-execution-cadence-vm docker-push-execution-cadence-vm
 
           # observer Build Commands
           - docker-build-observer-with-adx docker-push-observer-with-adx 
