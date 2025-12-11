@@ -11,13 +11,16 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	compare_cadence_vm "github.com/onflow/flow-go/cmd/util/cmd/compare-cadence-vm"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/initialize"
+	chunks2 "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification/convert"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
@@ -25,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils/debug"
 )
 
 // VerifyLastKHeight verifies the last k sealed blocks by verifying all chunks in the results.
@@ -41,7 +45,11 @@ func VerifyLastKHeight(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledTransactionsEnabled bool,
-) (err error) {
+	accessAddress string,
+) (
+	totalStats BlockVerificationStats,
+	err error,
+) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
 		lockManager,
 		chainID,
@@ -51,7 +59,7 @@ func VerifyLastKHeight(
 		scheduledTransactionsEnabled,
 	)
 	if err != nil {
-		return fmt.Errorf("could not init storages: %w", err)
+		return BlockVerificationStats{}, fmt.Errorf("could not init storages: %w", err)
 	}
 	defer func() {
 		closerErr := closer()
@@ -62,14 +70,18 @@ func VerifyLastKHeight(
 
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
-		return fmt.Errorf("could not get last sealed height: %w", err)
+		return BlockVerificationStats{}, fmt.Errorf("could not get last sealed height: %w", err)
 	}
 
 	root := state.Params().SealedRoot().Height
 
 	// preventing overflow
 	if k > lastSealed.Height+1 {
-		return fmt.Errorf("k is greater than the number of sealed blocks, k: %d, last sealed height: %d", k, lastSealed.Height)
+		return BlockVerificationStats{}, fmt.Errorf(
+			"k is greater than the number of sealed blocks, k: %d, last sealed height: %d",
+			k,
+			lastSealed.Height,
+		)
 	}
 
 	from := lastSealed.Height - k + 1
@@ -85,12 +97,24 @@ func VerifyLastKHeight(
 
 	log.Info().Msgf("verifying blocks from %d to %d", from, to)
 
-	err = verifyConcurrently(from, to, nWorker, stopOnMismatch, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
+	totalStats, err = verifyConcurrently(
+		from,
+		to,
+		nWorker,
+		stopOnMismatch,
+		storages.Headers,
+		chunkDataPacks,
+		storages.Results,
+		state,
+		verifier,
+		verifyHeight,
+		accessAddress,
+	)
 	if err != nil {
-		return err
+		return BlockVerificationStats{}, err
 	}
 
-	return nil
+	return totalStats, nil
 }
 
 // VerifyRange verifies all chunks in the results of the blocks in the given range.
@@ -105,7 +129,11 @@ func VerifyRange(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledTransactionsEnabled bool,
-) (err error) {
+	accessAddress string,
+) (
+	totalStats BlockVerificationStats,
+	err error,
+) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(
 		lockManager,
 		chainID,
@@ -115,7 +143,7 @@ func VerifyRange(
 		scheduledTransactionsEnabled,
 	)
 	if err != nil {
-		return fmt.Errorf("could not init storages: %w", err)
+		return BlockVerificationStats{}, fmt.Errorf("could not init storages: %w", err)
 	}
 	defer func() {
 		closerErr := closer()
@@ -129,15 +157,31 @@ func VerifyRange(
 	root := state.Params().SealedRoot().Height
 
 	if from <= root {
-		return fmt.Errorf("cannot verify blocks before the root block, from: %d, root: %d", from, root)
+		return BlockVerificationStats{}, fmt.Errorf(
+			"cannot verify blocks before the root block, from: %d, root: %d",
+			from,
+			root,
+		)
 	}
 
-	err = verifyConcurrently(from, to, nWorker, stopOnMismatch, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
+	totalStats, err = verifyConcurrently(
+		from,
+		to,
+		nWorker,
+		stopOnMismatch,
+		storages.Headers,
+		chunkDataPacks,
+		storages.Results,
+		state,
+		verifier,
+		verifyHeight,
+		accessAddress,
+	)
 	if err != nil {
-		return err
+		return BlockVerificationStats{}, err
 	}
 
-	return nil
+	return totalStats, nil
 }
 
 func verifyConcurrently(
@@ -149,17 +193,31 @@ func verifyConcurrently(
 	results storage.ExecutionResults,
 	state protocol.State,
 	verifier module.ChunkVerifier,
-	verifyHeight func(uint64, storage.Headers, storage.ChunkDataPacks, storage.ExecutionResults, protocol.State, module.ChunkVerifier, bool) error,
-) error {
+	verifyHeight func(
+	height uint64,
+	headers storage.Headers,
+	chunkDataPacks storage.ChunkDataPacks,
+	results storage.ExecutionResults,
+	state protocol.State,
+	verifier module.ChunkVerifier,
+	stopOnMismatch bool,
+	accessAddress string,
+) (BlockVerificationStats, error),
+	accessAddress string,
+) (BlockVerificationStats, error) {
+
 	tasks := make(chan uint64, int(nWorker))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // Ensure cancel is called to release resources
 
-	var lowestErr error
-	var lowestErrHeight = ^uint64(0) // Initialize to max value of uint64
-	var mu sync.Mutex                // To protect access to lowestErr and lowestErrHeight
+	var (
+		lowestErr       error
+		lowestErrHeight = ^uint64(0) // Initialize to max value of uint64
+		totalStats      BlockVerificationStats
+		mu              sync.Mutex // To protect access to variables above and blocksStats
+	)
 
-	lg := util.LogProgress(
+	logProgress := util.LogProgress(
 		log.Logger,
 		util.DefaultLogProgressConfig(
 			fmt.Sprintf("verifying heights progress for [%v:%v]", from, to),
@@ -177,8 +235,27 @@ func verifyConcurrently(
 				if !ok {
 					return // Exit if the tasks channel is closed
 				}
+
 				log.Info().Uint64("height", height).Msg("verifying height")
-				err := verifyHeight(height, headers, chunkDataPacks, results, state, verifier, stopOnMismatch)
+
+				blockStats, err := verifyHeight(
+					height,
+					headers,
+					chunkDataPacks,
+					results,
+					state,
+					verifier,
+					stopOnMismatch,
+					accessAddress,
+				)
+
+				mu.Lock()
+
+				totalStats.MatchedChunkCount += blockStats.MatchedChunkCount
+				totalStats.MismatchedChunkCount += blockStats.MismatchedChunkCount
+				totalStats.MatchedTransactionCount += blockStats.MatchedTransactionCount
+				totalStats.MismatchedTransactionCount += blockStats.MismatchedTransactionCount
+
 				if err != nil {
 					log.Error().Uint64("height", height).Err(err).Msg("error encountered while verifying height")
 
@@ -186,18 +263,18 @@ func verifyConcurrently(
 					// error, so we need to first cancel the context to stop worker from processing further tasks
 					// and wait until all workers are done, which will ensure all the heights before this height
 					// that had error are processed. Then we can safely update the lowestErr and lowestErrHeight
-					mu.Lock()
 					if height < lowestErrHeight {
 						lowestErr = err
 						lowestErrHeight = height
 						cancel() // Cancel context to stop further task dispatch
 					}
-					mu.Unlock()
 				} else {
 					log.Info().Uint64("height", height).Msg("verified height successfully")
 				}
 
-				lg(1) // log progress
+				mu.Unlock()
+
+				logProgress(1)
 			}
 		}
 	}
@@ -230,10 +307,10 @@ func verifyConcurrently(
 	// Check if there was an error
 	if lowestErr != nil {
 		log.Error().Uint64("height", lowestErrHeight).Err(lowestErr).Msg("error encountered while verifying height")
-		return fmt.Errorf("could not verify height %d: %w", lowestErrHeight, lowestErr)
+		return BlockVerificationStats{}, fmt.Errorf("could not verify height %d: %w", lowestErrHeight, lowestErr)
 	}
 
-	return nil
+	return totalStats, nil
 }
 
 func initStorages(
@@ -295,6 +372,13 @@ func initStorages(
 	return closer, storages, chunkDataPacks, state, verifier, nil
 }
 
+type BlockVerificationStats struct {
+	MatchedChunkCount          uint64
+	MismatchedChunkCount       uint64
+	MatchedTransactionCount    uint64
+	MismatchedTransactionCount uint64
+}
+
 // verifyHeight verifies all chunks in the results of the block at the given height.
 // Note: it returns nil if the block is not executed.
 func verifyHeight(
@@ -305,35 +389,43 @@ func verifyHeight(
 	state protocol.State,
 	verifier module.ChunkVerifier,
 	stopOnMismatch bool,
-) error {
+	accessAddress string,
+) (
+	stats BlockVerificationStats,
+	err error,
+) {
 	header, err := headers.ByHeight(height)
 	if err != nil {
-		return fmt.Errorf("could not get block header by height %d: %w", height, err)
+		return BlockVerificationStats{}, fmt.Errorf("could not get block header by height %d: %w", height, err)
 	}
 
 	blockID := header.ID()
+
+	chain := header.ChainID.Chain()
 
 	result, err := results.ByBlockID(blockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			log.Warn().Uint64("height", height).Hex("block_id", blockID[:]).Msg("execution result not found")
-			return nil
+			return BlockVerificationStats{}, nil
 		}
 
-		return fmt.Errorf("could not get execution result by block ID %s: %w", blockID, err)
+		return BlockVerificationStats{}, fmt.Errorf("could not get execution result by block ID %s: %w", blockID, err)
 	}
 	snapshot := state.AtBlockID(blockID)
 
 	for i, chunk := range result.Chunks {
 		chunkDataPack, err := chunkDataPacks.ByChunkID(chunk.ID())
 		if err != nil {
-			return fmt.Errorf("could not get chunk data pack by chunk ID %s: %w", chunk.ID(), err)
+			return BlockVerificationStats{}, fmt.Errorf("could not get chunk data pack by chunk ID %s: %w", chunk.ID(), err)
 		}
 
 		vcd, err := convert.FromChunkDataPack(chunk, chunkDataPack, header, snapshot, result)
 		if err != nil {
-			return err
+			return BlockVerificationStats{}, fmt.Errorf("could not convert chunk with ID %s to verifiable chunk data: %w", chunk.ID(), err)
 		}
+
+		chunkTransactionCount := vcd.Chunk.NumberOfTransactions
 
 		_, err = verifier.Verify(vcd)
 		if err != nil {
@@ -343,13 +435,92 @@ func verifyHeight(
 			}
 
 			if stopOnMismatch {
-				return fmt.Errorf("could not verify chunk (index: %v, ID: %v) at block %v (%v): %w", i, collectionID, height, blockID, err)
+				return BlockVerificationStats{}, fmt.Errorf(
+					"could not verify chunk (index: %v, ID: %v) at block %v (%v): %w",
+					i,
+					collectionID,
+					height,
+					blockID,
+					err,
+				)
 			}
 
-			log.Error().Err(err).Msgf("could not verify chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
+			if vcd.IsSystemChunk {
+				log.Warn().Err(err).Msgf(
+					"could not verify system chunk (index: %v, ID: %v) at block %v (%v)",
+					i, collectionID, height, blockID,
+				)
+			} else {
+
+				var cfMissingRegisterTouchErr *chunks2.CFMissingRegisterTouch
+				if errors.As(err, &cfMissingRegisterTouchErr) &&
+					reCompareBlockWithRemoteDebugger(accessAddress, blockID, header, chain) {
+
+					log.Info().Msgf(
+						"verification of chunk failed, but re-comparison with remote debugger succeeded "+
+							"(index: %v, ID: %v) at block %v (%v)",
+						i, collectionID, height, blockID,
+					)
+
+					stats.MatchedChunkCount++
+					stats.MatchedTransactionCount += chunkTransactionCount
+
+					continue
+				}
+
+				log.Error().Err(err).Msgf(
+					"could not verify chunk (index: %v, ID: %v) at block %v (%v)",
+					i, collectionID, height, blockID,
+				)
+			}
+
+			stats.MismatchedChunkCount++
+			stats.MismatchedTransactionCount += chunkTransactionCount
+		} else {
+			log.Info().Msgf("verified chunk (index: %v) at block %v (%v) successfully", i, height, blockID)
+
+			stats.MatchedChunkCount++
+			stats.MatchedTransactionCount += chunkTransactionCount
 		}
 	}
-	return nil
+	return stats, nil
+}
+
+func reCompareBlockWithRemoteDebugger(
+	accessAddress string,
+	blockID flow.Identifier,
+	header *flow.Header,
+	chain flow.Chain,
+) bool {
+
+	remoteClient, err := debug.NewExecutionDataRemoteClient(accessAddress, chain)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create execution data remote client")
+		return false
+	}
+	defer remoteClient.Close()
+
+	config, err := grpcclient.NewFlowClientConfig(accessAddress, "", flow.ZeroID, true)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create Flow client config")
+		return false
+	}
+
+	flowClient, err := grpcclient.FlowClient(config)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create Flow client")
+		return false
+	}
+	defer flowClient.Close()
+
+	result := compare_cadence_vm.CompareBlock(
+		blockID,
+		header,
+		remoteClient,
+		flowClient,
+		chain,
+	)
+	return result.Mismatches == 0
 }
 
 func makeVerifier(
