@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -25,6 +26,7 @@ type ExecutionResultInfoProviderSuite struct {
 	log      zerolog.Logger
 
 	receipts *storagemock.ExecutionReceipts
+	headers  *storagemock.Headers
 
 	rootBlock       *flow.Block
 	rootBlockResult *flow.ExecutionResult
@@ -42,7 +44,7 @@ func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	suite.snapshot = protocol.NewSnapshot(t)
 	suite.params = protocol.NewParams(t)
 	suite.receipts = storagemock.NewExecutionReceipts(t)
-
+	suite.headers = storagemock.NewHeaders(t)
 	suite.rootBlock = unittest.BlockFixture()
 	rootBlockID := suite.rootBlock.ID()
 	suite.rootBlockResult = unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(rootBlockID))
@@ -51,7 +53,6 @@ func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	suite.state.On("SealedResult", rootBlockID).Return(flow.ExecutionReceiptList{}).Maybe()
 	suite.params.On("SporkRootBlock").Return(suite.rootBlock)
 	suite.state.On("Params").Return(suite.params)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
 }
 
@@ -63,6 +64,7 @@ func (suite *ExecutionResultInfoProviderSuite) createProvider(
 		suite.log,
 		suite.state,
 		suite.receipts,
+		suite.headers,
 		NewExecutionNodeSelector(preferredExecutors, operatorCriteria.RequiredExecutors),
 		operatorCriteria,
 	)
@@ -75,7 +77,7 @@ func (suite *ExecutionResultInfoProviderSuite) setupIdentitiesMock(allExecutionN
 			return allExecutionNodes.Filter(filter)
 		},
 		func(flow.IdentityFilter[flow.Identity]) error { return nil },
-	)
+	).Once()
 }
 
 // TestExecutionResultQuery tests the main ExecutionResult function with various scenarios.
@@ -104,7 +106,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				receipts[i] = r
 			}
 
-			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			// Require specific executors (first two nodes)
@@ -148,8 +150,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				receipts[i] = r
 			}
 
-			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 			suite.setupIdentitiesMock(allExecutionNodes)
+			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
 
 			query, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
@@ -178,16 +180,18 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 
 			// Set up a separate mock call for this specific block
 			suite.receipts.On("ByBlockID", insufficientBlock.ID()).Return(receipts, nil).Once()
+			suite.headers.On("ByBlockID", insufficientBlock.ID()).Return(insufficientBlock.ToHeader(), nil).Once()
+			suite.headers.On("BlockIDByHeight", insufficientBlock.Height).Return(flow.ZeroID, storage.ErrNotFound).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
-			_, err := provider.ExecutionResultInfo(
+			result, err := provider.ExecutionResultInfo(
 				insufficientBlock.ID(), optimistic_sync.Criteria{
 					AgreeingExecutorsCount: 2,
 					RequiredExecutors:      allExecutionNodes[0:1].NodeIDs(),
 				},
 			)
 			suite.Require().Error(err)
-
+			suite.Require().Nil(result)
 			suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
 		},
 	)
@@ -198,37 +202,102 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 			receipts := make(flow.ExecutionReceiptList, totalReceipts)
 			for i := 0; i < totalReceipts; i++ {
 				r := unittest.ReceiptForBlockFixture(block)
-				r.ExecutorID = allExecutionNodes[i].NodeID
+				r.ExecutorID = allExecutionNodes[0].NodeID
 				r.ExecutionResult = *executionResult
 				receipts[i] = r
 			}
 
-			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
+			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
+			suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
+			suite.headers.On("BlockIDByHeight", block.Height).Return(flow.ZeroID, storage.ErrNotFound).Once()
 			suite.setupIdentitiesMock(allExecutionNodes)
 
 			// Require executors that didn't produce any receipts
-			_, err := provider.ExecutionResultInfo(
+			result, err := provider.ExecutionResultInfo(
 				block.ID(), optimistic_sync.Criteria{
-					RequiredExecutors: unittest.IdentityListFixture(
-						2,
-						unittest.WithRole(flow.RoleExecution),
-					).NodeIDs(),
+					RequiredExecutors: allExecutionNodes[1:2].NodeIDs(),
 				},
 			)
 			suite.Require().Error(err)
-
+			suite.Require().Nil(result)
 			suite.Assert().True(common.IsInsufficientExecutionReceipts(err))
 		},
 	)
+
+	suite.Run("agreeing executors count is greater than available executors count returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		suite.setupIdentitiesMock(allExecutionNodes)
+		requiredExecutors := allExecutionNodes.NodeIDs()
+
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: uint(len(allExecutionNodes) + 1),
+				RequiredExecutors:      requiredExecutors,
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsAgreeingExecutorsCountExceededError(err))
+	})
+
+	suite.Run("unknown required executor returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		suite.setupIdentitiesMock(allExecutionNodes)
+
+		unknownExecutorID := unittest.IdentifierFixture()
+		requiredExecutors := allExecutionNodes[0:1].NodeIDs()
+		requiredExecutors = append(requiredExecutors, unknownExecutorID)
+
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: 2,
+				RequiredExecutors:      requiredExecutors,
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsUnknownRequiredExecutorError(err))
+	})
+
+	suite.Run("criteria not met returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		receipts := make(flow.ExecutionReceiptList, totalReceipts)
+		for i := 0; i < totalReceipts; i++ {
+			r := unittest.ReceiptForBlockFixture(block)
+			r.ExecutorID = allExecutionNodes[0].NodeID
+			r.ExecutionResult = *executionResult
+			receipts[i] = r
+		}
+		suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
+		suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
+		suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
+		suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+		suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+		suite.setupIdentitiesMock(allExecutionNodes)
+
+		// Require all executors, but only one produces receipts
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: 1,
+				RequiredExecutors:      allExecutionNodes[1:2].NodeIDs(),
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsCriteriaNotMetError(err))
+	})
 }
 
 // TestRootBlockHandling tests the special case handling for root blocks.
 func (suite *ExecutionResultInfoProviderSuite) TestRootBlockHandling() {
 	allExecutionNodes := unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleExecution))
-	suite.setupIdentitiesMock(allExecutionNodes)
 
 	suite.Run(
 		"root block returns execution nodes without execution result", func() {
+			suite.setupIdentitiesMock(allExecutionNodes)
 			provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 
 			query, err := provider.ExecutionResultInfo(
@@ -245,6 +314,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestRootBlockHandling() {
 
 	suite.Run(
 		"root block with required executors", func() {
+			suite.setupIdentitiesMock(allExecutionNodes)
 			provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 
 			requiredExecutors := allExecutionNodes[0:2].NodeIDs()
@@ -279,10 +349,11 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 	}
 
 	suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-	suite.setupIdentitiesMock(allExecutionNodes)
 
 	suite.Run(
 		"with default optimistic_sync.Criteria", func() {
+			suite.setupIdentitiesMock(allExecutionNodes)
+
 			provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 
 			// optimistic_sync.Criteria are empty to use operator defaults
@@ -299,6 +370,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 	suite.Run(
 		"with operator preferred executors", func() {
+			suite.setupIdentitiesMock(allExecutionNodes)
+
 			provider := suite.createProvider(
 				allExecutionNodes[1:5].NodeIDs(),
 				optimistic_sync.Criteria{},
@@ -319,6 +392,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 	suite.Run(
 		"with operator required executors", func() {
+			suite.setupIdentitiesMock(allExecutionNodes)
+
 			provider := suite.createProvider(
 				flow.IdentifierList{}, optimistic_sync.Criteria{
 					RequiredExecutors: allExecutionNodes[5:8].NodeIDs(),
@@ -340,6 +415,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 	suite.Run(
 		"with both: operator preferred & required executors", func() {
+			suite.setupIdentitiesMock(allExecutionNodes)
+
 			provider := suite.createProvider(
 				allExecutionNodes[0:1].NodeIDs(), optimistic_sync.Criteria{
 					RequiredExecutors: allExecutionNodes[3:6].NodeIDs(),
@@ -364,6 +441,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 	suite.Run(
 		"with client preferred executors", func() {
+			suite.setupIdentitiesMock(allExecutionNodes)
+
 			provider := suite.createProvider(
 				allExecutionNodes[0:1].NodeIDs(), optimistic_sync.Criteria{
 					RequiredExecutors: allExecutionNodes[2:4].NodeIDs(),
