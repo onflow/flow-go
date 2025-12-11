@@ -135,7 +135,7 @@ func (e *Provider) ExecutionResultInfo(
 }
 
 // isBlockSealed reports whether the given block is sealed.
-// It returns (true, nil) if the block is sealed if, It returns (false, nil) if the block is not sealed.
+// It returns (true, nil) if the block is sealed, and (false, nil) if it is not sealed.
 //
 // No errors are expected during normal operation.
 func (e *Provider) isBlockSealed(blockID flow.Identifier) (bool, error) {
