@@ -267,25 +267,21 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 	}
 }
 
-// EntityByID adds an entity to the list of entities to be requested from the
-// provider. It is idempotent, meaning that adding the same entity to the
-// requester engine multiple times has no effect, unless the item has
-// expired due to too many requests and has thus been deleted from the
-// list. The provided selector will be applied to the set of valid providers on top
-// of the global selector injected upon construction. It allows for finer-grained
-// control over which subset of providers to request a given entity from, such as
-// selection of a collection cluster. Use `filter.Any` if no additional selection
-// is required. Checks integrity of response to make sure that we got entity that we were requesting.
+// EntityByID will enqueue the given entity for request by its ID (content hash).
+// The selector will be applied to the subset of valid providers configured globally for the Requester instance.
+// This allows finer-grained control over which providers to request from on a per-entity basis.
+// Use `filter.Any` if no additional restrictions are required.
+// Received entities will be verified for integrity using their ID function.
 func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(entityID, selector, true)
 }
 
-// Query will request data through the request engine backing the interface.
-// The additional selector will be applied to the subset
-// of valid providers for the data and allows finer-grained control
-// over which providers to request data from. Doesn't perform integrity check
-// can be used to get entities without knowing their ID.
-func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
+// EntityBySecondaryKey will enqueue the given entity for request by some secondary identifier (NOT its content hash).
+// The selector will be applied to the subset of valid providers configured globally for the Requester instance.
+// This allows finer-grained control over which providers to request from on a per-entity basis.
+// Use `filter.Any` if no additional restrictions are required.
+// Received entities WILL NOT be verified for integrity using their ID function.
+func (e *Engine) EntityBySecondaryKey(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(key, selector, false)
 }
 
