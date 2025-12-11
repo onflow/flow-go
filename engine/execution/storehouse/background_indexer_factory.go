@@ -52,7 +52,36 @@ func LoadRegisterStore(
 		log.Info().Msg("register store disabled")
 		return nil, nil, nil
 	}
+	return loadRegisterStore(
+		log,
+		state,
+		headers,
+		protocolEvents,
+		lastFinalizedHeight,
+		collector,
+		registerDir,
+		triedir,
+		importCheckpointWorkerCount,
+		importFunc,
+	)
+}
 
+func loadRegisterStore(
+	log zerolog.Logger,
+	state protocol.State,
+	headers storageerr.Headers,
+	protocolEvents *events.Distributor,
+	lastFinalizedHeight uint64,
+	collector module.ExecutionMetrics,
+	registerDir string,
+	triedir string,
+	importCheckpointWorkerCount int,
+	importFunc ImportRegistersFromCheckpoint,
+) (
+	*RegisterStore,
+	io.Closer,
+	error,
+) {
 	log.Info().
 		Str("pebble_db_path", registerDir).
 		Msg("register store enabled")
@@ -119,7 +148,6 @@ func LoadRegisterStore(
 }
 
 // LoadBackgroundIndexerEngine creates and initializes a BackgroundIndexerEngine.
-// It returns nil if background indexing is disabled or if storehouse is enabled.
 func LoadBackgroundIndexerEngine(
 	log zerolog.Logger,
 	enableStorehouse bool,
@@ -137,38 +165,37 @@ func LoadBackgroundIndexerEngine(
 	resultsReader storageerr.ExecutionResultsReader,
 	blockExecutedNotifier BlockExecutedNotifier, // optional: notifier for block executed events
 	followerDistributor *pubsub.FollowerDistributor,
-) (*BackgroundIndexerEngine, error) {
+) (*BackgroundIndexerEngine, bool, error) {
 	// Only create background indexer engine if storehouse is not enabled
 	// and background indexing is enabled
 	if enableStorehouse {
-		log.Info().Msg("background indexer engine disabled (storehouse enabled)")
-		return nil, nil
+		log.Info().Msg("background indexer engine disabled, since storehouse is enabled")
+		return nil, false, nil
 	}
 
 	if !enableBackgroundStorehouseIndexing {
-		log.Info().Msg("background indexer engine disabled")
-		return nil, nil
+		log.Info().Msg("background indexer engine disabled, since --enableBackgroundStorehouseIndexing==false")
+		return nil, false, nil
 	}
 
 	// Check that required dependencies are available
 	if executionDataStore == nil {
-		return nil, fmt.Errorf("execution data store is not initialized")
+		return nil, false, fmt.Errorf("execution data store is not initialized")
 	}
 	if resultsReader == nil {
-		return nil, fmt.Errorf("execution results reader is not initialized")
+		return nil, false, fmt.Errorf("execution results reader is not initialized")
 	}
 
 	// Create bootstrapper function that will load the register store and create the background indexer
 	bootstrapper := func(ctx context.Context) (*BackgroundIndexer, io.Closer, error) {
 		// Load register store for background indexing
-		registerStore, closer, err := LoadRegisterStore(
+		registerStore, closer, err := loadRegisterStore(
 			log,
 			state,
 			headers,
 			protocolEvents,
 			lastFinalizedHeight,
 			collector,
-			true, // enableStorehouse - always true for background indexing
 			registerDir,
 			triedir,
 			importCheckpointWorkerCount,
@@ -208,7 +235,7 @@ func LoadBackgroundIndexerEngine(
 		followerDistributor,
 	)
 
-	return backgroundIndexerEngine, nil
+	return backgroundIndexerEngine, true, nil
 }
 
 type pebbleDBCloser struct {

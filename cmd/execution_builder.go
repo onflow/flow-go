@@ -1357,7 +1357,7 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 	error,
 ) {
 	logger := node.Logger.With().Str("component", "background_indexer_engine").Logger()
-	engine, err := storehouse.LoadBackgroundIndexerEngine(
+	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		logger,
 		exeNode.exeConf.enableStorehouse,
 		exeNode.exeConf.enableBackgroundStorehouseIndexing,
@@ -1379,7 +1379,7 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 		return nil, err
 	}
 
-	if engine == nil {
+	if !created {
 		return &module.NoopReadyDoneAware{}, nil
 	}
 
