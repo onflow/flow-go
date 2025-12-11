@@ -299,12 +299,12 @@ func (e *Engine) addEntityRequest(queryKey flow.Identifier, selector flow.Identi
 
 	// otherwise, add a new item to the list
 	item := &Item{
-		QueryKey:              queryKey,
-		NumAttempts:           0,
-		LastRequested:         time.Time{},
-		RetryAfter:            e.cfg.RetryInitial,
-		ExtraSelector:         selector,
-		queryKeyIsContentHash: queryKeyIsContentHash,
+		EntityID:           queryKey,
+		NumAttempts:        0,
+		LastRequested:      time.Time{},
+		RetryAfter:         e.cfg.RetryInitial,
+		ExtraSelector:      selector,
+		queryByContentHash: queryKeyIsContentHash,
 	}
 	e.items[queryKey] = item
 }
@@ -599,7 +599,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 			return engine.NewInvalidInputErrorf("could not decode entity: %s", err.Error())
 		}
 
-		if item.queryKeyIsContentHash {
+		if item.queryByContentHash {
 			actualEntityID := entity.ID()
 			// validate that we got correct entity, exactly what we were expecting
 			if entityID != actualEntityID {

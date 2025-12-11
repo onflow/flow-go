@@ -14,13 +14,13 @@ type backendExecutionResults struct {
 }
 
 func (b *backendExecutionResults) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	// EntityBySecondaryKey seal by blockID
+	// Query seal by blockID
 	seal, err := b.seals.FinalizedSealForBlock(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	// EntityBySecondaryKey result by seal.ResultID
+	// Query result by seal.ResultID
 	result, err := b.executionResults.ByID(seal.ResultID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
