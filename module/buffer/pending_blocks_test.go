@@ -14,7 +14,7 @@ import (
 
 type PendingBlocksSuite struct {
 	suite.Suite
-	buffer *GenericPendingBlocks[*flow.Proposal]
+	buffer *GenericPendingBlocks[flow.Payload]
 }
 
 func TestPendingBlocksSuite(t *testing.T) {

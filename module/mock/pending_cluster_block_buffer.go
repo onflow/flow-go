@@ -15,7 +15,7 @@ type PendingClusterBlockBuffer struct {
 }
 
 // Add provides a mock function with given fields: block
-func (_m *PendingClusterBlockBuffer) Add(block flow.Slashable[*cluster.Proposal]) error {
+func (_m *PendingClusterBlockBuffer) Add(block flow.Slashable[*flow.GenericProposal[cluster.Payload]]) error {
 	ret := _m.Called(block)
 
 	if len(ret) == 0 {
@@ -23,7 +23,7 @@ func (_m *PendingClusterBlockBuffer) Add(block flow.Slashable[*cluster.Proposal]
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Slashable[*cluster.Proposal]) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Slashable[*flow.GenericProposal[cluster.Payload]]) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)
@@ -33,22 +33,22 @@ func (_m *PendingClusterBlockBuffer) Add(block flow.Slashable[*cluster.Proposal]
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *PendingClusterBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool) {
+func (_m *PendingClusterBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashable[*flow.GenericProposal[cluster.Payload]], bool) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
 	}
 
-	var r0 flow.Slashable[*cluster.Proposal]
+	var r0 flow.Slashable[*flow.GenericProposal[cluster.Payload]]
 	var r1 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.Slashable[*cluster.Proposal], bool)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.Slashable[*flow.GenericProposal[cluster.Payload]], bool)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[*cluster.Proposal]); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Slashable[*flow.GenericProposal[cluster.Payload]]); ok {
 		r0 = rf(blockID)
 	} else {
-		r0 = ret.Get(0).(flow.Slashable[*cluster.Proposal])
+		r0 = ret.Get(0).(flow.Slashable[*flow.GenericProposal[cluster.Payload]])
 	}
 
 	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
@@ -61,23 +61,23 @@ func (_m *PendingClusterBlockBuffer) ByID(blockID flow.Identifier) (flow.Slashab
 }
 
 // ByParentID provides a mock function with given fields: parentID
-func (_m *PendingClusterBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
+func (_m *PendingClusterBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[cluster.Payload]], bool) {
 	ret := _m.Called(parentID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByParentID")
 	}
 
-	var r0 []flow.Slashable[*cluster.Proposal]
+	var r0 []flow.Slashable[*flow.GenericProposal[cluster.Payload]]
 	var r1 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[cluster.Payload]], bool)); ok {
 		return rf(parentID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[*cluster.Proposal]); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Slashable[*flow.GenericProposal[cluster.Payload]]); ok {
 		r0 = rf(parentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Slashable[*cluster.Proposal])
+			r0 = ret.Get(0).([]flow.Slashable[*flow.GenericProposal[cluster.Payload]])
 		}
 	}
 

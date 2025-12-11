@@ -13,20 +13,15 @@ import (
 // proposalVertex implements [forest.Vertex] for generic block proposals.
 //
 //structwrite:immutable
-type proposalVertex[T module.BufferedProposal] struct {
-	proposal flow.Slashable[T]
+type proposalVertex[T flow.HashablePayload] struct {
+	proposal flow.Slashable[*flow.GenericProposal[T]]
 	id       flow.Identifier
 }
 
-// header is a shortform way to access the proposal's header.
-func (v proposalVertex[T]) header() *flow.Header {
-	return v.proposal.Message.ProposalHeader().Header
-}
-
-func newProposalVertex[T module.BufferedProposal](proposal flow.Slashable[T]) proposalVertex[T] {
+func newProposalVertex[T flow.HashablePayload](proposal flow.Slashable[*flow.GenericProposal[T]]) proposalVertex[T] {
 	return proposalVertex[T]{
 		proposal: proposal,
-		id:       proposal.Message.ProposalHeader().Header.ID(),
+		id:       proposal.Message.Block.ID(),
 	}
 }
 
@@ -37,12 +32,12 @@ func (v proposalVertex[T]) VertexID() flow.Identifier {
 
 // Level returns the view for the stored proposal.
 func (v proposalVertex[T]) Level() uint64 {
-	return v.header().View
+	return v.proposal.Message.Block.View
 }
 
 // Parent returns the parent ID and view for the stored proposal.
 func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
-	return v.header().ParentID, v.header().ParentView
+	return v.proposal.Message.Block.ParentID, v.proposal.Message.Block.ParentView
 }
 
 // GenericPendingBlocks implements a mempool of pending blocks that cannot yet be processed
@@ -51,14 +46,14 @@ func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
 // They are also indexed by view to support pruning.
 //
 // Safe for concurrent use.
-type GenericPendingBlocks[T module.BufferedProposal] struct {
+type GenericPendingBlocks[T flow.HashablePayload] struct {
 	lock                *sync.Mutex
 	forest              *forest.LevelledForest
 	activeViewRangeSize uint64
 }
 
-type PendingBlocks = GenericPendingBlocks[*flow.Proposal]
-type PendingClusterBlocks = GenericPendingBlocks[*cluster.Proposal]
+type PendingBlocks = GenericPendingBlocks[flow.Payload]
+type PendingClusterBlocks = GenericPendingBlocks[cluster.Payload]
 
 var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 var _ module.PendingClusterBlockBuffer = (*PendingClusterBlocks)(nil)
@@ -84,11 +79,11 @@ func NewPendingClusterBlocks(finalizedView uint64, activeViewRangeSize uint64) *
 // If the block already exists, or is below the finalized view, this is a no-op.
 // Errors returns:
 //   - mempool.BeyondActiveRangeError if block.View > finalizedView + activeViewRangeSize (when activeViewRangeSize > 0)
-func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) error {
+func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[*flow.GenericProposal[T]]) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	blockView := block.Message.ProposalHeader().Header.View
+	blockView := block.Message.Block.View
 	finalizedView := b.highestPrunedView()
 
 	// Check if block view exceeds the active view range size
@@ -106,19 +101,19 @@ func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[T]) error {
 
 // ByID returns the block with the given ID, if it exists.
 // Otherwise returns (nil, false)
-func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[T], bool) {
+func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[*flow.GenericProposal[T]], bool) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	vertex, ok := b.forest.GetVertex(blockID)
 	if !ok {
-		return flow.Slashable[T]{}, false
+		return flow.Slashable[*flow.GenericProposal[T]]{}, false
 	}
 	return vertex.(proposalVertex[T]).proposal, true
 }
 
 // ByParentID returns all direct children of the given block.
 // If no children with the given parent exist, returns (nil, false)
-func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[T], bool) {
+func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[T]], bool) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	n := b.forest.GetNumberOfChildren(parentID)
@@ -126,7 +121,7 @@ func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.S
 		return nil, false
 	}
 
-	children := make([]flow.Slashable[T], 0, n)
+	children := make([]flow.Slashable[*flow.GenericProposal[T]], 0, n)
 	iterator := b.forest.GetChildren(parentID)
 	for iterator.HasNext() {
 		vertex := iterator.NextVertex()
