@@ -96,41 +96,18 @@ func (e *Provider) ExecutionResultInfo(
 
 	result, executorIDs, findResultErr := e.findResultAndExecutors(blockID, criteria)
 	if findResultErr != nil {
-		findResultErr = fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, findResultErr)
 		// We want to return a more specific error when no matching execution results were found.
 		// This helps callers understand that their criteria likely cannot be met — especially if the
 		// block is already sealed.
-
-		// Step 1: Get the block header
-		header, err := e.headers.ByBlockID(blockID)
+		isBlockSealed, err := e.isBlockSealed(blockID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get header by block ID %v: %w", blockID, findResultErr)
+			return nil, fmt.Errorf("failed to check if block sealed: %w", err)
+		}
+		if isBlockSealed {
+			return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
 		}
 
-		// Step 2a: Lookup the finalized block ID at this height
-		blockIDFinalized, err := e.headers.BlockIDByHeight(header.Height)
-		if err != nil {
-			return nil, fmt.Errorf("failed to lookup finalized block ID at height %d: %w", header.Height, findResultErr)
-		}
-
-		// Step 2b: Check if this block is finalized.
-		// If BlockIDByHeight returns an ID that doesn't match, not finalized.
-		isFinalized := blockIDFinalized == blockID
-
-		// Step 3: Check sealed status only if block finalized.
-		if isFinalized {
-			sealedHeader, err := e.state.Sealed().Head()
-			if err != nil {
-				return nil, fmt.Errorf("failed to lookup sealed header: %w", err)
-			}
-
-			// If block is sealed, and didn't find any matching results return an error
-			if header.Height <= sealedHeader.Height {
-				return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
-			}
-		}
-
-		return nil, findResultErr
+		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, findResultErr)
 	}
 
 	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
@@ -155,6 +132,39 @@ func (e *Provider) ExecutionResultInfo(
 		ExecutionResultID: result.ID(),
 		ExecutionNodes:    subsetENs,
 	}, nil
+}
+
+// isBlockSealed reports whether the given block is sealed.
+// It returns (true, nil) if the block is sealed if, It returns (false, nil) if the block is not sealed.
+//
+// No errors are expected during normal operation.
+func (e *Provider) isBlockSealed(blockID flow.Identifier) (bool, error) {
+	// Step 1: Get the block header
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get header for block %v: %w", blockID, err)
+	}
+
+	// Step 2a: Lookup the finalized block ID at this height
+	blockIDFinalized, err := e.headers.BlockIDByHeight(header.Height)
+	if err != nil {
+		// no finalized block is known at given height, block is not finalized
+		return false, nil
+	}
+
+	// Step 2b: Check if this block is finalized.
+	// If BlockIDByHeight returns an ID that doesn't match, block is not finalized, it cannot be sealed.
+	if blockIDFinalized != blockID {
+		return false, nil
+	}
+
+	// Step 3: Check sealed status only if block finalized.
+	sealedHeader, err := e.state.Sealed().Head()
+	if err != nil {
+		return false, fmt.Errorf("failed to lookup sealed header: %w", err)
+	}
+
+	return header.Height <= sealedHeader.Height, nil
 }
 
 // validateCriteria verifies that the provided optimistic sync criteria can be
