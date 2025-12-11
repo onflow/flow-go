@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -18,6 +17,7 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -28,17 +28,15 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
 // LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
 type LocalTransactionProvider struct {
-	state             protocol.State
-	collections       storage.Collections
-	blocks            storage.Blocks
-	eventsIndex       *index.EventsIndex
-	txResultsIndex    *index.TransactionResultsIndex
-	txErrorMessages   error_messages.Provider
-	systemCollections *systemcollection.Versioned
-	txStatusDeriver   *txstatus.TxStatusDeriver
-	chainID           flow.ChainID
-	execResultInfoProvider    optimistic_sync.ExecutionResultInfoProvider
-	execStateCache            optimistic_sync.ExecutionStateCache
+	state                  protocol.State
+	collections            storage.Collections
+	blocks                 storage.Blocks
+	txErrorMessages        error_messages.Provider
+	systemCollections      *systemcollection.Versioned
+	txStatusDeriver        *txstatus.TxStatusDeriver
+	chainID                flow.ChainID
+	execResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	execStateCache         optimistic_sync.ExecutionStateCache
 }
 
 var _ TransactionProvider = (*LocalTransactionProvider)(nil)
@@ -55,17 +53,15 @@ func NewLocalTransactionProvider(
 	execStateCache optimistic_sync.ExecutionStateCache,
 ) *LocalTransactionProvider {
 	return &LocalTransactionProvider{
-		state:             state,
-		collections:       collections,
-		blocks:            blocks,
-		eventsIndex:       eventsIndex,
-		txResultsIndex:    txResultsIndex,
-		txErrorMessages:   txErrorMessages,
-		systemCollections: systemCollections,
-		txStatusDeriver:   txStatusDeriver,
-		chainID:           chainID,
-		execResultInfoProvider:    execResultInfoProvider,
-		execStateCache:            execStateCache,
+		state:                  state,
+		collections:            collections,
+		blocks:                 blocks,
+		txErrorMessages:        txErrorMessages,
+		systemCollections:      systemCollections,
+		txStatusDeriver:        txStatusDeriver,
+		chainID:                chainID,
+		execResultInfoProvider: execResultInfoProvider,
+		execStateCache:         execStateCache,
 	}
 }
 
@@ -96,7 +92,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 		return nil, err
 	}
 
-	blockHeight := block.Height
+	blockHeight := header.Height
 
 	// Get snapshot readers
 	txResultsReader := snapshot.LightTransactionResults()
@@ -317,7 +313,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 	// Get events reader
 	eventsReader := snapshot.Events()
 
-   // generate the system collection which includes scheduled transactions
+	// generate the system collection which includes scheduled transactions
 	eventProvider := func() (flow.EventsList, error) {
 		return eventsReader.ByBlockID(blockID)
 	}
@@ -478,7 +474,7 @@ func (t *LocalTransactionProvider) ScheduledTransactionsByBlockID(
 	// Get events reader
 	eventsReader := snapshot.Events()
 
-   // generate the system collection which includes scheduled transactions
+	// generate the system collection which includes scheduled transactions
 	events, err := eventsReader.ByBlockID(header.ID())
 	if err != nil {
 		return nil, rpc.ConvertIndexError(err, header.Height, "failed to get events to reconstruct scheduled transactions")

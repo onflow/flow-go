@@ -437,7 +437,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		return nil, nil, err
 	}
 
-	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion)
+	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion, optimistic_sync.Criteria{})
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
@@ -494,7 +494,7 @@ func (t *Transactions) lookupSystemTransactionResult(
 		return nil, false, status.Errorf(codes.NotFound, "could not find block: %v", err)
 	}
 
-	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
+	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, optimistic_sync.Criteria{})
 	return result, true, err
 }
 
@@ -531,7 +531,7 @@ func (t *Transactions) lookupScheduledTransactionResult(
 		return nil, false, err
 	}
 
-	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
+	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, optimistic_sync.Criteria{})
 	return result, true, err
 }
 

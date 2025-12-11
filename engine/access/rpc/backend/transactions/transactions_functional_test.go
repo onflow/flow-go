@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/executiondatasync/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -88,6 +89,10 @@ type TransactionsFunctionalSuite struct {
 	txResultsIndex         *index.TransactionResultsIndex
 	validatorBlocks        *validator.ProtocolStateBlocks
 	txErrorMessageProvider error_messages.Provider
+
+	execResultInfoProvider *optimisticsyncmock.ExecutionResultInfoProvider
+	execStateCache         *optimisticsyncmock.ExecutionStateCache
+	execStateSnapshot      *optimisticsyncmock.Snapshot
 
 	state               *protocol.State
 	rootSnapshot        *inmem.Snapshot
@@ -145,6 +150,10 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.validatorBlocks = validator.NewProtocolStateBlocks(s.state, reporter)
 
 	s.txErrorMessageProvider = error_messages.NewTxErrorMessageProvider(s.log, s.txErrorMessages, nil, nil, nil, nil)
+
+	s.execResultInfoProvider = optimisticsyncmock.NewExecutionResultInfoProvider(s.T())
+	s.execStateCache = optimisticsyncmock.NewExecutionStateCache(s.T())
+	s.execStateSnapshot = optimisticsyncmock.NewSnapshot(s.T())
 
 	s.participants = s.g.Identities().List(5, fixtures.Identity.WithAllRoles())
 	s.rootSnapshot = unittest.RootSnapshotFixtureWithChainID(s.participants, s.g.ChainID())
@@ -434,12 +443,12 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_Local() {
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -463,12 +472,12 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_Local() {
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -496,12 +505,12 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -536,12 +545,12 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -563,12 +572,12 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)

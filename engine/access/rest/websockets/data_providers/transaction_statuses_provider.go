@@ -23,7 +23,7 @@ import (
 
 // transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
 type transactionStatusesArguments struct {
-	TxID                flow.Identifier                  `json:"tx_id"`                  // ID of the transaction to monitor.
+	TxID                flow.Identifier                 `json:"tx_id"`                 // ID of the transaction to monitor.
 	ExecutionStateQuery *httpmodels.ExecutionStateQuery `json:"execution_state_query"` // Optional execution state query for selecting execution results.
 }
 
@@ -120,7 +120,7 @@ func parseTransactionStatusesArguments(
 	arguments wsmodels.Arguments,
 ) (transactionStatusesArguments, error) {
 	allowedFields := map[string]struct{}{
-		"tx_id":                  {},
+		"tx_id":                 {},
 		"execution_state_query": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)

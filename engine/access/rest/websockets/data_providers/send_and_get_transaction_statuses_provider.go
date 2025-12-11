@@ -25,7 +25,7 @@ import (
 
 // sendAndGetTransactionStatusesArguments contains the arguments required for sending tx and subscribing to transaction statuses
 type sendAndGetTransactionStatusesArguments struct {
-	Transaction         flow.TransactionBody                 // The transaction body to be sent and monitored.
+	Transaction         flow.TransactionBody            // The transaction body to be sent and monitored.
 	ExecutionStateQuery *httpmodels.ExecutionStateQuery `json:"execution_state_query"` // Optional execution state query for selecting execution results.
 }
 
