@@ -8,6 +8,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// IsIrrecoverableException returns true if and only of the provided error is
+// (a wrapped) irrecoverable exception. By protocol convention, irrecoverable
+// errors conceptually handled the same way as other unexpected errors: any
+// occurrence means that the software has left the pre-defined path of _safe_
+// operations. Continuing despite an unexpected error or irrecoverable exception
+// is impossible, because protocol-compliant operation of a node can no longer
+// be expected. In the worst case the node might be slashed or the protocol as a
+// hole compromised.
+// For the reason mentioned above, protocol business logic should generally only
+// check for sentinel errors expected exactly in the situation the business logic
+// is in. Any error that does not match the sentinels known to be benign in that
+// situation should be treated as a critical failure and the node must crash.
+// Hence, PROTOCOL BUSINESS LOGIC should NEVER CHECK whether an error is an
+// IRRECOVERABLE EXCEPTION. This function is for TESTING ONLY.
+func IsIrrecoverableException(err error) bool {
+	// The Go build system specifically handles `_test.go` files, treating them as part of
+	// the test suite and not including them in the final production binary using go build.
+	var e = new(exception)
+	return errors.As(err, &e)
+}
+
 var sentinelVar = errors.New("sentinelVar")
 
 type sentinelType struct{}
