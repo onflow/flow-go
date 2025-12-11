@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -129,9 +128,6 @@ type Pipeline2 struct {
 
 	signalerCtx irrecoverable.SignalerContext // the escalate irrecoverable errors to the higher-level business logic
 
-	// TODO: This can likely be removed
-	mu sync.Mutex
-
 	// The following fields are accessed externally. they are stored using atomics to avoid
 	// blocking the caller.
 	state              *optimistic_sync.State2Tracker // current state of the pipeline
@@ -144,8 +140,8 @@ type Pipeline2 struct {
 	isAbandoned          *atomic.Bool    // deprecated: to be removed
 	isIndexed            *atomic.Bool    // deprecated: to be removed
 
-	// TODO: to be moved to Core?
-	isSealed *atomic.Bool // deprecated: to be moved
+	// TODO: to be moved to Core ? ¯\_(ツ)_/¯
+	isSealed *atomic.Bool // deprecated
 }
 
 var _ optimistic_sync.Pipeline = (*Pipeline2)(nil)
@@ -238,9 +234,6 @@ func (p *Pipeline2) OnParentStateUpdated(parentState optimistic_sync.State2) {
 	// exactly what state evolution has taken place (could be multiple state transitions at once, if we haven't heard about some
 	// intermediate state transitions yet). If the state's tracker rejects the update, we retrospectively analyze what whether
 	// this rejection was expected or is a symptom of a bug or state corruption (in the latter case safe continuation is impossible).
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	oldParentState, parentSuccess := p.parentStateTracker.Evolve(parentState)
 	if !parentSuccess {

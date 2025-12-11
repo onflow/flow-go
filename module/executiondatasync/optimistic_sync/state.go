@@ -175,10 +175,10 @@ func (s State2) IsValidTransition(to State2) bool {
 	}
 }
 
-// isValidInitialState returns true if the state is a valid initial state for State2Tracker.
+// IsValidInitialState returns true if the state is a valid initial state for State2Tracker.
 // We only allow starting from State2Pending since the pipeline
 // always starts from the beginning.
-func (s State2) isValidInitialState() bool {
+func (s State2) IsValidInitialState() bool {
 	return s == State2Pending
 }
 
@@ -200,7 +200,7 @@ type State2Tracker struct {
 // Expected error returns during normal operations:
 //   - [ErrInvalidPipelineState]: if the initial value is not a valid starting state
 func NewState2Tracker(initialState State2) (*State2Tracker, error) {
-	if !initialState.isValidInitialState() {
+	if !initialState.IsValidInitialState() {
 		return nil, fmt.Errorf("state '%s' is not a valid starting state: %w", initialState.String(), ErrInvalidPipelineState)
 	}
 	return &State2Tracker{
