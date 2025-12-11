@@ -287,26 +287,26 @@ func (e *Engine) EntityBySecondaryKey(key flow.Identifier, selector flow.Identit
 
 // addEntityRequest adds request in in-memory storage of pending items to be requested.
 // Concurrency safe.
-func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity], checkIntegrity bool) {
+func (e *Engine) addEntityRequest(queryKey flow.Identifier, selector flow.IdentityFilter[flow.Identity], queryKeyIsContentHash bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	// check if we already have an item for this entity
-	_, duplicate := e.items[entityID]
+	_, duplicate := e.items[queryKey]
 	if duplicate {
 		return
 	}
 
 	// otherwise, add a new item to the list
 	item := &Item{
-		EntityID:       entityID,
-		NumAttempts:    0,
-		LastRequested:  time.Time{},
-		RetryAfter:     e.cfg.RetryInitial,
-		ExtraSelector:  selector,
-		checkIntegrity: checkIntegrity,
+		QueryKey:              queryKey,
+		NumAttempts:           0,
+		LastRequested:         time.Time{},
+		RetryAfter:            e.cfg.RetryInitial,
+		ExtraSelector:         selector,
+		queryKeyIsContentHash: queryKeyIsContentHash,
 	}
-	e.items[entityID] = item
+	e.items[queryKey] = item
 }
 
 // Force will force the requester engine to dispatch all currently
@@ -599,7 +599,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 			return engine.NewInvalidInputErrorf("could not decode entity: %s", err.Error())
 		}
 
-		if item.checkIntegrity {
+		if item.queryKeyIsContentHash {
 			actualEntityID := entity.ID()
 			// validate that we got correct entity, exactly what we were expecting
 			if entityID != actualEntityID {

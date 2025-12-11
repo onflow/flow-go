@@ -102,6 +102,8 @@ func NewMachine(
 			e.log.Error().Msgf("invalid entity type (%T)", entity)
 			return
 		}
+		// TODO: this should be a non-blocking handler function. Currently this is the only non-blocking
+		//  handler, which requires the requester engine to spawn a goroutine for each entity response.
 		e.core.OnCollection(collection)
 	})
 
