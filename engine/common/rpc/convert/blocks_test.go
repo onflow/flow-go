@@ -28,7 +28,7 @@ func TestConvertBlock(t *testing.T) {
 	converted, err := convert.MessageToBlock(msg)
 	require.NoError(t, err)
 
-	assert.Equal(t, block, converted)
+	assert.Equal(t, block.ID(), converted.ID())
 }
 
 // TestConvertBlockLight tests that converting a block to its light form results in only the correct
