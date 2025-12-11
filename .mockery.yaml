@@ -9,7 +9,8 @@ include-auto-generated: False
 disable-func-mocks: True
 fail-on-missing: True
 
-# Suppress warnings
+# Suppress info logs but keep warnings and errors
+log-level: "warn"
 issue-845-fix: True
 disable-version-string: True
 resolve-type-alias: False
