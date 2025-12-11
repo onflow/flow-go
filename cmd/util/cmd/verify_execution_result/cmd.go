@@ -25,6 +25,7 @@ var (
 	flagStopOnMismatch               bool
 	flagTransactionFeesDisabled      bool
 	flagScheduledTransactionsEnabled bool
+	flagAccessAddress                string
 )
 
 // # verify the last 100 sealed blocks
@@ -61,6 +62,9 @@ func init() {
 	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
 	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
+
+	Cmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "address of the access node")
+	_ = Cmd.MarkFlagRequired("access-address")
 }
 
 func run(*cobra.Command, []string) {
@@ -109,6 +113,7 @@ func run(*cobra.Command, []string) {
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
 			flagScheduledTransactionsEnabled,
+			flagAccessAddress,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
@@ -128,6 +133,7 @@ func run(*cobra.Command, []string) {
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
 			flagScheduledTransactionsEnabled,
+			flagAccessAddress,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")

@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	compare_cadence_vm "github.com/onflow/flow-go/cmd/util/cmd/compare-cadence-vm"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/initialize"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/verification/convert"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
@@ -25,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils/debug"
 )
 
 // VerifyLastKHeight verifies the last k sealed blocks by verifying all chunks in the results.
@@ -41,6 +44,7 @@ func VerifyLastKHeight(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledTransactionsEnabled bool,
+	accessAddress string,
 ) (
 	totalStats BlockVerificationStats,
 	err error,
@@ -103,6 +107,7 @@ func VerifyLastKHeight(
 		state,
 		verifier,
 		verifyHeight,
+		accessAddress,
 	)
 	if err != nil {
 		return BlockVerificationStats{}, err
@@ -123,6 +128,7 @@ func VerifyRange(
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
 	scheduledTransactionsEnabled bool,
+	accessAddress string,
 ) (
 	totalStats BlockVerificationStats,
 	err error,
@@ -168,6 +174,7 @@ func VerifyRange(
 		state,
 		verifier,
 		verifyHeight,
+		accessAddress,
 	)
 	if err != nil {
 		return BlockVerificationStats{}, err
@@ -193,7 +200,9 @@ func verifyConcurrently(
 	state protocol.State,
 	verifier module.ChunkVerifier,
 	stopOnMismatch bool,
+	accessAddress string,
 ) (BlockVerificationStats, error),
+	accessAddress string,
 ) (BlockVerificationStats, error) {
 
 	tasks := make(chan uint64, int(nWorker))
@@ -236,6 +245,7 @@ func verifyConcurrently(
 					state,
 					verifier,
 					stopOnMismatch,
+					accessAddress,
 				)
 
 				mu.Lock()
@@ -378,6 +388,7 @@ func verifyHeight(
 	state protocol.State,
 	verifier module.ChunkVerifier,
 	stopOnMismatch bool,
+	accessAddress string,
 ) (
 	stats BlockVerificationStats,
 	err error,
@@ -388,6 +399,8 @@ func verifyHeight(
 	}
 
 	blockID := header.ID()
+
+	chain := header.ChainID.Chain()
 
 	result, err := results.ByBlockID(blockID)
 	if err != nil {
@@ -432,9 +445,29 @@ func verifyHeight(
 			}
 
 			if vcd.IsSystemChunk {
-				log.Warn().Err(err).Msgf("could not verify system chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
+				log.Warn().Err(err).Msgf(
+					"could not verify system chunk (index: %v, ID: %v) at block %v (%v)",
+					i, collectionID, height, blockID,
+				)
 			} else {
-				log.Error().Err(err).Msgf("could not verify chunk (index: %v, ID: %v) at block %v (%v)", i, collectionID, height, blockID)
+
+				if reCompareBlockWithRemoteDebugger(accessAddress, blockID, header, chain) {
+					log.Info().Msgf(
+						"verification of chunk failed, but re-comparison with remote debugger succeeded "+
+							"(index: %v, ID: %v) at block %v (%v)",
+						i, collectionID, height, blockID,
+					)
+
+					stats.MatchedChunkCount++
+					stats.MatchedTransactionCount += chunkTransactionCount
+
+					continue
+				}
+
+				log.Error().Err(err).Msgf(
+					"could not verify chunk (index: %v, ID: %v) at block %v (%v)",
+					i, collectionID, height, blockID,
+				)
 			}
 
 			stats.MismatchedChunkCount++
@@ -447,6 +480,43 @@ func verifyHeight(
 		}
 	}
 	return stats, nil
+}
+
+func reCompareBlockWithRemoteDebugger(
+	accessAddress string,
+	blockID flow.Identifier,
+	header *flow.Header,
+	chain flow.Chain,
+) bool {
+
+	remoteClient, err := debug.NewExecutionDataRemoteClient(accessAddress, chain)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create execution data remote client")
+		return false
+	}
+	defer remoteClient.Close()
+
+	config, err := grpcclient.NewFlowClientConfig(accessAddress, "", flow.ZeroID, true)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create Flow client config")
+		return false
+	}
+
+	flowClient, err := grpcclient.FlowClient(config)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create Flow client")
+		return false
+	}
+	defer flowClient.Close()
+
+	result := compare_cadence_vm.CompareBlock(
+		blockID,
+		header,
+		remoteClient,
+		flowClient,
+		chain,
+	)
+	return result.Mismatches == 0
 }
 
 func makeVerifier(
