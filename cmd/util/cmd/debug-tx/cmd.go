@@ -341,6 +341,50 @@ func FetchBlockHeader(
 	return
 }
 
+func SubscribeBlockHeadersFromStartBlockID(
+	flowClient *client.Client,
+	startBlockID flow.Identifier,
+	blockStatus flow.BlockStatus,
+) (get func() (*flow.Header, error)) {
+	log.Info().Msg("Subscribing to block headers ...")
+
+	var err error
+	get, err = debug.SubscribeAccessAPIBlockHeadersFromStartBlockID(
+		context.Background(),
+		flowClient.RPCClient(),
+		startBlockID,
+		blockStatus,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+	}
+
+	log.Info().Msg("Subscribed to block headers")
+
+	return
+}
+
+func SubscribeBlockHeadersFromLatest(
+	flowClient *client.Client,
+	blockStatus flow.BlockStatus,
+) (get func() (*flow.Header, error)) {
+	log.Info().Msg("Subscribing to block headers ...")
+
+	var err error
+	get, err = debug.SubscribeAccessAPIBlockHeadersFromLatest(
+		context.Background(),
+		flowClient.RPCClient(),
+		blockStatus,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+	}
+
+	log.Info().Msg("Subscribed to block headers")
+
+	return
+}
+
 func FetchBlockTransactions(
 	blockID flow.Identifier,
 	flowClient *client.Client,
