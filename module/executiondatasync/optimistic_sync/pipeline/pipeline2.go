@@ -15,11 +15,17 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// Pipeline2 represents a pipelined state machine for a processing single ExecutionResult.
+// Pipeline2 represents a pipelined state machine for processing a single ExecutionResult.
 //
-// The state machine is initialized in the Pending state, and transitions through the following states:
+// The state machine is initialized in the Pending state and permits state transitions as specified by the diagram below. Intuitively,
+// we have a sequence of tasks (Downloading, Indexing, Persisting) that must run one after another, each task being executed at most
+// once. When the conditions have been satisfied for the next task to commence, the state machine atomically transitions to the next
+// state, which signifies that the task is in progress, and the task is put into the queue of a worker pool for execution. For example,
+// if the pipeline is in the Downloading state, it means that the downloading task is about to be executed (or already in progress).
+// By making the state transition Pending → Downloading atomic, we guarantee that the Downloading Task is only ever scheduled once.
+// Similar reasoning applies to the other tasks.
 //
-//	Trigger condition: (1)▷┬┄┄┄┄┄┐                           ┌┄┄┐                                 Trigger condition (3):
+//	Trigger condition: (1)▷┬┄┄┄┄┄┐                           ┌┄┄┐                                Trigger condition (3):
 //	        parent is      ┊    ╭∇─────────────────────────╮ ┊ ╭∇────────────────────────────╮ ┌┄(3)▷┄┬┄┄┄┄┐ sealed & parent completed
 //	      Downloading      ┊    │Task Downloading (once):  │ ┊ │Task Indexing (once):        │ ┊      ┊   ╭∇───────────────────────╮
 //	      or Indexing      ┊    │1. download               │ ┊ │1. build index from download │ ┊      ┊   │Task Persisting (once): │
@@ -34,64 +40,84 @@ import (
 //	             ┃              ╰─────┃────────────────────╯   ╰─────┃──────────────────┃────╯        ^   ╰────────────────────────╯
 //	             ┃                    ┃                              ┃                  ┃             ^
 //	             ┃                    ┃       ┏━━━━━━━━━━━━━━━┓      ┃                  ┃          This state transition only happens
-//	             ┗━━━━━━━━━━━━━━━━━━━━┻━━━━━━━▶   Abandoned   ◀━━━━━━┻━━━━━━━━━━━━━━━━━━┛          once this result is sealed. Hence,
+//	             ┗━━━━━━━━━━━━━━━━━━━━┻━━━━━━━▶   Abandoned   ◀━━━━━━┻━━━━━━━━━━━━━━━━━━┛          after this result is sealed. Hence,
 //	                                          ┗━━━━━━━━━━━━━━━┛                                    the result can no longer be abandoned
 //
-// Trigger condition (1):
-// ▷ Parent must be Downloading or Indexing or WaitingPersist or Complete.
-// This can be implement as listening to the `OnParentStateUpdated` event
-// (assuming no state change was missed, when pipeline was added to forest)
+// Note that the order of items in Tasks Downloading and Indexing has been swapped for ease of visualization (order 1, 3, 2). The term
+// 'CAS' refers to an atomic Compare-And-Swap operation on the pipeline's state. The CAS operation (step 2) acts as a gatekeeper
+// ensuring that only a single routine can successfully apply the state transition. The task (step 3) is scheduled by a go-routine only
+// after this routine successfully performed the state transition. Thereby, we guarantee that a task is only ever scheduled once.
+// All computationally heavy or blocking work (Tasks Downloading, Indexing, Persisting encapsulated in [Core]) is delegated to worker
+// pools. By utilizing CAS operations, we eliminate the need for locking the pipeline. Therefore, the pipeline's public methods have
+// computationally negligible latency, effectively returning almost immediately. Hence, the pipeline can use the calling goroutine
+// to perform its lifecycle updates (no need for internal goroutines beyond the injected worker pools), which improves concurrency
+// and simplifies the correctness prove for the implementation significantly.
 //
-// Trigger condition (2):
-// ▷ The download is completed.
+// Trigger condition (1), permitting state transition Pending → Downloading:
+// ▷ Parent must be in state Downloading or Indexing or WaitingPersist or Persisting or Complete.
+// This can be implement as listening to the `OnParentStateUpdated` notification.
+// (assuming no state change was missed, while pipeline is being added to forest)
+//
+// Trigger condition (2), permitting state transition Downloading → Indexing:
+// ▷ The Downloading Task completed successfully.
 // As we have a single routine executing the downloading task, this routine should always
 // be able to perform the state transition, barring the processing being abandoned.
 //
-// Trigger condition (3):
+// Trigger condition (3), permitting state transition WaitingPersist → Persisting:
 // ▷ Pipeline must represent a sealed result _and_ parent's state must be Complete.
-// This can be implement by listening to the events `OnParentStateUpdated` and `SetSealed`.
-// Each must have been called once, the latter event (atomically) triggers the task `Persisting`.
+// This can be implement by listening to the notifications `OnParentStateUpdated` and `SetSealed`. Whichever notification delivers the
+// last piece of required information also transitions updates performs the state transition WaitingPersist → Persisting (atomically,
+// via CAS) and schedules the `Persisting` task.
 //
-// REQUIREMENTS:
+// REQUIREMENTS for the PIPELINE implementation:
 // (I) All tasks are executed at most once.
 // (II) Trigger conditions being satisfied must not be missed.
 //
 // The only exceptions to rule (II) are:
-//   - Triggers can be missed if the pipeline reaches the Abandoned state. In this case, no further processing is required, so
-//     so interim triggers for processing work can be ignored.
+//   - Triggers can be missed if the pipeline reaches the Abandoned state. In this case, no further processing is desired and work
+//     already done can be discarded. Hence, interim triggers for processing work can be ignored.
 //   - The trigger to abandon processing can be missed (with low probability). In this case, we will do extra work but eventually
 //     the result will be garbage collected. Doing more work optimistically to improve latency than minimally necessary is acceptable.
 //
-// In a concurrent environment, there might be a "blind period" between a `Pipeline2` instance being created and it being subscribed
-// to the event sources emitting `OnParentStateUpdated` and `SetSealed` notifications. Notifications concurrently emitted during such
-// "blind period" might violate requirement (II). Design patters to avoid a "blind period" for the higher-level business logic are:
+// REQUIREMENTS for the HIGHER-level BUSINESS LOGIC instantiating and orchestrating Pipelines:
+// In a concurrent environment, there might be a "blind period" between a `Pipeline2` instance being created and it being subscribed to
+// the information sources emitting `OnParentStateUpdated` and `SetSealed` notifications. Notifications concurrently emitted during such
+// "blind period" might violate requirement (II). Design patters for the higher-level business logic to AVOID a "BLIND PERIODS" are:
 //   - Atomic instantiation-and-subscription:
-//     The `Pipeline2` instance is created and subscribed to the event sources within a single atomic operation. The result's own sealing
-//     status as well as the status of the parent result do not change during this atomic operation.
+//     The `Pipeline2` instance is created and subscribed to the notification sources within a single atomic operation. The result's own
+//     sealing status as well as the status of the parent result do not change during this atomic operation.
 //   - Instantiate-and-subscribe + Catchup:
 //     After successful instantiating a Pipeline2 object and subscribing it to `OnParentStateUpdated` plus `SetSealed`, the higher-level
 //     business logic does a second iteration over the result's sealing status and the parent result's status. It reads the status from
 //     the _sources directly_, not relying on notifications. This newest information about the most up-to-date status is then forwarded
 //     to the `Pipeline2` instance. When implementing this approach, we must follow an information-driven design:
 //     https://www.notion.so/flowfoundation/Reactive-State-Management-in-Distributed-Systems-A-Guide-to-Eventually-Consistent-Designs-22d1aee1232480b2ad05e95a7c48a32d
-//     Formally, you might think of the events as sets (of information), where the set relations defines a partial order.
+//     Formally, you might think of the notifications as sets (of information), where the set relations defines a partial order:
 //     Pending ⊂ Downloading ⊂ Indexing ⊂ WaitingPersist ⊂ Complete
 //     (Pending ∪ Downloading ∪ Indexing ∪ WaitingPersist) ⊂ Abandoned
 //     This implies:
 //     (a) Pipeline2 must be idempotent with respect to `OnParentStateUpdated` and `SetSealed` invocations.
 //     (b) Pipeline2 must recognize old information as such, which is already reflected in its internal state, and ignore it. For example,
-//     the Pipeline bing in the state "Indexing" should be understood as "we should download the data and index it once we have it".
-//     Then being informed (old information) that we have progressed to a point where we should be downloading the data, should result
-//     in a no-op because we already know that (and more, namely that we should be indexing the data too once we have downloaded it).
-//     (c) Pipeline2 must recognize notifications as such, that deliver newer information but skipping some intermediate state transitions.
-//     Pipeline2 can't just silently discard that information. Either, we return a sentinel error, signalling to the caller that they need
-//     to re-deliver missing interim notifications. Or Pipeline2 could advance the state internally to be up-to-date with the newest
-//     information it received. This can happen as a race condition in a concurrent environment: for example, assume that Pipeline2 is in
-//     the "Pending" state. It missed the notification that its parent has progressed to "Indexing". While the higher-level business logic
-//     is just about the deliver the newer information, the parent transitions to Complete and emits a notification that arrives first.
+//     the Pipeline being in the state `Indexing` should be understood as "we should download the data and index it once we have it".
+//     Then being informed (old information) that we have progressed to a point where we should be downloading the data, will be a no-op,
+//     because we already know that (and more, namely that we should be indexing the data in addition once we have downloaded it).
+//     (c) Pipeline2 must recognize, when notifications deliver newer information but skipp some intermediate state transitions. Pipeline2
+//     can't just silently discard that information. Either, we return a sentinel error, signalling to the caller that they need to re-
+//     deliver missing interim notifications. Or (approach implemented) Pipeline2 advances the state internally to be up-to-date with the
+//     newest information it received. This can happen as a race condition in a concurrent environment: for example, assume that Pipeline2
+//     is in the "Pending" state. It missed the notification that its parent has progressed to `Indexing`. While the higher-level business
+//     logic is just about the deliver the newer information, the parent transitions to Complete and emits a notification that arrives first.
 //
-// TODO: check if the following statement still applies after the refactoring:
-// Pipeline2 The state machine is designed to be run in a single goroutine. The Run method must only be called once.
+// In summary, ALL PUBLIC METHODS of Pipeline2 are CONCURRENCY safe, IDEMPOTENT, and tolerate information to arrive OUT-OF-ORDER. As long as
+// notifications eventually arrive, the pipeline will reach the same state as if all notifications are delivered in their canonical order.
+// Specifically, the pipeline can consume information from multiple independent sources concurrently, without requiring any external ordering
+// or synchronization. For example, one information source might already be telling us about the parent's most recent new state, while a
+// second information source could still be informing us about interim states that the parent has already passed through.
+// This design has major benefits: the higher-level business logic can use independent algorithmic paths concurrently to update and
+// orchestrate pipelines. This is the most robust design, where the caller has to know the least about the internal state of the pipeline
+// and its parent. The caller can just feed it with all information they have (and receive) - the pipeline will incorporate it correctly.
+// In a nutshell, the sole requirement a pipeline has on its input notifications / information is that they are explainable by
+// valid state machine evolutions.
 type Pipeline2 struct {
 	log           zerolog.Logger
 	stateConsumer optimistic_sync.PipelineStateConsumer
@@ -167,21 +193,6 @@ func NewPipeline2(
 
 func (p *Pipeline2) Run(ctx context.Context, core optimistic_sync.Core, parentState optimistic_sync.State) error {
 	panic("Run is deprecated, implementation now utilizes `State2Tracker` for atomicity and workerpools for any work with non-vanishing runtime")
-}
-
-// onPersistChanges performs the state transitions when the pipeline is in the WaitingPersist state.
-// When the execution result has been sealed and the parent has already transitioned to StateComplete then
-// we can persist the data and transition to StateComplete.
-// No error returns are expected during normal operations.
-func (p *Pipeline2) onPersistChanges() error {
-	if p.isSealed.Load() && p.parentState() == optimistic_sync.StateComplete {
-		if err := p.core.Persist(); err != nil {
-			return fmt.Errorf("could not persist pending changes: %w", err)
-		}
-		return p.transitionTo(optimistic_sync.StateComplete)
-	} else {
-		return nil
-	}
 }
 
 // checkAbandoned returns true if the pipeline or its parent are abandoned.
@@ -376,10 +387,10 @@ func (p *Pipeline2) checkTrigger3(parentState optimistic_sync.State2) {
 	p.indexingWorkerPool.Submit(p.persistingTask)
 }
 
-// indexingTask packages the work of saving the indexed execution result to the database (encapsulated in
+// persistingTask packages the work of saving the indexed execution result to the database (encapsulated in
 // [Core.Persist]) with the lifecycle updates of the pipeline's state machine. Once the call returns from Core without
 // error, the persisting work is complete, and we transition the pipeline state from `Persisting` to `Complete`. This
-// should _always_ succeed as the downloading task is the only place allowed to perform this state transition.
+// should _always_ succeed as the persisting task is the only place allowed to perform this state transition.
 //
 // TODO:
 // Unexpected errors returned from [Core.Persist] are escalated as irrecoverable exceptions to the higher-level
@@ -410,10 +421,28 @@ func (p *Pipeline2) IsSealed() bool {
 	panic("implement me")
 }
 
-// Abandon marks the pipeline as abandoned
-// This will cause the pipeline to eventually transition to the Abandoned state and halt processing
-func (p *Pipeline2) Abandon() {
-	if p.isAbandoned.CompareAndSwap(false, true) {
-		p.stateChangedNotifier.Notify()
+// Abandon leaves the pipeline in the abandoned state.
+// The sole requirement a pipeline has on its input notifications / information is that they are explainable
+// by valid state machine evolutions. This method is concurrency safe, idempotent and tolerates information
+// to arrive out of order. In general, the state evolution to `Abandoned` should always succeed. The returned
+// error [ErrInvalidStateEvolutionEpoch] should be considered in most cases a symptom of a bug or state
+// corruption, indicating that the provided inputs are not explainable by valid state machine evolution. In
+// this case, a safe continuation is impossible.
+//
+// No error returns expected during normal operations.
+func (p *Pipeline2) Abandon() error {
+	priorState, success := p.state.Evolve(optimistic_sync.State2Abandoned) // idempotent, as our state machine is reflexive
+	if !success {                                                          // none of the following should be compatible with a valid state evolution;
+		return fmt.Errorf("state evolution %s to %s attempted, with current sealing status of %t: %w", priorState, optimistic_sync.State2Abandoned, p.IsSealed(), ErrInvalidStateEvolution)
 	}
+	if priorState != optimistic_sync.State2Abandoned {
+		// we successfully applied the state transition for the first time. Subsequent calls will _not_ execute this block.
+		// TODO:
+		panic("try to cancel pending jobs if there are any? maybe with signaller context, which we also use for critical errors for the workers?")
+	}
+	return nil
 }
+
+// ErrInvalidStateEvolution indicates that the provided inputs are not explainable by valid state machine evolution.
+// In most cases, this error is a symptom of a bug or state corruption, making safe continuation impossible.
+var ErrInvalidStateEvolution = fmt.Errorf("provided inputs are not explainable by valid state machine evolution")

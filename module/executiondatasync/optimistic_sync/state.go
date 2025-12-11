@@ -227,7 +227,7 @@ func (t *State2Tracker) Set(newState State2) (oldState State2, success bool) {
 }
 
 // Evolve attempts a _sequence_ of valid state transitions (zero or more) to reach the specified `target`
-// from the current state. The entire sequence is performed as a single atomic operation. The state
+// from the current state. The entire sequence is performed as a single ATOMIC operation. The state
 // evolution succeeds if and only if it is valid as defined by [State2.CanReach]. No matter whether the
 // state evolution succeeds (second return value), the `oldState` return value is always the state from
 // which the evolution was attempted.
@@ -245,7 +245,7 @@ func (t *State2Tracker) Evolve(target State2) (oldState State2, success bool) {
 	}
 }
 
-// CompareAndSwap attempts an atomic transition from the anticipated old state to `newState`. If the current
+// CompareAndSwap attempts an ATOMIC transition from the anticipated old state to `newState`. If the current
 // state is different from `anticipatedOldState`, the transition fails. For matching current state, the
 // transition succeeds if and only if it is valid as defined by [State2.IsValidTransition]. No matter
 // whether the state transition succeeds (second return value), the `oldState` return value is always
