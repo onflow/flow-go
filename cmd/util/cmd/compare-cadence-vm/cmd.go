@@ -19,6 +19,7 @@ import (
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/utils/debug"
@@ -58,7 +59,7 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node (required if --use-execution-data-api is false)")
 
-	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", 9999, "transaction compute limit")
+	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", flow.DefaultMaxTransactionGasLimit, "transaction compute limit")
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
@@ -340,11 +341,30 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 	vmErr := vmResult.Output.Err
 
 	if interErr == nil && vmErr != nil {
-		log.Error().Msgf("VM failed but interpreter succeeded")
+
+		if vmErr.Code() == errors.ErrCodeComputationLimitExceededError {
+			log.Warn().Msg("VM exceeded computation limit but interpreter succeeded. Ignoring")
+			return true
+		}
+
+		log.Error().Msg("VM failed but interpreter succeeded")
 		mismatch = true
+
 	} else if interErr != nil && vmErr == nil {
-		log.Error().Msgf("Interpreter failed but VM succeeded")
+		if interErr.Code() == errors.ErrCodeComputationLimitExceededError {
+			log.Warn().Msg("Interpreter exceeded computation limit but VM succeeded. Ignoring")
+			return true
+		}
+
+		log.Error().Msg("Interpreter failed but VM succeeded")
 		mismatch = true
+	} else if interErr != nil &&
+		vmErr != nil &&
+		interErr.Code() == errors.ErrCodeComputationLimitExceededError &&
+		vmErr.Code() == errors.ErrCodeComputationLimitExceededError {
+
+		log.Warn().Msg("Both interpreter and VM exceeded computation limit. Ignoring")
+		return true
 	}
 
 	// Compare events
