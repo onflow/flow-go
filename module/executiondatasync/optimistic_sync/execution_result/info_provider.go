@@ -50,12 +50,9 @@ func NewExecutionResultInfoProvider(
 // based on the provided criteria.
 //
 // Expected errors during normal operations:
+//   - [storage.ErrNotFound]: If the execution receipts for the block ID are not found.
 //   - [optimistic_sync.ErrBlockNotFound]: If the request is for the spork root block, and the node was bootstrapped
 //     from a newer block.
-//   - [storage.ErrNotFound]: If the underlying storage does not yet contain data required to fulfill the request
-//     (e.g. receipts or result info for the given block ID are not found). This is a benign condition and callers
-//     should treat it as "data not available yet" and may retry later.
-//   - [optimistic_sync.NotEnoughAgreeingExecutorsError]: If no insufficient receipts are found for given block ID.
 //   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
 //     execution results was abandoned.
 //   - [optimistic_sync.ErrNotEnoughAgreeingExecutors]: If there are not enough execution nodes that produced the
@@ -126,6 +123,7 @@ func (p *Provider) ExecutionResultInfo(
 // results are found, then the result with the most executors is returned.
 //
 // Expected errors during normal operations:
+//   - [storage.ErrNotFound]: If the execution receipts for the block ID are not found.
 //   - [optimistic_sync.ErrForkAbandoned]: If the execution result is in a different fork than the one specified in the criteria.
 //   - [optimistic_sync.ErrNotEnoughAgreeingExecutors]: If the group does not have enough agreeing executors.
 //   - [optimistic_sync.ErrRequiredExecutorNotFound]: If the required executor is not in the group.
@@ -142,7 +140,7 @@ func (p *Provider) findResultAndExecutors(
 
 	allReceiptsForBlock, err := p.executionReceipts.ByBlockID(blockID)
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
+		return flow.ZeroID, nil, fmt.Errorf("failed to retrieve execution receipts for block ID %v: %w", blockID, err)
 	}
 
 	// find all results that match the criteria and have at least one acceptable executor
