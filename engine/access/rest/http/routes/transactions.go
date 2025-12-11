@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,7 +23,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 		return GetScheduledTransaction(r, backend, link)
 	}
 
-	req, err := request.GetTransactionRequest(r)
+	req, err := request.NewGetTransactionRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -35,12 +36,13 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 	var txr *accessmodel.TransactionResult
 	// only lookup result if transaction result is to be expanded
 	if req.ExpandsResult {
-		txr, err = backend.GetTransactionResult(
+		txr, _, err = backend.GetTransactionResult(
 			r.Context(),
 			req.ID,
 			req.BlockID,
 			req.CollectionID,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+			models.NewCriteria(req.ExecutionState),
 		)
 		if err != nil {
 			return nil, err
@@ -61,24 +63,25 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 		return GetScheduledTransactionResult(r, backend, link)
 	}
 
-	req, err := request.GetTransactionResultRequest(r)
+	req, err := request.NewGetTransactionResult(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 
-	txr, err := backend.GetTransactionResult(
+	executionState := req.ExecutionState
+	txr, executorMetadata, err := backend.GetTransactionResult(
 		r.Context(),
 		req.ID,
 		req.BlockID,
 		req.CollectionID,
 		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+		models.NewCriteria(executionState),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	var response commonmodels.TransactionResult
-	response.Build(txr, req.ID, link)
+	response := commonmodels.NewTransactionResult(txr, req.ID, link, executorMetadata, executionState.IncludeExecutorMetadata)
 	return response, nil
 }
 
@@ -136,8 +139,8 @@ func GetScheduledTransactionResult(r *common.Request, backend access.API, link c
 		return nil, err
 	}
 
-	var response commonmodels.TransactionResult
-	response.Build(txr, txr.TransactionID, link)
+	//TODO(Uliana): maybe to do GetScheduledTransactionResult in separate PR
+	response := commonmodels.NewTransactionResult(txr, txr.TransactionID, link, nil, false)
 	return response, nil
 }
 

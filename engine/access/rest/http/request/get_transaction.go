@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -18,74 +19,142 @@ type TransactionOptionals struct {
 	CollectionID flow.Identifier
 }
 
-func (t *TransactionOptionals) Parse(r *common.Request) error {
-	blockId, err := parser.NewID(r.GetQueryParam(blockIDQueryParam))
+// NewTransactionOptionals parses the request and returns a validated TransactionOptionals.
+//
+// All errors indicate the request is invalid.
+func NewTransactionOptionals(r *common.Request) (*TransactionOptionals, error) {
+	blockID, err := parser.NewID(r.GetQueryParam(blockIDQueryParam))
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("invalid block ID: %w", err)
 	}
-	t.BlockID = blockId.Flow()
 
-	collectionId, err := parser.NewID(r.GetQueryParam(collectionIDQueryParam))
+	collectionID, err := parser.NewID(r.GetQueryParam(collectionIDQueryParam))
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("invalid collection ID: %w", err)
 	}
-	t.CollectionID = collectionId.Flow()
 
-	return nil
+	return &TransactionOptionals{
+		BlockID:      blockID.Flow(),
+		CollectionID: collectionID.Flow(),
+	}, nil
 }
 
+// GetTransaction represents a parsed HTTP request for retrieving a transaction.
 type GetTransaction struct {
 	GetByIDRequest
 	TransactionOptionals
 	ExpandsResult bool
+	// TODO(Uliana): add this to the openapi
+	ExecutionState models.ExecutionStateQuery
 }
 
-// GetTransactionRequest extracts necessary variables from the provided request,
+// NewGetTransactionRequest extracts necessary variables from the provided request,
 // builds a GetTransaction instance, and validates it.
 //
 // All errors indicate a malformed request.
-func GetTransactionRequest(r *common.Request) (GetTransaction, error) {
-	var req GetTransaction
-	err := req.Build(r)
-	return req, err
+func NewGetTransactionRequest(r *common.Request) (*GetTransaction, error) {
+	return parseGetTransactionRequest(
+		r,
+		r.GetQueryParam(agreeingExecutorCountQuery),
+		r.GetQueryParams(requiredExecutorIdsQuery),
+		r.GetQueryParam(includeExecutorMetadataQuery),
+	)
 }
 
-func (g *GetTransaction) Build(r *common.Request) error {
-	err := g.TransactionOptionals.Parse(r)
+// parseGetTransactionRequest parses raw HTTP query parameters into a
+// GetTransaction struct. It validates the transaction ID, optional fields,
+// and execution state configuration extracted from the request.
+//
+// All errors indicate the request is invalid.
+func parseGetTransactionRequest(
+	r *common.Request,
+	rawAgreeingExecutorsCount string,
+	rawAgreeingExecutorsIds []string,
+	rawIncludeExecutorMetadata string,
+) (*GetTransaction, error) {
+	txOpts, err := NewTransactionOptionals(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = g.GetByIDRequest.Build(r)
-	g.ExpandsResult = r.Expands(resultExpandable)
+	var getByIDRequest GetByIDRequest
+	if err := getByIDRequest.Build(r); err != nil {
+		return nil, err
+	}
 
-	return err
+	executionStateQuery, err := parser.NewExecutionStateQuery(
+		rawAgreeingExecutorsCount,
+		rawAgreeingExecutorsIds,
+		rawIncludeExecutorMetadata,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetTransaction{
+		GetByIDRequest:       getByIDRequest,
+		TransactionOptionals: *txOpts,
+		ExpandsResult:        r.Expands(resultExpandable),
+		ExecutionState:       *executionStateQuery,
+	}, nil
 }
 
+// GetTransactionResult represents a parsed HTTP request for retrieving a transaction result.
 type GetTransactionResult struct {
 	GetByIDRequest
 	TransactionOptionals
+	// TODO(Uliana): add this to the openapi
+	ExecutionState models.ExecutionStateQuery
 }
 
-// GetTransactionResultRequest extracts necessary variables from the provided request,
+// NewGetTransactionResult extracts necessary variables from the provided request,
 // builds a GetTransactionResult instance, and validates it.
 //
 // All errors indicate a malformed request.
-func GetTransactionResultRequest(r *common.Request) (GetTransactionResult, error) {
-	var req GetTransactionResult
-	err := req.Build(r)
-	return req, err
+func NewGetTransactionResult(r *common.Request) (*GetTransactionResult, error) {
+	return parseGetTransactionResult(
+		r,
+		r.GetQueryParam(agreeingExecutorCountQuery),
+		r.GetQueryParams(requiredExecutorIdsQuery),
+		r.GetQueryParam(includeExecutorMetadataQuery),
+	)
 }
 
-func (g *GetTransactionResult) Build(r *common.Request) error {
-	err := g.TransactionOptionals.Parse(r)
+// parseGetTransactionResult parses raw HTTP query parameters into a
+// GetTransactionResult struct. It validates the transaction ID, optional fields,
+// and execution state configuration extracted from the request.
+//
+// All errors indicate the request is invalid.
+func parseGetTransactionResult(
+	r *common.Request,
+	rawAgreeingExecutorsCount string,
+	rawAgreeingExecutorsIds []string,
+	rawIncludeExecutorMetadata string,
+) (*GetTransactionResult, error) {
+	txOpts, err := NewTransactionOptionals(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = g.GetByIDRequest.Build(r)
+	var getByIDRequest GetByIDRequest
+	if err := getByIDRequest.Build(r); err != nil {
+		return nil, err
+	}
 
-	return err
+	executionStateQuery, err := parser.NewExecutionStateQuery(
+		rawAgreeingExecutorsCount,
+		rawAgreeingExecutorsIds,
+		rawIncludeExecutorMetadata,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetTransactionResult{
+		GetByIDRequest:       getByIDRequest,
+		TransactionOptionals: *txOpts,
+		ExecutionState:       *executionStateQuery,
+	}, nil
 }
 
 // GetScheduledTransaction represents a request to get a scheduled transaction by its scheduled
@@ -107,15 +176,14 @@ func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, err
 		return GetScheduledTransaction{}, fmt.Errorf("invalid ID format")
 	}
 
-	var transactionOptionals TransactionOptionals
-	err = transactionOptionals.Parse(r)
+	txOpts, err := NewTransactionOptionals(r)
 	if err != nil {
 		return GetScheduledTransaction{}, err
 	}
 
 	return GetScheduledTransaction{
 		ScheduledTxID:        scheduledTxID,
-		TransactionOptionals: transactionOptionals,
+		TransactionOptionals: *txOpts,
 		ExpandsResult:        r.Expands(resultExpandable),
 	}, nil
 }
@@ -138,14 +206,13 @@ func NewGetScheduledTransactionResult(r *common.Request) (GetScheduledTransactio
 		return GetScheduledTransactionResult{}, fmt.Errorf("invalid ID format")
 	}
 
-	var transactionOptionals TransactionOptionals
-	err = transactionOptionals.Parse(r)
+	txOpts, err := NewTransactionOptionals(r)
 	if err != nil {
 		return GetScheduledTransactionResult{}, err
 	}
 
 	return GetScheduledTransactionResult{
 		ScheduledTxID:        scheduledTxID,
-		TransactionOptionals: transactionOptionals,
+		TransactionOptionals: *txOpts,
 	}, nil
 }
