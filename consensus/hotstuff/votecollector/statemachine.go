@@ -243,9 +243,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		//    Informally, the state transition will happen _after_ we cached the vote.
 		//  * Case (c): `currentState` = [VoteCollectorStatusCaching] while `m.Status()` = [VoteCollectorStatusVerifying].
 		//    In this scenario, the vote is being fed into the [NoopProcessor] first, before we realize that the state has changed. However,
-		//    since the status has changed, the check below will trigger a repeat of the processing, which will then enter case (a)
-		//    (or leave the happy path by transitioning to [VoteCollectorStatusInvalid], implying we are dealing with a byzantine proposer, in which
-		//    case we may drop all votes anyway).
+		//    since the status has changed, the check below will trigger a repeat of the processing, which will then enter case (a).
 		// We have shown that all votes will reach the [VerifyingVoteProcessor] on the happy path.
 		//
 		// CAUTION: In the proof, we utilized that reading the `votesCache` happens before writing to it (case b). It is important to emphasize that
@@ -283,8 +281,6 @@ func (m *VoteCollector) View() uint64 {
 // equal to `expectedValue`. The implementation only allows the transitions
 //
 //	CachingVotes   → VerifyingVotes
-//	CachingVotes   → Invalid
-//	VerifyingVotes → Invalid
 //
 // No errors are expected during normal operation (Byzantine edge cases handled via notifications internally).
 func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
@@ -339,13 +335,6 @@ func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
 				return fmt.Errorf("while processing block %v, found that VoteProcessor reports status %s but has an incompatible implementation type %T",
 					proposal.Block.BlockID, proc.Status(), verifyingProc)
 			}
-			if verifyingProc.Block().BlockID != proposal.Block.BlockID {
-				m.terminateVoteProcessing()
-			}
-
-		// Vote processing for this view has already been terminated. Note: proposal equivocation
-		// is handled by hotstuff.Forks, so we don't have anything to do here.
-		case hotstuff.VoteCollectorStatusInvalid: /* no op */
 
 		default:
 			return fmt.Errorf("while processing block %v, found that VoteProcessor reported unknown status %s", proposal.Block.BlockID, proc.Status())
@@ -402,41 +391,6 @@ func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error 
 	}
 
 	return nil
-}
-
-// terminateVoteProcessing atomically transitions the VoteCollector into state
-// `VoteCollectorStatusInvalid`. if it wasn't already in this state.
-func (m *VoteCollector) terminateVoteProcessing() {
-	currentProcWrapper := m.votesProcessor.Load().(*atomicValueWrapper)
-	if currentProcWrapper.processor.Status() == hotstuff.VoteCollectorStatusInvalid {
-		return
-	}
-
-	newProcWrapper := &atomicValueWrapper{
-		processor: NewNoopCollector(hotstuff.VoteCollectorStatusInvalid),
-	}
-
-	// We now have an optimistically-constructed `newProcWrapper` that represents the desired new state (happy path). We must ensure
-	// that writing the `newProcWrapper` to `m.votesProcessor` happens ATOMICALLY if and only if the current state is not
-	// `VoteCollectorStatusInvalid`. The "Compare-And-Swap Loop" (CAS LOOP) is an efficient pattern to implement this:
-	//    (i) We first retrieved the current state (above) and checked whether it is different from `VoteCollectorStatusInvalid`.
-	//   (ii) If so, we attempt to compare-and-swap the current with the new state.
-	// Note that (i) and (ii) are separate operations. However, the CAS in (ii) ensures that the write only happens if the current state
-	// is still the same as what we observed in (i). If another thread changed the state in between (i) and (ii), we have worked with
-	// an outdated view of the current state, and should repeat the attempt to update the state (hence the "loop" in CAS LOOP).
-	// Since we are storing a pointer in the atomic.Value the value compared will be the reference to the object.
-	for {
-		stateUpdateSuccessful := m.votesProcessor.CompareAndSwap(currentProcWrapper, newProcWrapper)
-		if stateUpdateSuccessful {
-			return
-		}
-		// the `currentProcWrapper` we worked with was stale:
-		// reload, check if invalid target state has already been reached, and repeat if not
-		currentProcWrapper = m.votesProcessor.Load().(*atomicValueWrapper)
-		if currentProcWrapper.processor.Status() == hotstuff.VoteCollectorStatusInvalid {
-			return
-		}
-	}
 }
 
 // processCachedVotes feeds all cached votes into the VoteProcessor
