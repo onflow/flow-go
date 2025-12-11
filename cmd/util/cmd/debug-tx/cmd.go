@@ -57,7 +57,7 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node (required if --use-execution-data-api is false)")
 
-	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", 9999, "transaction compute limit")
+	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", flow.DefaultMaxTransactionGasLimit, "transaction compute limit")
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
@@ -456,6 +456,7 @@ func RunTransaction(
 
 	fvmOptions := []fvm.Option{
 		fvm.WithCadenceVMEnabled(useVM),
+		fvm.WithComputationLimit(computeLimit),
 	}
 
 	if spanExporter != nil {
@@ -497,7 +498,6 @@ func RunTransaction(
 		tx,
 		snapshot,
 		header,
-		computeLimit,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Transaction execution failed")
