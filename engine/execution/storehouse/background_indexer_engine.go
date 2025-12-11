@@ -70,7 +70,7 @@ func NewBackgroundIndexerEngine(
 func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	b.log.Info().Msg("bootstrapping background indexer")
+	b.log.Info().Msg("bootstrapping register store in background")
 	backgroundIndexer, closer, err := b.bootstrapper(ctx)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to bootstrap background indexer: %w", err))
@@ -80,16 +80,14 @@ func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, 
 	// Store the closer to close it during shutdown
 	b.registerStoreCloser = closer
 
-	b.log.Info().Msg("starting background indexer worker loop")
+	b.log.Info().Msg("bootstrapping completed, starting background indexer worker loop")
 
 	for {
 		select {
 		case <-ctx.Done():
 			// Close the register store when shutting down
-			if b.registerStoreCloser != nil {
-				if err := b.registerStoreCloser.Close(); err != nil {
-					b.log.Error().Err(err).Msg("failed to close register store during shutdown")
-				}
+			if err := b.registerStoreCloser.Close(); err != nil {
+				b.log.Error().Err(err).Msg("failed to close register store during shutdown")
 			}
 			return
 		case <-b.newBlockExecutedOrFinalized.Channel():
