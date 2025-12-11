@@ -1356,9 +1356,8 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	logger := node.Logger.With().Str("component", "background_indexer_engine").Logger()
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
-		logger,
+		node.Logger,
 		exeNode.exeConf.enableStorehouse,
 		exeNode.exeConf.enableBackgroundStorehouseIndexing,
 		node.State,

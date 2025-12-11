@@ -85,6 +85,7 @@ func loadRegisterStore(
 	log.Info().
 		Str("pebble_db_path", registerDir).
 		Msg("register store enabled")
+
 	pebbledb, err := storagepebble.OpenRegisterPebbleDB(
 		log.With().Str("pebbledb", "registers").Logger(),
 		registerDir)
@@ -93,6 +94,7 @@ func loadRegisterStore(
 		return nil, nil, fmt.Errorf("could not create disk register store: %w", err)
 	}
 
+	// wrap the pebble db with a struct to include detailed error message
 	closer := &pebbleDBCloser{db: pebbledb}
 
 	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
@@ -166,17 +168,22 @@ func LoadBackgroundIndexerEngine(
 	blockExecutedNotifier BlockExecutedNotifier, // optional: notifier for block executed events
 	followerDistributor *pubsub.FollowerDistributor,
 ) (*BackgroundIndexerEngine, bool, error) {
+
+	lg := log.With().Str("component", "background_indexer_loader").Logger()
+
 	// Only create background indexer engine if storehouse is not enabled
 	// and background indexing is enabled
 	if enableStorehouse {
-		log.Info().Msg("background indexer engine disabled, since storehouse is enabled")
+		lg.Info().Msg("background indexer engine disabled, since storehouse is enabled")
 		return nil, false, nil
 	}
 
 	if !enableBackgroundStorehouseIndexing {
-		log.Info().Msg("background indexer engine disabled, since --enableBackgroundStorehouseIndexing==false")
+		lg.Info().Msg("background indexer engine disabled, since --enableBackgroundStorehouseIndexing==false")
 		return nil, false, nil
 	}
+
+	lg.Info().Msg("background indexer engine enabled")
 
 	// Check that required dependencies are available
 	if executionDataStore == nil {
@@ -186,7 +193,9 @@ func LoadBackgroundIndexerEngine(
 		return nil, false, fmt.Errorf("execution results reader is not initialized")
 	}
 
-	// Create bootstrapper function that will load the register store and create the background indexer
+	// bootstrapper function allows deferred initialization of register store
+	// and the initial indexing work, so that it happens within the engine's worker loop
+	// and not block the component initialization
 	bootstrapper := func(ctx context.Context) (*BackgroundIndexer, io.Closer, error) {
 		// Load register store for background indexing
 		registerStore, closer, err := loadRegisterStore(
@@ -203,10 +212,6 @@ func LoadBackgroundIndexerEngine(
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load register store: %w", err)
-		}
-
-		if registerStore == nil {
-			return nil, nil, fmt.Errorf("register store is nil after loading")
 		}
 
 		// Create the register updates provider
