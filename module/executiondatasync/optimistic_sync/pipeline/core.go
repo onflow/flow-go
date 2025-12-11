@@ -136,7 +136,8 @@ func NewCore(
 // Calling Download after Abandon is called will return an error.
 //
 // Expected error returns during normal operation:
-// - [context.Canceled]: if the provided context was canceled before completion
+//   - [context.Canceled]: if the provided context was canceled before completion
+//   - [optimistic_sync.ErrResultAbandoned]: if the core is already abandoned
 func (c *Core) Download(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -205,7 +206,8 @@ func (c *Core) Download(ctx context.Context) error {
 // The method may only be called once. Calling it multiple times will return an error.
 // Calling Index after Abandon is called will return an error.
 //
-// No error returns are expected during normal operations
+// Expected error returns during normal operation:
+//   - [optimistic_sync.ErrResultAbandoned]: if the core is already abandoned
 func (c *Core) Index() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -259,7 +261,8 @@ func (c *Core) Index() error {
 // The method may only be called once. Calling it multiple times will return an error.
 // Calling Persist after Abandon is called will return an error.
 //
-// No error returns are expected during normal operations
+// Expected error returns during normal operation:
+//   - [optimistic_sync.ErrResultAbandoned]: if the core is already abandoned
 func (c *Core) Persist() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

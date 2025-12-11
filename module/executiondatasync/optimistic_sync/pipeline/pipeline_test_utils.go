@@ -114,7 +114,7 @@ func createPipeline(t *testing.T) (*Pipeline, *osmock.Core, <-chan optimistic_sy
 	parent := NewMockStateProvider()
 	stateReceiver := NewMockStateConsumer()
 
-	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), false, stateReceiver)
+	pipeline := NewPipeline(zerolog.Nop(), unittest.ExecutionResultFixture(), stateReceiver)
 
 	return pipeline, mockCore, stateReceiver.updateChan, parent
 }
