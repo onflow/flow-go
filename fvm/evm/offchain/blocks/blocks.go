@@ -83,7 +83,7 @@ func (b *Blocks) PushBlockMeta(
 	return b.storeBlockMetaData(meta)
 }
 
-// PushBlockHash pushes a new block block hash into the storage
+// PushBlockHash pushes a new block hash into the storage
 func (b *Blocks) PushBlockHash(
 	height uint64,
 	hash gethCommon.Hash,
