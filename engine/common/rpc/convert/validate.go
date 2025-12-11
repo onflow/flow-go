@@ -70,7 +70,7 @@ func BlockIDs(blockIDs [][]byte) ([]flow.Identifier, error) {
 }
 
 func CollectionID(collectionID []byte) (flow.Identifier, error) {
-	if len(collectionID) == 0 {
+	if len(collectionID) != flow.IdentifierLen {
 		return flow.ZeroID, status.Error(codes.InvalidArgument, "invalid collection id")
 	}
 	return flow.HashToID(collectionID), nil
@@ -84,7 +84,7 @@ func EventType(eventType string) (string, error) {
 }
 
 func TransactionID(txID []byte) (flow.Identifier, error) {
-	if len(txID) == 0 {
+	if len(txID) != flow.IdentifierLen {
 		return flow.ZeroID, status.Error(codes.InvalidArgument, "invalid transaction id")
 	}
 	return flow.HashToID(txID), nil

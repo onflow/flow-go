@@ -197,7 +197,7 @@ func (tb *ProtocolDataFixtureBuilder) buildBlocks() ([]*flow.Block, []*flow.Head
 		guarantees := make([]*flow.CollectionGuarantee, tb.colPerBlock)
 		blockCollections := make([]*flow.Collection, tb.colPerBlock)
 		for j := range tb.colPerBlock {
-			colTxs := unittest.TransactionBodyListFixture(tb.txPerCol)
+			colTxs := unittest.TransactionFixtures(tb.txPerCol)
 			col := unittest.CompleteCollectionFromTransactions(colTxs)
 			guarantees[j] = col.Guarantee
 

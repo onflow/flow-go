@@ -62,7 +62,7 @@ func TestTransactionPool(t *testing.T) {
 // TestConcurrentWriteAndRead checks correctness of transactions mempool under concurrent read and write.
 func TestConcurrentWriteAndRead(t *testing.T) {
 	total := 100
-	txs := unittest.TransactionBodyListFixture(total)
+	txs := unittest.TransactionFixtures(total)
 	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	wg := sync.WaitGroup{}
@@ -98,7 +98,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 // transactions in the same order as they are returned.
 func TestValuesReturnsInOrder(t *testing.T) {
 	total := 100
-	txs := unittest.TransactionBodyListFixture(total)
+	txs := unittest.TransactionFixtures(total)
 	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	// storing all transactions
