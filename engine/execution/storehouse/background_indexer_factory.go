@@ -223,6 +223,7 @@ func LoadBackgroundIndexerEngine(
 
 		// Create the background indexer
 		backgroundIndexer := NewBackgroundIndexer(
+			log,
 			provider,
 			registerStore,
 			state,

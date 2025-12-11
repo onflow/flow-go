@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -15,6 +17,7 @@ type RegisterUpdatesProvider interface {
 }
 
 type BackgroundIndexer struct {
+	log           zerolog.Logger
 	provider      RegisterUpdatesProvider
 	registerStore execution.RegisterStore
 	state         protocol.State
@@ -23,12 +26,14 @@ type BackgroundIndexer struct {
 }
 
 func NewBackgroundIndexer(
+	log zerolog.Logger,
 	provider RegisterUpdatesProvider,
 	registerStore execution.RegisterStore,
 	state protocol.State,
 	headers storage.Headers,
 ) *BackgroundIndexer {
 	return &BackgroundIndexer{
+		log:           log,
 		provider:      provider,
 		registerStore: registerStore,
 		state:         state,
@@ -46,6 +51,11 @@ func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx contex
 	if err != nil {
 		return fmt.Errorf("failed to get latest finalized height: %w", err)
 	}
+
+	b.log.Debug().
+		Uint64("start_height", startHeight).
+		Uint64("latest_finalized_height", latestFinalized.Height).
+		Msg("indexing registers up to latest finalized and executed height")
 
 	// Loop through each unindexed finalized height, fetch register updates and store them
 	for h := startHeight + 1; h <= latestFinalized.Height; h++ {
