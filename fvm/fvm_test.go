@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -4276,4 +4277,83 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expectedBlockHashListBucket, newBlockHashListBucket)
 		}))
+}
+
+func TestTransactionIndexCall(t *testing.T) {
+	t.Parallel()
+
+	t.Run("in transactions",
+		newVMTest().
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					snapshotTree snapshot.SnapshotTree,
+				) {
+					txBodyBuilder := flow.NewTransactionBodyBuilder().
+						SetScript([]byte(`
+						transaction {
+						  prepare() {
+							let idx = getTransactionIndex()
+							log(idx)
+						  }
+						}
+					`)).
+						SetProposalKey(chain.ServiceAddress(), 0, 0).
+						SetPayer(chain.ServiceAddress())
+
+					err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+					require.NoError(t, err)
+
+					txBody, err := txBodyBuilder.Build()
+					require.NoError(t, err)
+
+					ctx = fvm.NewContextFromParent(ctx, fvm.WithCadenceLogging(true))
+
+					txIndex := uint32(3)
+
+					_, output, err := vm.Run(
+						ctx,
+						fvm.Transaction(txBody, txIndex),
+						snapshotTree)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
+					require.Len(t, output.Logs, 1)
+
+					idx, err := strconv.Atoi(output.Logs[0])
+					require.NoError(t, err)
+					require.Equal(t, txIndex, uint32(idx))
+				},
+			),
+	)
+
+	t.Run("in scripts",
+		newVMTest().
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					snapshotTree snapshot.SnapshotTree,
+				) {
+					script := fvm.Script(
+						[]byte(`
+							access(all) fun main(): UInt32 {
+								return getTransactionIndex()
+							}`))
+
+					_, output, err := vm.Run(
+						ctx,
+						script,
+						snapshotTree)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
+
+					require.Equal(t, cadence.UInt32(0), output.Value)
+				},
+			),
+	)
 }
