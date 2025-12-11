@@ -55,6 +55,28 @@ func getTransactionReq(id string, expandResult bool, blockIdQuery string, collec
 	return req
 }
 
+func getTransactionsByBlockReq(blockId string, expandResult bool, collectionIdQuery string) *http.Request {
+	u, _ := url.Parse("/v1/transactions")
+	q := u.Query()
+
+	if blockId != "" {
+		q.Add("block_id", blockId)
+	}
+
+	if expandResult {
+		q.Add("expand", "result")
+	}
+
+	if collectionIdQuery != "" {
+		q.Add("collection_id", collectionIdQuery)
+	}
+
+	u.RawQuery = q.Encode()
+
+	req, _ := http.NewRequest("GET", u.String(), nil)
+	return req
+}
+
 func getTransactionResultReq(id string, blockIdQuery string, collectionIdQuery string) *http.Request {
 	u, _ := url.Parse(fmt.Sprintf("/v1/transaction_results/%s", id))
 	q := u.Query()
@@ -64,6 +86,20 @@ func getTransactionResultReq(id string, blockIdQuery string, collectionIdQuery s
 
 	if collectionIdQuery != "" {
 		q.Add("collection_id", collectionIdQuery)
+	}
+
+	u.RawQuery = q.Encode()
+
+	req, _ := http.NewRequest("GET", u.String(), nil)
+	return req
+}
+
+func getTransactionResultsByBlockReq(blockIdQuery string) *http.Request {
+	u, _ := url.Parse("/v1/transaction_results")
+	q := u.Query()
+
+	if blockIdQuery != "" {
+		q.Add("block_id", blockIdQuery)
 	}
 
 	u.RawQuery = q.Encode()
@@ -217,6 +253,250 @@ func TestGetTransactions(t *testing.T) {
 	})
 }
 
+func TestGetTransactionsByBlockID(t *testing.T) {
+	t.Run("get by block ID without expanded results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		blockID := unittest.IdentifierFixture()
+
+		tx1 := unittest.TransactionFixture()
+		tx2 := unittest.TransactionFixture()
+		txs := []*flow.TransactionBody{&tx1, &tx2}
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(txs, nil)
+		req := getTransactionsByBlockReq(blockID.String(), false, "")
+
+		expected := fmt.Sprintf(`[
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		},
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		}
+	]`,
+			txs[0].ID(), txs[0].ReferenceBlockID, util.ToBase64(txs[0].EnvelopeSignatures[0].Signature), txs[0].ID(), txs[0].ID(),
+			txs[1].ID(), txs[1].ReferenceBlockID, util.ToBase64(txs[1].EnvelopeSignatures[0].Signature), txs[1].ID(), txs[1].ID(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by block ID with expanded results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		blockID := unittest.IdentifierFixture()
+
+		tx1 := unittest.TransactionFixture()
+		tx2 := unittest.TransactionFixture()
+		txs := []*flow.TransactionBody{&tx1, &tx2}
+
+		txr1 := transactionResultFixture(tx1)
+		txr2 := transactionResultFixture(tx2)
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(txs, nil)
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, tx1.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txr1, nil)
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, tx2.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txr2, nil)
+
+		req := getTransactionsByBlockReq(blockID.String(), true, "")
+
+		expected := fmt.Sprintf(`[
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "result": {
+			  "block_id": "%s",
+			  "collection_id": "%s",
+			  "execution": "Success",
+			  "status": "Sealed",
+			  "status_code": 1,
+			  "error_message": "",
+			  "computation_used": "0",
+			  "events": [
+				  {
+					  "type": "flow.AccountCreated",
+					  "transaction_id": "%s",
+					  "transaction_index": "0",
+					  "event_index": "0",
+					  "payload": ""
+				  }
+			  ],
+			  "_links": {
+				  "_self": "/v1/transaction_results/%s"
+			  }
+		   },
+		   "_expandable": {},
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   }
+		},
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "result": {
+			  "block_id": "%s",
+			  "collection_id": "%s",
+			  "execution": "Success",
+			  "status": "Sealed",
+			  "status_code": 1,
+			  "error_message": "",
+			  "computation_used": "0",
+			  "events": [
+				  {
+					  "type": "flow.AccountCreated",
+					  "transaction_id": "%s",
+					  "transaction_index": "0",
+					  "event_index": "0",
+					  "payload": ""
+				  }
+			  ],
+			  "_links": {
+				  "_self": "/v1/transaction_results/%s"
+			  }
+		   },
+		   "_expandable": {},
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   }
+		}
+	]`,
+			// first tx + result
+			tx1.ID(), tx1.ReferenceBlockID, util.ToBase64(tx1.EnvelopeSignatures[0].Signature),
+			tx1.ReferenceBlockID, txr1.CollectionID, tx1.ID(), tx1.ID(), tx1.ID(),
+			// second tx + result
+			tx2.ID(), tx2.ReferenceBlockID, util.ToBase64(tx2.EnvelopeSignatures[0].Signature),
+			tx2.ReferenceBlockID, txr2.CollectionID, tx2.ID(), tx2.ID(), tx2.ID(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by block ID invalid block_id", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		req := getTransactionsByBlockReq("invalid", false, "")
+
+		expected := `{"code":400, "message":"invalid ID format"}`
+		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
+	})
+
+	t.Run("get by block ID non-existing block", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		blockID := unittest.IdentifierFixture()
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(nil, status.Error(codes.NotFound, "block not found"))
+
+		req := getTransactionsByBlockReq(blockID.String(), false, "")
+
+		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
+		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
+	})
+
+}
+
 func TestGetTransactionResult(t *testing.T) {
 	id := unittest.IdentifierFixture()
 	bid := unittest.IdentifierFixture()
@@ -350,6 +630,143 @@ func TestGetTransactionResult(t *testing.T) {
 		expected := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
 	})
+}
+
+func TestGetTransactionResultsByBlockID(t *testing.T) {
+
+	t.Run("get by block ID", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		blockID := unittest.IdentifierFixture()
+
+		// first tx + result
+		id1 := unittest.IdentifierFixture()
+		bid1 := blockID
+		cid1 := unittest.IdentifierFixture()
+		txr1 := &accessmodel.TransactionResult{
+			Status:     flow.TransactionStatusSealed,
+			StatusCode: 10,
+			Events: []flow.Event{
+				unittest.EventFixture(
+					unittest.Event.WithEventType(flow.EventAccountCreated),
+					unittest.Event.WithTransactionIndex(1),
+					unittest.Event.WithEventIndex(0),
+					unittest.Event.WithTransactionID(id1),
+				),
+			},
+			ErrorMessage:  "",
+			BlockID:       bid1,
+			CollectionID:  cid1,
+			TransactionID: id1,
+		}
+		txr1.Events[0].Payload = []byte(`test payload 1`)
+
+		// second tx + result
+		id2 := unittest.IdentifierFixture()
+		bid2 := blockID
+		cid2 := unittest.IdentifierFixture()
+		txr2 := &accessmodel.TransactionResult{
+			Status:     flow.TransactionStatusSealed,
+			StatusCode: 10,
+			Events: []flow.Event{
+				unittest.EventFixture(
+					unittest.Event.WithEventType(flow.EventAccountCreated),
+					unittest.Event.WithTransactionIndex(0),
+					unittest.Event.WithEventIndex(0),
+					unittest.Event.WithTransactionID(id2),
+				),
+			},
+			ErrorMessage:  "",
+			BlockID:       bid2,
+			CollectionID:  cid2,
+			TransactionID: id2,
+		}
+		txr2.Events[0].Payload = []byte(`test payload 2`)
+
+		txResults := []*accessmodel.TransactionResult{txr1, txr2}
+
+		backend.Mock.
+			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txResults, nil)
+
+		req := getTransactionResultsByBlockReq(blockID.String())
+
+		expected := fmt.Sprintf(`[
+			{
+				"block_id": "%s",
+				"collection_id": "%s",
+				"execution": "Success",
+				"status": "Sealed",
+				"status_code": 10,
+				"error_message": "",
+				"computation_used": "0",
+				"events": [
+					{
+						"type": "flow.AccountCreated",
+						"transaction_id": "%s",
+						"transaction_index": "1",
+						"event_index": "0",
+						"payload": "%s"
+					}
+				],
+				"_links": {
+					"_self": "/v1/transaction_results/%s"
+				}
+			},
+			{
+				"block_id": "%s",
+				"collection_id": "%s",
+				"execution": "Success",
+				"status": "Sealed",
+				"status_code": 10,
+				"error_message": "",
+				"computation_used": "0",
+				"events": [
+					{
+						"type": "flow.AccountCreated",
+						"transaction_id": "%s",
+						"transaction_index": "0",
+						"event_index": "0",
+						"payload": "%s"
+					}
+				],
+				"_links": {
+					"_self": "/v1/transaction_results/%s"
+				}
+			}
+		]`,
+			// first result
+			bid1.String(), cid1.String(), id1.String(), util.ToBase64(txr1.Events[0].Payload), id1.String(),
+			// second result
+			bid2.String(), cid2.String(), id2.String(), util.ToBase64(txr2.Events[0].Payload), id2.String(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by block ID invalid block_id", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		req := getTransactionResultsByBlockReq("invalid")
+
+		expected := `{"code":400, "message":"invalid ID format"}`
+		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
+	})
+
+	t.Run("get by block ID non-existing block", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		blockID := unittest.IdentifierFixture()
+
+		backend.Mock.
+			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(nil, status.Error(codes.NotFound, "block not found"))
+
+		req := getTransactionResultsByBlockReq(blockID.String())
+
+		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
+		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
+	})
+
 }
 
 func TestGetScheduledTransactions(t *testing.T) {

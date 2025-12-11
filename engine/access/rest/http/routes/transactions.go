@@ -52,6 +52,47 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 	return response, nil
 }
 
+// GetTransactionsByBlockID gets transactions by requested blockID.
+func GetTransactionsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	req, err := request.NewGetTransactionsByBlockIDRequest(r)
+	if err != nil {
+		return nil, common.NewBadRequestError(err)
+	}
+
+	transactions, err := backend.GetTransactionsByBlockID(r.Context(), req.BlockID)
+	if err != nil {
+		return nil, err
+	}
+
+	var transactionsResponse commonmodels.Transactions
+	// only lookup result if transaction result is to be expanded
+	if req.ExpandsResult {
+		transactionsResponse = make(commonmodels.Transactions, len(transactions))
+
+		for i, transaction := range transactions {
+			txr, err := backend.GetTransactionResult(
+				r.Context(),
+				transaction.ID(),
+				req.BlockID,
+				req.CollectionID,
+				entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			var response commonmodels.Transaction
+			response.Build(transaction, txr, link)
+
+			transactionsResponse[i] = response
+		}
+	} else {
+		transactionsResponse.Build(transactions, link)
+	}
+
+	return transactionsResponse, nil
+}
+
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
 // The ID may be either:
 //  1. the hex-encoded 32-byte hash of a user-submitted transaction, or
@@ -82,45 +123,6 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 	return response, nil
 }
 
-// GetTransactionsByBlockID gets transactions by requested blockID.
-func GetTransactionsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.NewGetTransactionsByBlockIDRequest(r)
-	if err != nil {
-		return nil, common.NewBadRequestError(err)
-	}
-
-	transactions, err := backend.GetTransactionsByBlockID(r.Context(), req.BlockID)
-	if err != nil {
-		return nil, err
-	}
-
-	var transactionsResponse commonmodels.Transactions
-	// only lookup result if transaction result is to be expanded
-	if req.ExpandsResult {
-		var response commonmodels.Transaction
-		for i, transaction := range transactions {
-			txr, err := backend.GetTransactionResult(
-				r.Context(),
-				transaction.ID(),
-				req.BlockID,
-				req.CollectionID,
-				entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			response.Build(transaction, txr, link)
-
-			transactionsResponse[i] = response
-		}
-	} else {
-		transactionsResponse.Build(transactions, link)
-	}
-
-	return transactionsResponse, nil
-}
-
 // GetTransactionResultsByBlockID gets transaction results by requested blockID.
 func GetTransactionResultsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetTransactionResultsByBlockIDRequest(r)
@@ -133,7 +135,7 @@ func GetTransactionResultsByBlockID(r *common.Request, backend access.API, link 
 		return nil, err
 	}
 
-	var response []commonmodels.TransactionResult
+	var response = make([]commonmodels.TransactionResult, len(transactionResults))
 	var txr commonmodels.TransactionResult
 	for i, transactionResult := range transactionResults {
 		txr.Build(transactionResult, transactionResult.TransactionID, link)
