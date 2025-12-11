@@ -20,7 +20,6 @@ type BackgroundIndexerEngine struct {
 	log                         zerolog.Logger
 	newBlockExecutedOrFinalized engine.Notifier
 	bootstrapper                func(ctx context.Context) (*BackgroundIndexer, io.Closer, error)
-	registerStoreCloser         io.Closer
 }
 
 func newFinalizedAndExecutedNotifier(
@@ -72,24 +71,21 @@ func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, 
 	ready()
 
 	b.log.Info().Msg("bootstrapping register store in background")
+
 	backgroundIndexer, closer, err := b.bootstrapper(ctx)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to bootstrap background indexer: %w", err))
 		return
 	}
+	defer closer.Close()
 
 	// Store the closer to close it during shutdown
-	b.registerStoreCloser = closer
 
 	b.log.Info().Msg("bootstrapping completed, starting background indexer worker loop")
 
 	for {
 		select {
 		case <-ctx.Done():
-			// Close the register store when shutting down
-			if err := b.registerStoreCloser.Close(); err != nil {
-				b.log.Error().Err(err).Msg("failed to close register store during shutdown")
-			}
 			return
 		case <-b.newBlockExecutedOrFinalized.Channel():
 			err := backgroundIndexer.IndexUpToLatestFinalizedAndExecutedHeight(ctx)
