@@ -126,6 +126,10 @@ type Pipeline2 struct {
 	indexingWorkerPool    *workerpool.WorkerPool
 	persistingWorkerPool  *workerpool.WorkerPool
 
+	rootContext context.Context // from the component managing the Results Forest and all its pipelines
+	// -> child context (aka "pipeline context") with cancel -> store pipeline context and the cancel in the pipeline here
+	// when submitting a task to a workerpool, use the pipeline context
+
 	signalerCtx irrecoverable.SignalerContext // the escalate irrecoverable errors to the higher-level business logic
 
 	// The following fields are accessed externally. they are stored using atomics to avoid
@@ -300,11 +304,11 @@ func (p *Pipeline2) checkTrigger1(parentState optimistic_sync.State2) {
 // Pipeline2 struct specification for details).
 func (p *Pipeline2) downloadTask() {
 	panic("update core to allow the following commented-out code: ")
-	//err := p.core.Download(ctx)
-	//if err != nil {
-	// TODO Expected error returns during normal operations:
-	//   - context.Canceled: when the context is canceled
-	//}
+	err := p.core.Download(ctx)
+	if err != nil {
+	TODO Expected error returns during normal operations:
+	  - context.Canceled: when the context is canceled
+	}
 
 	// Downloading Task finished successful. Atomically transition pipeline state to Indexing. In a second (non-atomic) step, we schedule
 	// the indexing task. We must show that this satisfies requirement (I) and (II):
@@ -424,8 +428,8 @@ func (p *Pipeline2) IsSealed() bool {
 //
 // No error returns expected during normal operations.
 func (p *Pipeline2) Abandon() error {
-	priorState, success := p.state.Evolve(optimistic_sync.State2Abandoned) // idempotent, as our state machine is reflexive
-	if !success {                                                          // none of the following should be compatible with a valid state evolution;
+	priorState, success := p.state.Set(optimistic_sync.State2Abandoned) // idempotent, as our state machine is reflexive
+	if !success {                                                       // none of the following should be compatible with a valid state evolution;
 		return fmt.Errorf("state evolution %s to %s attempted, with current sealing status of %t: %w", priorState, optimistic_sync.State2Abandoned, p.IsSealed(), ErrInvalidStateEvolution)
 	}
 	if priorState != optimistic_sync.State2Abandoned {
