@@ -38,7 +38,7 @@ var clusterBlocksCmd = &cobra.Command{
 			log.Info().Msgf("got flag chain name: %s", flagChainName)
 			chainID := flow.ChainID(flagChainName)
 
-			headers := store.NewHeaders(metrics, db, chainID)
+			headers := store.NewClusterHeaders(metrics, db, chainID)
 			clusterPayloads := store.NewClusterPayloads(metrics, db)
 			clusterBlocks := store.NewClusterBlocks(db, chainID, headers, clusterPayloads)
 

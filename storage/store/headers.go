@@ -27,8 +27,49 @@ type Headers struct {
 var _ storage.Headers = (*Headers)(nil)
 
 // NewHeaders creates a Headers instance, which stores block headers.
-// It supports storing, caching and retrieving by block ID and the additionally indexed by header height.
+// It supports storing, caching and retrieving by block ID, and additionally indexes by header height and view.
 func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
+	if chainID.IsClusterChain() {
+		panic("NewHeaders called on cluster chain ID - use NewClusterHeaders instead")
+	}
+	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		err := operation.LookupBlockHeight(r, height, &id)
+		return id, err
+	}
+	retrieveView := func(r storage.Reader, view uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		err := operation.LookupCertifiedBlockByView(r, view, &id)
+		return id, err
+	}
+	return newHeaders(collector, db, chainID, retrieveHeight, retrieveView)
+}
+
+// NewClusterHeaders creates a Headers instance for a collection cluster chain, which stores block headers for cluster blocks.
+// It supports storing, caching and retrieving by block ID, and additionally an index by header height.
+func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
+	if !chainID.IsClusterChain() {
+		panic("NewClusterHeaders called on non-cluster chain ID - use NewHeaders instead")
+	}
+	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		err := operation.LookupClusterBlockHeight(r, chainID, height, &id)
+		return id, err
+	}
+	retrieveView := func(r storage.Reader, height uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		return id, fmt.Errorf("retrieve by view not implemented for cluster headers")
+	}
+	return newHeaders(collector, db, chainID, retrieveHeight, retrieveView)
+}
+
+// newHeaders contains shared logic for Header storage, including storing and retrieving by block ID
+func newHeaders(collector module.CacheMetrics,
+	db storage.DB,
+	chainID flow.ChainID,
+	retrieveHeight retrieveFunc[uint64, flow.Identifier],
+	retrieveView retrieveFunc[uint64, flow.Identifier],
+) *Headers {
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
 		if header.ChainID != chainID {
 			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
@@ -48,26 +89,6 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 			return nil, fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
 		}
 		return &header, err
-	}
-
-	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
-		var id flow.Identifier
-		err := operation.LookupBlockHeight(r, height, &id)
-		return id, err
-	}
-
-	if chainID.IsClusterChain() {
-		retrieveHeight = func(r storage.Reader, height uint64) (flow.Identifier, error) {
-			var id flow.Identifier
-			err := operation.LookupClusterBlockHeight(r, chainID, height, &id)
-			return id, err
-		}
-	}
-
-	retrieveView := func(r storage.Reader, view uint64) (flow.Identifier, error) {
-		var id flow.Identifier
-		err := operation.LookupCertifiedBlockByView(r, view, &id)
-		return id, err
 	}
 
 	h := &Headers{

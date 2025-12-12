@@ -69,7 +69,7 @@ func (suite *MutatorSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
 	all := store.InitAll(metrics, suite.db, flow.Emulator)
-	clusterHeaders := store.NewHeaders(metrics, suite.db, suite.chainID)
+	clusterHeaders := store.NewClusterHeaders(metrics, suite.db, suite.chainID)
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference

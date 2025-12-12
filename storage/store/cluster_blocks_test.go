@@ -55,7 +55,7 @@ func TestClusterBlocks(t *testing.T) {
 		clusterBlocks := NewClusterBlocks(
 			db,
 			blocks[0].ChainID,
-			NewHeaders(metrics.NewNoopCollector(), db, blocks[0].ChainID),
+			NewClusterHeaders(metrics.NewNoopCollector(), db, blocks[0].ChainID),
 			NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 

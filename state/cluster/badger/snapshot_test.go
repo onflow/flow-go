@@ -58,7 +58,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	all := store.InitAll(metrics, suite.db, flow.Emulator)
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
-	clusterHeaders := store.NewHeaders(metrics, suite.db, suite.chainID)
+	clusterHeaders := store.NewClusterHeaders(metrics, suite.db, suite.chainID)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()

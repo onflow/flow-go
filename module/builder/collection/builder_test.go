@@ -100,7 +100,7 @@ func (suite *BuilderSuite) SetupTest() {
 	all := store.InitAll(metrics, suite.db, flow.Emulator)
 	consumer := events.NewNoop()
 
-	suite.headers = store.NewHeaders(metrics, suite.db, suite.chainID)
+	suite.headers = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
 	suite.blocks = all.Blocks
 	suite.payloads = store.NewClusterPayloads(metrics, suite.db)
 	suite.consensusHeaders = all.Headers
