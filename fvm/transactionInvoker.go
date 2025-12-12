@@ -378,6 +378,11 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
+	if executor.ctx.CadenceVMEnabled {
+		err = fmt.Errorf("Cadence VM execution is disabled for testing purposes")
+		return
+	}
+
 	err = executor.txnBodyExecutor.Execute()
 	if err != nil {
 		err = fmt.Errorf("transaction execute failed: %w", err)

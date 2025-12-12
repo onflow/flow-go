@@ -238,6 +238,10 @@ func (executor *scriptExecutor) execute() error {
 }
 
 func (executor *scriptExecutor) executeScript() error {
+	if executor.ctx.CadenceVMEnabled {
+		return fmt.Errorf("Cadence VM execution is disabled for testing purposes")
+	}
+
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
