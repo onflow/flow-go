@@ -1186,23 +1186,31 @@ func (fnb *FlowNodeBuilder) initStorageLockManager() error {
 	return nil
 }
 
+// determineChainID attempts to determine the chain this node is running on
+// directly from the database or root snapshot, before storage interfaces have been initialized.
+// No errors expected during normal operation.
 func (fnb *FlowNodeBuilder) determineChainID() error {
-	if ok, _ := badgerState.IsBootstrapped(fnb.ProtocolDB); ok {
-		chainID, err := badgerState.GetChainIDFromLatestFinalizedHeader(fnb.ProtocolDB)
-		if err == nil {
-			fnb.RootChainID = chainID
-			return nil
-		}
-	}
-	// could not read from DB; try reading root snapshot from disk
-	fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
-	rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+	bootstrapped, err := badgerState.IsBootstrapped(fnb.ProtocolDB)
 	if err != nil {
-		return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
-	}
-	// set root snapshot fields (including RootChainID)
-	if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 		return err
+	}
+	if bootstrapped {
+		chainID, err := badgerState.GetChainIDFromLatestFinalizedHeader(fnb.ProtocolDB)
+		if err != nil {
+			return err
+		}
+		fnb.RootChainID = chainID
+	} else {
+		// try reading root snapshot from disk (full bootstrap will happen later)
+		fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
+		rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
+		}
+		// set root snapshot fields, including fnb.RootChainID
+		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
+			return err
+		}
 	}
 	return nil
 }

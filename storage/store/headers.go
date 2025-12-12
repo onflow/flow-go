@@ -134,6 +134,7 @@ func newHeaders(collector module.CacheMetrics,
 // It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
 // This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
 // of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
+// Returns [storage.ErrWrongChain] if the header's ChainID does not match the one used when initializing the storage.
 // No other errors are expected during normal operation.
 func (h *Headers) storeTx(
 	lctx lockctx.Proof,
@@ -182,6 +183,7 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
 // ByBlockID returns the header with the given ID. It is available for finalized blocks and those pending finalization.
 // Error returns:
 //   - [storage.ErrNotFound] if no block header with the given ID exists
+//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
 }
