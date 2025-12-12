@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/encodable"
@@ -30,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	mSig "github.com/onflow/flow-go/module/signature"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -825,7 +823,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is no Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
@@ -848,7 +846,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
@@ -906,7 +904,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
-		packer := hsig.NewConsensusSigDataPacker(committee)
+		packer := signature.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewCombinedVerifier(committee, packer)
@@ -1033,7 +1031,7 @@ func TestCombinedVoteProcessorV2_DoubleVoting(t *testing.T) {
 
 	// create and sign proposal
 	leaderVote, err := rbSigner.CreateVote(block)
-	require.Equal(t, 2*mSig.SigLen, len(leaderVote.SigData), "sanity check failed: need a compound staking + beacon signature in the vote for this test")
+	require.Equal(t, 2*msig.SigLen, len(leaderVote.SigData), "sanity check failed: need a compound staking + beacon signature in the vote for this test")
 	require.NoError(t, err)
 	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
@@ -1057,7 +1055,7 @@ func TestCombinedVoteProcessorV2_DoubleVoting(t *testing.T) {
 	baseFactory := &combinedVoteProcessorFactoryBaseV2{
 		committee:   committee,
 		onQCCreated: onQCCreated,
-		packer:      hsig.NewConsensusSigDataPacker(committee),
+		packer:      signature.NewConsensusSigDataPacker(committee),
 	}
 	voteProcessorFactory := &VoteProcessorFactory{
 		baseFactory: baseFactory.Create,

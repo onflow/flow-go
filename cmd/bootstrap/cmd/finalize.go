@@ -19,7 +19,6 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
-	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
@@ -148,8 +147,8 @@ func finalize(cmd *cobra.Command, args []string) {
 	rootQC := constructRootQC(
 		block,
 		votes,
-		model.FilterByRole(stakingNodes, flow.RoleConsensus),
-		model.FilterByRole(internalNodes, flow.RoleConsensus),
+		bootstrap.FilterByRole(stakingNodes, flow.RoleConsensus),
+		bootstrap.FilterByRole(internalNodes, flow.RoleConsensus),
 		dkgData,
 	)
 	log.Info().Msg("")
@@ -200,15 +199,15 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	// write snapshot to disk
-	err = common.WriteJSON(model.PathRootProtocolStateSnapshot, flagOutdir, snapshot.Encodable())
+	err = common.WriteJSON(bootstrap.PathRootProtocolStateSnapshot, flagOutdir, snapshot.Encodable())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
-	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootProtocolStateSnapshot)
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, bootstrap.PathRootProtocolStateSnapshot)
 	log.Info().Msg("")
 
 	// read snapshot and verify consistency
-	rootSnapshot, err := loadRootProtocolSnapshot(model.PathRootProtocolStateSnapshot)
+	rootSnapshot, err := loadRootProtocolSnapshot(bootstrap.PathRootProtocolStateSnapshot)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to load serialized root protocol")
 	}
@@ -249,7 +248,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", flagOutdir).Msg("attempting to copy private key files")
 	if flagInternalNodePrivInfoDir != flagOutdir {
 		log.Info().Msg("copying internal private keys to output folder")
-		err := io.CopyDirectory(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, model.DirPrivateRoot))
+		err := io.CopyDirectory(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, bootstrap.DirPrivateRoot))
 		if err != nil {
 			log.Error().Err(err).Msg("could not copy private key files")
 		}
@@ -278,7 +277,7 @@ func readRootBlockVotes() []*hotstuff.Vote {
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.Contains(f, model.FilenameRootBlockVotePrefix) {
+		if !strings.Contains(f, bootstrap.FilenameRootBlockVotePrefix) {
 			continue
 		}
 
@@ -300,7 +299,7 @@ func readRootBlockVotes() []*hotstuff.Vote {
 //
 // IMPORTANT: node infos are returned in the canonical ordering, meaning this
 // is safe to use as the input to the DKG and protocol state.
-func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) ([]model.NodeInfo, error) {
+func mergeNodeInfos(internalNodes, partnerNodes []bootstrap.NodeInfo) ([]bootstrap.NodeInfo, error) {
 	nodes := append(internalNodes, partnerNodes...)
 
 	// test for duplicate Addresses
@@ -322,7 +321,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) ([]model.NodeI
 	}
 
 	// sort nodes using the canonical ordering
-	nodes = model.Sort(nodes, flow.Canonical[flow.Identity])
+	nodes = bootstrap.Sort(nodes, flow.Canonical[flow.Identity])
 
 	return nodes, nil
 }
@@ -410,7 +409,7 @@ func generateEmptyExecutionState(
 	}
 
 	commit, err = run.GenerateExecutionState(
-		filepath.Join(flagOutdir, model.DirnameExecutionState),
+		filepath.Join(flagOutdir, bootstrap.DirnameExecutionState),
 		serviceAccountPublicKey,
 		rootBlock.ChainID.Chain(),
 		fvm.WithRootBlock(rootBlock),

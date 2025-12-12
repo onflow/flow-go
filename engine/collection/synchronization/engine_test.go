@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/chainsync"
-	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
@@ -502,7 +501,7 @@ func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list
 	others := ss.participants.Filter(filter.HasNodeID[flow.Identity](ss.participants[1:].NodeIDs()...))
-	ss.con.On("Multicast", mock.Anything, synccore.DefaultPollNodes, others[0].NodeID, others[1].NodeID).Return(nil).Run(
+	ss.con.On("Multicast", mock.Anything, chainsync.DefaultPollNodes, others[0].NodeID, others[1].NodeID).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.SyncRequest)
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
@@ -520,7 +519,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	batches := unittest.BatchListFixture(1)
 
 	// should submit and mark requested all ranges
-	ss.con.On("Multicast", mock.AnythingOfType("*messages.RangeRequest"), synccore.DefaultBlockRequestNodes, mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Multicast", mock.AnythingOfType("*messages.RangeRequest"), chainsync.DefaultBlockRequestNodes, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
 			ss.Assert().Equal(ranges[0].From, req.FromHeight)
@@ -530,7 +529,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("RangeRequested", ranges[0])
 
 	// should submit and mark requested all batches
-	ss.con.On("Multicast", mock.AnythingOfType("*messages.BatchRequest"), synccore.DefaultBlockRequestNodes, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Multicast", mock.AnythingOfType("*messages.BatchRequest"), chainsync.DefaultBlockRequestNodes, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.BatchRequest)
 			ss.Assert().Equal(batches[0].BlockIDs, req.BlockIDs)

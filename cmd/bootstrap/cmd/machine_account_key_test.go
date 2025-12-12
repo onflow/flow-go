@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
-	model "github.com/onflow/flow-go/model/bootstrap"
 	ioutils "github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,11 +44,11 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 		nodeID := strings.TrimSpace(string(b))
 
 		// make sure file exists
-		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountPrivateKey, nodeID))
 		require.FileExists(t, machineKeyFilePath)
 
 		// read file priv key file before command
-		var machineAccountPrivBefore model.NodeMachineAccountKey
+		var machineAccountPrivBefore bootstrap.NodeMachineAccountKey
 		require.NoError(t, common.ReadJSON(machineKeyFilePath, &machineAccountPrivBefore))
 
 		// run command with flags
@@ -59,7 +58,7 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 		require.Regexp(t, keyFileExistsRegex, hook.logs.String())
 
 		// read machine account key file again
-		var machineAccountPrivAfter model.NodeMachineAccountKey
+		var machineAccountPrivAfter bootstrap.NodeMachineAccountKey
 		require.NoError(t, common.ReadJSON(machineKeyFilePath, &machineAccountPrivAfter))
 
 		// check if key was modified
@@ -99,7 +98,7 @@ func TestMachineAccountKeyFileCreated(t *testing.T) {
 		nodeID := strings.TrimSpace(string(b))
 
 		// delete machine account key file
-		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountPrivateKey, nodeID))
 		err = os.Remove(machineKeyFilePath)
 		require.NoError(t, err)
 

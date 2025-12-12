@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	mmetrics "github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -86,7 +85,7 @@ func TestBootstrapValid(t *testing.T) {
 func TestExtendValid(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		db := pebbleimpl.ToDB(pdb)
 		log := zerolog.Nop()
@@ -257,7 +256,7 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b4.ID())
 		require.NoError(t, err)
 
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		seals := store.NewSeals(metrics, db)
 
 		// can only find seal for G
@@ -2799,7 +2798,7 @@ func TestEpochTargetDuration(t *testing.T) {
 func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		db := pebbleimpl.ToDB(pdb)
@@ -3463,7 +3462,7 @@ func TestCacheAtomicity(t *testing.T) {
 func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		db := pebbleimpl.ToDB(pdb)

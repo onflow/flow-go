@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/access/validator"
@@ -30,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/access"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
@@ -347,7 +345,7 @@ func scheduledTransactionFromEvents(
 ) (*flow.TransactionBody, error) {
 	systemCollection, err := systemcollection.Default(chainID).
 		ByHeight(blockHeight).
-		SystemCollection(chainID.Chain(), access.StaticEventProvider(events))
+		SystemCollection(chainID.Chain(), accessmodel.StaticEventProvider(events))
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +521,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
 	systemCollection, err := versionedSystemCollection.
 		ByHeight(block.Height).
-		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
+		SystemCollection(s.g.ChainID().Chain(), accessmodel.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -594,7 +592,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_ExecutionNode() {
 	txID := s.tf.ExpectedResults[1].TransactionID
 
 	accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(1, entities.EventEncodingVersion_CCF_V0))
-	nodeResponse := &execution.GetTransactionResultResponse{
+	nodeResponse := &execproto.GetTransactionResultResponse{
 		StatusCode:           accessResponse.StatusCode,
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
@@ -624,7 +622,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 	blockID := s.tf.Block.ID()
 
 	accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(1, entities.EventEncodingVersion_CCF_V0))
-	nodeResponse := &execution.GetTransactionResultResponse{
+	nodeResponse := &execproto.GetTransactionResultResponse{
 		StatusCode:           accessResponse.StatusCode,
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
@@ -681,10 +679,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 	blockID := s.tf.Block.ID()
 
 	expectedResults := make([]*accessmodel.TransactionResult, len(s.tf.ExpectedResults))
-	nodeResults := make([]*execution.GetTransactionResultResponse, len(s.tf.ExpectedResults))
+	nodeResults := make([]*execproto.GetTransactionResultResponse, len(s.tf.ExpectedResults))
 	for i := range s.tf.ExpectedResults {
 		accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(i, entities.EventEncodingVersion_CCF_V0))
-		nodeResults[i] = &execution.GetTransactionResultResponse{
+		nodeResults[i] = &execproto.GetTransactionResultResponse{
 			StatusCode:   accessResponse.StatusCode,
 			ErrorMessage: accessResponse.ErrorMessage,
 			Events:       accessResponse.Events,
@@ -692,7 +690,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
 	}
 
-	nodeResponse := &execution.GetTransactionResultsResponse{
+	nodeResponse := &execproto.GetTransactionResultsResponse{
 		TransactionResults:   nodeResults,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
@@ -726,7 +724,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
 	systemCollection, err := versionedSystemCollection.
 		ByHeight(block.Height).
-		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
+		SystemCollection(s.g.ChainID().Chain(), accessmodel.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -745,8 +743,8 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 		}
 	}
 
-	nodeResponse := &execution.GetEventsForBlockIDsResponse{
-		Results: []*execution.GetEventsForBlockIDsResponse_Result{
+	nodeResponse := &execproto.GetEventsForBlockIDsResponse{
+		Results: []*execproto.GetEventsForBlockIDsResponse_Result{
 			{
 				BlockId:     blockID[:],
 				BlockHeight: block.Height,
