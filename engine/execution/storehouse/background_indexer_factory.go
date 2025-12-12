@@ -175,6 +175,7 @@ func LoadBackgroundIndexerEngine(
 	resultsReader storageerr.ExecutionResultsReader,
 	blockExecutedNotifier BlockExecutedNotifier, // optional: notifier for block executed events
 	followerDistributor *pubsub.FollowerDistributor,
+	heightsPerSecond uint64, // rate limit for indexing heights per second
 ) (*BackgroundIndexerEngine, bool, error) {
 
 	lg := log.With().Str("component", "background_indexer_loader").Logger()
@@ -236,6 +237,7 @@ func LoadBackgroundIndexerEngine(
 			registerStore,
 			state,
 			headers,
+			heightsPerSecond,
 		)
 
 		return backgroundIndexer, closer, nil

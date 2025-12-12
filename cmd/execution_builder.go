@@ -1432,6 +1432,7 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 		exeNode.resultsReader,
 		exeNode.blockExecutedNotifier,
 		exeNode.followerDistributor,
+		exeNode.exeConf.backgroundIndexerHeightsPerSecond,
 	)
 	if err != nil {
 		return nil, err
