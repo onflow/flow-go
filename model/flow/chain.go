@@ -2,6 +2,7 @@ package flow
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -60,6 +61,11 @@ func AllChainIDs() ChainIDList {
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
 	return c == Emulator || c == MonotonicEmulator || c == Localnet || c == Benchnet || c == BftTestnet || c == Previewnet
+}
+
+// IsClusterChain returns whether the chain ID is for a collection cluster during an epoch, rather than a full network.
+func (c ChainID) IsClusterChain() bool {
+	return strings.HasPrefix(string(c), "cluster")
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally

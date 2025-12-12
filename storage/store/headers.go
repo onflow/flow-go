@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -37,9 +36,6 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
 
-	isClusterChain := func(chainID flow.ChainID) bool {
-		return strings.HasPrefix(chainID.String(), "cluster")
-	}
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
 		var header flow.Header
 		err := operation.RetrieveHeader(r, blockID, &header)
@@ -60,7 +56,7 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 		return id, err
 	}
 
-	if isClusterChain(chainID) {
+	if chainID.IsClusterChain() {
 		retrieveHeight = func(r storage.Reader, height uint64) (flow.Identifier, error) {
 			var id flow.Identifier
 			err := operation.LookupClusterBlockHeight(r, chainID, height, &id)
