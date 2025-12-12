@@ -126,7 +126,7 @@ func NewBlobService(
 		prefix: prefix,
 		config: &BlobServiceConfig{
 			ReprovideInterval: DefaultReprovideInterval,
-			SkipBloomCache:    false, // default: use cached blockstore
+			SkipBloomCache:    false, // default: use bloom cache
 		},
 		blockStore: blockStore,
 	}

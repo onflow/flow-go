@@ -659,9 +659,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				opts = append(opts, blob.WithReprovideInterval(-1))
 			}
 
-			if !builder.BitswapBloomCacheEnabled {
-				opts = append(opts, blob.WithSkipBloomCache(true))
-			}
+			opts = append(opts, blob.WithSkipBloomCache(!builder.BitswapBloomCacheEnabled))
 
 			var err error
 			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)

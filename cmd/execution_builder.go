@@ -413,9 +413,7 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		opts = append(opts, blob.WithReprovideInterval(-1))
 	}
 
-	if !node.BitswapBloomCacheEnabled {
-		opts = append(opts, blob.WithSkipBloomCache(true))
-	}
+	opts = append(opts, blob.WithSkipBloomCache(!node.BitswapBloomCacheEnabled))
 
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
