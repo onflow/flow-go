@@ -145,7 +145,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
-	flags.BoolVar(&exeConf.enableBackgroundStorehouseIndexing, "enable-background-storehouse-indexing", false, "enable background indexing of storehouse data to eliminate downtime when enabling storehouse, default is false")
+	flags.BoolVar(&exeConf.enableBackgroundStorehouseIndexing, "enable-background-storehouse-indexing", false, "enable background indexing of storehouse data while storehouse is disabled to eliminate downtime when enabling it. default: false.")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledCallbacksEnabled, "enable execution of scheduled callbacks")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
