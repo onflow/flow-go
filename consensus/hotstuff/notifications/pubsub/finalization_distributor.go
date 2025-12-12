@@ -12,7 +12,7 @@ type OnBlockIncorporatedConsumer = func(block *model.Block)
 
 // FinalizationDistributor ingests events from HotStuff's logic for tracking forks + finalization
 // and distributes them to consumers. This logic generally runs inside all nodes (irrespectively whether
-// they are active consensus participants or or only consensus followers).
+// they are active consensus participants or only consensus followers).
 // Concurrently safe.
 type FinalizationDistributor struct {
 	blockFinalizedConsumers    []OnBlockFinalizedConsumer
