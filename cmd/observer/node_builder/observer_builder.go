@@ -1200,6 +1200,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				),
 			}
 
+			if !builder.BitswapBloomCacheEnabled {
+				opts = append(opts, blob.WithSkipBloomCache(true))
+			}
+
 			var err error
 			bs, err = node.EngineRegistry.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
 			if err != nil {
