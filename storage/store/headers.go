@@ -74,6 +74,15 @@ func newHeaders(collector module.CacheMetrics,
 		if header.ChainID != chainID {
 			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
 		}
+		if chainID.IsClusterChain() {
+			if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+				return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+			}
+		} else {
+			if !lctx.HoldsLock(storage.LockInsertBlock) {
+				return fmt.Errorf("missing lock: %v", storage.LockInsertBlock)
+			}
+		}
 		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
 
