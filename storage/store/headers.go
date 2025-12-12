@@ -92,9 +92,8 @@ func newHeaders(collector module.CacheMetrics,
 		if err != nil {
 			return nil, err
 		}
-		// raise an error when the retrieved header is for a different chain than expected,
-		// except in the case of cluster chains where the previous epoch(=chain) can be checked for transaction deduplication
-		if header.ChainID != chainID && !(isClusterChain(chainID) && isClusterChain(header.ChainID)) {
+		// raise an error when the retrieved header is for a different chain than expected
+		if header.ChainID != chainID {
 			return nil, fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
 		}
 		return &header, err

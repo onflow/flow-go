@@ -45,6 +45,7 @@ type Builder struct {
 	log                        zerolog.Logger
 	clusterEpoch               uint64 // the operating epoch for this cluster
 	// cache of values about the operating epoch which never change
+	epochFirstHeight *uint64          // first height of this cluster's operating epoch
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
@@ -285,14 +286,35 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.refChainFinalizedHeight = mainChainFinalizedHeader.Height
 	ctx.refChainFinalizedID = mainChainFinalizedHeader.ID()
 
+	// If we don't have the epoch boundaries (first/final height ON MAIN CHAIN) cached, try retrieve and cache them
+	r := b.db.Reader()
+
+	if b.epochFirstHeight != nil {
+		ctx.refEpochFirstHeight = *b.epochFirstHeight
+	} else {
+		var refEpochFirstHeight uint64
+
+		err = operation.RetrieveEpochFirstHeight(r, b.clusterEpoch, &refEpochFirstHeight)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				// can be missing if we joined (dynamic bootstrapped) in the middle of an epoch.
+				// 0 means FinalizedAncestryLookup will not be bounded by the epoch start,
+				// but only by which cluster blocks we have available.
+				refEpochFirstHeight = 0
+			} else {
+				return nil, fmt.Errorf("unexpected failure to retrieve first height of operating epoch: %w", err)
+			}
+		}
+		b.epochFirstHeight = &refEpochFirstHeight
+		ctx.refEpochFirstHeight = *b.epochFirstHeight
+	}
+
 	// if the epoch has ended and the final block is cached, use the cached values
 	if b.epochFinalHeight != nil && b.epochFinalID != nil {
 		ctx.refEpochFinalID = b.epochFinalID
 		ctx.refEpochFinalHeight = b.epochFinalHeight
 		return ctx, nil
 	}
-
-	r := b.db.Reader()
 
 	var refEpochFinalHeight uint64
 	var refEpochFinalID flow.Identifier
@@ -379,14 +401,14 @@ func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *block
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
-	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
+	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight, ctx)
 	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, b.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
 
 	for _, blockID := range clusterBlockIDs {
-		header, err := b.clusterHeaders.ByBlockID(blockID) // TODO(4204) transaction deduplication crosses clusterHeaders epoch boundary
+		header, err := b.clusterHeaders.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve cluster header (id=%x): %w", blockID, err)
 		}
@@ -617,11 +639,10 @@ func (b *Builder) buildHeader(
 // Input range is the (inclusive) range of reference heights of transactions included
 // in the collection under construction. Output range is the (inclusive) range of
 // reference heights which need to be searched.
-func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64) (start, end uint64) {
-	start = minRefHeight - flow.DefaultTransactionExpiry + 1
-	if start > minRefHeight {
-		start = 0 // overflow check
+func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64, ctx *blockBuildContext) (start, end uint64) {
+	delta := uint64(flow.DefaultTransactionExpiry + 1)
+	if minRefHeight <= ctx.refEpochFirstHeight+delta {
+		return ctx.refEpochFirstHeight, maxRefHeight // bound at start of epoch
 	}
-	end = maxRefHeight
-	return start, end
+	return minRefHeight - delta, maxRefHeight
 }
