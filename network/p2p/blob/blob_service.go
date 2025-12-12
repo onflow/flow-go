@@ -136,7 +136,7 @@ func NewBlobService(
 		opt(bs)
 	}
 
-	if bs.config.SkipBloomCache {
+	if !bs.config.SkipBloomCache {
 		cachedBlockStore, err := blockstore.CachedBlockstore(
 			context.Background(),
 			blockStore,
