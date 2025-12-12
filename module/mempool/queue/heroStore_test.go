@@ -56,7 +56,6 @@ func TestHeroStore_Concurrent(t *testing.T) {
 	messages := unittest.EngineMessageFixtures(sizeLimit)
 	// putting messages concurrently.
 	for _, m := range messages {
-		m := m
 		go func() {
 			require.True(t, store.Put(m))
 			putWG.Done()
