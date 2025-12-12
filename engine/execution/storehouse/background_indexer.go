@@ -3,6 +3,7 @@ package storehouse
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -20,11 +21,12 @@ type RegisterUpdatesProvider interface {
 // BackgroundIndexer indexes register updates for finalized and executed blocks.
 // It is passive and runs only when triggered by the BackgroundIndexerEngine.
 type BackgroundIndexer struct {
-	log           zerolog.Logger
-	registerStore execution.RegisterStore // write register updates to database
-	provider      RegisterUpdatesProvider // read register updates for each block
-	state         protocol.State          // read last finalized height for iteration
-	headers       storage.Headers         // read block headers by height, header is needed to store registers
+	log             zerolog.Logger
+	registerStore   execution.RegisterStore // write register updates to database
+	provider        RegisterUpdatesProvider // read register updates for each block
+	state           protocol.State          // read last finalized height for iteration
+	headers         storage.Headers         // read block headers by height, header is needed to store registers
+	heightsPerSecond uint64                  // rate limit for indexing heights per second
 }
 
 func NewBackgroundIndexer(
@@ -33,13 +35,15 @@ func NewBackgroundIndexer(
 	registerStore execution.RegisterStore,
 	state protocol.State,
 	headers storage.Headers,
+	heightsPerSecond uint64,
 ) *BackgroundIndexer {
 	return &BackgroundIndexer{
-		log:           log,
-		provider:      provider,
-		registerStore: registerStore,
-		state:         state,
-		headers:       headers,
+		log:             log,
+		provider:        provider,
+		registerStore:   registerStore,
+		state:           state,
+		headers:         headers,
+		heightsPerSecond: heightsPerSecond,
 	}
 }
 
@@ -56,10 +60,24 @@ func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx contex
 	b.log.Debug().
 		Uint64("start_height", startHeight).
 		Uint64("latest_finalized_height", latestFinalized.Height).
+		Uint64("heights_per_second", b.heightsPerSecond).
 		Msg("indexing registers up to latest finalized and executed height")
+
+	// Calculate sleep duration per height if rate limiting is enabled
+	var sleepDuration time.Duration
+	if b.heightsPerSecond > 0 {
+		sleepDuration = time.Second / time.Duration(b.heightsPerSecond)
+	}
 
 	// Loop through each unindexed finalized height, fetch register updates and store them
 	for h := startHeight + 1; h <= latestFinalized.Height; h++ {
+		// Check context cancellation before processing each height
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		header, err := b.headers.ByHeight(h)
 		if err != nil {
 			return fmt.Errorf("failed to get header for height %d: %w", h, err)
@@ -83,6 +101,16 @@ func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx contex
 		err = b.registerStore.SaveRegisters(header, registerEntries)
 		if err != nil {
 			return fmt.Errorf("failed to store registers for height %d: %w", h, err)
+		}
+
+		// Throttle indexing rate if configured
+		if b.heightsPerSecond > 0 && h < latestFinalized.Height {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(sleepDuration):
+				// Continue to next iteration
+			}
 		}
 	}
 
