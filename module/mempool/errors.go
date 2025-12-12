@@ -56,3 +56,30 @@ func IsBelowPrunedThresholdError(err error) bool {
 	var newIsBelowPrunedThresholdError BelowPrunedThresholdError
 	return errors.As(err, &newIsBelowPrunedThresholdError)
 }
+
+// BeyondActiveRangeError indicates that an input is beyond the allowed active range.
+// Mempools may impose an active range (eg. by view or by height) to bound the maximum
+// possible size of the mempool and limit spam attacks.
+type BeyondActiveRangeError struct {
+	err error
+}
+
+func NewBeyondActiveRangeError(msg string, args ...interface{}) error {
+	return BeyondActiveRangeError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e BeyondActiveRangeError) Unwrap() error {
+	return e.err
+}
+
+func (e BeyondActiveRangeError) Error() string {
+	return e.err.Error()
+}
+
+// IsBeyondActiveRangeError returns whether the given error is a BeyondActiveRangeError error
+func IsBeyondActiveRangeError(err error) bool {
+	var beyondActiveRangeErr BeyondActiveRangeError
+	return errors.As(err, &beyondActiveRangeErr)
+}

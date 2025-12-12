@@ -124,7 +124,7 @@ func (cs *CommonSuite) SetupTest() {
 
 	// set up pending module mock
 	cs.pending = &module.PendingClusterBlockBuffer{}
-	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
+	cs.pending.On("Add", mock.Anything, mock.Anything)
 	cs.pending.On("ByID", mock.Anything).Return(
 		func(blockID flow.Identifier) flow.Slashable[*cluster.Proposal] {
 			return cs.pendingDB[blockID]
@@ -143,9 +143,8 @@ func (cs *CommonSuite) SetupTest() {
 			return ok
 		},
 	)
-	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByView", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return(nil)
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
@@ -518,9 +517,6 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// check that we submitted each child to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
-
-	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
 }
 
 func (cs *CoreSuite) TestProposalBufferingOrder() {
@@ -546,7 +542,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 
 	// replace the engine buffer with the real one
-	cs.core.pending = realbuffer.NewPendingClusterBlocks()
+	cs.core.pending = realbuffer.NewPendingClusterBlocks(cs.head.Block.View, 100_000)
 
 	// process all of the descendants
 	for _, proposal := range proposals {

@@ -100,7 +100,10 @@ func NewCore(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialized finalized boundary cache: %w", err)
 	}
-	c.ProcessFinalizedBlock(final)
+	err = c.ProcessFinalizedBlock(final)
+	if err != nil {
+		return nil, fmt.Errorf("could not process finalized block: %w", err)
+	}
 
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
@@ -200,7 +203,15 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(proposal)
+		if err := c.pending.Add(proposal); err != nil {
+			if mempool.IsBeyondActiveRangeError(err) {
+				// In general we expect the block buffer to use SkipNewProposalsThreshold,
+				// however since it is instantiated outside this component, we allow the thresholds to differ
+				log.Debug().Err(err).Msg("dropping block beyond block buffer active range")
+				return nil
+			}
+			return fmt.Errorf("could not add proposal to pending buffer: %w", err)
+		}
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
@@ -214,7 +225,15 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		_ = c.pending.Add(proposal)
+		if err := c.pending.Add(proposal); err != nil {
+			if mempool.IsBeyondActiveRangeError(err) {
+				// In general we expect the block buffer to use SkipNewProposalsThreshold,
+				// however since it is instantiated outside this component, we allow the thresholds to differ
+				log.Debug().Err(err).Msg("dropping block beyond block buffer active range")
+				return nil
+			}
+			return fmt.Errorf("could not add proposal to pending buffer: %w", err)
+		}
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -299,9 +318,6 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Proposal
 			return cpr
 		}
 	}
-
-	// drop all the children that should have been processed now
-	c.pending.DropForParent(blockID)
 
 	return nil
 }
@@ -392,14 +408,19 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 
 // ProcessFinalizedBlock performs pruning of stale data based on finalization event
 // removes pending blocks below the finalized view
-func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) {
+// No errors are expected during normal operation.
+func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) error {
 	// remove all pending blocks at or below the finalized view
-	c.pending.PruneByView(finalized.View)
+	err := c.pending.PruneByView(finalized.View)
+	if err != nil {
+		return err
+	}
 	c.finalizedHeight.Set(finalized.Height)
 	c.finalizedView.Set(finalized.View)
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	return nil
 }
 
 // checkForAndLogOutdatedInputError checks whether error is an `engine.OutdatedInputError`.
