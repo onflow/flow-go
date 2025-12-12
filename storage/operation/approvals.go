@@ -1,13 +1,9 @@
 package operation
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/jordanschalm/lockctx"
-
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -37,45 +33,18 @@ func RetrieveResultApproval(r storage.Reader, approvalID flow.Identifier, approv
 //
 // Expected error returns:
 //   - `storage.ErrDataMismatch` if a *different* approval for the same key pair (ExecutionResultID, chunk index) is already indexed
-func InsertAndIndexResultApproval(approval *flow.ResultApproval) func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
+func InsertAndIndexResultApproval(approval *flow.ResultApproval) Functor {
 	approvalID := approval.ID()
 	resultID := approval.Body.ExecutionResultID
 	chunkIndex := approval.Body.ChunkIndex
 
-	// the following functors allow encoding to be done before acquiring the lock
-	inserting := Upserting(MakePrefix(codeResultApproval, approvalID), approval)
-	indexing := Upserting(MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
-
-	return func(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
-		if !lctx.HoldsLock(storage.LockIndexResultApproval) {
-			return fmt.Errorf("missing lock for index result approval for result: %v", resultID)
-		}
-
-		var storedApprovalID flow.Identifier
-		err := LookupResultApproval(rw.GlobalReader(), resultID, chunkIndex, &storedApprovalID)
-		if err == nil {
-			if storedApprovalID != approvalID {
-				return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
-					resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
-			}
-			return nil // already stored and indexed
-		}
-		if !errors.Is(err, storage.ErrNotFound) { // `storage.ErrNotFound` is expected, as this indicates that no receipt is indexed yet; anything else is an exception
-			return fmt.Errorf("could not lookup result approval ID: %w", irrecoverable.NewException(err))
-		}
-
-		err = inserting(rw.Writer())
-		if err != nil {
-			return fmt.Errorf("could not store result approval: %w", err)
-		}
-
-		err = indexing(rw.Writer())
-		if err != nil {
-			return fmt.Errorf("could not index result approval: %w", err)
-		}
-
-		return nil
-	}
+	errmsg := fmt.Sprintf("InsertAndIndexResultApproval failed with approvalID %v, chunkIndex %v, resultID %v",
+		approvalID, chunkIndex, resultID)
+	return WrapError(errmsg, BindFunctors(
+		CheckHoldsLockFunctor(storage.LockIndexResultApproval),
+		UpsertFunctor(MakePrefix(codeResultApproval, approvalID), approval),
+		InsertingWithMismatchCheck(MakePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID),
+	))
 }
 
 // LookupResultApproval finds a ResultApproval by result ID and chunk index.
