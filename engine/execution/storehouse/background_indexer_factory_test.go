@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
@@ -30,8 +33,6 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
 )
 
 // TestLoadRegisterStore_Disabled tests that LoadRegisterStore returns nil when enableStorehouse is false
