@@ -1,3 +1,6 @@
+// The factory provides functions for the execution_builder to load and initialize
+// the register store and background indexer engine, simplifying the builder by
+// encapsulating database setup, bootstrapping, and checkpoint import logic.
 package storehouse
 
 import (
@@ -27,6 +30,9 @@ type BlockExecutedNotifier interface {
 	AddConsumer(callback func())
 }
 
+// ImportRegistersFromCheckpoint imports registers from a checkpoint file.
+// It is defined as a function type to avoid a circular dependency; the
+// implementation (bootstrap.ImportRegistersFromCheckpoint) is provided by the caller.
 type ImportRegistersFromCheckpoint func(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, pdb *pebble.DB, workerCount int) error
 
 // LoadRegisterStore creates and initializes a RegisterStore.
@@ -66,6 +72,8 @@ func LoadRegisterStore(
 	)
 }
 
+// loadRegisterStore is an internal function that creates and initializes a RegisterStore.
+// it is reused by both LoadRegisterStore and LoadBackgroundIndexerEngine.
 func loadRegisterStore(
 	log zerolog.Logger,
 	state protocol.State,

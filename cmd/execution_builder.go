@@ -148,32 +148,37 @@ type ExecutionNode struct {
 	commitsReader   storageerr.CommitsReader
 	collections     storageerr.Collections
 
-	chunkDataPackDB         *pebble.DB
-	chunkDataPacks          storageerr.ChunkDataPacks
-	providerEngine          exeprovider.ProviderEngine
-	checkerEng              *checker.Engine
-	syncCore                *chainsync.Core
-	syncEngine              *synchronization.Engine
-	followerCore            *hotstuff.FollowerLoop        // follower hotstuff logic
-	followerEng             *followereng.ComplianceEngine // to sync blocks from consensus nodes
-	computationManager      *computation.Manager
-	collectionRequester     ingestion.CollectionRequester
-	scriptsEng              *scripts.Engine
-	followerDistributor     *pubsub.FollowerDistributor
-	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
-	diskWAL                 *wal.DiskWAL
-	blockDataUploader       *uploader.Manager
-	executionDataStore      execution_data.ExecutionDataStore
-	toTriggerCheckpoint     *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl             *stop.StopControl // stop the node at given block height
-	executionDataDatastore  execdatastorage.DatastoreManager
-	executionDataPruner     *pruner.Pruner
-	executionDataBlobstore  blobs.Blobstore
-	executionDataTracker    tracker.Storage
-	blobService             network.BlobService
-	blobserviceDependable   *module.ProxiedReadyDoneAware
-	metricsProvider         txmetrics.TransactionExecutionMetricsProvider
-	blockExecutedNotifier   *ingestion.BlockExecutedNotifier
+	chunkDataPackDB        *pebble.DB
+	chunkDataPacks         storageerr.ChunkDataPacks
+	providerEngine         exeprovider.ProviderEngine
+	checkerEng             *checker.Engine
+	syncCore               *chainsync.Core
+	syncEngine             *synchronization.Engine
+	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
+	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
+	computationManager     *computation.Manager
+	collectionRequester    ingestion.CollectionRequester
+	scriptsEng             *scripts.Engine
+	followerDistributor    *pubsub.FollowerDistributor
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
+	diskWAL                *wal.DiskWAL
+	blockDataUploader      *uploader.Manager
+	executionDataStore     execution_data.ExecutionDataStore
+	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl            *stop.StopControl // stop the node at given block height
+	executionDataDatastore execdatastorage.DatastoreManager
+	executionDataPruner    *pruner.Pruner
+	executionDataBlobstore blobs.Blobstore
+	executionDataTracker   tracker.Storage
+	blobService            network.BlobService
+	blobserviceDependable  *module.ProxiedReadyDoneAware
+	metricsProvider        txmetrics.TransactionExecutionMetricsProvider
+
+	// used by ingestion engine to notify executed block, and
+	// used by background indexer engine to trigger indexing
+	blockExecutedNotifier *ingestion.BlockExecutedNotifier
+
+	// save register updates in storehouse when it is not enabled
 	backgroundIndexerEngine *storehouse.BackgroundIndexerEngine
 }
 
