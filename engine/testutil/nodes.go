@@ -773,6 +773,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		pusherEngine,
 		uploader,
 		stopControl,
+		nil, // block executed callback not used in test
 	)
 	require.NoError(t, err)
 	node.ProtocolEvents.AddConsumer(stopControl)
