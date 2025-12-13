@@ -22,9 +22,9 @@ type EpochComponentsFactory struct {
 	mock.Mock
 }
 
-// Create provides a mock function with given fields: epoch, chainID
-func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID flow.ChainID) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error) {
-	ret := _m.Called(epoch, chainID)
+// Create provides a mock function with given fields: epoch, consensusChainID
+func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, consensusChainID flow.ChainID) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error) {
+	ret := _m.Called(epoch, consensusChainID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
@@ -39,10 +39,10 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	var r6 component.Component
 	var r7 error
 	if rf, ok := ret.Get(0).(func(protocol.CommittedEpoch, flow.ChainID) (cluster.State, component.Component, module.ReadyDoneAware, module.HotStuff, hotstuff.VoteAggregator, hotstuff.TimeoutAggregator, component.Component, error)); ok {
-		return rf(epoch, chainID)
+		return rf(epoch, consensusChainID)
 	}
 	if rf, ok := ret.Get(0).(func(protocol.CommittedEpoch, flow.ChainID) cluster.State); ok {
-		r0 = rf(epoch, chainID)
+		r0 = rf(epoch, consensusChainID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(cluster.State)
@@ -50,7 +50,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	}
 
 	if rf, ok := ret.Get(1).(func(protocol.CommittedEpoch, flow.ChainID) component.Component); ok {
-		r1 = rf(epoch, chainID)
+		r1 = rf(epoch, consensusChainID)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(component.Component)
@@ -58,7 +58,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	}
 
 	if rf, ok := ret.Get(2).(func(protocol.CommittedEpoch, flow.ChainID) module.ReadyDoneAware); ok {
-		r2 = rf(epoch, chainID)
+		r2 = rf(epoch, consensusChainID)
 	} else {
 		if ret.Get(2) != nil {
 			r2 = ret.Get(2).(module.ReadyDoneAware)
@@ -66,7 +66,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	}
 
 	if rf, ok := ret.Get(3).(func(protocol.CommittedEpoch, flow.ChainID) module.HotStuff); ok {
-		r3 = rf(epoch, chainID)
+		r3 = rf(epoch, consensusChainID)
 	} else {
 		if ret.Get(3) != nil {
 			r3 = ret.Get(3).(module.HotStuff)
@@ -74,7 +74,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	}
 
 	if rf, ok := ret.Get(4).(func(protocol.CommittedEpoch, flow.ChainID) hotstuff.VoteAggregator); ok {
-		r4 = rf(epoch, chainID)
+		r4 = rf(epoch, consensusChainID)
 	} else {
 		if ret.Get(4) != nil {
 			r4 = ret.Get(4).(hotstuff.VoteAggregator)
@@ -82,7 +82,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	}
 
 	if rf, ok := ret.Get(5).(func(protocol.CommittedEpoch, flow.ChainID) hotstuff.TimeoutAggregator); ok {
-		r5 = rf(epoch, chainID)
+		r5 = rf(epoch, consensusChainID)
 	} else {
 		if ret.Get(5) != nil {
 			r5 = ret.Get(5).(hotstuff.TimeoutAggregator)
@@ -90,7 +90,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	}
 
 	if rf, ok := ret.Get(6).(func(protocol.CommittedEpoch, flow.ChainID) component.Component); ok {
-		r6 = rf(epoch, chainID)
+		r6 = rf(epoch, consensusChainID)
 	} else {
 		if ret.Get(6) != nil {
 			r6 = ret.Get(6).(component.Component)
@@ -98,7 +98,7 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.CommittedEpoch, chainID 
 	}
 
 	if rf, ok := ret.Get(7).(func(protocol.CommittedEpoch, flow.ChainID) error); ok {
-		r7 = rf(epoch, chainID)
+		r7 = rf(epoch, consensusChainID)
 	} else {
 		r7 = ret.Error(7)
 	}
