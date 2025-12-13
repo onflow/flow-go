@@ -22,21 +22,23 @@ import (
 
 type MutableState struct {
 	*State
-	lockManager lockctx.Manager
-	tracer      module.Tracer
-	headers     storage.Headers
-	payloads    storage.ClusterPayloads
+	lockManager      lockctx.Manager
+	tracer           module.Tracer
+	headers          storage.Headers
+	payloads         storage.ClusterPayloads
+	consensusHeaders storage.Headers
 }
 
 var _ clusterstate.MutableState = (*MutableState)(nil)
 
-func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
+func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, consensusHeaders storage.Headers) (*MutableState, error) {
 	mutableState := &MutableState{
-		State:       state,
-		lockManager: lockManager,
-		tracer:      tracer,
-		headers:     headers,
-		payloads:    payloads,
+		State:            state,
+		lockManager:      lockManager,
+		tracer:           tracer,
+		headers:          headers,
+		payloads:         payloads,
+		consensusHeaders: consensusHeaders,
 	}
 	return mutableState, nil
 }
@@ -224,7 +226,7 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 	payload := ctx.candidate.Payload
 
 	// 1 - the reference block must be known
-	refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
+	refBlock, err := m.consensusHeaders.ByBlockID(payload.ReferenceBlockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
@@ -237,7 +239,7 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 		// a reference block which is above the finalized boundary can't be verified yet
 		return state.NewUnverifiableExtensionError("reference block is above finalized boundary (%d>%d)", refBlock.Height, ctx.finalizedConsensusHeight)
 	} else {
-		storedBlockIDForHeight, err := m.headers.BlockIDByHeight(refBlock.Height)
+		storedBlockIDForHeight, err := m.consensusHeaders.BlockIDByHeight(refBlock.Height)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not look up block ID for finalized height: %w", err)
 		}
@@ -291,7 +293,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 	minRefHeight := uint64(math.MaxUint64)
 	maxRefHeight := uint64(0)
 	for _, flowTx := range payload.Collection.Transactions {
-		refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
+		refBlock, err := m.consensusHeaders.ByBlockID(flowTx.ReferenceBlockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			// Reject collection if it contains a transaction with an unknown reference block, because we cannot verify its validity.
 			return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)

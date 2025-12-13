@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
@@ -53,9 +54,9 @@ func IsPebbleFolder(dataDir string) (bool, error) {
 	return pebblestorage.IsPebbleFolder(dataDir)
 }
 
-func InitStorages(db storage.DB) *store.All {
+func InitStorages(db storage.DB, chainID flow.ChainID) *store.All {
 	metrics := &metrics.NoopCollector{}
-	return store.InitAll(metrics, db)
+	return store.InitAll(metrics, db, chainID)
 }
 
 // WithStorage runs the given function with the storage depending on the flags.

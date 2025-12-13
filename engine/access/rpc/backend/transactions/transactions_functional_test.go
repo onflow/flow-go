@@ -123,7 +123,7 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.db = pebbleimpl.ToDB(pdb)
 
 	// Instantiate storages
-	all := store.InitAll(metrics, s.db)
+	all := store.InitAll(metrics, s.db, flow.Emulator)
 
 	s.blocks = all.Blocks
 	s.collections = all.Collections

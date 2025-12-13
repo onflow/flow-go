@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
@@ -27,8 +28,8 @@ type All struct {
 	Collections  *Collections
 }
 
-func InitAll(metrics module.CacheMetrics, db storage.DB) *All {
-	headers := NewHeaders(metrics, db)
+func InitAll(metrics module.CacheMetrics, db storage.DB, chainID flow.ChainID) *All {
+	headers := NewHeaders(metrics, db, chainID)
 	guarantees := NewGuarantees(metrics, db, DefaultCacheSize, DefaultCacheSize)
 	seals := NewSeals(metrics, db)
 	index := NewIndex(metrics, db)

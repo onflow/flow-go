@@ -39,18 +39,7 @@ import (
 )
 
 var signer = func(*flow.Header) ([]byte, error) { return unittest.SignatureFixture(), nil }
-var setter = func(h *flow.HeaderBodyBuilder) error {
-	h.WithHeight(42).
-		WithChainID(flow.Emulator).
-		WithParentID(unittest.IdentifierFixture()).
-		WithView(1337).
-		WithParentView(1336).
-		WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
-		WithParentVoterSigData(unittest.QCSigDataFixture()).
-		WithProposerID(unittest.IdentifierFixture())
-
-	return nil
-}
+var setter func(*flow.HeaderBodyBuilder) error
 
 type BuilderSuite struct {
 	suite.Suite
@@ -62,9 +51,10 @@ type BuilderSuite struct {
 	chainID      flow.ChainID
 	epochCounter uint64
 
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
-	blocks   storage.Blocks
+	headers          storage.Headers
+	payloads         storage.ClusterPayloads
+	blocks           storage.Blocks
+	consensusHeaders storage.Headers
 
 	state cluster.MutableState
 
@@ -84,6 +74,18 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.genesis, err = unittest.ClusterBlock.Genesis()
 	require.NoError(suite.T(), err)
 	suite.chainID = suite.genesis.ChainID
+	setter = func(h *flow.HeaderBodyBuilder) error {
+		h.WithHeight(42).
+			WithChainID(suite.chainID).
+			WithParentID(unittest.IdentifierFixture()).
+			WithView(1337).
+			WithParentView(1336).
+			WithParentVoterIndices(unittest.SignerIndicesFixture(4)).
+			WithParentVoterSigData(unittest.QCSigDataFixture()).
+			WithProposerID(unittest.IdentifierFixture())
+
+		return nil
+	}
 
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
@@ -95,12 +97,13 @@ func (suite *BuilderSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
 
-	all := store.InitAll(metrics, suite.db)
+	all := store.InitAll(metrics, suite.db, flow.Emulator)
 	consumer := events.NewNoop()
 
-	suite.headers = all.Headers
+	suite.headers = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
 	suite.blocks = all.Blocks
 	suite.payloads = store.NewClusterPayloads(metrics, suite.db)
+	suite.consensusHeaders = all.Headers
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
@@ -132,7 +135,7 @@ func (suite *BuilderSuite) SetupTest() {
 	clusterState, err := clusterkv.Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, suite.lockManager, tracer, suite.headers, suite.payloads)
+	suite.state, err = clusterkv.NewMutableState(clusterState, suite.lockManager, tracer, suite.headers, suite.payloads, suite.consensusHeaders)
 	suite.Require().NoError(err)
 
 	state, err := pbadger.Bootstrap(
@@ -182,7 +185,7 @@ func (suite *BuilderSuite) SetupTest() {
 		metrics,
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -602,7 +605,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -698,7 +701,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -731,7 +734,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -764,7 +767,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -823,7 +826,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -879,7 +882,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -920,7 +923,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -945,7 +948,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
 		h.WithHeight(1).
-			WithChainID(flow.Emulator).
+			WithChainID(suite.chainID).
 			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
@@ -987,7 +990,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -1017,7 +1020,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	// since rate limiting does not apply to non-payer keys, we should fill all collections in 10 blocks
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithChainID(flow.Emulator).
+		h.WithChainID(suite.chainID).
 			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
@@ -1055,7 +1058,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -1079,7 +1082,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	// rate-limiting should be applied, resulting in half-full collections (5/10)
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithChainID(flow.Emulator).
+		h.WithChainID(suite.chainID).
 			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
@@ -1119,7 +1122,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -1163,7 +1166,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 	// rate-limiting should be applied, resulting in minimum collection size.
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithChainID(flow.Emulator).
+		h.WithChainID(suite.chainID).
 			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
@@ -1200,7 +1203,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -1225,7 +1228,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	// having one transaction and empty collections otherwise
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithChainID(flow.Emulator).
+		h.WithChainID(suite.chainID).
 			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
@@ -1266,7 +1269,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -1290,7 +1293,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	// rate-limiting should not be applied, since the payer is marked as unlimited
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithChainID(flow.Emulator).
+		h.WithChainID(suite.chainID).
 			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
@@ -1331,7 +1334,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -1355,7 +1358,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 	// rate-limiting should not be applied, since dry-run setting is enabled
 	parentID := suite.genesis.ID()
 	setter := func(h *flow.HeaderBodyBuilder) error {
-		h.WithChainID(flow.Emulator).
+		h.WithChainID(suite.chainID).
 			WithParentID(parentID).
 			WithView(1337).
 			WithParentView(1336).
@@ -1394,7 +1397,7 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 		metrics.NewNoopCollector(),
 		suite.protoState,
 		suite.state,
-		suite.headers,
+		suite.consensusHeaders,
 		suite.headers,
 		suite.payloads,
 		suite.pool,
@@ -1488,10 +1491,11 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		all := store.InitAll(metrics, suite.db)
-		suite.headers = all.Headers
+		all := store.InitAll(metrics, suite.db, flow.Emulator)
+		suite.headers = store.NewHeaders(metrics, suite.db, suite.chainID)
 		suite.blocks = all.Blocks
 		suite.payloads = store.NewClusterPayloads(metrics, suite.db)
+		suite.consensusHeaders = all.Headers
 
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc, suite.epochCounter)
@@ -1499,7 +1503,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		state, err := clusterkv.Bootstrap(suite.db, suite.lockManager, stateRoot)
 		assert.NoError(b, err)
 
-		suite.state, err = clusterkv.NewMutableState(state, suite.lockManager, tracer, suite.headers, suite.payloads)
+		suite.state, err = clusterkv.NewMutableState(state, suite.lockManager, tracer, suite.headers, suite.payloads, suite.consensusHeaders)
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool
@@ -1517,7 +1521,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			metrics,
 			suite.protoState,
 			suite.state,
-			suite.headers,
+			suite.consensusHeaders,
 			suite.headers,
 			suite.payloads,
 			suite.pool,

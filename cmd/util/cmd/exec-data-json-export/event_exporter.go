@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -30,9 +31,13 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
 	return common.WithStorage(dbPath, func(db storage.DB) error {
+		chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+		if err != nil {
+			return err
+		}
 
 		cacheMetrics := &metrics.NoopCollector{}
-		headers := store.NewHeaders(cacheMetrics, db)
+		headers := store.NewHeaders(cacheMetrics, db, chainID)
 		events := store.NewEvents(cacheMetrics, db)
 		activeBlockID := blockID
 

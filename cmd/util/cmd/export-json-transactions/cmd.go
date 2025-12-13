@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions/transactions"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -67,7 +68,11 @@ func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir s
 
 	// init dependencies
 	return common.WithStorage(flagDatadir, func(db storage.DB) error {
-		storages := common.InitStorages(db)
+		chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+		if err != nil {
+			return err
+		}
+		storages := common.InitStorages(db, chainID)
 
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
