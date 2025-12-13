@@ -18,14 +18,16 @@ type RegisterUpdatesProvider interface {
 	RegisterUpdatesByHeight(ctx context.Context, blockID flow.Identifier) (flow.RegisterEntries, bool, error)
 }
 
+const DefaultHeightsPerSecond = 0 // 0 means no rate limiting by default
+
 // BackgroundIndexer indexes register updates for finalized and executed blocks.
 // It is passive and runs only when triggered by the BackgroundIndexerEngine.
 type BackgroundIndexer struct {
-	log             zerolog.Logger
-	registerStore   execution.RegisterStore // write register updates to database
-	provider        RegisterUpdatesProvider // read register updates for each block
-	state           protocol.State          // read last finalized height for iteration
-	headers         storage.Headers         // read block headers by height, header is needed to store registers
+	log              zerolog.Logger
+	registerStore    execution.RegisterStore // write register updates to database
+	provider         RegisterUpdatesProvider // read register updates for each block
+	state            protocol.State          // read last finalized height for iteration
+	headers          storage.Headers         // read block headers by height, header is needed to store registers
 	heightsPerSecond uint64                  // rate limit for indexing heights per second
 }
 
@@ -38,11 +40,11 @@ func NewBackgroundIndexer(
 	heightsPerSecond uint64,
 ) *BackgroundIndexer {
 	return &BackgroundIndexer{
-		log:             log,
-		provider:        provider,
-		registerStore:   registerStore,
-		state:           state,
-		headers:         headers,
+		log:              log,
+		provider:         provider,
+		registerStore:    registerStore,
+		state:            state,
+		headers:          headers,
 		heightsPerSecond: heightsPerSecond,
 	}
 }
@@ -57,7 +59,7 @@ func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx contex
 		return fmt.Errorf("failed to get latest finalized height: %w", err)
 	}
 
-	b.log.Debug().
+	b.log.Info().
 		Uint64("start_height", startHeight).
 		Uint64("latest_finalized_height", latestFinalized.Height).
 		Uint64("heights_per_second", b.heightsPerSecond).
