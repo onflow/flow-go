@@ -63,9 +63,10 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/ledger"
 	ledgerpkg "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
@@ -133,7 +134,7 @@ type ExecutionNode struct {
 	executionState state.ExecutionState
 	followerState  protocol.FollowerState
 	committee      hotstuff.DynamicCommittee
-	ledgerStorage  *ledger.Ledger
+	ledgerStorage  ledger.Ledger
 	registerStore  *storehouse.RegisterStore
 
 	// storage
@@ -239,7 +240,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				"chunk_data_pack", exeNode.chunkDataPackDB)
 		}).
 		Component("stop control", exeNode.LoadStopControl).
-		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		// disable execution data pruner for now, since storehouse is going to need the execution data
 		// for recovery,
 		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
@@ -656,11 +656,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		tries, _ := exeNode.ledgerStorage.Tries()
-		trieInfo := "empty"
-		if len(tries) > 0 {
-			trieInfo = fmt.Sprintf("length: %v, 1st: %v, last: %v", len(tries), tries[0].RootHash(), tries[len(tries)-1].RootHash())
-		}
+		// Note: Tries() is an implementation detail, not part of the interface
+		// This is only used for debugging/logging purposes - skip for now
+		trieInfo := "unavailable (ledger abstraction)"
 
 		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v, trie: %s: %w", blockID,
 			height, trieInfo, err)
@@ -953,27 +951,31 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		return nil, fmt.Errorf("failed to initialize wal: %w", err)
 	}
 
-	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
-		"ledger").Logger(), ledger.DefaultPathFinderVersion)
-	return exeNode.ledgerStorage, err
-}
+	// Create compactor config
+	compactorConfig := &ledger.CompactorConfig{
+		CheckpointCapacity:                   uint(exeNode.exeConf.mTrieCacheSize),
+		CheckpointDistance:                   exeNode.exeConf.checkpointDistance,
+		CheckpointsToKeep:                    exeNode.exeConf.checkpointsToKeep,
+		TriggerCheckpointOnNextSegmentFinish: exeNode.toTriggerCheckpoint,
+		Metrics:                              exeNode.collector,
+	}
 
-func (exeNode *ExecutionNode) LoadExecutionStateLedgerWALCompactor(
-	node *NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	return ledger.NewCompactor(
-		exeNode.ledgerStorage,
+	// Use factory to create ledger with internal compactor
+	factory := complete.NewLocalLedgerFactory(
 		exeNode.diskWAL,
-		node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
-		uint(exeNode.exeConf.mTrieCacheSize),
-		exeNode.exeConf.checkpointDistance,
-		exeNode.exeConf.checkpointsToKeep,
-		exeNode.toTriggerCheckpoint, // compactor will listen to the signal from admin tool for force triggering checkpointing
+		int(exeNode.exeConf.mTrieCacheSize),
+		compactorConfig,
 		exeNode.collector,
+		node.Logger.With().Str("subcomponent", "ledger").Logger(),
+		complete.DefaultPathFinderVersion,
 	)
+
+	exeNode.ledgerStorage, err = factory.NewLedger()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ledger: %w", err)
+	}
+
+	return exeNode.ledgerStorage, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionDataPruner(
