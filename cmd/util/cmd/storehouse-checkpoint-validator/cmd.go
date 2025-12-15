@@ -9,8 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/module/metrics"
-	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -100,4 +100,3 @@ func runE(*cobra.Command, []string) error {
 	log.Info().Msg("validation completed successfully")
 	return nil
 }
-

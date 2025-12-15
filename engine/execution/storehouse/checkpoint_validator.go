@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
-	"golang.org/x/sync/errgroup"
 )
 
 // ValidateWithCheckpoint validates the registers in the given store against the leaf nodes read from the checkpoint file.
