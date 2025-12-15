@@ -617,6 +617,8 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 		delete(e.items, entityID)
 
 		// process the entity
+		// TODO: We should update users of requester engine to uniformly pass in a non-blocking `handle` function
+		// (Currently all users except the execution ingestion engine have non-blocking handlers: https://github.com/onflow/flow-go/blob/be489481bff28f42bc887fe26fe19476585ab6aa/engine/execution/ingestion/machine.go#L99)
 		go e.handle(originID, entity)
 	}
 
