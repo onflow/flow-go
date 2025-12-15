@@ -55,12 +55,16 @@ func getTransactionReq(id string, expandResult bool, blockIdQuery string, collec
 	return req
 }
 
-func getTransactionsByBlockReq(blockId string, expandResult bool, collectionIdQuery string) *http.Request {
+func getTransactionsByBlockReq(blockId string, height string, expandResult bool, collectionIdQuery string) *http.Request {
 	u, _ := url.Parse("/v1/transactions")
 	q := u.Query()
 
 	if blockId != "" {
 		q.Add("block_id", blockId)
+	}
+
+	if height != "" {
+		q.Add("block_height", height)
 	}
 
 	if expandResult {
@@ -265,7 +269,96 @@ func TestGetTransactionsByBlockID(t *testing.T) {
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
 			Return(txs, nil)
-		req := getTransactionsByBlockReq(blockID.String(), false, "")
+		req := getTransactionsByBlockReq(blockID.String(), "", false, "")
+
+		expected := fmt.Sprintf(`[
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		},
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		}
+	]`,
+			txs[0].ID(), txs[0].ReferenceBlockID, util.ToBase64(txs[0].EnvelopeSignatures[0].Signature), txs[0].ID(), txs[0].ID(),
+			txs[1].ID(), txs[1].ReferenceBlockID, util.ToBase64(txs[1].EnvelopeSignatures[0].Signature), txs[1].ID(), txs[1].ID(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by height without expanded results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		height := uint64(123)
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		tx1 := unittest.TransactionFixture()
+		tx2 := unittest.TransactionFixture()
+		txs := []*flow.TransactionBody{&tx1, &tx2}
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, height).
+			Return(block, flow.BlockStatusFinalized, nil)
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(txs, nil)
+
+		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), false, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -359,7 +452,149 @@ func TestGetTransactionsByBlockID(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, tx2.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr2, nil)
 
-		req := getTransactionsByBlockReq(blockID.String(), true, "")
+		req := getTransactionsByBlockReq(blockID.String(), "", true, "")
+
+		expected := fmt.Sprintf(`[
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "result": {
+			  "block_id": "%s",
+			  "collection_id": "%s",
+			  "execution": "Success",
+			  "status": "Sealed",
+			  "status_code": 1,
+			  "error_message": "",
+			  "computation_used": "0",
+			  "events": [
+				  {
+					  "type": "flow.AccountCreated",
+					  "transaction_id": "%s",
+					  "transaction_index": "0",
+					  "event_index": "0",
+					  "payload": ""
+				  }
+			  ],
+			  "_links": {
+				  "_self": "/v1/transaction_results/%s"
+			  }
+		   },
+		   "_expandable": {},
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   }
+		},
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "result": {
+			  "block_id": "%s",
+			  "collection_id": "%s",
+			  "execution": "Success",
+			  "status": "Sealed",
+			  "status_code": 1,
+			  "error_message": "",
+			  "computation_used": "0",
+			  "events": [
+				  {
+					  "type": "flow.AccountCreated",
+					  "transaction_id": "%s",
+					  "transaction_index": "0",
+					  "event_index": "0",
+					  "payload": ""
+				  }
+			  ],
+			  "_links": {
+				  "_self": "/v1/transaction_results/%s"
+			  }
+		   },
+		   "_expandable": {},
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   }
+		}
+	]`,
+			// first tx + result
+			tx1.ID(), tx1.ReferenceBlockID, util.ToBase64(tx1.EnvelopeSignatures[0].Signature),
+			tx1.ReferenceBlockID, txr1.CollectionID, tx1.ID(), tx1.ID(), tx1.ID(),
+			// second tx + result
+			tx2.ID(), tx2.ReferenceBlockID, util.ToBase64(tx2.EnvelopeSignatures[0].Signature),
+			tx2.ReferenceBlockID, txr2.CollectionID, tx2.ID(), tx2.ID(), tx2.ID(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by height with expanded results", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		height := uint64(123)
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		tx1 := unittest.TransactionFixture()
+		tx2 := unittest.TransactionFixture()
+		txs := []*flow.TransactionBody{&tx1, &tx2}
+
+		txr1 := transactionResultFixture(tx1)
+		txr2 := transactionResultFixture(tx2)
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, height).
+			Return(block, flow.BlockStatusFinalized, nil)
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(txs, nil)
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, tx1.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txr1, nil)
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, tx2.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txr2, nil)
+
+		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), true, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -475,7 +710,7 @@ func TestGetTransactionsByBlockID(t *testing.T) {
 	t.Run("get by block ID invalid block_id", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionsByBlockReq("invalid", false, "")
+		req := getTransactionsByBlockReq("invalid", "", false, "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -489,10 +724,44 @@ func TestGetTransactionsByBlockID(t *testing.T) {
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
 			Return(nil, status.Error(codes.NotFound, "block not found"))
 
-		req := getTransactionsByBlockReq(blockID.String(), false, "")
+		req := getTransactionsByBlockReq(blockID.String(), "", false, "")
 
 		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
 		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
+	})
+
+	t.Run("get by height invalid height", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		req := getTransactionsByBlockReq("", "not-a-height", false, "")
+
+		expected := `{"code":400, "message":"invalid height format"}`
+		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
+	})
+
+	t.Run("get by height non-existing block", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		height := uint64(123)
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, height).
+			Return((*flow.Block)(nil), flow.BlockStatusUnknown, status.Error(codes.NotFound, "block not found"))
+
+		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), false, "")
+
+		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
+		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
+	})
+
+	t.Run("get with both block_id and height is invalid", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		blockID := unittest.IdentifierFixture()
+		req := getTransactionsByBlockReq(blockID.String(), "123", false, "")
+
+		expected := `{"code":400, "message":"can not provide both block ID and block height"}`
+		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
 	})
 
 }
