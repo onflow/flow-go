@@ -351,7 +351,7 @@ func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 	defer ticker.Stop()
 	for {
 		select {
-		case <-e.ShutdownSignal():
+		case <-ctx.Done():
 			return
 
 		case <-ticker.C:
