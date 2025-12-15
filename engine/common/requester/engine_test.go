@@ -3,6 +3,7 @@ package requester
 import (
 	"math/rand"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -88,96 +89,97 @@ func (s *RequesterEngineSuite) TestEntityByID() {
 }
 
 func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
+	synctest.Test(s.T(), func(t *testing.T) {
+		identities := unittest.IdentityListFixture(16)
+		targetID := identities[0].NodeID
 
-	identities := unittest.IdentityListFixture(16)
-	targetID := identities[0].NodeID
+		s.final.On("Identities", mock.Anything).Return(
+			func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
+				return identities.Filter(selector)
+			},
+			nil,
+		)
 
-	s.final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
-			return identities.Filter(selector)
-		},
-		nil,
-	)
+		cfg := Config{
+			BatchInterval:  200 * time.Millisecond,
+			BatchThreshold: 999,
+			RetryInitial:   100 * time.Millisecond,
+			RetryFunction:  RetryLinear(10 * time.Millisecond),
+			RetryAttempts:  2,
+			RetryMaximum:   300 * time.Millisecond,
+		}
 
-	cfg := Config{
-		BatchInterval:  200 * time.Millisecond,
-		BatchThreshold: 999,
-		RetryInitial:   100 * time.Millisecond,
-		RetryFunction:  RetryLinear(10 * time.Millisecond),
-		RetryAttempts:  2,
-		RetryMaximum:   300 * time.Millisecond,
-	}
+		// item that has just been added, should be included
+		justAdded := &Item{
+			EntityID:      unittest.IdentifierFixture(),
+			NumAttempts:   0,
+			LastRequested: time.Time{},
+			RetryAfter:    cfg.RetryInitial,
+			ExtraSelector: filter.Any,
+		}
 
-	// item that has just been added, should be included
-	justAdded := &Item{
-		EntityID:      unittest.IdentifierFixture(),
-		NumAttempts:   0,
-		LastRequested: time.Time{},
-		RetryAfter:    cfg.RetryInitial,
-		ExtraSelector: filter.Any,
-	}
+		// item was tried long time ago, should be included
+		triedAnciently := &Item{
+			EntityID:      unittest.IdentifierFixture(),
+			NumAttempts:   1,
+			LastRequested: time.Now().UTC().Add(-cfg.RetryMaximum),
+			RetryAfter:    cfg.RetryFunction(cfg.RetryInitial),
+			ExtraSelector: filter.Any,
+		}
 
-	// item was tried long time ago, should be included
-	triedAnciently := &Item{
-		EntityID:      unittest.IdentifierFixture(),
-		NumAttempts:   1,
-		LastRequested: time.Now().UTC().Add(-cfg.RetryMaximum),
-		RetryAfter:    cfg.RetryFunction(cfg.RetryInitial),
-		ExtraSelector: filter.Any,
-	}
+		// item that was just tried, should be excluded
+		triedRecently := &Item{
+			EntityID:      unittest.IdentifierFixture(),
+			NumAttempts:   1,
+			LastRequested: time.Now().UTC(),
+			RetryAfter:    cfg.RetryFunction(cfg.RetryInitial),
+		}
 
-	// item that was just tried, should be excluded
-	triedRecently := &Item{
-		EntityID:      unittest.IdentifierFixture(),
-		NumAttempts:   1,
-		LastRequested: time.Now().UTC(),
-		RetryAfter:    cfg.RetryFunction(cfg.RetryInitial),
-	}
+		// item was tried twice, should be excluded
+		triedTwice := &Item{
+			EntityID:      unittest.IdentifierFixture(),
+			NumAttempts:   2,
+			LastRequested: time.Time{},
+			RetryAfter:    cfg.RetryInitial,
+			ExtraSelector: filter.Any,
+		}
 
-	// item was tried twice, should be excluded
-	triedTwice := &Item{
-		EntityID:      unittest.IdentifierFixture(),
-		NumAttempts:   2,
-		LastRequested: time.Time{},
-		RetryAfter:    cfg.RetryInitial,
-		ExtraSelector: filter.Any,
-	}
+		items := make(map[flow.Identifier]*Item)
+		items[justAdded.EntityID] = justAdded
+		items[triedAnciently.EntityID] = triedAnciently
+		items[triedRecently.EntityID] = triedRecently
+		items[triedTwice.EntityID] = triedTwice
+		s.engine.cfg = cfg
+		s.engine.items = items
+		s.engine.selector = filter.HasNodeID[flow.Identity](targetID)
 
-	items := make(map[flow.Identifier]*Item)
-	items[justAdded.EntityID] = justAdded
-	items[triedAnciently.EntityID] = triedAnciently
-	items[triedRecently.EntityID] = triedRecently
-	items[triedTwice.EntityID] = triedTwice
-	s.engine.cfg = cfg
-	s.engine.items = items
-	s.engine.selector = filter.HasNodeID[flow.Identity](targetID)
+		var nonce uint64
 
-	var nonce uint64
+		s.con.On("Unicast", mock.Anything, mock.Anything).Run(
+			func(args mock.Arguments) {
+				request := args.Get(0).(*messages.EntityRequest)
+				originID := args.Get(1).(flow.Identifier)
+				nonce = request.Nonce
+				assert.Equal(s.T(), originID, targetID)
+				assert.ElementsMatch(s.T(), request.EntityIDs, []flow.Identifier{justAdded.EntityID, triedAnciently.EntityID})
+			},
+		).Return(nil).Once()
 
-	s.con.On("Unicast", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			request := args.Get(0).(*messages.EntityRequest)
-			originID := args.Get(1).(flow.Identifier)
-			nonce = request.Nonce
-			assert.Equal(s.T(), originID, targetID)
-			assert.ElementsMatch(s.T(), request.EntityIDs, []flow.Identifier{justAdded.EntityID, triedAnciently.EntityID})
-		},
-	).Return(nil).Once()
+		dispatched, err := s.engine.dispatchRequest()
+		require.NoError(s.T(), err)
+		require.True(s.T(), dispatched)
 
-	dispatched, err := s.engine.dispatchRequest()
-	require.NoError(s.T(), err)
-	require.True(s.T(), dispatched)
+		s.engine.mu.Lock()
+		assert.Contains(s.T(), s.engine.requests, nonce)
+		s.engine.mu.Unlock()
 
-	s.engine.mu.Lock()
-	assert.Contains(s.T(), s.engine.requests, nonce)
-	s.engine.mu.Unlock()
+		time.Sleep(cfg.BatchInterval)
+		synctest.Wait()
 
-	// TODO: racy/slow test
-	time.Sleep(2 * cfg.RetryInitial)
-
-	s.engine.mu.Lock()
-	assert.NotContains(s.T(), s.engine.requests, nonce)
-	s.engine.mu.Unlock()
+		s.engine.mu.Lock()
+		assert.NotContains(s.T(), s.engine.requests, nonce)
+		s.engine.mu.Unlock()
+	})
 }
 
 func (s *RequesterEngineSuite) TestDispatchRequestBatchSize() {
@@ -331,10 +333,10 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 	now := time.Now()
 
 	iwanted := &Item{
-		EntityID:       wanted.ID(),
-		LastRequested:  now,
-		ExtraSelector:  filter.Any,
-		checkIntegrity: true,
+		EntityID:           wanted.ID(),
+		LastRequested:      now,
+		ExtraSelector:      filter.Any,
+		queryByContentHash: true,
 	}
 
 	assert.NotEqual(s.T(), wanted, wanted2)
@@ -369,7 +371,7 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 	// check that the provided item wasn't removed
 	assert.Contains(s.T(), s.engine.items, wanted.ID())
 
-	iwanted.checkIntegrity = false
+	iwanted.queryByContentHash = false
 	s.engine.items[iwanted.EntityID] = iwanted
 	s.engine.requests[req.Nonce] = req
 
@@ -399,10 +401,10 @@ func (s *RequesterEngineSuite) TestOriginValidation() {
 	now := time.Now()
 
 	iwanted := &Item{
-		EntityID:       wanted.ID(),
-		LastRequested:  now,
-		ExtraSelector:  filter.HasNodeID[flow.Identity](targetID),
-		checkIntegrity: true,
+		EntityID:           wanted.ID(),
+		LastRequested:      now,
+		ExtraSelector:      filter.HasNodeID[flow.Identity](targetID),
+		queryByContentHash: true,
 	}
 
 	// prepare payload
