@@ -68,6 +68,7 @@ func (g *GetTransaction) Build(r *common.Request) error {
 // a block ID, and contains the parsed and validated input parameters.
 type GetTransactionsByBlockID struct {
 	TransactionOptionals
+	BlockHeight   uint64
 	ExpandsResult bool
 }
 
@@ -95,7 +96,21 @@ func parseGetTransactionsByBlockID(r *common.Request) (*GetTransactionsByBlockID
 		return nil, err
 	}
 
+	var height Height
+	err = height.Parse(r.GetQueryParam(blockHeightQuery))
+	if err != nil {
+		return nil, err
+	}
+	req.BlockHeight = height.Flow()
 	req.ExpandsResult = r.Expands(resultExpandable)
+
+	if req.BlockHeight == EmptyHeight && req.BlockID == flow.ZeroID {
+		req.BlockHeight = FinalHeight
+	}
+
+	if req.BlockID != flow.ZeroID && req.BlockHeight != EmptyHeight {
+		return nil, fmt.Errorf("can not provide both block ID and block height")
+	}
 
 	return &req, err
 }
@@ -127,9 +142,10 @@ func (g *GetTransactionResult) Build(r *common.Request) error {
 }
 
 // GetTransactionResultsByBlockID represents a request to get transaction results by
-// block ID, and contains the parsed and validated input parameters.
+// block ID or height, and contains the parsed and validated input parameters.
 type GetTransactionResultsByBlockID struct {
 	TransactionOptionals
+	BlockHeight uint64
 }
 
 // NewGetTransactionResultsByBlockIDRequest extracts necessary variables from the provided request,
@@ -154,6 +170,21 @@ func parseGetTransactionResultsByBlockID(r *common.Request) (*GetTransactionResu
 	err := req.TransactionOptionals.Parse(r)
 	if err != nil {
 		return nil, err
+	}
+
+	var height Height
+	err = height.Parse(r.GetQueryParam(blockHeightQuery))
+	if err != nil {
+		return nil, err
+	}
+	req.BlockHeight = height.Flow()
+
+	if req.BlockHeight == EmptyHeight && req.BlockID == flow.ZeroID {
+		req.BlockHeight = FinalHeight
+	}
+
+	if req.BlockID != flow.ZeroID && req.BlockHeight != EmptyHeight {
+		return nil, fmt.Errorf("can not provide both block ID and block height")
 	}
 
 	return &req, err

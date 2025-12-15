@@ -52,14 +52,24 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 	return response, nil
 }
 
-// GetTransactionsByBlockID gets transactions by requested blockID.
+// GetTransactionsByBlockID gets transactions by requested blockID or height.
 func GetTransactionsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetTransactionsByBlockIDRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 
-	transactions, err := backend.GetTransactionsByBlockID(r.Context(), req.BlockID)
+	blockID := req.BlockID
+	if blockID == flow.ZeroID {
+		block, _, err := backend.GetBlockByHeight(r.Context(), req.BlockHeight)
+		if err != nil {
+			return nil, err
+		}
+
+		blockID = block.ID()
+	}
+
+	transactions, err := backend.GetTransactionsByBlockID(r.Context(), blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +83,7 @@ func GetTransactionsByBlockID(r *common.Request, backend access.API, link common
 			txr, err := backend.GetTransactionResult(
 				r.Context(),
 				transaction.ID(),
-				req.BlockID,
+				blockID,
 				req.CollectionID,
 				entitiesproto.EventEncodingVersion_JSON_CDC_V0,
 			)
@@ -123,21 +133,31 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 	return response, nil
 }
 
-// GetTransactionResultsByBlockID gets transaction results by requested blockID.
+// GetTransactionResultsByBlockID gets transaction results by requested blockID or height.
 func GetTransactionResultsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetTransactionResultsByBlockIDRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 
-	transactionResults, err := backend.GetTransactionResultsByBlockID(r.Context(), req.BlockID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	blockID := req.BlockID
+	if blockID == flow.ZeroID {
+		block, _, err := backend.GetBlockByHeight(r.Context(), req.BlockHeight)
+		if err != nil {
+			return nil, err
+		}
+
+		blockID = block.ID()
+	}
+
+	transactionResults, err := backend.GetTransactionResultsByBlockID(r.Context(), blockID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	if err != nil {
 		return nil, err
 	}
 
 	var response = make([]commonmodels.TransactionResult, len(transactionResults))
-	var txr commonmodels.TransactionResult
 	for i, transactionResult := range transactionResults {
+		var txr commonmodels.TransactionResult
 		txr.Build(transactionResult, transactionResult.TransactionID, link)
 		response[i] = txr
 	}
