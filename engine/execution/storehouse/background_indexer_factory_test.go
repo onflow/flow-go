@@ -90,6 +90,7 @@ func TestLoadBackgroundIndexerEngine_StorehouseEnabled(t *testing.T) {
 	resultsReader := storagemock.NewExecutionResults(t)
 	blockExecutedNotifier := ingestion.NewBlockExecutedNotifier()
 	followerDistributor := pubsub.NewFollowerDistributor()
+	heightsPerSecond := uint64(10)
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		log,
 		enableStorehouse,
@@ -107,6 +108,7 @@ func TestLoadBackgroundIndexerEngine_StorehouseEnabled(t *testing.T) {
 		resultsReader,
 		blockExecutedNotifier,
 		followerDistributor,
+		heightsPerSecond,
 	)
 
 	require.NoError(t, err)
@@ -134,6 +136,7 @@ func TestLoadBackgroundIndexerEngine_BackgroundIndexingDisabled(t *testing.T) {
 	resultsReader := storagemock.NewExecutionResults(t)
 	blockExecutedNotifier := ingestion.NewBlockExecutedNotifier()
 	followerDistributor := pubsub.NewFollowerDistributor()
+	heightsPerSecond := uint64(10)
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		log,
 		enableStorehouse,
@@ -151,6 +154,7 @@ func TestLoadBackgroundIndexerEngine_BackgroundIndexingDisabled(t *testing.T) {
 		resultsReader,
 		blockExecutedNotifier,
 		followerDistributor,
+		heightsPerSecond,
 	)
 
 	require.NoError(t, err)
@@ -246,6 +250,7 @@ func TestLoadBackgroundIndexerEngine_Bootstrap(t *testing.T) {
 	// These are needed even though we stop after bootstrapping
 	blockExecutedNotifier := ingestion.NewBlockExecutedNotifier()
 	followerDistributor := pubsub.NewFollowerDistributor()
+	heightsPerSecond := uint64(10)
 
 	// Create background indexer engine
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
@@ -265,6 +270,7 @@ func TestLoadBackgroundIndexerEngine_Bootstrap(t *testing.T) {
 		resultsReader,
 		blockExecutedNotifier,
 		followerDistributor,
+		heightsPerSecond,
 	)
 
 	require.NoError(t, err)
@@ -492,6 +498,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 	// Set up block executed notifier and follower distributor
 	blockExecutedNotifier := ingestion.NewBlockExecutedNotifier()
 	followerDistributor := pubsub.NewFollowerDistributor()
+	heightsPerSecond := uint64(10)
 
 	// Create background indexer engine
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
@@ -511,6 +518,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 		resultsReader,
 		blockExecutedNotifier,
 		followerDistributor,
+		heightsPerSecond,
 	)
 
 	require.NoError(t, err)
