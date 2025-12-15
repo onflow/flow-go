@@ -156,16 +156,3 @@ func NewFailedSubscription(err error, msg string) *SubscriptionImpl {
 	sub.Fail(fmt.Errorf("%s: %w", msg, err))
 	return sub
 }
-
-var _ Subscription = (*HeightBasedSubscription)(nil)
-
-// HeightBasedSubscription is a subscription that retrieves data sequentially by block height
-type HeightBasedSubscription struct {
-	*SubscriptionImpl
-}
-
-func NewHeightBasedSubscription(bufferSize int) *HeightBasedSubscription {
-	return &HeightBasedSubscription{
-		SubscriptionImpl: NewSubscription(bufferSize),
-	}
-}

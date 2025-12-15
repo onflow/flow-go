@@ -46,13 +46,6 @@ func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	suite.rootBlock = unittest.BlockFixture()
 	rootBlockID := suite.rootBlock.ID()
 	suite.rootBlockResult = unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(rootBlockID))
-	// This will be used just for the root block
-	suite.snapshot.On("SealedResult").Return(suite.rootBlockResult, nil, nil).Maybe()
-	suite.state.On("SealedResult", rootBlockID).Return(flow.ExecutionReceiptList{}).Maybe()
-	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Maybe()
-	suite.state.On("Params").Return(suite.params).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Maybe()
 }
 
 func (suite *ExecutionResultInfoProviderSuite) createProvider(
@@ -65,16 +58,6 @@ func (suite *ExecutionResultInfoProviderSuite) createProvider(
 		suite.receipts,
 		NewExecutionNodeSelector(preferredExecutors, operatorCriteria.RequiredExecutors),
 		operatorCriteria,
-	)
-}
-
-// setupIdentitiesMock sets up the mock for identity-related calls.
-func (suite *ExecutionResultInfoProviderSuite) setupIdentitiesMock(allExecutionNodes flow.IdentityList) {
-	suite.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
-			return allExecutionNodes.Filter(filter)
-		},
-		func(flow.IdentityFilter[flow.Identity]) error { return nil },
 	)
 }
 
@@ -92,6 +75,31 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 	// create two different execution results to test agreement logic
 	executionResult := unittest.ExecutionResultFixture()
 
+	suite.snapshot.
+		On("Identities", mock.Anything).
+		Return(
+			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
+				return allExecutionNodes.Filter(filter)
+			},
+			func(flow.IdentityFilter[flow.Identity]) error { return nil },
+		).
+		Times(4) // for each subtest
+
+	suite.state.
+		On("Params").
+		Return(suite.params).
+		Times(4) // for each subtest
+
+	suite.params.
+		On("SporkRootBlock").
+		Return(suite.rootBlock).
+		Times(4) // for each subtest
+
+	suite.state.
+		On("Final").
+		Return(suite.snapshot, nil).
+		Times(4) // for each subtest
+
 	suite.Run(
 		"query with client required executors", func() {
 			provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
@@ -104,8 +112,10 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				receipts[i] = r
 			}
 
-			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-			suite.setupIdentitiesMock(allExecutionNodes)
+			suite.receipts.
+				On("ByBlockID", block.ID()).
+				Return(receipts, nil).
+				Once()
 
 			// Require specific executors (first two nodes)
 			requiredExecutors := allExecutionNodes[0:2].NodeIDs()
@@ -148,8 +158,10 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				receipts[i] = r
 			}
 
-			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-			suite.setupIdentitiesMock(allExecutionNodes)
+			suite.receipts.
+				On("ByBlockID", block.ID()).
+				Return(receipts, nil).
+				Once()
 
 			query, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{})
 			suite.Require().NoError(err)
@@ -177,8 +189,10 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 			}
 
 			// Set up a separate mock call for this specific block
-			suite.receipts.On("ByBlockID", insufficientBlock.ID()).Return(receipts, nil).Once()
-			suite.setupIdentitiesMock(allExecutionNodes)
+			suite.receipts.
+				On("ByBlockID", insufficientBlock.ID()).
+				Return(receipts, nil).
+				Once()
 
 			_, err := provider.ExecutionResultInfo(
 				insufficientBlock.ID(), optimistic_sync.Criteria{
@@ -201,8 +215,10 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				receipts[i] = r
 			}
 
-			suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-			suite.setupIdentitiesMock(allExecutionNodes)
+			suite.receipts.
+				On("ByBlockID", block.ID()).
+				Return(receipts, nil).
+				Once()
 
 			// Require executors that didn't produce any receipts
 			_, err := provider.ExecutionResultInfo(
@@ -221,7 +237,22 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 // TestRootBlockHandling tests the special case handling for root blocks.
 func (suite *ExecutionResultInfoProviderSuite) TestRootBlockHandling() {
 	allExecutionNodes := unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleExecution))
-	suite.setupIdentitiesMock(allExecutionNodes)
+	suite.snapshot.
+		On("Identities", mock.Anything).
+		Return(
+			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
+				return allExecutionNodes.Filter(filter)
+			},
+			func(flow.IdentityFilter[flow.Identity]) error { return nil },
+		).
+		Times(2) // for each subtest
+
+	// expected to be called once in each subtest
+	suite.state.On("Params").Return(suite.params).Times(2)
+	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Times(2)
+	suite.state.On("Final").Return(suite.snapshot, nil).Times(2)
+	suite.state.On("AtBlockID", suite.rootBlock.ID()).Return(suite.snapshot).Times(2)
+	suite.snapshot.On("SealedResult").Return(suite.rootBlockResult, nil, nil).Times(2)
 
 	suite.Run(
 		"root block returns execution nodes without execution result", func() {
@@ -274,8 +305,21 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 		receipts[i] = r
 	}
 
-	suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
-	suite.setupIdentitiesMock(allExecutionNodes)
+	suite.snapshot.
+		On("Identities", mock.Anything).
+		Return(
+			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
+				return allExecutionNodes.Filter(filter)
+			},
+			func(flow.IdentityFilter[flow.Identity]) error { return nil },
+		).
+		Times(5) // for each subtest
+
+	// expected to be called once in each subtest
+	suite.state.On("Params").Return(suite.params).Times(5)
+	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Times(5)
+	suite.state.On("Final").Return(suite.snapshot, nil).Times(5)
+	suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Times(5)
 
 	suite.Run(
 		"with default optimistic_sync.Criteria", func() {
@@ -386,27 +430,33 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderForkEr
 	operatorCriteria := optimistic_sync.Criteria{
 		AgreeingExecutorsCount: 1,
 	}
+
+	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Once()
+	suite.state.On("Params").Return(suite.params).Once()
+	// expected to be called for each ExecutionResultInfo call in this test (twice)
+	suite.state.On("Final").Return(suite.snapshot, nil).Times(2)
+
 	provider := suite.createProvider(preferredExecutors, operatorCriteria)
 
-	generator := fixtures.NewGeneratorSuite(fixtures.WithSeed(42))
+	g := fixtures.NewGeneratorSuite()
 
 	// set up 2 executors that produce different execution results
-	block := generator.Blocks().Fixture()
-	baseExecutionResult := generator.ExecutionResults().Fixture(fixtures.ExecutionResult.WithBlock(block))
+	block := g.Blocks().Fixture()
+	baseExecutionResult := g.ExecutionResults().Fixture(fixtures.ExecutionResult.WithBlock(block))
 
 	// fork 1 and fork 2, both descend from baseExecutionResult
-	executionResult1 := generator.ExecutionResults().Fixture(fixtures.ExecutionResult.WithPreviousResultID(baseExecutionResult.ID()))
-	executionResult2 := generator.ExecutionResults().Fixture(fixtures.ExecutionResult.WithPreviousResultID(baseExecutionResult.ID()))
+	executionResult1 := g.ExecutionResults().Fixture(fixtures.ExecutionResult.WithPreviousResultID(baseExecutionResult.ID()))
+	executionResult2 := g.ExecutionResults().Fixture(fixtures.ExecutionResult.WithPreviousResultID(baseExecutionResult.ID()))
 
 	// two execution identities (executors)
-	executors := generator.Identities().List(2, fixtures.Identity.WithRole(flow.RoleExecution))
+	executors := g.Identities().List(2, fixtures.Identity.WithRole(flow.RoleExecution))
 
 	// receipts for both forks, one per executor
-	receipt1 := generator.ExecutionReceipts().Fixture(
+	receipt1 := g.ExecutionReceipts().Fixture(
 		fixtures.ExecutionReceipt.WithExecutorID(executors[0].NodeID),
 		fixtures.ExecutionReceipt.WithExecutionResult(*executionResult1),
 	)
-	receipt2 := generator.ExecutionReceipts().Fixture(
+	receipt2 := g.ExecutionReceipts().Fixture(
 		fixtures.ExecutionReceipt.WithExecutorID(executors[1].NodeID),
 		fixtures.ExecutionReceipt.WithExecutionResult(*executionResult2),
 	)

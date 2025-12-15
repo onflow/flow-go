@@ -30,7 +30,9 @@ func TestStream(t *testing.T) {
 	timeout := subscription.DefaultSendTimeout
 
 	sub := submock.NewStreamable(t)
-	sub.On("ID").Return(uuid.NewString())
+	sub.
+		On("ID").
+		Return(uuid.NewString())
 
 	tests := []testData{}
 	for i := 0; i < 4; i++ {
@@ -48,7 +50,6 @@ func TestStream(t *testing.T) {
 
 	getData := func(ctx context.Context, height uint64) (interface{}, error) {
 		if td, ok := dataByHeight[height]; ok {
-			// when error is non-nil, return error (no data)
 			if td.err != nil {
 				return nil, td.err
 			}
@@ -60,13 +61,27 @@ func TestStream(t *testing.T) {
 	}
 
 	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub, dataProvider)
+	streamer := subscription.NewStreamer(
+		unittest.Logger(),
+		broadcaster,
+		timeout,
+		subscription.DefaultResponseLimit,
+		sub,
+		dataProvider,
+	)
 
 	for _, d := range tests {
 		if d.err == nil {
-			sub.On("Send", mock.Anything, d.data, timeout).Return(nil).Once()
+			sub.
+				On("Send", mock.Anything, d.data, timeout).
+				Return(nil).
+				Once()
 		} else {
-			mocked := sub.On("Fail", mock.Anything).Return().Once()
+			mocked := sub.
+				On("Fail", mock.Anything).
+				Return().
+				Once()
+
 			mocked.RunFn = func(args mock.Arguments) {
 				assert.ErrorIs(t, args.Get(0).(error), d.err)
 			}
@@ -90,7 +105,9 @@ func TestStreamRatelimited(t *testing.T) {
 	for _, limit := range []float64{0.2, 3, 20, 500} {
 		t.Run(fmt.Sprintf("responses are limited - %.1f rps", limit), func(t *testing.T) {
 			sub := submock.NewStreamable(t)
-			sub.On("ID").Return(uuid.NewString())
+			sub.
+				On("ID").
+				Return(uuid.NewString())
 
 			broadcaster := engine.NewBroadcaster()
 
@@ -101,11 +118,21 @@ func TestStreamRatelimited(t *testing.T) {
 			}
 
 			dataProvider := subscription.NewHeightByFuncProvider(0, getData)
-			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, dataProvider)
+			streamer := subscription.NewStreamer(
+				unittest.Logger(),
+				broadcaster,
+				timeout,
+				limit,
+				sub,
+				dataProvider,
+			)
 
-			sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
-				sendCalls++
-			})
+			sub.
+				On("Send", mock.Anything, "data", timeout).
+				Return(nil).
+				Run(func(args mock.Arguments) {
+					sendCalls++
+				})
 
 			broadcaster.Publish()
 
@@ -145,7 +172,9 @@ func TestLongStreamRatelimited(t *testing.T) {
 	duration := 30 * time.Second
 
 	sub := submock.NewStreamable(t)
-	sub.On("ID").Return(uuid.NewString())
+	sub.
+		On("ID").
+		Return(uuid.NewString())
 
 	broadcaster := engine.NewBroadcaster()
 
@@ -158,9 +187,12 @@ func TestLongStreamRatelimited(t *testing.T) {
 	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
 	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, dataProvider)
 
-	sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
-		sendCalls++
-	})
+	sub.
+		On("Send", mock.Anything, "data", timeout).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			sendCalls++
+		})
 
 	broadcaster.Publish()
 

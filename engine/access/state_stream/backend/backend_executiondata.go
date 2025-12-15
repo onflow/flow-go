@@ -80,10 +80,9 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 		case errors.Is(err, storage.ErrNotFound) ||
 			errors.Is(err, optimistic_sync.ErrBlockBeforeNodeHistory) ||
 			errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) ||
-			errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound):
+			errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound) ||
+			errors.Is(err, optimistic_sync.ErrForkAbandoned):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrForkAbandoned):
-			return nil, nil, access.NewPreconditionFailedError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
