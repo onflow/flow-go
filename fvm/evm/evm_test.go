@@ -1639,6 +1639,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -1703,6 +1704,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -1774,6 +1776,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -1845,6 +1848,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -1916,6 +1920,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
@@ -1980,6 +1985,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
 					Build()
 				require.NoError(t, err)
