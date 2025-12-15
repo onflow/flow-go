@@ -1201,16 +1201,21 @@ func (fnb *FlowNodeBuilder) determineChainID() error {
 		}
 		fnb.RootChainID = chainID
 	} else {
-		// try reading root snapshot from disk (full bootstrap will happen later)
-		fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
-		rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+		// if no root snapshot is configured, attempt to load the file from disk
+		var rootSnapshot = fnb.RootSnapshot
+		if rootSnapshot == nil {
+			fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
+			rootSnapshot, err = loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+			if err != nil {
+				return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
+			}
+		}
+		// retrieve ChainID from the snapshot
+		sealingSegment, err := rootSnapshot.SealingSegment()
 		if err != nil {
-			return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
+			return fmt.Errorf("failed to read ChainID from root snapshot: %w", err)
 		}
-		// set root snapshot fields, including fnb.RootChainID
-		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
-			return err
-		}
+		fnb.RootChainID = sealingSegment.Highest().ChainID
 	}
 	return nil
 }
@@ -1486,7 +1491,6 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.FinalizedRootBlock.ChainID
 	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
@@ -2110,18 +2114,18 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
+	for _, f := range fnb.preInitFns {
+		if err := fnb.handlePreInit(f); err != nil {
+			return err
+		}
+	}
+
 	if err := fnb.determineChainID(); err != nil {
 		return err
 	}
 
 	if err := fnb.initStorage(); err != nil {
 		return err
-	}
-
-	for _, f := range fnb.preInitFns {
-		if err := fnb.handlePreInit(f); err != nil {
-			return err
-		}
 	}
 
 	if err := fnb.initState(); err != nil {
