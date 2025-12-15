@@ -142,7 +142,7 @@ func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data
 	log := e.log.With().Hex("block_id", logging.ID(executionData.BlockID)).Logger()
 	log.Trace().Msg("received execution data")
 
-	// TODO: we want to avoid this pattern to silently log error and proceed.
+	// TODO: update this to throw an irrecoverable error
 	header, err := e.headers.ByBlockID(executionData.BlockID)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized

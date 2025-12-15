@@ -78,7 +78,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 		err = fmt.Errorf("failed to get execution result info for block %s: %w", blockID, err)
 		switch {
 		case errors.Is(err, storage.ErrNotFound) ||
-			errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
+			errors.Is(err, optimistic_sync.ErrBlockBeforeNodeHistory) ||
 			errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) ||
 			errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)

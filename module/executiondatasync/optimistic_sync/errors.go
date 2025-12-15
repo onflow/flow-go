@@ -15,6 +15,6 @@ var ErrRequiredExecutorNotFound = errors.New("required executor not found")
 // ErrNotEnoughAgreeingExecutors is returned if there are not enough execution nodes that produced the execution result.
 var ErrNotEnoughAgreeingExecutors = errors.New("not enough agreeing executors found")
 
-// ErrBlockNotFound is returned if the request is for the spork root block, and the node was bootstrapped from
-// a newer block.
-var ErrBlockNotFound = errors.New("block not found")
+// ErrBlockBeforeNodeHistory is returned when the requested block predates what the node has in storage
+// (for example, requesting the spork root block while the node was bootstrapped from a newer block).
+var ErrBlockBeforeNodeHistory = errors.New("requested block is before node history")

@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -32,7 +33,7 @@ import (
 type BackendExecutionDataSuite2 struct {
 	suite.Suite
 
-	fixtureGenerator *fixtures.GeneratorSuite
+	g *fixtures.GeneratorSuite
 
 	log      zerolog.Logger
 	state    *protocolmock.State
@@ -81,14 +82,11 @@ func TestBackendExecutionDataSuite2(t *testing.T) {
 func (s *BackendExecutionDataSuite2) SetupTest() {
 	s.log = unittest.Logger()
 
-	s.fixtureGenerator = fixtures.NewGeneratorSuite(
-		fixtures.WithChainID(flow.Testnet),
-		fixtures.WithSeed(42),
-	)
+	s.g = fixtures.NewGeneratorSuite()
 
 	// blocks and execution data for the tests
-	s.blocks = s.fixtureGenerator.Blocks().List(5)
-	s.log.Info().Msgf("first block height: %d, last block height: %d", s.blocks[0].Height, s.blocks[len(s.blocks)-1].Height)
+	s.blocks = s.g.Blocks().List(5)
+	s.T().Logf("first block height: %d, last block height: %d", s.blocks[0].Height, s.blocks[len(s.blocks)-1].Height)
 
 	s.sporkRootBlock = s.blocks[0]
 	s.blocksHeightToBlockMap = make(map[uint64]*flow.Block)
@@ -102,7 +100,7 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 		s.blocksHeightToBlockMap[block.Height] = block
 		s.blocksIDToBlockMap[block.ID()] = block
 
-		execData := s.fixtureGenerator.BlockExecutionDatas().Fixture(
+		execData := s.g.BlockExecutionDatas().Fixture(
 			fixtures.BlockExecutionData.WithBlockID(block.ID()),
 		)
 		if block.ID() == s.sporkRootBlock.ID() {
@@ -253,6 +251,8 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 		}
 	}
 
+	// we only break out of the above loop when the subscription's channel is closed. this happens after
+	// the context cancellation is processed. At this point, the subscription should contain the error.
 	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
@@ -290,14 +290,8 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 		Once()
 
 	s.headers.
-		On("ByHeight", mock.AnythingOfType("uint64")).
-		Return(func(height uint64) (*flow.Header, error) {
-			block, ok := s.blocksHeightToBlockMap[height]
-			if !ok {
-				return nil, storage.ErrNotFound
-			}
-			return block.ToHeader(), nil
-		}).
+		On("ByHeight", s.sporkRootBlock.Height).
+		Return(s.sporkRootBlock.ToHeader(), nil).
 		Once()
 
 	backend := s.createExecutionDataBackend()
@@ -335,6 +329,8 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 		}
 	}
 
+	// we only break out of the above loop when the subscription's channel is closed. this happens after
+	// the context cancellation is processed. At this point, the subscription should contain the error.
 	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
@@ -406,6 +402,8 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 		}
 	}
 
+	// we only break out of the above loop when the subscription's channel is closed. this happens after
+	// the context cancellation is processed. At this point, the subscription should contain the error.
 	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
@@ -476,6 +474,8 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 		}
 	}
 
+	// we only break out of the above loop when the subscription's channel is closed. this happens after
+	// the context cancellation is processed. At this point, the subscription should contain the error.
 	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
@@ -493,7 +493,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData() {
 		backend.GetExecutionDataByBlockID(context.Background(), s.sporkRootBlock.ID(), s.criteria)
 	expectedExecData := s.blockIDToExecutionDataMap[s.sporkRootBlock.ID()]
 
-	require.Nil(s.T(), err)
+	require.NoError(s.T(), err)
 	require.NotEmpty(s.T(), metadata)
 	require.Equal(s.T(), expectedExecData, actualExecData)
 }
@@ -527,7 +527,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 	s.Run("execution result info returns block not found", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
-			Return(nil, optimistic_sync.ErrBlockNotFound).
+			Return(nil, optimistic_sync.ErrBlockBeforeNodeHistory).
 			Once()
 
 		execDataRes, metadata, err :=
@@ -554,7 +554,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 
 	s.Run("execution result info returns unexpected error", func() {
 		// any unexpected error should be wrapped by access.RequireNoError, i.e., returned as-is
-		unexpected := assert.AnError
+		unexpected := errors.New("unexpected error")
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(nil, unexpected).
@@ -650,7 +650,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 			}).
 			Once()
 
-		unexpected := assert.AnError
+		unexpected := errors.New("unexpected error")
 		s.executionStateCache.
 			On("Snapshot", mock.Anything).
 			Return(nil, unexpected).
@@ -813,7 +813,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 		},
 		{
 			name:        "block not found",
-			expectedErr: optimistic_sync.ErrBlockNotFound,
+			expectedErr: optimistic_sync.ErrBlockBeforeNodeHistory,
 			mockState: func() {
 				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
@@ -827,7 +827,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-						return nil, optimistic_sync.ErrBlockNotFound
+						return nil, optimistic_sync.ErrBlockBeforeNodeHistory
 					}).
 					Once()
 			},
@@ -1127,8 +1127,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 			currentHeight := s.sporkRootBlock.Height
 			sub := backend.SubscribeExecutionDataFromStartBlockID(ctx, s.sporkRootBlock.ID(), s.criteria)
 
-			// cancel after we have received all expected blocks to avoid waiting for
-			// streamer/provider to hit the "block not ready" or missing height path.
+			// cancel after we have received all expected blocks.
 			received := 0
 			expected := len(s.blocks)
 

@@ -7,27 +7,19 @@ import (
 
 // DataProvider represents a source of sequential items to be streamed to a client.
 //
-// TODO: It can and should operate on generic type  rather than `any`. IT'd require lots of refactoring,
-// so it should be done in a PR with the subscription package refactoring.
+// TODO: This should operate on a concrete generic type rather than `any`. It requires
+// substantial refactoring and should be addressed alongside broader subscription
+// package refactors in a dedicated PR.
 type DataProvider interface {
-	// NextData retrieves the next sequential item from the data source.
+	// NextData returns the next item in sequence.
 	//
-	// - Retrieves the next available item in sequence and returns it as the first result.
-	// - If no further item is currently available yet (e.g. the next block/data is not ready), it
-	//   should return a non-nil error that satisfies [ErrBlockNotReady]. The streamer interprets this
-	//   as a normal "no more right now" condition and will pause until new data is broadcast.
-	// - To signal a terminal end of the stream (no more data will ever be available for this
-	//   subscription), return a non-nil error that satisfies [ErrEndOfData]. The streamer will close
-	//   the subscription gracefully.
-	// - Must observe the provided context: if the context is canceled or its deadline is exceeded,
-	//   return the respective context error.
-	// - Implementers should avoid returning (nil, nil). The streamer currently treats that as a
-	//   no-op and immediately tries again.
+	// If (nil, nil) is returned, the stream progresses forward to the next item.
 	//
-	// Expected errors during normal operations:
-	//   - [context.Canceled], [context.DeadlineExceeded]: When the caller cancels or times out.
-	//   - [ErrBlockNotReady]: When the next sequential item is not yet available.
-	//   - [ErrEndOfData]: When the stream has been fully consumed and will not produce more items.
+	// Expected errors during normal operation:
+	//   - [context.Canceled], [context.DeadlineExceeded]: If the context is canceled, or its deadline expires.
+	//   - [ErrBlockNotReady]: If the next item is not yet available. Callers may retry later,
+	//  	and the streamer will pause until new data is broadcast.
+	//   - [ErrEndOfData]: If no further items are produced, the subscription is closed gracefully.
 	NextData(ctx context.Context) (any, error)
 }
 
@@ -47,20 +39,22 @@ func NewHeightByFuncProvider(startHeight uint64, getData GetDataByHeightFunc) *H
 
 var _ DataProvider = (*HeightByFuncProvider)(nil)
 
-// NextData sequentially retrieves the next item using the configured GetDataByHeightFunc.
-// It starts at the provider's current height and advances the internal height counter only
-// after a successful retrieval.
+// NextData retrieves the next item using the configured GetDataByHeightFunc.
+// It starts at the provider's current height and advances the internal height counter
+// only after successful retrieval.
 //
 // Behavior:
 //   - On success, returns the fetched value and increments the internal height by 1.
 //   - On failure, returns a wrapped error and does not advance the height, so the same height
 //     will be retried on the next call.
-//   - Honors the provided context; context cancellation or deadline expiration should be
-//     surfaced by the underlying function.
 //
-// Note: This implementation itself does not translate backend "not ready" conditions into
-// [ErrBlockNotReady]; it simply wraps and returns them. The caller is responsible for
-// interpreting such errors.
+// If (nil, nil) is returned, the stream progresses forward to the next item.
+//
+// Expected errors during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: If the context is canceled, or its deadline expires.
+//   - [ErrBlockNotReady]: If the next item is not yet available. Callers may retry later,
+//     and the streamer will pause until new data is broadcast.
+//   - [ErrEndOfData]: If no further items are produced, the subscription is closed gracefully.
 func (p *HeightByFuncProvider) NextData(ctx context.Context) (any, error) {
 	v, err := p.getData(ctx, p.nextHeight)
 	if err != nil {

@@ -51,7 +51,7 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound]: If the execution receipts for the block ID are not found.
-//   - [optimistic_sync.ErrBlockNotFound]: If the request is for the spork root block, and the node was bootstrapped
+//   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for the spork root block, and the node was bootstrapped
 //     from a newer block.
 //   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
 //     execution results was abandoned.
@@ -80,7 +80,7 @@ func (p *Provider) ExecutionResultInfo(
 		if err != nil {
 			// if the node was bootstrapped from a block after the spork root block, then the root
 			// block's result will not be present.
-			return nil, errors.Join(optimistic_sync.ErrBlockNotFound, err)
+			return nil, errors.Join(optimistic_sync.ErrBlockBeforeNodeHistory, err)
 		}
 
 		return &optimistic_sync.ExecutionResultInfo{

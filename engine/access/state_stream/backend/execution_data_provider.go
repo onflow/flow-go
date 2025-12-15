@@ -53,7 +53,7 @@ var _ subscription.DataProvider = (*executionDataProvider)(nil)
 //
 //   - [subscription.ErrBlockNotReady]: If the execution data is not yet available. This includes cases where
 //     the block is not finalized yet, or the execution result is pending (e.g. not enough agreeing executors).
-//   - [optimistic_sync.ErrBlockNotFound]: If the request is for the spork root block, and the node was bootstrapped
+//   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for the spork root block, and the node was bootstrapped
 //     from a newer block.
 //   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
 //     execution results was abandoned.
@@ -93,7 +93,7 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 			errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, errors.Join(subscription.ErrBlockNotReady, err)
 
-		case errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
+		case errors.Is(err, optimistic_sync.ErrBlockBeforeNodeHistory) ||
 			errors.Is(err, optimistic_sync.ErrForkAbandoned):
 			return nil, err
 

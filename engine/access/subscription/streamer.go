@@ -18,11 +18,16 @@ var ErrBlockNotReady = errors.New("block not ready")
 // ErrEndOfData represents an error indicating that no more data available for streaming.
 var ErrEndOfData = errors.New("end of data")
 
-// GetDataByHeightFunc is a callback used by subscriptions to retrieve data for a given height.
-// Expected errors:
-// - storage.ErrNotFound
-// - execution_data.BlobNotFoundError
-// All other errors are considered exceptions
+// GetDataByHeightFunc is a callback implemented by backends and used by streamer to retrieve data for a given height.
+//
+// If (nil, nil) is returned, the stream progresses forward to the next item.
+//
+// Expected errors during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: If the context is canceled, or its deadline expires.
+//   - [storage.ErrNotFound]: If the data for a block not found in storage.
+//   - [ErrBlockNotReady]: If the next item is not yet available. Callers may retry later,
+//     and the streamer will pause until new data is broadcast.
+//   - [ErrEndOfData]: If no further items are produced, the subscription is closed gracefully.
 type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
 
 // Streamer represents a streaming subscription that delivers data to clients.
@@ -94,7 +99,7 @@ func (s *Streamer) Stream(ctx context.Context) {
 				return
 			}
 
-			// TODO: Can we change it to return no error when a client disconnects (it is done in a new subscription PR)
+			// TODO: We can change it to return no error when a client disconnects (it is done in a new subscription PR)
 			if errors.Is(err, context.Canceled) {
 				s.sub.Fail(fmt.Errorf("client disconnected: %w", ctx.Err()))
 				return
