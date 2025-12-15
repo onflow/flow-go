@@ -225,7 +225,7 @@ func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
 func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 	payload := ctx.candidate.Payload
 
-	// 1 - the reference block must be known
+	// 1 - the reference block must be known, and it must be part of the main consensus chain
 	refBlock, err := m.consensusHeaders.ByBlockID(payload.ReferenceBlockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
@@ -249,9 +249,6 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 				payload.ReferenceBlockID, refBlock.Height, storedBlockIDForHeight)
 		}
 	}
-
-	// TODO ensure the reference block is part of the main chain https://github.com/onflow/flow-go/issues/4204
-	_ = refBlock
 
 	// 3 - the reference block must be within the cluster's operating epoch
 	if refBlock.Height < ctx.epochFirstHeight {
