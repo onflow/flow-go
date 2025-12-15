@@ -1303,9 +1303,19 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           }
 
           access(all)
-          fun main(): [UInt8] {
+          fun main() {
               let s = S(x: 4, y: 2)
-              return EVM.encodeABI([s])
+              let encodedData = EVM.encodeABI([s])
+              assert(encodedData == [
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x4,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2
+              ])
+
+              let values = EVM.decodeABI(types: [Type<S>()], data: encodedData)
+              assert(values.length == 1)
+			  let s2 = values[0] as! S
+			  assert(s2.x == 4)
+			  assert(s2.y == 2)
           }
     	`)
 
@@ -1314,7 +1324,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source:    script,
 				Arguments: [][]byte{},
@@ -1329,30 +1339,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		abiBytes := []byte{
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x4,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2,
-		}
-		expected := "0000000000000000000000000000000000000000000000000000000000000004" +
-			"0000000000000000000000000000000000000000000000000000000000000002"
-		assert.Equal(
-			t,
-			expected,
-			hex.EncodeToString(abiBytes),
-		)
-		cdcBytes := make([]cadence.Value, 0)
-		for _, bt := range abiBytes {
-			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
-		}
-		encodedABI := cadence.NewArray(
-			cdcBytes,
-		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
-
-		assert.Equal(t,
-			encodedABI,
-			result,
-		)
-		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
+		assert.Equal(t, uint64(64), gauge.TotalComputationUsed())
 	})
 }
 

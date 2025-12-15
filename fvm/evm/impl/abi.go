@@ -855,6 +855,50 @@ func asTupleEncodableCompositeType(ty sema.Type) *sema.CompositeType {
 	return compositeType
 }
 
+// asTupleDecodableCompositeType determines if the given type can be decoded as a tuple
+// (when the type is user-defined (location != nil) struct type,
+// and the initializer parameters (argument label and type) match the struct fields)
+func asTupleDecodableCompositeType(ty sema.Type) *sema.CompositeType {
+	compositeType := asTupleEncodableCompositeType(ty)
+	if compositeType == nil {
+		return nil
+	}
+
+	var (
+		index                           int
+		hasInvalidInitializerParameters bool
+	)
+
+	compositeType.Members.Foreach(func(name string, member *sema.Member) {
+		if hasInvalidInitializerParameters ||
+			member.DeclarationKind != common.DeclarationKindField {
+
+			return
+		}
+
+		if index >= len(compositeType.ConstructorParameters) {
+			hasInvalidInitializerParameters = true
+			return
+		}
+
+		param := compositeType.ConstructorParameters[index]
+		index++
+
+		if param.EffectiveArgumentLabel() != name ||
+			!param.TypeAnnotation.Type.Equal(member.TypeAnnotation.Type) {
+
+			hasInvalidInitializerParameters = true
+			return
+		}
+	})
+
+	if hasInvalidInitializerParameters {
+		return nil
+	}
+
+	return compositeType
+}
+
 func newInternalEVMTypeDecodeABIFunction(
 	gauge common.MemoryGauge,
 	location common.AddressLocation,
@@ -1215,6 +1259,51 @@ func decodeABI(
 				location,
 				bytes,
 			), nil
+
+		default:
+			semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+			if compositeType := asTupleDecodableCompositeType(semaType); compositeType != nil {
+
+				valueStruct := reflect.ValueOf(value)
+
+				fields := make([]interpreter.CompositeField, 0, compositeType.Members.Len())
+
+				compositeType.Members.Foreach(func(name string, member *sema.Member) {
+					if member.DeclarationKind != common.DeclarationKindField {
+						return
+					}
+
+					fieldValue := valueStruct.FieldByName(exportedName(name)).Interface()
+
+					fieldStaticType := interpreter.ConvertSemaToStaticType(
+						context,
+						member.TypeAnnotation.Type,
+					)
+
+					decodedFieldValue, err := decodeABI(
+						context,
+						fieldValue,
+						fieldStaticType,
+						location,
+						evmTypeIDs,
+					)
+					if err != nil {
+						panic(err)
+					}
+
+					field := interpreter.NewCompositeField(context, name, decodedFieldValue)
+					fields = append(fields, field)
+				})
+
+				return interpreter.NewCompositeValue(
+					context,
+					compositeType.Location,
+					compositeType.QualifiedIdentifier(),
+					compositeType.Kind,
+					fields,
+					common.ZeroAddress,
+				), nil
+			}
 		}
 	}
 
