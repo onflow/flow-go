@@ -5266,8 +5266,9 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
           let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
           cadenceOwnedAccount.deposit(from: <-vault)
 
-          let vault2 <- cadenceOwnedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
+          let vault2 <- cadenceOwnedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000900000000))
           let balance = vault2.balance
+          assert(balance == 1.23000000, message: "mismatching vault balance")
           log(vault2.uuid)
 
           destroy cadenceOwnedAccount
