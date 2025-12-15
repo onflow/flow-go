@@ -64,7 +64,8 @@ type BackendExecutionDataSuite2 struct {
 	executionDataList         []*execution_data.BlockExecutionData
 	blockIDToExecutionDataMap map[flow.Identifier]*execution_data.BlockExecutionData
 
-	executionResults []*flow.ExecutionResult
+	executionResults     []*flow.ExecutionResult
+	blockIDToReceiptsMap map[flow.Identifier]flow.ExecutionReceiptList
 
 	// execution node configuration
 	fixedExecutionNodes       flow.IdentityList
@@ -95,6 +96,7 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 	s.executionDataList = make([]*execution_data.BlockExecutionData, len(s.blocks))
 	s.blockIDToExecutionDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionData)
 	s.executionResults = make([]*flow.ExecutionResult, len(s.blocks))
+	s.blockIDToReceiptsMap = make(map[flow.Identifier]flow.ExecutionReceiptList)
 
 	for i, block := range s.blocks {
 		s.blocksHeightToBlockMap[block.Height] = block
@@ -147,16 +149,12 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 		s.executionResults[i] = &receipt1.ExecutionResult
 
 		receipts := flow.ExecutionReceiptList{receipt1, receipt2}
-		s.receipts.
-			On("ByBlockID", block.ID()).
-			Return(receipts, nil).
-			Maybe()
+		s.blockIDToReceiptsMap[block.ID()] = receipts
 	}
 
 	s.snapshot = protocolmock.NewSnapshot(s.T())
 	s.params = protocolmock.NewParams(s.T())
 	s.state = protocolmock.NewState(s.T())
-
 	s.headers = storagemock.NewHeaders(s.T())
 
 	// execution data stuff
@@ -187,48 +185,6 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 	s.criteria = optimistic_sync.DefaultCriteria
 }
 
-func (s *BackendExecutionDataSuite2) initRealExecutionResultProvider() {
-	executionNodeSelector := execution_result.NewExecutionNodeSelector(
-		s.preferredExecutionNodeIDs,
-		s.fixedExecutionNodes.NodeIDs(),
-	)
-
-	s.state.On("Params").Return(s.params).Once()
-	s.params.On("SporkRootBlock").Return(s.sporkRootBlock, nil).Once()
-
-	s.executionResultProviderReal = execution_result.NewExecutionResultInfoProvider(
-		s.log,
-		s.state,
-		s.receipts,
-		executionNodeSelector,
-		s.criteria,
-	)
-}
-
-func (s *BackendExecutionDataSuite2) mockParams(sporkRootBlockHeightCalls int, sporkRootBlockCalls int) {
-	totalParamsCalls := sporkRootBlockHeightCalls + sporkRootBlockCalls
-	if totalParamsCalls > 0 {
-		s.state.
-			On("Params").
-			Return(s.params).
-			Times(totalParamsCalls)
-	}
-
-	if sporkRootBlockHeightCalls > 0 {
-		s.params.
-			On("SporkRootBlockHeight").
-			Return(s.sporkRootBlock.Height, nil).
-			Times(sporkRootBlockHeightCalls)
-	}
-
-	if sporkRootBlockCalls > 0 {
-		s.params.
-			On("SporkRootBlock").
-			Return(s.sporkRootBlock, nil).
-			Times(sporkRootBlockCalls)
-	}
-}
-
 // TestSubscribeExecutionData verifies that the subscription to execution data works correctly
 // starting from the spork root block ID. It ensures that the execution data is received
 // sequentially and matches the expected data.
@@ -242,8 +198,13 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 	trackerCallsCount := len(s.blocks) + 1
 
 	s.initRealExecutionResultProvider()
-	s.mockParams(len(s.blocks), 2)
 
+	// SporkRootBlockHeight is checked for each block processed by NextData.
+	paramHeightCalls := len(s.blocks)
+	// SporkRootBlock is checked during initialization (start height check) and for the root block processing.
+	paramBlockCalls := 2
+	s.mockParams(paramHeightCalls, paramBlockCalls)
+	s.mockReceipts(s.blocks)
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
 
 	s.executionDataTracker.
@@ -308,7 +269,13 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 	trackerCallsCount := len(s.blocks) + 1
 
 	s.initRealExecutionResultProvider()
-	s.mockParams(len(s.blocks), 1)
+
+	// SporkRootBlockHeight is checked for each block processed by NextData.
+	paramHeightCalls := len(s.blocks)
+	// SporkRootBlock is checked only for the root block processing.
+	paramBlockCalls := 1
+	s.mockParams(paramHeightCalls, paramBlockCalls)
+	s.mockReceipts(s.blocks)
 
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
 
@@ -384,7 +351,13 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 	trackerCallsCount := len(s.blocks) + 1
 
 	s.initRealExecutionResultProvider()
-	s.mockParams(len(s.blocks), 2)
+
+	// SporkRootBlockHeight is checked for each block processed by NextData.
+	paramHeightCalls := len(s.blocks)
+	// SporkRootBlock is checked during initialization (start height check) and for the root block processing.
+	paramBlockCalls := 2
+	s.mockParams(paramHeightCalls, paramBlockCalls)
+	s.mockReceipts(s.blocks)
 
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
 
@@ -449,7 +422,13 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 	trackerCallsCount := len(s.blocks) + 1
 
 	s.initRealExecutionResultProvider()
-	s.mockParams(len(s.blocks), 1)
+
+	// SporkRootBlockHeight is checked for each block processed by NextData.
+	paramHeightCalls := len(s.blocks)
+	// SporkRootBlock is checked only for the root block processing.
+	paramBlockCalls := 1
+	s.mockParams(paramHeightCalls, paramBlockCalls)
+	s.mockReceipts(s.blocks)
 
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
 
@@ -815,6 +794,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "block is not finalized",
 			expectedErr: storage.ErrNotFound,
 			mockState: func() {
+				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -835,6 +815,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "block not found",
 			expectedErr: optimistic_sync.ErrBlockNotFound,
 			mockState: func() {
+				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -855,6 +836,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "fork abandoned",
 			expectedErr: optimistic_sync.ErrForkAbandoned,
 			mockState: func() {
+				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -875,6 +857,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "unexpected error",
 			expectedErr: assert.AnError,
 			mockState: func() {
+				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
 				s.executionResultProvider.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
@@ -894,7 +877,19 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 	}
 
 	s.initRealExecutionResultProvider()
-	s.mockParams(3*len(tests), 2*len(tests))
+
+	// SporkRootBlockHeight is called 3 times per test:
+	// 1. NextData(root block)
+	// 2. NextData(block 1)
+	// 3. NextData(block 2) - where it fails
+	paramHeightCalls := 3 * len(tests)
+
+	// SporkRootBlock is called 2 times per test:
+	// 1. GetStartHeightFromBlockID (initial check)
+	// 2. NextData(root block)
+	paramBlockCalls := 2 * len(tests)
+
+	s.mockParams(paramHeightCalls, paramBlockCalls)
 
 	s.state.
 		On("Final").
@@ -998,7 +993,17 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 	s.initRealExecutionResultProvider()
 
 	mockStateFunc := func(errToReturn error) {
-		s.mockParams(len(s.blocks)+1, 2)
+		// SporkRootBlockHeight is called:
+		// - once for each block in s.blocks (len(s.blocks))
+		// - plus one extra time because of the retry on the ignorable error
+		paramHeightCalls := len(s.blocks) + 1
+
+		// SporkRootBlock is called:
+		// - once during initialization (GetStartHeightFromBlockID)
+		// - once for the root block processing in NextData
+		paramBlockCalls := 2
+		s.mockParams(paramHeightCalls, paramBlockCalls)
+		s.mockReceipts(s.blocks)
 
 		s.state.
 			On("Final").
@@ -1231,4 +1236,59 @@ func (s *BackendExecutionDataSuite2) mockExecutionResultProvider(expectationsCou
 			return s.executionResultProviderReal.ExecutionResultInfo(blockID, criteria)
 		}).
 		Times(expectationsCount)
+}
+
+func (s *BackendExecutionDataSuite2) initRealExecutionResultProvider() {
+	executionNodeSelector := execution_result.NewExecutionNodeSelector(
+		s.preferredExecutionNodeIDs,
+		s.fixedExecutionNodes.NodeIDs(),
+	)
+
+	s.state.On("Params").Return(s.params).Once()
+	s.params.On("SporkRootBlock").Return(s.sporkRootBlock, nil).Once()
+
+	s.executionResultProviderReal = execution_result.NewExecutionResultInfoProvider(
+		s.log,
+		s.state,
+		s.receipts,
+		executionNodeSelector,
+		s.criteria,
+	)
+}
+
+func (s *BackendExecutionDataSuite2) mockParams(sporkRootBlockHeightCalls int, sporkRootBlockCalls int) {
+	totalParamsCalls := sporkRootBlockHeightCalls + sporkRootBlockCalls
+	if totalParamsCalls > 0 {
+		s.state.
+			On("Params").
+			Return(s.params).
+			Times(totalParamsCalls)
+	}
+
+	if sporkRootBlockHeightCalls > 0 {
+		s.params.
+			On("SporkRootBlockHeight").
+			Return(s.sporkRootBlock.Height, nil).
+			Times(sporkRootBlockHeightCalls)
+	}
+
+	if sporkRootBlockCalls > 0 {
+		s.params.
+			On("SporkRootBlock").
+			Return(s.sporkRootBlock, nil).
+			Times(sporkRootBlockCalls)
+	}
+}
+
+func (s *BackendExecutionDataSuite2) mockReceipts(blocks []*flow.Block) {
+	for _, block := range blocks {
+		if block.ID() == s.sporkRootBlock.ID() {
+			continue
+		}
+
+		s.receipts.
+			On("ByBlockID", block.ID()).
+			Return(s.blockIDToReceiptsMap[block.ID()], nil).
+			Once()
+	}
 }
