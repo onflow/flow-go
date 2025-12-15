@@ -74,7 +74,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 			require.True(t, transactions.Add(tx.ID(), &tx))
 
 			wg.Done()
-		}(txs[i])
+		}(*txs[i])
 	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not write all transactions on time")
@@ -89,7 +89,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 			require.Equal(t, tx, *actual)
 
 			wg.Done()
-		}(txs[i])
+		}(*txs[i])
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not read all transactions on time")
 }
@@ -103,15 +103,15 @@ func TestValuesReturnsInOrder(t *testing.T) {
 
 	// storing all transactions
 	for i := 0; i < total; i++ {
-		require.True(t, transactions.Add(txs[i].ID(), &txs[i]))
+		require.True(t, transactions.Add(txs[i].ID(), txs[i]))
 		tx, ok := transactions.Get(txs[i].ID())
 		require.True(t, ok)
-		require.Equal(t, txs[i], *tx)
+		require.Equal(t, txs[i], tx)
 	}
 
 	// all transactions must be retrieved in the same order as they are added
 	all := transactions.Values()
 	for i := 0; i < total; i++ {
-		require.Equal(t, txs[i], *all[i])
+		require.Equal(t, txs[i], all[i])
 	}
 }

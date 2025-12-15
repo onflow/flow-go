@@ -136,8 +136,8 @@ func parseTransactionStatusesArguments(
 		return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must not be empty")
 	}
 
-	var parsedTxID parser.ID
-	if err = parsedTxID.Parse(txIDString); err != nil {
+	parsedTxID, err := parser.NewID(txIDString)
+	if err != nil {
 		return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
 	}
 

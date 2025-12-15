@@ -114,7 +114,10 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = nil
 	s.accessClient = nil
 
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(
+		flow.RoleAccess,
+		testnet.WithAdditionalFlag("--execution-result-agreeing-executors-count=1"),
+	))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)

@@ -22,7 +22,7 @@ type mockStateProvider struct {
 
 var _ optimistic_sync.PipelineStateProvider = (*mockStateProvider)(nil)
 
-// NewMockStateProvider initializes a mockStateProvider with the default state StatePending.
+// NewMockStateProvider initializes a mockStateProvider with the default state optimistic_sync.StatePending.
 func NewMockStateProvider() *mockStateProvider {
 	return &mockStateProvider{
 		state: optimistic_sync.StatePending,

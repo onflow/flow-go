@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
@@ -17,71 +18,30 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// RegisterAtHeight returns register value for provided register ID at the block height.
-// Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
-// If the register with the ID was not indexed at all return nil value and no error.
-// Expected errors:
-// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
-type RegisterAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
+// Scripts provides methods for executing Cadence scripts and querying data
+// at specific block heights. It ensures that queries are only run for blocks compatible
+// with the node's current version.
+type Scripts struct {
+	log      zerolog.Logger
+	executor *query.QueryExecutor
+	headers  storage.Headers
 
-type ScriptExecutor interface {
-	// ExecuteAtBlockHeight executes provided script against the block height.
-	// A result value is returned encoded as byte array. An error will be returned if script
-	// doesn't successfully execute.
-	// Expected errors:
-	// - storage.ErrNotFound if block or register value at height was not found.
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
-	ExecuteAtBlockHeight(
-		ctx context.Context,
-		script []byte,
-		arguments [][]byte,
-		height uint64,
-	) ([]byte, error)
-
-	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
-
-	// GetAccountBalance returns a Flow account balance by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
-	GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error)
-
-	// GetAccountAvailableBalance returns a Flow account available balance by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
-	GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error)
-
-	// GetAccountKeys returns a Flow account public keys by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
-	GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
-
-	// GetAccountKey returns a Flow account public key by the provided address, block height and index.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
-	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
+	compatibleHeights *CompatibleHeights
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
 
-type Scripts struct {
-	executor         *query.QueryExecutor
-	headers          storage.Headers
-	registerAtHeight RegisterAtHeight
-}
-
+// NewScripts creates a new Scripts instance.
 func NewScripts(
 	log zerolog.Logger,
 	metrics module.ExecutionMetrics,
 	chainID flow.ChainID,
 	protocolSnapshotProvider protocol.SnapshotExecutionSubsetProvider,
 	header storage.Headers,
-	registerAtHeight RegisterAtHeight,
 	queryConf query.QueryConfig,
 	derivedChainData *derived.DerivedChainData,
 	enableProgramCacheWrites bool,
+	compatibleHeights *CompatibleHeights,
 ) *Scripts {
 	vm := fvm.NewVirtualMachine()
 
@@ -107,26 +67,35 @@ func NewScripts(
 	)
 
 	return &Scripts{
-		executor:         queryExecutor,
-		headers:          header,
-		registerAtHeight: registerAtHeight,
+		log:               zerolog.New(log).With().Str("component", "script_executor").Logger(),
+		executor:          queryExecutor,
+		headers:           header,
+		compatibleHeights: compatibleHeights,
 	}
 }
 
-// ExecuteAtBlockHeight executes provided script against the block height.
-// A result value is returned encoded as byte array. An error will be returned if script
-// doesn't successfully execute.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+// ExecuteAtBlockHeight executes the provided script against the block height.
+// A result value is returned encoded as a byte array. An error will be returned if the script
+// does not successfully execute.
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange]: If incoming block height is higher than the last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
+//   - [storage.ErrNotFound]: If no block is finalized at the provided height.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+//   - [fvmerrors.ErrCodeScriptExecutionCancelledError]: If script execution is cancelled.
+//   - [fvmerrors.ErrCodeScriptExecutionTimedOutError]: If script execution timed out.
+//   - [fvmerrors.ErrCodeComputationLimitExceededError]: If script execution computation limit is exceeded.
+//   - [fvmerrors.ErrCodeMemoryLimitExceededError]: If script execution memory limit is exceeded.
+//   - [fvmerrors.FailureCodeLedgerFailure]: If the script execution fails due to ledger errors.
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
 	height uint64,
+	registerSnapshot storage.RegisterSnapshotReader,
 ) ([]byte, error) {
-
-	snap, header, err := s.snapshotWithBlock(height)
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -138,11 +107,15 @@ func (s *Scripts) ExecuteAtBlockHeight(
 }
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
-	snap, header, err := s.snapshotWithBlock(height)
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange]: If incoming block height is higher than the last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
+//   - [storage.ErrNotFound]: If no block is finalized at the provided height.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+//   - [fvmerrors.ErrCodeAccountNotFoundError]: If the account is not found by address.
+func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.Account, error) {
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +123,15 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 	return s.executor.GetAccount(ctx, address, header, snap)
 }
 
-// GetAccountBalance returns a balance of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
-	snap, header, err := s.snapshotWithBlock(height)
+// GetAccountBalance returns the balance of a Flow account by the provided address and block height.
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange]: If incoming block height is higher than the last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
+//   - [storage.ErrNotFound]: If no block is finalized at the provided height.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
 		return 0, err
 	}
@@ -163,12 +139,15 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 	return s.executor.GetAccountBalance(ctx, address, header, snap)
 }
 
-// GetAccountAvailableBalance returns an available balance of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
-	snap, header, err := s.snapshotWithBlock(height)
+// GetAccountAvailableBalance returns the available balance of a Flow account by the provided address and block height.
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange]: If incoming block height is higher than the last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
+//   - [storage.ErrNotFound]: If no block is finalized at the provided height.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) (uint64, error) {
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
 		return 0, err
 	}
@@ -176,12 +155,16 @@ func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.A
 	return s.executor.GetAccountAvailableBalance(ctx, address, header, snap)
 }
 
-// GetAccountKeys returns a public keys of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
-	snap, header, err := s.snapshotWithBlock(height)
+// GetAccountKeys returns the public keys of a Flow account by the provided address and block height.
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange]: If incoming block height is higher than the last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
+//   - [storage.ErrNotFound]: If no block is finalized at the provided height.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError]: If public keys are not found for the given address.
+func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64, registerSnapshot storage.RegisterSnapshotReader) ([]flow.AccountPublicKey, error) {
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -189,12 +172,16 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 	return s.executor.GetAccountKeys(ctx, address, header, snap)
 }
 
-// GetAccountKey returns a public key of Flow account by the provided address, block height and index.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
-	snap, header, err := s.snapshotWithBlock(height)
+// GetAccountKey returns a public key of a Flow account by the provided address, block height, and key index.
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange]: If incoming block height is higher than the last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
+//   - [storage.ErrNotFound]: If no block is finalized at the provided height.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+//   - [fvmerrors.ErrCodeAccountPublicKeyNotFoundError]: If a public key is not found for the given address and key index.
+func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, registerSnapshot storage.RegisterSnapshotReader) (*flow.AccountPublicKey, error) {
+	header, snap, err := s.getHeaderAndSnapshot(height, registerSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -202,17 +189,29 @@ func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIn
 	return s.executor.GetAccountKey(ctx, address, keyIndex, header, snap)
 }
 
-// snapshotWithBlock is a common function for executing scripts and get account functionality.
-// It creates a storage snapshot that is needed by the FVM to execute scripts.
-func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
+// getHeaderAndSnapshot retrieves the header and storage snapshot for a given block height.
+//
+// Expected error returns during normal operation:
+//   - [version.ErrOutOfRange]: If incoming block height is higher than the last handled block height.
+//   - [execution.ErrIncompatibleNodeVersion]: If the block height is not compatible with the node version.
+//   - [storage.ErrNotFound]: If no block is finalized at the provided height.
+//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+func (s *Scripts) getHeaderAndSnapshot(
+	height uint64,
+	registerSnapshot storage.RegisterSnapshotReader,
+) (*flow.Header, snapshot.StorageSnapshot, error) {
+	err := s.compatibleHeights.Check(height)
+	if err != nil {
+		return nil, nil, fmt.Errorf("block height is not compatible with the node's version: %w", err)
+	}
 	header, err := s.headers.ByHeight(height)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+	}
+	snap, err := registerSnapshot.StorageSnapshot(height)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get storage snapshot for height %d: %w", height, err)
 	}
 
-	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		return s.registerAtHeight(ID, height)
-	})
-
-	return storageSnapshot, header, nil
+	return header, snap, nil
 }

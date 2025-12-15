@@ -13,9 +13,7 @@ func NewAccountEvents(accountEvents map[string]flow.EventsList) AccountEvents {
 	result := make(map[string]models.Events, len(accountEvents))
 
 	for i, e := range accountEvents {
-		var events models.Events
-		events.Build(e)
-		result[i] = events
+		result[i] = models.NewEvents(e)
 	}
 
 	return result

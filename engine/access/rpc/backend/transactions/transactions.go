@@ -449,7 +449,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		// all expected errors fall through to be processed as a known unexecuted transaction.
 
 		// The transaction is not executed yet
-		txStatus, err := t.txStatusDeriver.DeriveTransactionStatus(block.Height, false)
+		txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, false)
 		if err != nil {
 			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
 			return nil, nil, err

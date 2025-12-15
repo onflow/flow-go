@@ -5,89 +5,121 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const eventTypeQuery = "type"
-const blockQuery = "block_ids"
+const blockIdsQuery = "block_ids"
 const MaxEventRequestHeightRange = 250
+const agreeingExecutorCountQuery = "agreeing_executors_count"
+const requiredExecutorIdsQuery = "required_executor_ids"
+const includeExecutorMetadataQuery = "include_executor_metadata"
 
 type GetEvents struct {
-	StartHeight uint64
-	EndHeight   uint64
-	Type        string
-	BlockIDs    []flow.Identifier
+	StartHeight    uint64
+	EndHeight      uint64
+	Type           string
+	BlockIDs       []flow.Identifier
+	ExecutionState models.ExecutionStateQuery
 }
 
-// GetEventsRequest extracts necessary variables from the provided request,
-// builds a GetEvents instance, and validates it.
-//
-// No errors are expected during normal operation.
-func GetEventsRequest(r *common.Request) (GetEvents, error) {
-	var req GetEvents
-	err := req.Build(r)
-	return req, err
-}
-
-func (g *GetEvents) Build(r *common.Request) error {
-	return g.Parse(
+func NewGetEvents(r *common.Request) (GetEvents, error) {
+	return parseGetEvents(
 		r.GetQueryParam(eventTypeQuery),
 		r.GetQueryParam(startHeightQuery),
 		r.GetQueryParam(endHeightQuery),
-		r.GetQueryParams(blockQuery),
+		r.GetQueryParams(blockIdsQuery),
+		r.GetQueryParam(agreeingExecutorCountQuery),
+		r.GetQueryParams(requiredExecutorIdsQuery),
+		r.GetQueryParam(includeExecutorMetadataQuery),
 	)
 }
 
-func (g *GetEvents) Parse(rawType string, rawStart string, rawEnd string, rawBlockIDs []string) error {
-	var height Height
-	err := height.Parse(rawStart)
+// parseGetEvents validates given request parameters and returns a GetEvents struct.
+//
+// No errors are expected during normal operation.
+func parseGetEvents(
+	rawEventType string,
+	rawStartHeight string,
+	rawEndHeight string,
+	rawBlockIds []string,
+	rawAgreeingExecutorsCount string,
+	rawAgreeingExecutorsIds []string,
+	rawIncludeExecutorMetadata string,
+) (GetEvents, error) {
+	var startHeight Height
+	err := startHeight.Parse(rawStartHeight)
 	if err != nil {
-		return fmt.Errorf("invalid start height: %w", err)
+		return GetEvents{}, fmt.Errorf("invalid start height: %w", err)
 	}
-	g.StartHeight = height.Flow()
-	err = height.Parse(rawEnd)
+
+	var endHeight Height
+	err = endHeight.Parse(rawEndHeight)
 	if err != nil {
-		return fmt.Errorf("invalid end height: %w", err)
+		return GetEvents{}, fmt.Errorf("invalid end height: %w", err)
 	}
-	g.EndHeight = height.Flow()
 
-	var blockIDs parser.IDs
-	err = blockIDs.Parse(rawBlockIDs)
+	blockIDs, err := parser.NewIDs(rawBlockIds)
 	if err != nil {
-		return err
-	}
-	g.BlockIDs = blockIDs.Flow()
-
-	// if both height and one or both of start and end height are provided
-	if len(blockIDs) > 0 && (g.StartHeight != EmptyHeight || g.EndHeight != EmptyHeight) {
-		return fmt.Errorf("can only provide either block IDs or start and end height range")
+		return GetEvents{}, err
 	}
 
-	// if neither height nor start and end height are provided
-	if len(blockIDs) == 0 && (g.StartHeight == EmptyHeight || g.EndHeight == EmptyHeight) {
-		return fmt.Errorf("must provide either block IDs or start and end height range")
+	isStartHeightProvided := startHeight.Flow() != EmptyHeight
+	isEndHeightProvided := endHeight.Flow() != EmptyHeight
+	isBlockIDsProvided := len(blockIDs) > 0
+
+	// if both block IDs and (start or end height) are provided
+	if isBlockIDsProvided && (isStartHeightProvided || isEndHeightProvided) {
+		return GetEvents{}, fmt.Errorf("can only provide either block IDs or start and end height range")
 	}
 
-	if rawType == "" {
-		return fmt.Errorf("event type must be provided")
+	// if neither block IDs nor both heights are provided
+	if !isBlockIDsProvided && (!isStartHeightProvided || !isEndHeightProvided) {
+		return GetEvents{}, fmt.Errorf("must provide either block IDs or start and end height range")
 	}
 
-	eventType, err := parser.NewEventType(rawType)
+	if rawEventType == "" {
+		return GetEvents{}, fmt.Errorf("event type must be provided")
+	}
+
+	eventType, err := parser.NewEventType(rawEventType)
 	if err != nil {
-		return err
+		return GetEvents{}, err
 	}
-	g.Type = eventType.Flow()
 
 	// validate start end height option
-	if g.StartHeight != EmptyHeight && g.EndHeight != EmptyHeight {
-		if g.StartHeight > g.EndHeight {
-			return fmt.Errorf("start height must be less than or equal to end height")
+	if isStartHeightProvided && isEndHeightProvided {
+		if startHeight > endHeight {
+			return GetEvents{}, fmt.Errorf("start height must be less than or equal to end height")
 		}
-		// check if range exceeds maximum but only if end is not equal to special value which is not known yet
-		if g.EndHeight-g.StartHeight >= MaxEventRequestHeightRange && g.EndHeight != FinalHeight && g.EndHeight != SealedHeight {
-			return fmt.Errorf("height range %d exceeds maximum allowed of %d", g.EndHeight-g.StartHeight, MaxEventRequestHeightRange)
+
+		isEndHeightFinalOrSealed := endHeight.Flow() == FinalHeight || endHeight.Flow() == SealedHeight
+		isRangeTooLarge := endHeight-startHeight >= MaxEventRequestHeightRange
+
+		if isRangeTooLarge && !isEndHeightFinalOrSealed {
+			return GetEvents{}, fmt.Errorf(
+				"height range %d exceeds maximum allowed of %d",
+				endHeight-startHeight,
+				MaxEventRequestHeightRange,
+			)
 		}
 	}
 
-	return nil
+	executionStateQuery, err := parser.NewExecutionStateQuery(
+		rawAgreeingExecutorsCount,
+		rawAgreeingExecutorsIds,
+		rawIncludeExecutorMetadata,
+	)
+	if err != nil {
+		return GetEvents{}, err
+	}
+
+	return GetEvents{
+		StartHeight:    startHeight.Flow(),
+		EndHeight:      endHeight.Flow(),
+		Type:           eventType.Flow(),
+		BlockIDs:       blockIDs.Flow(),
+		ExecutionState: *executionStateQuery,
+	}, nil
 }

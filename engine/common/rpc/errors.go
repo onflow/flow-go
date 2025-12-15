@@ -8,12 +8,51 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
 
 // ErrScriptTooLarge is returned when a script and/or arguments exceed the max size allowed by the server
 var ErrScriptTooLarge = errors.New("script and/or arguments are too large")
+
+// ErrorToStatus converts an Access API error into a grpc status error.
+// The input may either be a status.Error already, or an access sentinel error.
+// All generic errors are classified as `codes.Unknown`
+func ErrorToStatus(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Already converted
+	if status.Code(err) != codes.Unknown {
+		return err
+	}
+
+	switch {
+	case access.IsInvalidRequestError(err):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case access.IsDataNotFoundError(err):
+		return status.Error(codes.NotFound, err.Error())
+	case access.IsPreconditionFailedError(err):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case access.IsOutOfRangeError(err):
+		return status.Error(codes.OutOfRange, err.Error())
+	case access.IsInternalError(err):
+		return status.Error(codes.Internal, err.Error())
+	case access.IsRequestCanceledError(err):
+		return status.Error(codes.Canceled, err.Error())
+	case access.IsRequestTimedOutError(err):
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	case access.IsServiceUnavailable(err):
+		return status.Error(codes.Unavailable, err.Error())
+	case access.IsResourceExhausted(err):
+		return status.Error(codes.ResourceExhausted, err.Error())
+	default:
+		// all errors should have explicit sentinels. reporting them as `Unknown` will make them easier to find and fix.
+		return status.Error(codes.Unknown, err.Error())
+	}
+}
 
 // ConvertError converts a generic error into a grpc status error. The input may either
 // be a status.Error already, or standard error type. Any error that matches on of the

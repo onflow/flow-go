@@ -16,19 +16,26 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -55,7 +62,7 @@ type BackendExecutionDataSuite struct {
 	events         *storagemock.Events
 	seals          *storagemock.Seals
 	results        *storagemock.ExecutionResults
-	registers      *storagemock.RegisterIndex
+	registers      *storagemock.RegisterSnapshotReader
 	registersAsync *execution.RegistersAsyncStore
 	eventsIndex    *index.EventsIndex
 
@@ -67,6 +74,11 @@ type BackendExecutionDataSuite struct {
 	executionDataTracker     *trackermock.ExecutionDataTracker
 	backend                  *StateStreamBackend
 	executionDataTrackerReal tracker.ExecutionDataTracker
+
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	executionDataSnapshot   *osyncmock.Snapshot
+	criteria                optimistic_sync.Criteria
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -169,6 +181,11 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
+	s.criteria = optimistic_sync.Criteria{}
+
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	s.blockMap[s.rootBlock.Height] = s.rootBlock
@@ -182,18 +199,11 @@ func (s *BackendExecutionDataSuite) SetupTestMocks() {
 
 	s.eventsIndex = index.NewEventsIndex(index.NewReporter(), s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
-	s.registers = storagemock.NewRegisterIndex(s.T())
+	s.registers = storagemock.NewRegisterSnapshotReader(s.T())
 	err := s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(s.rootBlock.Height).Maybe()
 	s.registers.On("FirstHeight").Return(s.rootBlock.Height).Maybe()
-	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
-		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-			if id == s.registerID {
-				return flow.RegisterValue{}, nil
-			}
-			return nil, storage.ErrNotFound
-		}).Maybe()
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Maybe()
@@ -261,6 +271,8 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 			subscription.DefaultSendBufferSize,
 		),
 		s.executionDataTracker,
+		s.executionResultProvider,
+		s.executionStateCache,
 	)
 	require.NoError(s.T(), err)
 
@@ -335,24 +347,189 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	// notify backend block is available
 	s.highestBlockHeader = block.ToHeader()
 
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+
 	var err error
+	reader := osyncmock.NewBlockExecutionDataReader(s.T())
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
-		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		metadata := &accessmodel.ExecutorMetadata{
+			ExecutionResultID: result.ID(),
+			ExecutorIDs:       executionNodes.NodeIDs(),
+		}
+
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(execData, nil).
+			Once()
+
+		res, resMetadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.NotNil(s.T(), resMetadata)
+		assert.Equal(s.T(), metadata, resMetadata)
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
 
 	s.execDataHeroCache.Clear()
 
+	s.Run("execution result info returns data not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("execution result info returns unexpected error", func() {
+		exception := fmt.Errorf("failed to get execution result info for block: %w", storage.ErrDataMismatch)
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(nil, storage.ErrDataMismatch).
+			Once()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+
+	s.Run("snapshot returns data not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("snapshot returns unexpected error", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		exception := fmt.Errorf("unexpected error")
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(nil, exception).
+			Once()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
-		execDataRes, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID(), s.criteria)
 		assert.Nil(s.T(), execDataRes)
-		assert.Equal(s.T(), codes.NotFound, status.Code(err))
+		assert.Nil(s.T(), metadata)
+		s.Require().True(access.IsDataNotFoundError(err))
+	})
+
+	s.Run("unexpected error from ByBlockID", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).
+			Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.
+			On("BlockExecutionData").
+			Return(reader).
+			Once()
+
+		reader.
+			On("ByBlockID", mock.Anything, block.ID()).
+			Return(nil, storage.ErrDataMismatch).
+			Once()
+
+		exception := fmt.Errorf("unexpected error getting execution data: %w", storage.ErrDataMismatch)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
 	})
 }
 
@@ -717,29 +894,294 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	})
 }
 
+// TestGetRegisterValues tests that GetRegisterValues correctly returns register data
+// in normal conditions and propagates appropriate errors for all failure scenarios.
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
-	s.Run("normal case", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	block := s.blocks[0]
+	seal := s.sealMap[block.ID()]
+	result := s.resultMap[seal.ResultID]
+
+	// notify backend block is available
+	s.highestBlockHeader = block.ToHeader()
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+
+	s.Run("happy case", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		metadata := &accessmodel.ExecutorMetadata{
+			ExecutionResultID: result.ID(),
+			ExecutorIDs:       executionNodes.NodeIDs(),
+		}
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+
+		expectedRegister := flow.RegisterValue("value0")
+		s.registers.On("Get", s.registerID, block.Height).Return(expectedRegister, nil).Once()
+
+		res, resMetadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+
+		require.Equal(s.T(), []flow.RegisterValue{expectedRegister}, res)
+		require.Equal(s.T(), metadata, resMetadata)
 		require.NoError(s.T(), err)
-		require.NotEmpty(s.T(), res)
-	})
-
-	s.Run("returns error if block height is out of range", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Height+1)
-		require.Nil(s.T(), res)
-		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
-	})
-
-	s.Run("returns error if register path is not indexed", func() {
-		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		res, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Height)
-		require.Nil(s.T(), res)
-		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Height)
+		res, metadata, err := s.backend.GetRegisterValues(ctx, make(flow.RegisterIDs, s.backend.registerRequestLimit+1), block.Height, s.criteria)
+
 		require.Nil(s.T(), res)
-		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsInvalidRequestError(err))
+	})
+
+	s.Run("returns error if failed to get execution result info for block - insufficient receipts", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(nil, common.NewInsufficientExecutionReceipts(block.ID(), 0)).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("returns error if failed to get execution result info for block - not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(nil, storage.ErrNotFound).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("execution result info returns unexpected error", func() {
+		exception := fmt.Errorf("failed to get execution result info for block: %w", storage.ErrDataMismatch)
+
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(nil, storage.ErrDataMismatch).Once()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		res, metadata, err := s.backend.GetRegisterValues(ctxIrr, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+	})
+
+	s.Run("returns error when snapshot is not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("snapshot returns unexpected error", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		exception := fmt.Errorf("unexpected error")
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(nil, exception).
+			Once()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		execDataRes, metadata, err := s.backend.GetExecutionDataByBlockID(ctxIrr, block.ID(), s.criteria)
+		assert.Nil(s.T(), execDataRes)
+		assert.Nil(s.T(), metadata)
+		assert.Error(s.T(), err)
+	})
+
+	s.Run("returns error if the storage is still bootstrapping.", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.On("Registers").Return(nil, indexer.ErrIndexNotInitialized).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsPreconditionFailedError(err))
+	})
+
+	s.Run("registers returns unexpected error", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		exception := fmt.Errorf("unexpected error")
+		s.executionDataSnapshot.On("Registers").Return(nil, exception).Once()
+
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		res, metadata, err := s.backend.GetRegisterValues(ctxIrr, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+	})
+
+	s.Run("returns error if the requested height is outside the range of indexed blocks", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+
+		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrHeightNotIndexed).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, storage.ErrHeightNotIndexed)
+	})
+
+	s.Run("returns error if block or registerSnapshot value at height was not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrNotFound).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("returns error if block or registerSnapshot value at height was not found", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrNotFound).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
+	})
+
+	s.Run("registers Get returns unexpected error", func() {
+		s.executionResultProvider.
+			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
+			Return(&optimistic_sync.ExecutionResultInfo{
+				ExecutionResultID: result.ID(),
+				ExecutionNodes:    executionNodes.ToSkeleton(),
+			}, nil).Once()
+
+		s.executionStateCache.
+			On("Snapshot", result.ID()).
+			Return(s.executionDataSnapshot, nil).
+			Once()
+
+		s.executionDataSnapshot.On("Registers").Return(s.registers, nil).Once()
+
+		exception := fmt.Errorf("failed to get register by the register ID at a given block height: %w", storage.ErrDataMismatch)
+		ctxSignaler := irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, exception)
+		ctxIrr := irrecoverable.WithSignalerContext(ctx, ctxSignaler)
+
+		s.registers.On("Get", s.registerID, block.Height).Return(nil, storage.ErrDataMismatch).Once()
+
+		res, metadata, err := s.backend.GetRegisterValues(ctxIrr, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+	})
+
+	s.Run("returns error if no finalized block is known at the given height", func() {
+		s.headers.On("ByHeight", block.Height).Unset()
+		s.headers.On("ByHeight", block.Height).Return(nil, storage.ErrNotFound)
+
+		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
+		require.Nil(s.T(), res)
+		require.Nil(s.T(), metadata)
+		require.Error(s.T(), err)
+		require.True(s.T(), access.IsDataNotFoundError(err))
 	})
 }

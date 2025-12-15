@@ -5,10 +5,15 @@ package mock
 import (
 	context "context"
 
-	flow "github.com/onflow/flow-go/model/flow"
+	access "github.com/onflow/flow-go/model/access"
+
 	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
 
+	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
+
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 
 	state_stream "github.com/onflow/flow-go/engine/access/state_stream"
 
@@ -20,64 +25,82 @@ type API struct {
 	mock.Mock
 }
 
-// GetExecutionDataByBlockID provides a mock function with given fields: ctx, blockID
-func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
-	ret := _m.Called(ctx, blockID)
+// GetExecutionDataByBlockID provides a mock function with given fields: ctx, blockID, criteria
+func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier, criteria optimistic_sync.Criteria) (*execution_data.BlockExecutionData, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, blockID, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetExecutionDataByBlockID")
 	}
 
 	var r0 *execution_data.BlockExecutionData
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*execution_data.BlockExecutionData, error)); ok {
-		return rf(ctx, blockID)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) (*execution_data.BlockExecutionData, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, blockID, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *execution_data.BlockExecutionData); ok {
-		r0 = rf(ctx, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) *execution_data.BlockExecutionData); ok {
+		r0 = rf(ctx, blockID, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution_data.BlockExecutionData)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, blockID, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, blockID, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetRegisterValues provides a mock function with given fields: registerIDs, height
-func (_m *API) GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	ret := _m.Called(registerIDs, height)
+// GetRegisterValues provides a mock function with given fields: ctx, registerIDs, height, criteria
+func (_m *API) GetRegisterValues(ctx context.Context, registerIDs flow.RegisterIDs, height uint64, criteria optimistic_sync.Criteria) ([]flow.RegisterValue, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, registerIDs, height, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRegisterValues")
 	}
 
 	var r0 []flow.RegisterValue
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.RegisterIDs, uint64) ([]flow.RegisterValue, error)); ok {
-		return rf(registerIDs, height)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) ([]flow.RegisterValue, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, registerIDs, height, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(flow.RegisterIDs, uint64) []flow.RegisterValue); ok {
-		r0 = rf(registerIDs, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) []flow.RegisterValue); ok {
+		r0 = rf(ctx, registerIDs, height, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.RegisterValue)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.RegisterIDs, uint64) error); ok {
-		r1 = rf(registerIDs, height)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, registerIDs, height, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.RegisterIDs, uint64, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, registerIDs, height, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // SubscribeAccountStatusesFromLatestBlock provides a mock function with given fields: ctx, filter

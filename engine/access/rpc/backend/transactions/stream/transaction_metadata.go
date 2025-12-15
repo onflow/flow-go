@@ -11,11 +11,9 @@ import (
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -146,22 +144,18 @@ func (t *TransactionMetadata) refreshStatus(ctx context.Context) error {
 
 		t.txResult.Status, err = t.txStatusDeriver.DeriveUnknownTransactionStatus(t.txReferenceBlockID)
 		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return rpc.ConvertStorageError(err)
+			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive unknown transaction status: %w", err))
+			return err
 		}
 		return nil
 	}
 
 	// When the transaction is included in an executed block, the `txResult` may be updated during `Refresh`
 	// Recheck the status to ensure it's accurate.
-	t.txResult.Status, err = t.txStatusDeriver.DeriveTransactionStatus(t.blockWithTx.Height, t.txResult.IsExecuted())
+	t.txResult.Status, err = t.txStatusDeriver.DeriveFinalizedTransactionStatus(t.blockWithTx.Height, t.txResult.IsExecuted())
 	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return rpc.ConvertStorageError(err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to derive finalized transaction status: %w", err))
+		return err
 	}
 	return nil
 }

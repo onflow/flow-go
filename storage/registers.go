@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -10,9 +11,10 @@ type RegisterIndexReader interface {
 	//
 	// If the register at the given height was not indexed, returns the highest
 	// height the register was indexed at.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
-	// - storage.ErrNotFound if the given height is indexed, but the register does not exist.
+	//
+	// Expected error returns during normal operation:
+	//   - [storage.ErrHeightNotIndexed]: If the given height was not indexed yet or lower than the first indexed height.
+	//   - [storage.ErrNotFound]: If the given height is indexed, but the register does not exist.
 	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
 	// LatestHeight returns the latest indexed height.
@@ -34,4 +36,21 @@ type RegisterIndex interface {
 	//
 	// No errors are expected during normal operation.
 	Store(entries flow.RegisterEntries, height uint64) error
+}
+
+// RegisterSnapshotReader defines methods to access register values at specific heights
+// and to construct storage snapshots that can be queried.
+//
+// This interface wraps a RegisterIndexReader and ensures explicit range validation
+// before returning a snapshot.
+type RegisterSnapshotReader interface {
+	RegisterIndexReader
+	// StorageSnapshot creates a snapshot view of registers at the given block height.
+	//
+	// The snapshot allows reading registers by ID at the specified height. Range checks are
+	// performed before constructing the snapshot.
+	//
+	// Expected error returns during normal operation:
+	//   - [storage.ErrHeightNotIndexed]: If the requested height is outside the range of indexed blocks.
+	StorageSnapshot(height uint64) (snapshot.StorageSnapshot, error)
 }

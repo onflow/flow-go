@@ -5,12 +5,15 @@ package mock
 import (
 	context "context"
 
-	flow "github.com/onflow/flow-go/model/flow"
+	access "github.com/onflow/flow-go/model/access"
+
 	entities "github.com/onflow/flow/protobuf/go/flow/entities"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 
-	modelaccess "github.com/onflow/flow-go/model/access"
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 
 	subscription "github.com/onflow/flow-go/engine/access/subscription"
 )
@@ -20,360 +23,468 @@ type API struct {
 	mock.Mock
 }
 
-// ExecuteScriptAtBlockHeight provides a mock function with given fields: ctx, blockHeight, script, arguments
-func (_m *API) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
-	ret := _m.Called(ctx, blockHeight, script, arguments)
+// ExecuteScriptAtBlockHeight provides a mock function with given fields: ctx, blockHeight, script, arguments, criteria
+func (_m *API) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, blockHeight, script, arguments, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteScriptAtBlockHeight")
 	}
 
 	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, []byte, [][]byte) ([]byte, error)); ok {
-		return rf(ctx, blockHeight, script, arguments)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, blockHeight, script, arguments, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, []byte, [][]byte) []byte); ok {
-		r0 = rf(ctx, blockHeight, script, arguments)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) []byte); ok {
+		r0 = rf(ctx, blockHeight, script, arguments, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, []byte, [][]byte) error); ok {
-		r1 = rf(ctx, blockHeight, script, arguments)
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, blockHeight, script, arguments, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, uint64, []byte, [][]byte, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, blockHeight, script, arguments, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// ExecuteScriptAtBlockID provides a mock function with given fields: ctx, blockID, script, arguments
-func (_m *API) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
-	ret := _m.Called(ctx, blockID, script, arguments)
+// ExecuteScriptAtBlockID provides a mock function with given fields: ctx, blockID, script, arguments, criteria
+func (_m *API) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, blockID, script, arguments, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteScriptAtBlockID")
 	}
 
 	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte, [][]byte) ([]byte, error)); ok {
-		return rf(ctx, blockID, script, arguments)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, blockID, script, arguments, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte, [][]byte) []byte); ok {
-		r0 = rf(ctx, blockID, script, arguments)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) []byte); ok {
+		r0 = rf(ctx, blockID, script, arguments, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, []byte, [][]byte) error); ok {
-		r1 = rf(ctx, blockID, script, arguments)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, blockID, script, arguments, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, []byte, [][]byte, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, blockID, script, arguments, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// ExecuteScriptAtLatestBlock provides a mock function with given fields: ctx, script, arguments
-func (_m *API) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
-	ret := _m.Called(ctx, script, arguments)
+// ExecuteScriptAtLatestBlock provides a mock function with given fields: ctx, script, arguments, criteria
+func (_m *API) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte, criteria optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, script, arguments, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteScriptAtLatestBlock")
 	}
 
 	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) ([]byte, error)); ok {
-		return rf(ctx, script, arguments)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) ([]byte, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, script, arguments, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) []byte); ok {
-		r0 = rf(ctx, script, arguments)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) []byte); ok {
+		r0 = rf(ctx, script, arguments, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) error); ok {
-		r1 = rf(ctx, script, arguments)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, script, arguments, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, script, arguments, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccount provides a mock function with given fields: ctx, address
-func (_m *API) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	ret := _m.Called(ctx, address)
+// GetAccount provides a mock function with given fields: ctx, address, criteria
+func (_m *API) GetAccount(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccount")
 	}
 
 	var r0 *flow.Account
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (*flow.Account, error)); ok {
-		return rf(ctx, address)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) *flow.Account); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) *flow.Account); ok {
+		r0 = rf(ctx, address, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountAtBlockHeight provides a mock function with given fields: ctx, address, height
-func (_m *API) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
-	ret := _m.Called(ctx, address, height)
+// GetAccountAtBlockHeight provides a mock function with given fields: ctx, address, height, criteria
+func (_m *API) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, height, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountAtBlockHeight")
 	}
 
 	var r0 *flow.Account
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (*flow.Account, error)); ok {
-		return rf(ctx, address, height)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, height, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) *flow.Account); ok {
-		r0 = rf(ctx, address, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) *flow.Account); ok {
+		r0 = rf(ctx, address, height, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
-		r1 = rf(ctx, address, height)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, height, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, height, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountAtLatestBlock provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
-	ret := _m.Called(ctx, address)
+// GetAccountAtLatestBlock provides a mock function with given fields: ctx, address, criteria
+func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountAtLatestBlock")
 	}
 
 	var r0 *flow.Account
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (*flow.Account, error)); ok {
-		return rf(ctx, address)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) (*flow.Account, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) *flow.Account); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) *flow.Account); ok {
+		r0 = rf(ctx, address, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountBalanceAtBlockHeight provides a mock function with given fields: ctx, address, height
-func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
-	ret := _m.Called(ctx, address, height)
+// GetAccountBalanceAtBlockHeight provides a mock function with given fields: ctx, address, height, criteria
+func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) (uint64, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, height, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountBalanceAtBlockHeight")
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (uint64, error)); ok {
-		return rf(ctx, address, height)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) (uint64, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, height, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) uint64); ok {
-		r0 = rf(ctx, address, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) uint64); ok {
+		r0 = rf(ctx, address, height, criteria)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
-		r1 = rf(ctx, address, height)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, height, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, height, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountBalanceAtLatestBlock provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
-	ret := _m.Called(ctx, address)
+// GetAccountBalanceAtLatestBlock provides a mock function with given fields: ctx, address, criteria
+func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) (uint64, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountBalanceAtLatestBlock")
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (uint64, error)); ok {
-		return rf(ctx, address)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) (uint64, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) uint64); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) uint64); ok {
+		r0 = rf(ctx, address, criteria)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountKeyAtBlockHeight provides a mock function with given fields: ctx, address, keyIndex, height
-func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
-	ret := _m.Called(ctx, address, keyIndex, height)
+// GetAccountKeyAtBlockHeight provides a mock function with given fields: ctx, address, keyIndex, height, criteria
+func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64, criteria optimistic_sync.Criteria) (*flow.AccountPublicKey, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, keyIndex, height, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountKeyAtBlockHeight")
 	}
 
 	var r0 *flow.AccountPublicKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, uint64) (*flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address, keyIndex, height)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, uint64, optimistic_sync.Criteria) (*flow.AccountPublicKey, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, keyIndex, height, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, uint64) *flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address, keyIndex, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, uint64, optimistic_sync.Criteria) *flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, keyIndex, height, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.AccountPublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, uint64) error); ok {
-		r1 = rf(ctx, address, keyIndex, height)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, keyIndex, height, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint32, uint64, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, keyIndex, height, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountKeyAtLatestBlock provides a mock function with given fields: ctx, address, keyIndex
-func (_m *API) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error) {
-	ret := _m.Called(ctx, address, keyIndex)
+// GetAccountKeyAtLatestBlock provides a mock function with given fields: ctx, address, keyIndex, criteria
+func (_m *API) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32, criteria optimistic_sync.Criteria) (*flow.AccountPublicKey, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, keyIndex, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountKeyAtLatestBlock")
 	}
 
 	var r0 *flow.AccountPublicKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32) (*flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address, keyIndex)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, optimistic_sync.Criteria) (*flow.AccountPublicKey, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, keyIndex, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32) *flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address, keyIndex)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, optimistic_sync.Criteria) *flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, keyIndex, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.AccountPublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint32) error); ok {
-		r1 = rf(ctx, address, keyIndex)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, keyIndex, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint32, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, keyIndex, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountKeysAtBlockHeight provides a mock function with given fields: ctx, address, height
-func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
-	ret := _m.Called(ctx, address, height)
+// GetAccountKeysAtBlockHeight provides a mock function with given fields: ctx, address, height, criteria
+func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64, criteria optimistic_sync.Criteria) ([]flow.AccountPublicKey, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, height, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountKeysAtBlockHeight")
 	}
 
 	var r0 []flow.AccountPublicKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) ([]flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address, height)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) ([]flow.AccountPublicKey, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, height, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) []flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) []flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, height, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.AccountPublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
-		r1 = rf(ctx, address, height)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, height, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint64, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, height, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountKeysAtLatestBlock provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
-	ret := _m.Called(ctx, address)
+// GetAccountKeysAtLatestBlock provides a mock function with given fields: ctx, address, criteria
+func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address, criteria optimistic_sync.Criteria) ([]flow.AccountPublicKey, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, address, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountKeysAtLatestBlock")
 	}
 
 	var r0 []flow.AccountPublicKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) ([]flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) ([]flow.AccountPublicKey, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, address, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) []flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, optimistic_sync.Criteria) []flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.AccountPublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, address, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, address, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetBlockByHeight provides a mock function with given fields: ctx, height
@@ -554,64 +665,82 @@ func (_m *API) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow
 	return r0, r1
 }
 
-// GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion
-func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+// GetEventsForBlockIDs provides a mock function with given fields: ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria
+func (_m *API) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventsForBlockIDs")
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) ([]flow.BlockEvents, error)); ok {
-		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) []flow.BlockEvents); ok {
-		r0 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
+		r0 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.BlockEvents)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, []flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, eventType, blockIDs, requiredEventEncodingVersion, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetEventsForHeightRange provides a mock function with given fields: ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion
-func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-	ret := _m.Called(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+// GetEventsForHeightRange provides a mock function with given fields: ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria
+func (_m *API) GetEventsForHeightRange(ctx context.Context, eventType string, startHeight uint64, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error) {
+	ret := _m.Called(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventsForHeightRange")
 	}
 
 	var r0 []flow.BlockEvents
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) ([]flow.BlockEvents, error)); ok {
-		return rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	var r1 *access.ExecutorMetadata
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) ([]flow.BlockEvents, *access.ExecutorMetadata, error)); ok {
+		return rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) []flow.BlockEvents); ok {
-		r0 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) []flow.BlockEvents); ok {
+		r0 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.BlockEvents)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion) error); ok {
-		r1 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(1).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) *access.ExecutorMetadata); ok {
+		r1 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*access.ExecutorMetadata)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, uint64, uint64, entities.EventEncodingVersion, optimistic_sync.Criteria) error); ok {
+		r2 = rf(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion, criteria)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetExecutionResultByID provides a mock function with given fields: ctx, id
@@ -809,41 +938,41 @@ func (_m *API) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, erro
 }
 
 // GetNetworkParameters provides a mock function with given fields: ctx
-func (_m *API) GetNetworkParameters(ctx context.Context) modelaccess.NetworkParameters {
+func (_m *API) GetNetworkParameters(ctx context.Context) access.NetworkParameters {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNetworkParameters")
 	}
 
-	var r0 modelaccess.NetworkParameters
-	if rf, ok := ret.Get(0).(func(context.Context) modelaccess.NetworkParameters); ok {
+	var r0 access.NetworkParameters
+	if rf, ok := ret.Get(0).(func(context.Context) access.NetworkParameters); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(modelaccess.NetworkParameters)
+		r0 = ret.Get(0).(access.NetworkParameters)
 	}
 
 	return r0
 }
 
 // GetNodeVersionInfo provides a mock function with given fields: ctx
-func (_m *API) GetNodeVersionInfo(ctx context.Context) (*modelaccess.NodeVersionInfo, error) {
+func (_m *API) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNodeVersionInfo")
 	}
 
-	var r0 *modelaccess.NodeVersionInfo
+	var r0 *access.NodeVersionInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*modelaccess.NodeVersionInfo, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (*access.NodeVersionInfo, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *modelaccess.NodeVersionInfo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) *access.NodeVersionInfo); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*modelaccess.NodeVersionInfo)
+			r0 = ret.Get(0).(*access.NodeVersionInfo)
 		}
 	}
 
@@ -947,23 +1076,23 @@ func (_m *API) GetScheduledTransaction(ctx context.Context, scheduledTxID uint64
 }
 
 // GetScheduledTransactionResult provides a mock function with given fields: ctx, scheduledTxID, encodingVersion
-func (_m *API) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, encodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
+func (_m *API) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
 	ret := _m.Called(ctx, scheduledTxID, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetScheduledTransactionResult")
 	}
 
-	var r0 *modelaccess.TransactionResult
+	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, entities.EventEncodingVersion) (*modelaccess.TransactionResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
 		return rf(ctx, scheduledTxID, encodingVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, entities.EventEncodingVersion) *modelaccess.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, entities.EventEncodingVersion) *access.TransactionResult); ok {
 		r0 = rf(ctx, scheduledTxID, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*modelaccess.TransactionResult)
+			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
@@ -1007,23 +1136,23 @@ func (_m *API) GetSystemTransaction(ctx context.Context, txID flow.Identifier, b
 }
 
 // GetSystemTransactionResult provides a mock function with given fields: ctx, txID, blockID, encodingVersion
-func (_m *API) GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
+func (_m *API) GetSystemTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
 	ret := _m.Called(ctx, txID, blockID, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSystemTransactionResult")
 	}
 
-	var r0 *modelaccess.TransactionResult
+	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) (*modelaccess.TransactionResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
 		return rf(ctx, txID, blockID, encodingVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) *modelaccess.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) *access.TransactionResult); ok {
 		r0 = rf(ctx, txID, blockID, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*modelaccess.TransactionResult)
+			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
@@ -1067,23 +1196,23 @@ func (_m *API) GetTransaction(ctx context.Context, id flow.Identifier) (*flow.Tr
 }
 
 // GetTransactionResult provides a mock function with given fields: ctx, txID, blockID, collectionID, encodingVersion
-func (_m *API) GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
+func (_m *API) GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
 	ret := _m.Called(ctx, txID, blockID, collectionID, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTransactionResult")
 	}
 
-	var r0 *modelaccess.TransactionResult
+	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) (*modelaccess.TransactionResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
 		return rf(ctx, txID, blockID, collectionID, encodingVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) *modelaccess.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) *access.TransactionResult); ok {
 		r0 = rf(ctx, txID, blockID, collectionID, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*modelaccess.TransactionResult)
+			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
@@ -1097,23 +1226,23 @@ func (_m *API) GetTransactionResult(ctx context.Context, txID flow.Identifier, b
 }
 
 // GetTransactionResultByIndex provides a mock function with given fields: ctx, blockID, index, encodingVersion
-func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*modelaccess.TransactionResult, error) {
+func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
 	ret := _m.Called(ctx, blockID, index, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTransactionResultByIndex")
 	}
 
-	var r0 *modelaccess.TransactionResult
+	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint32, entities.EventEncodingVersion) (*modelaccess.TransactionResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint32, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
 		return rf(ctx, blockID, index, encodingVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint32, entities.EventEncodingVersion) *modelaccess.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint32, entities.EventEncodingVersion) *access.TransactionResult); ok {
 		r0 = rf(ctx, blockID, index, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*modelaccess.TransactionResult)
+			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
@@ -1127,23 +1256,23 @@ func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Ide
 }
 
 // GetTransactionResultsByBlockID provides a mock function with given fields: ctx, blockID, encodingVersion
-func (_m *API) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*modelaccess.TransactionResult, error) {
+func (_m *API) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*access.TransactionResult, error) {
 	ret := _m.Called(ctx, blockID, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTransactionResultsByBlockID")
 	}
 
-	var r0 []*modelaccess.TransactionResult
+	var r0 []*access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) ([]*modelaccess.TransactionResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) ([]*access.TransactionResult, error)); ok {
 		return rf(ctx, blockID, encodingVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) []*modelaccess.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) []*access.TransactionResult); ok {
 		r0 = rf(ctx, blockID, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*modelaccess.TransactionResult)
+			r0 = ret.Get(0).([]*access.TransactionResult)
 		}
 	}
 

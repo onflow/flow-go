@@ -15,8 +15,13 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/accounts"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/blocks"
+	blockstream "github.com/onflow/flow-go/engine/access/rpc/backend/blocks/stream"
+	collectionsbackend "github.com/onflow/flow-go/engine/access/rpc/backend/collections"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/execution_results"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/network"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/scripts"
@@ -36,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -50,14 +56,7 @@ const DefaultConnectionPoolSize = 250
 
 // Backend implements the Access API.
 //
-// It is composed of several sub-backends that implement part of the Access API.
-//
-// Script related calls are handled by backendScripts.
-// Transaction related calls are handled by backendTransactions.
-// Block Header related calls are handled by backendBlockHeaders.
-// Block details related calls are handled by backendBlockDetails.
-// Event related calls are handled by backendEvents.
-// Account related calls are handled by backendAccounts.
+// It is composed of several sub-backends that implement parts of the Access API.
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
@@ -66,14 +65,13 @@ type Backend struct {
 	scripts.Scripts
 	transactions.Transactions
 	txstream.TransactionStream
-	backendBlockHeaders
-	backendBlockDetails
-	backendExecutionResults
-	backendNetwork
-	backendSubscribeBlocks
+	blocks.BlocksBase
+	blockstream.SubscribeBlocks
+	execution_results.ExecutionResults
+	network.Network
+	collectionsbackend.Collections
 
 	state               protocol.State
-	collections         storage.Collections
 	staticCollectionRPC accessproto.AccessAPIClient
 
 	stateParams    protocol.Params
@@ -95,6 +93,7 @@ type Params struct {
 	Seals                    storage.Seals
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
 	ScheduledTransactions    storage.ScheduledTransactionsReader
+	RegistersAsyncStore      *execution.RegistersAsyncStore
 	ChainID                  flow.ChainID
 	AccessMetrics            module.AccessMetrics
 	ConnFactory              connection.ConnectionFactory
@@ -119,6 +118,10 @@ type Params struct {
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 	TxErrorMessageProvider     error_messages.Provider
+
+	ExecutionResultInfoProvider optimistic_sync.ExecutionResultInfoProvider
+	ExecutionStateCache         optimistic_sync.ExecutionStateCache
+	ScheduledCallbacksEnabled   bool
 }
 
 var _ access.API = (*Backend)(nil)
@@ -152,6 +155,8 @@ func New(params Params) (*Backend, error) {
 		params.ScriptExecutionMode,
 		params.ScriptExecutor,
 		params.ExecNodeIdentitiesProvider,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounts: %w", err)
@@ -166,8 +171,9 @@ func New(params Params) (*Backend, error) {
 		params.ConnFactory,
 		params.Communicator,
 		params.EventQueryMode,
-		params.EventsIndex,
 		params.ExecNodeIdentitiesProvider,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events: %w", err)
@@ -185,6 +191,8 @@ func New(params Params) (*Backend, error) {
 		params.ExecNodeIdentitiesProvider,
 		loggedScripts,
 		params.MaxScriptAndArgumentSize,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scripts: %w", err)
@@ -206,6 +214,7 @@ func New(params Params) (*Backend, error) {
 			CheckPayerBalanceMode:        params.CheckPayerBalanceMode,
 		},
 		params.ScriptExecutor,
+		params.RegistersAsyncStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
@@ -289,47 +298,39 @@ func New(params Params) (*Backend, error) {
 		txStatusDeriver,
 	)
 
+	subscribeBlocksBackend := blockstream.NewSubscribeBlocks(
+		params.Log,
+		params.State,
+		params.Headers,
+		params.Blocks,
+		params.SubscriptionHandler,
+		params.BlockTracker,
+	)
+
+	executionResultsBackend := execution_results.NewExecutionResults(params.ExecutionResults, params.Seals)
+
+	networkBackend := network.NewNetwork(
+		params.State,
+		params.ChainID,
+		params.Headers,
+		params.SnapshotHistoryLimit,
+	)
+
+	collectionsBackend := collectionsbackend.NewCollectionsBackend(params.Collections)
+
 	b := &Backend{
 		Accounts:          *accountsBackend,
 		Events:            *eventsBackend,
 		Scripts:           *scriptsBackend,
 		Transactions:      *txBackend,
 		TransactionStream: *txStreamBackend,
-		backendBlockHeaders: backendBlockHeaders{
-			backendBlockBase: backendBlockBase{
-				blocks:  params.Blocks,
-				headers: params.Headers,
-				state:   params.State,
-			},
-		},
-		backendBlockDetails: backendBlockDetails{
-			backendBlockBase: backendBlockBase{
-				blocks:  params.Blocks,
-				headers: params.Headers,
-				state:   params.State,
-			},
-		},
-		backendExecutionResults: backendExecutionResults{
-			executionResults: params.ExecutionResults,
-			seals:            params.Seals,
-		},
-		backendNetwork: backendNetwork{
-			state:                params.State,
-			chainID:              params.ChainID,
-			headers:              params.Headers,
-			snapshotHistoryLimit: params.SnapshotHistoryLimit,
-		},
-		backendSubscribeBlocks: backendSubscribeBlocks{
-			log:                 params.Log,
-			state:               params.State,
-			headers:             params.Headers,
-			blocks:              params.Blocks,
-			subscriptionHandler: params.SubscriptionHandler,
-			blockTracker:        params.BlockTracker,
-		},
+		BlocksBase:        blocks.NewBlockBase(params.Blocks, params.Headers, params.State),
+		SubscribeBlocks:   *subscribeBlocksBackend,
+		ExecutionResults:  *executionResultsBackend,
+		Network:           *networkBackend,
+		Collections:       *collectionsBackend,
 
 		state:               params.State,
-		collections:         params.Collections,
 		staticCollectionRPC: params.CollectionRPC,
 		stateParams:         params.State.Params(),
 		versionControl:      params.VersionControl,
@@ -340,12 +341,19 @@ func New(params Params) (*Backend, error) {
 }
 
 // Ping responds to requests when the server is up.
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+//
+// Expected sentinel errors providing details to clients about failed requests:
+//   - [access.ServiceUnavailable]: If the configured static collection node does not respond to ping.
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
-		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
-		if err != nil {
-			return fmt.Errorf("could not ping collection node: %w", err)
+		if _, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{}); err != nil {
+			return access.NewServiceUnavailable(fmt.Errorf("could not ping collection node: %w", err))
 		}
 	}
 
@@ -353,13 +361,18 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
+//
+// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention
+// As documented in the [access.API], which we partially implement with this function
+//   - All errors returned by this API are guaranteed to be benign. The node can continue normal operations after such errors.
+//   - Hence, we MUST check here and crash on all errors *except* for those known to be benign in the present context!
+func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error) {
 	sporkID := b.stateParams.SporkID()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
 	nodeRootBlockHeader := b.stateParams.SealedRoot()
 	protocolSnapshot, err := b.state.Final().ProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not read finalized protocol kvstore: %w", err)
+		return nil, access.RequireNoError(ctx, fmt.Errorf("could not read finalized protocol kvstore: %w", err))
 	}
 
 	var compatibleRange *accessmodel.CompatibleRange
@@ -384,40 +397,4 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersio
 	}
 
 	return nodeInfo, nil
-}
-
-func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
-	// retrieve the collection from the collection storage
-	col, err := b.collections.LightByID(colID)
-	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so
-		// it is possible for a client to request a finalized block from us
-		// containing some collection, then get a not found error when requesting
-		// that collection. These clients should retry.
-		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
-		return nil, err
-	}
-
-	return col, nil
-}
-
-func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier) (*flow.Collection, error) {
-	// retrieve the collection from the collection storage
-	col, err := b.collections.ByID(colID)
-	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so
-		// it is possible for a client to request a finalized block from us
-		// containing some collection, then get a not found error when requesting
-		// that collection. These clients should retry.
-		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
-		return nil, err
-	}
-
-	return col, nil
-}
-
-func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
-	return accessmodel.NetworkParameters{
-		ChainID: b.backendNetwork.chainID,
-	}
 }

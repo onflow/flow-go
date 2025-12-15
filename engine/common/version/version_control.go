@@ -251,8 +251,9 @@ func (v *VersionControl) BlockFinalized(h *flow.Header) {
 
 // CompatibleAtBlock checks if the node's version is compatible at a given block height.
 // It returns true if the node's version is compatible within the specified height range.
-// Returns expected errors:
-// - ErrOutOfRange if incoming block height is higher that last handled block height
+//
+// Expected error returns during normal operation:
+//   - [ErrOutOfRange]: If incoming block height is higher that last handled block height.
 func (v *VersionControl) CompatibleAtBlock(height uint64) (bool, error) {
 	// Check, if the height smaller than sealed root block height. If so, return an error indicating that the height is unhandled.
 	sealedRootHeight := v.sealedRootBlockHeight.Load()

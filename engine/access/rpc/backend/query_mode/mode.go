@@ -18,10 +18,6 @@ const (
 	// then falls back to execution nodes if data is not available for the height or if request
 	// failed due to a non-user error.
 	IndexQueryModeFailover
-
-	// IndexQueryModeCompare executes scripts and gets accounts using both local storage and
-	// execution nodes and compares the results. The execution node result is always returned.
-	IndexQueryModeCompare
 )
 
 func ParseIndexQueryMode(s string) (IndexQueryMode, error) {
@@ -32,8 +28,6 @@ func ParseIndexQueryMode(s string) (IndexQueryMode, error) {
 		return IndexQueryModeExecutionNodesOnly, nil
 	case IndexQueryModeFailover.String():
 		return IndexQueryModeFailover, nil
-	case IndexQueryModeCompare.String():
-		return IndexQueryModeCompare, nil
 	default:
 		return 0, errors.New("invalid script execution mode")
 	}
@@ -47,8 +41,6 @@ func (m IndexQueryMode) String() string {
 		return "execution-nodes-only"
 	case IndexQueryModeFailover:
 		return "failover"
-	case IndexQueryModeCompare:
-		return "compare"
 	default:
 		return ""
 	}
