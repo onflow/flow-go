@@ -152,7 +152,7 @@ func TestNativeTokenBridging(t *testing.T) {
 			t.Run("tokens withdraw that results in rounding error", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						// Happy path, withdraw amount is fits in Flow vault
+						// Happy path, withdraw amount fits in Flow vault
 						call := types.NewWithdrawCall(bridgeAccount, testAccount, types.OneFlow(), testAccountNonce)
 						res, err := blk.DirectCall(call)
 						requireSuccessfulExecution(t, err, res)
