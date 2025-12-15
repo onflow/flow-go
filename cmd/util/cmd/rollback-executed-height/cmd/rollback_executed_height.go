@@ -64,7 +64,7 @@ func runE(*cobra.Command, []string) error {
 		if err != nil {
 			return err
 		}
-		storages := common.InitStorages(db, chainID) // TODO(4204) - clean up duplicated storage types
+		storages := common.InitStorages(db, chainID)
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
 			return fmt.Errorf("could not open protocol states: %w", err)
@@ -76,15 +76,14 @@ func runE(*cobra.Command, []string) error {
 		if err != nil {
 			return err
 		}
-		commits := store.NewCommits(metrics, db)
-		results := store.NewExecutionResults(metrics, db)
-		receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
+		commits := storages.Commits
+		results := storages.Results
+		receipts := storages.Receipts
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
-		headers := store.NewHeaders(metrics, db, chainID)
+		headers := storages.Headers
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
-		transactions := store.NewTransactions(metrics, db)
-		collections := store.NewCollections(db, transactions)
+		collections := storages.Collections
 		// require the chunk data pack data must exist before returning the storage module
 		chunkDataPacksPebbleDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
 			log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)
