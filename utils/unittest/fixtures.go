@@ -2642,7 +2642,7 @@ func MachineAccountFixture(t *testing.T) (
 ) {
 	info := NodeMachineAccountInfoFixture()
 
-	bal, err := cadence.NewUFix64("0.5")
+	bal, err := cadence.NewUFix64("5.0")
 	require.NoError(t, err)
 
 	acct := &sdk.Account{
