@@ -14,9 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -26,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
@@ -60,6 +59,8 @@ type Transactions struct {
 	systemCollections *systemcollection.Versioned
 	txResultCache     TxResultCache
 
+	executionStateCache          optimistic_sync.ExecutionStateCache
+	executionResultProvider      optimistic_sync.ExecutionResultInfoProvider
 	scheduledTransactionsEnabled bool
 }
 
@@ -81,13 +82,12 @@ type Params struct {
 	Collections                  storage.Collections
 	Transactions                 storage.Transactions
 	ScheduledTransactions        storage.ScheduledTransactionsReader
-	TxErrorMessageProvider       error_messages.Provider
 	TxResultCache                TxResultCache
 	TxProvider                   provider.TransactionProvider
 	TxValidator                  *validator.TransactionValidator
 	TxStatusDeriver              *txstatus.TxStatusDeriver
-	EventsIndex                  *index.EventsIndex
-	TxResultsIndex               *index.TransactionResultsIndex
+	ExecutionStateCache          optimistic_sync.ExecutionStateCache
+	ExecutionResultProvider      optimistic_sync.ExecutionResultInfoProvider
 	ScheduledTransactionsEnabled bool
 }
 
@@ -110,6 +110,8 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		txValidator:                  params.TxValidator,
 		txProvider:                   params.TxProvider,
 		txStatusDeriver:              params.TxStatusDeriver,
+		executionStateCache:          params.ExecutionStateCache,
+		executionResultProvider:      params.ExecutionResultProvider,
 		scheduledTransactionsEnabled: params.ScheduledTransactionsEnabled,
 	}
 
@@ -331,7 +333,8 @@ func (t *Transactions) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-) (txResult *accessmodel.TransactionResult, err error) {
+	criteria optimistic_sync.Criteria,
+) (txResult *accessmodel.TransactionResult, metadata *accessmodel.ExecutorMetadata, err error) {
 	var scriptSize int
 	start := time.Now()
 	defer func() {
@@ -342,35 +345,49 @@ func (t *Transactions) GetTransactionResult(
 		}
 	}()
 
-	txResult, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion)
+	// if block is not provided, we can use the latest finalized block to get the result
+	if blockID == flow.ZeroID {
+		latestFinalizedHeader, err := t.state.Final().Head()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to lookup latest finalized header: %w", err)
+		}
+		blockID = latestFinalizedHeader.ID()
+	}
+
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to get execution result for block: %w", err)
+	}
+
+	txResult, metadata, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion, executionResultInfo)
+	if err != nil {
+		return nil, nil, err
 	}
 	if isSystemTx {
-		return txResult, nil
+		return txResult, metadata, nil
 	}
 
 	// if the node is not indexing scheduled transactions, then fallback to the normal lookup. if the
 	// request was for a scheduled transaction, it will fail with a not found error.
 	if t.scheduledTransactions != nil {
-		txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, blockID, encodingVersion)
+		txResult, metadata, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, blockID, encodingVersion, executionResultInfo)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if isScheduledTx {
-			return txResult, nil
+			return txResult, metadata, nil
 		}
 	}
 
-	txResult, tx, err := t.lookupSubmittedTransactionResult(ctx, txID, blockID, collectionID, encodingVersion)
+	txResult, metadata, tx, err := t.lookupSubmittedTransactionResult(ctx, txID, blockID, collectionID, encodingVersion, executionResultInfo)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if tx != nil {
 		scriptSize = len(tx.Script)
 	}
 
-	return txResult, nil
+	return txResult, metadata, nil
 }
 
 // lookupSubmittedTransactionResult looks up the transaction result for a user transaction.
@@ -385,7 +402,8 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, *flow.TransactionBody, error) {
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, *flow.TransactionBody, error) {
 	// 1. lookup the the collection that contains the transaction. if it is not found, then the
 	// collection is not yet indexed and the transaction is either unknown or pending.
 	//
@@ -396,18 +414,19 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	lightCollection, err := t.collections.LightByTransactionID(txID)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, status.Errorf(codes.Internal, "failed to find collection for transaction: %v", err)
+			return nil, nil, nil, status.Errorf(codes.Internal, "failed to find collection for transaction: %v", err)
 		}
 		// we have already checked if this is a system or scheduled tx. at this point, the tx is either
 		// pending, unknown, or from a past spork.
 		result, err := t.getUnknownUserTransactionResult(ctx, txID, blockID, collectionID)
-		return result, nil, err
+		// no metadata because transaction is not executed yet
+		return result, nil, nil, err
 	}
 	actualCollectionID := lightCollection.ID()
 	if collectionID == flow.ZeroID {
 		collectionID = actualCollectionID
 	} else if collectionID != actualCollectionID {
-		return nil, nil, status.Errorf(codes.NotFound, "transaction found in collection %s, but %s was provided", actualCollectionID, collectionID)
+		return nil, nil, nil, status.Errorf(codes.NotFound, "transaction found in collection %s, but %s was provided", actualCollectionID, collectionID)
 	}
 
 	// 2. lookup the block containing the collection.
@@ -417,13 +436,13 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		// otherwise the stored state is inconsistent.
 		err = fmt.Errorf("failed to find block for collection %v: %w", collectionID, err)
 		irrecoverable.Throw(ctx, err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	actualBlockID := block.ID()
 	if blockID == flow.ZeroID {
 		blockID = actualBlockID
 	} else if blockID != actualBlockID {
-		return nil, nil, status.Errorf(codes.NotFound, "transaction found in block %s, but %s was provided", actualBlockID, blockID)
+		return nil, nil, nil, status.Errorf(codes.NotFound, "transaction found in block %s, but %s was provided", actualBlockID, blockID)
 	}
 
 	// 3. lookup the transaction and its result
@@ -433,10 +452,10 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		// an inconsistent state
 		err = fmt.Errorf("failed to get transaction from storage: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion)
+	txResult, metadata, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion, executionResultInfo)
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
@@ -444,15 +463,14 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		case errors.Is(err, storage.ErrHeightNotIndexed):
 		case status.Code(err) == codes.NotFound:
 		default:
-			return nil, nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
+			return nil, nil, nil, fmt.Errorf("failed to retrieve result %w", err)
 		}
 		// all expected errors fall through to be processed as a known unexecuted transaction.
 
 		// The transaction is not executed yet
 		txStatus, err := t.txStatusDeriver.DeriveFinalizedTransactionStatus(block.Height, false)
 		if err != nil {
-			irrecoverable.Throw(ctx, fmt.Errorf("failed to derive transaction status: %w", err))
-			return nil, nil, err
+			return nil, nil, nil, fmt.Errorf("failed to derive transaction status: %w", err)
 		}
 
 		return &accessmodel.TransactionResult{
@@ -461,10 +479,10 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 			TransactionID: txID,
 			Status:        txStatus,
 			CollectionID:  collectionID,
-		}, tx, nil
+		}, nil, tx, nil
 	}
 
-	return txResult, tx, nil
+	return txResult, metadata, tx, nil
 }
 
 // lookupSystemTransactionResult looks up the transaction result for a system transaction.
@@ -478,23 +496,24 @@ func (t *Transactions) lookupSystemTransactionResult(
 	txID flow.Identifier,
 	blockID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, bool, error) {
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, bool, error) {
 	if _, ok := t.systemCollections.SearchAll(txID); !ok {
-		return nil, false, nil // tx is not a system tx
+		return nil, nil, false, nil // tx is not a system tx
 	}
 
 	// block must be provided to get the correct system tx result
 	if blockID == flow.ZeroID {
-		return nil, false, status.Errorf(codes.InvalidArgument, "block ID is required for system transactions")
+		return nil, nil, false, status.Errorf(codes.InvalidArgument, "block ID is required for system transactions")
 	}
 
 	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
-		return nil, false, status.Errorf(codes.NotFound, "could not find block: %v", err)
+		return nil, nil, false, status.Errorf(codes.NotFound, "could not find block: %v", err)
 	}
 
-	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
-	return result, true, err
+	result, metadata, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, executionResultInfo)
+	return result, metadata, true, err
 }
 
 // lookupScheduledTransactionResult looks up the transaction result for a scheduled transaction.
@@ -508,17 +527,18 @@ func (t *Transactions) lookupScheduledTransactionResult(
 	txID flow.Identifier,
 	blockID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, bool, error) {
+	executionResultInfo *optimistic_sync.ExecutionResultInfo,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, bool, error) {
 	scheduledTxBlockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, false, nil // tx is not a scheduled tx
+			return nil, nil, false, nil // tx is not a scheduled tx
 		}
-		return nil, false, status.Errorf(codes.Internal, "failed to get scheduled transaction block ID: %v", err)
+		return nil, nil, false, status.Errorf(codes.Internal, "failed to get scheduled transaction block ID: %v", err)
 	}
 
 	if blockID != flow.ZeroID && scheduledTxBlockID != blockID {
-		return nil, false, status.Errorf(codes.NotFound, "scheduled transaction found in block %s, but %s was provided", scheduledTxBlockID, blockID)
+		return nil, nil, false, status.Errorf(codes.NotFound, "scheduled transaction found in block %s, but %s was provided", scheduledTxBlockID, blockID)
 	}
 
 	header, err := t.state.AtBlockID(scheduledTxBlockID).Head()
@@ -527,11 +547,11 @@ func (t *Transactions) lookupScheduledTransactionResult(
 		// otherwise the node is in an inconsistent state
 		err = fmt.Errorf("failed to get scheduled transaction's block from storage: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, false, err
+		return nil, nil, false, err
 	}
 
-	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
-	return result, true, err
+	result, metadata, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, executionResultInfo)
+	return result, metadata, true, err
 }
 
 // getUnknownUserTransactionResult returns the transaction result for a transaction that is not yet
@@ -609,14 +629,20 @@ func (t *Transactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
-) ([]*accessmodel.TransactionResult, error) {
+	criteria optimistic_sync.Criteria,
+) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, nil, rpc.ConvertStorageError(err)
 	}
 
-	return t.txProvider.TransactionResultsByBlockID(ctx, block, encodingVersion)
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get execution result for block: %w", err)
+	}
+
+	return t.txProvider.TransactionResultsByBlockID(ctx, block, encodingVersion, executionResultInfo)
 }
 
 // GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
@@ -626,21 +652,27 @@ func (t *Transactions) GetTransactionResultByIndex(
 	blockID flow.Identifier,
 	index uint32,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	criteria optimistic_sync.Criteria,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	block, err := t.blocks.ByID(blockID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, nil, rpc.ConvertStorageError(err)
 	}
 
 	collectionID, err := t.lookupCollectionIDByBlockAndTxIndex(block, index)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "could not find collection for transaction result: %v", err)
+			return nil, nil, status.Errorf(codes.NotFound, "could not find collection for transaction result: %v", err)
 		}
-		return nil, status.Errorf(codes.Internal, "failed to lookup collection ID in block by index: %v", err)
+		return nil, nil, status.Errorf(codes.Internal, "failed to lookup collection ID in block by index: %v", err)
 	}
 
-	return t.txProvider.TransactionResultByIndex(ctx, block, index, collectionID, encodingVersion)
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+	}
+
+	return t.txProvider.TransactionResultByIndex(ctx, block, index, collectionID, encodingVersion, executionResultInfo)
 }
 
 // GetSystemTransaction returns a system transaction by ID.
@@ -700,7 +732,13 @@ func (t *Transactions) GetSystemTransactionResult(
 		txID = systemChunkTx.ID()
 	}
 
-	txResult, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion)
+	// TODO(#7648): optimistic_sync.DefaultCriteria should be replaced with user criteria
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(blockID, optimistic_sync.DefaultCriteria)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+	}
+
+	txResult, _, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion, executionResultInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -757,7 +795,20 @@ func (t *Transactions) GetScheduledTransactionResult(ctx context.Context, schedu
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	txResult, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, flow.ZeroID, encodingVersion)
+	// GetScheduledTransactionResult allows querying with only a scheduledTxID's ID.
+	// In this case, we can use the latest finalized block to get the result info
+	latestFinalizedHeader, err := t.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup latest finalized header: %w", err)
+	}
+
+	// TODO: optimistic_sync.DefaultCriteria should be replaced with user criteria
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(latestFinalizedHeader.ID(), optimistic_sync.DefaultCriteria)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execution result info for block: %w", err)
+	}
+
+	txResult, _, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, flow.ZeroID, encodingVersion, executionResultInfo)
 	if err != nil {
 		return nil, err
 	}

@@ -93,3 +93,15 @@ func isExpired(refHeight, compareToHeight uint64) bool {
 	}
 	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
 }
+
+// DeriveExecutedTransactionStatus returns the transaction status for an executed transaction based on its block's status.
+func (t *TxStatusDeriver) DeriveExecutedTransactionStatus(blockStatus flow.BlockStatus) flow.TransactionStatus {
+	switch blockStatus {
+	case flow.BlockStatusSealed:
+		return flow.TransactionStatusSealed
+	case flow.BlockStatusFinalized:
+		return flow.TransactionStatusFinalized
+	default:
+		return flow.TransactionStatusExecuted
+	}
+}
