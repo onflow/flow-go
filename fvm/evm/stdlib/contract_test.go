@@ -1286,6 +1286,74 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 
 		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
+
+	t.Run("ABI encode struct into tuple Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          struct S {
+              access(all) let x: UInt8
+              access(all) let y: Int16
+
+              init(x: UInt8, y: Int16) {
+                  self.x = x
+                  self.y = y
+              }
+          }
+
+          access(all)
+          fun main(): [UInt8] {
+              let s = S(x: 4, y: 2)
+              return EVM.encodeABI([s])
+          }
+    	`)
+
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x4,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2,
+		}
+		expected := "0000000000000000000000000000000000000000000000000000000000000004" +
+			"0000000000000000000000000000000000000000000000000000000000000002"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
+	})
 }
 
 func TestEVMEncodeABIComputation(t *testing.T) {

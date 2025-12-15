@@ -88,8 +88,8 @@ type evmSpecialTypeIDs struct {
 func NewEVMSpecialTypeIDs(
 	gauge common.MemoryGauge,
 	location common.AddressLocation,
-) evmSpecialTypeIDs {
-	return evmSpecialTypeIDs{
+) *evmSpecialTypeIDs {
+	return &evmSpecialTypeIDs{
 		AddressTypeID: location.TypeID(gauge, stdlib.EVMAddressTypeQualifiedIdentifier),
 		BytesTypeID:   location.TypeID(gauge, stdlib.EVMBytesTypeQualifiedIdentifier),
 		Bytes4TypeID:  location.TypeID(gauge, stdlib.EVMBytes4TypeQualifiedIdentifier),
@@ -102,111 +102,146 @@ type abiEncodingContext interface {
 	interpreter.ValueTransferContext
 }
 
-func reportABIEncodingComputation(
+func reportArrayABIEncodingComputation(
 	context abiEncodingContext,
 	values *interpreter.ArrayValue,
-	evmTypeIDs evmSpecialTypeIDs,
+	evmTypeIDs *evmSpecialTypeIDs,
 	reportComputation func(intensity uint64),
 ) {
-
 	values.Iterate(
 		context,
 		func(element interpreter.Value) (resume bool) {
-			switch value := element.(type) {
-			case *interpreter.StringValue:
-				// Dynamic variables, such as strings, are encoded
-				// in 2+ chunks of 32 bytes. The first chunk contains
-				// the index where information for the string begin,
-				// the second chunk contains the number of bytes the
-				// string occupies, and the third chunk contains the
-				// value of the string itself.
-				computation := uint64(2 * abiEncodingByteSize)
-				stringLength := len(value.Str)
-				chunks := math.Ceil(float64(stringLength) / float64(abiEncodingByteSize))
-				computation += uint64(chunks * abiEncodingByteSize)
-				reportComputation(computation)
-
-			case interpreter.BoolValue,
-				interpreter.UIntValue,
-				interpreter.UInt8Value,
-				interpreter.UInt16Value,
-				interpreter.UInt32Value,
-				interpreter.UInt64Value,
-				interpreter.UInt128Value,
-				interpreter.UInt256Value,
-				interpreter.IntValue,
-				interpreter.Int8Value,
-				interpreter.Int16Value,
-				interpreter.Int32Value,
-				interpreter.Int64Value,
-				interpreter.Int128Value,
-				interpreter.Int256Value:
-
-				// Numeric and bool variables are also static variables
-				// with a fixed size of 32 bytes.
-				reportComputation(abiEncodingByteSize)
-
-			case *interpreter.CompositeValue:
-				switch value.TypeID() {
-				case evmTypeIDs.AddressTypeID:
-					// EVM addresses are static variables with a fixed
-					// size of 32 bytes.
-					reportComputation(abiEncodingByteSize)
-
-				case evmTypeIDs.BytesTypeID:
-					computation := uint64(2 * abiEncodingByteSize)
-					valueMember := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
-					bytesArray, ok := valueMember.(*interpreter.ArrayValue)
-					if !ok {
-						panic(abiEncodingError{
-							Type:    value.StaticType(context),
-							Message: "could not convert value field to array",
-						})
-					}
-					bytesLength := bytesArray.Count()
-					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
-					computation += uint64(chunks * abiEncodingByteSize)
-					reportComputation(computation)
-
-				case evmTypeIDs.Bytes4TypeID:
-					reportComputation(abiEncodingByteSize)
-
-				case evmTypeIDs.Bytes32TypeID:
-					reportComputation(abiEncodingByteSize)
-
-				default:
-					panic(abiEncodingError{
-						Type: value.StaticType(context),
-					})
-				}
-
-			case *interpreter.ArrayValue:
-				// Dynamic variables, such as arrays & slices, are encoded
-				// in 2+ chunks of 32 bytes. The first chunk contains
-				// the index where information for the array begin,
-				// the second chunk contains the number of bytes the
-				// array occupies, and the third chunk contains the
-				// values of the array itself.
-				computation := uint64(2 * abiEncodingByteSize)
-				reportComputation(computation)
-				reportABIEncodingComputation(
-					context,
-					value,
-					evmTypeIDs,
-					reportComputation,
-				)
-
-			default:
-				panic(abiEncodingError{
-					Type: element.StaticType(context),
-				})
-			}
+			reportABIEncodingComputation(
+				context,
+				element,
+				evmTypeIDs,
+				reportComputation,
+			)
 
 			// continue iteration
 			return true
 		},
 		false,
 	)
+}
+
+func reportABIEncodingComputation(
+	context abiEncodingContext,
+	value interpreter.Value,
+	evmTypeIDs *evmSpecialTypeIDs,
+	reportComputation func(intensity uint64),
+) {
+	switch value := value.(type) {
+	case *interpreter.StringValue:
+		// Dynamic variables, such as strings, are encoded
+		// in 2+ chunks of 32 bytes. The first chunk contains
+		// the index where information for the string begin,
+		// the second chunk contains the number of bytes the
+		// string occupies, and the third chunk contains the
+		// value of the string itself.
+		computation := uint64(2 * abiEncodingByteSize)
+		stringLength := len(value.Str)
+		chunks := math.Ceil(float64(stringLength) / float64(abiEncodingByteSize))
+		computation += uint64(chunks * abiEncodingByteSize)
+		reportComputation(computation)
+
+	case interpreter.BoolValue,
+		interpreter.UIntValue,
+		interpreter.UInt8Value,
+		interpreter.UInt16Value,
+		interpreter.UInt32Value,
+		interpreter.UInt64Value,
+		interpreter.UInt128Value,
+		interpreter.UInt256Value,
+		interpreter.IntValue,
+		interpreter.Int8Value,
+		interpreter.Int16Value,
+		interpreter.Int32Value,
+		interpreter.Int64Value,
+		interpreter.Int128Value,
+		interpreter.Int256Value:
+
+		// Numeric and bool variables are also static variables
+		// with a fixed size of 32 bytes.
+		reportComputation(abiEncodingByteSize)
+
+	case *interpreter.CompositeValue:
+		switch value.TypeID() {
+		case evmTypeIDs.AddressTypeID:
+			// EVM addresses are static variables with a fixed
+			// size of 32 bytes.
+			reportComputation(abiEncodingByteSize)
+
+		case evmTypeIDs.BytesTypeID:
+			computation := uint64(2 * abiEncodingByteSize)
+			valueMember := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			bytesArray, ok := valueMember.(*interpreter.ArrayValue)
+			if !ok {
+				panic(abiEncodingError{
+					Type:    value.StaticType(context),
+					Message: "could not convert value field to array",
+				})
+			}
+			bytesLength := bytesArray.Count()
+			chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
+			computation += uint64(chunks * abiEncodingByteSize)
+			reportComputation(computation)
+
+		case evmTypeIDs.Bytes4TypeID:
+			reportComputation(abiEncodingByteSize)
+
+		case evmTypeIDs.Bytes32TypeID:
+			reportComputation(abiEncodingByteSize)
+
+		default:
+			staticType := value.StaticType(context)
+			semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+			if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
+
+				// TODO:
+
+				compositeType.Members.Foreach(func(name string, member *sema.Member) {
+					if member.DeclarationKind != common.DeclarationKindField {
+						return
+					}
+
+					fieldValue := value.GetMember(context, name)
+					reportABIEncodingComputation(
+						context,
+						fieldValue,
+						evmTypeIDs,
+						reportComputation,
+					)
+				})
+
+			} else {
+				panic(abiEncodingError{
+					Type: value.StaticType(context),
+				})
+			}
+		}
+
+	case *interpreter.ArrayValue:
+		// Dynamic variables, such as arrays & slices, are encoded
+		// in 2+ chunks of 32 bytes. The first chunk contains
+		// the index where information for the array begin,
+		// the second chunk contains the number of bytes the
+		// array occupies, and the third chunk contains the
+		// values of the array itself.
+		computation := uint64(2 * abiEncodingByteSize)
+		reportComputation(computation)
+		reportArrayABIEncodingComputation(
+			context,
+			value,
+			evmTypeIDs,
+			reportComputation,
+		)
+
+	default:
+		panic(abiEncodingError{
+			Type: value.StaticType(context),
+		})
+	}
 }
 
 func newInternalEVMTypeEncodeABIFunction(
@@ -229,7 +264,7 @@ func newInternalEVMTypeEncodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			reportABIEncodingComputation(
+			reportArrayABIEncodingComputation(
 				context,
 				valuesArray,
 				evmSpecialTypeIDs,
@@ -325,9 +360,14 @@ var gethTypeBytes4 = gethABI.Type{T: gethABI.FixedBytesTy, Size: 4}
 
 var gethTypeBytes32 = gethABI.Type{T: gethABI.FixedBytesTy, Size: 32}
 
+func exportedName(name string) string {
+	return strings.ToUpper(name[:1]) + name[1:]
+}
+
 func gethABIType(
+	context abiEncodingContext,
 	staticType interpreter.StaticType,
-	evmTypeIDs evmSpecialTypeIDs,
+	evmTypeIDs *evmSpecialTypeIDs,
 ) (gethABI.Type, bool) {
 	switch staticType {
 	case interpreter.PrimitiveStaticTypeString:
@@ -379,8 +419,71 @@ func gethABIType(
 			return gethTypeBytes32, true
 		}
 
+		semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+		if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
+
+			var (
+				fieldTypeIsInvalid   bool
+				goStructFields       []reflect.StructField
+				gethABITupleElements []*gethABI.Type
+				gethABITupleNames    []string
+			)
+
+			compositeType.Members.Foreach(func(name string, member *sema.Member) {
+				if fieldTypeIsInvalid {
+					return
+				}
+
+				if member.DeclarationKind != common.DeclarationKindField {
+					return
+				}
+
+				fieldStaticType := interpreter.ConvertSemaToStaticType(
+					context,
+					member.TypeAnnotation.Type,
+				)
+
+				fieldGethABIType, ok := gethABIType(
+					context,
+					fieldStaticType,
+					evmTypeIDs,
+				)
+				if !ok {
+					fieldTypeIsInvalid = true
+					return
+				}
+
+				gethABITupleElements = append(gethABITupleElements, &fieldGethABIType)
+
+				// reflect.StructField.Name must be exported (start with uppercase)
+				goStructFieldName := exportedName(name)
+
+				gethABITupleNames = append(gethABITupleNames, goStructFieldName)
+
+				goStructFields = append(
+					goStructFields,
+					reflect.StructField{
+						Name: goStructFieldName,
+						Type: fieldGethABIType.GetType(),
+					},
+				)
+			})
+
+			if fieldTypeIsInvalid {
+				break
+			}
+
+			return gethABI.Type{
+				T:             gethABI.TupleTy,
+				TupleType:     reflect.StructOf(goStructFields),
+				TupleElems:    gethABITupleElements,
+				TupleRawNames: gethABITupleNames,
+			}, true
+		}
+
 	case *interpreter.ConstantSizedStaticType:
 		elementGethABIType, ok := gethABIType(
+			context,
 			staticType.ElementType(),
 			evmTypeIDs,
 		)
@@ -396,6 +499,7 @@ func gethABIType(
 
 	case *interpreter.VariableSizedStaticType:
 		elementGethABIType, ok := gethABIType(
+			context,
 			staticType.ElementType(),
 			evmTypeIDs,
 		)
@@ -415,7 +519,7 @@ func gethABIType(
 
 func goType(
 	staticType interpreter.StaticType,
-	evmTypeIDs evmSpecialTypeIDs,
+	evmTypeIDs *evmSpecialTypeIDs,
 ) (reflect.Type, bool) {
 	switch staticType {
 	case interpreter.PrimitiveStaticTypeString:
@@ -490,7 +594,7 @@ func encodeABI(
 	context abiEncodingContext,
 	value interpreter.Value,
 	staticType interpreter.StaticType,
-	evmTypeIDs evmSpecialTypeIDs,
+	evmTypeIDs *evmSpecialTypeIDs,
 ) (
 	any,
 	gethABI.Type,
@@ -625,10 +729,62 @@ func encodeABI(
 			return [stdlib.EVMBytes32Length]byte(bytes), gethTypeBytes32, nil
 		}
 
+		staticType := value.StaticType(context)
+		semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+
+		if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
+
+			tupleGethABIType, ok := gethABIType(
+				context,
+				staticType,
+				evmTypeIDs,
+			)
+			if !ok {
+				break
+			}
+
+			result := reflect.New(tupleGethABIType.TupleType)
+
+			var index int
+
+			compositeType.Members.Foreach(func(name string, member *sema.Member) {
+
+				goStructFieldName := tupleGethABIType.TupleRawNames[index]
+
+				if exportedName(name) != goStructFieldName {
+					// Continue to next member
+					return
+				}
+
+				index++
+
+				fieldValue := value.GetMember(context, name)
+
+				fieldElement, _, err := encodeABI(
+					context,
+					fieldValue,
+					fieldValue.StaticType(context),
+					evmTypeIDs,
+				)
+				if err != nil {
+					panic(err)
+				}
+
+				field := result.Elem().FieldByName(goStructFieldName)
+				field.Set(reflect.ValueOf(fieldElement))
+			})
+
+			return result.Interface(), tupleGethABIType, nil
+		}
+
 	case *interpreter.ArrayValue:
 		arrayStaticType := value.Type
 
-		arrayGethABIType, ok := gethABIType(arrayStaticType, evmTypeIDs)
+		arrayGethABIType, ok := gethABIType(
+			context,
+			arrayStaticType,
+			evmTypeIDs,
+		)
 		if !ok {
 			break
 		}
@@ -684,10 +840,26 @@ func encodeABI(
 		Type: value.StaticType(context),
 	}
 }
+
+// asTupleEncodableCompositeType determines if the given type can be encoded as a tuple
+// (when the type is user-defined (location != nil) struct type)
+func asTupleEncodableCompositeType(ty sema.Type) *sema.CompositeType {
+	compositeType, ok := ty.(*sema.CompositeType)
+	if !ok ||
+		compositeType.Location == nil ||
+		compositeType.IsResourceType() {
+
+		return nil
+	}
+
+	return compositeType
+}
+
 func newInternalEVMTypeDecodeABIFunction(
 	gauge common.MemoryGauge,
 	location common.AddressLocation,
 ) *interpreter.HostFunctionValue {
+
 	evmSpecialTypeIDs := NewEVMSpecialTypeIDs(gauge, location)
 
 	return interpreter.NewStaticHostFunctionValue(
@@ -734,7 +906,11 @@ func newInternalEVMTypeDecodeABIFunction(
 
 					staticType := typeValue.Type
 
-					gethABITy, ok := gethABIType(staticType, evmSpecialTypeIDs)
+					gethABITy, ok := gethABIType(
+						context,
+						staticType,
+						evmSpecialTypeIDs,
+					)
 					if !ok {
 						panic(abiDecodingError{
 							Type: staticType,
@@ -821,7 +997,7 @@ func decodeABI(
 	value any,
 	staticType interpreter.StaticType,
 	location common.AddressLocation,
-	evmTypeIDs evmSpecialTypeIDs,
+	evmTypeIDs *evmSpecialTypeIDs,
 ) (
 	interpreter.Value,
 	error,
