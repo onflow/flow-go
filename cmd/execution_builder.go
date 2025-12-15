@@ -1113,9 +1113,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 			func() flow.Entity { return new(flow.Collection) },
 			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
-			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
-			// hence we not need to check origin
-			requester.WithValidateStaking(false),
 			// we have observed execution nodes occasionally fail to retrieve collections using this engine, which can cause temporary execution halts
 			// setting a retry maximum of 10s results in a much faster recovery from these faults (default is 2m)
 			requester.WithRetryMaximum(10*time.Second),

@@ -85,13 +85,12 @@ func New(
 
 	// initialize the default config
 	cfg := Config{
-		BatchThreshold:  32,
-		BatchInterval:   time.Second,
-		RetryInitial:    4 * time.Second,
-		RetryFunction:   RetryGeometric(2),
-		RetryMaximum:    2 * time.Minute,
-		RetryAttempts:   math.MaxUint32,
-		ValidateStaking: true,
+		BatchThreshold: 32,
+		BatchInterval:  time.Second,
+		RetryInitial:   4 * time.Second,
+		RetryFunction:  RetryGeometric(2),
+		RetryMaximum:   2 * time.Minute,
+		RetryAttempts:  math.MaxUint32,
 	}
 
 	// apply the custom option parameters
@@ -118,13 +117,12 @@ func New(
 	)
 
 	// make sure we only send requests to nodes that are active in the current epoch and have positive weight
-	if cfg.ValidateStaking {
-		selector = filter.And(
-			selector,
-			filter.HasInitialWeight[flow.Identity](true),
-			filter.HasParticipationStatus(flow.EpochParticipationStatusActive),
-		)
-	}
+	selector = filter.And(
+		selector,
+		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
+		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
+		filter.HasInitialWeight[flow.Identity](true),
+	)
 
 	handler := engine.NewMessageHandler(
 		log,
@@ -537,18 +535,16 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 
 	lg.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")
 
-	if e.cfg.ValidateStaking {
-		// check that the response comes from a valid provider
-		providers, err := e.state.Final().Identities(filter.And(
-			e.selector,
-			filter.HasNodeID[flow.Identity](originID),
-		))
-		if err != nil {
-			return fmt.Errorf("could not get providers: %w", err)
-		}
-		if len(providers) == 0 {
-			return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
-		}
+	// check that the response comes from a valid provider
+	providers, err := e.state.Final().Identities(filter.And(
+		e.selector,
+		filter.HasNodeID[flow.Identity](originID),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get providers: %w", err)
+	}
+	if len(providers) == 0 {
+		return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
 	}
 
 	if e.log.Debug().Enabled() {

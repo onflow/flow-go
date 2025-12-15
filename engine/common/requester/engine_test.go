@@ -438,12 +438,4 @@ func (s *RequesterEngineSuite) TestOriginValidation() {
 	err := s.engine.onEntityResponse(wrongID, res)
 	assert.Error(s.T(), err)
 	assert.IsType(s.T(), engine.InvalidInputError{}, err)
-
-	s.engine.cfg.ValidateStaking = false
-
-	err = s.engine.onEntityResponse(wrongID, res)
-	assert.NoError(s.T(), err)
-
-	// handler are called async, but this should be extremely quick
-	unittest.AssertClosesBefore(s.T(), called, time.Second)
 }
