@@ -112,7 +112,7 @@ func (err InvalidVertexError) Error() string {
 	return fmt.Sprintf("invalid vertex %s: %s", VertexToString(err.Vertex), err.msg)
 }
 
-// IsInvalidVertexError returns ture if and only if the input error is a (wrapped) InvalidVertexError.
+// IsInvalidVertexError returns true if and only if the input error is a (wrapped) InvalidVertexError.
 func IsInvalidVertexError(err error) bool {
 	var target InvalidVertexError
 	return errors.As(err, &target)
