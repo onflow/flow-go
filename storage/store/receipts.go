@@ -78,6 +78,9 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) (*flow.ExecutionRece
 	return val, nil
 }
 
+// byBlockID retrieves list of execution receipts from the storage
+//
+//   - [storage.ErrNotFound]: if `blockID` does not refer to a known block
 func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
 	var receiptIDs []flow.Identifier
 	err := operation.LookupExecutionReceipts(r.db.Reader(), blockID, &receiptIDs)
@@ -112,7 +115,7 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 
 // ByBlockID retrieves list of execution receipts from the storage
 //
-// No errors are expected errors during normal operations.
+//   - [storage.ErrNotFound]: if `blockID` does not refer to a known block
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	return r.byBlockID(blockID)
 }

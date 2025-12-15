@@ -21,7 +21,7 @@ type Criteria struct {
 
 // DefaultCriteria is the operator's default criteria for execution result queries.
 var DefaultCriteria = Criteria{
-	AgreeingExecutorsCount: 1,
+	AgreeingExecutorsCount: 2,
 }
 
 // OverrideWith overrides the original criteria with the incoming criteria, returning a new Criteria object.
@@ -61,12 +61,9 @@ type ExecutionResultInfoProvider interface {
 	// based on the provided criteria.
 	//
 	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound]: If the execution receipts for the block ID are not found.
 	//   - [optimistic_sync.ErrBlockNotFound]: If the request is for the spork root block, and the node was bootstrapped
 	//     from a newer block.
-	//   - [storage.ErrNotFound]: If the underlying storage does not yet contain data required to fulfill
-	//     the request (e.g. receipts or result info for the given block ID are not found). This is a benign
-	//     condition and callers should treat it as "data not available yet".
-	//   - [optimistic_sync.NotEnoughAgreeingExecutorsError]: If no insufficient receipts are found for given block ID.
 	//   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
 	//     execution results was abandoned.
 	//   - [optimistic_sync.ErrNotEnoughAgreeingExecutors]: If there are not enough execution nodes that produced the

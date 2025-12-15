@@ -381,17 +381,14 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 	)
 }
 
-func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderReturnsErrorWhenForkCannotBeExtended() {
+func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderForkError() {
 	preferredExecutors := flow.IdentifierList{}
 	operatorCriteria := optimistic_sync.Criteria{
 		AgreeingExecutorsCount: 1,
 	}
 	provider := suite.createProvider(preferredExecutors, operatorCriteria)
 
-	generator := fixtures.NewGeneratorSuite(
-		fixtures.WithSeed(42),
-		fixtures.WithChainID(flow.Testnet),
-	)
+	generator := fixtures.NewGeneratorSuite(fixtures.WithSeed(42))
 
 	// set up 2 executors that produce different execution results
 	block := generator.Blocks().Fixture()
