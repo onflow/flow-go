@@ -220,4 +220,3 @@ func protoKeyToLedgerKey(protoKey *ledgerpb.Key) (ledger.Key, error) {
 
 	return ledger.NewKey(keyParts), nil
 }
-

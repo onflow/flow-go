@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/rs/zerolog"
@@ -17,8 +18,8 @@ import (
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
-	"github.com/onflow/flow-go/ledger/remote"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
+	"github.com/onflow/flow-go/ledger/remote"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -28,6 +29,7 @@ var (
 	capacity          = flag.Int("capacity", 100, "Ledger capacity (number of tries)")
 	checkpointDist    = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
+	logLevel          = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
 )
 
 func main() {
@@ -37,6 +39,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: -wal-dir is required\n")
 		os.Exit(1)
 	}
+
+	// Parse and set log level
+	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLevel))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: invalid log level %q: %v\n", *logLevel, err)
+		os.Exit(1)
+	}
+	zerolog.SetGlobalLevel(lvl)
 
 	logger := zerolog.New(os.Stderr).With().
 		Timestamp().
