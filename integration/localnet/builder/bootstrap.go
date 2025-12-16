@@ -17,6 +17,8 @@ import (
 	"github.com/go-yaml/yaml"
 
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -462,12 +464,15 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		)
 		// Execution node depends on ledger service
 		service.DependsOn = append(service.DependsOn, "ledger_service_1")
+		// Execution nodes using remote ledger should NOT mount the trie directory
+		// because the ledger service manages it
+	} else {
+		// Execution nodes with index >= ledgerExecutionCount use local ledger by default (no flag needed)
+		// These nodes need to mount the trie directory for their local ledger
+		service.Volumes = append(service.Volumes,
+			fmt.Sprintf("%s:/trie:z", trieDir),
+		)
 	}
-	// Execution nodes with index >= ledgerExecutionCount use local ledger by default (no flag needed)
-
-	service.Volumes = append(service.Volumes,
-		fmt.Sprintf("%s:/trie:z", trieDir),
-	)
 
 	service.AddExposedPorts(testnet.GRPCPort)
 
@@ -695,18 +700,16 @@ func writePrometheusConfig(serviceDisc PrometheusServiceDiscovery) error {
 }
 
 func openAndTruncate(filename string) (*os.File, error) {
-	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		return nil, err
+	// Check if path exists and is a directory, remove it if so
+	if fi, err := os.Stat(filename); err == nil {
+		if fi.IsDir() {
+			if err := os.RemoveAll(filename); err != nil {
+				return nil, fmt.Errorf("failed to remove existing directory %s: %w", filename, err)
+			}
+		}
 	}
 
-	// overwrite current file contents
-	err = f.Truncate(0)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = f.Seek(0, 0)
+	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -809,9 +812,37 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 	// Use the same trie directory as the first execution node
 	trieDir := "./" + filepath.Join(TrieDir, firstExecutionNode.Role.String(), firstExecutionNode.NodeID.String())
 
+	// Ensure trie directory exists for the ledger service
+	err := os.MkdirAll(trieDir, 0755)
+	if err != nil && !errors.Is(err, fs.ErrExist) {
+		panic(err)
+	}
+
+	// Copy root checkpoint from bootstrap directory to trie directory on the host
+	// The symlinks will work inside containers because:
+	// 1. Execution node has both /bootstrap and /trie mounted
+	// 2. Ledger service has /trie mounted and can follow symlinks to /bootstrap (via execution node's mount)
+	// 3. We create symlinks using relative paths that work in both host and container contexts
+	bootstrapExecutionStateDir := filepath.Join(BootstrapDir, bootstrapFilenames.DirnameExecutionState)
+	checkpointSource := filepath.Join(bootstrapExecutionStateDir, bootstrapFilenames.FilenameWALRootCheckpoint)
+	if _, err := os.Stat(checkpointSource); err == nil {
+		// Checkpoint exists, create symlinks on host
+		// The symlinks will use relative paths that resolve correctly inside containers
+		// because both /bootstrap and /trie are mounted in the containers
+		_, err = wal.SoftlinkCheckpointFile(bootstrapFilenames.FilenameWALRootCheckpoint, bootstrapExecutionStateDir, trieDir)
+		if err != nil {
+			panic(fmt.Errorf("failed to create checkpoint symlinks: %w", err))
+		}
+		fmt.Printf("created checkpoint symlinks in trie directory: %s\n", trieDir)
+	} else {
+		// Checkpoint doesn't exist, this is expected for fresh bootstrap
+		// The execution node will create it when it initializes
+		fmt.Printf("root checkpoint not found in %s, ledger service will start with empty state\n", checkpointSource)
+	}
+
 	// Allocate ports for ledger service
 	ledgerServiceName := "ledger_service_1"
-	err := ports.AllocatePorts(ledgerServiceName, "ledger")
+	err = ports.AllocatePorts(ledgerServiceName, "ledger")
 	if err != nil {
 		panic(err)
 	}
@@ -830,6 +861,7 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/trie:z", trieDir),
+			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
 		},
 		Environment: []string{
 			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
