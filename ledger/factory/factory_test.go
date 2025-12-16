@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 
@@ -52,13 +51,7 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 	require.NoError(t, err)
 
 	// Create compactor config
-	compactorConfig := &ledger.CompactorConfig{
-		CheckpointCapacity:                   100,
-		CheckpointDistance:                   100,
-		CheckpointsToKeep:                    3,
-		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
-		Metrics:                              metricsCollector,
-	}
+	compactorConfig := ledger.DefaultCompactorConfig(metricsCollector)
 
 	// Create ledger factory
 	factory := complete.NewLocalLedgerFactory(
