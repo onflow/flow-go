@@ -47,7 +47,7 @@ func (h *Hub) DeliverAllEventually(t *testing.T, condition func() bool) {
 	h.DeliverAllEventuallyUntil(t, condition, time.Second*10, time.Millisecond*500)
 }
 
-// DeliverAllEventuallyUntil attempts attempts on delivery of all the buffered messages in the Network instances
+// DeliverAllEventuallyUntil attempts on delivery of all the buffered messages in the Network instances
 // attached to this instance of Hub. Once the delivery is done, it evaluates and returns the
 // condition function. It fails if delivery of all buffered messages in the Network instances
 // attached to this Hub is not getting done within `waitFor` time interval.
