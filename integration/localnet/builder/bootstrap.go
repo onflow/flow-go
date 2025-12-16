@@ -62,6 +62,7 @@ var (
 	accessCount                 int
 	observerCount               int
 	testExecutionCount          int
+	ledgerExecutionCount        int
 	nClusters                   uint
 	numViewsInStakingPhase      uint64
 	numViewsInDKGPhase          uint64
@@ -104,6 +105,7 @@ func init() {
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
+	flag.IntVar(&ledgerExecutionCount, "ledger-execution", 0, "number of execution nodes that use remote ledger service (0 = all use local ledger, max = execution count)")
 }
 
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
@@ -176,6 +178,14 @@ func main() {
 	flowNetworkConf := testnet.NewNetworkConfig("localnet", flowNodes, flowNetworkOpts...)
 	displayFlowNetworkConf(flowNetworkConf)
 
+	// Validate ledger execution count
+	if ledgerExecutionCount < 0 {
+		panic(fmt.Sprintf("ledger-execution must be >= 0, got %d", ledgerExecutionCount))
+	}
+	if ledgerExecutionCount > executionCount {
+		panic(fmt.Sprintf("ledger-execution (%d) must not be greater than execution count (%d)", ledgerExecutionCount, executionCount))
+	}
+
 	// Generate the Flow network bootstrap files for this localnet
 	flowNodeContainerConfigs := generateBootstrapData(flowNetworkConf)
 
@@ -188,6 +198,10 @@ func main() {
 		panic(err)
 	}
 
+	// Only create ledger service if at least one execution node uses remote ledger
+	if ledgerExecutionCount > 0 {
+		dockerServices = prepareLedgerService(dockerServices, flowNodeContainerConfigs)
+	}
 	dockerServices = prepareObserverServices(dockerServices, flowNodeContainerConfigs)
 	dockerServices = prepareTestExecutionService(dockerServices, flowNodeContainerConfigs)
 
@@ -439,6 +453,17 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		"--pruning-config-sleep-after-iteration=1m",
 		"--scheduled-callbacks-enabled=true",
 	)
+
+	// Configure ledger service: execution nodes with index < ledgerExecutionCount use remote ledger
+	if i < ledgerExecutionCount {
+		// This execution node uses remote ledger service
+		service.Command = append(service.Command,
+			fmt.Sprintf("--ledger-service-addr=ledger_service_1:%s", testnet.GRPCPort),
+		)
+		// Execution node depends on ledger service
+		service.DependsOn = append(service.DependsOn, "ledger_service_1")
+	}
+	// Execution nodes with index >= ledgerExecutionCount use local ledger by default (no flag needed)
 
 	service.Volumes = append(service.Volumes,
 		fmt.Sprintf("%s:/trie:z", trieDir),
@@ -758,6 +783,82 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 	fmt.Println()
 	fmt.Println("Observer services bootstrapping data generated...")
 	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", testnet.PrimaryAN, agPublicKey)
+
+	return dockerServices
+}
+
+func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
+	// Find the first execution node that uses remote ledger (index 0)
+	// The ledger service will reuse its trie directory
+	var firstExecutionNode *testnet.ContainerConfig
+	executionIndex := 0
+	for _, container := range flowNodeContainerConfigs {
+		if container.Role == flow.RoleExecution {
+			if executionIndex < ledgerExecutionCount {
+				firstExecutionNode = &container
+				break
+			}
+			executionIndex++
+		}
+	}
+
+	if firstExecutionNode == nil {
+		panic("failed to find first execution node for ledger service")
+	}
+
+	// Use the same trie directory as the first execution node
+	trieDir := "./" + filepath.Join(TrieDir, firstExecutionNode.Role.String(), firstExecutionNode.NodeID.String())
+
+	// Allocate ports for ledger service
+	ledgerServiceName := "ledger_service_1"
+	err := ports.AllocatePorts(ledgerServiceName, "ledger")
+	if err != nil {
+		panic(err)
+	}
+
+	// Create ledger service
+	service := Service{
+		name:  ledgerServiceName,
+		Image: "localnet-ledger",
+		Command: []string{
+			"--wal-dir=/trie",
+			fmt.Sprintf("--grpc-addr=0.0.0.0:%s", testnet.GRPCPort),
+			"--capacity=100",
+			"--checkpoint-distance=100",
+			"--checkpoints-to-keep=3",
+			fmt.Sprintf("--loglevel=%s", logLevel),
+		},
+		Volumes: []string{
+			fmt.Sprintf("%s:/trie:z", trieDir),
+		},
+		Environment: []string{
+			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
+		},
+		Labels: map[string]string{
+			"org.flowfoundation.role": "ledger",
+			"org.flowfoundation.num":  "001",
+		},
+	}
+
+	// Build configuration for ledger service
+	service.Build = Build{
+		Context:    "../../",
+		Dockerfile: "cmd/Dockerfile",
+		Args: map[string]string{
+			"TARGET":  "./cmd/ledger",
+			"VERSION": build.Version(),
+			"COMMIT":  build.Commit(),
+			"GOARCH":  runtime.GOARCH,
+		},
+		Target: "production",
+	}
+
+	service.AddExposedPorts(testnet.GRPCPort)
+
+	dockerServices[ledgerServiceName] = service
+
+	fmt.Println()
+	fmt.Println("Ledger service bootstrapping data generated...")
 
 	return dockerServices
 }
