@@ -70,5 +70,9 @@ type ExecutionResultInfoProvider interface {
 	//     execution result.
 	//   - [optimistic_sync.ErrRequiredExecutorNotFound]: If the criteria's required executor is not in the group of
 	//     execution nodes that produced the execution result.
+	//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
+	//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+	//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
+	//     sealed but no execution result can satisfy the provided criteria.
 	ExecutionResultInfo(blockID flow.Identifier, criteria Criteria) (*ExecutionResultInfo, error)
 }

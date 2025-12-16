@@ -163,6 +163,12 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsUnknownRequiredExecutorError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsCriteriaNotMetError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -221,6 +227,12 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsUnknownRequiredExecutorError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsCriteriaNotMetError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
@@ -284,6 +296,12 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsUnknownRequiredExecutorError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsCriteriaNotMetError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}

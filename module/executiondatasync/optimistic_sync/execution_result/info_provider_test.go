@@ -25,6 +25,7 @@ type ExecutionResultInfoProviderSuite struct {
 	log      zerolog.Logger
 
 	receipts *storagemock.ExecutionReceipts
+	headers  *storagemock.Headers
 
 	rootBlock       *flow.Block
 	rootBlockResult *flow.ExecutionResult
@@ -42,7 +43,7 @@ func (suite *ExecutionResultInfoProviderSuite) SetupTest() {
 	suite.snapshot = protocol.NewSnapshot(t)
 	suite.params = protocol.NewParams(t)
 	suite.receipts = storagemock.NewExecutionReceipts(t)
-
+	suite.headers = storagemock.NewHeaders(t)
 	suite.rootBlock = unittest.BlockFixture()
 	rootBlockID := suite.rootBlock.ID()
 	suite.rootBlockResult = unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(rootBlockID))
@@ -56,6 +57,7 @@ func (suite *ExecutionResultInfoProviderSuite) createProvider(
 		suite.log,
 		suite.state,
 		suite.receipts,
+		suite.headers,
 		NewExecutionNodeSelector(preferredExecutors, operatorCriteria.RequiredExecutors),
 		operatorCriteria,
 	)
@@ -83,22 +85,22 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 			},
 			func(flow.IdentityFilter[flow.Identity]) error { return nil },
 		).
-		Times(4) // for each subtest
+		Times(7) // for each subtest in this test case
 
 	suite.state.
 		On("Params").
 		Return(suite.params).
-		Times(4) // for each subtest
+		Times(7) // for each subtest in this test case
 
 	suite.params.
 		On("SporkRootBlock").
 		Return(suite.rootBlock).
-		Times(4) // for each subtest
+		Times(7) // for each subtest in this test case
 
 	suite.state.
-		On("Final").
-		Return(suite.snapshot, nil).
-		Times(4) // for each subtest
+		On("AtBlockID", mock.Anything).
+		Return(suite.snapshot).
+		Times(7) // for each subtest in this test case
 
 	suite.Run(
 		"query with client required executors", func() {
@@ -188,10 +190,18 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				r,
 			}
 
-			// Set up a separate mock call for this specific block
 			suite.receipts.
 				On("ByBlockID", insufficientBlock.ID()).
 				Return(receipts, nil).
+				Once()
+
+			suite.headers.
+				On("ByBlockID", insufficientBlock.ID()).
+				Return(insufficientBlock.ToHeader(), nil).
+				Once()
+			suite.headers.
+				On("BlockIDByHeight", insufficientBlock.Height).
+				Return(unittest.IdentifierFixture(), nil).
 				Once()
 
 			_, err := provider.ExecutionResultInfo(
@@ -207,8 +217,10 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 	suite.Run(
 		"required executors not found returns error", func() {
 			provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
-			receipts := make(flow.ExecutionReceiptList, totalReceipts)
-			for i := 0; i < totalReceipts; i++ {
+			// only some of the available executors produce receipts,
+			// so we can require an available executor that did not produce a receipt
+			receipts := make(flow.ExecutionReceiptList, totalReceipts-1)
+			for i := 0; i < totalReceipts-1; i++ {
 				r := unittest.ReceiptForBlockFixture(block)
 				r.ExecutorID = allExecutionNodes[i].NodeID
 				r.ExecutionResult = *executionResult
@@ -220,18 +232,76 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 				Return(receipts, nil).
 				Once()
 
-			// Require executors that didn't produce any receipts
+			// Require an available executor that didn't produce any receipts for the chosen result
 			_, err := provider.ExecutionResultInfo(
 				block.ID(), optimistic_sync.Criteria{
-					RequiredExecutors: unittest.IdentityListFixture(
-						2,
-						unittest.WithRole(flow.RoleExecution),
-					).NodeIDs(),
+					RequiredExecutors: allExecutionNodes[totalReceipts-1 : totalReceipts].NodeIDs(),
 				},
 			)
 			suite.Require().ErrorIs(err, optimistic_sync.ErrRequiredExecutorNotFound)
 		},
 	)
+
+	suite.Run("agreeing executors count is greater than available executors count returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		requiredExecutors := allExecutionNodes.NodeIDs()
+
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: uint(len(allExecutionNodes) + 1),
+				RequiredExecutors:      requiredExecutors,
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsAgreeingExecutorsCountExceededError(err))
+	})
+
+	suite.Run("unknown required executor returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		unknownExecutorID := unittest.IdentifierFixture()
+		requiredExecutors := allExecutionNodes[0:1].NodeIDs()
+		requiredExecutors = append(requiredExecutors, unknownExecutorID)
+
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: 2,
+				RequiredExecutors:      requiredExecutors,
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsUnknownRequiredExecutorError(err))
+	})
+
+	suite.Run("criteria not met returns error", func() {
+		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
+
+		receipts := make(flow.ExecutionReceiptList, totalReceipts)
+		for i := 0; i < totalReceipts; i++ {
+			r := unittest.ReceiptForBlockFixture(block)
+			r.ExecutorID = allExecutionNodes[0].NodeID
+			r.ExecutionResult = *executionResult
+			receipts[i] = r
+		}
+		suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Once()
+		suite.headers.On("ByBlockID", block.ID()).Return(block.ToHeader(), nil).Once()
+		suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil).Once()
+		suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+		suite.snapshot.On("Head").Return(func() *flow.Header { return block.ToHeader() }, nil).Once()
+
+		// require more agreeing executors than available for the chosen result
+		query, err := provider.ExecutionResultInfo(
+			block.ID(), optimistic_sync.Criteria{
+				AgreeingExecutorsCount: 2,
+			},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(query)
+		suite.Require().True(optimistic_sync.IsCriteriaNotMetError(err))
+	})
 }
 
 // TestRootBlockHandling tests the special case handling for root blocks.
@@ -250,9 +320,10 @@ func (suite *ExecutionResultInfoProviderSuite) TestRootBlockHandling() {
 	// expected to be called once in each subtest
 	suite.state.On("Params").Return(suite.params).Times(2)
 	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Times(2)
-	suite.state.On("Final").Return(suite.snapshot, nil).Times(2)
-	suite.state.On("AtBlockID", suite.rootBlock.ID()).Return(suite.snapshot).Times(2)
 	suite.snapshot.On("SealedResult").Return(suite.rootBlockResult, nil, nil).Times(2)
+
+	// expected to be called twice once in each subtest
+	suite.state.On("AtBlockID", suite.rootBlock.ID()).Return(suite.snapshot).Times(4)
 
 	suite.Run(
 		"root block returns execution nodes without execution result", func() {
@@ -317,8 +388,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 	// expected to be called once in each subtest
 	suite.state.On("Params").Return(suite.params).Times(5)
+	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Times(5)
 	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Times(5)
-	suite.state.On("Final").Return(suite.snapshot, nil).Times(5)
 	suite.receipts.On("ByBlockID", block.ID()).Return(receipts, nil).Times(5)
 
 	suite.Run(
@@ -433,8 +504,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderForkEr
 
 	suite.params.On("SporkRootBlock").Return(suite.rootBlock).Once()
 	suite.state.On("Params").Return(suite.params).Once()
-	// expected to be called for each ExecutionResultInfo call in this test (twice)
-	suite.state.On("Final").Return(suite.snapshot, nil).Times(2)
+	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot).Times(2)
 
 	provider := suite.createProvider(preferredExecutors, operatorCriteria)
 

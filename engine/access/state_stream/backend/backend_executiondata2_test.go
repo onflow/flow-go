@@ -204,8 +204,6 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 	// when the streamer checks the next height which is not yet ready.
 	trackerCallsCount := len(s.blocks) + 1
 
-	// TODO: 1. why if i mock it in the setup suite func, the test fails ????
-	// 2. why i can't set mock expectations from this func directly here  ???
 	s.initRealExecutionResultProvider()
 
 	// SporkRootBlockHeight is checked for each block processed by NextData.
@@ -215,6 +213,10 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 	s.mockParams(paramHeightCalls, paramBlockCalls)
 	s.mockReceipts(s.blocks)
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
+
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot, nil)
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -286,6 +288,10 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromNonRoot() {
 	s.mockParams(paramHeightCalls, paramBlockCalls)
 	s.mockReceipts(s.blocks)
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
+
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot, nil)
 
 	startBlock := s.blocksHeightToBlockMap[s.sporkRootBlock.Height+1]
 	s.headers.
@@ -365,6 +371,10 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
 
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot, nil)
+
 	s.headers.
 		On("ByHeight", s.sporkRootBlock.Height).
 		Return(s.sporkRootBlock.ToHeader(), nil).
@@ -441,6 +451,10 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
 
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot, nil)
+
 	backend := NewExecutionDataBackend(
 		s.log,
 		s.state,
@@ -511,6 +525,10 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 	s.mockReceipts(s.blocks)
 
 	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
+
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -672,14 +690,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 		s.snapshot.Test(s.T())
 
 		s.state.
-			On("Final").
-			Return(s.snapshot, nil).
-			Once()
-
-		s.state.
 			On("AtBlockID", block.ID()).
 			Return(s.snapshot, nil).
-			Once()
+			Twice()
 
 		s.snapshot.
 			On("Identities", mock.Anything).
@@ -716,14 +729,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 		s.snapshot.Test(s.T())
 
 		s.state.
-			On("Final").
-			Return(s.snapshot, nil).
-			Once()
-
-		s.state.
 			On("AtBlockID", block.ID()).
 			Return(s.snapshot, nil).
-			Once()
+			Twice()
 
 		s.snapshot.
 			On("Identities", mock.Anything).
@@ -763,14 +771,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 		s.snapshot.Test(s.T())
 
 		s.state.
-			On("Final").
-			Return(s.snapshot, nil).
-			Once()
-
-		s.state.
 			On("AtBlockID", block.ID()).
 			Return(s.snapshot, nil).
-			Once()
+			Twice()
 
 		s.snapshot.
 			On("Identities", mock.Anything).
@@ -815,14 +818,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 		s.snapshot.Test(s.T())
 
 		s.state.
-			On("Final").
-			Return(s.snapshot, nil).
-			Once()
-
-		s.state.
 			On("AtBlockID", block.ID()).
 			Return(s.snapshot, nil).
-			Once()
+			Twice()
 
 		s.snapshot.
 			On("Identities", mock.Anything).
@@ -968,8 +966,8 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 	s.mockParams(paramHeightCalls, paramBlockCalls)
 
 	s.state.
-		On("Final").
-		Return(s.snapshot, nil).
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot).
 		Times(len(tests))
 
 	s.snapshot.
@@ -1068,8 +1066,8 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 		s.mockReceipts(s.blocks)
 
 		s.state.
-			On("Final").
-			Return(s.snapshot, nil).
+			On("AtBlockID", mock.Anything).
+			Return(s.snapshot).
 			Times(len(s.blocks) - 1)
 
 		s.snapshot.
@@ -1081,13 +1079,13 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 		s.executionResultProvider.
 			On("ExecutionResultInfo", mock.Anything, mock.Anything).
 			Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-				// after an 'ignorable' error occures, the streamer goes to sleep waiting for the notification
+				// after an 'ignorable' error occurs, the streamer goes to sleep waiting for the notification
 				// that the new data is available.
 				// since we are about to return an error, we notify the streamer in advance. this will cause it
 				// to wake up and try again with a new mock.
 				s.executionDataBroadcaster.Publish()
 
-				return nil, optimistic_sync.ErrRequiredExecutorNotFound
+				return nil, errToReturn
 			}).
 			Once()
 
@@ -1165,6 +1163,9 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
+			s.state.Test(s.T())
+			s.snapshot.Test(s.T())
+
 			test.mockState()
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -1223,9 +1224,9 @@ func (s *BackendExecutionDataSuite2) mockExecutionResultProvider(expectationsCou
 	executionDataReader := osyncmock.NewBlockExecutionDataReader(s.T())
 
 	s.state.
-		On("Final").
-		Return(s.snapshot, nil).
-		Times(expectationsCount)
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot).
+		Once()
 
 	s.snapshot.
 		On("Identities", mock.Anything).
@@ -1277,6 +1278,7 @@ func (s *BackendExecutionDataSuite2) initRealExecutionResultProvider() {
 		s.log,
 		s.state,
 		s.receipts,
+		s.headers,
 		executionNodeSelector,
 		s.criteria,
 	)

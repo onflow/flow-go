@@ -83,6 +83,12 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 			errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound) ||
 			errors.Is(err, optimistic_sync.ErrForkAbandoned):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
+		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsUnknownRequiredExecutorError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
+		case optimistic_sync.IsCriteriaNotMetError(err):
+			return nil, nil, access.NewInvalidRequestError(err)
 		default:
 			return nil, nil, access.RequireNoError(ctx, err)
 		}
