@@ -52,9 +52,9 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 	return response, nil
 }
 
-// GetTransactionsByBlockID gets transactions by requested blockID or height.
-func GetTransactionsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.NewGetTransactionsByBlockIDRequest(r)
+// GetTransactionsByBlock gets transactions by requested blockID or height.
+func GetTransactionsByBlock(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	req, err := request.NewGetTransactionsByBlockRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -133,9 +133,9 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 	return response, nil
 }
 
-// GetTransactionResultsByBlockID gets transaction results by requested blockID or height.
-func GetTransactionResultsByBlockID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
-	req, err := request.NewGetTransactionResultsByBlockIDRequest(r)
+// GetTransactionResultsByBlock gets transaction results by requested blockID or height.
+func GetTransactionResultsByBlock(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+	req, err := request.NewGetTransactionResultsByBlockRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}

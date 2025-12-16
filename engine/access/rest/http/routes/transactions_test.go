@@ -261,7 +261,7 @@ func TestGetTransactions(t *testing.T) {
 	})
 }
 
-func TestGetTransactionsByBlockID(t *testing.T) {
+func TestGetTransactionsByBlock(t *testing.T) {
 	t.Run("get by block ID without expanded results", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 		blockID := unittest.IdentifierFixture()
@@ -901,7 +901,7 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 }
 
-func TestGetTransactionResultsByBlockID(t *testing.T) {
+func TestGetTransactionResultsByBlock(t *testing.T) {
 	t.Run("get by block ID", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 		blockID := unittest.IdentifierFixture()

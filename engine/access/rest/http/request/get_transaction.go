@@ -64,20 +64,20 @@ func (g *GetTransaction) Build(r *common.Request) error {
 	return err
 }
 
-// GetTransactionsByBlockID represents a request to get transactions by
+// GetTransactionsByBlock represents a request to get transactions by
 // a block ID, and contains the parsed and validated input parameters.
-type GetTransactionsByBlockID struct {
+type GetTransactionsByBlock struct {
 	TransactionOptionals
 	BlockHeight   uint64
 	ExpandsResult bool
 }
 
-// NewGetTransactionsByBlockIDRequest extracts necessary variables from the provided request,
-// builds a GetTransactionsByBlockID instance, and validates it.
+// NewGetTransactionsByBlockRequest extracts necessary variables from the provided request,
+// builds a GetTransactionsByBlock instance, and validates it.
 //
 // All errors indicate a malformed request.
-func NewGetTransactionsByBlockIDRequest(r *common.Request) (*GetTransactionsByBlockID, error) {
-	req, err := parseGetTransactionsByBlockID(r)
+func NewGetTransactionsByBlockRequest(r *common.Request) (*GetTransactionsByBlock, error) {
+	req, err := parseGetTransactionsByBlock(r)
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +85,12 @@ func NewGetTransactionsByBlockIDRequest(r *common.Request) (*GetTransactionsByBl
 	return req, nil
 }
 
-// parseGetTransactionsByBlockID parses raw query and body parameters from an incoming request
-// and constructs a validated GetTransactionsByBlockID instance.
+// parseGetTransactionsByBlock parses raw query and body parameters from an incoming request
+// and constructs a validated GetTransactionsByBlock instance.
 //
 // All errors indicate the request is invalid.
-func parseGetTransactionsByBlockID(r *common.Request) (*GetTransactionsByBlockID, error) {
-	var req GetTransactionsByBlockID
+func parseGetTransactionsByBlock(r *common.Request) (*GetTransactionsByBlock, error) {
+	var req GetTransactionsByBlock
 	err := req.TransactionOptionals.Parse(r)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func parseGetTransactionsByBlockID(r *common.Request) (*GetTransactionsByBlockID
 		req.BlockHeight = SealedHeight
 	}
 
-	if req.BlockID != flow.ZeroID && req.BlockHeight != EmptyHeight {
+	if req.BlockHeight != EmptyHeight && req.BlockID != flow.ZeroID {
 		return nil, fmt.Errorf("can not provide both block ID and block height")
 	}
 
@@ -141,19 +141,19 @@ func (g *GetTransactionResult) Build(r *common.Request) error {
 	return err
 }
 
-// GetTransactionResultsByBlockID represents a request to get transaction results by
+// GetTransactionResultsByBlock represents a request to get transaction results by
 // block ID or height, and contains the parsed and validated input parameters.
-type GetTransactionResultsByBlockID struct {
+type GetTransactionResultsByBlock struct {
 	TransactionOptionals
 	BlockHeight uint64
 }
 
-// NewGetTransactionResultsByBlockIDRequest extracts necessary variables from the provided request,
-// builds a GetTransactionResultsByBlockID instance, and validates it.
+// NewGetTransactionResultsByBlockRequest extracts necessary variables from the provided request,
+// builds a GetTransactionResultsByBlock instance, and validates it.
 //
 // All errors indicate a malformed request.
-func NewGetTransactionResultsByBlockIDRequest(r *common.Request) (*GetTransactionResultsByBlockID, error) {
-	req, err := parseGetTransactionResultsByBlockID(r)
+func NewGetTransactionResultsByBlockRequest(r *common.Request) (*GetTransactionResultsByBlock, error) {
+	req, err := parseGetTransactionResultsByBlock(r)
 	if err != nil {
 		return nil, err
 	}
@@ -161,12 +161,12 @@ func NewGetTransactionResultsByBlockIDRequest(r *common.Request) (*GetTransactio
 	return req, nil
 }
 
-// parseGetTransactionResultsByBlockID parses raw query and body parameters from an incoming request
-// and constructs a validated GetTransactionResultsByBlockID instance.
+// parseGetTransactionResultsByBlock parses raw query and body parameters from an incoming request
+// and constructs a validated GetTransactionResultsByBlock instance.
 //
 // All errors indicate the request is invalid.
-func parseGetTransactionResultsByBlockID(r *common.Request) (*GetTransactionResultsByBlockID, error) {
-	var req GetTransactionResultsByBlockID
+func parseGetTransactionResultsByBlock(r *common.Request) (*GetTransactionResultsByBlock, error) {
+	var req GetTransactionResultsByBlock
 	err := req.TransactionOptionals.Parse(r)
 	if err != nil {
 		return nil, err
@@ -183,7 +183,7 @@ func parseGetTransactionResultsByBlockID(r *common.Request) (*GetTransactionResu
 		req.BlockHeight = SealedHeight
 	}
 
-	if req.BlockID != flow.ZeroID && req.BlockHeight != EmptyHeight {
+	if req.BlockHeight != EmptyHeight && req.BlockID != flow.ZeroID {
 		return nil, fmt.Errorf("can not provide both block ID and block height")
 	}
 
