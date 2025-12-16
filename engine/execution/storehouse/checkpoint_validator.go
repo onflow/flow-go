@@ -32,6 +32,12 @@ func ValidateWithCheckpoint(
 	// used by N workers to validate registers in store
 	leafNodeChan := make(chan *wal.LeafNode, 1000)
 
+	// get rootHash before creating goroutines since we need a valid rootHash to validate registers
+	rootHash, err := rootHashByHeight(results, headers, blockHeight)
+	if err != nil {
+		return err
+	}
+
 	// create N workers to validate registers in store
 	cct, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -44,11 +50,6 @@ func ValidateWithCheckpoint(
 		g.Go(func() error {
 			return validatingRegisterInStore(gCtx, store, leafNodeChan, blockHeight)
 		})
-	}
-
-	rootHash, err := rootHashByHeight(results, headers, blockHeight)
-	if err != nil {
-		return err
 	}
 
 	// read leaf nodes from checkpoint file and send to leafNodeChan
