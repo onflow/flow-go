@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/remote"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -100,7 +101,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	// Create and register ledger service
-	ledgerService := NewLedgerService(ledgerStorage, logger)
+	ledgerService := remote.NewService(ledgerStorage, logger)
 	ledgerpb.RegisterLedgerServiceServer(grpcServer, ledgerService)
 
 	// Start gRPC server
