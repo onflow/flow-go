@@ -2,10 +2,7 @@ package remote
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -226,14 +223,14 @@ func (c *Client) Ready() <-chan struct{} {
 		ctx := context.Background()
 		maxRetries := 30
 		retryDelay := 100 * time.Millisecond
-		
+
 		for i := 0; i < maxRetries; i++ {
 			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
 			if err == nil {
 				c.logger.Info().Msg("ledger service ready")
 				return
 			}
-			
+
 			if i < maxRetries-1 {
 				c.logger.Debug().
 					Err(err).
