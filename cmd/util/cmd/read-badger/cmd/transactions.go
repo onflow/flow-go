@@ -6,9 +6,11 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/store"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
-	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -24,11 +26,7 @@ var transactionsCmd = &cobra.Command{
 	Short: "get transaction by ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
-			if err != nil {
-				return err
-			}
-			storages := common.InitStorages(db, chainID) // TODO(4204) - header storage not used
+			transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
 
 			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
@@ -37,7 +35,7 @@ var transactionsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting transaction by id: %v", transactionID)
-			tx, err := storages.Transactions.ByID(transactionID)
+			tx, err := transactions.ByID(transactionID)
 			if err != nil {
 				return fmt.Errorf("could not get transaction with id: %v: %w", transactionID, err)
 			}

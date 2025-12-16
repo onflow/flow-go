@@ -8,8 +8,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
-	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var flagSealID string
@@ -26,11 +27,7 @@ var sealsCmd = &cobra.Command{
 	Short: "get seals by block or seal ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
-			if err != nil {
-				return err
-			}
-			storages := common.InitStorages(db, chainID) // TODO(4204) - header storage not used
+			seals := store.NewSeals(&metrics.NoopCollector{}, db)
 
 			if flagSealID != "" && flagBlockID != "" {
 				return fmt.Errorf("provide one of the flags --id or --block-id")
@@ -44,7 +41,7 @@ var sealsCmd = &cobra.Command{
 				}
 
 				log.Info().Msgf("getting seal by id: %v", sealID)
-				seal, err := storages.Seals.ByID(sealID)
+				seal, err := seals.ByID(sealID)
 				if err != nil {
 					return fmt.Errorf("could not get seal with id: %v: %w", sealID, err)
 				}
@@ -61,7 +58,7 @@ var sealsCmd = &cobra.Command{
 				}
 
 				log.Info().Msgf("getting seal by block id: %v", blockID)
-				seal, err := storages.Seals.FinalizedSealForBlock(blockID)
+				seal, err := seals.FinalizedSealForBlock(blockID)
 				if err != nil {
 					return fmt.Errorf("could not get seal for block id: %v: %w", blockID, err)
 				}
