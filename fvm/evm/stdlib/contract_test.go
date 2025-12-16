@@ -439,8 +439,7 @@ func TestEVMEncodeABI(t *testing.T) {
 	// Run script
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:        runtimeInterface,
@@ -547,8 +546,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -612,8 +610,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -687,8 +684,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -747,8 +743,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -818,8 +813,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -889,8 +883,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		// Run script
 		result, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -991,7 +984,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
             let encodedData = EVM.encodeABI([bytes])
             let types = [Type<EVM.EVMBytes>()]
@@ -1000,8 +993,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! EVM.EVMBytes
             assert(evmBytes.value == [5, 10, 15, 20, 25])
-
-            return true
           }
 		`)
 
@@ -1010,10 +1001,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -1024,11 +1014,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
 
 		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
@@ -1038,7 +1023,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
             let bytesArray: [EVM.EVMBytes] = [bytes]
             let encodedData = EVM.encodeABI([bytesArray])
@@ -1048,8 +1033,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! [EVM.EVMBytes]
             assert(evmBytes[0].value == [5, 10, 15, 20, 25])
-
-            return true
           }
 		`)
 
@@ -1058,10 +1041,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -1072,11 +1054,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
 
 		assert.Equal(t, uint64(160), gauge.TotalComputationUsed())
 	})
@@ -1086,7 +1063,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
             let encodedData = EVM.encodeABI([bytes])
             let types = [Type<EVM.EVMBytes4>()]
@@ -1095,8 +1072,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! EVM.EVMBytes4
             assert(evmBytes.value == [5, 10, 15, 20])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1104,10 +1079,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -1118,11 +1092,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
 
 		assert.Equal(t, uint64(32), gauge.TotalComputationUsed())
 	})
@@ -1132,7 +1101,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
             let bytesArray: [EVM.EVMBytes4] = [bytes]
             let encodedData = EVM.encodeABI([bytesArray])
@@ -1142,8 +1111,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! [EVM.EVMBytes4]
             assert(evmBytes[0].value == [5, 10, 15, 20])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1151,10 +1118,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -1166,11 +1132,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
-
 		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
 
@@ -1179,7 +1140,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
               value: [
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
@@ -1198,8 +1159,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
               17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
               31, 32
             ])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1207,10 +1166,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -1222,11 +1180,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
-
 		assert.Equal(t, uint64(32), gauge.TotalComputationUsed())
 	})
 
@@ -1235,7 +1188,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
               value: [
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
@@ -1255,8 +1208,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
               17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
               31, 32
             ])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1264,10 +1215,9 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -1278,11 +1228,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
 
 		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
@@ -1326,8 +1271,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		// Run script
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:        runtimeInterface,
@@ -1425,8 +1369,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 	// Run script
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:        runtimeInterface,
@@ -1519,8 +1462,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:        runtimeInterface,
@@ -1622,8 +1564,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:        runtimeInterface,
@@ -1658,7 +1599,7 @@ func TestEVMDecodeABI(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(data: [UInt8]): Bool {
+      fun main(data: [UInt8]) {
         let types = [Type<String>(), Type<UInt64>(), Type<Bool>()]
         let values = EVM.decodeABI(types: types, data: data)
 
@@ -1666,8 +1607,6 @@ func TestEVMDecodeABI(t *testing.T) {
         assert((values[0] as! String) == "John Doe")
         assert((values[1] as! UInt64) == UInt64(33))
         assert((values[2] as! Bool) == false)
-
-        return true
       }
 	`)
 
@@ -1738,7 +1677,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		cdcBytes,
 	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
-	result, err := rt.ExecuteScript(
+	_, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 			Arguments: EncodeArgs([]cadence.Value{
@@ -1755,7 +1694,6 @@ func TestEVMDecodeABI(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	assert.Equal(t, cadence.NewBool(true), result)
 	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 }
 
@@ -1850,8 +1788,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:        runtimeInterface,
@@ -1932,7 +1869,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           // Check UInt/Int encode/decode
           let amount: UInt256 = 18446744073709551615
           let minBalance: Int256 = -18446744073709551615
@@ -1947,17 +1884,14 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
           )
           assert((values[0] as! UInt) == UInt(amount))
           assert((values[1] as! Int) == Int(minBalance))
-
-          return true
         }
 		`)
 
 		// Run script
 
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -1966,8 +1900,6 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t, cadence.Bool(true), result)
 	})
 
 	t.Run("with values at the boundaries", func(t *testing.T) {
@@ -1976,11 +1908,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           // Check UInt*/Int* encode/decode
           let data = EVM.encodeABIWithSignature(
             "withdraw(uint,int,uint,int)",
-            [UInt(UInt256.max), Int(Int256.max),UInt(UInt256.min), Int(Int256.min)]
+            [UInt(UInt256.max), Int(Int256.max), UInt(UInt256.min), Int(Int256.min)]
           )
           let values = EVM.decodeABIWithSignature(
             "withdraw(uint,int,uint,int)",
@@ -1991,17 +1923,14 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
           assert((values[1] as! Int) == Int(Int256.max))
           assert((values[2] as! UInt) == UInt(UInt256.min))
           assert((values[3] as! Int) == Int(Int256.min))
-
-          return true
         }
 		`)
 
 		// Run script
 
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2010,8 +1939,6 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t, cadence.Bool(true), result)
 	})
 
 	t.Run("with UInt values outside the boundaries", func(t *testing.T) {
@@ -2020,13 +1947,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           let data = EVM.encodeABIWithSignature(
             "withdraw(uint)",
             [UInt(UInt256.max)+10]
           )
-
-          return true
         }
 		`)
 
@@ -2034,8 +1959,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2058,13 +1982,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           let data = EVM.encodeABIWithSignature(
             "withdraw(int)",
             [Int(Int256.max)+10]
           )
-
-          return true
         }
 		`)
 
@@ -2072,8 +1994,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2096,13 +2017,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           let data = EVM.encodeABIWithSignature(
             "withdraw(int)",
             [Int(Int256.min)-10]
           )
-
-          return true
         }
 		`)
 
@@ -2110,8 +2029,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2146,7 +2064,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(): Bool {
+      fun main() {
         // Check EVM.EVMAddress encode/decode
         let address = EVM.EVMAddress(
             bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
@@ -2340,8 +2258,6 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
         values = EVM.decodeABI(types: [Type<[[String]]>()], data: data)
         assert(values.length == 1)
         assert((values[0] as! [[String]]) == [["Foo", "Bar"], ["Baz", "Qux"]])
-
-        return true
       }
 	`)
 
@@ -2387,10 +2303,9 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 
 	// Run script
 
-	result, err := rt.ExecuteScript(
+	_, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
@@ -2399,11 +2314,6 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-
-	assert.Equal(t,
-		cadence.Bool(true),
-		result,
-	)
 }
 
 func TestEVMEncodeDecodeABIErrors(t *testing.T) {
@@ -2469,18 +2379,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let address: Address = 0x045a1763c93006ca
-            let data = EVM.encodeABI([address])
-
-            return true
+            EVM.encodeABI([address])
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2555,17 +2462,14 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
-            let data = EVM.encodeABI([0.2])
-
-            return true
+          fun main() {
+            EVM.encodeABI([0.2])
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2640,18 +2544,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let dict: {Int: Bool} = {0: false, 1: true}
-            let data = EVM.encodeABI([dict])
-
-            return true
+            EVM.encodeABI([dict])
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2726,18 +2627,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let chars: [Character] = ["a", "b", "c"]
-            let data = EVM.encodeABI([chars])
-
-            return true
+            EVM.encodeABI([chars])
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2827,8 +2725,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2903,18 +2800,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<Bool>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<Bool>()], data: data)
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -2989,18 +2883,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<String>(), Type<Bool>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<String>(), Type<Bool>()], data: data)
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -3075,18 +2966,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<UFix64>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<UFix64>()], data: data)
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -3161,18 +3049,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<{Int: Bool}>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<{Int: Bool}>()], data: data)
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -3247,18 +3132,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<[Character]>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<[Character]>()], data: data)
           }
 		`)
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -3348,8 +3230,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
 		_, err := rt.ExecuteScript(
 			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
+				Source: script,
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
@@ -3451,8 +3332,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
+			Source: script,
 		},
 		runtime.Context{
 			Interface:        runtimeInterface,
@@ -3505,7 +3385,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(data: [UInt8]): Bool {
+      fun main(data: [UInt8]) {
         let values = EVM.decodeABIWithSignature(
           "withdraw(address,uint256)",
           types: [Type<EVM.EVMAddress>(), Type<UInt256>()],
@@ -3523,8 +3403,6 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
         assert(values.length == 2)
         assert((values[0] as! EVM.EVMAddress).bytes == address.bytes)
         assert((values[1] as! UInt256) == UInt256(250))
-
-        return true
       }
 	`)
 
@@ -3596,7 +3474,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		cdcBytes,
 	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
-	result, err := rt.ExecuteScript(
+	_, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 			Arguments: EncodeArgs([]cadence.Value{
@@ -3612,8 +3490,6 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-
-	assert.Equal(t, cadence.NewBool(true), result)
 	// The method ID is a byte array of length 4
 	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed()+4)
 }
@@ -3635,7 +3511,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(data: [UInt8]): Bool {
+      fun main(data: [UInt8]) {
         // The data was encoded for the function "withdraw(address,uint256)",
         // but we pass a different function signature
         let values = EVM.decodeABIWithSignature(
@@ -3643,8 +3519,6 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
           types: [Type<UInt256>(), Type<EVM.EVMAddress>()],
           data: data
         )
-
-        return true
       }
 	`)
 
@@ -4498,9 +4372,14 @@ func TestEVMBatchRun(t *testing.T) {
 		batchRun: func(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
 			runCalled = true
 
-			assert.EqualValues(t, [][]byte{
-				{1, 2, 3}, {4, 5, 6}, {7, 8, 9},
-			}, txs)
+			assert.EqualValues(t,
+				[][]byte{
+					{1, 2, 3},
+					{4, 5, 6},
+					{7, 8, 9},
+				},
+				txs,
+			)
 			assert.Equal(t,
 				types.Address{
 					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
