@@ -16,6 +16,7 @@ import (
 
 var (
 	flagPebbleDir     string
+	flagDataDir       string
 	flagCheckpointDir string
 	flagBlockHeight   uint64
 	flagWorkerCount   int
@@ -35,6 +36,9 @@ func init() {
 		"directory containing the Pebble database with register store")
 	_ = Cmd.MarkFlagRequired("pebble-dir")
 
+	Cmd.Flags().StringVar(&flagDataDir, "datadir", "/var/flow/data/protocol",
+		"directory containing the protocol database")
+
 	Cmd.Flags().StringVar(&flagCheckpointDir, "checkpoint-dir", "",
 		"directory containing the checkpoint file (must have root.checkpoint)")
 	_ = Cmd.MarkFlagRequired("checkpoint-dir")
@@ -50,6 +54,7 @@ func init() {
 func runE(*cobra.Command, []string) error {
 	log.Info().
 		Str("pebble-dir", flagPebbleDir).
+		Str("datadir", flagDataDir).
 		Str("checkpoint-dir", flagCheckpointDir).
 		Uint64("block-height", flagBlockHeight).
 		Int("worker-count", flagWorkerCount).
@@ -74,8 +79,18 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("failed to initialize register store: %w", err)
 	}
 
-	// Convert pebble DB to storage.DB for protocol storage
-	protocolDB := pebbleimpl.ToDB(pebbleDB)
+	// Open protocol database from datadir
+	protocolPebbleDB, err := pebblestorage.ShouldOpenDefaultPebbleDB(log.Logger, flagDataDir)
+	if err != nil {
+		return fmt.Errorf("failed to open protocol database at %s: %w", flagDataDir, err)
+	}
+	defer func() {
+		if closeErr := protocolPebbleDB.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("failed to close protocol database")
+		}
+	}()
+
+	protocolDB := pebbleimpl.ToDB(protocolPebbleDB)
 
 	// Initialize storage components
 	metricsCollector := &metrics.NoopCollector{}
