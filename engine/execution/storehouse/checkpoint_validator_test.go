@@ -84,13 +84,14 @@ func TestValidateWithCheckpoint_WithMismatches(t *testing.T) {
 	log := zerolog.New(io.Discard)
 	rootHeight := uint64(10000)
 	workerCount := 2
+	registerCount := 50 // Increased from 5 to ensure some registers are in subtries, not all in top trie
 
 	unittest.RunWithTempDir(t, func(dir string) {
 		// create generator suite for random register entries
 		suite := fixtures.NewGeneratorSuite()
 
 		// generate random register entries using unittest fixtures
-		registerEntries := suite.RegisterEntries().List(5)
+		registerEntries := suite.RegisterEntries().List(registerCount)
 
 		// create checkpoint from register entries
 		tries, rootHash := createTrieFromRegisterEntries(t, registerEntries)
