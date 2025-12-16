@@ -65,10 +65,8 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	ledgerpkg "github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/ledger/remote"
+	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -943,58 +941,25 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	module.ReadyDoneAware,
 	error,
 ) {
-	var err error
-	var factory ledger.Factory
-
-	// Check if remote ledger service is configured
-	if exeNode.exeConf.ledgerServiceAddr != "" {
-		// Use remote ledger service
-		node.Logger.Info().
-			Str("ledger_service_addr", exeNode.exeConf.ledgerServiceAddr).
-			Msg("using remote ledger service")
-
-		factory = remote.NewRemoteLedgerFactory(
-			exeNode.exeConf.ledgerServiceAddr,
-			node.Logger.With().Str("subcomponent", "ledger").Logger(),
-		)
-	} else {
-		// Use local ledger with WAL
-		node.Logger.Info().
-			Str("triedir", exeNode.exeConf.triedir).
-			Msg("using local ledger")
-
-		// DiskWal is a dependent component because we need to ensure
-		// that all WAL updates are completed before closing opened WAL segment.
-		exeNode.diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
-			node.MetricsRegisterer, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize wal: %w", err)
-		}
-
-		// Create compactor config
-		compactorConfig := &ledger.CompactorConfig{
-			CheckpointCapacity:                   uint(exeNode.exeConf.mTrieCacheSize),
-			CheckpointDistance:                   exeNode.exeConf.checkpointDistance,
-			CheckpointsToKeep:                    exeNode.exeConf.checkpointsToKeep,
-			TriggerCheckpointOnNextSegmentFinish: exeNode.toTriggerCheckpoint,
-			Metrics:                              exeNode.collector,
-		}
-
-		// Use factory to create ledger with internal compactor
-		factory = complete.NewLocalLedgerFactory(
-			exeNode.diskWAL,
-			int(exeNode.exeConf.mTrieCacheSize),
-			compactorConfig,
-			exeNode.collector,
-			node.Logger.With().Str("subcomponent", "ledger").Logger(),
-			complete.DefaultPathFinderVersion,
-		)
-	}
-
-	exeNode.ledgerStorage, err = factory.NewLedger()
+	// Create ledger using factory
+	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
+		LedgerServiceAddr:                    exeNode.exeConf.ledgerServiceAddr,
+		Triedir:                              exeNode.exeConf.triedir,
+		MTrieCacheSize:                       exeNode.exeConf.mTrieCacheSize,
+		CheckpointDistance:                   exeNode.exeConf.checkpointDistance,
+		CheckpointsToKeep:                    exeNode.exeConf.checkpointsToKeep,
+		TriggerCheckpointOnNextSegmentFinish: exeNode.toTriggerCheckpoint,
+		MetricsRegisterer:                    node.MetricsRegisterer,
+		WALMetrics:                           exeNode.collector,
+		LedgerMetrics:                        exeNode.collector,
+		Logger:                               node.Logger,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create ledger: %w", err)
+		return nil, err
 	}
+
+	exeNode.ledgerStorage = result.Ledger
+	exeNode.diskWAL = result.WAL
 
 	return exeNode.ledgerStorage, nil
 }
