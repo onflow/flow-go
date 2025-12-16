@@ -47,8 +47,9 @@ type BackendExecutionDataSuite2 struct {
 	executionDataTracker     tracker.ExecutionDataTracker
 
 	// optimistic sync stuff
-	executionResultProvider     *osyncmock.ExecutionResultInfoProvider
-	executionResultProviderReal optimistic_sync.ExecutionResultInfoProvider
+	executionResultProviderMock *osyncmock.ExecutionResultInfoProvider
+	executionResultProvider     optimistic_sync.ExecutionResultInfoProvider
+	executionDataReader         *osyncmock.BlockExecutionDataReader
 	executionStateCache         *osyncmock.ExecutionStateCache
 	executionDataSnapshot       *osyncmock.Snapshot
 	criteria                    optimistic_sync.Criteria
@@ -173,20 +174,25 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 	)
 
 	// optimistic sync stuff
-	//executionNodeSelector := execution_result.NewExecutionNodeSelector(
-	//	s.preferredExecutionNodeIDs,
-	//	s.fixedExecutionNodes.NodeIDs(),
-	//)
-	//
-	//s.executionResultProviderReal = execution_result.NewExecutionResultInfoProvider(
-	//	s.log,
-	//	s.state,
-	//	s.receipts,
-	//	executionNodeSelector,
-	//	s.criteria,
-	//)
+	executionNodeSelector := execution_result.NewExecutionNodeSelector(
+		s.preferredExecutionNodeIDs,
+		s.fixedExecutionNodes.NodeIDs(),
+	)
 
-	s.executionResultProvider = osyncmock.NewExecutionResultInfoProvider(s.T())
+	// these are used in provider constructor
+	s.state.On("Params").Return(s.params).Once()
+	s.params.On("SporkRootBlock").Return(s.sporkRootBlock, nil).Once()
+	s.executionResultProvider = execution_result.NewExecutionResultInfoProvider(
+		s.log,
+		s.state,
+		s.receipts,
+		s.headers,
+		executionNodeSelector,
+		s.criteria,
+	)
+
+	s.executionResultProviderMock = osyncmock.NewExecutionResultInfoProvider(s.T())
+	s.executionDataReader = osyncmock.NewBlockExecutionDataReader(s.T())
 	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
 	s.criteria = optimistic_sync.DefaultCriteria
@@ -196,27 +202,7 @@ func (s *BackendExecutionDataSuite2) SetupTest() {
 // starting from the spork root block ID. It ensures that the execution data is received
 // sequentially and matches the expected data.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
-	// the spork root block (index 0) is a special case and doesn't require fetching execution data
-	// from the provider/storage, hence -1.
-	dataCallsCount := len(s.blocks) - 1
-
-	// the tracker is called for each block to check if it's finalized, plus one extra call
-	// when the streamer checks the next height which is not yet ready.
-	trackerCallsCount := len(s.blocks) + 1
-
-	s.initRealExecutionResultProvider()
-
-	// SporkRootBlockHeight is checked for each block processed by NextData.
-	paramHeightCalls := len(s.blocks)
-	// SporkRootBlock is checked during initialization (start height check) and for the root block processing.
-	paramBlockCalls := 2
-	s.mockParams(paramHeightCalls, paramBlockCalls)
-	s.mockReceipts(s.blocks)
-	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
-
-	s.state.
-		On("AtBlockID", mock.Anything).
-		Return(s.snapshot, nil)
+	s.mockSubscribeFuncState()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -271,28 +257,9 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionData() {
 // ID different from the spork root works as expected. We start from the block right
 // after the spork root and stream all remaining blocks.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromNonRoot() {
-	// all non-root blocks require fetching execution data
-	dataCallsCount := len(s.blocks) - 1
+	s.mockSubscribeFuncState()
 
-	// the tracker is called for each processed block, plus one extra when streamer
-	// checks the next height which is not yet ready.
-	trackerCallsCount := len(s.blocks) + 1
-
-	s.initRealExecutionResultProvider()
-
-	// SporkRootBlockHeight is checked for each processed block by NextData.
-	// Since we start from the block right after the root, we process N-1 blocks.
-	paramHeightCalls := len(s.blocks) - 1
-	// SporkRootBlock is checked during initialization (start height check) only.
-	paramBlockCalls := 1
-	s.mockParams(paramHeightCalls, paramBlockCalls)
-	s.mockReceipts(s.blocks)
-	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
-
-	s.state.
-		On("AtBlockID", mock.Anything).
-		Return(s.snapshot, nil)
-
+	// called on the start by tracker
 	startBlock := s.blocksHeightToBlockMap[s.sporkRootBlock.Height+1]
 	s.headers.
 		On("ByBlockID", startBlock.ID()).
@@ -352,28 +319,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromNonRoot() {
 // block height. It ensures that the correct block header is retrieved and data streaming starts
 // from the correct block.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight() {
-	// the spork root block (index 0) is a special case and doesn't require fetching execution data
-	// from the provider/storage, hence -1.
-	dataCallsCount := len(s.blocks) - 1
-
-	// the tracker is called for each block to check if it's finalized, plus one extra call
-	// when the streamer checks the next height which is not yet ready.
-	trackerCallsCount := len(s.blocks) + 1
-
-	s.initRealExecutionResultProvider()
-
-	// SporkRootBlockHeight is checked for each block processed by NextData.
-	paramHeightCalls := len(s.blocks)
-	// SporkRootBlock is checked only for the root block processing.
-	paramBlockCalls := 1
-	s.mockParams(paramHeightCalls, paramBlockCalls)
-	s.mockReceipts(s.blocks)
-
-	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
-
-	s.state.
-		On("AtBlockID", mock.Anything).
-		Return(s.snapshot, nil)
+	s.mockSubscribeFuncState()
 
 	s.headers.
 		On("ByHeight", s.sporkRootBlock.Height).
@@ -432,28 +378,7 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartHeight()
 // block ID. It checks that the start height is correctly resolved from the block ID and data
 // streaming proceeds.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
-	// the spork root block (index 0) is a special case and doesn't require fetching execution data
-	// from the provider/storage, hence -1.
-	dataCallsCount := len(s.blocks) - 1
-
-	// the tracker is called for each block to check if it's finalized, plus one extra call
-	// when the streamer checks the next height which is not yet ready.
-	trackerCallsCount := len(s.blocks) + 1
-
-	s.initRealExecutionResultProvider()
-
-	// SporkRootBlockHeight is checked for each block processed by NextData.
-	paramHeightCalls := len(s.blocks)
-	// SporkRootBlock is checked during initialization (start height check) and for the root block processing.
-	paramBlockCalls := 2
-	s.mockParams(paramHeightCalls, paramBlockCalls)
-	s.mockReceipts(s.blocks)
-
-	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
-
-	s.state.
-		On("AtBlockID", mock.Anything).
-		Return(s.snapshot, nil)
+	s.mockSubscribeFuncState()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -507,34 +432,12 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromStartID() {
 // available finalized block. It ensures that the start height is correctly determined and data
 // streaming begins.
 func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
-	// the spork root block (index 0) is a special case and doesn't require fetching execution data
-	// from the provider/storage, hence -1.
-	dataCallsCount := len(s.blocks) - 1
-
-	// the tracker is called for each block to check if it's finalized, plus one extra call
-	// when the streamer checks the next height which is not yet ready.
-	trackerCallsCount := len(s.blocks) + 1
-
-	s.initRealExecutionResultProvider()
-
-	// SporkRootBlockHeight is checked for each block processed by NextData.
-	paramHeightCalls := len(s.blocks)
-	// SporkRootBlock is checked only for the root block processing.
-	paramBlockCalls := 1
-	s.mockParams(paramHeightCalls, paramBlockCalls)
-	s.mockReceipts(s.blocks)
-
-	s.mockDataProviderState(dataCallsCount, trackerCallsCount)
-
-	s.state.
-		On("AtBlockID", mock.Anything).
-		Return(s.snapshot, nil)
+	s.mockSubscribeFuncState()
+	s.state.On("Sealed").Return(s.snapshot, nil).Once()
+	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Once()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	s.state.On("Sealed").Return(s.snapshot, nil).Once()
-	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil).Once()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -580,10 +483,11 @@ func (s *BackendExecutionDataSuite2) TestSubscribeExecutionDataFromLatest() {
 // TestGetExecutionData verifies the retrieval of execution data for a specific block ID.
 // It checks that the data and metadata are returned correctly.
 func (s *BackendExecutionDataSuite2) TestGetExecutionData() {
-	s.initRealExecutionResultProvider()
-	s.mockExecutionResultProvider(1)
-	s.state.On("AtBlockID", s.sporkRootBlock.ID()).Return(s.snapshot, nil).Once()
-	s.snapshot.On("SealedResult").Return(s.executionResults[0], nil, nil).Once()
+	s.mockExecutionResultProviderState()
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil).
+		Once()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -607,15 +511,13 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData() {
 // TestGetExecutionData_Errors verifies how GetExecutionDataByBlockID handles various error
 // conditions, such as missing data, block not found, fork abandoned, and unexpected system errors.
 func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
-	s.initRealExecutionResultProvider()
-
 	backend := NewExecutionDataBackend(
 		s.log,
 		s.state,
 		s.headers,
 		s.subscriptionFactory,
 		s.executionDataTracker,
-		s.executionResultProvider,
+		s.executionResultProviderMock,
 		s.executionStateCache,
 	)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -625,7 +527,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 
 	s.Run("execution result info returns data not found", func() {
 		// provider returns storage.ErrNotFound which should map to access.DataNotFoundError
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(nil, storage.ErrNotFound).
 			Once()
@@ -639,7 +541,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 	})
 
 	s.Run("execution result info returns block not found", func() {
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(nil, optimistic_sync.ErrBlockBeforeNodeHistory).
 			Once()
@@ -653,7 +555,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 	})
 
 	s.Run("execution result info returns fork abandoned", func() {
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(nil, optimistic_sync.ErrForkAbandoned).
 			Once()
@@ -669,7 +571,7 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 	s.Run("execution result info returns unexpected error", func() {
 		// any unexpected error should be wrapped by access.RequireNoError, i.e., returned as-is
 		unexpected := errors.New("unexpected error")
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
 			Return(nil, unexpected).
 			Once()
@@ -705,9 +607,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 			Once()
 
 		// first return a valid exec result info
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
-			Return(s.executionResultProviderReal.ExecutionResultInfo).
+			Return(s.executionResultProvider.ExecutionResultInfo).
 			Once()
 
 		// Snapshot not found maps to DataNotFoundError
@@ -743,9 +645,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 			Return(s.executionResults[0], nil, nil).
 			Once()
 
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
-			Return(s.executionResultProviderReal.ExecutionResultInfo).
+			Return(s.executionResultProvider.ExecutionResultInfo).
 			Once()
 
 		unexpected := errors.New("unexpected error")
@@ -785,9 +687,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 			Return(s.executionResults[0], nil, nil).
 			Once()
 
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
-			Return(s.executionResultProviderReal.ExecutionResultInfo).
+			Return(s.executionResultProvider.ExecutionResultInfo).
 			Once()
 
 		// provide snapshot and reader that returns not found
@@ -832,9 +734,9 @@ func (s *BackendExecutionDataSuite2) TestGetExecutionData_Errors() {
 			Return(s.executionResults[0], nil, nil).
 			Once()
 
-		s.executionResultProvider.
+		s.executionResultProviderMock.
 			On("ExecutionResultInfo", block.ID(), mock.Anything).
-			Return(s.executionResultProviderReal.ExecutionResultInfo).
+			Return(s.executionResultProvider.ExecutionResultInfo).
 			Once()
 
 		reader := osyncmock.NewBlockExecutionDataReader(s.T())
@@ -876,14 +778,13 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "block is not finalized",
 			expectedErr: storage.ErrNotFound,
 			mockState: func() {
-				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(s.executionResultProviderReal.ExecutionResultInfo).
+					Return(s.executionResultProvider.ExecutionResultInfo).
 					Once()
 
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 						return nil, storage.ErrNotFound
@@ -895,14 +796,13 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "block not found",
 			expectedErr: optimistic_sync.ErrBlockBeforeNodeHistory,
 			mockState: func() {
-				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(s.executionResultProviderReal.ExecutionResultInfo).
+					Return(s.executionResultProvider.ExecutionResultInfo).
 					Once()
 
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 						return nil, optimistic_sync.ErrBlockBeforeNodeHistory
@@ -914,14 +814,13 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "fork abandoned",
 			expectedErr: optimistic_sync.ErrForkAbandoned,
 			mockState: func() {
-				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(s.executionResultProviderReal.ExecutionResultInfo).
+					Return(s.executionResultProvider.ExecutionResultInfo).
 					Once()
 
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 						return nil, optimistic_sync.ErrForkAbandoned
@@ -933,14 +832,13 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 			name:        "unexpected error",
 			expectedErr: assert.AnError,
 			mockState: func() {
-				s.mockReceipts([]*flow.Block{s.blocks[1]})
 				// stream the first block normally, then stream an error
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
-					Return(s.executionResultProviderReal.ExecutionResultInfo).
+					Return(s.executionResultProvider.ExecutionResultInfo).
 					Once()
 
-				s.executionResultProvider.
+				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
 						return nil, assert.AnError
@@ -950,63 +848,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 		},
 	}
 
-	s.initRealExecutionResultProvider()
-
-	// SporkRootBlockHeight is called 3 times per test:
-	// 1. NextData(root block)
-	// 2. NextData(block 1)
-	// 3. NextData(block 2) - where it fails
-	paramHeightCalls := 3 * len(tests)
-
-	// SporkRootBlock is called 2 times per test:
-	// 1. GetStartHeightFromBlockID (initial check)
-	// 2. NextData(root block)
-	paramBlockCalls := 2 * len(tests)
-
-	s.mockParams(paramHeightCalls, paramBlockCalls)
-
-	s.state.
-		On("AtBlockID", mock.Anything).
-		Return(s.snapshot).
-		Times(len(tests))
-
-	s.snapshot.
-		On("Identities", mock.Anything).
-		Return(s.fixedExecutionNodes, nil).
-		Times(len(tests))
-
-	s.headers.
-		On("BlockIDByHeight", mock.Anything).
-		Return(func(height uint64) (flow.Identifier, error) {
-			block, ok := s.blocksHeightToBlockMap[height]
-			if !ok {
-				return flow.ZeroID, storage.ErrNotFound
-			}
-			return block.ID(), nil
-		})
-
-	executionDataReader := osyncmock.NewBlockExecutionDataReader(s.T())
-	s.executionDataSnapshot.
-		On("BlockExecutionData").
-		Return(executionDataReader)
-
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil)
-
-	executionDataReader.
-		On("ByBlockID", mock.Anything, mock.Anything).
-		Return(func(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
-			ed, ok := s.blockIDToExecutionDataMap[blockID]
-			if !ok {
-				return nil, storage.ErrNotFound
-			}
-
-			return &execution_data.BlockExecutionDataEntity{
-				BlockExecutionData: ed,
-				ExecutionDataID:    unittest.IdentifierFixture(),
-			}, nil
-		})
+	s.mockSubscribeFuncState()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -1014,7 +856,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 		s.headers,
 		s.subscriptionFactory,
 		s.executionDataTracker,
-		s.executionResultProvider,
+		s.executionResultProviderMock,
 		s.executionStateCache,
 	)
 
@@ -1050,53 +892,6 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderErrors() {
 // errors like missing required executors, rather than terminating the subscription immediately,
 // until the context is canceled.
 func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() {
-	s.initRealExecutionResultProvider()
-
-	mockStateFunc := func(errToReturn error) {
-		// SporkRootBlockHeight is called:
-		// - once for each block in s.blocks (len(s.blocks))
-		// - plus one extra time because of the retry on the ignorable error
-		paramHeightCalls := len(s.blocks) + 1
-
-		// SporkRootBlock is called:
-		// - once during initialization (GetStartHeightFromBlockID)
-		// - once for the root block processing in NextData
-		paramBlockCalls := 2
-		s.mockParams(paramHeightCalls, paramBlockCalls)
-		s.mockReceipts(s.blocks)
-
-		s.state.
-			On("AtBlockID", mock.Anything).
-			Return(s.snapshot).
-			Times(len(s.blocks) - 1)
-
-		s.snapshot.
-			On("Identities", mock.Anything).
-			Return(s.fixedExecutionNodes, nil).
-			Times(len(s.blocks) - 1)
-
-		// if this error is seen, we continue trying to fetch results until we get a result or other error.
-		s.executionResultProvider.
-			On("ExecutionResultInfo", mock.Anything, mock.Anything).
-			Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-				// after an 'ignorable' error occurs, the streamer goes to sleep waiting for the notification
-				// that the new data is available.
-				// since we are about to return an error, we notify the streamer in advance. this will cause it
-				// to wake up and try again with a new mock.
-				s.executionDataBroadcaster.Publish()
-
-				return nil, errToReturn
-			}).
-			Once()
-
-		s.executionResultProvider.
-			On("ExecutionResultInfo", mock.Anything, mock.Anything).
-			Return(s.executionResultProviderReal.ExecutionResultInfo).
-			Times(len(s.blocks) - 1) // we expect storage.ErrNotFound to be returned for the unknown height
-		// Times is equal to `len(s.blocks)-1)` because the function is never called for the spork root block,
-		// as well as for the last block that is not found in storage.
-	}
-
 	tests := []struct {
 		name        string
 		expectedErr error
@@ -1106,50 +901,53 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 			name:        "required executors not found",
 			expectedErr: context.Canceled,
 			mockState: func() {
-				mockStateFunc(optimistic_sync.ErrRequiredExecutorNotFound)
+				s.executionResultProviderMock.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						// after an 'ignorable' error occurs, the streamer goes to sleep waiting for the notification
+						// that the new data is available.
+						// since we are about to return an error, we notify the streamer in advance. this will cause it
+						// to wake up and try again with a new mock.
+						s.executionDataBroadcaster.Publish()
+
+						return nil, optimistic_sync.ErrRequiredExecutorNotFound
+					}).
+					Once()
+
+				// called `len(s.blocks) - 1` times because we return the error for the first block
+				s.executionResultProviderMock.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(s.executionResultProvider.ExecutionResultInfo).
+					Times(len(s.blocks) - 1)
 			},
 		},
 		{
 			name:        "not enough agreeing executors",
 			expectedErr: context.Canceled,
 			mockState: func() {
-				mockStateFunc(optimistic_sync.ErrNotEnoughAgreeingExecutors)
+				s.executionResultProviderMock.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
+						// after an 'ignorable' error occurs, the streamer goes to sleep waiting for the notification
+						// that the new data is available.
+						// since we are about to return an error, we notify the streamer in advance. this will cause it
+						// to wake up and try again with a new mock.
+						s.executionDataBroadcaster.Publish()
+
+						return nil, optimistic_sync.ErrNotEnoughAgreeingExecutors
+					}).
+					Once()
+
+				// called `len(s.blocks) - 1` times because we return the error for the first block
+				s.executionResultProviderMock.
+					On("ExecutionResultInfo", mock.Anything, mock.Anything).
+					Return(s.executionResultProvider.ExecutionResultInfo).
+					Times(len(s.blocks) - 1)
 			},
 		},
 	}
 
-	s.headers.
-		On("BlockIDByHeight", mock.Anything).
-		Return(func(height uint64) (flow.Identifier, error) {
-			block, ok := s.blocksHeightToBlockMap[height]
-			if !ok {
-				return flow.ZeroID, storage.ErrNotFound
-			}
-			return block.ID(), nil
-		})
-
-	executionDataReader := osyncmock.NewBlockExecutionDataReader(s.T())
-	s.executionDataSnapshot.
-		On("BlockExecutionData").
-		Return(executionDataReader)
-
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil)
-
-	executionDataReader.
-		On("ByBlockID", mock.Anything, mock.Anything).
-		Return(func(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
-			ed, ok := s.blockIDToExecutionDataMap[blockID]
-			if !ok {
-				return nil, storage.ErrNotFound
-			}
-
-			return &execution_data.BlockExecutionDataEntity{
-				BlockExecutionData: ed,
-				ExecutionDataID:    unittest.IdentifierFixture(),
-			}, nil
-		})
+	s.mockSubscribeFuncState()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -1157,7 +955,7 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 		s.headers,
 		s.subscriptionFactory,
 		s.executionDataTracker,
-		s.executionResultProvider,
+		s.executionResultProviderMock,
 		s.executionStateCache,
 	)
 
@@ -1201,9 +999,23 @@ func (s *BackendExecutionDataSuite2) TestExecutionDataProviderIgnorableErrors() 
 	}
 }
 
-// mockDataProviderState sets up the mocked state for the dataProvider interface implementation.
-// It configures the behavior and expectations of the headers and result provider mocks/
-func (s *BackendExecutionDataSuite2) mockDataProviderState(dataCallsCount int, trackerCallsCount int) {
+// mockSubscribeFuncState sets up mock expectations for Subscribe* functions that require access to the
+// execution state.
+func (s *BackendExecutionDataSuite2) mockSubscribeFuncState() {
+	s.params.On("SporkRootBlockHeight").Return(s.sporkRootBlock.Height, nil)
+	s.params.On("SporkRootBlock").Return(s.sporkRootBlock, nil)
+	s.state.On("Params").Return(s.params)
+
+	s.receipts.
+		On("ByBlockID", mock.Anything).
+		Return(func(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
+			if blockID == s.sporkRootBlock.ID() {
+				return nil, errors.New("no execution receipts exist for spork root block")
+			}
+
+			return s.blockIDToReceiptsMap[blockID], nil
+		})
+
 	s.headers.
 		On("BlockIDByHeight", mock.Anything).
 		Return(func(height uint64) (flow.Identifier, error) {
@@ -1212,38 +1024,22 @@ func (s *BackendExecutionDataSuite2) mockDataProviderState(dataCallsCount int, t
 				return flow.ZeroID, storage.ErrNotFound
 			}
 			return block.ID(), nil
-		}).
-		Times(dataCallsCount)
+		})
 
-	s.mockExecutionResultProvider(dataCallsCount)
+	s.mockExecutionResultProviderState()
 }
 
-// mockExecutionResultProvider sets up mocked behaviors for execution state cache, execution data snapshot,
-// execution data reader, and execution result provider.
-func (s *BackendExecutionDataSuite2) mockExecutionResultProvider(expectationsCount int) {
-	executionDataReader := osyncmock.NewBlockExecutionDataReader(s.T())
+// mockExecutionResultProviderState sets up mock expectations for the code that calls the execution result provider.
+func (s *BackendExecutionDataSuite2) mockExecutionResultProviderState() {
+	s.snapshot.
+		On("Identities", mock.Anything).
+		Return(s.fixedExecutionNodes, nil)
 
 	s.state.
 		On("AtBlockID", mock.Anything).
-		Return(s.snapshot).
-		Once()
+		Return(s.snapshot, nil)
 
-	s.snapshot.
-		On("Identities", mock.Anything).
-		Return(s.fixedExecutionNodes, nil).
-		Times(expectationsCount)
-
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil).
-		Times(expectationsCount)
-
-	s.executionDataSnapshot.
-		On("BlockExecutionData").
-		Return(executionDataReader).
-		Times(expectationsCount)
-
-	executionDataReader.
+	s.executionDataReader.
 		On("ByBlockID", mock.Anything, mock.Anything).
 		Return(func(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
 			ed, ok := s.blockIDToExecutionDataMap[blockID]
@@ -1255,68 +1051,13 @@ func (s *BackendExecutionDataSuite2) mockExecutionResultProvider(expectationsCou
 				BlockExecutionData: ed,
 				ExecutionDataID:    unittest.IdentifierFixture(),
 			}, nil
-		}).
-		Times(expectationsCount)
+		})
 
-	s.executionResultProvider.
-		On("ExecutionResultInfo", mock.Anything, mock.Anything).
-		Return(s.executionResultProviderReal.ExecutionResultInfo).
-		Times(expectationsCount)
-}
+	s.executionDataSnapshot.
+		On("BlockExecutionData").
+		Return(s.executionDataReader)
 
-func (s *BackendExecutionDataSuite2) initRealExecutionResultProvider() {
-	executionNodeSelector := execution_result.NewExecutionNodeSelector(
-		s.preferredExecutionNodeIDs,
-		s.fixedExecutionNodes.NodeIDs(),
-	)
-
-	// these are used in provider constructor
-	s.state.On("Params").Return(s.params).Once()
-	s.params.On("SporkRootBlock").Return(s.sporkRootBlock, nil).Once()
-
-	s.executionResultProviderReal = execution_result.NewExecutionResultInfoProvider(
-		s.log,
-		s.state,
-		s.receipts,
-		s.headers,
-		executionNodeSelector,
-		s.criteria,
-	)
-}
-
-func (s *BackendExecutionDataSuite2) mockParams(sporkRootBlockHeightCalls int, sporkRootBlockCalls int) {
-	totalParamsCalls := sporkRootBlockHeightCalls + sporkRootBlockCalls
-	if totalParamsCalls > 0 {
-		s.state.
-			On("Params").
-			Return(s.params).
-			Times(totalParamsCalls)
-	}
-
-	if sporkRootBlockHeightCalls > 0 {
-		s.params.
-			On("SporkRootBlockHeight").
-			Return(s.sporkRootBlock.Height, nil).
-			Times(sporkRootBlockHeightCalls)
-	}
-
-	if sporkRootBlockCalls > 0 {
-		s.params.
-			On("SporkRootBlock").
-			Return(s.sporkRootBlock, nil).
-			Times(sporkRootBlockCalls)
-	}
-}
-
-func (s *BackendExecutionDataSuite2) mockReceipts(blocks []*flow.Block) {
-	for _, block := range blocks {
-		if block.ID() == s.sporkRootBlock.ID() {
-			continue
-		}
-
-		s.receipts.
-			On("ByBlockID", block.ID()).
-			Return(s.blockIDToReceiptsMap[block.ID()], nil).
-			Once()
-	}
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionDataSnapshot, nil)
 }
