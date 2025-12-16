@@ -3,7 +3,9 @@ package storehouse
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -13,8 +15,32 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
+
+// ErrMismatch represents a register value mismatch error with details about the mismatch.
+type ErrMismatch struct {
+	RegisterID     flow.RegisterID
+	Height         uint64
+	StoredLength   int
+	ExpectedLength int
+	Message        string
+}
+
+func (e *ErrMismatch) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("register value mismatch: owner=%s, key=%s, height=%d, stored_length=%d, expected_length=%d",
+		e.RegisterID.Owner, e.RegisterID.Key, e.Height, e.StoredLength, e.ExpectedLength)
+}
+
+// IsErrMismatch returns true if the given error is an ErrMismatch or wraps an ErrMismatch.
+func IsErrMismatch(err error) bool {
+	var mismatchErr *ErrMismatch
+	return errors.As(err, &mismatchErr)
+}
 
 // ValidateWithCheckpoint validates the registers in the given store against the leaf nodes read from the checkpoint file.
 // Limitation: the validation can not cover if there are extra non-empty registers in the store that are not in the checkpoint file.
@@ -44,11 +70,14 @@ func ValidateWithCheckpoint(
 
 	g, gCtx := errgroup.WithContext(cct)
 
+	// track total number of mismatch errors across all workers
+	var mismatchErrorCount atomic.Int64
+
 	start := time.Now()
 	log.Info().Msgf("validation registers from checkpoint with %v worker", workerCount)
 	for i := 0; i < workerCount; i++ {
 		g.Go(func() error {
-			return validatingRegisterInStore(gCtx, store, leafNodeChan, blockHeight)
+			return validatingRegisterInStore(gCtx, log, store, leafNodeChan, blockHeight, &mismatchErrorCount)
 		})
 	}
 
@@ -62,7 +91,12 @@ func ValidateWithCheckpoint(
 		return fmt.Errorf("failed to validate registers from checkpoint file: %w", err)
 	}
 
-	log.Info().Msgf("finished validating registers from checkpoint in %s", time.Since(start))
+	totalMismatches := mismatchErrorCount.Load()
+	if totalMismatches > 0 {
+		return fmt.Errorf("validation failed: found %d register value mismatches", totalMismatches)
+	}
+
+	log.Info().Msgf("finished validating registers from checkpoint in %s, no mismatch found", time.Since(start))
 	return nil
 }
 
@@ -85,7 +119,7 @@ func rootHashByHeight(results storage.ExecutionResults, headers storage.Headers,
 	return ledger.RootHash(commit), nil
 }
 
-func validatingRegisterInStore(ctx context.Context, store execution.OnDiskRegisterStore, leafNodeChan chan *wal.LeafNode, height uint64) error {
+func validatingRegisterInStore(ctx context.Context, log zerolog.Logger, store execution.OnDiskRegisterStore, leafNodeChan chan *wal.LeafNode, height uint64, mismatchErrorCount *atomic.Int64) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -96,7 +130,21 @@ func validatingRegisterInStore(ctx context.Context, store execution.OnDiskRegist
 			}
 			err := validateRegister(store, leafNode, height)
 			if err != nil {
-				return err
+				var mismatchErr *ErrMismatch
+				if errors.As(err, &mismatchErr) {
+					// mismatch error: log and continue, increment counter
+					log.Error().
+						Str("owner", mismatchErr.RegisterID.Owner).
+						Str("key", mismatchErr.RegisterID.Key).
+						Uint64("height", mismatchErr.Height).
+						Int("stored_length", mismatchErr.StoredLength).
+						Int("expected_length", mismatchErr.ExpectedLength).
+						Msg("register value mismatch")
+					mismatchErrorCount.Add(1)
+				} else {
+					// non-mismatch error: this is an exception, crash the process
+					log.Fatal().Err(err).Msg("unexpected error during validation")
+				}
 			}
 		}
 	}
@@ -104,6 +152,7 @@ func validatingRegisterInStore(ctx context.Context, store execution.OnDiskRegist
 
 // validateRegister checks if the register store has the same register as the leaf node.
 // It follows the same pattern as batchIndexRegisters but validates instead of indexing.
+// Returns ErrMismatch for value mismatches, or other errors for exceptions.
 func validateRegister(store execution.OnDiskRegisterStore, leafNode *wal.LeafNode, height uint64) error {
 	payload := leafNode.Payload
 	key, err := payload.Key()
@@ -120,8 +169,16 @@ func validateRegister(store execution.OnDiskRegisterStore, leafNode *wal.LeafNod
 	storedValue, err := store.Get(registerID, height)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			return fmt.Errorf("register not found in store: owner=%s, key=%s, height=%d", registerID.Owner, registerID.Key, height)
+			// register not found is a mismatch error (expected register missing)
+			return &ErrMismatch{
+				RegisterID:     registerID,
+				Height:         height,
+				StoredLength:   0,
+				ExpectedLength: len(payload.Value()),
+				Message:        fmt.Sprintf("register not found in store: owner=%s, key=%s, height=%d", registerID.Owner, registerID.Key, height),
+			}
 		}
+		// other store errors are exceptions
 		return fmt.Errorf("failed to get register from store: owner=%s, key=%s, height=%d: %w", registerID.Owner, registerID.Key, height, err)
 	}
 
@@ -130,8 +187,13 @@ func validateRegister(store execution.OnDiskRegisterStore, leafNode *wal.LeafNod
 
 	// Compare the stored value with the expected value
 	if !bytes.Equal(storedValue, expectedValue) {
-		return fmt.Errorf("register value mismatch: owner=%s, key=%s, height=%d, stored_length=%d, expected_length=%d",
-			registerID.Owner, registerID.Key, height, len(storedValue), len(expectedValue))
+		// value mismatch is a mismatch error
+		return &ErrMismatch{
+			RegisterID:     registerID,
+			Height:         height,
+			StoredLength:   len(storedValue),
+			ExpectedLength: len(expectedValue),
+		}
 	}
 
 	return nil
