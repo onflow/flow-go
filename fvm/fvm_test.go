@@ -3976,15 +3976,19 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 			nil,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
-			sema.NewReferenceType(
+			interpreter.NewReferenceStaticType(
 				nil,
-				sema.NewEntitlementSetAccess(
-					[]*sema.EntitlementType{
-						sema.MutateType,
+				interpreter.NewEntitlementSetAuthorization(
+					nil,
+					func() []common.TypeID {
+						return []common.TypeID{
+							sema.MutateType.ID(),
+						}
 					},
+					1,
 					sema.Conjunction,
 				),
-				sema.IntType,
+				interpreter.PrimitiveStaticTypeInt,
 			),
 			nil,
 		)
@@ -4005,10 +4009,10 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 			nil,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
-			sema.NewReferenceType(
+			interpreter.NewReferenceStaticType(
 				nil,
-				sema.UnauthorizedAccess,
-				sema.IntType,
+				interpreter.UnauthorizedAccess,
+				interpreter.PrimitiveStaticTypeInt,
 			),
 			nil,
 		)
