@@ -2811,22 +2811,17 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		script := []byte(`
           import EVM from 0x1
 
-          access(all) struct Token {
-            access(all) let id: Int
-            access(all) var balance: UInt
+          access(all) struct Fun {
+              access(all) let f: fun(): Void
 
-            init(id: Int, balance: UInt) {
-              self.id = id
-              self.balance = balance
-            }
+			  init() {
+				  self.f = fun(): Void {}
+              }
           }
 
           access(all)
-          fun main(): Bool {
-            let token = Token(id: 9, balance: 150)
-            let data = EVM.encodeABI([token])
-
-            return true
+          fun main() {
+            EVM.encodeABI([Fun()])
           }
 		`)
 
@@ -2845,7 +2840,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		assert.ErrorContains(
 			t,
 			err,
-			"failed to ABI encode value of type s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+			"failed to ABI encode value of type fun(): Void",
 		)
 	})
 
@@ -3337,22 +3332,17 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		script := []byte(`
           import EVM from 0x1
 
-          access(all) struct Token {
-            access(all) let id: Int
-            access(all) var balance: UInt
-
-            init(id: Int, balance: UInt) {
-              self.id = id
-              self.balance = balance
+          access(all) struct S {
+            access(all) let x: UInt8
+            init() {
+              self.x = 42
             }
           }
 
           access(all)
-          fun main(): Bool {
-            let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<Token>()], data: data)
-
-            return true
+          fun main() {
+            let data = EVM.encodeABI([1 as UInt8])
+            EVM.decodeABI(types: [Type<S>()], data: data)
           }
 		`)
 
@@ -3371,7 +3361,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		assert.ErrorContains(
 			t,
 			err,
-			"failed to ABI decode data with type s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+			"failed to ABI decode data with type s.0100000000000000000000000000000000000000000000000000000000000000.S",
 		)
 	})
 }
