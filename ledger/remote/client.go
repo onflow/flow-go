@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -18,6 +19,8 @@ type Client struct {
 	conn   *grpc.ClientConn
 	client ledgerpb.LedgerServiceClient
 	logger zerolog.Logger
+	done   chan struct{}
+	once   sync.Once
 }
 
 // NewClient creates a new remote ledger client.
@@ -39,6 +42,7 @@ func NewClient(grpcAddr string, logger zerolog.Logger) (*Client, error) {
 		conn:   conn,
 		client: client,
 		logger: logger,
+		done:   make(chan struct{}),
 	}, nil
 }
 
@@ -214,16 +218,18 @@ func (c *Client) Ready() <-chan struct{} {
 }
 
 // Done returns a channel that is closed when the client is done.
-// This closes the gRPC connection.
+// This closes the gRPC connection. The method is idempotent - multiple calls
+// return the same channel.
 func (c *Client) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		if err := c.Close(); err != nil {
-			c.logger.Error().Err(err).Msg("error closing gRPC connection")
-		}
-	}()
-	return done
+	c.once.Do(func() {
+		go func() {
+			defer close(c.done)
+			if err := c.Close(); err != nil {
+				c.logger.Error().Err(err).Msg("error closing gRPC connection")
+			}
+		}()
+	})
+	return c.done
 }
 
 // ledgerKeyToProtoKey converts a ledger.Key to a protobuf Key.

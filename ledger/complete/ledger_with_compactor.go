@@ -109,8 +109,19 @@ func (lwc *LedgerWithCompactor) Done() <-chan struct{} {
 	go func() {
 		defer close(done)
 
+		lwc.logger.Info().Msg("stopping ledger with compactor...")
+
+		// Close the trie update channel first so the compactor can drain it
+		// The compactor's drain loop blocks until the channel is closed.
+		// Use sync.Once to ensure it's only closed once (ledger.Done() also closes it).
+		lwc.ledger.closeTrieUpdateCh.Do(func() {
+			close(lwc.ledger.trieUpdateCh)
+		})
+
 		// Stop compactor first (it needs to finish WAL writes)
 		<-lwc.compactor.Done()
+
+		lwc.logger.Info().Msg("stopping ledger ...")
 
 		// Then stop ledger
 		<-lwc.ledger.Done()

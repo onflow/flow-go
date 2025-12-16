@@ -20,21 +20,15 @@ type LocalLedgerFactory struct {
 
 // NewLocalLedgerFactory creates a new factory for local ledger instances.
 func NewLocalLedgerFactory(
-	walInterface interface{},
+	ledgerWAL wal.LedgerWAL,
 	capacity int,
 	compactorConfig *ledger.CompactorConfig,
 	metrics module.LedgerMetrics,
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
 ) ledger.Factory {
-	// Type assert to get the concrete WAL type
-	wal, ok := walInterface.(wal.LedgerWAL)
-	if !ok {
-		panic("wal must implement wal.LedgerWAL interface")
-	}
-
 	return &LocalLedgerFactory{
-		wal:               wal,
+		wal:               ledgerWAL,
 		capacity:          capacity,
 		compactorConfig:   compactorConfig,
 		metrics:           metrics,
