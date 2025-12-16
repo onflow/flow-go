@@ -55,7 +55,7 @@ var _ component.Component = (*blobService)(nil)
 type BlobServiceConfig struct {
 	ReprovideInterval time.Duration    // the interval at which the DHT provider entries are refreshed
 	BitswapOptions    []bitswap.Option // options to pass to the Bitswap service
-	SkipBloomCache    bool             // if true, skip the bloom cache and use plain blockstore
+	UseBloomCache     bool             // if true, use the bloom cache (cached blockstore), otherwise use plain blockstore
 }
 
 // WithReprovideInterval sets the interval at which DHT provider entries are refreshed
@@ -99,12 +99,14 @@ func WithRateLimit(r float64, b int) network.BlobServiceOption {
 	}
 }
 
-// WithSkipBloomCache disables the bloom cache, using a plain blockstore instead.
-// This avoids the CPU cost of building the bloom filter on startup by scanning all keys.
-// Pebble's built-in bloom filters (persisted in SSTables) are still used for efficient lookups.
-func WithSkipBloomCache(skip bool) network.BlobServiceOption {
+// WithUseBloomCache enables or disables the bloom cache.
+// When enabled (true), uses a cached blockstore with bloom filter (default behavior).
+// When disabled (false), uses a plain blockstore instead, avoiding the CPU cost of building
+// the bloom filter on startup by scanning all keys. Pebble's built-in bloom filters
+// (persisted in SSTables) are still used for efficient lookups.
+func WithUseBloomCache(use bool) network.BlobServiceOption {
 	return func(bs network.BlobService) {
-		bs.(*blobService).config.SkipBloomCache = skip
+		bs.(*blobService).config.UseBloomCache = use
 	}
 }
 
@@ -126,17 +128,17 @@ func NewBlobService(
 		prefix: prefix,
 		config: &BlobServiceConfig{
 			ReprovideInterval: DefaultReprovideInterval,
-			SkipBloomCache:    false, // default: use bloom cache
+			UseBloomCache:     true, // default: use bloom cache
 		},
 		blockStore: blockStore,
 	}
 
-	// Apply options before creating blockstore, as SkipBloomCache affects blockstore creation
+	// Apply options before creating blockstore, as UseBloomCache affects blockstore creation
 	for _, opt := range opts {
 		opt(bs)
 	}
 
-	if !bs.config.SkipBloomCache {
+	if bs.config.UseBloomCache {
 		cachedBlockStore, err := blockstore.CachedBlockstore(
 			context.Background(),
 			blockStore,
