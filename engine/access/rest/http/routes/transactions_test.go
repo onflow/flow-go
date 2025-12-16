@@ -55,23 +55,22 @@ func getTransactionReq(id string, expandResult bool, blockIdQuery string, collec
 	return req
 }
 
-// getTransactionResultReq builds an HTTP GET request for fetching a transaction result with optional query parameters.
-func getTransactionResultReq(
+func transactionResultURL(
 	txID string,
-	blockIdQuery string,
-	collectionIdQuery string,
+	blockID string,
+	collectionID string,
 	agreeingExecutorsCount string,
 	requiredExecutors []string,
 	includeExecutorMetadata string,
-) *http.Request {
+) string {
 	u, _ := url.Parse(fmt.Sprintf("/v1/transaction_results/%s", txID))
 	q := u.Query()
-	if blockIdQuery != "" {
-		q.Add("block_id", blockIdQuery)
+	if blockID != "" {
+		q.Add("block_id", blockID)
 	}
 
-	if collectionIdQuery != "" {
-		q.Add("collection_id", collectionIdQuery)
+	if collectionID != "" {
+		q.Add("collection_id", collectionID)
 	}
 
 	if len(agreeingExecutorsCount) > 0 {
@@ -87,8 +86,25 @@ func getTransactionResultReq(
 	}
 
 	u.RawQuery = q.Encode()
+	return u.String()
+}
 
-	req, _ := http.NewRequest("GET", u.String(), nil)
+// getTransactionResultReq builds an HTTP GET request for fetching a transaction result with optional query parameters.
+func getTransactionResultReq(
+	t *testing.T,
+	txID string,
+	blockID string,
+	collectionID string,
+	agreeingExecutorsCount string,
+	requiredExecutors []string,
+	includeExecutorMetadata string,
+) *http.Request {
+	req, err := http.NewRequest(
+		"GET",
+		transactionResultURL(txID, blockID, collectionID, agreeingExecutorsCount, requiredExecutors, includeExecutorMetadata),
+		nil)
+	require.NoError(t, err)
+
 	return req
 }
 
@@ -239,9 +255,9 @@ func TestGetTransactionResult(t *testing.T) {
 	blockID := txr.BlockID
 	collectionID := txr.CollectionID
 
-	t.Run("happy path - get by transaction ID", func(t *testing.T) {
+	t.Run("get by transaction ID", func(t *testing.T) {
 		backend := accessmock.NewAPI(t)
-		req := getTransactionResultReq(txID.String(), "", "", "", []string{}, "false")
+		req := getTransactionResultReq(t, txID.String(), "", "", "", []string{}, "false")
 
 		backend.On("GetTransactionResult", mock.Anything, txID, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, mock.Anything).
 			Return(txr, nil, nil).
@@ -251,9 +267,9 @@ func TestGetTransactionResult(t *testing.T) {
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
-	t.Run("happy path - get by block ID", func(t *testing.T) {
+	t.Run("get by block ID", func(t *testing.T) {
 		backend := accessmock.NewAPI(t)
-		req := getTransactionResultReq(txID.String(), blockID.String(), "", "", []string{}, "false")
+		req := getTransactionResultReq(t, txID.String(), blockID.String(), "", "", []string{}, "false")
 
 		backend.On("GetTransactionResult", mock.Anything, txID, blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, mock.Anything).
 			Return(txr, nil, nil).
@@ -263,9 +279,9 @@ func TestGetTransactionResult(t *testing.T) {
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
-	t.Run("happy path - get by collection ID", func(t *testing.T) {
+	t.Run("get by collection ID", func(t *testing.T) {
 		backend := accessmock.NewAPI(t)
-		req := getTransactionResultReq(txID.String(), "", collectionID.String(), "", []string{}, "false")
+		req := getTransactionResultReq(t, txID.String(), "", collectionID.String(), "", []string{}, "false")
 
 		backend.On("GetTransactionResult", mock.Anything, txID, flow.ZeroID, collectionID, entities.EventEncodingVersion_JSON_CDC_V0, mock.Anything).
 			Return(txr, nil, nil).
@@ -275,7 +291,7 @@ func TestGetTransactionResult(t *testing.T) {
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
-	t.Run("happy path - get by transaction ID with metadata", func(t *testing.T) {
+	t.Run("get by transaction ID with metadata", func(t *testing.T) {
 		backend := accessmock.NewAPI(t)
 
 		metadata := &accessmodel.ExecutorMetadata{
@@ -284,7 +300,7 @@ func TestGetTransactionResult(t *testing.T) {
 		}
 
 		criteria := optimistic_sync.DefaultCriteria
-		req := getTransactionResultReq(txID.String(), "", "", fmt.Sprintf("%d", criteria.AgreeingExecutorsCount), []string{}, "true")
+		req := getTransactionResultReq(t, txID.String(), "", "", fmt.Sprintf("%d", criteria.AgreeingExecutorsCount), []string{}, "true")
 
 		backend.On("GetTransactionResult", mock.Anything, txID, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, criteria).
 			Return(txr, metadata, nil).
@@ -358,7 +374,7 @@ func TestGetTransactionResult(t *testing.T) {
 					test.statusCode,
 					test.errorMessage,
 				)
-				req := getTransactionResultReq(txResult.TransactionID.String(), "", "", "", []string{}, "false")
+				req := getTransactionResultReq(t, txResult.TransactionID.String(), "", "", "", []string{}, "false")
 				backend.On("GetTransactionResult", mock.Anything, txResult.TransactionID, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, mock.Anything).
 					Return(txResult, nil, nil).
 					Once()
@@ -368,6 +384,62 @@ func TestGetTransactionResult(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestGetTransactionResultErrors verifies that the GetTransactionResult endpoint
+// correctly returns appropriate HTTP error codes and messages in various failure scenarios.
+//
+// Test cases:
+//  1. A request with an invalid account address returns http.StatusBadRequest.
+//  2. Simulated failure when fetching GetTransactionResult from backend
+//     to ensure that any propagated errors are correctly returned.
+//
+// TODO(): These tests (test case 2 - error type) should be updated when error handling will be added.
+func TestGetTransactionResultErrors(t *testing.T) {
+	backend := accessmock.NewAPI(t)
+
+	tx := unittest.TransactionFixture()
+	txr := transactionResultFixture(tx, flow.TransactionStatusSealed, 0, "")
+	txID := txr.TransactionID
+
+	tests := []struct {
+		name   string
+		url    string
+		setup  func()
+		status int
+		out    string
+	}{
+		{
+			name:   "invalid transaction ID",
+			url:    transactionResultURL("invalidID", "", "", "", []string{}, "false"),
+			setup:  func() {},
+			status: http.StatusBadRequest,
+			out:    `{"code":400, "message":"invalid ID format"}`,
+		},
+		{
+			name: "GetTransactionResult fails",
+			url:  transactionResultURL(txID.String(), "", "", "", []string{}, "false"),
+			setup: func() {
+
+				backend.On("GetTransactionResult", mock.Anything, txID, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0, mock.Anything).
+					Return(nil, nil, fmt.Errorf("backend error")).
+					Once()
+			},
+			status: http.StatusInternalServerError,
+			out:    `{"code":500, "message":"internal server error"}`,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.setup()
+			req, _ := http.NewRequest("GET", test.url, nil)
+			rr := router.ExecuteRequest(req, backend)
+
+			require.Equal(t, test.status, rr.Code, fmt.Sprintf("test #%d failed: %v", i, test))
+			require.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
+		})
+	}
 }
 
 func TestGetScheduledTransactions(t *testing.T) {
@@ -419,7 +491,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(txr, nil).
 			Once()
 
-		req := getTransactionResultReq(fmt.Sprint(scheduledTxID), "", "", "", []string{}, "false")
+		req := getTransactionResultReq(t, fmt.Sprint(scheduledTxID), "", "", "", []string{}, "false")
 
 		router.AssertOKResponse(t, req, string(expectedResult), backend)
 	})
