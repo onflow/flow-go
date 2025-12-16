@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -67,9 +68,9 @@ func NewLocalTransactionProvider(
 
 // TransactionResult retrieves a transaction result from storage by block ID and transaction ID.
 // Expected errors during normal operation:
-//   - codes.NotFound when result cannot be provided by storage due to the absence of data.
-//   - codes.Internal if event payload conversion failed.
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [access.DataNotFoundError]: If result cannot be provided by storage due to the absence of data.
+//   - [access.PreconditionFailedError]: If execution result criteria are not met.
+//   - [access.InternalError]: If event payload conversion fails.
 func (t *LocalTransactionProvider) TransactionResult(
 	ctx context.Context,
 	header *flow.Header,
@@ -81,15 +82,12 @@ func (t *LocalTransactionProvider) TransactionResult(
 	blockID := header.ID()
 	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(blockID, criteria)
 	if err != nil {
-		// Execution result info is not available
-		// TODO: check error conversion
-		return nil, err
+		return nil, convertOptimisticSyncError(err, blockID, "failed to get execution result info")
 	}
 
 	snapshot, err := t.execStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		// Snapshot is not available
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	blockHeight := header.Height
@@ -102,7 +100,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 	// Get light transaction result
 	lightTxResult, err := txResultsReader.ByBlockIDTransactionID(blockID, transactionID)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Get error message if transaction failed
@@ -120,7 +118,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 					blockID,
 				)
 			}
-			return nil, err
+			return nil, rpc.ConvertStorageError(err)
 		}
 
 		txErrorMessage = errorMsg.ErrorMessage
@@ -146,16 +144,14 @@ func (t *LocalTransactionProvider) TransactionResult(
 	// Get events
 	events, err := eventsReader.ByBlockIDTransactionID(blockID, transactionID)
 	if err != nil {
-		// TODO: check err conversion
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Events are encoded in CCF format in storage. Convert to JSON-CDC if requested
 	if encodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		events, err = convert.CcfEventsToJsonEvents(events)
 		if err != nil {
-			// TODO: check err conversion
-			return nil, status.Errorf(codes.Internal, "failed to convert event payload: %v", err)
+			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
 	}
 
@@ -174,10 +170,9 @@ func (t *LocalTransactionProvider) TransactionResult(
 
 // TransactionResultByIndex retrieves a transaction result by index from storage.
 // Expected errors during normal operation:
-//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-//   - codes.Internal when event payload conversion failed.
-//   - storage.ErrHeightNotIndexed when data is unavailable.
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [access.DataNotFoundError]: If result cannot be provided by storage due to the absence of data.
+//   - [access.PreconditionFailedError]: If execution result criteria are not met.
+//   - [access.InternalError]: If event payload conversion fails or data is unavailable.
 func (t *LocalTransactionProvider) TransactionResultByIndex(
 	ctx context.Context,
 	block *flow.Block,
@@ -189,14 +184,12 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 
 	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(blockID, optimistic_sync.Criteria{})
 	if err != nil {
-		// Execution result info is not available
-		return nil, err
+		return nil, convertOptimisticSyncError(err, blockID, "failed to get execution result info")
 	}
 
 	snapshot, err := t.execStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		// Snapshot is not available
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	blockHeight := block.Height
@@ -209,7 +202,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	// Get light transaction result by index
 	lightTxResult, err := txResultsReader.ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Get error message if transaction failed
@@ -226,7 +219,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 					blockID,
 				)
 			}
-			return nil, err
+			return nil, rpc.ConvertStorageError(err)
 		}
 
 		txErrorMessage = errorMsg.ErrorMessage
@@ -252,7 +245,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	// Get events by index
 	events, err := eventsReader.ByBlockIDTransactionIndex(blockID, index)
 	if err != nil {
-		return nil, rpc.ConvertIndexError(err, blockHeight, "failed to get events")
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Events are encoded in CCF format in storage. Convert to JSON-CDC if requested
@@ -275,14 +268,11 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	}, nil
 }
 
-// TransactionsByBlockID retrieves transactions by block ID from storage
+// TransactionsByBlockID retrieves transactions by block ID from storage.
 // Expected errors during normal operation:
-//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-//   - codes.Internal when event payload conversion failed.
-//   - storage.ErrHeightNotIndexed when data is unavailable
-//
-// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-// getter or when deriving transaction status.
+//   - [access.DataNotFoundError]: If result cannot be provided by storage due to the absence of data.
+//   - [access.PreconditionFailedError]: If execution result criteria are not met.
+//   - [access.InternalError]: If event payload conversion fails or data is unavailable.
 func (t *LocalTransactionProvider) TransactionsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
@@ -301,14 +291,12 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 
 	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(blockID, optimistic_sync.Criteria{})
 	if err != nil {
-		// Execution result info is not available
-		return nil, err
+		return nil, convertOptimisticSyncError(err, blockID, "failed to get execution result info")
 	}
 
 	snapshot, err := t.execStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		// Snapshot is not available
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Get events reader
@@ -329,12 +317,11 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 	return append(transactions, sysCollection.Transactions...), nil
 }
 
-// TransactionResultsByBlockID retrieves transaction results by block ID from storage
+// TransactionResultsByBlockID retrieves transaction results by block ID from storage.
 // Expected errors during normal operation:
-//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-//   - codes.Internal when event payload conversion failed.
-//   - storage.ErrHeightNotIndexed when data is unavailable
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//   - [access.DataNotFoundError]: If result cannot be provided by storage due to the absence of data.
+//   - [access.PreconditionFailedError]: If execution result criteria are not met.
+//   - [access.InternalError]: If event payload conversion fails or data is unavailable.
 func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,
 	block *flow.Block,
@@ -344,14 +331,12 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(blockID, optimistic_sync.Criteria{})
 	if err != nil {
-		// Execution result info is not available
-		return nil, err
+		return nil, convertOptimisticSyncError(err, blockID, "failed to get execution result info")
 	}
 
 	snapshot, err := t.execStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		// Snapshot is not available
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	blockHeight := block.Height
@@ -364,13 +349,13 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	// Get all light transaction results for the block
 	lightTxResults, err := txResultsReader.ByBlockID(blockID)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Get all error messages for the block
 	txErrorMessages, err := errorMessagesReader.ByBlockID(blockID)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Build map of transaction ID to error message
@@ -414,7 +399,7 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 
 		events, err := eventsReader.ByBlockIDTransactionID(blockID, lightTxResult.TransactionID)
 		if err != nil {
-			return nil, err
+			return nil, rpc.ConvertStorageError(err)
 		}
 
 		// Events are encoded in CCF format in storage. Convert to JSON-CDC if requested
@@ -447,14 +432,11 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	return results, nil
 }
 
-// ScheduledTransactionsByBlockID constructs the scheduled transaction bodies using events from the
-// local storage.
-//
+// ScheduledTransactionsByBlockID constructs the scheduled transaction bodies using events from the local storage.
 // Expected error returns during normal operation:
-//   - [codes.NotFound]: if the events are not found for the block ID.
-//   - [codes.OutOfRange]: if the events are not available for the block height.
-//   - [codes.FailedPrecondition]: if the events index is not initialized.
-//   - [codes.Internal]: if the scheduled transactions cannot be constructed.
+//   - [access.DataNotFoundError]: If the events are not found for the block ID or events are not available for the block height.
+//   - [access.PreconditionFailedError]: If execution result criteria are not met or events index is not initialized.
+//   - [access.InternalError]: If the scheduled transactions cannot be constructed.
 func (t *LocalTransactionProvider) ScheduledTransactionsByBlockID(
 	ctx context.Context,
 	header *flow.Header,
@@ -462,14 +444,12 @@ func (t *LocalTransactionProvider) ScheduledTransactionsByBlockID(
 
 	execResultInfo, err := t.execResultInfoProvider.ExecutionResultInfo(header.ID(), optimistic_sync.Criteria{})
 	if err != nil {
-		// Execution result info is not available
-		return nil, err
+		return nil, convertOptimisticSyncError(err, header.ID(), "failed to get execution result info")
 	}
 
 	snapshot, err := t.execStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		// Snapshot is not available
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// Get events reader
@@ -507,4 +487,30 @@ func (t *LocalTransactionProvider) buildTxIDToCollectionIDMapping(block *flow.Bl
 	}
 
 	return txToCollectionID, nil
+}
+
+// convertOptimisticSyncError converts optimistic sync errors to access sentinel errors.
+// This follows the error handling framework where backend APIs map errors to access sentinel errors,
+// which are then converted to protocol-specific errors (gRPC/REST/WebSocket) by the handler layer.
+func convertOptimisticSyncError(err error, blockID flow.Identifier, msg string) error {
+	if err == nil {
+		return nil
+	}
+
+	err = fmt.Errorf("%s for block %s: %w", msg, blockID, err)
+
+	// Map optimistic sync errors to access sentinel errors
+	switch {
+	case errors.Is(err, storage.ErrNotFound) ||
+		errors.Is(err, optimistic_sync.ErrBlockNotFound) ||
+		errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) ||
+		errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound):
+		return access.NewDataNotFoundError("execution result", err)
+	case errors.Is(err, optimistic_sync.ErrForkAbandoned):
+		return access.NewPreconditionFailedError(err)
+	default:
+		// Unknown errors are mapped as internal errors - these are benign errors that callers
+		// should handle as request processing failures
+		return access.NewInternalError(err)
+	}
 }
