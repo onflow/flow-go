@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
+	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -273,7 +273,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
-			Return(txs, nil)
+			Return(txs, nil).Once()
 		req := getTransactionsByBlockReq(blockID.String(), "", false, "")
 
 		expected := fmt.Sprintf(`[
@@ -357,11 +357,11 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, height).
-			Return(block, flow.BlockStatusSealed, nil)
+			Return(block, flow.BlockStatusSealed, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
-			Return(txs, nil)
+			Return(txs, nil).Once()
 
 		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), false, "")
 
@@ -446,11 +446,11 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, request.SealedHeight).
-			Return(block, flow.BlockStatusSealed, nil)
+			Return(block, flow.BlockStatusSealed, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
-			Return(txs, nil)
+			Return(txs, nil).Once()
 
 		req := getTransactionsByBlockReq("", router.SealedHeightQueryParam, false, "")
 
@@ -535,11 +535,11 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, request.FinalHeight).
-			Return(block, flow.BlockStatusFinalized, nil)
+			Return(block, flow.BlockStatusFinalized, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
-			Return(txs, nil)
+			Return(txs, nil).Once()
 
 		req := getTransactionsByBlockReq("", router.FinalHeightQueryParam, false, "")
 
@@ -682,15 +682,12 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
-			Return(txs, nil)
+			Return(txs, nil).Once()
 
+		txResults := []*accessmodel.TransactionResult{txr1, txr2}
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx1.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr1, nil)
-
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx2.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr2, nil)
+			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txResults, nil).Once()
 
 		req := getTransactionsByBlockReq(blockID.String(), "", true, "")
 
@@ -818,19 +815,16 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, height).
-			Return(block, flow.BlockStatusSealed, nil)
+			Return(block, flow.BlockStatusSealed, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
-			Return(txs, nil)
+			Return(txs, nil).Once()
 
+		txResults := []*accessmodel.TransactionResult{txr1, txr2}
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx1.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr1, nil)
-
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx2.ID(), blockID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txr2, nil)
+			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txResults, nil).Once()
 
 		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), true, "")
 
@@ -958,7 +952,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
-			Return(nil, status.Error(codes.NotFound, "block not found"))
+			Return(nil, status.Error(codes.NotFound, "block not found")).Once()
 
 		req := getTransactionsByBlockReq(blockID.String(), "", false, "")
 
@@ -982,7 +976,8 @@ func TestGetTransactionsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, height).
-			Return((*flow.Block)(nil), flow.BlockStatusUnknown, status.Error(codes.NotFound, "block not found"))
+			Return((*flow.Block)(nil), flow.BlockStatusUnknown, status.Error(codes.NotFound, "block not found")).
+			Once()
 
 		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), false, "")
 
@@ -1188,7 +1183,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txResults, nil)
+			Return(txResults, nil).Once()
 
 		req := getTransactionResultsByBlockReq(blockID.String(), "")
 
@@ -1293,11 +1288,11 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, height).
-			Return(block, flow.BlockStatusSealed, nil)
+			Return(block, flow.BlockStatusSealed, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txResults, nil)
+			Return(txResults, nil).Once()
 
 		req := getTransactionResultsByBlockReq("", fmt.Sprintf("%d", height))
 
@@ -1382,11 +1377,11 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, request.SealedHeight).
-			Return(block, flow.BlockStatusSealed, nil)
+			Return(block, flow.BlockStatusSealed, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txResults, nil)
+			Return(txResults, nil).Once()
 
 		req := getTransactionResultsByBlockReq("", router.SealedHeightQueryParam)
 
@@ -1449,11 +1444,11 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, request.FinalHeight).
-			Return(block, flow.BlockStatusFinalized, nil)
+			Return(block, flow.BlockStatusFinalized, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(txResults, nil)
+			Return(txResults, nil).Once()
 
 		req := getTransactionResultsByBlockReq("", router.FinalHeightQueryParam)
 
@@ -1514,11 +1509,11 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, request.SealedHeight).
-			Return(block, flow.BlockStatusSealed, nil)
+			Return(block, flow.BlockStatusSealed, nil).Once()
 
 		backend.Mock.
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return([]*accessmodel.TransactionResult{txr1}, nil)
+			Return([]*accessmodel.TransactionResult{txr1}, nil).Once()
 
 		req := getTransactionResultsByBlockReq("", "")
 
@@ -1573,7 +1568,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
-			Return(nil, status.Error(codes.NotFound, "block not found"))
+			Return(nil, status.Error(codes.NotFound, "block not found")).Once()
 
 		req := getTransactionResultsByBlockReq(blockID.String(), "")
 
@@ -1588,7 +1583,8 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 
 		backend.Mock.
 			On("GetBlockByHeight", mocks.Anything, height).
-			Return((*flow.Block)(nil), flow.BlockStatusUnknown, status.Error(codes.NotFound, "block not found"))
+			Return((*flow.Block)(nil), flow.BlockStatusUnknown, status.Error(codes.NotFound, "block not found")).
+			Once()
 
 		req := getTransactionResultsByBlockReq("", fmt.Sprintf("%d", height))
 

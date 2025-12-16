@@ -19,7 +19,7 @@ func testCases() []testCase {
 		{
 			name:     "/v1/transactions",
 			url:      "/v1/transactions",
-			expected: "getTransactionsByBlockID",
+			expected: "getTransactionsByBlock",
 		},
 		{
 			name:     "/v1/transactions/{id}",
@@ -34,7 +34,7 @@ func testCases() []testCase {
 		{
 			name:     "/v1/transaction_results",
 			url:      "/v1/transaction_results",
-			expected: "getTransactionResultsByBlockID",
+			expected: "getTransactionResultsByBlock",
 		},
 		{
 			name:     "/v1/transaction_results/{id}",

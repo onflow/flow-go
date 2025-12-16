@@ -79,20 +79,14 @@ func GetTransactionsByBlock(r *common.Request, backend access.API, link commonmo
 	if req.ExpandsResult {
 		transactionsResponse = make(commonmodels.Transactions, len(transactions))
 
-		for i, transaction := range transactions {
-			txr, err := backend.GetTransactionResult(
-				r.Context(),
-				transaction.ID(),
-				blockID,
-				req.CollectionID,
-				entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-			)
-			if err != nil {
-				return nil, err
-			}
+		txResults, err := backend.GetTransactionResultsByBlockID(r.Context(), blockID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		if err != nil {
+			return nil, err
+		}
 
+		for i, transaction := range transactions {
 			var response commonmodels.Transaction
-			response.Build(transaction, txr, link)
+			response.Build(transaction, txResults[i], link)
 
 			transactionsResponse[i] = response
 		}
