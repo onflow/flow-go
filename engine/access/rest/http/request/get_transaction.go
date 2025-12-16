@@ -105,7 +105,7 @@ func parseGetTransactionsByBlockID(r *common.Request) (*GetTransactionsByBlockID
 	req.ExpandsResult = r.Expands(resultExpandable)
 
 	if req.BlockHeight == EmptyHeight && req.BlockID == flow.ZeroID {
-		req.BlockHeight = FinalHeight
+		req.BlockHeight = SealedHeight
 	}
 
 	if req.BlockID != flow.ZeroID && req.BlockHeight != EmptyHeight {
@@ -180,7 +180,7 @@ func parseGetTransactionResultsByBlockID(r *common.Request) (*GetTransactionResu
 	req.BlockHeight = height.Flow()
 
 	if req.BlockHeight == EmptyHeight && req.BlockID == flow.ZeroID {
-		req.BlockHeight = FinalHeight
+		req.BlockHeight = SealedHeight
 	}
 
 	if req.BlockID != flow.ZeroID && req.BlockHeight != EmptyHeight {
