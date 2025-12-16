@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"net/http"
 	"net/url"
 	"strings"
@@ -428,6 +429,241 @@ func TestGetTransactionsByBlock(t *testing.T) {
 	]`,
 			txs[0].ID(), txs[0].ReferenceBlockID, util.ToBase64(txs[0].EnvelopeSignatures[0].Signature), txs[0].ID(), txs[0].ID(),
 			txs[1].ID(), txs[1].ReferenceBlockID, util.ToBase64(txs[1].EnvelopeSignatures[0].Signature), txs[1].ID(), txs[1].ID(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by height sealed", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		tx1 := unittest.TransactionFixture()
+		tx2 := unittest.TransactionFixture()
+		txs := []*flow.TransactionBody{&tx1, &tx2}
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, request.SealedHeight).
+			Return(block, flow.BlockStatusSealed, nil)
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(txs, nil)
+
+		req := getTransactionsByBlockReq("", router.SealedHeightQueryParam, false, "")
+
+		expected := fmt.Sprintf(`[
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		},
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		}
+	]`,
+			txs[0].ID(), txs[0].ReferenceBlockID, util.ToBase64(txs[0].EnvelopeSignatures[0].Signature), txs[0].ID(), txs[0].ID(),
+			txs[1].ID(), txs[1].ReferenceBlockID, util.ToBase64(txs[1].EnvelopeSignatures[0].Signature), txs[1].ID(), txs[1].ID(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by height final", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		tx1 := unittest.TransactionFixture()
+		tx2 := unittest.TransactionFixture()
+		txs := []*flow.TransactionBody{&tx1, &tx2}
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, request.FinalHeight).
+			Return(block, flow.BlockStatusFinalized, nil)
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(txs, nil)
+
+		req := getTransactionsByBlockReq("", router.FinalHeightQueryParam, false, "")
+
+		expected := fmt.Sprintf(`[
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		},
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		}
+	]`,
+			txs[0].ID(), txs[0].ReferenceBlockID, util.ToBase64(txs[0].EnvelopeSignatures[0].Signature), txs[0].ID(), txs[0].ID(),
+			txs[1].ID(), txs[1].ReferenceBlockID, util.ToBase64(txs[1].EnvelopeSignatures[0].Signature), txs[1].ID(), txs[1].ID(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get with no block_id or height defaults to sealed", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		tx1 := unittest.TransactionFixture()
+		txs := []*flow.TransactionBody{&tx1}
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, request.SealedHeight).
+			Return(block, flow.BlockStatusSealed, nil)
+
+		backend.Mock.
+			On("GetTransactionsByBlockID", mocks.Anything, blockID).
+			Return(txs, nil)
+
+		req := getTransactionsByBlockReq("", "", false, "")
+
+		expected := fmt.Sprintf(`[
+		{
+		   "id":"%s",
+		   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
+		   "arguments": [],
+		   "reference_block_id":"%s",
+		   "gas_limit":"10",
+		   "payer":"8c5303eaa26202d6",
+		   "proposal_key":{
+			  "address":"8c5303eaa26202d6",
+			  "key_index":"1",
+			  "sequence_number":"0"
+		   },
+		   "authorizers":[
+			  "8c5303eaa26202d6"
+		   ],
+		   "payload_signatures": [],
+		   "envelope_signatures":[
+			  {
+				 "address":"8c5303eaa26202d6",
+				 "key_index":"1",
+				 "signature":"%s"
+			  }
+		   ],
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   },
+		   "_expandable": {
+			  "result": "/v1/transaction_results/%s"
+		   }
+		}
+	]`,
+			txs[0].ID(), txs[0].ReferenceBlockID, util.ToBase64(txs[0].EnvelopeSignatures[0].Signature), txs[0].ID(), txs[0].ID(),
 		)
 
 		router.AssertOKResponse(t, req, expected, backend)
@@ -1113,6 +1349,202 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			blockID.String(), cid2.String(), id2.String(), util.ToBase64(txr2.Events[0].Payload), id2.String(),
 		)
 
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get results by height sealed", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		id1 := unittest.IdentifierFixture()
+		cid1 := unittest.IdentifierFixture()
+		txr1 := &accessmodel.TransactionResult{
+			Status:        flow.TransactionStatusSealed,
+			StatusCode:    10,
+			ErrorMessage:  "",
+			BlockID:       blockID,
+			CollectionID:  cid1,
+			TransactionID: id1,
+			Events: []flow.Event{
+				unittest.EventFixture(
+					unittest.Event.WithEventType(flow.EventAccountCreated),
+					unittest.Event.WithTransactionIndex(1),
+					unittest.Event.WithEventIndex(0),
+					unittest.Event.WithTransactionID(id1),
+				),
+			},
+		}
+		txr1.Events[0].Payload = []byte(`test payload 1`)
+
+		txResults := []*accessmodel.TransactionResult{txr1}
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, request.SealedHeight).
+			Return(block, flow.BlockStatusSealed, nil)
+
+		backend.Mock.
+			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txResults, nil)
+
+		req := getTransactionResultsByBlockReq("", router.SealedHeightQueryParam)
+
+		expected := fmt.Sprintf(`[
+		{
+			"block_id": "%s",
+			"collection_id": "%s",
+			"execution": "Success",
+			"status": "Sealed",
+			"status_code": 10,
+			"error_message": "",
+			"computation_used": "0",
+			"events": [
+				{
+					"type": "flow.AccountCreated",
+					"transaction_id": "%s",
+					"transaction_index": "1",
+					"event_index": "0",
+					"payload": "%s"
+				}
+			],
+			"_links": {
+				"_self": "/v1/transaction_results/%s"
+			}
+		}
+	]`,
+			blockID.String(), cid1.String(), id1.String(), util.ToBase64(txr1.Events[0].Payload), id1.String(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get results by height finalized", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		id1 := unittest.IdentifierFixture()
+		cid1 := unittest.IdentifierFixture()
+		txr1 := &accessmodel.TransactionResult{
+			Status:        flow.TransactionStatusFinalized,
+			StatusCode:    10,
+			ErrorMessage:  "",
+			BlockID:       blockID,
+			CollectionID:  cid1,
+			TransactionID: id1,
+			Events: []flow.Event{
+				unittest.EventFixture(
+					unittest.Event.WithEventType(flow.EventAccountCreated),
+					unittest.Event.WithTransactionIndex(1),
+					unittest.Event.WithEventIndex(0),
+					unittest.Event.WithTransactionID(id1),
+				),
+			},
+		}
+		txr1.Events[0].Payload = []byte(`test payload 1`)
+
+		txResults := []*accessmodel.TransactionResult{txr1}
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, request.FinalHeight).
+			Return(block, flow.BlockStatusFinalized, nil)
+
+		backend.Mock.
+			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return(txResults, nil)
+
+		req := getTransactionResultsByBlockReq("", router.FinalHeightQueryParam)
+
+		expected := fmt.Sprintf(`[
+		{
+			"block_id": "%s",
+			"collection_id": "%s",
+			"execution": "Pending",
+			"status": "Finalized",
+			"status_code": 10,
+			"error_message": "",
+			"computation_used": "0",
+			"events": [
+				{
+					"type": "flow.AccountCreated",
+					"transaction_id": "%s",
+					"transaction_index": "1",
+					"event_index": "0",
+					"payload": "%s"
+				}
+			],
+			"_links": {
+				"_self": "/v1/transaction_results/%s"
+			}
+		}
+	]`,
+			blockID.String(), cid1.String(), id1.String(), util.ToBase64(txr1.Events[0].Payload), id1.String(),
+		)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get results with no block_id or height defaults to sealed", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		id1 := unittest.IdentifierFixture()
+		cid1 := unittest.IdentifierFixture()
+		txr1 := &accessmodel.TransactionResult{
+			Status:        flow.TransactionStatusSealed,
+			StatusCode:    10,
+			ErrorMessage:  "",
+			BlockID:       blockID,
+			CollectionID:  cid1,
+			TransactionID: id1,
+			Events: []flow.Event{
+				unittest.EventFixture(
+					unittest.Event.WithEventType(flow.EventAccountCreated),
+					unittest.Event.WithTransactionIndex(1),
+					unittest.Event.WithEventIndex(0),
+					unittest.Event.WithTransactionID(id1),
+				),
+			},
+		}
+		txr1.Events[0].Payload = []byte(`test payload 1`)
+
+		backend.Mock.
+			On("GetBlockByHeight", mocks.Anything, request.SealedHeight).
+			Return(block, flow.BlockStatusSealed, nil)
+
+		backend.Mock.
+			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
+			Return([]*accessmodel.TransactionResult{txr1}, nil)
+
+		req := getTransactionResultsByBlockReq("", "")
+
+		expected := fmt.Sprintf(`[
+		{
+			"block_id": "%s",
+			"collection_id": "%s",
+			"execution": "Success",
+			"status": "Sealed",
+			"status_code": 10,
+			"error_message": "",
+			"computation_used": "0",
+			"events": [
+				{
+					"type": "flow.AccountCreated",
+					"transaction_id": "%s",
+					"transaction_index": "1",
+					"event_index": "0",
+					"payload": "%s"
+				}
+			],
+			"_links": {
+				"_self": "/v1/transaction_results/%s"
+			}
+		}
+	]`, blockID.String(), cid1.String(), id1.String(), util.ToBase64(txr1.Events[0].Payload), id1.String())
 		router.AssertOKResponse(t, req, expected, backend)
 	})
 
