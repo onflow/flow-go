@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 

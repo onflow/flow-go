@@ -162,7 +162,6 @@ func createTrieFromRegisterEntries(t *testing.T, entries flow.RegisterEntries) (
 	return []*trie.MTrie{populatedTrie}, populatedTrie.RootHash()
 }
 
-
 func createMocks(t *testing.T, height uint64, rootHash ledger.RootHash) (storage.Headers, storage.ExecutionResults) {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
@@ -182,4 +181,3 @@ func createMocks(t *testing.T, height uint64, rootHash ledger.RootHash) (storage
 
 	return mockHeaders, mockResults
 }
-
