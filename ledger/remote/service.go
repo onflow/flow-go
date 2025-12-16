@@ -155,9 +155,42 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	// Debug log before Set call
+	s.logger.Debug().
+		Hex("input_state", state[:]).
+		Int("num_keys", len(keys)).
+		Int("num_values", len(values)).
+		Msg("Set request received")
+
+	// Log first few keys for debugging
+	for i := 0; i < len(keys) && i < 5; i++ {
+		s.logger.Debug().
+			Int("key_index", i).
+			Str("key", keys[i].String()).
+			Int("value_len", len(values[i])).
+			Msg("Set key detail")
+	}
+
 	newState, trieUpdate, err := s.ledger.Set(update)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// Debug log after Set call
+	s.logger.Debug().
+		Hex("new_state", newState[:]).
+		Int("trie_update_paths", len(trieUpdate.Paths)).
+		Hex("trie_update_root", trieUpdate.RootHash[:]).
+		Msg("Set response")
+
+	// Log first few trie update paths for debugging
+	for i := 0; i < len(trieUpdate.Paths) && i < 5; i++ {
+		s.logger.Debug().
+			Hex("new_state", newState[:]).
+			Int("path_index", i).
+			Hex("path", trieUpdate.Paths[i][:]).
+			Int("payload_size", trieUpdate.Payloads[i].Size()).
+			Msg("TrieUpdate path detail")
 	}
 
 	// Encode trie update using the ledger's encoding function

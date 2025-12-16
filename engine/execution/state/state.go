@@ -334,6 +334,14 @@ func CommitDelta(
 
 	newCommit := flow.StateCommitment(newState)
 
+	// Debug log trie update details
+	fmt.Printf("[DEBUG CommitDelta] stateCommitment=%x, trieUpdate.RootHash=%x, numPaths=%d\n",
+		newCommit[:], trieUpdate.RootHash[:], len(trieUpdate.Paths))
+	for i := 0; i < len(trieUpdate.Paths) && i < 5; i++ {
+		fmt.Printf("[DEBUG CommitDelta] stateCommitment=%x, path[%d]=%x, payload_size=%d\n",
+			i, newCommit[:], trieUpdate.Paths[i][:], trieUpdate.Payloads[i].Size())
+	}
+
 	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, ruh.UpdatedRegisterSet())
 
 	return newCommit, trieUpdate, newStorageSnapshot, nil
