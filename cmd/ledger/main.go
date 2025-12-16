@@ -16,10 +16,7 @@ import (
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/wal"
+	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	"github.com/onflow/flow-go/ledger/remote"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/module/metrics"
@@ -52,45 +49,24 @@ func main() {
 		Int("capacity", *capacity).
 		Msg("starting ledger service")
 
-	// Create WAL
+	// Create ledger using factory
 	metricsCollector := &metrics.NoopCollector{}
-	diskWal, err := wal.NewDiskWAL(
-		logger,
-		nil,
-		metricsCollector,
-		*walDir,
-		*capacity,
-		pathfinder.PathByteSize,
-		wal.SegmentSize,
-	)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to create WAL")
-	}
-
-	// Create compactor config
-	compactorConfig := &ledger.CompactorConfig{
-		CheckpointCapacity:                   uint(*capacity),
+	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
+		Triedir:                              *walDir,
+		MTrieCacheSize:                       uint32(*capacity),
 		CheckpointDistance:                   *checkpointDist,
 		CheckpointsToKeep:                    *checkpointsToKeep,
 		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
-		Metrics:                              metricsCollector,
-	}
-
-	// Create ledger factory
-	factory := complete.NewLocalLedgerFactory(
-		diskWal,
-		*capacity,
-		compactorConfig,
-		metricsCollector,
-		logger.With().Str("component", "ledger").Logger(),
-		complete.DefaultPathFinderVersion,
-	)
-
-	// Create ledger instance
-	ledgerStorage, err := factory.NewLedger()
+		MetricsRegisterer:                    nil,
+		WALMetrics:                           metricsCollector,
+		LedgerMetrics:                        metricsCollector,
+		Logger:                               logger,
+	})
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create ledger")
 	}
+
+	ledgerStorage := result.Ledger
 
 	// Wait for ledger to be ready (WAL replay)
 	logger.Info().Msg("waiting for ledger initialization...")
