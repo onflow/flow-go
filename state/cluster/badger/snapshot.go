@@ -68,6 +68,28 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return &head, err
 }
 
+func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
+	var pendingIDs flow.IdentifierList
+	err := operation.RetrieveBlockChildren(s.state.db.Reader(), s.blockID, &pendingIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not get QC for finalized head %v: %w", s.blockID, err)
+
+		// The low-level storage returns `storage.ErrNotFound` in two cases:
+		// 1. the block/collection is unknown
+		// 2. the block/collection is known but no children have been indexed yet
+		// By contract of the constructor, the blockID must correspond to a known collection in the database.
+		// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
+		// possible here.
+	}
+	var child flow.Header
+	err = operation.RetrieveHeader(s.state.db.Reader(), pendingIDs[0], &child)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve header for unfinalized child %v: %w", pendingIDs[0], err)
+	}
+	return child.ParentQC(), nil
+
+}
+
 // Pending returns the IDs of all collections descending from the snapshot's head collection.
 // The result is ordered such that parents are included before their children. While only valid
 // descendants will be returned, note that the descendants may not be finalized yet.

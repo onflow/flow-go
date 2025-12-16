@@ -176,6 +176,7 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow
 		return fmt.Errorf("could not get last finalized header: %w", err)
 	}
 
+	// TODO(8173) remove this step and only rely on certified sync responses?
 	// queue any missing heights as needed
 	r.core.HandleHeight(final, req.Height)
 
@@ -185,11 +186,16 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow
 		return nil
 	}
 
+	qc, err := r.state.Final().QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not get QC for last finalized header: %w", err)
+	}
+
 	// if we're sufficiently ahead of the requester, send a response
 	res := &messages.SyncResponse{
-		Nonce:  req.Nonce,
-		Header: final,
-		//CertifyingQC: proof.CertifiedChild.Block.QC,
+		Nonce:        req.Nonce,
+		Header:       final,
+		CertifyingQC: qc,
 	}
 	err = r.con.Unicast(res, originID)
 	if err != nil {

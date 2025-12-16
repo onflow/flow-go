@@ -23,6 +23,12 @@ type Snapshot interface {
 	//  - If the snapshot is for an unknown collection [state.ErrUnknownSnapshotReference]
 	Head() (*flow.Header, error)
 
+	// QuorumCertificate returns a valid quorum certificate pointing to the header at this snapshot.
+	//
+	// Expected error returns during normal operations:
+	//  - If the snapshot is for an unknown collection [state.ErrUnknownSnapshotReference]
+	QuorumCertificate() (*flow.QuorumCertificate, error)
+
 	// Pending returns the IDs of *all* collections descending from the snapshot's head collection.
 	// The result is ordered such that parents are included before their children. While only valid
 	// descendants will be returned, note that the descendants may not be finalized yet.
