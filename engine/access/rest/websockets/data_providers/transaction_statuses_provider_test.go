@@ -100,6 +100,7 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 					mock.Anything,
 					mock.Anything,
 					entities.EventEncodingVersion_JSON_CDC_V0,
+					mock.Anything, // optimistic_sync.Criteria
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponses,
@@ -177,6 +178,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		mock.Anything,
 		mock.Anything,
 		entities.EventEncodingVersion_JSON_CDC_V0,
+		mock.Anything, // optimistic_sync.Criteria
 	).Return(sub)
 
 	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(

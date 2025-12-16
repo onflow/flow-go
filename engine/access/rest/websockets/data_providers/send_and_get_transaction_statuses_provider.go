@@ -125,8 +125,26 @@ func parseSendAndGetTransactionStatusesArguments(
 ) (sendAndGetTransactionStatusesArguments, error) {
 	var args sendAndGetTransactionStatusesArguments
 
-	// Convert the arguments map to JSON
-	rawJSON, err := json.Marshal(arguments)
+	// Parse execution_state_query first if provided (optional)
+	if rawQuery, exists := arguments["execution_state_query"]; exists && rawQuery != nil {
+		query, err := parseExecutionStateQuery(rawQuery)
+		if err != nil {
+			return sendAndGetTransactionStatusesArguments{}, fmt.Errorf("invalid 'execution_state_query': %w", err)
+		}
+		args.ExecutionStateQuery = &query
+	}
+
+	// Extract transaction-specific fields, excluding execution_state_query
+	// since it's not part of the transaction body
+	txArgs := make(map[string]interface{})
+	for key, value := range arguments {
+		if key != "execution_state_query" {
+			txArgs[key] = value
+		}
+	}
+
+	// Convert the transaction arguments to JSON
+	rawJSON, err := json.Marshal(txArgs)
 	if err != nil {
 		return sendAndGetTransactionStatusesArguments{}, fmt.Errorf("failed to marshal arguments: %w", err)
 	}
@@ -140,15 +158,6 @@ func parseSendAndGetTransactionStatusesArguments(
 	}
 
 	args.Transaction = tx.Flow()
-
-	// Parse execution_state_query if provided (optional)
-	if rawQuery, exists := arguments["execution_state_query"]; exists && rawQuery != nil {
-		query, err := parseExecutionStateQuery(rawQuery)
-		if err != nil {
-			return sendAndGetTransactionStatusesArguments{}, fmt.Errorf("invalid 'execution_state_query': %w", err)
-		}
-		args.ExecutionStateQuery = &query
-	}
 
 	return args, nil
 }

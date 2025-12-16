@@ -240,7 +240,10 @@ func (s *TransactionStreamSuite) initializeBackend() {
 	)
 
 	execResultInfoProvider := optimisticmock.NewExecutionResultInfoProvider(s.T())
+	execResultInfoProvider.On("ExecutionResultInfo", mock.Anything, mock.Anything).Return(nil, status.Error(codes.NotFound, "execution result not found")).Maybe()
+
 	execStateCache := optimisticmock.NewExecutionStateCache(s.T())
+	execStateCache.On("Snapshot", mock.Anything).Return(nil, status.Error(codes.NotFound, "snapshot not found")).Maybe()
 
 	var systemCollections *systemcollection.Versioned
 	localTxProvider := provider.NewLocalTransactionProvider(

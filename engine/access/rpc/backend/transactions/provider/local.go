@@ -168,6 +168,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 		ErrorMessage:  txErrorMessage,
 		BlockID:       blockID,
 		BlockHeight:   blockHeight,
+		CollectionID:  collectionID,
 	}, nil
 }
 

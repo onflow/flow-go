@@ -15,7 +15,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -46,9 +48,18 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 
-	s.rootBlock = unittest.BlockFixture(
-		unittest.Block.WithHeight(0),
-	)
+	// s.rootBlock = unittest.BlockFixture(
+	// 	 unittest.Block.WithHeight(0),
+	// )
+	//  code above was creating a regular block with height 0, which violates Flow's block validation rules. In Flow:
+	//  - Genesis blocks (the first block in a chain) are special and can have height 0
+	//  - Non-genesis blocks must have height > 0
+	//
+	//  When the test tried to call block.ID(), it internally calls block.ToHeader(), which validates the block header.
+	//  The validation failed with:
+	//  panic: could not build header from block: invalid header body: Height must be > 0 for non-root header
+
+	s.rootBlock = unittest.Block.Genesis(s.chain.ChainID())
 
 	s.factory = NewDataProviderFactory(
 		s.log,
@@ -66,8 +77,8 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 // when it is configured correctly and operating under normal conditions. It
 // validates that tx statuses are correctly streamed to the channel and ensures
 // no unexpected errors occur.
-func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
-	tx := unittest.TransactionBodyFixture()
+func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+	tx := unittest.TransactionFixture()
 	tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 	tx.Arguments = [][]uint8{}
 
@@ -90,6 +101,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 					mock.Anything,
 					mock.Anything,
 					entities.EventEncodingVersion_JSON_CDC_V0,
+					mock.Anything, // optimistic_sync.Criteria
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponse,
@@ -108,6 +120,136 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 	)
 }
 
+// TestSendTransactionStatusesDataProvider_WithExecutionStateQuery tests that execution state query
+// is properly extracted and passed to the API when provided in the request.
+func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_WithExecutionStateQuery() {
+	tx := unittest.TransactionFixture()
+	tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+	tx.Arguments = [][]uint8{}
+
+	executorID1 := unittest.IdentifierFixture()
+	executorID2 := unittest.IdentifierFixture()
+
+	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			return "some_link", nil
+		},
+	)
+
+	backendResponse := backendTransactionStatusesResponse(s.rootBlock)
+	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse, SendAndGetTransactionStatusesTopic)
+
+	testCases := []testType{
+		{
+			name: "with agreeing_executors_count",
+			arguments: func() map[string]interface{} {
+				args := unittest.CreateSendTxHttpPayload(tx)
+				args["execution_state_query"] = map[string]interface{}{
+					"agreeing_executors_count": float64(2),
+				}
+				return args
+			}(),
+			setupBackend: func(sub *submock.Subscription) {
+				s.api.On(
+					"SendAndSubscribeTransactionStatuses",
+					mock.Anything,
+					mock.Anything,
+					entities.EventEncodingVersion_JSON_CDC_V0,
+					mock.MatchedBy(func(criteria interface{}) bool {
+						// Verify criteria has agreeing executors count set to 2
+						c, ok := criteria.(optimistic_sync.Criteria)
+						if !ok {
+							return false
+						}
+						return c.AgreeingExecutorsCount == 2
+					}),
+				).Return(sub).Once()
+			},
+			expectedResponses: expectedResponse,
+		},
+		{
+			name: "with required_executor_ids",
+			arguments: func() map[string]interface{} {
+				args := unittest.CreateSendTxHttpPayload(tx)
+				args["execution_state_query"] = map[string]interface{}{
+					"required_executor_ids": []interface{}{
+						executorID1.String(),
+						executorID2.String(),
+					},
+				}
+				return args
+			}(),
+			setupBackend: func(sub *submock.Subscription) {
+				s.api.On(
+					"SendAndSubscribeTransactionStatuses",
+					mock.Anything,
+					mock.Anything,
+					entities.EventEncodingVersion_JSON_CDC_V0,
+					mock.MatchedBy(func(criteria interface{}) bool {
+						// Verify criteria has required executor IDs
+						c, ok := criteria.(optimistic_sync.Criteria)
+						if !ok {
+							return false
+						}
+						if len(c.RequiredExecutors) != 2 {
+							return false
+						}
+						return c.RequiredExecutors[0] == executorID1 && c.RequiredExecutors[1] == executorID2
+					}),
+				).Return(sub).Once()
+			},
+			expectedResponses: expectedResponse,
+		},
+		{
+			name: "with both agreeing_executors_count and required_executor_ids",
+			arguments: func() map[string]interface{} {
+				args := unittest.CreateSendTxHttpPayload(tx)
+				args["execution_state_query"] = map[string]interface{}{
+					"agreeing_executors_count": float64(3),
+					"required_executor_ids": []interface{}{
+						executorID1.String(),
+					},
+				}
+				return args
+			}(),
+			setupBackend: func(sub *submock.Subscription) {
+				s.api.On(
+					"SendAndSubscribeTransactionStatuses",
+					mock.Anything,
+					mock.Anything,
+					entities.EventEncodingVersion_JSON_CDC_V0,
+					mock.MatchedBy(func(criteria interface{}) bool {
+						// Verify criteria has both agreeing executors count and required executor IDs
+						c, ok := criteria.(optimistic_sync.Criteria)
+						if !ok {
+							return false
+						}
+						if c.AgreeingExecutorsCount != 3 {
+							return false
+						}
+						if len(c.RequiredExecutors) != 1 {
+							return false
+						}
+						return c.RequiredExecutors[0] == executorID1
+					}),
+				).Return(sub).Once()
+			},
+			expectedResponses: expectedResponse,
+		},
+	}
+
+	testHappyPath(
+		s.T(),
+		SendAndGetTransactionStatusesTopic,
+		s.factory,
+		testCases,
+		func(dataChan chan interface{}) {
+			dataChan <- backendResponse
+		},
+		s.requireTransactionStatuses,
+	)
+}
+
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 	actual interface{},
@@ -118,6 +260,24 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 
 	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
+}
+
+// expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
+func (s *SendTransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
+	backendResponses []*accessmodel.TransactionResult,
+	topic string,
+) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, nil, uint64(i))
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   topic,
+			Payload: expectedResponsePayload,
+		}
+	}
+
+	return expectedResponses
 }
 
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider
@@ -235,6 +395,49 @@ func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 				"unexpected_argument": "dummy",
 			},
 			expectedErrorMsg: "request body contains unknown field",
+		},
+		{
+			name: "invalid 'execution_state_query' type - not an object",
+			arguments: map[string]interface{}{
+				"execution_state_query": "not_an_object",
+			},
+			expectedErrorMsg: "execution_state_query must be an object",
+		},
+		{
+			name: "invalid 'agreeing_executors_count' type",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count": "not_a_number",
+				},
+			},
+			expectedErrorMsg: "invalid agreeing_executors_count",
+		},
+		{
+			name: "invalid 'required_executor_ids' type - not an array",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"required_executor_ids": "not_an_array",
+				},
+			},
+			expectedErrorMsg: "required_executor_ids must be an array",
+		},
+		{
+			name: "invalid 'required_executor_ids' element type",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"required_executor_ids": []interface{}{123, 456},
+				},
+			},
+			expectedErrorMsg: "required_executor_ids[0] must be a string",
+		},
+		{
+			name: "invalid 'required_executor_ids' element value - invalid ID",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"required_executor_ids": []interface{}{"invalid_id"},
+				},
+			},
+			expectedErrorMsg: "invalid required_executor_ids[0]",
 		},
 	}
 }
