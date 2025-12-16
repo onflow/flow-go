@@ -82,14 +82,13 @@ func (d *RemoteDebugger) RunSDKTransaction(
 	tx *sdk.Transaction,
 	snapshot StorageSnapshot,
 	header *flow.Header,
-	computeLimit uint64,
 ) (
 	Result,
 	error,
 ) {
 	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(tx.Script).
-		SetComputeLimit(computeLimit).
+		SetComputeLimit(tx.GasLimit).
 		SetPayer(flow.Address(tx.Payer))
 
 	for _, argument := range tx.Arguments {
