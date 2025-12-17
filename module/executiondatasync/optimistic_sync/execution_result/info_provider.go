@@ -20,6 +20,7 @@ type Provider struct {
 	log zerolog.Logger
 
 	executionReceipts storage.ExecutionReceipts
+	headers           storage.Headers
 	state             protocol.State
 	rootBlockID       flow.Identifier
 	executionNodes    *ExecutionNodeSelector
@@ -33,12 +34,14 @@ func NewExecutionResultInfoProvider(
 	log zerolog.Logger,
 	state protocol.State,
 	executionReceipts storage.ExecutionReceipts,
+	headers storage.Headers,
 	executionNodes *ExecutionNodeSelector,
 	operatorCriteria optimistic_sync.Criteria,
 ) *Provider {
 	return &Provider{
 		log:               log.With().Str("module", "execution_result_info").Logger(),
 		executionReceipts: executionReceipts,
+		headers:           headers,
 		state:             state,
 		executionNodes:    executionNodes,
 		rootBlockID:       state.Params().SporkRootBlock().ID(),
@@ -51,15 +54,23 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
-//   - [storage.ErrNotFound]: If the request is for the spork root block and the node was bootstrapped
-//     from a newer block.
+//   - [storage.ErrNotFound]: If the data was not found.
+//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
+//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
+//     sealed but no execution result can satisfy the provided criteria.
 func (e *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) (*optimistic_sync.ExecutionResultInfo, error) {
-	executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	executorIdentities, err := e.state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
+	}
+
+	err = e.validateCriteria(criteria, executorIdentities)
+	if err != nil {
+		return nil, fmt.Errorf("invalid required executors: %w", err)
 	}
 
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
@@ -83,9 +94,20 @@ func (e *Provider) ExecutionResultInfo(
 		}, nil
 	}
 
-	result, executorIDs, err := e.findResultAndExecutors(blockID, criteria)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
+	result, executorIDs, findResultErr := e.findResultAndExecutors(blockID, criteria)
+	if findResultErr != nil {
+		// We want to return a more specific error when no matching execution results were found.
+		// This helps callers understand that their criteria likely cannot be met — especially if the
+		// block is already sealed.
+		isBlockSealed, err := e.isBlockSealed(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if block sealed: %w", err)
+		}
+		if isBlockSealed {
+			return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
+		}
+
+		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, findResultErr)
 	}
 
 	executors := executorIdentities.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
@@ -110,6 +132,69 @@ func (e *Provider) ExecutionResultInfo(
 		ExecutionResultID: result.ID(),
 		ExecutionNodes:    subsetENs,
 	}, nil
+}
+
+// isBlockSealed reports whether the given block is sealed.
+// It returns (true, nil) if the block is sealed, and (false, nil) if it is not sealed.
+//
+// No errors are expected during normal operation.
+func (e *Provider) isBlockSealed(blockID flow.Identifier) (bool, error) {
+	// Step 1: Get the block header
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get header for block %v: %w", blockID, err)
+	}
+
+	// Step 2a: Lookup the finalized block ID at this height
+	blockIDFinalized, err := e.headers.BlockIDByHeight(header.Height)
+	if err != nil {
+		// no finalized block is known at given height, block is not finalized
+		return false, nil
+	}
+
+	// Step 2b: Check if this block is finalized.
+	// If BlockIDByHeight returns an ID that doesn't match, block is not finalized, it cannot be sealed.
+	if blockIDFinalized != blockID {
+		return false, nil
+	}
+
+	// Step 3: Check sealed status only if block finalized.
+	sealedHeader, err := e.state.Sealed().Head()
+	if err != nil {
+		return false, fmt.Errorf("failed to lookup sealed header: %w", err)
+	}
+
+	return header.Height <= sealedHeader.Height, nil
+}
+
+// validateCriteria verifies that the provided optimistic sync criteria can be
+// satisfied by the currently available execution nodes.
+//
+// The validation ensures that the requested AgreeingExecutorsCount is feasible,
+// and that every required executor ID is present in the available set.
+//
+// Expected errors during normal operations:
+//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
+//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+func (e *Provider) validateCriteria(
+	criteria optimistic_sync.Criteria,
+	availableExecutors flow.IdentityList,
+) error {
+	if uint(len(availableExecutors)) < criteria.AgreeingExecutorsCount {
+		return optimistic_sync.NewAgreeingExecutorsCountExceededError(
+			criteria.AgreeingExecutorsCount,
+			len(availableExecutors),
+		)
+	}
+
+	lookup := availableExecutors.Lookup()
+	for _, executorID := range criteria.RequiredExecutors {
+		if _, ok := lookup[executorID]; !ok {
+			return optimistic_sync.NewUnknownRequiredExecutorError(executorID)
+		}
+	}
+
+	return nil
 }
 
 // findResultAndExecutors returns a query response for a given block ID.
