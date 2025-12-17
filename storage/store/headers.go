@@ -32,6 +32,15 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 	if chainID.IsClusterChain() {
 		panic("NewHeaders called on cluster chain ID - use NewClusterHeaders instead")
 	}
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
+		if header.ChainID != chainID {
+			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
+		}
+		if !lctx.HoldsLock(storage.LockInsertBlock) {
+			return fmt.Errorf("missing lock: %v", storage.LockInsertBlock)
+		}
+		return operation.InsertHeader(lctx, rw, blockID, header)
+	}
 	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
 		var id flow.Identifier
 		err := operation.LookupBlockHeight(r, height, &id)
@@ -42,7 +51,7 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 		err := operation.LookupCertifiedBlockByView(r, view, &id)
 		return id, err
 	}
-	return newHeaders(collector, db, chainID, retrieveHeight, retrieveView)
+	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView)
 }
 
 // NewClusterHeaders creates a Headers instance for a collection cluster chain, which stores block headers for cluster blocks.
@@ -50,6 +59,15 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
 	if !chainID.IsClusterChain() {
 		panic("NewClusterHeaders called on non-cluster chain ID - use NewHeaders instead")
+	}
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
+		if header.ChainID != chainID {
+			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
+		}
+		if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+			return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+		}
+		return operation.InsertClusterHeader(lctx, rw, blockID, header)
 	}
 	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
 		var id flow.Identifier
@@ -60,32 +78,17 @@ func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flo
 		var id flow.Identifier
 		return id, fmt.Errorf("retrieve by view not implemented for cluster headers")
 	}
-	return newHeaders(collector, db, chainID, retrieveHeight, retrieveView)
+	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView)
 }
 
 // newHeaders contains shared logic for Header storage, including storing and retrieving by block ID
 func newHeaders(collector module.CacheMetrics,
 	db storage.DB,
 	chainID flow.ChainID,
+	storeWithLock storeWithLockFunc[flow.Identifier, *flow.Header],
 	retrieveHeight retrieveFunc[uint64, flow.Identifier],
 	retrieveView retrieveFunc[uint64, flow.Identifier],
 ) *Headers {
-	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
-		if header.ChainID != chainID {
-			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
-		}
-		if chainID.IsClusterChain() {
-			if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
-				return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
-			}
-		} else {
-			if !lctx.HoldsLock(storage.LockInsertBlock) {
-				return fmt.Errorf("missing lock: %v", storage.LockInsertBlock)
-			}
-		}
-		return operation.InsertHeader(lctx, rw, blockID, header)
-	}
-
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
 		var header flow.Header
 		err := operation.RetrieveHeader(r, blockID, &header)

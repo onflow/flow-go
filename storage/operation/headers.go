@@ -40,6 +40,36 @@ func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flo
 	return UpsertByKey(rw.Writer(), key, header)
 }
 
+// InsertClusterHeader inserts a cluster block header into the database.
+//
+// CAUTION:
+//   - The caller must ensure that headerID is a collision-resistant hash of the provided header!
+//     Otherwise, data corruption may occur.
+//   - The caller must acquire the following lock and hold it until the database
+//     write has been committed: [storage.LockInsertOrFinalizeClusterBlock].
+//
+// It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
+// This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
+// of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
+// No other error returns are expected during normal operation.
+func InsertClusterHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
+	held := lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	if !held {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
+	}
+
+	key := MakePrefix(codeHeader, headerID)
+	exist, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return err
+	}
+	if exist {
+		return fmt.Errorf("header already exists: %w", storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, header)
+}
+
 // RetrieveHeader retrieves the header of the block with the specified ID.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block with the specified `blockID` is known.
