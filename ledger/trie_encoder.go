@@ -540,6 +540,12 @@ func decodePayload(inp []byte, zeroCopy bool, version uint16) (*Payload, error) 
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
+	// Normalize nil to empty slice for deterministic CBOR serialization
+	// ReadSlice returns nil when size is 0, but we need []byte{} for consistency
+	if encValue == nil {
+		encValue = []byte{}
+	}
+
 	if zeroCopy {
 		return &Payload{encKey, encValue}, nil
 	}

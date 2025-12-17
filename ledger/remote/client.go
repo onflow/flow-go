@@ -110,6 +110,14 @@ func (c *Client) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, e
 		return nil, fmt.Errorf("failed to get single value: %w", err)
 	}
 
+	// Reconstruct the original value type using is_nil flag
+	// This preserves the distinction between nil and []byte{} that protobuf loses
+	if resp.Value.Data == nil || len(resp.Value.Data) == 0 {
+		if resp.Value.IsNil {
+			return nil, nil
+		}
+		return ledger.Value([]byte{}), nil
+	}
 	return ledger.Value(resp.Value.Data), nil
 }
 
@@ -135,7 +143,17 @@ func (c *Client) Get(query *ledger.Query) ([]ledger.Value, error) {
 
 	values := make([]ledger.Value, len(resp.Values))
 	for i, protoValue := range resp.Values {
-		values[i] = ledger.Value(protoValue.Data)
+		// Reconstruct the original value type using is_nil flag
+		// This preserves the distinction between nil and []byte{} that protobuf loses
+		if protoValue.Data == nil || len(protoValue.Data) == 0 {
+			if protoValue.IsNil {
+				values[i] = nil
+			} else {
+				values[i] = ledger.Value([]byte{})
+			}
+		} else {
+			values[i] = ledger.Value(protoValue.Data)
+		}
 	}
 
 	return values, nil
@@ -158,8 +176,12 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 	}
 
 	for i, value := range update.Values() {
+		// Distinguish between nil and []byte{} for protobuf encoding
+		// Protobuf cannot distinguish them, so we use is_nil flag
+		isNil := value == nil
 		req.Values[i] = &ledgerpb.Value{
-			Data: value,
+			Data:  value,
+			IsNil: isNil,
 		}
 	}
 
@@ -181,6 +203,83 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 		if err != nil {
 			c.logger.Warn().Err(err).Msg("failed to decode trie update")
 			// Continue without trie update rather than failing
+		} else if trieUpdate != nil {
+			// Now we have trieRootHash, log all debug information with it
+			trieRootHash := trieUpdate.RootHash
+
+			// Log values that were sent to service (with trieRootHash for filtering)
+			for i, value := range update.Values() {
+				var sentValueType string
+				var sentValueLen int
+				if value == nil {
+					sentValueType = "NIL"
+					sentValueLen = 0
+				} else {
+					sentValueLen = len(value)
+					if sentValueLen == 0 {
+						sentValueType = "EMPTY_SLICE"
+					} else {
+						sentValueType = fmt.Sprintf("LEN_%d", sentValueLen)
+					}
+				}
+				keyBytes := update.Keys()[i].CanonicalForm()
+				fmt.Printf("[DEBUG LedgerClient SENDING] trieRootHash=%x key[%d]=%x sentValueType=%s sentValueLen=%d\n",
+					trieRootHash[:], i, keyBytes, sentValueType, sentValueLen)
+			}
+			// Log payload value types after decoding
+			for i, payload := range trieUpdate.Payloads {
+				if payload != nil {
+					val := payload.Value()
+					var valType string
+					var valLen int
+					if val == nil {
+						valType = "NIL"
+						valLen = 0
+					} else {
+						valLen = len(val)
+						if valLen == 0 {
+							valType = "EMPTY_SLICE"
+						} else {
+							valType = fmt.Sprintf("LEN_%d", valLen)
+						}
+					}
+					path := trieUpdate.Paths[i]
+					fmt.Printf("[DEBUG LedgerClient RECEIVED] trieRootHash=%x path[%d]=%x valueType=%s valueLen=%d (after decode)\n",
+						trieRootHash[:], i, path[:], valType, valLen)
+				}
+			}
+
+			// Normalize nil payload values to empty slice for deterministic CBOR serialization
+			// We need to recreate payloads with normalized values since Payload.value is private
+			for i, payload := range trieUpdate.Payloads {
+				if payload != nil && payload.Value() == nil {
+					key, _ := payload.Key()
+					trieUpdate.Payloads[i] = ledger.NewPayload(key, []byte{})
+				}
+			}
+
+			// Log payload value types after normalization
+			for i, payload := range trieUpdate.Payloads {
+				if payload != nil {
+					val := payload.Value()
+					var valType string
+					var valLen int
+					if val == nil {
+						valType = "NIL"
+						valLen = 0
+					} else {
+						valLen = len(val)
+						if valLen == 0 {
+							valType = "EMPTY_SLICE"
+						} else {
+							valType = fmt.Sprintf("LEN_%d", valLen)
+						}
+					}
+					path := trieUpdate.Paths[i]
+					fmt.Printf("[DEBUG LedgerClient AFTER_NORMALIZE] trieRootHash=%x path[%d]=%x valueType=%s valueLen=%d\n",
+						trieRootHash[:], i, path[:], valType, valLen)
+				}
+			}
 		}
 	}
 

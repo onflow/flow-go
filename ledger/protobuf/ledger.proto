@@ -46,6 +46,12 @@ message Key {
 // Value represents a ledger value
 message Value {
   bytes data = 1;
+  // is_nil distinguishes between nil and []byte{} (empty slice).
+  // When data is nil or empty:
+  //   - is_nil=true means the original value was nil
+  //   - is_nil=false means the original value was []byte{} (empty slice)
+  // When data is non-empty, is_nil is ignored (should be false).
+  bool is_nil = 2;
 }
 
 // StateRequest contains a state to query

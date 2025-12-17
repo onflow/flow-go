@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -78,7 +79,8 @@ func (s *Service) GetSingleValue(ctx context.Context, req *ledgerpb.GetSingleVal
 
 	return &ledgerpb.ValueResponse{
 		Value: &ledgerpb.Value{
-			Data: value,
+			Data:  value,
+			IsNil: value == nil,
 		},
 	}, nil
 }
@@ -114,7 +116,8 @@ func (s *Service) Get(ctx context.Context, req *ledgerpb.GetRequest) (*ledgerpb.
 	protoValues := make([]*ledgerpb.Value, len(values))
 	for i, v := range values {
 		protoValues[i] = &ledgerpb.Value{
-			Data: v,
+			Data:  v,
+			IsNil: v == nil,
 		}
 	}
 
@@ -147,7 +150,22 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 
 	values := make([]ledger.Value, len(req.Values))
 	for i, protoValue := range req.Values {
-		values[i] = ledger.Value(protoValue.Data)
+		var value ledger.Value
+		// Reconstruct the original value type using is_nil flag
+		// This preserves the distinction between nil and []byte{} that protobuf loses
+		if protoValue.Data == nil || len(protoValue.Data) == 0 {
+			if protoValue.IsNil {
+				// Original value was nil
+				value = nil
+			} else {
+				// Original value was []byte{} (empty slice)
+				value = ledger.Value([]byte{})
+			}
+		} else {
+			// Non-empty value, use data as-is
+			value = ledger.Value(protoValue.Data)
+		}
+		values[i] = value
 	}
 
 	update, err := ledger.NewUpdate(state, keys, values)
@@ -155,42 +173,75 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	// Debug log before Set call
-	s.logger.Debug().
-		Hex("input_state", state[:]).
-		Int("num_keys", len(keys)).
-		Int("num_values", len(values)).
-		Msg("Set request received")
-
-	// Log first few keys for debugging
-	for i := 0; i < len(keys) && i < 5; i++ {
-		s.logger.Debug().
-			Int("key_index", i).
-			Str("key", keys[i].String()).
-			Int("value_len", len(values[i])).
-			Msg("Set key detail")
-	}
-
 	newState, trieUpdate, err := s.ledger.Set(update)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Debug log after Set call
-	s.logger.Debug().
-		Hex("new_state", newState[:]).
-		Int("trie_update_paths", len(trieUpdate.Paths)).
-		Hex("trie_update_root", trieUpdate.RootHash[:]).
-		Msg("Set response")
+	// Now we have trieRootHash, log all the debug information with it
+	trieRootHash := trieUpdate.RootHash
 
-	// Log first few trie update paths for debugging
-	for i := 0; i < len(trieUpdate.Paths) && i < 5; i++ {
-		s.logger.Debug().
-			Hex("new_state", newState[:]).
-			Int("path_index", i).
-			Hex("path", trieUpdate.Paths[i][:]).
-			Int("payload_size", trieUpdate.Payloads[i].Size()).
-			Msg("TrieUpdate path detail")
+	// Log received values from client (with trieRootHash for filtering)
+	for i, protoValue := range req.Values {
+		var receivedValueType string
+		var receivedValueLen int
+		if protoValue.Data == nil {
+			receivedValueType = "NIL"
+			receivedValueLen = 0
+		} else {
+			receivedValueLen = len(protoValue.Data)
+			if receivedValueLen == 0 {
+				receivedValueType = "EMPTY_SLICE"
+			} else {
+				receivedValueType = fmt.Sprintf("LEN_%d", receivedValueLen)
+			}
+		}
+		keyBytes := keys[i].CanonicalForm()
+		fmt.Printf("[DEBUG LedgerService RECEIVED] trieRootHash=%x key[%d]=%x receivedValueType=%s receivedValueLen=%d\n",
+			trieRootHash[:], i, keyBytes, receivedValueType, receivedValueLen)
+	}
+
+	// Log values being passed to ledger.Set (with trieRootHash for filtering)
+	for i := range values {
+		var passedValueType string
+		var passedValueLen int
+		if values[i] == nil {
+			passedValueType = "NIL"
+			passedValueLen = 0
+		} else {
+			passedValueLen = len(values[i])
+			if passedValueLen == 0 {
+				passedValueType = "EMPTY_SLICE"
+			} else {
+				passedValueType = fmt.Sprintf("LEN_%d", passedValueLen)
+			}
+		}
+		keyBytes := keys[i].CanonicalForm()
+		fmt.Printf("[DEBUG LedgerService TO_SET] trieRootHash=%x key[%d]=%x passedValueType=%s passedValueLen=%d\n",
+			trieRootHash[:], i, keyBytes, passedValueType, passedValueLen)
+	}
+
+	// Debug log payload value types (before encoding)
+	for i, payload := range trieUpdate.Payloads {
+		if payload != nil {
+			val := payload.Value()
+			var valType string
+			var valLen int
+			if val == nil {
+				valType = "NIL"
+				valLen = 0
+			} else {
+				valLen = len(val)
+				if valLen == 0 {
+					valType = "EMPTY_SLICE"
+				} else {
+					valType = fmt.Sprintf("LEN_%d", valLen)
+				}
+			}
+			path := trieUpdate.Paths[i]
+			fmt.Printf("[DEBUG LedgerService FROM_SET] trieRootHash=%x path[%d]=%x valueType=%s valueLen=%d\n",
+				trieRootHash[:], i, path[:], valType, valLen)
+		}
 	}
 
 	// Encode trie update using the ledger's encoding function
