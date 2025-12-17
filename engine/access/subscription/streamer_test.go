@@ -48,19 +48,24 @@ func TestStream(t *testing.T) {
 		dataByHeight[uint64(i)] = d
 	}
 
-	getData := func(ctx context.Context, height uint64) (interface{}, error) {
-		if td, ok := dataByHeight[height]; ok {
-			if td.err != nil {
-				return nil, td.err
+	nextHeight := uint64(0)
+	dataProvider := submock.NewDataProvider(t)
+	dataProvider.
+		On("NextData", mock.Anything).
+		Return(func(ctx context.Context) (interface{}, error) {
+			if td, ok := dataByHeight[nextHeight]; ok {
+				nextHeight++
+				if td.err != nil {
+					return nil, td.err
+				}
+
+				return td.data, nil
 			}
-			return td.data, nil
-		}
 
-		// default to block not ready once we run out of prepared data
-		return nil, subscription.ErrBlockNotReady
-	}
+			// default to block not ready once we run out of prepared data
+			return nil, subscription.ErrBlockNotReady
+		})
 
-	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
 	streamer := subscription.NewStreamer(
 		unittest.Logger(),
 		broadcaster,
@@ -112,12 +117,15 @@ func TestStreamRatelimited(t *testing.T) {
 			broadcaster := engine.NewBroadcaster()
 
 			var nextCalls, sendCalls int
-			getData := func(ctx context.Context, height uint64) (interface{}, error) {
-				nextCalls++
-				return "data", nil
-			}
 
-			dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+			dataProvider := submock.NewDataProvider(t)
+			dataProvider.
+				On("NextData", mock.Anything).
+				Return(func(ctx context.Context) (interface{}, error) {
+					nextCalls++
+					return "data", nil
+				})
+
 			streamer := subscription.NewStreamer(
 				unittest.Logger(),
 				broadcaster,
