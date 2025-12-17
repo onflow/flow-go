@@ -15,17 +15,17 @@ import (
 // CAUTION:
 //   - The caller must ensure that headerID is a collision-resistant hash of the provided header!
 //     Otherwise, data corruption may occur.
-//   - The caller must acquire one (but not both) of the following locks and hold it until the database
-//     write has been committed: either [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock].
+//   - The caller must acquire the following lock and hold it until the database
+//     write has been committed: [storage.LockInsertBlock].
 //
 // It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
 // This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
 // of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
 // No other error returns are expected during normal operation.
 func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
-	held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	held := lctx.HoldsLock(storage.LockInsertBlock)
 	if !held {
-		return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
 	}
 
 	key := MakePrefix(codeHeader, headerID)
