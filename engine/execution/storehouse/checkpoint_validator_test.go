@@ -2,6 +2,8 @@ package storehouse
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -22,6 +24,48 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
+
+func TestIsErrMismatch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns true for direct ErrMismatch", func(t *testing.T) {
+		err := &ErrMismatch{
+			RegisterID:     flow.RegisterID{Owner: "owner", Key: "key"},
+			Height:         100,
+			StoredLength:   10,
+			ExpectedLength: 20,
+		}
+		mismatchErr, ok := IsErrMismatch(err)
+		require.True(t, ok)
+		require.Equal(t, err, mismatchErr)
+	})
+
+	t.Run("returns true for wrapped ErrMismatch", func(t *testing.T) {
+		original := &ErrMismatch{
+			RegisterID:     flow.RegisterID{Owner: "owner", Key: "key"},
+			Height:         100,
+			StoredLength:   10,
+			ExpectedLength: 20,
+		}
+		wrapped := fmt.Errorf("wrapper: %w", original)
+		mismatchErr, ok := IsErrMismatch(wrapped)
+		require.True(t, ok)
+		require.Equal(t, original, mismatchErr)
+	})
+
+	t.Run("returns false for non-ErrMismatch", func(t *testing.T) {
+		err := errors.New("some other error")
+		mismatchErr, ok := IsErrMismatch(err)
+		require.False(t, ok)
+		require.Nil(t, mismatchErr)
+	})
+
+	t.Run("returns false for nil error", func(t *testing.T) {
+		mismatchErr, ok := IsErrMismatch(nil)
+		require.False(t, ok)
+		require.Nil(t, mismatchErr)
+	})
+}
 
 func TestValidateWithCheckpoint_AllMatching(t *testing.T) {
 	t.Parallel()

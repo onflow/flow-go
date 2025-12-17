@@ -25,6 +25,8 @@ type ErrMismatch struct {
 	Height         uint64
 	StoredLength   int
 	ExpectedLength int
+	StoredData     []byte
+	ExpectedData   []byte
 	Message        string
 }
 
@@ -37,9 +39,10 @@ func (e *ErrMismatch) Error() string {
 }
 
 // IsErrMismatch returns true if the given error is an ErrMismatch or wraps an ErrMismatch.
-func IsErrMismatch(err error) bool {
+func IsErrMismatch(err error) (*ErrMismatch, bool) {
 	var mismatchErr *ErrMismatch
-	return errors.As(err, &mismatchErr)
+	isErr := errors.As(err, &mismatchErr)
+	return mismatchErr, isErr
 }
 
 // ValidateWithCheckpoint validates the registers in the given store against the leaf nodes read from the checkpoint file.
@@ -130,8 +133,8 @@ func validatingRegisterInStore(ctx context.Context, log zerolog.Logger, store ex
 			}
 			err := validateRegister(store, leafNode, height)
 			if err != nil {
-				var mismatchErr *ErrMismatch
-				if errors.As(err, &mismatchErr) {
+				mismatchErr, ok := IsErrMismatch(err)
+				if ok {
 					// mismatch error: log and continue, increment counter
 					log.Error().
 						Str("owner", mismatchErr.RegisterID.Owner).
