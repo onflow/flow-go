@@ -2,33 +2,42 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 )
 
-// the following logic is used to match the URL with the correct route for metrics collection.
-
+// For each compiled route regex store a map[method]routeName
 var routePatterns []*regexp.Regexp
-var routeNameMap map[*regexp.Regexp]string
+var routeMethodNameMap map[*regexp.Regexp]map[string]string
 
 func init() {
 	routePatterns = make([]*regexp.Regexp, 0, len(Routes)+len(WSLegacyRoutes))
-	routeNameMap = make(map[*regexp.Regexp]string)
+	routeMethodNameMap = make(map[*regexp.Regexp]map[string]string)
 
-	// Convert REST route patterns to regex patterns for matching
-	for _, r := range Routes {
-		regexPattern := patternToRegex(r.Pattern)
-		re := regexp.MustCompile("^" + regexPattern + "$")
-		routePatterns = append(routePatterns, re)
-		routeNameMap[re] = r.Name
+	// Deduplicate compiled regex by pattern string (for GET/POST same path)
+	regexByPattern := make(map[string]*regexp.Regexp)
+
+	add := func(method, pattern, name string) {
+		// Compile one regex per unique path pattern
+		regexPattern := "^" + patternToRegex(pattern) + "$"
+
+		re, ok := regexByPattern[regexPattern]
+		if !ok {
+			re = regexp.MustCompile(regexPattern)
+			regexByPattern[regexPattern] = re
+			routePatterns = append(routePatterns, re)
+			routeMethodNameMap[re] = make(map[string]string)
+		}
+
+		routeMethodNameMap[re][method] = name
 	}
 
-	// Convert WebSocket route patterns to regex patterns for matching
+	for _, r := range Routes {
+		add(r.Method, r.Pattern, r.Name)
+	}
 	for _, r := range WSLegacyRoutes {
-		regexPattern := patternToRegex(r.Pattern)
-		re := regexp.MustCompile("^" + regexPattern + "$")
-		routePatterns = append(routePatterns, re)
-		routeNameMap[re] = r.Name
+		add(r.Method, r.Pattern, r.Name)
 	}
 }
 
@@ -46,13 +55,36 @@ func patternToRegex(pattern string) string {
 	return escaped
 }
 
-// URLToRoute matches the URL against route patterns and returns the matching route name
-func URLToRoute(url string) (string, error) {
+func MethodURLToRoute(method, url string) (string, error) {
 	path := strings.TrimPrefix(url, "/v1")
+
 	for _, pattern := range routePatterns {
 		if pattern.MatchString(path) {
-			return routeNameMap[pattern], nil
+			if byMethod, ok := routeMethodNameMap[pattern]; ok {
+				if name, ok := byMethod[method]; ok {
+					return name, nil
+				}
+				return "", fmt.Errorf("no matching route found for method %s and URL: %s", method, url)
+			}
 		}
 	}
+
 	return "", fmt.Errorf("no matching route found for URL: %s", url)
+}
+
+// URLToRoute matches the URL against route patterns and returns the matching route name
+func URLToRoute(id string) (string, error) {
+	method := http.MethodGet
+	path := id
+
+	if sp := strings.IndexByte(id, ' '); sp > 0 {
+		maybeMethod := id[:sp]
+		maybePath := strings.TrimSpace(id[sp+1:])
+		if strings.HasPrefix(maybePath, "/") {
+			method = maybeMethod
+			path = maybePath
+		}
+	}
+
+	return MethodURLToRoute(method, path)
 }

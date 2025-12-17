@@ -436,7 +436,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			path:   fmt.Sprintf("/transaction_results/%s?block_id=%s&collection_id=%s", transactionId, block.ID().String(), collection.ID().String()),
 		},
 		{
-			name:   "getTransactionResultsByBlockID",
+			name:   "getTransactionResultsByBlock",
 			method: http.MethodGet,
 			path:   "/transaction_results?block_id=" + block.ID().String(),
 		},

@@ -76,14 +76,14 @@ func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer 
 // ObserveHTTPRequestDuration records the duration of the REST request.
 // This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) ObserveHTTPRequestDuration(_ context.Context, p httpmetrics.HTTPReqProperties, duration time.Duration) {
-	handler := r.mapURLToRoute(p.ID)
+	handler := r.mapURLToRoute(p.Method + " " + p.ID)
 	r.httpRequestDurHistogram.WithLabelValues(p.Service, handler, p.Method, p.Code).Observe(duration.Seconds())
 }
 
 // ObserveHTTPResponseSize records the response size of the REST request.
 // This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) ObserveHTTPResponseSize(_ context.Context, p httpmetrics.HTTPReqProperties, sizeBytes int64) {
-	handler := r.mapURLToRoute(p.ID)
+	handler := r.mapURLToRoute(p.Method + " " + p.ID)
 	r.httpResponseSizeHistogram.WithLabelValues(p.Service, handler, p.Method, p.Code).Observe(float64(sizeBytes))
 }
 
@@ -97,7 +97,7 @@ func (r *RestCollector) AddInflightRequests(_ context.Context, p httpmetrics.HTT
 // AddTotalRequests records all REST requests
 // This is a custom method called by the REST handler
 func (r *RestCollector) AddTotalRequests(_ context.Context, method, path string) {
-	handler := r.mapURLToRoute(path)
+	handler := r.mapURLToRoute(method + " " + path)
 	r.httpRequestsTotal.WithLabelValues(method, handler).Inc()
 }
 
