@@ -10,7 +10,7 @@ import (
 
 // A ChainID is a unique identifier for a specific Flow network instance.
 //
-// Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
+// Chain IDs are used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
 type ChainIDList []ChainID
 

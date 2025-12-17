@@ -17,10 +17,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -1079,22 +1077,22 @@ func TestGetTransactionResult(t *testing.T) {
 		testVectors := map[*accessmodel.TransactionResult]string{{
 			Status:       flow.TransactionStatusExpired,
 			ErrorMessage: "",
-		}: string(models.FAILURE_RESULT), {
+		}: string(commonmodels.FAILURE_RESULT), {
 			Status:       flow.TransactionStatusSealed,
 			ErrorMessage: "cadence runtime exception",
-		}: string(models.FAILURE_RESULT), {
+		}: string(commonmodels.FAILURE_RESULT), {
 			Status:       flow.TransactionStatusFinalized,
 			ErrorMessage: "",
-		}: string(models.PENDING_RESULT), {
+		}: string(commonmodels.PENDING_RESULT), {
 			Status:       flow.TransactionStatusPending,
 			ErrorMessage: "",
-		}: string(models.PENDING_RESULT), {
+		}: string(commonmodels.PENDING_RESULT), {
 			Status:       flow.TransactionStatusExecuted,
 			ErrorMessage: "",
-		}: string(models.PENDING_RESULT), {
+		}: string(commonmodels.PENDING_RESULT), {
 			Status:       flow.TransactionStatusSealed,
 			ErrorMessage: "",
-		}: string(models.SUCCESS_RESULT)}
+		}: string(commonmodels.SUCCESS_RESULT)}
 
 		for txResult, err := range testVectors {
 			txResult.BlockID = bid
@@ -1638,7 +1636,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(tx, nil).
 			Once()
 		backend.
-			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
+			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil).
 			Once()
 
@@ -1648,14 +1646,14 @@ func TestGetScheduledTransactions(t *testing.T) {
 	})
 
 	t.Run("get result by scheduled transaction ID", func(t *testing.T) {
-		var expectedTxResult models.TransactionResult
+		var expectedTxResult commonmodels.TransactionResult
 		expectedTxResult.Build(txr, txID, link)
 		expectedResult, err := json.Marshal(expectedTxResult)
 		require.NoError(t, err)
 
 		backend := mock.NewAPI(t)
 		backend.
-			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
+			On("GetScheduledTransactionResult", mocks.Anything, scheduledTxID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil).
 			Once()
 
@@ -1686,7 +1684,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(tx, nil).
 			Once()
 		backend.
-			On("GetTransactionResult", mocks.Anything, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0).
+			On("GetTransactionResult", mocks.Anything, txID, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil).
 			Once()
 
@@ -1833,7 +1831,7 @@ func scheduledTransactionFixture(t *testing.T, g *fixtures.GeneratorSuite, sched
 // expectedTransactionResponse constructs the expected json transaction response for the given
 // transaction body and transaction result.
 func expectedTransactionResponse(t *testing.T, tx *flow.TransactionBody, txr *accessmodel.TransactionResult, link commonmodels.LinkGenerator) string {
-	var expectedTxWithoutResult models.Transaction
+	var expectedTxWithoutResult commonmodels.Transaction
 	expectedTxWithoutResult.Build(tx, txr, link)
 
 	expected, err := json.Marshal(expectedTxWithoutResult)
