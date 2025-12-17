@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
-	followereng "github.com/onflow/flow-go/engine/common/follower"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/verification/assigner"
@@ -390,7 +389,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 			}
 
-			core, err := followereng.NewComplianceCore(
+			core, err := follower.NewComplianceCore(
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
@@ -405,7 +404,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
 			}
 
-			followerEng, err = followereng.NewComplianceLayer(
+			followerEng, err = follower.NewComplianceLayer(
 				node.Logger,
 				node.EngineRegistry,
 				node.Me,
