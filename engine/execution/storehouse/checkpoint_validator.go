@@ -136,13 +136,7 @@ func validatingRegisterInStore(ctx context.Context, log zerolog.Logger, store ex
 				mismatchErr, ok := IsErrMismatch(err)
 				if ok {
 					// mismatch error: log and continue, increment counter
-					log.Error().
-						Str("owner", mismatchErr.RegisterID.Owner).
-						Str("key", mismatchErr.RegisterID.Key).
-						Uint64("height", mismatchErr.Height).
-						Int("stored_length", mismatchErr.StoredLength).
-						Int("expected_length", mismatchErr.ExpectedLength).
-						Msg("register value mismatch")
+					log.Error().Msg(mismatchErr.Error())
 					mismatchErrorCount.Add(1)
 				} else {
 					// non-mismatch error: this is an exception, crash the process
