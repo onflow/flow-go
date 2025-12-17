@@ -168,6 +168,9 @@ func validateRegister(store execution.OnDiskRegisterStore, leafNode *wal.LeafNod
 		return fmt.Errorf("could not get register ID from key: %w", err)
 	}
 
+	// Get the expected value from the leaf node payload
+	expectedValue := payload.Value()
+
 	// Get the register value from the store at the given height
 	storedValue, err := store.Get(registerID, height)
 	if err != nil {
@@ -177,16 +180,15 @@ func validateRegister(store execution.OnDiskRegisterStore, leafNode *wal.LeafNod
 				RegisterID:     registerID,
 				Height:         height,
 				StoredLength:   0,
-				ExpectedLength: len(payload.Value()),
+				ExpectedLength: len(expectedValue),
+				StoredData:     nil,
+				ExpectedData:   expectedValue,
 				Message:        fmt.Sprintf("register not found in store: owner=%s, key=%s, height=%d", registerID.Owner, registerID.Key, height),
 			}
 		}
 		// other store errors are exceptions
 		return fmt.Errorf("failed to get register from store: owner=%s, key=%s, height=%d: %w", registerID.Owner, registerID.Key, height, err)
 	}
-
-	// Get the expected value from the leaf node payload
-	expectedValue := payload.Value()
 
 	// Compare the stored value with the expected value
 	if !bytes.Equal(storedValue, expectedValue) {
@@ -196,6 +198,8 @@ func validateRegister(store execution.OnDiskRegisterStore, leafNode *wal.LeafNod
 			Height:         height,
 			StoredLength:   len(storedValue),
 			ExpectedLength: len(expectedValue),
+			StoredData:     storedValue,
+			ExpectedData:   expectedValue,
 		}
 	}
 
