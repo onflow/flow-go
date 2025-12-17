@@ -120,7 +120,13 @@ func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 	values := update.Values()
 	payloads := make([]*ledger.Payload, len(keys))
 	for i := range keys {
-		payload := ledger.NewPayload(keys[i], values[i])
+		val := values[i]
+		// Normalize nil to empty slice for consistency across local/remote ledgers
+		// and deterministic CBOR serialization.
+		if val == nil {
+			val = []byte{}
+		}
+		payload := ledger.NewPayload(keys[i], val)
 		payloads[i] = payload
 	}
 	return payloads, nil
