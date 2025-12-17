@@ -248,14 +248,7 @@ func TestConvertBlockEvent(t *testing.T) {
 	converted, err := convert.MessageToBlockEvents(msg)
 	require.NoError(t, err)
 	require.NotNil(t, converted)
-
-	require.Equal(t, blockEvents.BlockHeight, converted.BlockHeight)
-	require.Equal(t, blockEvents.BlockID, converted.BlockID)
-	require.Equal(t, blockEvents.BlockTimestamp, converted.BlockTimestamp)
-	require.Len(t, converted.Events, len(blockEvents.Events))
-	for i, event := range blockEvents.Events {
-		require.Equal(t, event.ID(), converted.Events[i].ID())
-	}
+	require.Equal(t, blockEvents, *converted)
 }
 
 // TestConvertCcfEventToJsonEvent tests converting a single CCF event to JSON event.

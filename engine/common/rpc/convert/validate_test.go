@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
 // TestValidateAddress tests the Address validation function.
@@ -146,21 +147,20 @@ func TestValidateBlockID(t *testing.T) {
 func TestValidateBlockIDs(t *testing.T) {
 	t.Parallel()
 
+	g := fixtures.NewGeneratorSuite()
+
 	t.Run("valid random block IDs lists", func(t *testing.T) {
 		t.Parallel()
 
-		// Test multiple random lists to exercise conversion pathways
-		for count := 3; count < 8; count++ {
-			expectedIDs := unittest.IdentifierListFixture(count)
-			rawIDs := make([][]byte, len(expectedIDs))
-			for j, id := range expectedIDs {
-				rawIDs[j] = id[:]
-			}
-
-			blockIDs, err := convert.BlockIDs(rawIDs)
-			require.NoError(t, err)
-			assert.Equal(t, []flow.Identifier(expectedIDs), blockIDs)
+		expectedIDs := g.Identifiers().List(g.Random().IntInRange(3, 8))
+		rawIDs := make([][]byte, len(expectedIDs))
+		for j, id := range expectedIDs {
+			rawIDs[j] = id[:]
 		}
+
+		blockIDs, err := convert.BlockIDs(rawIDs)
+		require.NoError(t, err)
+		assert.Equal(t, []flow.Identifier(expectedIDs), blockIDs)
 	})
 
 	t.Run("empty block IDs list", func(t *testing.T) {
@@ -175,7 +175,7 @@ func TestValidateBlockIDs(t *testing.T) {
 	t.Run("one invalid block ID in list", func(t *testing.T) {
 		t.Parallel()
 
-		validID := unittest.IdentifierFixture()
+		validID := g.Identifiers().Fixture()
 		invalidID := []byte{0x01, 0x02}
 
 		rawIDs := [][]byte{validID[:], invalidID}
@@ -213,7 +213,6 @@ func TestValidateCollectionID(t *testing.T) {
 	t.Run("collection ID with different length", func(t *testing.T) {
 		t.Parallel()
 
-		// so this should succeed
 		shortID := []byte{0x01, 0x02}
 
 		_, err := convert.CollectionID(shortID)
