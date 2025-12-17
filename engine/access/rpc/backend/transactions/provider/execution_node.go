@@ -36,7 +36,7 @@ type ENTransactionProvider struct {
 
 	connFactory      connection.ConnectionFactory
 	nodeCommunicator node_communicator.Communicator
-	// TODO(#): nodeProvider should be removed when ScheduledTransactionsByBlockID and ScheduledTransactionResult will be updated
+	// TODO: nodeProvider should be removed when ScheduledTransactionsByBlockID and ScheduledTransactionResult will be updated
 	nodeProvider *rpc.ExecutionNodeIdentitiesProvider
 
 	txStatusDeriver *txstatus.TxStatusDeriver
@@ -459,7 +459,7 @@ func (e *ENTransactionProvider) getBlockEvents(
 	blockID flow.Identifier,
 	eventType flow.EventType,
 ) (flow.EventsList, error) {
-	//TODO(#): execNodes should be used from execution result info when TransactionsByBlockID and ScheduledTransactionsByBlockID endpoints will be updated
+	//TODO: execNodes should be used from execution result info when TransactionsByBlockID and ScheduledTransactionsByBlockID endpoints will be updated
 	execNodes, err := e.nodeProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,

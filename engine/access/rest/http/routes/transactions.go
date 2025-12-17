@@ -139,7 +139,6 @@ func GetScheduledTransactionResult(r *common.Request, backend access.API, link c
 		return nil, err
 	}
 
-	//TODO(Uliana): maybe to do GetScheduledTransactionResult in separate PR
 	response := commonmodels.NewTransactionResult(txr, txr.TransactionID, link, nil, false)
 	return response, nil
 }
