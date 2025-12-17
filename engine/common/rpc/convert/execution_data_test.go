@@ -47,7 +47,8 @@ func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 			for i, e := range events {
 				require.Equal(t, ccfEvents[i], e)
 
-				_, err := ccf.Decode(nil, e.Payload)
+				res, err := ccf.Decode(nil, e.Payload)
+				require.NotNil(t, res)
 				require.NoError(t, err)
 			}
 		}
@@ -64,7 +65,8 @@ func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 			for i, e := range events {
 				require.Equal(t, jsonEvents[i], e)
 
-				_, err := jsoncdc.Decode(nil, e.Payload)
+				res, err := jsoncdc.Decode(nil, e.Payload)
+				require.NotNil(t, res)
 				require.NoError(t, err)
 			}
 		}
