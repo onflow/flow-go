@@ -125,7 +125,8 @@ func loadRegisterStore(
 		checkpointHeight := sealedRoot.Height
 		rootHash := ledger.RootHash(rootSeal.FinalState)
 
-		err = importFunc(log, checkpointFile, checkpointHeight, rootHash, pebbledb, importCheckpointWorkerCount)
+		err = importFunc(log.With().Str("component", "background-indexing").Logger(),
+			checkpointFile, checkpointHeight, rootHash, pebbledb, importCheckpointWorkerCount)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
