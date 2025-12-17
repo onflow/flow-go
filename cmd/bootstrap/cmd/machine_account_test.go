@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
-	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	ioutils "github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -55,11 +54,11 @@ func TestMachineAccountHappyPath(t *testing.T) {
 		nodeID := strings.TrimSpace(string(b))
 
 		// make sure key file exists (sanity check)
-		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountPrivateKey, nodeID))
 		require.FileExists(t, machineKeyFilePath)
 
 		// sanity check if machine account info file exists
-		machineInfoFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID))
+		machineInfoFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID))
 		require.NoFileExists(t, machineInfoFilePath)
 
 		// make sure regex matches and file was created
@@ -102,11 +101,11 @@ func TestMachineAccountInfoFileExists(t *testing.T) {
 		nodeID := strings.TrimSpace(string(b))
 
 		// make sure key file exists (sanity check)
-		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountPrivateKey, nodeID))
 		require.FileExists(t, machineKeyFilePath)
 
 		// sanity check if machine account info file exists
-		machineInfoFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID))
+		machineInfoFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID))
 		require.NoFileExists(t, machineInfoFilePath)
 
 		// run machine account to create info file
@@ -115,14 +114,14 @@ func TestMachineAccountInfoFileExists(t *testing.T) {
 		hook.logs.Reset()
 
 		// read in info file
-		var machineAccountInfoBefore model.NodeMachineAccountInfo
+		var machineAccountInfoBefore bootstrap.NodeMachineAccountInfo
 		require.NoError(t, common.ReadJSON(machineInfoFilePath, &machineAccountInfoBefore))
 
 		// run again and make sure info file was not changed
 		machineAccountRun(nil, nil)
 		require.Regexp(t, regex, hook.logs.String())
 
-		var machineAccountInfoAfter model.NodeMachineAccountInfo
+		var machineAccountInfoAfter bootstrap.NodeMachineAccountInfo
 		require.NoError(t, common.ReadJSON(machineInfoFilePath, &machineAccountInfoAfter))
 
 		assert.Equal(t, machineAccountInfoBefore, machineAccountInfoAfter)
@@ -160,11 +159,11 @@ func TestMachineAccountWrongFlowAddressFormat(t *testing.T) {
 		nodeID := strings.TrimSpace(string(b))
 
 		// make sure key file exists (sanity check)
-		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountPrivateKey, nodeID))
 		require.FileExists(t, machineKeyFilePath)
 
 		// sanity check if machine account info file exists
-		machineInfoFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID))
+		machineInfoFilePath := filepath.Join(flagOutdir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID))
 		require.NoFileExists(t, machineInfoFilePath)
 
 		// run machine account command
