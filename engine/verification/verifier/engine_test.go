@@ -9,7 +9,6 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/mock"
-	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -69,11 +68,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.approvals = mockstorage.NewResultApprovals(suite.T())
 	suite.chunkVerifier = mockmodule.NewChunkVerifier(suite.T())
 
-	suite.net.On("Register", channels.PushApprovals, testifymock.Anything).
+	suite.net.On("Register", channels.PushApprovals, mock.Anything).
 		Return(suite.pushCon, nil).
 		Once()
 
-	suite.net.On("Register", channels.ProvideApprovalsByChunk, testifymock.Anything).
+	suite.net.On("Register", channels.ProvideApprovalsByChunk, mock.Anything).
 		Return(suite.pullCon, nil).
 		Once()
 
@@ -128,7 +127,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	eng := suite.getTestNewEngine()
 
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
+	suite.ss.On("Identities", mock.Anything).Return(consensusNodes, nil)
 
 	vChunk, _ := unittest.VerifiableChunkDataFixture(uint64(0))
 
@@ -183,9 +182,9 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 				Once()
 
 			suite.pushCon.
-				On("Publish", testifymock.Anything, testifymock.Anything).
+				On("Publish", mock.Anything, mock.Anything).
 				Return(nil).
-				Run(func(args testifymock.Arguments) {
+				Run(func(args mock.Arguments) {
 					// check that the approval matches the input execution result
 					ra, ok := args[0].(*messages.ResultApproval)
 					suite.Require().True(ok)

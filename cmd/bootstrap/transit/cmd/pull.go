@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
-	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -130,7 +129,7 @@ func pull(cmd *cobra.Command, args []string) {
 	if role == flow.RoleExecution {
 
 		// root.checkpoint* is downloaded to <bootstrap folder>/public-root-information after a pull
-		localPublicRootInfoDir := filepath.Join(flagBootDir, model.DirnamePublicBootstrap)
+		localPublicRootInfoDir := filepath.Join(flagBootDir, bootstrap.DirnamePublicBootstrap)
 
 		// move the root.checkpoint, root.checkpoint.0, root.checkpoint.1 etc. files to the bootstrap/execution-state dir
 		err = filepath.WalkDir(localPublicRootInfoDir, func(srcPath string, rootCheckpointFile fs.DirEntry, err error) error {
@@ -139,9 +138,9 @@ func pull(cmd *cobra.Command, args []string) {
 			}
 
 			// if rootCheckpointFile is a file whose name starts with "root.checkpoint", then move it
-			if !rootCheckpointFile.IsDir() && strings.HasPrefix(rootCheckpointFile.Name(), model.FilenameWALRootCheckpoint) {
+			if !rootCheckpointFile.IsDir() && strings.HasPrefix(rootCheckpointFile.Name(), bootstrap.FilenameWALRootCheckpoint) {
 
-				dstPath := filepath.Join(flagBootDir, model.DirnameExecutionState, rootCheckpointFile.Name())
+				dstPath := filepath.Join(flagBootDir, bootstrap.DirnameExecutionState, rootCheckpointFile.Name())
 				log.Info().Str("src", srcPath).Str("destination", dstPath).Msgf("moving file")
 				err = moveFile(srcPath, dstPath)
 				if err != nil {
@@ -165,7 +164,7 @@ func pull(cmd *cobra.Command, args []string) {
 	}
 
 	// calculate SHA256 of rootsnapshot
-	rootFile := filepath.Join(flagBootDir, model.PathRootProtocolStateSnapshot)
+	rootFile := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
 	rootSHA256, err := getFileSHA256(rootFile)
 	if err != nil {
 		log.Fatal().Err(err).Str("file", rootFile).Msg("failed to calculate SHA256 of root file")
