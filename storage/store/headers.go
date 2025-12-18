@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
@@ -29,7 +30,7 @@ var _ storage.Headers = (*Headers)(nil)
 // NewHeaders creates a Headers instance, which stores block headers.
 // It supports storing, caching and retrieving by block ID, and additionally indexes by header height and view.
 func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
-	if chainID.IsClusterChain() {
+	if cluster.IsCanonicalClusterID(chainID) {
 		panic("NewHeaders called on cluster chain ID - use NewClusterHeaders instead")
 	}
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
@@ -57,7 +58,7 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 // NewClusterHeaders creates a Headers instance for a collection cluster chain, which stores block headers for cluster blocks.
 // It supports storing, caching and retrieving by block ID, and additionally an index by header height.
 func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
-	if !chainID.IsClusterChain() {
+	if !cluster.IsCanonicalClusterID(chainID) {
 		panic("NewClusterHeaders called on non-cluster chain ID - use NewHeaders instead")
 	}
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
