@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 )
 
 var ClusterBlock clusterBlockFactory
@@ -17,7 +18,7 @@ func ClusterBlockFixture(opts ...func(*cluster.Block)) *cluster.Block {
 		HeaderBody: HeaderBodyFixture(),
 		Payload:    *ClusterPayloadFixture(3),
 	}
-	block.ChainID = "cluster"
+	block.ChainID = clusterstate.CanonicalClusterID(0, IdentifierListFixture(1))
 	for _, opt := range opts {
 		opt(block)
 	}
@@ -62,7 +63,7 @@ func (f *clusterBlockFactory) WithPayload(payload cluster.Payload) func(*cluster
 func (f *clusterBlockFactory) Genesis() (*cluster.Block, error) {
 	headerBody, err := flow.NewRootHeaderBody(flow.UntrustedHeaderBody{
 		View:      0,
-		ChainID:   "cluster",
+		ChainID:   clusterstate.CanonicalClusterID(0, IdentifierListFixture(1)),
 		Timestamp: uint64(flow.GenesisTime.UnixMilli()),
 		ParentID:  flow.ZeroID,
 	})
