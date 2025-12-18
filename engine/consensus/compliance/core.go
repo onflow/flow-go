@@ -168,17 +168,18 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	}
 
 	// first, we reject all blocks that we don't need to process:
-	// 1) blocks already in the cache; they will already be processed later
-	// 2) blocks already on disk; they were processed and await finalization
+	// 1. blocks already in the cache, that are disconnected will, they will be processed later.
+	// 2. blocks already in the cache, that were already processed, they will be eventually pruned by view.
+	// 3. blocks already on disk; they were processed and await finalization
 
-	// ignore proposals that are already cached
+	// 1,2. Ignore proposals that are already cached
 	_, cached := c.pending.ByID(blockID)
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
-	// ignore proposals that were already processed
+	// 3. Ignore proposals that were already processed
 	_, err := c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
@@ -188,46 +189,23 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
-	// there are two possibilities if the proposal is neither already pending
-	// processing in the cache, nor has already been processed:
-	// 1) the proposal is unverifiable because the parent is unknown
-	// => we cache the proposal
-	// 2) the proposal is connected to finalized state through an unbroken chain
-	// => we verify the proposal and forward it to hotstuff if valid
+	// at this point we are dealing with a block proposal that is not present both in the cache and on disk.
+	// There are three possibilities if the proposal is stored neither in cache nor on disk:
+	// 1. The proposal is connected to the finalized state => we perform the further processing and pass it to the hotstuff layer.
+	// 2. The proposal is not connected to the finalized state:
+	// 2.1 Parent has been already cached, meaning we have a partial chain => cache the proposal and wait for eventual resolution of missing the piece.
+	// 2.2 Parent has not been cached yet => cache the proposal, additionally request the missing parent from the committee.
 
-	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
-	// we don't have to request its parent block or its ancestor again, because as a
-	// pending block, its parent block must have been requested.
-	// if there was problem requesting its parent or ancestors, the sync engine's forward
-	// syncing with range requests for finalized blocks will request for the blocks.
-	_, found := c.pending.ByID(header.ParentID)
-	if found {
-		// add the block to the cache
-		if err := c.pending.Add(proposal); err != nil {
-			if mempool.IsBeyondActiveRangeError(err) {
-				// In general we expect the block buffer to use SkipNewProposalsThreshold,
-				// however since it is instantiated outside this component, we allow the thresholds to differ
-				log.Debug().Err(err).Msg("dropping block beyond block buffer active range")
-				return nil
-			}
-			return fmt.Errorf("could not add proposal to pending buffer: %w", err)
-		}
-		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
-
-		return nil
-	}
-
-	// if the proposal is connected to a block that is neither in the cache, nor
-	// in persistent storage, its direct parent is missing; cache the proposal
-	// and request the parent
+	// 1. Check if we parent is connected to the finalized state
 	exists, err := c.headers.Exists(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
+		// 2. Cache the proposal either way for 2.1 or 2.2
 		if err := c.pending.Add(proposal); err != nil {
 			if mempool.IsBeyondActiveRangeError(err) {
-				// In general we expect the block buffer to use SkipNewProposalsThreshold,
+				// In general, we expect the block buffer to use SkipNewProposalsThreshold,
 				// however since it is instantiated outside this component, we allow the thresholds to differ
 				log.Debug().Err(err).Msg("dropping block beyond block buffer active range")
 				return nil
@@ -236,12 +214,16 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 		}
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
-		c.sync.RequestBlock(header.ParentID, header.Height-1)
-		log.Debug().Msg("requesting missing parent for proposal")
+		// 2.2 Parent has not been cached yet, request it from the committee
+		if _, found := c.pending.ByID(header.ParentID); !found {
+			c.sync.RequestBlock(header.ParentID, header.Height-1)
+			log.Debug().Msg("requesting missing parent for proposal")
+		}
+
 		return nil
 	}
 
-	// At this point, we should be able to connect the proposal to the finalized
+	// 1. At this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not.
 	// processBlockAndDescendants is a recursive function. Here we trace the
 	// execution of the entire recursion, which might include processing the
