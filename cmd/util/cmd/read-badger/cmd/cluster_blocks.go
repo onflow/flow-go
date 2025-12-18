@@ -38,9 +38,9 @@ var clusterBlocksCmd = &cobra.Command{
 			log.Info().Msgf("got flag chain name: %s", flagChainName)
 			chainID := flow.ChainID(flagChainName)
 
-			headers := store.NewClusterHeaders(metrics, db, chainID)
+			clusterHeaders := store.NewClusterHeaders(metrics, db, chainID)
 			clusterPayloads := store.NewClusterPayloads(metrics, db)
-			clusterBlocks := store.NewClusterBlocks(db, chainID, headers, clusterPayloads)
+			clusterBlocks := store.NewClusterBlocks(db, chainID, clusterHeaders, clusterPayloads)
 
 			if flagClusterBlockID != "" && flagHeight != 0 {
 				return fmt.Errorf("provide either a --id or --height and not both")

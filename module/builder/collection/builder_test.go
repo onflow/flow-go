@@ -51,8 +51,8 @@ type BuilderSuite struct {
 	chainID      flow.ChainID
 	epochCounter uint64
 
-	headers          storage.Headers
-	payloads         storage.ClusterPayloads
+	clusterHeaders   storage.Headers
+	clusterPayloads  storage.ClusterPayloads
 	blocks           storage.Blocks
 	consensusHeaders storage.Headers
 
@@ -100,9 +100,9 @@ func (suite *BuilderSuite) SetupTest() {
 	all := store.InitAll(metrics, suite.db, flow.Emulator)
 	consumer := events.NewNoop()
 
-	suite.headers = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+	suite.clusterHeaders = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
 	suite.blocks = all.Blocks
-	suite.payloads = store.NewClusterPayloads(metrics, suite.db)
+	suite.clusterPayloads = store.NewClusterPayloads(metrics, suite.db)
 	suite.consensusHeaders = all.Headers
 
 	// just bootstrap with a genesis block, we'll use this as reference
@@ -135,7 +135,7 @@ func (suite *BuilderSuite) SetupTest() {
 	clusterState, err := clusterkv.Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, suite.lockManager, tracer, suite.headers, suite.payloads, suite.consensusHeaders)
+	suite.state, err = clusterkv.NewMutableState(clusterState, suite.lockManager, tracer, suite.clusterHeaders, suite.clusterPayloads, suite.consensusHeaders)
 	suite.Require().NoError(err)
 
 	state, err := pbadger.Bootstrap(
@@ -186,8 +186,8 @@ func (suite *BuilderSuite) SetupTest() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -606,8 +606,8 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -702,8 +702,8 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -735,8 +735,8 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -768,8 +768,8 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -827,8 +827,8 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -883,8 +883,8 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -924,8 +924,8 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -991,8 +991,8 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -1059,8 +1059,8 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -1123,8 +1123,8 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -1204,8 +1204,8 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -1270,8 +1270,8 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -1335,8 +1335,8 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -1398,8 +1398,8 @@ func (suite *BuilderSuite) TestBuildOn_SystemTxAlwaysIncluded() {
 		suite.protoState,
 		suite.state,
 		suite.consensusHeaders,
-		suite.headers,
-		suite.payloads,
+		suite.clusterHeaders,
+		suite.clusterPayloads,
 		suite.pool,
 		unittest.Logger(),
 		suite.epochCounter,
@@ -1492,9 +1492,9 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		all := store.InitAll(metrics, suite.db, flow.Emulator)
-		suite.headers = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+		suite.clusterHeaders = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
 		suite.blocks = all.Blocks
-		suite.payloads = store.NewClusterPayloads(metrics, suite.db)
+		suite.clusterPayloads = store.NewClusterPayloads(metrics, suite.db)
 		suite.consensusHeaders = all.Headers
 
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
@@ -1503,7 +1503,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		state, err := clusterkv.Bootstrap(suite.db, suite.lockManager, stateRoot)
 		assert.NoError(b, err)
 
-		suite.state, err = clusterkv.NewMutableState(state, suite.lockManager, tracer, suite.headers, suite.payloads, suite.consensusHeaders)
+		suite.state, err = clusterkv.NewMutableState(state, suite.lockManager, tracer, suite.clusterHeaders, suite.clusterPayloads, suite.consensusHeaders)
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool
@@ -1522,8 +1522,8 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			suite.protoState,
 			suite.state,
 			suite.consensusHeaders,
-			suite.headers,
-			suite.payloads,
+			suite.clusterHeaders,
+			suite.clusterPayloads,
 			suite.pool,
 			unittest.Logger(),
 			suite.epochCounter,

@@ -43,9 +43,9 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flo
 	error,
 ) {
 
-	headers := store.NewClusterHeaders(f.metrics, f.db, stateRoot.ClusterID())
-	payloads := store.NewClusterPayloads(f.metrics, f.db)
-	blocks := store.NewClusterBlocks(f.db, stateRoot.ClusterID(), headers, payloads)
+	clusterHeaders := store.NewClusterHeaders(f.metrics, f.db, stateRoot.ClusterID())
+	clusterPayloads := store.NewClusterPayloads(f.metrics, f.db)
+	clusterBlocks := store.NewClusterBlocks(f.db, stateRoot.ClusterID(), clusterHeaders, clusterPayloads)
 	consensusHeaders := store.NewHeaders(f.metrics, f.db, chainID) // for reference blocks
 
 	isBootStrapped, err := clusterkv.IsBootstrapped(f.db, stateRoot.ClusterID())
@@ -54,7 +54,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flo
 	}
 	var clusterState *clusterkv.State
 	if isBootStrapped {
-		clusterState, err = clusterkv.OpenState(f.db, f.tracer, headers, payloads, stateRoot.ClusterID(), stateRoot.EpochCounter())
+		clusterState, err = clusterkv.OpenState(f.db, f.tracer, clusterHeaders, clusterPayloads, stateRoot.ClusterID(), stateRoot.EpochCounter())
 		if err != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("could not open cluster state: %w", err)
 		}
@@ -65,9 +65,9 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flo
 		}
 	}
 
-	mutableState, err := clusterkv.NewMutableState(clusterState, f.lockManager, f.tracer, headers, payloads, consensusHeaders)
+	mutableState, err := clusterkv.NewMutableState(clusterState, f.lockManager, f.tracer, clusterHeaders, clusterPayloads, consensusHeaders)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
 	}
-	return mutableState, headers, payloads, blocks, consensusHeaders, err
+	return mutableState, clusterHeaders, clusterPayloads, clusterBlocks, consensusHeaders, err
 }
