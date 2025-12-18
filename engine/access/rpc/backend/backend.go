@@ -25,13 +25,13 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	txstream "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/stream"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -92,6 +92,7 @@ type Params struct {
 	Transactions             storage.Transactions
 	ExecutionReceipts        storage.ExecutionReceipts
 	ExecutionResults         storage.ExecutionResults
+	Seals                    storage.Seals
 	TxResultErrorMessages    storage.TransactionResultErrorMessages
 	ScheduledTransactions    storage.ScheduledTransactionsReader
 	ChainID                  flow.ChainID
@@ -118,7 +119,6 @@ type Params struct {
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 	TxErrorMessageProvider     error_messages.Provider
-	ScheduledCallbacksEnabled  bool
 }
 
 var _ access.API = (*Backend)(nil)
@@ -138,9 +138,9 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	systemCollection, err := system.DefaultSystemCollection(params.ChainID, params.ScheduledCallbacksEnabled)
+	systemCollections, err := systemcollection.NewVersioned(params.ChainID.Chain(), systemcollection.Default(params.ChainID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to construct system collection: %w", err)
+		return nil, fmt.Errorf("failed to create system collection set: %w", err)
 	}
 
 	accountsBackend, err := accounts.NewAccountsBackend(
@@ -220,10 +220,9 @@ func New(params Params) (*Backend, error) {
 		params.EventsIndex,
 		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
-		systemCollection,
+		systemCollections,
 		txStatusDeriver,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -233,34 +232,32 @@ func New(params Params) (*Backend, error) {
 		params.Communicator,
 		params.ExecNodeIdentitiesProvider,
 		txStatusDeriver,
-		systemCollection,
+		systemCollections,
 		params.ChainID,
-		params.ScheduledCallbacksEnabled,
 	)
 	failoverTxProvider := provider.NewFailoverTransactionProvider(localTxProvider, execNodeTxProvider)
 
 	txParams := transactions.Params{
-		Log:                          params.Log,
-		Metrics:                      params.AccessMetrics,
-		State:                        params.State,
-		ChainID:                      params.ChainID,
-		SystemCollection:             systemCollection,
-		StaticCollectionRPCClient:    params.CollectionRPC,
-		HistoricalAccessNodeClients:  params.HistoricalAccessNodes,
-		NodeCommunicator:             params.Communicator,
-		ConnFactory:                  params.ConnFactory,
-		NodeProvider:                 params.ExecNodeIdentitiesProvider,
-		Blocks:                       params.Blocks,
-		Collections:                  params.Collections,
-		Transactions:                 params.Transactions,
-		TxErrorMessageProvider:       params.TxErrorMessageProvider,
-		ScheduledTransactions:        params.ScheduledTransactions,
-		TxResultCache:                txResCache,
-		TxValidator:                  txValidator,
-		TxStatusDeriver:              txStatusDeriver,
-		EventsIndex:                  params.EventsIndex,
-		TxResultsIndex:               params.TxResultsIndex,
-		ScheduledTransactionsEnabled: params.ScheduledCallbacksEnabled,
+		Log:                         params.Log,
+		Metrics:                     params.AccessMetrics,
+		State:                       params.State,
+		ChainID:                     params.ChainID,
+		SystemCollections:           systemCollections,
+		StaticCollectionRPCClient:   params.CollectionRPC,
+		HistoricalAccessNodeClients: params.HistoricalAccessNodes,
+		NodeCommunicator:            params.Communicator,
+		ConnFactory:                 params.ConnFactory,
+		NodeProvider:                params.ExecNodeIdentitiesProvider,
+		Blocks:                      params.Blocks,
+		Collections:                 params.Collections,
+		Transactions:                params.Transactions,
+		TxErrorMessageProvider:      params.TxErrorMessageProvider,
+		ScheduledTransactions:       params.ScheduledTransactions,
+		TxResultCache:               txResCache,
+		TxValidator:                 txValidator,
+		TxStatusDeriver:             txStatusDeriver,
+		EventsIndex:                 params.EventsIndex,
+		TxResultsIndex:              params.TxResultsIndex,
 	}
 
 	switch params.TxResultQueryMode {
@@ -314,6 +311,7 @@ func New(params Params) (*Backend, error) {
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
+			seals:            params.Seals,
 		},
 		backendNetwork: backendNetwork{
 			state:                params.State,

@@ -1,4 +1,4 @@
-package optimistic_sync
+package pipeline
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/metrics"
 	reqestermock "github.com/onflow/flow-go/module/state_synchronization/requester/mock"
 	"github.com/onflow/flow-go/storage"
@@ -53,7 +54,7 @@ type PipelineFunctionalSuite struct {
 	headers                       *store.Headers
 	results                       *store.ExecutionResults
 	persistentLatestSealedResult  *store.LatestPersistedSealedResult
-	core                          *CoreImpl
+	core                          *Core
 	block                         *flow.Block
 	executionResult               *flow.ExecutionResult
 	metrics                       module.CacheMetrics
@@ -155,10 +156,16 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	require.NoError(t, err)
 
 	// Store and index sealed block execution result
-	err = p.results.Store(sealedExecutionResult)
-	p.Require().NoError(err)
+	err = unittest.WithLock(t, p.lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
+		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := p.results.BatchStore(sealedExecutionResult, rw)
+			p.Require().NoError(err)
 
-	err = p.results.Index(sealedBlock.ID(), sealedExecutionResult.ID())
+			err = p.results.BatchIndex(lctx, rw, sealedBlock.ID(), sealedExecutionResult.ID())
+			p.Require().NoError(err)
+			return nil
+		})
+	})
 	p.Require().NoError(err)
 
 	p.persistentLatestSealedResult, err = store.NewLatestPersistedSealedResult(p.consumerProgress, p.headers, p.results)
@@ -169,7 +176,7 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.txResultErrMsgsRequestTimeout = DefaultTxResultErrMsgsRequestTimeout
 
 	p.config = PipelineConfig{
-		parentState: StateWaitingPersist,
+		parentState: optimistic_sync.StateWaitingPersist,
 	}
 
 	//  generate expected data based on the fixtures
@@ -231,14 +238,22 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-		pipeline.OnParentStateUpdated(StateComplete)
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+		// Check for errors in a separate goroutine
+		go func() {
+			err := <-errChan
+			if err != nil {
+				p.T().Errorf("Pipeline error: %v", err)
+			}
+		}()
 
-		waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing, StateWaitingPersist)
+		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
+
+		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
 
 		pipeline.SetSealed()
 
-		waitForStateUpdates(p.T(), updateChan, errChan, StateComplete)
+		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateComplete)
 
 		actualEvents, err := p.persistentEvents.ByBlockID(p.block.ID())
 		p.Require().NoError(err)
@@ -287,11 +302,11 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(nil, expectedErr).Once()
 		p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-		p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-			pipeline.OnParentStateUpdated(StateComplete)
+		p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+			pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 			waitForError(p.T(), errChan, expectedErr)
-			p.Assert().Equal(StateProcessing, pipeline.GetState())
+			p.Assert().Equal(optimistic_sync.StateProcessing, pipeline.GetState())
 		}, p.config)
 	})
 
@@ -301,11 +316,11 @@ func (p *PipelineFunctionalSuite) TestPipelineDownloadError() {
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 		p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(nil, expectedErr).Once()
 
-		p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-			pipeline.OnParentStateUpdated(StateComplete)
+		p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+			pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 			waitForError(p.T(), errChan, expectedErr)
-			p.Assert().Equal(StateProcessing, pipeline.GetState())
+			p.Assert().Equal(optimistic_sync.StateProcessing, pipeline.GetState())
 		}, p.config)
 	})
 }
@@ -327,14 +342,14 @@ func (p *PipelineFunctionalSuite) TestPipelineIndexingError() {
 	expectedIndexingError := fmt.Errorf("could not perform indexing: failed to index execution data: unexpected block execution data: expected block_id=%s, actual block_id=%s",
 		p.block.ID().String(), invalidBlockID.String())
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-		pipeline.OnParentStateUpdated(StateComplete)
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
 		waitForErrorWithCustomCheckers(p.T(), errChan, func(err error) {
 			p.Require().Error(err)
 			p.Assert().Equal(expectedIndexingError.Error(), err.Error())
 		})
-		p.Assert().Equal(StateProcessing, pipeline.GetState())
+		p.Assert().Equal(optimistic_sync.StateProcessing, pipeline.GetState())
 	}, p.config)
 }
 
@@ -344,21 +359,23 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	// Mock events storage to simulate an error on a persisting step. In normal flow and with real storages,
 	// it is hard to make a meaningful error explicitly.
 	mockEvents := storagemock.NewEvents(p.T())
-	mockEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(expectedError).Once()
+	mockEvents.On("BatchStore",
+		mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+		p.block.ID(), []flow.EventsList{p.expectedData.events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(expectedError).Once()
 	p.persistentEvents = mockEvents
 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-		pipeline.OnParentStateUpdated(StateComplete)
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
-		waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing, StateWaitingPersist)
+		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
 
 		pipeline.SetSealed()
 
 		waitForError(p.T(), errChan, expectedError)
-		p.Assert().Equal(StateWaitingPersist, pipeline.GetState())
+		p.Assert().Equal(optimistic_sync.StateWaitingPersist, pipeline.GetState())
 	}, p.config)
 }
 
@@ -366,7 +383,7 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 // request of execution data. It ensures that cancellation is handled properly when triggered
 // while execution data is being downloaded.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecutionData() {
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		p.execDataRequester.
 			On("RequestExecutionData", mock.Anything).
 			Return(func(ctx context.Context) (*execution_data.BlockExecutionData, error) {
@@ -379,13 +396,13 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 		// This call marked as `Maybe()` because it may not be called depending on timing.
 		p.txResultErrMsgsRequester.On("Request", mock.Anything).Return([]flow.TransactionResultErrorMessage{}, nil).Maybe()
 
-		pipeline.OnParentStateUpdated(StateComplete)
+		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
-		waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing)
+		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing)
 		waitForError(p.T(), errChan, context.Canceled)
 
-		p.Assert().Equal(StateProcessing, pipeline.GetState())
-	}, PipelineConfig{parentState: StatePending})
+		p.Assert().Equal(optimistic_sync.StateProcessing, pipeline.GetState())
+	}, PipelineConfig{parentState: optimistic_sync.StatePending})
 }
 
 // TestMainCtxCancellationDuringRequestingTxResultErrMsgs tests context cancellation during
@@ -393,7 +410,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingExecuti
 // is cancelled during this phase, the pipeline handles the cancellation gracefully
 // and transitions to the correct state.
 func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResultErrMsgs() {
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		// This call marked as `Maybe()` because it may not be called depending on timing.
 		p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(nil, nil).Maybe()
 
@@ -406,13 +423,13 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringRequestingTxResul
 			}).
 			Once()
 
-		pipeline.OnParentStateUpdated(StateComplete)
+		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
-		waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing)
+		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing)
 		waitForError(p.T(), errChan, context.Canceled)
 
-		p.Assert().Equal(StateProcessing, pipeline.GetState())
-	}, PipelineConfig{parentState: StatePending})
+		p.Assert().Equal(optimistic_sync.StateProcessing, pipeline.GetState())
+	}, PipelineConfig{parentState: optimistic_sync.StatePending})
 }
 
 // TestMainCtxCancellationDuringWaitingPersist tests the pipeline's behavior when the main context is canceled during StateWaitingPersist.
@@ -420,10 +437,10 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() 
 	p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
-	p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
-		pipeline.OnParentStateUpdated(StateComplete)
+	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
+		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
-		waitForStateUpdates(p.T(), updateChan, errChan, StateProcessing, StateWaitingPersist)
+		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
 
 		cancel()
 
@@ -431,7 +448,7 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() 
 
 		waitForError(p.T(), errChan, context.Canceled)
 
-		p.Assert().Equal(StateWaitingPersist, pipeline.GetState())
+		p.Assert().Equal(optimistic_sync.StateWaitingPersist, pipeline.GetState())
 	}, p.config)
 }
 
@@ -445,32 +462,32 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 		name        string
 		config      PipelineConfig
 		checkError  func(err error)
-		customSetup func(pipeline Pipeline, updateChan chan State, errChan chan error)
+		customSetup func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error)
 	}{
 		{
 			name: "from StatePending",
 			config: PipelineConfig{
-				beforePipelineRun: func(pipeline *PipelineImpl) {
-					pipeline.OnParentStateUpdated(StateAbandoned)
+				beforePipelineRun: func(pipeline *Pipeline) {
+					pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned)
 				},
-				parentState: StateAbandoned,
+				parentState: optimistic_sync.StateAbandoned,
 			},
 			checkError:  assertNoError,
-			customSetup: func(pipeline Pipeline, updateChan chan State, errChan chan error) {},
+			customSetup: func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error) {},
 		},
 		{
 			name: "from StateProcessing",
 			config: PipelineConfig{
-				beforePipelineRun: func(pipeline *PipelineImpl) {
+				beforePipelineRun: func(pipeline *Pipeline) {
 					p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(func(ctx context.Context) (*execution_data.BlockExecutionData, error) {
-						pipeline.OnParentStateUpdated(StateAbandoned) // abandon during processing step
+						pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned) // abandon during processing step
 						return p.expectedExecutionData, nil
 					}).Once()
 					// this method may not be called depending on how quickly the RequestExecutionData
 					// mock returns.
 					p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Maybe()
 				},
-				parentState: StateWaitingPersist,
+				parentState: optimistic_sync.StateWaitingPersist,
 			},
 			checkError: func(err error) {
 				// depending on the timing, the error may be during or after the indexing step.
@@ -480,23 +497,23 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 					p.Require().NoError(err)
 				}
 			},
-			customSetup: func(pipeline Pipeline, updateChan chan State, errChan chan error) {
-				synctestWaitForStateUpdates(p.T(), updateChan, StateProcessing)
+			customSetup: func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error) {
+				synctestWaitForStateUpdates(p.T(), updateChan, optimistic_sync.StateProcessing)
 			},
 		},
 		{
 			name: "from StateWaitingPersist",
 			config: PipelineConfig{
-				beforePipelineRun: func(pipeline *PipelineImpl) {
+				beforePipelineRun: func(pipeline *Pipeline) {
 					p.execDataRequester.On("RequestExecutionData", mock.Anything).Return(p.expectedExecutionData, nil).Once()
 					p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 				},
-				parentState: StateWaitingPersist,
+				parentState: optimistic_sync.StateWaitingPersist,
 			},
 			checkError: assertNoError,
-			customSetup: func(pipeline Pipeline, updateChan chan State, errChan chan error) {
-				synctestWaitForStateUpdates(p.T(), updateChan, StateProcessing, StateWaitingPersist)
-				pipeline.OnParentStateUpdated(StateAbandoned)
+			customSetup: func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error) {
+				synctestWaitForStateUpdates(p.T(), updateChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
+				pipeline.OnParentStateUpdated(optimistic_sync.StateAbandoned)
 			},
 		},
 	}
@@ -507,13 +524,13 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 			p.txResultErrMsgsRequester.On("Request", mock.Anything).Unset()
 
 			synctest.Test(p.T(), func(t *testing.T) {
-				p.WithRunningPipeline(func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc) {
+				p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 					test.customSetup(pipeline, updateChan, errChan)
 
-					synctestWaitForStateUpdates(p.T(), updateChan, StateAbandoned)
+					synctestWaitForStateUpdates(p.T(), updateChan, optimistic_sync.StateAbandoned)
 					test.checkError(<-errChan)
 
-					p.Assert().Equal(StateAbandoned, pipeline.GetState())
+					p.Assert().Equal(optimistic_sync.StateAbandoned, pipeline.GetState())
 					p.Assert().Nil(p.core.workingData)
 				}, test.config)
 			})
@@ -522,20 +539,20 @@ func (p *PipelineFunctionalSuite) TestPipelineShutdownOnParentAbandon() {
 }
 
 type PipelineConfig struct {
-	beforePipelineRun func(pipeline *PipelineImpl)
-	parentState       State
+	beforePipelineRun func(pipeline *Pipeline)
+	parentState       optimistic_sync.State
 }
 
 // WithRunningPipeline is a test helper that initializes and starts a pipeline instance.
 // It manages the context and channels needed to run the pipeline and invokes the testFunc
 // with access to the pipeline, update channel, error channel, and cancel function.
 func (p *PipelineFunctionalSuite) WithRunningPipeline(
-	testFunc func(pipeline Pipeline, updateChan chan State, errChan chan error, cancel context.CancelFunc),
+	testFunc func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc),
 	pipelineConfig PipelineConfig,
 ) {
 	var err error
 
-	p.core, err = NewCoreImpl(
+	p.core, err = NewCore(
 		p.logger,
 		p.executionResult,
 		p.block,

@@ -10,7 +10,7 @@ import (
 
 // A ChainID is a unique identifier for a specific Flow network instance.
 //
-// Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
+// Chain IDs are used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
 type ChainIDList []ChainID
 
@@ -59,7 +59,7 @@ func AllChainIDs() ChainIDList {
 
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
-	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet || c == Previewnet
+	return c == Emulator || c == MonotonicEmulator || c == Localnet || c == Benchnet || c == BftTestnet || c == Previewnet
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally

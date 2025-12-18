@@ -991,7 +991,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
 
-			address := flow.ConvertAddress(
+			address := flow.Address(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
 					cadenceStdlib.AccountEventAddressParameter.Identifier,
@@ -2432,7 +2432,7 @@ func TestInteractionLimit(t *testing.T) {
 				return snapshotTree, err
 			}
 
-			address = flow.ConvertAddress(
+			address = flow.Address(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
 					cadenceStdlib.AccountEventAddressParameter.Identifier,
@@ -2949,7 +2949,10 @@ func TestFlowCallbackScheduler(t *testing.T) {
 	t.Parallel()
 
 	ctxOpts := []fvm.Option{
-		fvm.WithScheduleCallbacksEnabled(true),
+		fvm.WithScheduledTransactionsEnabled(true),
+		// use localnet to ensure the scheduled transaction executor account
+		// is created during bootstrap, since testnet is manually created
+		fvm.WithChain(flow.Localnet.Chain()),
 	}
 
 	newVMTest().
@@ -2962,17 +2965,41 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-			require.NotNil(t, sc.FlowCallbackScheduler.Address)
-			require.NotNil(t, sc.FlowCallbackScheduler.Name)
+			require.NotNil(t, sc.FlowTransactionScheduler.Address)
+			require.NotNil(t, sc.FlowTransactionScheduler.Name)
+			require.NotNil(t, sc.ScheduledTransactionExecutor.Address)
 
+			_, err := fvm.GetAccount(ctx, sc.ScheduledTransactionExecutor.Address, snapshotTree)
+			require.NoError(t, err)
+
+			// Verify that the capability was stored in the executor account
 			script := fvm.Script([]byte(fmt.Sprintf(`
+			import FlowTransactionScheduler from %s
+
+			access(all) fun main(executorAddress: Address): Bool {
+				let executorAccount = getAccount(executorAddress)
+				return executorAccount.storage.check<Capability<auth(FlowTransactionScheduler.Execute) &FlowTransactionScheduler.SharedScheduler>>(
+					from: /storage/executeScheduledTransactionsCapability
+				)
+			}
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
+
+			executorAddressArg, err := jsoncdc.Encode(cadence.Address(sc.ScheduledTransactionExecutor.Address))
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(ctx, script.WithArguments(executorAddressArg), snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Equal(t, cadence.Bool(true), output.Value)
+
+			script = fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): FlowTransactionScheduler.Status? {
 					return FlowTransactionScheduler.getStatus(id: 1)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
-			_, output, err := vm.Run(ctx, script, snapshotTree)
+			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 			require.NotNil(t, output.Value)
@@ -2983,7 +3010,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 				access(all) fun main(): UInt64 {
 					return FlowTransactionScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowTransactionScheduler.Priority.High)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)
@@ -3010,14 +3037,12 @@ func TestEVM(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
 	}
 
 	t.Run("successful transaction", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3076,7 +3101,6 @@ func TestEVM(t *testing.T) {
 
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3114,7 +3138,6 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the EVM error is correctly returned as an error and has a correct type
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3169,7 +3192,6 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3219,7 +3241,6 @@ func TestEVM(t *testing.T) {
 			txBody, err := txBodyBuilder.Build()
 			require.NoError(t, err)
 
-			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
@@ -3281,7 +3302,6 @@ func TestVMBridge(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
@@ -3289,7 +3309,7 @@ func TestVMBridge(t *testing.T) {
 	}
 
 	t.Run("successful FT Type Onboarding and Bridging", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withBootstrapProcedureOptions(fvm.WithSetupVMBridgeEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3527,7 +3547,7 @@ func TestVMBridge(t *testing.T) {
 	)
 
 	t.Run("successful NFT Type Onboarding and Bridging", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withBootstrapProcedureOptions(fvm.WithSetupVMBridgeEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -4174,7 +4194,6 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 	t.Run("block hash list write on push", newVMTest().
 		withContextOptions(
 			fvm.WithChain(chain),
-			fvm.WithEVMEnabled(true),
 		).
 		run(func(
 			t *testing.T,

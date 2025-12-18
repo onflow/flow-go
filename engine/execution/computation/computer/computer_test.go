@@ -381,7 +381,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("system chunk transaction should not fail", func(t *testing.T) {
 		// include all fees. System chunk should ignore them
 		contextOptions := []fvm.Option{
-			fvm.WithEVMEnabled(true),
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithBlocks(&environment.NoopBlockFinder{}),
@@ -1231,7 +1230,6 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
-		fvm.WithEVMEnabled(true),
 		fvm.WithChain(flow.Localnet.Chain()),
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
@@ -1368,17 +1366,17 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	committer.AssertExpectations(t)
 }
 
-func Test_ScheduledCallback(t *testing.T) {
+func Test_ScheduledTransactions(t *testing.T) {
 	chain := flow.Testnet.Chain()
 
 	t.Run("process with no scheduled callback", func(t *testing.T) {
-		testScheduledCallback(t, chain, []cadence.Event{}, 2) // process callback + system chunk
+		testScheduledTransactions(t, chain, []cadence.Event{}, 2) // process callback + system chunk
 	})
 
 	t.Run("process with 2 scheduled callbacks", func(t *testing.T) {
 		// create callback events that process callback will return
 		env := systemcontracts.SystemContractsForChain(chain.ChainID())
-		location := common.NewAddressLocation(nil, common.Address(env.FlowCallbackScheduler.Address), "FlowTransactionScheduler")
+		location := common.NewAddressLocation(nil, common.Address(env.FlowTransactionScheduler.Address), "FlowTransactionScheduler")
 
 		eventType := cadence.NewEventType(
 			location,
@@ -1419,25 +1417,25 @@ func Test_ScheduledCallback(t *testing.T) {
 			},
 		).WithType(eventType)
 
-		testScheduledCallback(t, chain, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
+		testScheduledTransactions(t, chain, []cadence.Event{callbackEvent1, callbackEvent2}, 4) // process callback + 2 callbacks + system chunk
 	})
 
 	t.Run("process callback transaction execution error", func(t *testing.T) {
 		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback execution failed")
-		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 0, processCallbackError, nil)
+		testScheduledTransactionsWithError(t, chain, []cadence.Event{}, 0, processCallbackError, nil)
 	})
 
 	t.Run("process callback transaction output error", func(t *testing.T) {
 		processCallbackError := fvmErrors.NewInvalidAddressErrorf(flow.EmptyAddress, "process callback output error")
-		testScheduledCallbackWithError(t, chain, []cadence.Event{}, 2, nil, processCallbackError)
+		testScheduledTransactionsWithError(t, chain, []cadence.Event{}, 2, nil, processCallbackError)
 	})
 }
 
-func testScheduledCallback(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int) {
-	testScheduledCallbackWithError(t, chain, callbackEvents, expectedTransactionCount, nil, nil)
+func testScheduledTransactions(t *testing.T, chain flow.Chain, callbackEvents []cadence.Event, expectedTransactionCount int) {
+	testScheduledTransactionsWithError(t, chain, callbackEvents, expectedTransactionCount, nil, nil)
 }
 
-func testScheduledCallbackWithError(
+func testScheduledTransactionsWithError(
 	t *testing.T,
 	chain flow.Chain,
 	callbackEvents []cadence.Event,
@@ -1451,7 +1449,7 @@ func testScheduledCallbackWithError(
 	testLogger := NewTestLogger()
 
 	execCtx := fvm.NewContext(
-		fvm.WithScheduleCallbacksEnabled(true), // Enable callbacks
+		fvm.WithScheduledTransactionsEnabled(true), // Enable scheduled transactions
 		fvm.WithChain(chain),
 		fvm.WithLogger(testLogger.Logger),
 	)
@@ -1562,9 +1560,9 @@ func testScheduledCallbackWithError(
 		Return(nil).
 		Times(1)
 
-	// expect callback execution metrics if there are callbacks
+	// expect scheduled transaction execution metrics if there are scheduled transactions
 	if len(callbackEvents) > 0 {
-		exemetrics.On("ExecutionCallbacksExecuted",
+		exemetrics.On("ExecutionScheduledTransactionsExecuted",
 			mock.Anything,
 			mock.Anything,
 			mock.Anything).
@@ -1789,7 +1787,7 @@ func (c *callbackTestExecutor) Output() fvm.ProcedureOutput {
 			Events: events,
 		}
 	// scheduled callbacks execute transaction
-	case strings.Contains(string(txBody.Script), "scheduler.executeTransaction"):
+	case strings.Contains(string(txBody.Script), "schedulerRef.executeTransaction"):
 		// extract the callback ID from the arguments
 		if len(txBody.Arguments) == 0 {
 			return fvm.ProcedureOutput{}

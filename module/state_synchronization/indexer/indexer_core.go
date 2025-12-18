@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -144,8 +145,9 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		return fmt.Errorf("must index block data with the next height %d, but got %d", latest+1, header.Height)
 	}
 
-	// allow rerunning the indexer for same height since we are fetching height from register storage, but there are other storages
-	// for indexing resources which might fail to update the values, so this enables rerunning and reindexing those resources
+	// Data for the block is stored into both the protocol and registers databases. This creates a
+	// race condition where it's possible only one completes if the node crashes at an inopportune time.
+	// In this case, allow reindexing the last block. Both databases should treat this as a no-op.
 	if header.Height == latest {
 		lg.Warn().Msg("reindexing block data")
 		c.metrics.BlockReindexed()
@@ -169,23 +171,19 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		systemChunkEvents := data.ChunkExecutionDatas[systemChunkIndex].Events
 		systemChunkResults := data.ChunkExecutionDatas[systemChunkIndex].TransactionResults
 
-		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, systemChunkResults, systemChunkEvents)
+		scheduledTransactionData, err := collectScheduledTransactions(c.fvmEnv, c.chainID, header.Height, systemChunkResults, systemChunkEvents)
 		if err != nil {
 			return fmt.Errorf("could not collect scheduled transaction data: %w", err)
 		}
 
-		err = storage.WithLocks(c.lockManager, []string{
-			storage.LockInsertLightTransactionResult,
-			storage.LockIndexScheduledTransaction,
-		},
+		err = storage.WithLocks(c.lockManager, storage.LockGroupAccessStateSyncIndexBlockData,
 			func(lctx lockctx.Context) error {
 				return c.protocolDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, rw)
+					err := c.events.BatchStore(lctx, data.BlockID, []flow.EventsList{events}, rw)
 					if err != nil {
 						return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
 					}
 
-					// requires the [storage.LockInsertLightTransactionResult] lock
 					err = c.results.BatchStore(lctx, rw, data.BlockID, results)
 					if err != nil {
 						return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
@@ -203,6 +201,10 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			})
 
 		if err != nil {
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				// Since reindexing is a no-op, return early without an error
+				return nil
+			}
 			return fmt.Errorf("could not commit block data: %w", err)
 		}
 
@@ -228,18 +230,17 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		// than the latest indexed block. Calling the collection handler with a collection that
 		// has already been indexed is a noop.
 
-		// index all collections except the system chunk. if there is only a single chunk, it is the
-		// system chunk and can be skipped.
-		indexedCount := 0
-		if len(data.ChunkExecutionDatas) > 1 {
-			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				c.collectionIndexer.OnCollectionReceived(chunk.Collection)
-				indexedCount++
+		// index all standard (non-system) collections
+		standardCollections := data.StandardCollections()
+		if len(standardCollections) > 0 {
+			err := c.collectionIndexer.IndexCollections(standardCollections)
+			if err != nil {
+				return fmt.Errorf("could not index collections: %w", err)
 			}
 		}
 
 		lg.Debug().
-			Int("collection_count", indexedCount).
+			Int("collection_count", len(standardCollections)).
 			Dur("duration_ms", time.Since(start)).
 			Msg("indexed collections")
 
@@ -317,6 +318,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 func collectScheduledTransactions(
 	fvmEnv templates.Environment,
 	chainID flow.ChainID,
+	height uint64,
 	systemChunkResults []flow.LightTransactionResult,
 	systemChunkEvents []flow.Event,
 ) (map[flow.Identifier]uint64, error) {
@@ -341,9 +343,9 @@ func collectScheduledTransactions(
 
 	// there are 3 possible valid cases:
 	// 1. N (1 or more) scheduled transaction were executed, there should be N + 2 results
-	//    (N scheduled transactions, process callback tx, and the standard system tx)
+	//    (N scheduled transactions, process scheduled transactions tx, and the standard system tx)
 	// 2. 0 scheduled transactions were executed, and scheduled transactions are enabled. there should be 2 results
-	//    (process callback tx, and the standard system tx)
+	//    (process scheduled transactions tx, and the standard system tx)
 	// 3. 0 scheduled transactions were executed, and scheduled transactions are disabled. there should be 1 result
 	//    (the standard system tx)
 	// there is currently no way to determine if scheduled transactions are enabled or disabled, so
@@ -362,11 +364,18 @@ func collectScheduledTransactions(
 	// if there were scheduled transactions, there should be exactly 2 more results than there were
 	// scheduled transactions.
 	if len(scheduledTransactionIDs) != len(systemChunkResults)-2 {
-		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled callbacks", len(systemChunkResults), len(scheduledTransactionIDs))
+		return nil, fmt.Errorf("system chunk contained %d results, but found %d scheduled transactions", len(systemChunkResults), len(scheduledTransactionIDs))
 	}
 
 	// reconstruct the system collection, and verify that the results match the expected transaction
-	systemCollection, err := blueprints.SystemCollection(chainID.Chain(), pendingExecutionEvents)
+	versionedCollection := systemcollection.Default(chainID)
+	systemCollection, err := versionedCollection.
+		ByHeight(height).
+		SystemCollection(chainID.Chain(),
+			func() (flow.EventsList, error) {
+				return pendingExecutionEvents, nil
+			},
+		)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct system collection: %w", err)
 	}

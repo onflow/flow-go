@@ -19,11 +19,11 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/system"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -54,11 +54,11 @@ type Transactions struct {
 	transactions          storage.Transactions
 	scheduledTransactions storage.ScheduledTransactionsReader
 
-	txValidator      *validator.TransactionValidator
-	txProvider       provider.TransactionProvider
-	txStatusDeriver  *txstatus.TxStatusDeriver
-	systemCollection *system.SystemCollection
-	txResultCache    TxResultCache
+	txValidator       *validator.TransactionValidator
+	txProvider        provider.TransactionProvider
+	txStatusDeriver   *txstatus.TxStatusDeriver
+	systemCollections *systemcollection.Versioned
+	txResultCache     TxResultCache
 
 	scheduledTransactionsEnabled bool
 }
@@ -70,7 +70,7 @@ type Params struct {
 	Metrics                      module.TransactionMetrics
 	State                        protocol.State
 	ChainID                      flow.ChainID
-	SystemCollection             *system.SystemCollection
+	SystemCollections            *systemcollection.Versioned
 	StaticCollectionRPCClient    accessproto.AccessAPIClient
 	HistoricalAccessNodeClients  []accessproto.AccessAPIClient
 	NodeCommunicator             node_communicator.Communicator
@@ -97,7 +97,7 @@ func NewTransactionsBackend(params Params) (*Transactions, error) {
 		metrics:                      params.Metrics,
 		state:                        params.State,
 		chainID:                      params.ChainID,
-		systemCollection:             params.SystemCollection,
+		systemCollections:            params.SystemCollections,
 		collectionRPCClient:          params.StaticCollectionRPCClient,
 		historicalAccessNodeClients:  params.HistoricalAccessNodeClients,
 		nodeCommunicator:             params.NodeCommunicator,
@@ -250,7 +250,7 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 	}
 
 	// check if it's one of the static system txs
-	if tx, ok := t.systemCollection.ByID(txID); ok {
+	if tx, ok := t.systemCollections.SearchAll(txID); ok {
 		return tx, nil
 	}
 
@@ -274,7 +274,6 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 // Returns false and no error if the transaction is not a known scheduled tx.
 //
 // Expected error returns during normal operation:
-//   - [codes.NotFound]: if the transaction is not a scheduled transaction was not found in the block
 //   - [codes.Internal]: if there was an error looking up the events
 func (t *Transactions) lookupScheduledTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, bool, error) {
 	blockID, err := t.scheduledTransactions.BlockIDByTransactionID(txID)
@@ -480,9 +479,7 @@ func (t *Transactions) lookupSystemTransactionResult(
 	blockID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, bool, error) {
-	// TODO: system transactions can change over time. Use the blockID to get the correct system tx
-	// for the provided block.
-	if _, ok := t.systemCollection.ByID(txID); !ok {
+	if _, ok := t.systemCollections.SearchAll(txID); !ok {
 		return nil, false, nil // tx is not a system tx
 	}
 
@@ -655,20 +652,24 @@ func (t *Transactions) GetSystemTransaction(
 	txID flow.Identifier,
 	blockID flow.Identifier,
 ) (*flow.TransactionBody, error) {
-	if txID == flow.ZeroID {
-		txID = t.systemCollection.SystemTxID()
-	}
-
-	tx, ok := t.systemCollection.ByID(txID)
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "no system transaction with the provided ID found")
-	}
-
-	// TODO: system tx can change. we should lookup the correct system tx for the block instead of
-	// always returning the current system tx.
-	_, err := t.state.AtBlockID(blockID).Head()
+	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
+	}
+
+	if txID == flow.ZeroID {
+		systemChunkTx, err := t.systemCollections.
+			ByHeight(header.Height).
+			SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get system chunk transaction: %v", err)
+		}
+		txID = systemChunkTx.ID()
+	}
+
+	tx, ok := t.systemCollections.SearchAll(txID)
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "no system transaction with the provided ID found")
 	}
 
 	return tx, nil
@@ -684,8 +685,19 @@ func (t *Transactions) GetSystemTransactionResult(
 	blockID flow.Identifier,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.TransactionResult, error) {
+	header, err := t.state.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	if txID == flow.ZeroID {
-		txID = t.systemCollection.SystemTxID()
+		systemChunkTx, err := t.systemCollections.
+			ByHeight(header.Height).
+			SystemChunkTransaction(t.chainID.Chain())
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get system chunk transaction: %v", err)
+		}
+		txID = systemChunkTx.ID()
 	}
 
 	txResult, isSystemTx, err := t.lookupSystemTransactionResult(ctx, txID, blockID, encodingVersion)

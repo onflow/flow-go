@@ -66,7 +66,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -183,7 +182,6 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
-	scheduledCallbacksEnabled            bool
 }
 
 type PublicNetworkConfig struct {
@@ -291,7 +289,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             0,
-		scheduledCallbacksEnabled:            fvm.DefaultScheduledCallbacksEnabled,
 	}
 }
 
@@ -505,12 +502,12 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			builder.FollowerDistributor,
 			node.ComplianceConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
@@ -535,12 +532,12 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
 			spamConfig,
+			builder.FollowerDistributor,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
-		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return builder.SyncEng, nil
 	})
@@ -758,13 +755,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.Storage.Headers,
 				builder.executionDataConfig,
 				execDataDistributor,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
 			}
 			builder.ExecutionDataRequester = r
-
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
 			// to wait for the requester to be ready before starting.
@@ -1324,10 +1320,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
-		flags.BoolVar(&builder.scheduledCallbacksEnabled,
-			"scheduled-callbacks-enabled",
-			defaultConfig.scheduledCallbacksEnabled,
-			"whether to include scheduled callback transactions in system collections.")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1516,6 +1508,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		var unusedRetryEnabled bool
 		flags.BoolVar(&unusedRetryEnabled, "retry-enabled", false, "[deprecated] whether to enable the retry mechanism at the access node level")
 		_ = flags.MarkDeprecated("retry-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
+
+		var unusedScheduledCallbacksEnabled bool
+		flags.BoolVar(&unusedScheduledCallbacksEnabled, "scheduled-callbacks-enabled", false, "[deprecated] whether to include scheduled callback transactions in system collections.")
+		_ = flags.MarkDeprecated("scheduled-callbacks-enabled", "[deprecated] this flag is ignored and will be removed in a future release.")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -2129,6 +2125,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:          notNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
+				Seals:                 node.Storage.Seals,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
 				ScheduledTransactions: builder.scheduledTransactions,          // might be nil
 				ChainID:               node.RootChainID,
@@ -2160,7 +2157,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
 				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
-				ScheduledCallbacksEnabled:  builder.scheduledCallbacksEnabled,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2181,6 +2177,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.stateStreamBackend),
 				builder.stateStreamConf,
 				indexReporter,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, err
@@ -2193,7 +2190,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
 		}).
@@ -2215,6 +2211,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			collectionIndexer, err := collections.NewIndexer(
 				node.Logger,
+				builder.ProtocolDB,
 				notNil(builder.collectionExecutedMetric),
 				node.State,
 				node.Storage.Blocks,
@@ -2233,6 +2230,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			var executionDataSyncer *collections.ExecutionDataSyncer
 			if builder.executionDataSyncEnabled && !builder.executionDataIndexingEnabled {
 				executionDataSyncer = collections.NewExecutionDataSyncer(
+					node.Logger,
 					notNil(builder.ExecutionDataCache),
 					collectionIndexer,
 				)
@@ -2269,6 +2267,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.EngineRegistry,
 				node.State,
 				node.Me,
+				node.StorageLockMgr,
+				node.ProtocolDB,
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
@@ -2277,6 +2277,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.CollectionIndexer),
 				notNil(builder.collectionExecutedMetric),
 				notNil(builder.TxResultErrorMessagesCore),
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, err
@@ -2284,7 +2285,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.IngestEng = ingestEng
 
 			ingestionDependable.Init(builder.IngestEng)
-			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
 		})
@@ -2321,11 +2321,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					node.Storage.Headers,
 					processedTxErrorMessagesBlockHeight,
 					builder.TxResultErrorMessagesCore,
+					builder.FollowerDistributor,
 				)
 				if err != nil {
 					return nil, err
 				}
-				builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
 
 				return engine, nil
 			})
@@ -2341,11 +2341,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				node.Storage.Blocks,
 				builder.SyncCore,
+				builder.FollowerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
-			builder.FollowerDistributor.AddFinalizationConsumer(syncRequestHandler)
 
 			return syncRequestHandler, nil
 		})

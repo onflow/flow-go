@@ -3,7 +3,9 @@
 package mock
 
 import (
+	lockctx "github.com/jordanschalm/lockctx"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/storage"
@@ -32,17 +34,17 @@ func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.Re
 	return r0
 }
 
-// BatchStore provides a mock function with given fields: blockID, events, batch
-func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
-	ret := _m.Called(blockID, events, batch)
+// BatchStore provides a mock function with given fields: lctx, blockID, events, batch
+func (_m *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+	ret := _m.Called(lctx, blockID, events, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchStore")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList, storage.ReaderBatchWriter) error); ok {
-		r0 = rf(blockID, events, batch)
+	if rf, ok := ret.Get(0).(func(lockctx.Proof, flow.Identifier, []flow.EventsList, storage.ReaderBatchWriter) error); ok {
+		r0 = rf(lctx, blockID, events, batch)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -168,24 +170,6 @@ func (_m *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uin
 	}
 
 	return r0, r1
-}
-
-// Store provides a mock function with given fields: blockID, blockEvents
-func (_m *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
-	ret := _m.Called(blockID, blockEvents)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList) error); ok {
-		r0 = rf(blockID, blockEvents)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // NewEvents creates a new instance of Events. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

@@ -11,7 +11,6 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -77,6 +76,7 @@ type Suite struct {
 	transactions          *storagemock.Transactions
 	receipts              *storagemock.ExecutionReceipts
 	results               *storagemock.ExecutionResults
+	seals                 *storagemock.Seals
 	transactionResults    *storagemock.LightTransactionResults
 	events                *storagemock.Events
 	scheduledTransactions *storagemock.ScheduledTransactions
@@ -125,6 +125,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
+	suite.seals = new(storagemock.Seals)
 	suite.txErrorMessages = storagemock.NewTransactionResultErrorMessages(suite.T())
 	suite.colClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -922,7 +923,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
-	block := unittest.BlockFixture()
+	block := unittest.BlockFixture(unittest.Block.WithHeight(1))
 	blockId := block.ID()
 	index := uint32(0)
 
@@ -956,6 +957,12 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.execClient.
 		On("GetTransactionResultByIndex", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
+
+	suite.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, mock.Anything).
+		Return(&execproto.GetEventsForBlockIDsResponse{
+			Results: []*execproto.GetEventsForBlockIDsResponse_Result{},
+		}, nil)
 
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
@@ -1008,7 +1015,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	}
 
 	exeEventResp := &execproto.GetTransactionResultsResponse{
-		TransactionResults:   []*execproto.GetTransactionResultResponse{{}},
+		TransactionResults:   []*execproto.GetTransactionResultResponse{{}, {}},
 		EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
 	}
 
@@ -1017,10 +1024,16 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.ScheduledCallbacksEnabled = true
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
+
+	suite.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, mock.Anything).
+		Return(&execproto.GetEventsForBlockIDsResponse{
+			Results: []*execproto.GetEventsForBlockIDsResponse_Result{},
+		}, nil).
+		Maybe()
 
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
@@ -1561,13 +1574,28 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 	nonexistingBlockID := unittest.IdentifierFixture()
 
+	// Create a seal for the existing block
+	seal := unittest.Seal.Fixture(
+		unittest.Seal.WithBlockID(blockID),
+		unittest.Seal.WithResult(executionResult),
+	)
+
 	results := new(storagemock.ExecutionResults)
-	results.
-		On("ByBlockID", nonexistingBlockID).
+	seals := new(storagemock.Seals)
+
+	// Mock seals for nonexisting block
+	seals.
+		On("FinalizedSealForBlock", nonexistingBlockID).
 		Return(nil, storage.ErrNotFound)
 
+	// Mock seals for existing block
+	seals.
+		On("FinalizedSealForBlock", blockID).
+		Return(seal, nil)
+
+	// Mock execution results by ID (using seal.ResultID)
 	results.
-		On("ByBlockID", blockID).
+		On("ByID", seal.ResultID).
 		Return(executionResult, nil)
 
 	suite.Run("nonexisting execution results", func() {
@@ -1575,6 +1603,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
+		params.Seals = seals
 		params.ConnFactory = connFactory
 
 		backend, err := New(params)
@@ -1591,6 +1620,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
+		params.Seals = seals
 		params.ConnFactory = connFactory
 
 		backend, err := New(params)
@@ -1605,6 +1635,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	})
 
 	results.AssertExpectations(suite.T())
+	seals.AssertExpectations(suite.T())
 	suite.assertAllExpectations()
 }
 
@@ -1848,7 +1879,7 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
-	block := unittest.BlockFixture()
+	block := unittest.BlockFixture(unittest.Block.WithHeight(1))
 	blockId := block.ID()
 	index := uint32(0)
 
@@ -1871,6 +1902,14 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
+
+	// Mock GetEventsForBlockIDs for system collection construction
+	suite.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, mock.Anything).
+		Return(&execproto.GetEventsForBlockIDsResponse{
+			Results: []*execproto.GetEventsForBlockIDsResponse_Result{},
+		}, nil).
+		Maybe()
 
 	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
 	ccfEvents, jsoncdcEvents := generateEncodedEvents(suite.T(), 1)
@@ -1909,6 +1948,10 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultsByBlockID", version.String()), func() {
 			exeEventResp := &execproto.GetTransactionResultsResponse{
 				TransactionResults: []*execproto.GetTransactionResultResponse{
+					{
+						Events:               eventMessages,
+						EventEncodingVersion: exeNodeEventEncodingVersion,
+					},
 					{
 						Events:               eventMessages,
 						EventEncodingVersion: exeNodeEventEncodingVersion,
@@ -2022,7 +2065,7 @@ func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 }
 
 func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
-	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	ccfEvents := unittest.EventGenerator.GetEventsWithEncoding(n, entitiesproto.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, n)
 	for i, e := range ccfEvents {
 		jsonEvent, err := convert.CcfEventToJsonEvent(e)
@@ -2041,6 +2084,7 @@ func (suite *Suite) defaultBackendParams() Params {
 		Transactions:         suite.transactions,
 		ExecutionReceipts:    suite.receipts,
 		ExecutionResults:     suite.results,
+		Seals:                suite.seals,
 		ChainID:              suite.chainID,
 		CollectionRPC:        suite.colClient,
 		MaxHeightRange:       events.DefaultMaxHeightRange,

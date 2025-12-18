@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion/collections"
@@ -58,6 +60,8 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
+	db                storage.DB
+	lockManager       storage.LockManager
 	blocks            storage.Blocks
 	executionReceipts storage.ExecutionReceipts
 	maxReceiptHeight  uint64
@@ -83,6 +87,8 @@ func New(
 	net network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
+	lockManager storage.LockManager,
+	db storage.DB,
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
@@ -91,6 +97,7 @@ func New(
 	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -116,6 +123,8 @@ func New(
 		log:                      log.With().Str("engine", "ingestion").Logger(),
 		state:                    state,
 		me:                       me,
+		lockManager:              lockManager,
+		db:                       db,
 		blocks:                   blocks,
 		executionResults:         executionResults,
 		executionReceipts:        executionReceipts,
@@ -180,6 +189,8 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
+
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -334,9 +345,9 @@ func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event int
 	return e.process(originID, event)
 }
 
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+// onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization registrar and forwards them to the finalizedBlockConsumer.
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.finalizedBlockNotifier.Notify()
 }
 
@@ -355,17 +366,27 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexBlockContainingCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := storage.WithLocks(e.lockManager, storage.LockGroupAccessFinalizingBlock, func(lctx lockctx.Context) error {
+		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// requires [storage.LockIndexBlockByPayloadGuarantees] lock
+			err := e.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
+			if err != nil {
+				return fmt.Errorf("could not index block for collections: %w", err)
+			}
+
+			// loop through seals and index ID -> result ID
+			for _, seal := range block.Payload.Seals {
+				// requires [storage.LockIndexExecutionResult] lock
+				err := e.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
+				if err != nil {
+					return fmt.Errorf("could not index block for execution result: %w", err)
+				}
+			}
+			return nil
+		})
+	})
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
-	}
-
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
 	}
 
 	err = e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)

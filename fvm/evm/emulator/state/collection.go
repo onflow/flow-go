@@ -257,8 +257,8 @@ func (v ByteStringValue) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
 	return v, nil
 }
 
-func (v ByteStringValue) Storable(storage atree.SlabStorage, address atree.Address, maxInlineSize uint64) (atree.Storable, error) {
-	if uint64(v.ByteSize()) <= maxInlineSize {
+func (v ByteStringValue) Storable(storage atree.SlabStorage, address atree.Address, maxInlineSize uint32) (atree.Storable, error) {
+	if v.ByteSize() <= maxInlineSize {
 		return v, nil
 	}
 
