@@ -47,10 +47,10 @@ type Builder struct {
 
 	// cache of values about the operating epoch which never change:
 	// We can't specify the height of the epoch's first consensus block (height ON MAIN CHAIN) during which this cluster is
-	// active, because the builder is typically _instantiated_ before the epoch starts. However, the builder should only be 
-	// called once the epoch has started, i.e. consensus has finalized the first block in the epoch. Consequently, we 
+	// active, because the builder is typically _instantiated_ before the epoch starts. However, the builder should only be
+	// called once the epoch has started, i.e. consensus has finalized the first block in the epoch. Consequently, we
 	// retrieve the epoch's first height on the first call of the builder, and cache it.
-	epochFirstHeight *uint64  
+	epochFirstHeight *uint64
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }

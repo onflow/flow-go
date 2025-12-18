@@ -6,12 +6,11 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/store"
-
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func init() {
