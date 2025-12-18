@@ -31,11 +31,12 @@ type ErrMismatch struct {
 }
 
 func (e *ErrMismatch) Error() string {
+	msg := "register value mismatch"
 	if e.Message != "" {
-		return e.Message
+		msg = e.Message
 	}
-	return fmt.Sprintf("register value mismatch: owner=%s, key=%s, height=%d, stored_length=%d, expected_length=%d",
-		e.RegisterID.Owner, e.RegisterID.Key, e.Height, e.StoredLength, e.ExpectedLength)
+	return fmt.Sprintf("%s: owner=%x, key=%x, height=%d, stored_length=%d, expected_length=%d",
+		msg, e.RegisterID.Owner, e.RegisterID.Key, e.Height, e.StoredLength, e.ExpectedLength)
 }
 
 // IsErrMismatch returns true if the given error is an ErrMismatch or wraps an ErrMismatch.
@@ -177,7 +178,7 @@ func validateRegister(store execution.OnDiskRegisterStore, leafNode *wal.LeafNod
 				ExpectedLength: len(expectedValue),
 				StoredData:     nil,
 				ExpectedData:   expectedValue,
-				Message:        fmt.Sprintf("register not found in store: owner=%s, key=%s, height=%d", registerID.Owner, registerID.Key, height),
+				Message:        "register not found in store",
 			}
 		}
 		// other store errors are exceptions
