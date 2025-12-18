@@ -155,8 +155,8 @@ func testCases() []testCase {
 
 func TestURLToRoute(t *testing.T) {
 	for _, tt := range testCases() {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := URLToRoute(tt.method + " " + tt.url)
+		t.Run(tt.method+" "+tt.name, func(t *testing.T) {
+			got, err := MethodURLToRoute(tt.method, tt.url)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -166,10 +166,9 @@ func TestURLToRoute(t *testing.T) {
 func TestBenchmarkURLToRoute(t *testing.T) {
 	for _, tt := range testCases() {
 		t.Run(tt.method+" "+tt.name, func(t *testing.T) {
-			id := tt.method + " " + tt.url
 			start := time.Now()
 			for i := 0; i < 100_000; i++ {
-				_, _ = URLToRoute(id)
+				_, _ = MethodURLToRoute(tt.method, tt.url)
 			}
 			t.Logf("%s %s: %v", tt.method, tt.name, time.Since(start)/100_000)
 		})

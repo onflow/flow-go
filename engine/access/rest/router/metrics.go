@@ -2,35 +2,29 @@ package router
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 )
 
-// For each compiled route regex store a map[method]routeName
-var routePatterns []*regexp.Regexp
-var routeMethodNameMap map[*regexp.Regexp]map[string]string
+// routeMatcher ties together an HTTP method with a compiled regex for the path and the route name.
+type routeMatcher struct {
+	method string
+	re     *regexp.Regexp
+	name   string
+}
+
+var matchers []routeMatcher
 
 func init() {
-	routePatterns = make([]*regexp.Regexp, 0, len(Routes)+len(WSLegacyRoutes))
-	routeMethodNameMap = make(map[*regexp.Regexp]map[string]string)
-
-	// Deduplicate compiled regex by pattern string (for GET/POST same path)
-	regexByPattern := make(map[string]*regexp.Regexp)
+	matchers = make([]routeMatcher, 0, len(Routes)+len(WSLegacyRoutes))
 
 	add := func(method, pattern, name string) {
-		// Compile one regex per unique path pattern
 		regexPattern := "^" + patternToRegex(pattern) + "$"
-
-		re, ok := regexByPattern[regexPattern]
-		if !ok {
-			re = regexp.MustCompile(regexPattern)
-			regexByPattern[regexPattern] = re
-			routePatterns = append(routePatterns, re)
-			routeMethodNameMap[re] = make(map[string]string)
-		}
-
-		routeMethodNameMap[re][method] = name
+		matchers = append(matchers, routeMatcher{
+			method: method,
+			re:     regexp.MustCompile(regexPattern),
+			name:   name,
+		})
 	}
 
 	for _, r := range Routes {
@@ -55,36 +49,32 @@ func patternToRegex(pattern string) string {
 	return escaped
 }
 
+// MethodURLToRoute matches (method, url) against compiled route regexes and returns the route name.
 func MethodURLToRoute(method, url string) (string, error) {
 	path := strings.TrimPrefix(url, "/v1")
 
-	for _, pattern := range routePatterns {
-		if pattern.MatchString(path) {
-			if byMethod, ok := routeMethodNameMap[pattern]; ok {
-				if name, ok := byMethod[method]; ok {
-					return name, nil
-				}
-				return "", fmt.Errorf("no matching route found for method %s and URL: %s", method, url)
-			}
+	for _, m := range matchers {
+		if m.method != method {
+			continue
+		}
+		if m.re.MatchString(path) {
+			return m.name, nil
+		}
+	}
+
+	return "", fmt.Errorf("no matching route found for method %s and URL: %s", method, url)
+}
+
+// PathURLToRoute matches URL ignoring HTTP method.
+// Used only where method is unavailable (e.g. inflight metrics).
+func PathURLToRoute(url string) (string, error) {
+	path := strings.TrimPrefix(url, "/v1")
+
+	for _, m := range matchers {
+		if m.re.MatchString(path) {
+			return m.name, nil
 		}
 	}
 
 	return "", fmt.Errorf("no matching route found for URL: %s", url)
-}
-
-// URLToRoute matches the URL against route patterns and returns the matching route name
-func URLToRoute(id string) (string, error) {
-	method := http.MethodGet
-	path := id
-
-	if sp := strings.IndexByte(id, ' '); sp > 0 {
-		maybeMethod := id[:sp]
-		maybePath := strings.TrimSpace(id[sp+1:])
-		if strings.HasPrefix(maybePath, "/") {
-			method = maybeMethod
-			path = maybePath
-		}
-	}
-
-	return MethodURLToRoute(method, path)
 }
