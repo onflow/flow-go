@@ -211,20 +211,10 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 
 	err = unittest.WithLocks(s.T(), s.lockManager, []string{
 		storage.LockInsertLightTransactionResult,
-    storage.LockInsertEvent,
-		storage.LockInsertTransactionResultErrMessage,
 		storage.LockIndexScheduledTransaction,
 	}, func(lctx lockctx.Context) error {
 		return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			if err := s.results.BatchStore(lctx, rw, blockID, s.tf.ExpectedResults); err != nil {
-				return err
-			}
-
-			if err := s.events.BatchStore(blockID, []flow.EventsList{s.tf.ExpectedEvents}, rw); err != nil {
-				return err
-			}
-
-			if err := s.txErrorMessages.BatchStore(lctx, rw, blockID, s.tf.TxErrorMessages); err != nil {
 				return err
 			}
 
@@ -235,6 +225,20 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 			}
 
 			return nil
+		})
+	})
+	s.Require().NoError(err)
+
+	err = unittest.WithLock(s.T(), s.lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+		return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return s.events.BatchStore(lctx, blockID, []flow.EventsList{s.tf.ExpectedEvents}, rw)
+		})
+	})
+	s.Require().NoError(err)
+
+	err = unittest.WithLock(s.T(), s.lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+		return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return s.txErrorMessages.BatchStore(lctx, rw, blockID, s.tf.TxErrorMessages)
 		})
 	})
 	s.Require().NoError(err)

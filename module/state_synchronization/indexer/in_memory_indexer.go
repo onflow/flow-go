@@ -163,7 +163,7 @@ func (i *InMemoryIndexer) IndexBlockData(data *execution_data.BlockExecutionData
 	systemChunkEvents := data.ChunkExecutionDatas[systemChunkIndex].Events
 	systemChunkResults := data.ChunkExecutionDatas[systemChunkIndex].TransactionResults
 
-	scheduledTransactionData, err := collectScheduledTransactions(i.fvmEnv, i.block.ChainID, systemChunkResults, systemChunkEvents)
+	scheduledTransactionData, err := collectScheduledTransactions(i.fvmEnv, i.block.ChainID, i.block.Height, systemChunkResults, systemChunkEvents)
 	if err != nil {
 		return nil, fmt.Errorf("could not collect scheduled transaction data: %w", err)
 	}
