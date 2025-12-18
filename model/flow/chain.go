@@ -11,7 +11,7 @@ import (
 
 // A ChainID is a unique identifier for a specific Flow network instance.
 //
-// Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
+// Chain IDs are used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
 type ChainIDList []ChainID
 
@@ -104,7 +104,7 @@ type chainImpl interface {
 	chain() ChainID
 }
 
-// monotonicImpl is a simple implementation of adress generation
+// monotonicImpl is a simple implementation of address generation
 // where addresses are simply the index of the account.
 type monotonicImpl struct{}
 
