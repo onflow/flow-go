@@ -72,7 +72,9 @@ update-cadence-version:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages
-	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
+	$(if $(NATIVE_TEST), \
+		CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES), \
+		CGO_CFLAGS=$(CRYPTO_FLAG) gotestsum --format=pkgname-and-test-fails --format-hide-empty-pkg -- -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES))
 
 .PHONY: install-mock-generators
 install-mock-generators:
@@ -85,7 +87,8 @@ install-tools: check-go-version install-mock-generators
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
-	go install golang.org/x/tools/cmd/stringer@master;
+	go install golang.org/x/tools/cmd/stringer@master; \
+	go install gotest.tools/gotestsum@latest;
 
 .PHONY: verify-mocks
 verify-mocks: tidy generate-mocks
