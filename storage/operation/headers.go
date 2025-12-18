@@ -13,6 +13,7 @@ import (
 // InsertHeader inserts a block header into the database.
 //
 // CAUTION:
+//   - This function must ONLY be used for storing headers of main consensus, NOT CLUSTER consensus.
 //   - The caller must ensure that headerID is a collision-resistant hash of the provided header!
 //     Otherwise, data corruption may occur.
 //   - The caller must acquire the following lock and hold it until the database
@@ -43,6 +44,7 @@ func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flo
 // InsertClusterHeader inserts a cluster block header into the database.
 //
 // CAUTION:
+//   - This function must ONLY be used for storing headers produced by CLUSTER consensus.
 //   - The caller must ensure that headerID is a collision-resistant hash of the provided header!
 //     Otherwise, data corruption may occur.
 //   - The caller must acquire the following lock and hold it until the database

@@ -1492,7 +1492,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		all := store.InitAll(metrics, suite.db, flow.Emulator)
-		suite.headers = store.NewHeaders(metrics, suite.db, suite.chainID)
+		suite.headers = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
 		suite.blocks = all.Blocks
 		suite.payloads = store.NewClusterPayloads(metrics, suite.db)
 		suite.consensusHeaders = all.Headers

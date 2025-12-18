@@ -44,8 +44,13 @@ type Builder struct {
 	bySealingRateLimiterConfig module.ReadonlySealingLagRateLimiterConfig
 	log                        zerolog.Logger
 	clusterEpoch               uint64 // the operating epoch for this cluster
-	// cache of values about the operating epoch which never change
-	epochFirstHeight *uint64          // first height of this cluster's operating epoch
+
+	// cache of values about the operating epoch which never change:
+	// We can't specify the height of the epoch's first consensus block (height ON MAIN CHAIN) during which this cluster is
+	// active, because the builder is typically _instantiated_ before the epoch starts. However, the builder should only be 
+	// called once the epoch has started, i.e. consensus has finalized the first block in the epoch. Consequently, we 
+	// retrieve the epoch's first height on the first call of the builder, and cache it.
+	epochFirstHeight *uint64  
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
@@ -288,12 +293,10 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 
 	// If we don't have the epoch boundaries (first/final height ON MAIN CHAIN) cached, try retrieve and cache them
 	r := b.db.Reader()
-
 	if b.epochFirstHeight != nil {
 		ctx.refEpochFirstHeight = *b.epochFirstHeight
 	} else {
 		var refEpochFirstHeight uint64
-
 		err = operation.RetrieveEpochFirstHeight(r, b.clusterEpoch, &refEpochFirstHeight)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {

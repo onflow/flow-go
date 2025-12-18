@@ -28,6 +28,9 @@ type All struct {
 	Collections  *Collections
 }
 
+// InitAll initializes the common storage abstractions used by all node roles (with default cache sizes
+// suitable for mainnet). The chain ID indicates which Flow network the node is operating on and references
+// the ID of the main consensus (not the chains built by collector clusters)
 func InitAll(metrics module.CacheMetrics, db storage.DB, chainID flow.ChainID) *All {
 	headers := NewHeaders(metrics, db, chainID)
 	guarantees := NewGuarantees(metrics, db, DefaultCacheSize, DefaultCacheSize)

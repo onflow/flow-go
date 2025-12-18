@@ -215,7 +215,7 @@ func LookupClusterBlocksByReferenceHeightRange(lctx lockctx.Proof, r storage.Rea
 func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *cluster.Proposal) error {
 	// We need to enforce that each cluster block is inserted and indexed exactly once (no overwriting allowed):
 	//   1. We check that the lock [storage.LockInsertOrFinalizeClusterBlock] for cluster block insertion is held.
-	//   2. When calling `operation.InsertHeader`, we append the storage operations for inserting the header to the
+	//   2. When calling `operation.InsertClusterHeader `, we append the storage operations for inserting the header to the
 	//      provided write batch. Note that `operation.InsertClusterHeader` checks whether the header already exists,
 	//      returning [storage.ErrAlreadyExists] if so.
 	//   3. We append all other storage indexing operations to the same write batch, without additional existence

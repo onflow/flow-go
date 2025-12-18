@@ -54,6 +54,10 @@ func IsPebbleFolder(dataDir string) (bool, error) {
 	return pebblestorage.IsPebbleFolder(dataDir)
 }
 
+// InitStorages initializes the common storage abstractions used by all node roles (with default cache sizes
+// suitable for mainnet). However, no metrics are collected (if you need metrics, use [store.InitAll] directly).
+// The chain ID indicates which Flow network the node is operating, referencing the ID of the blockchain
+// build by the main consensus, i.e. security nodes (not the chains built by collector clusters).
 func InitStorages(db storage.DB, chainID flow.ChainID) *store.All {
 	metrics := &metrics.NoopCollector{}
 	return store.InitAll(metrics, db, chainID)
