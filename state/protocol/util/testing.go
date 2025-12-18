@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	mmetrics "github.com/onflow/flow-go/module/metrics"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -70,7 +69,7 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
@@ -97,7 +96,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
@@ -187,7 +186,7 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
@@ -231,7 +230,7 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
@@ -272,7 +271,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		all := store.InitAll(metrics, db, flow.Emulator)
@@ -369,7 +368,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
@@ -410,7 +409,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		metrics := metrics.NewNoopCollector()
+		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
