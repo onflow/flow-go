@@ -33,9 +33,9 @@ func NewScheduledTransactionsStore(
 // Persist saves and indexes all scheduled transactions for the block as part of the provided database
 // batch. The caller must acquire [storage.LockIndexScheduledTransaction] and hold it until the write
 // batch has been committed.
-// Will return an error if the scheduled transactions are already indexed for the block.
 //
-// No error returns are expected during normal operations
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (s *ScheduledTransactionsStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 	for txID, scheduledTxID := range s.data {
 		err := s.scheduledTransactions.BatchIndex(lctx, s.blockID, txID, scheduledTxID, rw)

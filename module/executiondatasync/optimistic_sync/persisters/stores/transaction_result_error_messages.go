@@ -36,9 +36,9 @@ func NewTxResultErrMsgStore(
 // Persist saves and indexes all transaction result error messages for the block as part of the
 // provided database batch. The caller must acquire [storage.LockInsertTransactionResultErrMessage]
 // and hold it until the write batch has been committed.
-// Will return an error if the transaction result error messages for the block already exist.
 //
-// No error returns are expected during normal operations
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (t *TxResultErrMsgStore) Persist(lctx lockctx.Proof, rw storage.ReaderBatchWriter) error {
 	err := t.txResultErrMsg.BatchStore(lctx, rw, t.blockID, t.data)
 	if err != nil {

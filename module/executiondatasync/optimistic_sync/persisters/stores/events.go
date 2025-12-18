@@ -31,10 +31,10 @@ func NewEventsStore(
 }
 
 // Persist adds events to the batch.
-// Will return an error if the events for the block already exist.
-// The caller must acquire [storage.LockInsertEvent] and hold it until the write batch is  committed.
+// The caller must acquire [storage.LockInsertEvent] and hold it until the write batch is committed.
 //
-// No error returns are expected during normal operations
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (e *EventsStore) Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error {
 	err := e.events.BatchStore(lctx, e.blockID, []flow.EventsList{e.data}, batch)
 	if err != nil {
