@@ -3,7 +3,6 @@ package state
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
@@ -178,7 +177,7 @@ func (v *BaseView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 // if account doesn't exist we return empty hash
 // if account exist but not a smart contract we return EmptyRootHash
 // if is a contract we return the hash of the root slab content (some sort of commitment).
-func (v *BaseView) GetStorageRoot(addr common.Address) (common.Hash, error) {
+func (v *BaseView) GetStorageRoot(addr gethCommon.Address) (gethCommon.Hash, error) {
 	account, err := v.getAccount(addr)
 	if err != nil {
 		return gethCommon.Hash{}, err
