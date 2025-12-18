@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
-	"github.com/onflow/flow-go/engine/collection/ingest"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/engine/collection/pusher"
@@ -51,7 +50,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	esbootstrap "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
@@ -303,7 +301,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	clusterPayloads := store.NewClusterPayloads(node.Metrics, db)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig(),
-		ingest.NewAddressRateLimiter(rate.Limit(1), 10)) // 10 tps
+		collectioningest.NewAddressRateLimiter(rate.Limit(1), 10)) // 10 tps
 	require.NoError(t, err)
 
 	selector := filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleVerification)
@@ -614,7 +612,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
+	bootstrapper := esbootstrap.NewBootstrapper(node.Log)
 	commit, err := bootstrapper.BootstrapLedger(
 		ls,
 		unittest.ServiceAccountPublicKey,

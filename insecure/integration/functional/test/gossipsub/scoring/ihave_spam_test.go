@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -40,7 +39,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 
 	receivedIWants := concurrentmap.New[string, struct{}]()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
+	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *pubsub.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
 		if rpc.RPC.Control == nil || rpc.RPC.Control.Iwant == nil {
 			return nil
@@ -192,7 +191,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	receivedIWants := concurrentmap.New[string, struct{}]()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
+	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *pubsub.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
 		if rpc.RPC.Control == nil || rpc.RPC.Control.Iwant == nil {
 			return nil
