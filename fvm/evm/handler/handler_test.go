@@ -1177,10 +1177,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 					acc.Call(types.EmptyAddress, nil, 1000, types.EmptyBalance)
 
 					backend.ExpectedSpan(t, trace.FVMEVMDeposit)
-					acc.Deposit(types.NewFlowTokenVault(types.EmptyBalance))
+					acc.Deposit(types.NewFlowTokenVault(types.OneFlow()))
 
 					backend.ExpectedSpan(t, trace.FVMEVMWithdraw)
-					acc.Withdraw(types.EmptyBalance)
+					acc.Withdraw(types.OneFlow())
 
 					backend.ExpectedSpan(t, trace.FVMEVMDeploy)
 					acc.Deploy(nil, 1, types.EmptyBalance)

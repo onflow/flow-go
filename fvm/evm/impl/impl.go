@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/errors"
@@ -632,7 +633,19 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalance(amountValue.BigInt)
+			_, overflow := uint256.FromBig(amountValue.BigInt)
+			if overflow {
+				panic(types.ErrInvalidBalance)
+			}
+
+			// check balance is not prone to rounding error
+			if !types.AttoFlowBalanceIsValidForFlowVault(amountValue.BigInt) {
+				panic(types.ErrWithdrawBalanceRounding)
+			}
+
+			// this is where rounding from Atto scale to UFix scale happens.
+			value := new(big.Int).Div(amountValue.BigInt, types.UFixToAttoConversionMultiplier)
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(value.Uint64()))
 
 			// Withdraw
 
@@ -644,6 +657,8 @@ func newInternalEVMTypeWithdrawFunction(
 			if err != nil {
 				panic(err)
 			}
+			// We have already truncated the remainder above, but we still leave
+			// the rounding check in as a redundancy.
 			if roundedOff {
 				panic(types.ErrWithdrawBalanceRounding)
 			}
