@@ -53,7 +53,6 @@ type BuilderSuite struct {
 
 	clusterHeaders   storage.Headers
 	clusterPayloads  storage.ClusterPayloads
-	blocks           storage.Blocks
 	consensusHeaders storage.Headers
 
 	state cluster.MutableState
@@ -101,7 +100,6 @@ func (suite *BuilderSuite) SetupTest() {
 	consumer := events.NewNoop()
 
 	suite.clusterHeaders = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
-	suite.blocks = all.Blocks
 	suite.clusterPayloads = store.NewClusterPayloads(metrics, suite.db)
 	suite.consensusHeaders = all.Headers
 
@@ -1493,7 +1491,6 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		tracer := trace.NewNoopTracer()
 		all := store.InitAll(metrics, suite.db, flow.Emulator)
 		suite.clusterHeaders = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
-		suite.blocks = all.Blocks
 		suite.clusterPayloads = store.NewClusterPayloads(metrics, suite.db)
 		suite.consensusHeaders = all.Headers
 
