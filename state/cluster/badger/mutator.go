@@ -24,20 +24,20 @@ type MutableState struct {
 	*State
 	lockManager      lockctx.Manager
 	tracer           module.Tracer
-	headers          storage.Headers
-	payloads         storage.ClusterPayloads
+	clusterHeaders   storage.Headers
+	clusterPayloads  storage.ClusterPayloads
 	consensusHeaders storage.Headers
 }
 
 var _ clusterstate.MutableState = (*MutableState)(nil)
 
-func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, consensusHeaders storage.Headers) (*MutableState, error) {
+func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, clusterHeaders storage.Headers, clusterPayloads storage.ClusterPayloads, consensusHeaders storage.Headers) (*MutableState, error) {
 	mutableState := &MutableState{
 		State:            state,
 		lockManager:      lockManager,
 		tracer:           tracer,
-		headers:          headers,
-		payloads:         payloads,
+		clusterHeaders:   clusterHeaders,
+		clusterPayloads:  clusterPayloads,
 		consensusHeaders: consensusHeaders,
 	}
 	return mutableState, nil
@@ -167,7 +167,7 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 	}
 
 	// get the header of the parent of the new block
-	parent, err := m.headers.ByBlockID(candidate.ParentID)
+	parent, err := m.clusterHeaders.ByBlockID(candidate.ParentID)
 	if err != nil {
 		return irrecoverable.NewExceptionf("could not retrieve latest finalized header: %w", err)
 	}
@@ -198,7 +198,7 @@ func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
 	// start with the extending block's parent
 	for parentID != finalizedID {
 		// get the parent of current block
-		ancestor, err := m.headers.ByBlockID(parentID)
+		ancestor, err := m.clusterHeaders.ByBlockID(parentID)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", parentID, err)
 		}
@@ -384,8 +384,8 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 // No errors are expected during normal operation.
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 	var duplicateTxIDs []flow.Identifier
-	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
-		payload, err := m.payloads.ByBlockID(ancestor.ID())
+	err := fork.TraverseBackward(m.clusterHeaders, block.ParentID, func(ancestor *flow.Header) error {
+		payload, err := m.clusterPayloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 		}
@@ -456,7 +456,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
 
 	for _, blockID := range clusterBlockIDs {
 		// TODO: could add LightByBlockID and retrieve only tx IDs
-		payload, err := m.payloads.ByBlockID(blockID)
+		payload, err := m.clusterPayloads.ByBlockID(blockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve cluster payload (block_id=%x) to de-duplicate: %w", blockID, err)
 		}
@@ -484,7 +484,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
 		// extension here. Hence, a higher block may have been finalized just now and returned by the
 		// database search. However, all newer finalized blocks have height > `finalClusterHeight`, i.e.
 		// a height outside the range this function scans.
-		header, err := m.headers.ByBlockID(blockID)
+		header, err := m.clusterHeaders.ByBlockID(blockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve header by block_id=%x: %w", blockID, err)
 		}
