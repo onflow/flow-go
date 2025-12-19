@@ -1754,7 +1754,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
-		m, err := metrics.NewRestCollector(router.MethodURLToRoute, router.PathURLToRoute, node.MetricsRegisterer)
+		m, err := metrics.NewRestCollector(router.MethodURLToRoute, node.MetricsRegisterer)
 		if err != nil {
 			return err
 		}

@@ -17,8 +17,7 @@ type RestCollector struct {
 	httpRequestsInflight      *prometheus.GaugeVec
 	httpRequestsTotal         *prometheus.GaugeVec
 
-	urlToRouteMapper     func(string, string) (string, error) // converts (method, url) to a route name
-	urlToRoutePathMapper func(path string) (string, error)    // for inflight where method isn't available
+	urlToRouteMapper func(string, string) (string, error) // converts (method, url) to a route name
 }
 
 var _ module.RestMetrics = (*RestCollector)(nil)
@@ -26,19 +25,14 @@ var _ module.RestMetrics = (*RestCollector)(nil)
 // NewRestCollector returns a new metrics RestCollector that implements the RestCollector
 // using Prometheus as the backend.
 func NewRestCollector(urlToRouteMapper func(string, string) (string, error),
-	urlToRoutePathMapper func(path string) (string, error),
 	registerer prometheus.Registerer,
 ) (*RestCollector, error) {
 	if urlToRouteMapper == nil {
 		return nil, fmt.Errorf("urlToRouteMapper cannot be nil")
 	}
-	if urlToRoutePathMapper == nil {
-		return nil, fmt.Errorf("urlToRoutePathMapper cannot be nil")
-	}
 
 	r := &RestCollector{
-		urlToRouteMapper:     urlToRouteMapper,
-		urlToRoutePathMapper: urlToRoutePathMapper,
+		urlToRouteMapper: urlToRouteMapper,
 		httpRequestDurHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceRestAPI,
 			Subsystem: subsystemHTTP,
@@ -97,7 +91,7 @@ func (r *RestCollector) ObserveHTTPResponseSize(_ context.Context, p httpmetrics
 // AddInflightRequests increments and decrements the number of inflight request being processed.
 // This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) AddInflightRequests(_ context.Context, p httpmetrics.HTTPProperties, quantity int) {
-	handler := r.mapPathToRoute(p.ID)
+	handler := r.mapURLToRoute("", p.ID)
 	r.httpRequestsInflight.WithLabelValues(p.Service, handler).Add(float64(quantity))
 }
 
@@ -116,18 +110,5 @@ func (r *RestCollector) mapURLToRoute(method, url string) string {
 		return "unknown"
 	}
 
-	return route
-}
-
-// mapPathToRoute uses the urlToRoutePathMapper callback to convert a request path
-// to a route name.
-//
-// This is used when the HTTP method is not available (e.g. inflight request
-// metrics)
-func (r *RestCollector) mapPathToRoute(path string) string {
-	route, err := r.urlToRoutePathMapper(path)
-	if err != nil {
-		return "unknown"
-	}
 	return route
 }

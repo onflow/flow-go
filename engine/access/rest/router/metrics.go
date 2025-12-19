@@ -53,6 +53,15 @@ func patternToRegex(pattern string) string {
 func MethodURLToRoute(method, url string) (string, error) {
 	path := strings.TrimPrefix(url, "/v1")
 
+	if method == "" {
+		for _, m := range matchers {
+			if m.re.MatchString(path) {
+				return m.name, nil
+			}
+		}
+		return "", fmt.Errorf("no matching route found for URL: %s", url)
+	}
+
 	for _, m := range matchers {
 		if m.method != method {
 			continue
