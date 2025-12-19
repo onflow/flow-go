@@ -3225,10 +3225,17 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
             }
           }
 
+          access(all) resource R {
+            access(all) let x: UInt8
+            init() {
+			  self.x = 42
+            }
+          }
+
           access(all)
           fun main() {
-            let data = EVM.encodeABI([1 as UInt8])
-            EVM.decodeABI(types: [Type<S>()], data: data)
+            let data = EVM.encodeABI([S()])
+            EVM.decodeABI(types: [Type<@R>()], data: data)
           }
 		`)
 
@@ -3246,7 +3253,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		assert.ErrorContains(
 			t,
 			err,
-			"failed to ABI decode data with type s.0100000000000000000000000000000000000000000000000000000000000000.S",
+			"failed to ABI decode data with type s.0100000000000000000000000000000000000000000000000000000000000000.R",
 		)
 	})
 }
