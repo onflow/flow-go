@@ -198,8 +198,6 @@ func reportABIEncodingComputation(
 			semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
 			if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
 
-				// TODO:
-
 				compositeType.Members.Foreach(func(name string, member *sema.Member) {
 					if member.DeclarationKind != common.DeclarationKindField {
 						return
@@ -749,6 +747,10 @@ func encodeABI(
 
 			compositeType.Members.Foreach(func(name string, member *sema.Member) {
 
+				if member.DeclarationKind != common.DeclarationKindField {
+					return
+				}
+
 				goStructFieldName := tupleGethABIType.TupleRawNames[index]
 
 				if exportedName(name) != goStructFieldName {
@@ -849,50 +851,6 @@ func asTupleEncodableCompositeType(ty sema.Type) *sema.CompositeType {
 		compositeType.Location == nil ||
 		compositeType.IsResourceType() {
 
-		return nil
-	}
-
-	return compositeType
-}
-
-// asTupleDecodableCompositeType determines if the given type can be decoded as a tuple
-// (when the type is user-defined (location != nil) struct type,
-// and the initializer parameters (argument label and type) match the struct fields)
-func asTupleDecodableCompositeType(ty sema.Type) *sema.CompositeType {
-	compositeType := asTupleEncodableCompositeType(ty)
-	if compositeType == nil {
-		return nil
-	}
-
-	var (
-		index                           int
-		hasInvalidInitializerParameters bool
-	)
-
-	compositeType.Members.Foreach(func(name string, member *sema.Member) {
-		if hasInvalidInitializerParameters ||
-			member.DeclarationKind != common.DeclarationKindField {
-
-			return
-		}
-
-		if index >= len(compositeType.ConstructorParameters) {
-			hasInvalidInitializerParameters = true
-			return
-		}
-
-		param := compositeType.ConstructorParameters[index]
-		index++
-
-		if param.EffectiveArgumentLabel() != name ||
-			!param.TypeAnnotation.Type.Equal(member.TypeAnnotation.Type) {
-
-			hasInvalidInitializerParameters = true
-			return
-		}
-	})
-
-	if hasInvalidInitializerParameters {
 		return nil
 	}
 
@@ -1262,7 +1220,7 @@ func decodeABI(
 
 		default:
 			semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
-			if compositeType := asTupleDecodableCompositeType(semaType); compositeType != nil {
+			if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
 
 				valueStruct := reflect.ValueOf(value)
 

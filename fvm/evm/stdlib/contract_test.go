@@ -1245,6 +1245,10 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
                   self.x = x
                   self.y = y
               }
+
+              access(all) fun toString(): String {
+                  return "S(x: \(self.x), y: \(self.y))"
+              }
           }
 
           access(all)
