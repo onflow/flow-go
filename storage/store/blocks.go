@@ -39,6 +39,7 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 //
 // Expected error returns during normal operations:
 // - [storage.ErrAlreadyExists] if some block with the same ID has already been stored
+// - [storage.ErrWrongChain] if the block is part of a different chain than this storage was initialized with
 func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *flow.Proposal) error {
 	blockID := proposal.Block.ID()
 	err := b.headers.storeTx(lctx, rw, blockID, proposal.Block.ToHeader(), proposal.ProposerSigData)
@@ -56,6 +57,7 @@ func (b *Blocks) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, pr
 // finalized and pending blocks.
 // Expected error returns during normal operations:
 // - [storage.ErrNotFound] if no block is found
+// - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 	header, err := b.headers.retrieveTx(blockID)
 	if err != nil {
@@ -88,6 +90,7 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 // It is available for finalized and pending blocks.
 // Expected error returns during normal operations:
 // - [storage.ErrNotFound] if no block is found
+// - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, error) {
 	block, err := b.retrieve(blockID)
 	if err != nil {
@@ -122,7 +125,8 @@ func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, erro
 // that have been appended to any of the known forks) no matter whether the block has been finalized or not.
 //
 // Error returns:
-//   - storage.ErrNotFound if no block with the corresponding ID was found
+//   - [storage.ErrNotFound] if no block with the corresponding ID was found
+//   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
@@ -134,7 +138,8 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 // of the known forks) no matter whether the block has been finalized or not.
 //
 // Error returns:
-//   - storage.ErrNotFound if no block with the corresponding ID was found
+//   - [storage.ErrNotFound] if no block with the corresponding ID was found
+//   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
@@ -171,7 +176,7 @@ func (b *Blocks) ProposalByView(view uint64) (*flow.Proposal, error) {
 // for finalized blocks.
 //
 // Error returns:
-//   - storage.ErrNotFound if no block for the corresponding height was found
+//   - [storage.ErrNotFound] if no block for the corresponding height was found
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
@@ -186,7 +191,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 // signature on it. It is only available for finalized blocks.
 //
 // Error returns:
-//   - storage.ErrNotFound if no block proposal for the corresponding height was found
+//   - [storage.ErrNotFound] if no block proposal for the corresponding height was found
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
@@ -205,7 +210,7 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
 // Error returns:
-//   - storage.ErrNotFound if the collection ID was not found
+//   - [storage.ErrNotFound] if the collection ID was not found
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
@@ -227,7 +232,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
 // Error returns:
-//   - storage.ErrNotFound if no FINALIZED block exists containing the expected collection guarantee
+//   - [storage.ErrNotFound] if no FINALIZED block exists containing the expected collection guarantee
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error) {
