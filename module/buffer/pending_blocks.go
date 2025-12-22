@@ -42,8 +42,22 @@ func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
 
 // GenericPendingBlocks implements a mempool of pending blocks that cannot yet be processed
 // because they do not connect to the rest of the chain state.
-// They are indexed by parent ID to enable processing all of a parent's children once the parent is received.
-// They are also indexed by view to support pruning.
+// Under the hood, we utilize the LevelledForest to store the pending blocks:
+//   - The LevelledForest automatically indexes all vertices by their parent ID. This allows us
+//     to process all of a parent's children once the parent is received.
+//   - The LevelledForest automatically indexes all vertices by their level (for which we use
+//     the view here) and provides efficient pruning of all vertices below a certain level / view.
+//
+// The primary use case of this buffer is to cache blocks until they can be processed once their
+// ancestry is known. However, care must be taken to avoid unbounded memory growth which can be
+// exploited by byzantine proposers to mount memory exhaustion attacks.
+//
+// In order to mitigate memory exhaustion attacks ActiveViewRangeSize to the PendingBlockBuffer,
+// which puts an upper limit on what views we will accept when adding blocks. However, this only
+// limits the depth of the tree, but not thw tree's width. A byzantine proposer might create
+// lots of conflicting blocks (valid or invalid). We prevent unbounded memory growth from such
+// attacks by ...
+// TODO: ↑
 //
 // Safe for concurrent use.
 type GenericPendingBlocks[T flow.HashablePayload] struct {
