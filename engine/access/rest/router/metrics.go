@@ -73,17 +73,3 @@ func MethodURLToRoute(method, url string) (string, error) {
 
 	return "", fmt.Errorf("no matching route found for method %s and URL: %s", method, url)
 }
-
-// PathURLToRoute matches URL ignoring HTTP method.
-// Used only where method is unavailable (e.g. inflight metrics).
-func PathURLToRoute(url string) (string, error) {
-	path := strings.TrimPrefix(url, "/v1")
-
-	for _, m := range matchers {
-		if m.re.MatchString(path) {
-			return m.name, nil
-		}
-	}
-
-	return "", fmt.Errorf("no matching route found for URL: %s", url)
-}
