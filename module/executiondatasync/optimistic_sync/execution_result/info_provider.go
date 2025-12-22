@@ -54,8 +54,7 @@ func NewExecutionResultInfoProvider(
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound]: If the execution receipts for the block ID are not found.
-//   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for the spork root block, and the node was bootstrapped
-//     from a newer block.
+//   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for data before the node's root block.
 //   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
 //     execution results was abandoned.
 //   - [optimistic_sync.ErrNotEnoughAgreeingExecutors]: If there are not enough execution nodes that produced the
@@ -75,14 +74,14 @@ func (p *Provider) ExecutionResultInfo(
 		return nil, fmt.Errorf("failed to retrieve execution IDs: %w", err)
 	}
 
-	err = p.validateCriteria(criteria, executorIdentities)
+	err = p.canCriteriaBeSatisfied(criteria, executorIdentities)
 	if err != nil {
-		return nil, fmt.Errorf("invalid required executors: %w", err)
+		return nil, fmt.Errorf("criteria cannot be satisfied: %w", err)
 	}
 
 	// if the block ID is the root block, then use the root ExecutionResult and skip the receipt
 	// check since there will not be any.
-	if p.rootBlockID == blockID {
+	if blockID == p.rootBlockID {
 		subsetENs, err := p.executionNodes.SelectExecutionNodes(executorIdentities, criteria.RequiredExecutors)
 		if err != nil {
 			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", p.rootBlockID, err)
@@ -104,18 +103,21 @@ func (p *Provider) ExecutionResultInfo(
 	resultID, executorIDs, err := p.findResultAndExecutors(blockID, criteria)
 	if err != nil {
 		switch {
+		case errors.Is(err, optimistic_sync.ErrForkAbandoned), errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound):
+			return nil, err
+
 		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
 			isBlockSealed, err := p.isBlockSealed(blockID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if block sealed: %w", err)
 			}
+
+			// if the block is already sealed, then the criteria could not be satisfied.
 			if isBlockSealed {
 				return nil, optimistic_sync.NewCriteriaNotMetError(blockID)
 			}
-			fallthrough
 
-		case errors.Is(err, optimistic_sync.ErrForkAbandoned), errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound):
-			return nil, err
+			fallthrough
 
 		default:
 			return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
@@ -179,16 +181,16 @@ func (e *Provider) isBlockSealed(blockID flow.Identifier) (bool, error) {
 	return header.Height <= sealedHeader.Height, nil
 }
 
-// validateCriteria verifies that the provided optimistic sync criteria can be
+// canCriteriaBeSatisfied verifies that the provided optimistic sync criteria can be
 // satisfied by the currently available execution nodes.
 //
-// The validation ensures that the requested AgreeingExecutorsCount is feasible,
+// The validation ensures that the requested AgreeingExecutorsCount is feasible
 // and that every required executor ID is present in the available set.
 //
 // Expected errors during normal operations:
 //   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 //   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
-func (e *Provider) validateCriteria(
+func (e *Provider) canCriteriaBeSatisfied(
 	criteria optimistic_sync.Criteria,
 	availableExecutors flow.IdentityList,
 ) error {
@@ -199,9 +201,9 @@ func (e *Provider) validateCriteria(
 		)
 	}
 
-	lookup := availableExecutors.Lookup()
+	executors := availableExecutors.Lookup()
 	for _, executorID := range criteria.RequiredExecutors {
-		if _, ok := lookup[executorID]; !ok {
+		if _, ok := executors[executorID]; !ok {
 			return optimistic_sync.NewUnknownRequiredExecutorError(executorID)
 		}
 	}
@@ -231,7 +233,7 @@ func (p *Provider) findResultAndExecutors(
 
 	allReceiptsForBlock, err := p.executionReceipts.ByBlockID(blockID)
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("failed to retrieve execution receipts for block ID %v: %w", blockID, err)
+		return flow.ZeroID, nil, err
 	}
 
 	// find all results that match the criteria and have at least one acceptable executor
@@ -239,9 +241,9 @@ func (p *Provider) findResultAndExecutors(
 	var lastErr error
 	for executionResultID, executionReceiptList := range allReceiptsForBlock.GroupByResultID() {
 		result := &executionReceiptList[0].ExecutionResult
-		receipts := executionReceiptList.GroupByExecutorID()
+		executorToReceiptsMap := executionReceiptList.GroupByExecutorID()
 
-		if err := p.isExecutorGroupMeetingCriteria(result, receipts, criteria); err != nil {
+		if err := p.isExecutorGroupMeetingCriteria(result, executorToReceiptsMap, criteria); err != nil {
 			// skip groups that don't meet criteria; remember the last error
 			lastErr = err
 			continue

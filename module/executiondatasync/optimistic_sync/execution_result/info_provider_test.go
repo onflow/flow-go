@@ -79,12 +79,9 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultQuery() {
 
 	suite.snapshot.
 		On("Identities", mock.Anything).
-		Return(
-			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
-				return allExecutionNodes.Filter(filter)
-			},
-			func(flow.IdentityFilter[flow.Identity]) error { return nil },
-		).
+		Return(func(filter flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+			return allExecutionNodes.Filter(filter), nil
+		}).
 		Times(7) // for each subtest in this test case
 
 	suite.state.
@@ -309,12 +306,9 @@ func (suite *ExecutionResultInfoProviderSuite) TestRootBlockHandling() {
 	allExecutionNodes := unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleExecution))
 	suite.snapshot.
 		On("Identities", mock.Anything).
-		Return(
-			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
-				return allExecutionNodes.Filter(filter)
-			},
-			func(flow.IdentityFilter[flow.Identity]) error { return nil },
-		).
+		Return(func(filter flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+			return allExecutionNodes.Filter(filter), nil
+		}).
 		Times(2) // for each subtest
 
 	// expected to be called once in each subtest
@@ -378,12 +372,9 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 	suite.snapshot.
 		On("Identities", mock.Anything).
-		Return(
-			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
-				return allExecutionNodes.Filter(filter)
-			},
-			func(flow.IdentityFilter[flow.Identity]) error { return nil },
-		).
+		Return(func(filter flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+			return allExecutionNodes.Filter(filter), nil
+		}).
 		Times(5) // for each subtest
 
 	// expected to be called once in each subtest
