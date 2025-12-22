@@ -31,7 +31,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
 )
 
-func getTransactionReq(id string, expandResult bool, blockIdQuery string, collectionIdQuery string) *http.Request {
+func newGetTransactionRequest(id string, expandResult bool, blockIdQuery string, collectionIdQuery string) *http.Request {
 	u, _ := url.Parse(fmt.Sprintf("/v1/transactions/%s", id))
 	q := u.Query()
 
@@ -54,7 +54,7 @@ func getTransactionReq(id string, expandResult bool, blockIdQuery string, collec
 	return req
 }
 
-func getTransactionsByBlockReq(blockId string, height string, expandResult bool, collectionIdQuery string) *http.Request {
+func newGetTransactionsRequest(blockId string, height string, expandResult bool, collectionIdQuery string) *http.Request {
 	u, _ := url.Parse("/v1/transactions")
 	q := u.Query()
 
@@ -80,7 +80,7 @@ func getTransactionsByBlockReq(blockId string, height string, expandResult bool,
 	return req
 }
 
-func getTransactionResultReq(id string, blockIdQuery string, collectionIdQuery string) *http.Request {
+func newGetTransactionResultRequest(id string, blockIdQuery string, collectionIdQuery string) *http.Request {
 	u, _ := url.Parse(fmt.Sprintf("/v1/transaction_results/%s", id))
 	q := u.Query()
 	if blockIdQuery != "" {
@@ -97,7 +97,7 @@ func getTransactionResultReq(id string, blockIdQuery string, collectionIdQuery s
 	return req
 }
 
-func getTransactionResultsByBlockReq(blockIdQuery string, height string) *http.Request {
+func newGetTransactionResultsRequest(blockIdQuery string, height string) *http.Request {
 	u, _ := url.Parse("/v1/transaction_results")
 	q := u.Query()
 
@@ -115,7 +115,7 @@ func getTransactionResultsByBlockReq(blockIdQuery string, height string) *http.R
 	return req
 }
 
-func createTransactionReq(body interface{}) *http.Request {
+func newCreateTransactionRequest(body interface{}) *http.Request {
 	jsonBody, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", "/v1/transactions", bytes.NewBuffer(jsonBody))
 	return req
@@ -125,7 +125,7 @@ func TestGetTransactions(t *testing.T) {
 	t.Run("get by ID without results", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 		tx := unittest.TransactionFixture()
-		req := getTransactionReq(tx.ID().String(), false, "", "")
+		req := newGetTransactionRequest(tx.ID().String(), false, "", "")
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
@@ -181,7 +181,7 @@ func TestGetTransactions(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, tx.ID(), flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil)
 
-		req := getTransactionReq(tx.ID().String(), true, "", "")
+		req := newGetTransactionRequest(tx.ID().String(), true, "", "")
 
 		expected := fmt.Sprintf(`
 			{
@@ -240,7 +240,7 @@ func TestGetTransactions(t *testing.T) {
 	t.Run("get by ID Invalid", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionReq("invalid", false, "", "")
+		req := newGetTransactionRequest("invalid", false, "", "")
 		expected := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
 	})
@@ -249,7 +249,7 @@ func TestGetTransactions(t *testing.T) {
 		backend := mock.NewAPI(t)
 
 		tx := unittest.TransactionFixture()
-		req := getTransactionReq(tx.ID().String(), false, "", "")
+		req := newGetTransactionRequest(tx.ID().String(), false, "", "")
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
@@ -273,7 +273,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			On("GetTransactionsByBlockID", mocks.Anything, blockID).
 			Return(txs, nil).
 			Once()
-		req := getTransactionsByBlockReq(blockID.String(), "", false, "")
+		req := newGetTransactionsRequest(blockID.String(), "", false, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -363,7 +363,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return(txs, nil).
 			Once()
 
-		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), false, "")
+		req := newGetTransactionsRequest("", fmt.Sprintf("%d", height), false, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -453,7 +453,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return(txs, nil).
 			Once()
 
-		req := getTransactionsByBlockReq("", router.SealedHeightQueryParam, false, "")
+		req := newGetTransactionsRequest("", router.SealedHeightQueryParam, false, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -543,7 +543,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return(txs, nil).
 			Once()
 
-		req := getTransactionsByBlockReq("", router.FinalHeightQueryParam, false, "")
+		req := newGetTransactionsRequest("", router.FinalHeightQueryParam, false, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -633,7 +633,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return(txs, nil).
 			Once()
 
-		req := getTransactionsByBlockReq("", "", false, "")
+		req := newGetTransactionsRequest("", "", false, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -695,7 +695,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return(txResults, nil).
 			Once()
 
-		req := getTransactionsByBlockReq(blockID.String(), "", true, "")
+		req := newGetTransactionsRequest(blockID.String(), "", true, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -835,7 +835,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return(txResults, nil).
 			Once()
 
-		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), true, "")
+		req := newGetTransactionsRequest("", fmt.Sprintf("%d", height), true, "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -949,7 +949,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 	t.Run("get by block ID invalid block_id", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionsByBlockReq("invalid", "", false, "")
+		req := newGetTransactionsRequest("invalid", "", false, "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -964,7 +964,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return(nil, status.Error(codes.NotFound, "block not found")).
 			Once()
 
-		req := getTransactionsByBlockReq(blockID.String(), "", false, "")
+		req := newGetTransactionsRequest(blockID.String(), "", false, "")
 
 		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
 		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
@@ -973,7 +973,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 	t.Run("get by height invalid height", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionsByBlockReq("", "not-a-height", false, "")
+		req := newGetTransactionsRequest("", "not-a-height", false, "")
 
 		expected := `{"code":400, "message":"invalid height format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -989,7 +989,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 			Return((*flow.Block)(nil), flow.BlockStatusUnknown, status.Error(codes.NotFound, "block not found")).
 			Once()
 
-		req := getTransactionsByBlockReq("", fmt.Sprintf("%d", height), false, "")
+		req := newGetTransactionsRequest("", fmt.Sprintf("%d", height), false, "")
 
 		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
 		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
@@ -999,7 +999,7 @@ func TestGetTransactionsByBlock(t *testing.T) {
 		backend := mock.NewAPI(t)
 
 		blockID := unittest.IdentifierFixture()
-		req := getTransactionsByBlockReq(blockID.String(), "123", false, "")
+		req := newGetTransactionsRequest(blockID.String(), "123", false, "")
 
 		expected := `{"code":400, "message":"can not provide both block ID and block height"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -1051,7 +1051,7 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by transaction ID", func(t *testing.T) {
 		backend := mock.NewAPI(t)
-		req := getTransactionResultReq(id.String(), "", "")
+		req := newGetTransactionResultRequest(id.String(), "", "")
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
@@ -1063,7 +1063,7 @@ func TestGetTransactionResult(t *testing.T) {
 	t.Run("get by block ID", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionResultReq(id.String(), bid.String(), "")
+		req := newGetTransactionResultRequest(id.String(), bid.String(), "")
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
@@ -1074,7 +1074,7 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by collection ID", func(t *testing.T) {
 		backend := mock.NewAPI(t)
-		req := getTransactionResultReq(id.String(), "", cid.String())
+		req := newGetTransactionResultRequest(id.String(), "", cid.String())
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid, entities.EventEncodingVersion_JSON_CDC_V0).
@@ -1109,7 +1109,7 @@ func TestGetTransactionResult(t *testing.T) {
 		for txResult, err := range testVectors {
 			txResult.BlockID = bid
 			txResult.CollectionID = cid
-			req := getTransactionResultReq(id.String(), "", "")
+			req := newGetTransactionResultRequest(id.String(), "", "")
 			backend.Mock.
 				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 				Return(txResult, nil).
@@ -1135,7 +1135,7 @@ func TestGetTransactionResult(t *testing.T) {
 	t.Run("get by ID Invalid", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionResultReq("invalid", "", "")
+		req := newGetTransactionResultRequest("invalid", "", "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -1195,7 +1195,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txResults, nil).Once()
 
-		req := getTransactionResultsByBlockReq(blockID.String(), "")
+		req := newGetTransactionResultsRequest(blockID.String(), "")
 
 		expected := fmt.Sprintf(`[
 			{
@@ -1304,7 +1304,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txResults, nil).Once()
 
-		req := getTransactionResultsByBlockReq("", fmt.Sprintf("%d", height))
+		req := newGetTransactionResultsRequest("", fmt.Sprintf("%d", height))
 
 		expected := fmt.Sprintf(`[
 			{
@@ -1393,7 +1393,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txResults, nil).Once()
 
-		req := getTransactionResultsByBlockReq("", router.SealedHeightQueryParam)
+		req := newGetTransactionResultsRequest("", router.SealedHeightQueryParam)
 
 		expected := fmt.Sprintf(`[
 		{
@@ -1460,7 +1460,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txResults, nil).Once()
 
-		req := getTransactionResultsByBlockReq("", router.FinalHeightQueryParam)
+		req := newGetTransactionResultsRequest("", router.FinalHeightQueryParam)
 
 		expected := fmt.Sprintf(`[
 		{
@@ -1525,7 +1525,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return([]*accessmodel.TransactionResult{txr1}, nil).Once()
 
-		req := getTransactionResultsByBlockReq("", "")
+		req := newGetTransactionResultsRequest("", "")
 
 		expected := fmt.Sprintf(`[
 		{
@@ -1556,7 +1556,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 	t.Run("get by block ID invalid block_id", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionResultsByBlockReq("invalid", "")
+		req := newGetTransactionResultsRequest("invalid", "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -1565,7 +1565,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 	t.Run("get by height invalid height", func(t *testing.T) {
 		backend := mock.NewAPI(t)
 
-		req := getTransactionResultsByBlockReq("", "not-a-height")
+		req := newGetTransactionResultsRequest("", "not-a-height")
 
 		expected := `{"code":400, "message":"invalid height format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -1580,7 +1580,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			On("GetTransactionResultsByBlockID", mocks.Anything, blockID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(nil, status.Error(codes.NotFound, "block not found")).Once()
 
-		req := getTransactionResultsByBlockReq(blockID.String(), "")
+		req := newGetTransactionResultsRequest(blockID.String(), "")
 
 		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
 		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
@@ -1596,7 +1596,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 			Return((*flow.Block)(nil), flow.BlockStatusUnknown, status.Error(codes.NotFound, "block not found")).
 			Once()
 
-		req := getTransactionResultsByBlockReq("", fmt.Sprintf("%d", height))
+		req := newGetTransactionResultsRequest("", fmt.Sprintf("%d", height))
 
 		expected := `{"code":404, "message":"Flow resource not found: block not found"}`
 		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
@@ -1606,7 +1606,7 @@ func TestGetTransactionResultsByBlock(t *testing.T) {
 		backend := mock.NewAPI(t)
 
 		blockID := unittest.IdentifierFixture()
-		req := getTransactionResultsByBlockReq(blockID.String(), "123")
+		req := newGetTransactionResultsRequest(blockID.String(), "123")
 
 		expected := `{"code":400, "message":"can not provide both block ID and block height"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
@@ -1636,7 +1636,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(tx, nil).
 			Once()
 
-		req := getTransactionReq(fmt.Sprint(scheduledTxID), false, "", "")
+		req := newGetTransactionRequest(fmt.Sprint(scheduledTxID), false, "", "")
 
 		router.AssertOKResponse(t, req, string(expectedWithoutResult), backend)
 	})
@@ -1652,7 +1652,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(txr, nil).
 			Once()
 
-		req := getTransactionReq(fmt.Sprint(scheduledTxID), true, "", "")
+		req := newGetTransactionRequest(fmt.Sprint(scheduledTxID), true, "", "")
 
 		router.AssertOKResponse(t, req, string(expectedWithResult), backend)
 	})
@@ -1669,7 +1669,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(txr, nil).
 			Once()
 
-		req := getTransactionResultReq(fmt.Sprint(scheduledTxID), "", "")
+		req := newGetTransactionResultRequest(fmt.Sprint(scheduledTxID), "", "")
 
 		router.AssertOKResponse(t, req, string(expectedResult), backend)
 	})
@@ -1684,7 +1684,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(tx, nil).
 			Once()
 
-		req := getTransactionReq(txID.String(), false, "", "")
+		req := newGetTransactionRequest(txID.String(), false, "", "")
 
 		router.AssertOKResponse(t, req, string(expectedWithoutResult), backend)
 	})
@@ -1700,7 +1700,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			Return(txr, nil).
 			Once()
 
-		req := getTransactionReq(txID.String(), true, "", "")
+		req := newGetTransactionRequest(txID.String(), true, "", "")
 
 		router.AssertOKResponse(t, req, string(expectedWithResult), backend)
 	})
@@ -1711,7 +1711,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			On("GetScheduledTransaction", mocks.Anything, scheduledTxID).
 			Return(nil, status.Error(codes.NotFound, "transaction not found"))
 
-		req := getTransactionReq(fmt.Sprint(scheduledTxID), false, "", "")
+		req := newGetTransactionRequest(fmt.Sprint(scheduledTxID), false, "", "")
 
 		expected := `{"code":404, "message":"Flow resource not found: transaction not found"}`
 		router.AssertResponse(t, req, http.StatusNotFound, expected, backend)
@@ -1725,7 +1725,7 @@ func TestCreateTransaction(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 		tx.Arguments = [][]uint8{}
-		req := createTransactionReq(unittest.CreateSendTxHttpPayload(tx))
+		req := newCreateTransactionRequest(unittest.CreateSendTxHttpPayload(tx))
 
 		backend.Mock.
 			On("SendTransaction", mocks.Anything, &tx).
@@ -1795,7 +1795,7 @@ func TestCreateTransaction(t *testing.T) {
 			tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 			testTx := unittest.CreateSendTxHttpPayload(tx)
 			testTx[test.inputField] = test.inputValue
-			req := createTransactionReq(testTx)
+			req := newCreateTransactionRequest(testTx)
 
 			router.AssertResponse(t, req, http.StatusBadRequest, test.output, backend)
 		}
