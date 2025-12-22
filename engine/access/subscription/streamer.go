@@ -18,13 +18,26 @@ var ErrBlockNotReady = errors.New("block not ready")
 // ErrEndOfData represents an error indicating that no more data available for streaming.
 var ErrEndOfData = errors.New("end of data")
 
+// GetDataByHeightFunc is a callback implemented by backends and used by streamer to retrieve data for a given height.
+//
+// If (nil, nil) is returned, the stream progresses forward to the next item.
+//
+// Expected errors during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: If the context is canceled, or its deadline expires.
+//   - [storage.ErrNotFound]: If the data for a block not found in storage.
+//   - [ErrBlockNotReady]: If the next item is not yet available. Callers may retry later,
+//     and the streamer will pause until new data is broadcast.
+//   - [ErrEndOfData]: If no further items are produced, the subscription is closed gracefully.
+type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
+
 // Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
-	log         zerolog.Logger
-	sub         Streamable
-	broadcaster *engine.Broadcaster
-	sendTimeout time.Duration
-	limiter     *rate.Limiter
+	log          zerolog.Logger
+	sub          Streamable
+	broadcaster  *engine.Broadcaster
+	sendTimeout  time.Duration
+	limiter      *rate.Limiter
+	dataProvider DataProvider
 }
 
 // NewStreamer creates a new Streamer instance.
@@ -34,6 +47,7 @@ func NewStreamer(
 	sendTimeout time.Duration,
 	limit float64,
 	sub Streamable,
+	dataProvider DataProvider,
 ) *Streamer {
 	var limiter *rate.Limiter
 	if limit > 0 {
@@ -42,11 +56,12 @@ func NewStreamer(
 	}
 
 	return &Streamer{
-		log:         log.With().Str("sub_id", sub.ID()).Logger(),
-		broadcaster: broadcaster,
-		sendTimeout: sendTimeout,
-		limiter:     limiter,
-		sub:         sub,
+		log:          log.With().Str("sub_id", sub.ID()).Logger(),
+		broadcaster:  broadcaster,
+		sendTimeout:  sendTimeout,
+		limiter:      limiter,
+		sub:          sub,
+		dataProvider: dataProvider,
 	}
 }
 
@@ -83,10 +98,13 @@ func (s *Streamer) Stream(ctx context.Context) {
 				s.sub.Close()
 				return
 			}
+
+			// TODO: We can change it to return no error when a client disconnects (it is done in a new subscription PR)
 			if errors.Is(err, context.Canceled) {
 				s.sub.Fail(fmt.Errorf("client disconnected: %w", ctx.Err()))
 				return
 			}
+
 			s.log.Err(err).Msg("error sending response")
 			s.sub.Fail(err)
 			return
@@ -102,8 +120,7 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			return fmt.Errorf("error waiting for response capacity: %w", err)
 		}
 
-		response, err := s.sub.Next(ctx)
-
+		response, err := s.dataProvider.NextData(ctx)
 		if response == nil && err == nil {
 			continue
 		}
@@ -115,12 +132,6 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			}
 
 			return fmt.Errorf("could not get response: %w", err)
-		}
-
-		if ssub, ok := s.sub.(*HeightBasedSubscription); ok {
-			s.log.Trace().
-				Uint64("next_height", ssub.nextHeight).
-				Msg("sending response")
 		}
 
 		err = s.sub.Send(ctx, response, s.sendTimeout)

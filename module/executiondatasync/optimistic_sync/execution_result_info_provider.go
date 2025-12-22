@@ -10,8 +10,13 @@ import (
 type Criteria struct {
 	// AgreeingExecutorsCount is the number of receipts including the same ExecutionResult
 	AgreeingExecutorsCount uint
+
 	// RequiredExecutors is the list of EN node IDs, one of which must have produced the result
 	RequiredExecutors flow.IdentifierList
+
+	// ParentExecutionResultID is the ID of the parent execution result.
+	// If set, the result's PreviousResultID field must exactly match.
+	ParentExecutionResultID flow.Identifier
 }
 
 // DefaultCriteria is the operator's default criteria for execution result queries.
@@ -32,6 +37,10 @@ func (c *Criteria) OverrideWith(override Criteria) Criteria {
 		newCriteria.RequiredExecutors = override.RequiredExecutors
 	}
 
+	if override.ParentExecutionResultID != flow.ZeroID {
+		newCriteria.ParentExecutionResultID = override.ParentExecutionResultID
+	}
+
 	return newCriteria
 }
 
@@ -49,12 +58,17 @@ type ExecutionResultInfo struct {
 // to ensure consistency and reliability of execution results.
 type ExecutionResultInfoProvider interface {
 	// ExecutionResultInfo retrieves execution results and associated execution nodes for a given block ID
-	// based on the provided criteria. It returns ExecutionResultInfo containing the execution result and
-	// the execution nodes that produced it.
+	// based on the provided criteria.
 	//
-	// Expected error returns during normal operation:
-	//   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
-	//   - [storage.ErrNotFound]: If the data was not found.
+	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound]: If the execution receipts for the block ID are not found.
+	//   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for data before the node's root block.
+	//   - [optimistic_sync.ErrForkAbandoned]: If the execution fork of an execution node from which we were getting the
+	//     execution results was abandoned.
+	//   - [optimistic_sync.ErrNotEnoughAgreeingExecutors]: If there are not enough execution nodes that produced the
+	//     execution result.
+	//   - [optimistic_sync.ErrRequiredExecutorNotFound]: If the criteria's required executor is not in the group of
+	//     execution nodes that produced the execution result.
 	//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
 	//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
 	//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
