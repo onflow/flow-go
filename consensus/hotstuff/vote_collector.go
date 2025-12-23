@@ -32,10 +32,6 @@ const (
 	// VoteCollectorStatusVerifying is for the status when the block has been received,
 	// and is able to process all votes for it.
 	VoteCollectorStatusVerifying
-
-	// VoteCollectorStatusInvalid is for the status when the block has been verified and
-	// is invalid. All votes to this block will be collected to slash the voter.
-	VoteCollectorStatusInvalid
 )
 
 // VoteCollector collects votes for the same block, produces QC when enough votes are collected
@@ -51,10 +47,31 @@ func (ps VoteCollectorStatus) String() string {
 	return collectorStatusNames[ps]
 }
 
-// VoteCollector collects all votes for a specified view. On the happy path, it
-// generates a QC when enough votes have been collected.
-// The VoteCollector internally delegates the vote-format specific processing
-// to the VoteProcessor.
+// VoteCollector collects all votes for a specified view. On the happy path, it generates a QC when enough votes have been
+// collected. The [VoteCollector] internally delegates the vote-format specific processing to the [hotstuff.VoteProcessor].
+//
+// External REQUIREMENT:
+//   - The [VoteCollector] must receive only blocks that passed the Compliance Layer, i.e. blocks that are valid. Otherwise,
+//     The [VoteCollector] might produce QCs for invalid blocks, should a byzantine supermajority exist in the committee
+//     producing such votes. This is very unlikely in practice, but the probability is still too large to ignore for Flow's
+//     Cluster Consensus. More generally, byzantine supermajorities are plausible in architectures, where small consensus
+//     committees are sampled from larger populations of nodes, with byzantine stake close to 1/3.
+//     If given an invalid proposal and in the present of a byzantine supermajority, [VoteCollector] might produce a
+//     cryptographically valid QC for an invalid block, thereby actively aiding byzantine actors in the committee.
+//
+// BFT NOTES:
+// The stack of [VoteCollector] plus [hotstuff.VoteProcessor] is resilient (safe and live) against any vote-driven attacks:
+//   - The [VoteCollector] guarantees liveness, by shielding the [hotstuff.VoteProcessor] from resource exhaustion attacks via
+//     repeated, potentially equivocating stand-alone votes and/or votes embedded into proposals. Checks should be very fast
+//     (no cryptograph involved) and hence assumed to not become a bottleneck compared to the consumed networking bandwidth
+//     and decoding work in case this node is under attack.
+//     As the first layer of defense, the [hotstuff.VoteProcessor] detects and rejects duplicates and equivocations.
+//     [VoteCollector] reliably reports the first equivocation attempt; repeated reports about the same offending node may be
+//     dropped without loss of generality.
+//   - The [hotstuff.VoteProcessor] guarantees safety of the concurrent QC generation logic, being resilient against arbitrary
+//     byzantine inputs, including cryptographic validity checks.
+//   - Proposal equivocation is handled and reported by [hotstuff.Forks], so we don't have to do anything here. [VoteCollector]
+//     can ignore anything but the first (valid) proposal for a view.
 type VoteCollector interface {
 	// ProcessBlock performs validation of block signature and processes block with respected collector.
 	// Calling this function will mark conflicting collector as stale and change state of valid collectors
@@ -87,6 +104,16 @@ type VoteCollector interface {
 
 // VoteProcessor processes votes. It implements the vote-format specific processing logic.
 // Depending on their implementation, a VoteProcessor might drop votes or attempt to construct a QC.
+//
+// BFT NOTES:
+//   - The [VoteProcessor] is entirely resilient to repeated, invalid and/or equivocating votes, thereby providing
+//     safety against vote-driven attacks.
+//
+// ATTENTION BFT LIMITATION:
+// The [VoteProcessor]'s primary responsibility is to construct a valid QC. It reliably detects invalid votes - if they reach
+// the [VoteProcessor], i.e. aren't already rejected and flagged as an equivocation attack by the [VoteCollector]. The [VoteProcessor]
+// responds with dedicated sentinel errors when it rejects a vote (e.g., due to equivocation or invalidity). However, the [VoteProcessor]
+// is not designed to reliably detect all equivocation attempts.
 type VoteProcessor interface {
 	// Process performs processing of single vote. This function is safe to call from multiple goroutines.
 	//
