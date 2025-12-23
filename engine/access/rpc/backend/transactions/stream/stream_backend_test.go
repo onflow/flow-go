@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/access/validator"
 	validatormock "github.com/onflow/flow-go/access/validator/mock"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -53,6 +54,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
+
+// progressReaderAdapter adapts a PersistentStrictMonotonicCounter to implement collection_sync.ProgressReader
+type progressReaderAdapter struct {
+	counter *counters.PersistentStrictMonotonicCounter
+}
+
+var _ collection_sync.ProgressReader = (*progressReaderAdapter)(nil)
+
+func (p *progressReaderAdapter) ProcessedHeight() uint64 {
+	return p.counter.Value()
+}
 
 // TransactionStreamSuite represents a suite for testing transaction status-related functionality in the Flow blockchain.
 type TransactionStreamSuite struct {
@@ -212,7 +224,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 
 	txStatusDeriver := txstatus.NewTxStatusDeriver(
 		s.state,
-		s.lastFullBlockHeight,
+		&progressReaderAdapter{counter: s.lastFullBlockHeight},
 	)
 
 	nodeCommunicator := node_communicator.NewNodeCommunicator(false)

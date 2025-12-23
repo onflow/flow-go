@@ -250,7 +250,7 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Instantiate intermediate components
-	s.txStatusDeriver = txstatus.NewTxStatusDeriver(s.state, s.lastFullBlockHeight)
+	s.txStatusDeriver = txstatus.NewTxStatusDeriver(s.state, &progressReaderAdapter{counter: s.lastFullBlockHeight})
 
 	s.mockState = protocolmock.NewState(s.T())
 	s.nodeProvider = commonrpc.NewExecutionNodeIdentitiesProvider(s.log, s.mockState, s.receipts, nil, nil)

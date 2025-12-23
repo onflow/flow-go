@@ -27,7 +27,7 @@ type ExecutionDataReader struct {
 	store *cache.ExecutionDataCache
 
 	fetchTimeout             time.Duration
-	highestConsecutiveHeight func() (uint64, error)
+	highestConsecutiveHeight func() uint64
 
 	// TODO: refactor this to accept a context in AtIndex instead of storing it on the struct.
 	// This requires also refactoring jobqueue.Consumer
@@ -38,7 +38,7 @@ type ExecutionDataReader struct {
 func NewExecutionDataReader(
 	store *cache.ExecutionDataCache,
 	fetchTimeout time.Duration,
-	highestConsecutiveHeight func() (uint64, error),
+	highestConsecutiveHeight func() uint64,
 ) *ExecutionDataReader {
 	return &ExecutionDataReader{
 		store:                    store,
@@ -62,10 +62,7 @@ func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 	}
 
 	// data for the requested height or a lower height, has not been downloaded yet.
-	highestHeight, err := r.highestConsecutiveHeight()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get highest height: %w", err)
-	}
+	highestHeight := r.highestConsecutiveHeight()
 
 	if height > highestHeight {
 		return nil, storage.ErrNotFound
@@ -88,5 +85,5 @@ func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 
 // Head returns the highest consecutive block height with downloaded execution data
 func (r *ExecutionDataReader) Head() (uint64, error) {
-	return r.highestConsecutiveHeight()
+	return r.highestConsecutiveHeight(), nil
 }

@@ -61,6 +61,15 @@ func (c *CollectionsReader) LightByID(collID flow.Identifier) (*flow.LightCollec
 	return val, nil
 }
 
+// ExistByID checks whether a collection with the given ID exists in storage.
+// Returns (true, nil) if it exists,
+// Returns (false, nil) if it does not exist.
+// No errors are expected during normal operation.
+func (c *CollectionsReader) ExistByID(collID flow.Identifier) (bool, error) {
+	_, exists := c.collections[collID]
+	return exists, nil
+}
+
 // LightByTransactionID returns the collection for the given transaction ID. Only retrieves transaction hashes.
 //
 // Expected error returns during normal operation:
