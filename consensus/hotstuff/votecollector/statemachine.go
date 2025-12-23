@@ -24,17 +24,54 @@ type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.Si
 // VoteCollector implements a state machine for transition between different states of vote processor.
 // It ingests *all* votes for a specified view and consolidates the handling of all byzantine edge cases
 // related to voting (including byzantine leaders publishing conflicting proposals and/or votes).
-// On the happy path, the VoteCollector generates a QC when enough votes have been ingested.
-// We internally delegate the vote-format specific processing to the VoteProcessor.
+// On the happy path, the [VoteCollector] generates a QC when enough votes have been ingested.
+// We internally delegate the vote-format specific processing to the [hotstuff.VoteProcessor].
+//
+// External REQUIREMENT:
+//   - The [VoteCollector] must receive only blocks that passed the Compliance Layer, i.e. blocks that are valid. Otherwise,
+//     The [VoteCollector] might produce QCs for invalid blocks, should a byzantine supermajority exist in the committee
+//     producing such votes. This is very unlikely in practice, but the probability is still too large to ignore for Flow's
+//     Cluster Consensus. More generally, byzantine supermajorities are plausible in architectures, where small consensus
+//     committees are sampled from larger populations of nodes, with byzantine stake close to 1/3.
+//     If given an invalid proposal and in the present of a byzantine supermajority, [VoteCollector] might produce a
+//     cryptographically valid QC for an invalid block, thereby actively aiding byzantine actors in the committee.
+//
+// BFT NOTES:
+// The stack of [VoteCollector] plus [hotstuff.VoteProcessor] is resilient (safe and live) against any vote-driven attacks:
+//   - The [VoteCollector] guarantees liveness, by shielding the [hotstuff.VoteProcessor] from resource exhaustion attacks via
+//     repeated, potentially equivocating stand-alone votes and/or votes embedded into proposals. Checks should be very fast
+//     (no cryptograph involved) and hence assumed to not become a bottleneck compared to the consumed networking bandwidth
+//     and decoding work in case this node is under attack.
+//     As the first, layer of defense, the [hotstuff.VoteProcessor] detects and rejects duplicates and equivocations.
+//     [VoteCollector] reliably reports the first equivocation attempt; repeated reports about the same offending node may be
+//     dropped without loss of generality.
+//   - The [hotstuff.VoteProcessor] guarantees safety of the concurrent QC generation logic, being resilient against arbitrary
+//     byzantine inputs, including cryptographic validity.
+//   - Proposal equivocation is handled and reported by [hotstuff.Forks], so we don't have to do anything here. [VoteCollector]
+//     can ignore anything but the first (valid) proposal for a view.
+//
+// Implementation Notes:
+//   - Vote equivocation attacks are mitigated by retaining the first vote only from any replica for the specific view. From
+//     a byzantine proposer, we memorize only the first (valid) proposal. Vote equivocations (including votes contained in
+//     proposals) are reliably detected and reported. Checks are very fast (no cryptograph involved) and hence assumed to not
+//     become a bottleneck compared to the consumed networking bandwidth and decoding work in case this node is under attack.
+//   - Proposal equivocation is handled by [hotstuff.Forks]. We just continue processing votes for the first proposal received.
+//     For all subsequent proposals for the same view, we check the proposer's vote for equivocation, but otherwise we just drop
+//     the proposal.
+//
+// The [VoteCollector] guarantees that an equivocating node (leader or replica, using stand-alone votes or votes embedded
+// into proposals) is detected at least once (provided the respective data arrives at the [VoteCollector], before it is pruned).
 type VoteCollector struct {
 	log                      zerolog.Logger
 	workers                  hotstuff.Workers
 	notifier                 hotstuff.VoteAggregationConsumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
-	// Byzantine nodes might mount the following attacks on the vote-processing logic:
-	//  1. The leader might send block proposal and equivocate by sending a different conflicting vote as an independent message.
-	//  2. The leader might send a block proposal and (repeatedly) send the same vote again as an independent message.
+	// BFT NOTES:
+	//
+	// Byzantine nodes might mount the following attacks on the vote-processing logic (stack of [VoteCollector] and [hotstuff.VoteProcessor]):
+	//  1. The leader might send block a proposal and equivocate by sending a different conflicting vote as an independent message.
+	//  2. The leader might send a block proposal and (repeatedly) send the same vote again as an independent message (spamming with valid votes).
 	//  3. Any byzantine replica might send multiple individual vote messages (repeated identical votes, or equivocating with different votes).
 	// These are resource exhaustion attacks (if frequent), but can also be attempts by byzantine nodes to have their votes repeatedly
 	// counted (producing an invalid QC if repeatedly counted and thereby disrupting the certification and finalization process).
@@ -43,19 +80,32 @@ type VoteCollector struct {
 	// Hence, attacks 1. and 2. are only available to the leader, because these attacks specifically utilize the fact that the leader signs
 	// their proposal, with the signature authenticating the proposal as well as serving as the leader's vote. Attack 3. can be mounted by
 	// replicas and the leader alike.
+	//   In the current implementation, it is subtle but important that stand-alone votes and votes embedded in proposals are ingested
+	// concurrently via independent algorithmic paths. An attacker (leader or consensus replica) might utilize both paths concurrently
+	// to mount an attack.
 	//
-	// ATTENTION: Detecting vote equivocation is a collaborative effort of the VoteCollector's `votesCache` and the `VoteProcessor`.
-	//  * Stand-alone votes always hit the `votesCache`, which checks the vote against all previously cached votes for
-	//    equivocation (protocol violation) or exact duplicates (non-slashable, potential spamming). This mitigates attack 3.
-	//  * In the current implementation, the `votesCache` does not catch leader attacks 1. and 2., which exploit the fact that stand-alone
-	//    votes and votes embedded in proposals are processed concurrently through different code paths. We emphasize that attack vectors
-	//    1. and 2. are only available to a byzantine leader as long as the leader has not (yet) equivocated for the current view. Once
-	//    the VoteCollector notices that the _leader_ equivocates, it immediately stops accepting proposals for the view, thereby closing
-	//    attack vectors 1. and 2. Hence, it is sufficient for the [VerifyingVoteProcessor] to catch _all_ equivocation attacks,
-	//    including attacks 1. and 2.
+	// Mitigations:
+	//  * Detecting vote equivocation is the responsibility of the [VoteCollector]. We cache the first vote from each node in the `votesCache`.
+	//    If we receive subsequent votes (stand-alone votes or votes embedded into proposals) from the same node, we check whether the vote
+	//    is different (equivocation) and in this case raise a notification with the slashing evidence. Thereby we guarantee that an equivocating
+	//    node (leader or replica, using stand-alone votes or votes embedded into proposals) is detected at least once (provided the respective
+	//    data arrives at the [VoteCollector], before it is pruned) and the respective evidence is collected. Checks are very fast (no
+	//    cryptograph involved) and hence assumed to not become a bottleneck compared to the consumed networking bandwidth and decoding work
+	//    in case this node is under attack. Thereby, the [VoteCollector] shields itself and the [VoteProcessor] from attackers trying to cause
+	//    excessive CPU or memory consumption, providing liveness in the present of resource exhaustion attacks.
+	//  * For maximum resilience, the [VoteProcessor] is entirely resilient to repeated, invalid and/or equivocating votes, thereby providing
+	//    safety against vote-driven attacks.
+	//    ATTENTION: The [VoteProcessor]'s primary responsibility is to construct a valid QC. It reliably detects invalid votes (if they reach
+	//    the [VoteProcessor], i.e. aren't already rejected and flagged as an equivocation attack by the [VoteCollector]). The [VoteProcessor]
+	//    responds with dedicated sentinel errors when it rejects a vote (e.g., due to equivocation or invalidity). However, the [VoteProcessor]
+	//    is not designed to reliably detect all equivocation attempts.
 	//
-	// The VoteProcessor provides the final defense against any double-counting attacks, because this attack vector is only open as long
-	// as we are ingesting votes with the goal of producing a QC, in other words as along as we are still following the happy path.
+	// Both mitigations in combination make (i) vote processing resilient (safe and live) against any vote-driven attacks (resource exhaustion
+	// attacks or attacking the QC-generation logic via repeated, potentially equivocating stand-alone votes and/or votes embedded into proposals).
+	// Furthermore, (ii) the stack of [VoteCollector] and [VoteProcessor] reliably detects equivocating nodes and/or nodes submitting invalid
+	// votes. The respective evidence is submitted to a dedicated consumer (property iii). In summary, [VoteCollector] plus [VoteProcessor]
+	// can (i) withstand attacks, (ii) detect attacks as such, and (iii) by collecting conclusive slashing evidence enable suppression of attacks.
+	//
 	votesCache     VotesCache
 	votesProcessor atomic.Value
 }
@@ -66,7 +116,7 @@ func (m *VoteCollector) atomicLoadProcessor() hotstuff.VoteProcessor {
 	return m.votesProcessor.Load().(*atomicValueWrapper).processor
 }
 
-// atomic.Value doesn't allow storing interfaces as atomic values,
+// [atomic.Value] doesn't allow storing interfaces as atomic values,
 // it requires that stored type is always the same, so we need a wrapper that will mitigate this restriction
 // https://github.com/golang/go/issues/22550
 type atomicValueWrapper struct {
@@ -276,14 +326,28 @@ func (m *VoteCollector) View() uint64 {
 // because we don't want to build on any proposal from an equivocating primary. Note: slashing challenges
 // for proposal equivocation are triggered by hotstuff.Forks, so we don't have to do anything else here.
 //
-// The internal state change is implemented as an atomic compare-and-swap, i.e.
-// the state transition is only executed if VoteCollector's internal state is
-// equal to `expectedValue`. The implementation only allows the transitions
-//
-//	CachingVotes   → VerifyingVotes
+// The internal state change is implemented as an atomic compare-and-swap, i.e. the state transition is
+// only executed if VoteCollector's internal state is equal to `expectedValue`. The implementation only
+// allows the transition CachingVotes → VerifyingVotes.
 //
 // No errors are expected during normal operation (Byzantine edge cases handled via notifications internally).
 func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
+	// BFT NOTES: we must (i) withstand attacks, (ii) detect attacks as such, and (iii) suppress attacks (collect slashing evidence).
+	// * Vote equivocation attacks:
+	//   (i) Withstanding attacks: Conceptually, vote equivocation (leader or replica) can be used as an angle for resource
+	//   exhaustion attacks. The `votesCache` rejects all but the first votes from a party. Checking the cache is very fast and
+	//   assumed to not become a bottleneck compared to the consumed networking bandwidth and decoding work if a node is under
+	//   attack. As only a single vote from the leader can pass this step, no vector for resource exhaustion attacks remains.
+	//   (ii) and (iii) We attempt to add all votes eventually to the `votesCache`. The `votesCache` detects equivocation
+	//   and submits pairs of equivocating votes internally to dedicated consumers.
+	// * Proposal equivocation attacks:
+	//   Proposal equivocation is handled by `hotstuff.Forks`, so we don't have to do anything here in case the VoteProcessor's
+	//   status is already `VoteCollectorStatusVerifying`. We just continue processing votes for the first proposal received. This
+	//   could be extended in the future to stop processing votes for equivocating proposers, reducing the probability that a
+	//   proposal of an equivocating leader gets certified. However, the protocol anyway has to handle the edge case where a
+	//   supermajority of nodes already voted for an equivocating leader's proposal, before the equivocation is detected. Hence, we
+	//   keep the implementation simple here and rather focus our efforts on quickly slashing byzantine proposers (future work).
+
 	proposerVote, err := proposal.ProposerVote()
 	if err != nil {
 		return model.NewInvalidProposalErrorf(proposal, "invalid proposer vote")
@@ -326,9 +390,8 @@ func (m *VoteCollector) ProcessBlock(proposal *model.SignedProposal) error {
 
 			m.processCachedVotes(proposal.Block)
 
-		// We already received a valid block for this view. Check whether the proposer is
-		// equivocating and terminate vote processing in this case. Note: proposal equivocation
-		// is handled by hotstuff.Forks, so we don't have to do anything else here.
+		// We already received a valid block for this view; continue collecting votes for the valid proposal we received
+		// (even if proposer is equivocating - for reasoning, see BFT NOTES above).
 		case hotstuff.VoteCollectorStatusVerifying:
 			verifyingProc, ok := proc.(hotstuff.VerifyingVoteProcessor)
 			if !ok {
@@ -356,7 +419,7 @@ func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 // caching2Verifying ensures that the VoteProcessor is currently in state [VoteCollectorStatusCaching]
 // and replaces it by a newly-created VerifyingVoteProcessor.
 // Error returns:
-// * ErrDifferentCollectorState if the VoteCollector's state is _not_ `CachingVotes`
+// * ErrDifferentCollectorState if the VoteCollector's state is _not_ [VoteCollectorStatusCaching]
 // * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
 func (m *VoteCollector) caching2Verifying(proposal *model.SignedProposal) error {
 	blockID := proposal.Block.BlockID
