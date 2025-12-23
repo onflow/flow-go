@@ -73,7 +73,6 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(sizeLimit))
 	// pushing entities concurrently.
 	for _, e := range entities {
-		e := e // suppress loop variable
 		go func() {
 			require.True(t, q.Push(e.Identifier, e))
 			pushWG.Done()

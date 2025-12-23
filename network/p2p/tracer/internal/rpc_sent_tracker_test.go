@@ -54,7 +54,6 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 		}
 		iHaves := make([]*pb.ControlIHave, len(testCases))
 		for i, testCase := range testCases {
-			testCase := testCase
 			iHaves[i] = &pb.ControlIHave{
 				MessageIDs: testCase.messageIDS,
 			}

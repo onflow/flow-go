@@ -160,8 +160,6 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 
 	chunkDataIDs := make([]cid.Cid, len(executionData.ChunkExecutionDatas))
 	for i, chunkExecutionData := range executionData.ChunkExecutionDatas {
-		i := i
-		chunkExecutionData := chunkExecutionData
 
 		g.Go(func() error {
 			logger.Debug().Int("chunk_index", i).Msg("adding chunk execution data")
