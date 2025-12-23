@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -82,6 +83,10 @@ type Suite struct {
 	txResultsIndex *index.TransactionResultsIndex
 
 	errorMessageProvider error_messages.Provider
+
+	execResultInfoProvider *optimisticsyncmock.ExecutionResultInfoProvider
+	execStateCache         *optimisticsyncmock.ExecutionStateCache
+	execStateSnapshot      *optimisticsyncmock.Snapshot
 
 	chainID                              flow.ChainID
 	systemCollection                     *flow.Collection
@@ -134,6 +139,10 @@ func (suite *Suite) SetupTest() {
 	suite.Require().NoError(err)
 	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
+
+	suite.execResultInfoProvider = optimisticsyncmock.NewExecutionResultInfoProvider(suite.T())
+	suite.execStateCache = optimisticsyncmock.NewExecutionStateCache(suite.T())
+	suite.execStateSnapshot = optimisticsyncmock.NewSnapshot(suite.T())
 
 	suite.scheduledTransactionsEnabled = true
 
@@ -584,7 +593,7 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(expectedResult, nil)
 
 		params := suite.defaultTransactionsParams()
@@ -611,7 +620,7 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(nil, expectedErr)
 
 		params := suite.defaultTransactionsParams()
@@ -694,7 +703,7 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(expectedResult, nil)
 
 		params := suite.defaultTransactionsParams()
@@ -794,7 +803,7 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(nil, expectedErr)
 
 		params := suite.defaultTransactionsParams()
@@ -855,7 +864,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion, mock.Anything).
 			Return(expectedResult, nil)
 
 		params := suite.defaultTransactionsParams()
@@ -887,7 +896,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion, mock.Anything).
 			Return(expectedResult, nil)
 
 		params := suite.defaultTransactionsParams()
@@ -919,7 +928,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion, mock.Anything).
 			Return(nil, storage.ErrNotFound)
 
 		params := suite.defaultTransactionsParams()
@@ -1073,7 +1082,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, collectionID, encodingVersion, mock.Anything).
 			Return(nil, expectedErr)
 
 		params := suite.defaultTransactionsParams()
@@ -1713,7 +1722,7 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(expectedResult, nil).
 			Once()
 
@@ -1742,7 +1751,7 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), systemTxID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), systemTxID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(expectedResult, nil).
 			Once()
 
@@ -1794,7 +1803,7 @@ func (suite *Suite) TestGetSystemTransactionResult() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(nil, expectedErr).
 			Once()
 
@@ -2089,7 +2098,7 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(expectedResult, nil)
 
 		params := suite.defaultTransactionsParams()
@@ -2203,7 +2212,7 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, mock.Anything).
 			Return(nil, expectedErr)
 
 		params := suite.defaultTransactionsParams()

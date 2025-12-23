@@ -37,6 +37,8 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	optimisticsyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/executiondatasync/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -88,6 +90,10 @@ type TransactionsFunctionalSuite struct {
 	txResultsIndex         *index.TransactionResultsIndex
 	validatorBlocks        *validator.ProtocolStateBlocks
 	txErrorMessageProvider error_messages.Provider
+
+	execResultInfoProvider *optimisticsyncmock.ExecutionResultInfoProvider
+	execStateCache         *optimisticsyncmock.ExecutionStateCache
+	execStateSnapshot      *optimisticsyncmock.Snapshot
 
 	state               *protocol.State
 	rootSnapshot        *inmem.Snapshot
@@ -145,6 +151,10 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.validatorBlocks = validator.NewProtocolStateBlocks(s.state, reporter)
 
 	s.txErrorMessageProvider = error_messages.NewTxErrorMessageProvider(s.log, s.txErrorMessages, nil, nil, nil, nil)
+
+	s.execResultInfoProvider = optimisticsyncmock.NewExecutionResultInfoProvider(s.T())
+	s.execStateCache = optimisticsyncmock.NewExecutionStateCache(s.T())
+	s.execStateSnapshot = optimisticsyncmock.NewSnapshot(s.T())
 
 	s.participants = s.g.Identities().List(5, fixtures.Identity.WithAllRoles())
 	s.rootSnapshot = unittest.RootSnapshotFixtureWithChainID(s.participants, s.g.ChainID())
@@ -426,20 +436,33 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_Local() {
 	txID := s.tf.ExpectedResults[1].TransactionID
 
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil).Maybe()
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil).Maybe()
+
+	// Mock the execution result info provider
+	s.execResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).Return(
+		&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: s.tf.ExecutionResult.ID(),
+			ExecutionNodes:    flow.IdentitySkeletonList{},
+		}, nil).Maybe()
+
+	// Mock the execution state cache
+	s.execStateCache.On("Snapshot", s.tf.ExecutionResult.ID()).Return(s.execStateSnapshot, nil).Maybe()
+	s.execStateSnapshot.On("Events").Return(s.events).Maybe()
+	s.execStateSnapshot.On("LightTransactionResults").Return(s.results).Maybe()
+	s.execStateSnapshot.On("TransactionResultErrorMessages").Return(s.txErrorMessages).Maybe()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -455,20 +478,33 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_Local() {
 	blockID := s.tf.Block.ID()
 
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil).Maybe()
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil).Maybe()
+
+	// Mock the execution result info provider
+	s.execResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).Return(
+		&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: s.tf.ExecutionResult.ID(),
+			ExecutionNodes:    flow.IdentitySkeletonList{},
+		}, nil).Maybe()
+
+	// Mock the execution state cache
+	s.execStateCache.On("Snapshot", s.tf.ExecutionResult.ID()).Return(s.execStateSnapshot, nil).Maybe()
+	s.execStateSnapshot.On("Events").Return(s.events).Maybe()
+	s.execStateSnapshot.On("LightTransactionResults").Return(s.results).Maybe()
+	s.execStateSnapshot.On("TransactionResultErrorMessages").Return(s.txErrorMessages).Maybe()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -488,20 +524,33 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
 	}
 
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil).Maybe()
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil).Maybe()
+
+	// Mock the execution result info provider
+	s.execResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).Return(
+		&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: s.tf.ExecutionResult.ID(),
+			ExecutionNodes:    flow.IdentitySkeletonList{},
+		}, nil).Maybe()
+
+	// Mock the execution state cache
+	s.execStateCache.On("Snapshot", s.tf.ExecutionResult.ID()).Return(s.execStateSnapshot, nil).Maybe()
+	s.execStateSnapshot.On("Events").Return(s.events).Maybe()
+	s.execStateSnapshot.On("LightTransactionResults").Return(s.results).Maybe()
+	s.execStateSnapshot.On("TransactionResultErrorMessages").Return(s.txErrorMessages).Maybe()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -528,20 +577,33 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil).Maybe()
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil).Maybe()
+
+	// Mock the execution result info provider
+	s.execResultInfoProvider.On("ExecutionResultInfo", blockID, mock.Anything).Return(
+		&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: s.tf.ExecutionResult.ID(),
+			ExecutionNodes:    flow.IdentitySkeletonList{},
+		}, nil).Maybe()
+
+	// Mock the execution state cache
+	s.execStateCache.On("Snapshot", s.tf.ExecutionResult.ID()).Return(s.execStateSnapshot, nil).Maybe()
+	s.execStateSnapshot.On("Events").Return(s.events).Maybe()
+	s.execStateSnapshot.On("LightTransactionResults").Return(s.results).Maybe()
+	s.execStateSnapshot.On("TransactionResultErrorMessages").Return(s.txErrorMessages).Maybe()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -555,20 +617,30 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local() {
 	block := s.tf.Block
 
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+	// Mock the execution result info provider
+	s.execResultInfoProvider.On("ExecutionResultInfo", block.ID(), mock.Anything).Return(
+		&optimistic_sync.ExecutionResultInfo{
+			ExecutionResultID: s.tf.ExecutionResult.ID(),
+			ExecutionNodes:    flow.IdentitySkeletonList{},
+		}, nil).Maybe()
+
+	// Mock the execution state cache
+	s.execStateCache.On("Snapshot", s.tf.ExecutionResult.ID()).Return(s.execStateSnapshot, nil).Maybe()
+
+	// Mock the events reader - use the actual events storage from the test suite
+	s.execStateSnapshot.On("Events").Return(s.events).Maybe()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventsIndex,
-		s.txResultsIndex,
 		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.execResultInfoProvider,
+		s.execStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)

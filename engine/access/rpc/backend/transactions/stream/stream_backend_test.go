@@ -41,6 +41,8 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	optimisticmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -237,17 +239,23 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		execNodeProvider,
 	)
 
+	execResultInfoProvider := optimisticmock.NewExecutionResultInfoProvider(s.T())
+	execResultInfoProvider.On("ExecutionResultInfo", mock.Anything, mock.Anything).Return(nil, status.Error(codes.NotFound, "execution result not found")).Maybe()
+
+	execStateCache := optimisticmock.NewExecutionStateCache(s.T())
+	execStateCache.On("Snapshot", mock.Anything).Return(nil, status.Error(codes.NotFound, "snapshot not found")).Maybe()
+
 	var systemCollections *systemcollection.Versioned
 	localTxProvider := provider.NewLocalTransactionProvider(
 		s.state,
 		s.collections,
 		s.blocks,
-		s.eventIndex,
-		s.txResultIndex,
 		errorMessageProvider,
 		systemCollections,
 		txStatusDeriver,
 		s.chainID,
+		execResultInfoProvider,
+		execStateCache,
 	)
 
 	execNodeTxProvider := provider.NewENTransactionProvider(
@@ -543,7 +551,7 @@ func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
-	sub := s.txStreamBackend.SendAndSubscribeTransactionStatuses(ctx, &transaction, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SendAndSubscribeTransactionStatuses(ctx, &transaction, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
@@ -592,7 +600,7 @@ func (s *TransactionStreamSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound)
 
 	// Subscribe to transaction status and receive the first message with pending status
-	sub := s.txStreamBackend.SendAndSubscribeTransactionStatuses(ctx, &transaction, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SendAndSubscribeTransactionStatuses(ctx, &transaction, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
@@ -629,7 +637,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentPendin
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
 
-	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
 
 	s.addBlockWithTransaction(&transaction)
@@ -664,7 +672,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentFinali
 
 	s.addBlockWithTransaction(&transaction)
 
-	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{
 		flow.TransactionStatusPending,
 		flow.TransactionStatusFinalized,
@@ -703,7 +711,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentExecut
 	// init transaction result for storage
 	hasTransactionResultInStorage = true
 	s.addNewFinalizedBlock(s.finalizedBlock.ToHeader(), true)
-	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 	s.checkNewSubscriptionMessage(
 		sub,
 		txId,
@@ -747,7 +755,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentSealed
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.ToHeader(), true)
 
-	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 
 	s.checkNewSubscriptionMessage(
 		sub,
@@ -783,7 +791,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		signalerCtx := irrecoverable.WithSignalerContext(ctx,
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, fmt.Errorf("failed to lookup sealed block: %w", expectedError)))
 
-		sub := s.txStreamBackend.SubscribeTransactionStatuses(signalerCtx, txId, entities.EventEncodingVersion_CCF_V0)
+		sub := s.txStreamBackend.SubscribeTransactionStatuses(signalerCtx, txId, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 		s.Assert().ErrorContains(sub.Err(), fmt.Errorf("failed to lookup sealed block: %w", expectedError).Error())
 	})
 
@@ -795,7 +803,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		expectedError := storage.ErrNotFound
 		s.blockTracker.On("GetStartHeightFromBlockID", s.sealedBlock.ID()).Return(uint64(0), expectedError).Once()
 
-		sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+		sub := s.txStreamBackend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0, optimistic_sync.Criteria{})
 		s.Assert().ErrorContains(sub.Err(), expectedError.Error())
 		s.Require().ErrorIs(sub.Err(), expectedError)
 	})

@@ -8,15 +8,16 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	txprovider "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // TransactionMetadata manages the state of a transaction subscription.
@@ -36,6 +37,7 @@ type TransactionMetadata struct {
 
 	txProvider      *txprovider.FailoverTransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
+	criteria        optimistic_sync.Criteria
 }
 
 // NewTransactionMetadata initializes a new metadata object for a transaction subscription.
@@ -44,11 +46,15 @@ type TransactionMetadata struct {
 // and maintaining its state throughout execution.
 //
 // Parameters:
-//   - ctx: Context for managing the lifecycle of the operation.
-//   - backendTransactions: A reference to the txStreamBackend transaction manager.
+//   - blocks: Storage interface for accessing block data.
+//   - collections: Storage interface for accessing collection data.
+//   - transactions: Storage interface for accessing transaction data.
 //   - txID: The unique identifier of the transaction.
-//   - txReferenceBlockID: The ID of the transaction’s reference block.
+//   - txReferenceBlockID: The ID of the transaction's reference block.
 //   - eventEncodingVersion: The required version of event encoding.
+//   - txProvider: Provider for retrieving transaction results.
+//   - txStatusDeriver: Deriver for determining transaction status.
+//   - criteria: The execution state query criteria for selecting execution results.
 //
 // Returns:
 //   - *TransactionMetadata: The initialized transaction metadata object.
@@ -61,6 +67,7 @@ func NewTransactionMetadata(
 	eventEncodingVersion entities.EventEncodingVersion,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	criteria optimistic_sync.Criteria,
 ) *TransactionMetadata {
 	return &TransactionMetadata{
 		txResult:             &accessmodel.TransactionResult{TransactionID: txID},
@@ -71,6 +78,7 @@ func NewTransactionMetadata(
 		txReferenceBlockID:   txReferenceBlockID,
 		txProvider:           txProvider,
 		txStatusDeriver:      txStatusDeriver,
+		criteria:             criteria,
 	}
 }
 
@@ -80,7 +88,7 @@ func NewTransactionMetadata(
 //   - ctx: Context for managing the operation lifecycle.
 //
 // Expected errors during normal operation:
-//   - [ErrBlockNotReady] if the block at the given height is not found.
+//   - [subscription.ErrBlockNotReady] if the block at the given height is not found.
 //   - codes.Internal if impossible to get transaction result due to event payload conversion failed
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the refreshing transaction result
@@ -188,8 +196,11 @@ func (t *TransactionMetadata) refreshBlock() error {
 
 // refreshCollection updates the collection metadata if the transaction is included in a block.
 //
+// This method uses direct storage access since we don't yet know which block contains the transaction.
+// Once we find the collection, we can get the block and then use the caching layer for subsequent queries.
+//
 // Expected errors during normal operation:
-//   - [ErrTransactionNotInBlock] if the transaction is not found in the block.
+//   - storage.ErrNotFound if the transaction is not found (returns nil, indicating tx not yet indexed).
 //
 // All other errors should be treated as exceptions.
 func (t *TransactionMetadata) refreshCollection() error {
@@ -197,9 +208,11 @@ func (t *TransactionMetadata) refreshCollection() error {
 		return nil
 	}
 
+	// Use direct storage since we don't know which block yet
 	collection, err := t.collections.LightByTransactionID(t.txResult.TransactionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
+			// Transaction not indexed yet - this is expected during normal operation
 			return nil
 		}
 		return fmt.Errorf("failed to lookup collection containing tx: %w", err)
@@ -208,13 +221,20 @@ func (t *TransactionMetadata) refreshCollection() error {
 	return nil
 }
 
-// refreshTransactionResult attempts to retrieve the transaction result from storage or an execution node.
+// refreshTransactionResult attempts to retrieve the transaction result from the caching layer or execution nodes.
+//
+// This method tries to retrieve transaction results in the following order:
+//  1. Caching layer (optimistic sync cache with snapshot readers) - when indexing is enabled
+//  2. Execution nodes - final fallback when local data is unavailable
+//
+// The caching layer ensures all data (events, results, error messages) come from the same execution result.
 //
 // Parameters:
 //   - ctx: Context for managing the operation lifecycle.
 //
 // Expected errors during normal operation:
 //   - [codes.NotFound] if the transaction result is unavailable.
+//   - storage.ErrNotFound if the transaction result is not found in the snapshot. //TODO check
 //
 // All other errors should be treated as exceptions.
 func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) error {
@@ -229,6 +249,7 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		t.txResult.TransactionID,
 		t.txResult.CollectionID,
 		t.eventEncodingVersion,
+		t.criteria,
 	)
 	if err != nil {
 		// TODO: I don't like the fact we propagate this error from txProvider.

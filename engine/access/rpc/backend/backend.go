@@ -226,12 +226,12 @@ func New(params Params) (*Backend, error) {
 		params.State,
 		params.Collections,
 		params.Blocks,
-		params.EventsIndex,
-		params.TxResultsIndex,
 		params.TxErrorMessageProvider,
 		systemCollections,
 		txStatusDeriver,
 		params.ChainID,
+		params.ExecutionResultInfoProvider,
+		params.ExecutionStateCache,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,

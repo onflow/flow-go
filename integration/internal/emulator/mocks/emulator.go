@@ -14,8 +14,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	access "github.com/onflow/flow-go/model/access"
 	emulator "github.com/onflow/flow-go/integration/internal/emulator"
+	access "github.com/onflow/flow-go/model/access"
 	flow "github.com/onflow/flow-go/model/flow"
 )
 
