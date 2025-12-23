@@ -3,12 +3,8 @@ package runtime
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
-	"github.com/onflow/cadence/stdlib"
-
-	"github.com/onflow/flow-go/fvm/errors"
 )
 
 // Note: this is a subset of environment.Environment, redeclared to handle
@@ -18,12 +14,7 @@ type Environment interface {
 	common.Gauge
 
 	RandomSourceHistory() ([]byte, error)
-}
-
-// randomSourceFunctionType is the type of the `randomSource` function.
-// This defines the signature as `func(): [UInt8]`
-var randomSourceFunctionType = &sema.FunctionType{
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+	TxIndex() uint32
 }
 
 type ReusableCadenceRuntime struct {
@@ -44,63 +35,17 @@ func NewReusableCadenceRuntime(
 		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
 	}
 
-	reusable.declareRandomSourceHistory()
+	reusable.declareStandardLibraryFunctions()
 
 	return reusable
 }
 
-func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
+func (reusable *ReusableCadenceRuntime) declareStandardLibraryFunctions() {
+	reusable.TxRuntimeEnv.DeclareValue(blockRandomSourceDeclaration(reusable), nil)
 
-	// Declare the `randomSourceHistory` function. This function is **only** used by the
-	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
-	// resource. This allows the `RandomBeaconHistory` contract to be a standard contract,
-	// without any special parts.
-	// Since the `randomSourceHistory` function is only used by the System transaction,
-	// it is not part of the cadence standard library, and can just be injected from here.
-	// It also doesnt need user documentation, since it is not (and should not)
-	// be called by the user. If it is called by the user it will panic.
-	functionType := randomSourceFunctionType
-
-	blockRandomSource := stdlib.StandardLibraryValue{
-		Name: "randomSourceHistory",
-		Type: functionType,
-		Kind: common.DeclarationKindFunction,
-		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
-			functionType,
-			func(invocation interpreter.Invocation) interpreter.Value {
-
-				actualArgumentCount := len(invocation.Arguments)
-				expectedArgumentCount := len(functionType.Parameters)
-
-				if actualArgumentCount != expectedArgumentCount {
-					panic(errors.NewInvalidArgumentErrorf(
-						"incorrect number of arguments: got %d, expected %d",
-						actualArgumentCount,
-						expectedArgumentCount,
-					))
-				}
-
-				var err error
-				var source []byte
-				fvmEnv := reusable.fvmEnv
-				if fvmEnv != nil {
-					source, err = fvmEnv.RandomSourceHistory()
-				} else {
-					err = errors.NewOperationNotSupportedError("randomSourceHistory")
-				}
-
-				if err != nil {
-					panic(err)
-				}
-
-				return interpreter.ByteSliceToByteArrayValue(
-					invocation.InvocationContext,
-					source)
-			},
-		),
-	}
-
-	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
+	declaration := transactionIndexDeclaration(reusable)
+	reusable.TxRuntimeEnv.DeclareValue(declaration, nil)
+	reusable.ScriptRuntimeEnv.DeclareValue(declaration, nil)
 }
 
 func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv Environment) {
