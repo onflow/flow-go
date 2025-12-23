@@ -107,7 +107,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
 			dbReader: pebbleimpl.ToDB(pdb).Reader(),
-			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb), flow.Emulator),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
@@ -177,7 +177,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
 			dbReader: pebbleimpl.ToDB(pdb).Reader(),
-			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb), flow.Emulator),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),
@@ -236,7 +236,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		fin := Finalizer{
 			dbReader: pebbleimpl.ToDB(pdb).Reader(),
-			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb)),
+			headers:  store.NewHeaders(metrics, pebbleimpl.ToDB(pdb), flow.Emulator),
 			state:    state,
 			tracer:   trace.NewNoopTracer(),
 			cleanup:  LogCleanup(&list),

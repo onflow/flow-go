@@ -70,7 +70,7 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
 		metrics := mmetrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -100,7 +100,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -144,7 +144,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := store.InitAll(mmetrics.NewNoopCollector(), db)
+		all := store.InitAll(mmetrics.NewNoopCollector(), db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -190,7 +190,7 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -234,7 +234,7 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -274,7 +274,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 		metrics := mmetrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -317,7 +317,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 		db := pebbleimpl.ToDB(pdb)
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := store.InitAll(mmetrics.NewNoopCollector(), db)
+		all := store.InitAll(mmetrics.NewNoopCollector(), db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -372,7 +372,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -413,7 +413,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,

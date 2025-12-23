@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
@@ -21,33 +22,87 @@ type Headers struct {
 	heightCache *Cache[uint64, flow.Identifier]
 	viewCache   *Cache[uint64, flow.Identifier]
 	sigs        *proposalSignatures
+	chainID     flow.ChainID
 }
 
 var _ storage.Headers = (*Headers)(nil)
 
 // NewHeaders creates a Headers instance, which stores block headers.
-// It supports storing, caching and retrieving by block ID and the additionally indexed by header height.
-func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
+// It supports storing, caching and retrieving by block ID, and additionally indexes by header height and view.
+// Must be initialized with a non-cluster chainID; see [cluster.IsCanonicalClusterID].
+func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
+	if cluster.IsCanonicalClusterID(chainID) {
+		panic("NewHeaders called on cluster chain ID - use NewClusterHeaders instead")
+	}
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
+		if header.ChainID != chainID {
+			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
+		}
+		if !lctx.HoldsLock(storage.LockInsertBlock) {
+			return fmt.Errorf("missing lock: %v", storage.LockInsertBlock)
+		}
 		return operation.InsertHeader(lctx, rw, blockID, header)
 	}
-
-	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
-		var header flow.Header
-		err := operation.RetrieveHeader(r, blockID, &header)
-		return &header, err
-	}
-
 	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
 		var id flow.Identifier
 		err := operation.LookupBlockHeight(r, height, &id)
 		return id, err
 	}
-
 	retrieveView := func(r storage.Reader, view uint64) (flow.Identifier, error) {
 		var id flow.Identifier
 		err := operation.LookupCertifiedBlockByView(r, view, &id)
 		return id, err
+	}
+	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView)
+}
+
+// NewClusterHeaders creates a Headers instance for a collection cluster chain, which stores block headers for cluster blocks.
+// It supports storing, caching and retrieving by block ID, and additionally an index by header height.
+// Must be initialized with a valid cluster chain ID; see [cluster.IsCanonicalClusterID]
+func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
+	if !cluster.IsCanonicalClusterID(chainID) {
+		panic("NewClusterHeaders called on non-cluster chain ID - use NewHeaders instead")
+	}
+	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
+		if header.ChainID != chainID {
+			return fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
+		}
+		if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+			return fmt.Errorf("missing lock: %v", storage.LockInsertOrFinalizeClusterBlock)
+		}
+		return operation.InsertClusterHeader(lctx, rw, blockID, header)
+	}
+	retrieveHeight := func(r storage.Reader, height uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		err := operation.LookupClusterBlockHeight(r, chainID, height, &id)
+		return id, err
+	}
+	retrieveView := func(r storage.Reader, height uint64) (flow.Identifier, error) {
+		var id flow.Identifier
+		return id, fmt.Errorf("retrieve by view not implemented for cluster headers")
+	}
+	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView)
+}
+
+// newHeaders contains shared logic for Header storage, including storing and retrieving by block ID
+func newHeaders(collector module.CacheMetrics,
+	db storage.DB,
+	chainID flow.ChainID,
+	storeWithLock storeWithLockFunc[flow.Identifier, *flow.Header],
+	retrieveHeight retrieveFunc[uint64, flow.Identifier],
+	retrieveView retrieveFunc[uint64, flow.Identifier],
+) *Headers {
+	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.Header, error) {
+		var header flow.Header
+		err := operation.RetrieveHeader(r, blockID, &header)
+		if err != nil {
+			return nil, err
+		}
+		// raise an error when the retrieved header is for a different chain than expected
+		if header.ChainID != chainID {
+			return nil, fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
+		}
+		return &header, err
 	}
 
 	h := &Headers{
@@ -65,7 +120,8 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withRetrieve(retrieveView)),
 
-		sigs: newProposalSignatures(collector, db),
+		sigs:    newProposalSignatures(collector, db),
+		chainID: chainID,
 	}
 
 	return h
@@ -83,6 +139,7 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB) *Headers {
 // It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
 // This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
 // of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
+// Returns [storage.ErrWrongChain] if the header's ChainID does not match the one used when initializing the storage.
 // No other errors are expected during normal operation.
 func (h *Headers) storeTx(
 	lctx lockctx.Proof,
@@ -131,6 +188,7 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
 // ByBlockID returns the header with the given ID. It is available for finalized blocks and those pending finalization.
 // Error returns:
 //   - [storage.ErrNotFound] if no block header with the given ID exists
+//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
 }
@@ -139,6 +197,7 @@ func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 // It is available for finalized blocks and those pending finalization.
 // Error returns:
 //   - [storage.ErrNotFound] if no block header or proposer signature with the given blockID exists
+//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 func (h *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHeader, error) {
 	return h.retrieveProposalTx(blockID)
 }
@@ -146,6 +205,7 @@ func (h *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHead
 // ByHeight returns the block with the given number. It is only available for finalized blocks.
 // Error returns:
 //   - [storage.ErrNotFound] if no finalized block is known at the given height
+//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -202,6 +262,7 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if no block with the given parentID is known
+//   - [storage.ErrWrongChain] if any children exist but are part of a different chain than expected
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	var blockIDs flow.IdentifierList
 	err := operation.RetrieveBlockChildren(h.db.Reader(), parentID, &blockIDs)
@@ -235,7 +296,7 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 
 // BlockIDByView returns the block ID that is certified at the given view. It is an optimized
 // version of `ByView` that skips retrieving the block. Expected errors during normal operations:
-//   - `[storage.ErrNotFound] if no certified block is known at given view.
+//   - [storage.ErrNotFound] if no certified block is known at given view.
 //
 // NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
 func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {

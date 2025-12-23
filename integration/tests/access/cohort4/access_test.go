@@ -154,7 +154,7 @@ func (s *AccessSuite) runTestSignerIndicesDecoding() {
 	err = container.WaitForContainerStopped(5 * time.Second)
 	require.NoError(s.T(), err)
 
-	// open state to build a block singer decoder
+	// open state to build a block signer decoder
 	state, err := container.OpenState()
 	require.NoError(s.T(), err)
 

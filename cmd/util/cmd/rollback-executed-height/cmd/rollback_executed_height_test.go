@@ -39,7 +39,7 @@ func TestReExecuteBlock(t *testing.T) {
 		// create all modules
 		metrics := &metrics.NoopCollector{}
 
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		headers := all.Headers
 		blocks := all.Blocks
 		txResults, err := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
@@ -199,7 +199,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		// create all modules
 		metrics := &metrics.NoopCollector{}
-		all := store.InitAll(metrics, db)
+		all := store.InitAll(metrics, db, flow.Emulator)
 		headers := all.Headers
 		blocks := all.Blocks
 		commits := store.NewCommits(metrics, db)

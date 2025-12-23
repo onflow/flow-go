@@ -29,6 +29,7 @@ func TestInvalidTopicErrRoundTrip(t *testing.T) {
 
 // TestUnknownClusterIDErrRoundTrip ensures correct error formatting for UnknownClusterIDErr.
 func TestUnknownClusterIDErrRoundTrip(t *testing.T) {
+	// NOTE: we do not use CanonicalClusterID here to avoid circular dependency
 	clusterId := flow.ChainID("cluster-id")
 	activeClusterIds := flow.ChainIDList{"active", "cluster", "ids"}
 	err := NewUnknownClusterIdErr(clusterId, activeClusterIds)

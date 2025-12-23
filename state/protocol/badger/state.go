@@ -989,6 +989,48 @@ func IsBootstrapped(db storage.DB) (bool, error) {
 	return true, nil
 }
 
+// GetChainIDFromLatestFinalizedHeader attempts to retrieve the consensus chainID
+// from the latest finalized header in the database, before storage or protocol state have been initialized.
+// Expected errors during normal operations:
+// - [storage.ErrNotFound] if the node is not bootstrapped.
+func GetChainIDFromLatestFinalizedHeader(db storage.DB) (flow.ChainID, error) {
+	h, err := GetLatestFinalizedHeader(db)
+	if err != nil {
+		return "", err
+	}
+	return h.ChainID, nil
+}
+
+// GetLatestFinalizedHeader attempts to retrieve the latest finalized header
+// without going through the storage.Headers interface.
+// Expected errors during normal operations:
+// - [storage.ErrNotFound] if the node is not bootstrapped.
+func GetLatestFinalizedHeader(db storage.DB) (*flow.Header, error) {
+	var finalized uint64
+	r := db.Reader()
+	err := operation.RetrieveFinalizedHeight(r, &finalized)
+	if err != nil {
+		return nil, err
+	}
+	var id flow.Identifier
+	err = operation.LookupBlockHeight(r, finalized, &id)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("could not retrieve finalized header: not present in height index")
+		}
+		return nil, err
+	}
+	var header flow.Header
+	err = operation.RetrieveHeader(r, id, &header)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("could not retrieve finalized header: block not known")
+		}
+		return nil, err
+	}
+	return &header, nil
+}
+
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
 func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {

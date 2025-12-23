@@ -31,6 +31,10 @@ var (
 
 	// ErrNotBootstrapped is returned when the database has not been bootstrapped.
 	ErrNotBootstrapped = errors.New("pebble database not bootstrapped")
+
+	// ErrWrongChain is returned when data from a specific chain (consensus or cluster)
+	// is expected to be read or inserted, but the actual chainID does not match.
+	ErrWrongChain = errors.New("data is not part of the expected chain")
 )
 
 // InvalidDKGStateTransitionError is a sentinel error that is returned in case an invalid state transition is attempted.

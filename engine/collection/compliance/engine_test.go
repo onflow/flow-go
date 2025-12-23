@@ -19,6 +19,7 @@ import (
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	mocknetwork "github.com/onflow/flow-go/network/mock"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -79,7 +80,7 @@ func (cs *EngineSuite) SetupTest() {
 	cs.protoState = &protocol.State{}
 	cs.protoState.On("Final").Return(protoSnapshot)
 
-	cs.clusterID = "cluster-id"
+	cs.clusterID = clusterstate.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
 	clusterParams := &protocol.Params{}
 	clusterParams.On("ChainID").Return(cs.clusterID, nil)
 
