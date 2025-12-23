@@ -65,7 +65,7 @@ func (ps VoteCollectorStatus) String() string {
 //     repeated, potentially equivocating stand-alone votes and/or votes embedded into proposals. Checks should be very fast
 //     (no cryptograph involved) and hence assumed to not become a bottleneck compared to the consumed networking bandwidth
 //     and decoding work in case this node is under attack.
-//     As the first, layer of defense, the [hotstuff.VoteProcessor] detects and rejects duplicates and equivocations.
+//     As the first layer of defense, the [hotstuff.VoteProcessor] detects and rejects duplicates and equivocations.
 //     [VoteCollector] reliably reports the first equivocation attempt; repeated reports about the same offending node may be
 //     dropped without loss of generality.
 //   - The [hotstuff.VoteProcessor] guarantees safety of the concurrent QC generation logic, being resilient against arbitrary
