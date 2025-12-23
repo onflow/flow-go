@@ -659,6 +659,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				opts = append(opts, blob.WithReprovideInterval(-1))
 			}
 
+			opts = append(opts, blob.WithUseBloomCache(builder.BitswapBloomCacheEnabled))
+
 			var err error
 			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, builder.ExecutionDatastoreManager.Datastore(), opts...)
 			if err != nil {
