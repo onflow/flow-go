@@ -100,7 +100,10 @@ func NewCore(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialized finalized boundary cache: %w", err)
 	}
-	c.ProcessFinalizedBlock(final)
+	err = c.ProcessFinalizedBlock(final)
+	if err != nil {
+		return nil, fmt.Errorf("could not process finalized block: %w", err)
+	}
 
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
@@ -111,6 +114,49 @@ func NewCore(
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
 func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
+	// In general, there are a variety of attacks that a byzantine proposer might attempt. Conceptually,
+	// there are two classes:
+	//	 (I) Protocol-level attacks by either sending individually invalid blocks, or by equivocating with
+	//       by sending a pair of conflicting blocks (individually valid and/or invalid) for the same view.
+	//	(II) Resource exhaustion attacks by sending a large number of individually invalid or valid blocks.
+	// Category (I) will be eventually detected. Attacks of category (II), typically contain elements of (I).
+	// This is because the protocol is purposefully designed such that there is few degrees of freedom available
+	// to a byzantine proposer attempting to mount a resource exhaustion attack (type II), unless the proposer
+	// violates protocol rules i.e. provides evidence of their wrongdoing (type I).
+	// However, we have to make sure that the nodes survive an attack of category (II), and stays responsive.
+	// If the node crashes, the node will lose the evidence of the attack, and the byzantine proposer
+	// will have succeeded in their goal of mounting a denial-of-service attack without being held accountable.
+	//
+	// The general requirements for a BFT system are:
+	// 1. withstand attacks (don't crash and remain responsive)
+	// 2. detect attacks and collect evidence for slashing challenges
+	// 3. suppress the attack by slashing and ejecting the offending node(s)
+	//
+	// The primary responsibility of compliance engine is to protect the business logic from attacks of
+	// category (II) and to collect evidence for attacks of category (I) for blocks that are _individually_
+	// invalid. The compliance engine may detect some portion of equivocation attacks (type I), in order
+	// to better protect itself from resource exhaustion attacks (type II). Though, the primary responsibility
+	// for detecting equivocation is with the hotstuff layer. The reason is that, in case of equivocation with
+	// multiple valid blocks, the compliance engine can't know which block might get certified and potentially
+	// finalized. So it can't reject _valid_ equivocating blocks outright, as that might lead to liveness issues.
+	//
+	// The compliance engine must be resilient to the following classes of resource exhaustion attacks:
+	//  1. A byzantine proposers might attempt to create blocks at many different future views. Mitigations:
+	//     • Only proposals whose proposer is the valid leader for the respective view should pass the compliance
+	//     engine. Block that are not proposed by a valid leader are outright reject and we create a slashing
+	//     challenge against the proposer. This filtering should be done by the compliance engine. Such blocks
+	//     should never reach the higher-level business logic.
+	//     • A byzantine proposer might attempt to create blocks for a large number of different future views,
+	//     for which it is valid leader. This is mitigated by dropping blocks that are too far ahead of the
+	//     locally finalized view. The threshold is configured via `SkipNewProposalsThreshold` parameter.
+	//     This does not lead to a slashing challenge, as we can't reliably detect without investing significant
+	//     CPU resources validating the QC, whether the proposer is violating protocol rules by making up an
+	//     invalid QC / TC. Valid blocks will eventually be retrieved via sync again, once the local finalized
+	//     view catches up, even if they were dropped at first.
+	//  2. A byzantine proposers might spam us with many different _valid_ blocks for the same view, for which
+	//     it is the leader. This is particularly dangerous for
+	//
+
 	block := proposal.Message.Block
 	header := block.ToHeader()
 	blockID := block.ID()
@@ -165,17 +211,18 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	}
 
 	// first, we reject all blocks that we don't need to process:
-	// 1) blocks already in the cache; they will already be processed later
-	// 2) blocks already on disk; they were processed and await finalization
+	// 1. blocks already in the cache, that are disconnected: they will be processed later.
+	// 2. blocks already in the cache, that were already processed: they will be eventually pruned by view.
+	// 3. blocks already on disk: they were processed and await finalization
 
-	// ignore proposals that are already cached
+	// 1,2. Ignore proposals that are already cached
 	_, cached := c.pending.ByID(blockID)
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
-	// ignore proposals that were already processed
+	// 3. Ignore proposals that were already processed
 	_, err := c.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
@@ -185,44 +232,41 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
-	// there are two possibilities if the proposal is neither already pending
-	// processing in the cache, nor has already been processed:
-	// 1) the proposal is unverifiable because the parent is unknown
-	// => we cache the proposal
-	// 2) the proposal is connected to finalized state through an unbroken chain
-	// => we verify the proposal and forward it to hotstuff if valid
+	// At this point we are dealing with a block proposal that is neither present in the cache nor on disk.
+	// There are three possibilities if the proposal is stored neither in cache nor on disk:
+	// 1. The proposal is connected to the finalized state => we perform the further processing and pass it to the hotstuff layer.
+	// 2. The proposal is not connected to the finalized state:
+	// 2.1 Parent has been already cached, meaning we have a partial chain => cache the proposal and wait for eventual resolution of missing the piece.
+	// 2.2 Parent has not been cached yet => cache the proposal, additionally request the missing parent from the committee.
 
-	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
-	// we don't have to request its parent block or its ancestor again, because as a
-	// pending block, its parent block must have been requested.
-	// if there was problem requesting its parent or ancestors, the sync engine's forward
-	// syncing with range requests for finalized blocks will request for the blocks.
-	_, found := c.pending.ByID(header.ParentID)
-	if found {
-		// add the block to the cache
-		_ = c.pending.Add(proposal)
-		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
-
-		return nil
-	}
-
-	// if the proposal is connected to a block that is neither in the cache, nor
-	// in persistent storage, its direct parent is missing; cache the proposal
-	// and request the parent
+	// 1. Check if we parent is connected to the finalized state
 	exists, err := c.headers.Exists(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		_ = c.pending.Add(proposal)
+		// 2. Cache the proposal either way for 2.1 or 2.2
+		if err := c.pending.Add(proposal); err != nil {
+			if mempool.IsBeyondActiveRangeError(err) {
+				// In general, we expect the block buffer to use SkipNewProposalsThreshold,
+				// however since it is instantiated outside this component, we allow the thresholds to differ
+				log.Debug().Err(err).Msg("dropping block beyond block buffer active range")
+				return nil
+			}
+			return fmt.Errorf("could not add proposal to pending buffer: %w", err)
+		}
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
-		c.sync.RequestBlock(header.ParentID, header.Height-1)
-		log.Debug().Msg("requesting missing parent for proposal")
+		// 2.2 Parent has not been cached yet, request it from the committee
+		if _, found := c.pending.ByID(header.ParentID); !found {
+			c.sync.RequestBlock(header.ParentID, header.Height-1)
+			log.Debug().Msg("requesting missing parent for proposal")
+		}
+
 		return nil
 	}
 
-	// At this point, we should be able to connect the proposal to the finalized
+	// 1. At this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not.
 	// processBlockAndDescendants is a recursive function. Here we trace the
 	// execution of the entire recursion, which might include processing the
@@ -299,9 +343,6 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Proposal
 			return cpr
 		}
 	}
-
-	// drop all the children that should have been processed now
-	c.pending.DropForParent(blockID)
 
 	return nil
 }
@@ -392,14 +433,19 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 
 // ProcessFinalizedBlock performs pruning of stale data based on finalization event
 // removes pending blocks below the finalized view
-func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) {
+// No errors are expected during normal operation.
+func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) error {
 	// remove all pending blocks at or below the finalized view
-	c.pending.PruneByView(finalized.View)
+	err := c.pending.PruneByView(finalized.View)
+	if err != nil {
+		return err
+	}
 	c.finalizedHeight.Set(finalized.Height)
 	c.finalizedView.Set(finalized.View)
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+	return nil
 }
 
 // checkForAndLogOutdatedInputError checks whether error is an `engine.OutdatedInputError`.
