@@ -381,12 +381,13 @@ func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
 func (proc *procedure) mintTo(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, value := convertAndCheckValue(call.Value)
+	// check and convert value
+	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	// create bridge account if not exist
@@ -425,19 +426,21 @@ func (proc *procedure) mintTo(
 func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, value := convertAndCheckValue(call.Value)
+	// check and convert value
+	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	// check balance is not prone to rounding error
-	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+	if !types.AttoFlowBalanceIsValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrWithdrawBalanceRounding), nil
+			types.ErrWithdrawBalanceRounding,
+		), nil
 	}
 
 	// create bridge account if not exist
@@ -479,12 +482,13 @@ func (proc *procedure) withdrawFrom(
 func (proc *procedure) deployAt(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, castedValue := convertAndCheckValue(call.Value)
+	// check and convert value
+	castedValue, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	txHash := call.Hash()
@@ -729,15 +733,15 @@ func (proc *procedure) run(
 	return &res, nil
 }
 
-func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int) {
+func checkAndConvertValue(input *big.Int) (converted *uint256.Int, isValid bool) {
 	// check for negative input
 	if input.Sign() < 0 {
-		return false, nil
+		return nil, false
 	}
 	// convert value into uint256
 	value, overflow := uint256.FromBig(input)
 	if overflow {
-		return true, nil
+		return nil, false
 	}
-	return true, value
+	return value, true
 }
