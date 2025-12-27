@@ -39,6 +39,38 @@ var (
 // ErrChainArchived is returned when attempting to write to an archived chain.
 var ErrChainArchived = errors.New("chain has been archived, no extensions allowed")
 
+// BeyondArchiveThreshold is intended as a wrapper around [storage.ErrNotFound] to indicate that
+// this request was found in the database but held back due to being beyond the archive cutoff.
+type BeyondArchiveThreshold struct {
+	err error
+}
+
+func NewBeyondArchiveThreshold() error {
+	return BeyondArchiveThreshold{
+		err: fmt.Errorf("requested information beyond pruning threshold: %w", storage.ErrNotFound),
+	}
+}
+
+func NewBeyondArchiveThresholdf(msg string, args ...interface{}) error {
+	return BeyondArchiveThreshold{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e BeyondArchiveThreshold) Unwrap() error {
+	return e.err
+}
+
+func (e BeyondArchiveThreshold) Error() string {
+	return e.err.Error()
+}
+
+// IsBeyondArchiveThreshold returns whether the given error is an BeyondArchiveThreshold error
+func IsBeyondArchiveThreshold(err error) bool {
+	var errBeyondArchiveThreshold BeyondArchiveThreshold
+	return errors.As(err, &errBeyondArchiveThreshold)
+}
+
 // InsertHeader inserts a block header into the database.
 //
 // CAUTION:
@@ -77,14 +109,16 @@ func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flo
 //     or if the block's view exceeds the archive threshold.
 //   - generic error in case of unexpected failure from the database layer
 func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {
-	err := RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
+	var h flow.Header
+	err := RetrieveByKey(r, MakePrefix(codeHeader, blockID), &h)
 	if err != nil {
 		return err
 	}
 	// ARCHIVE THRESHOLD: Check if block's view is beyond the archived threshold
-	if header.View > ArchiveLatestFinalizedView {
-		return storage.ErrNotFound
+	if h.View > ArchiveLatestFinalizedView {
+		return NewBeyondArchiveThreshold()
 	}
+	*header = h
 	return nil
 }
 
@@ -154,7 +188,7 @@ func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier) error {
 	// Check if height is beyond the archived threshold
 	if height > ArchiveLatestFinalizedHeight {
-		return storage.ErrNotFound
+		return NewBeyondArchiveThreshold()
 	}
 	return RetrieveByKey(r, MakePrefix(codeHeightToBlock, height), blockID)
 }
@@ -166,7 +200,7 @@ func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier
 func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Identifier) error {
 	// ARCHIVE THRESHOLD: Check if view is beyond the archived threshold
 	if view > ArchiveLatestFinalizedView {
-		return storage.ErrNotFound
+		return NewBeyondArchiveThreshold()
 	}
 	return RetrieveByKey(r, MakePrefix(codeCertifiedBlockByView, view), blockID)
 }
@@ -184,7 +218,7 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 			return false, nil
 		}
 		return false, err
-	}
+	} // block is known, i.e. confirmed to be below archive threshold
 	return true, nil
 }
 
@@ -218,11 +252,13 @@ func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Ident
 //   - [storage.ErrNotFound] if no block is known that contains the specified collection ID.
 //     or if the block's view exceeds the archive threshold.
 func LookupBlockContainingCollectionGuarantee(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
-	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	err := RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
+	if err != nil {
+		return err
+	}
+	// ARCHIVE THRESHOLD: Check if block's view is beyond the archived threshold
 	var header flow.Header
 	return RetrieveHeader(r, *blockID, &header)
-
-	return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding

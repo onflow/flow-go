@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -184,6 +185,16 @@ func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if the specified block is unknown
 func LookupLatestSealAtBlock(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	var header flow.Header
+	err := RetrieveHeader(r, blockID, &header)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return storage.ErrNotFound
+		}
+		return err
+	} // block is known, i.e. confirmed to be below archive threshold
+
 	return RetrieveByKey(r, MakePrefix(codeBlockIDToLatestSealID, blockID), &sealID)
 }
 
@@ -215,5 +226,15 @@ func IndexFinalizedSealByBlockID(w storage.Writer, sealedBlockID flow.Identifier
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no seal for the specified block is known.
 func LookupBySealedBlockID(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	var header flow.Header
+	err := RetrieveHeader(r, blockID, &header)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return storage.ErrNotFound
+		}
+		return err
+	} // block is known, i.e. confirmed to be below archive threshold
+
 	return RetrieveByKey(r, MakePrefix(codeBlockIDToFinalizedSeal, blockID), &sealID)
 }
