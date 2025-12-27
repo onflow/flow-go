@@ -554,6 +554,9 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 func (n *Network) Receive(msg network.IncomingMessageScope) error {
 	n.metrics.InboundMessageReceived(msg.Size(), msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
 
+	// drop all incoming messages from the network to avoid the historic AN from attempting to process new data.
+	return nil
+
 	err := n.processNetworkMessage(msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)

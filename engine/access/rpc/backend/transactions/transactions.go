@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -242,6 +243,22 @@ func (t *Transactions) SendRawTransaction(
 func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
 	tx, err := t.transactions.ByID(txID)
 	if err == nil {
+		// Make sure the transaction is from before the hardfork
+		lightCollection, err := t.collections.LightByTransactionID(txID)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "transaction not found in any collection")
+		}
+		_, err = t.blocks.ByCollectionID(lightCollection.ID())
+		if err != nil {
+			if errors.Is(err, badger.ErrBlockAfterHardfork) {
+				return nil, status.Errorf(codes.NotFound, "transaction if from after the hardfork")
+			}
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, status.Errorf(codes.Internal, "could not find block for collection %s: %v", lightCollection.ID(), err)
+			}
+			// collection may not be found if it's not indexed
+		}
+
 		return tx, nil
 	}
 
@@ -286,6 +303,10 @@ func (t *Transactions) lookupScheduledTransaction(ctx context.Context, txID flow
 
 	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
+		if errors.Is(err, badger.ErrBlockAfterHardfork) {
+			return nil, false, status.Errorf(codes.NotFound, "scheduled transaction block is after the hardfork")
+		}
+
 		// since the scheduled transaction is indexed at this block, it must exist in storage, otherwise
 		// the node is in an inconsistent state
 		err = fmt.Errorf("failed to get block header: %w", err)
@@ -413,12 +434,17 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	// 2. lookup the block containing the collection.
 	block, err := t.blocks.ByCollectionID(collectionID)
 	if err != nil {
+		if errors.Is(err, badger.ErrBlockAfterHardfork) {
+			return nil, nil, status.Errorf(codes.NotFound, "block is after the hardfork")
+		}
+
 		// this is an exception. the block/collection index must exist if the collection/tx is indexed,
 		// otherwise the stored state is inconsistent.
 		err = fmt.Errorf("failed to find block for collection %v: %w", collectionID, err)
 		irrecoverable.Throw(ctx, err)
 		return nil, nil, err
 	}
+
 	actualBlockID := block.ID()
 	if blockID == flow.ZeroID {
 		blockID = actualBlockID
@@ -523,6 +549,10 @@ func (t *Transactions) lookupScheduledTransactionResult(
 
 	header, err := t.state.AtBlockID(scheduledTxBlockID).Head()
 	if err != nil {
+		if errors.Is(err, badger.ErrBlockAfterHardfork) {
+			return nil, false, status.Errorf(codes.NotFound, "scheduled transaction block is after the hardfork")
+		}
+
 		// the scheduled transaction is indexed at this block, so this block must exist in storage.
 		// otherwise the node is in an inconsistent state
 		err = fmt.Errorf("failed to get scheduled transaction's block from storage: %w", err)

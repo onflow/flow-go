@@ -20,6 +20,15 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+const (
+	// hardcoded finalized and sealed heights from the end of the mainnet27 network. These ensure that
+	// blocks after the hardfork are ignored by the API.
+	HardcodedFinalizedHeight = 137363402
+	HardcodedSealedHeight    = 137363395
+)
+
+var ErrBlockAfterHardfork = errors.New("block is after the hardfork")
+
 // cachedLatest caches both latest finalized and sealed block
 // since finalized block and sealed block are updated together atomically,
 // we can cache them together
