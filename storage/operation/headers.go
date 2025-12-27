@@ -23,17 +23,16 @@ var _ = fmt.Errorf
 var (
 	// ArchiveLatestSealedHeight is the height of the latest sealed block in the archived chain.
 	ArchiveLatestSealedHeight uint64 = 1000 // TODO: replace with actual value
-	// ArchiveLatestSealedView is the view of the latest sealed block in the archived chain.
-	ArchiveLatestSealedView uint64 = 1000 // TODO: replace with actual value
-	// ArchiveLatestSealedBlockID is the ID of the latest sealed block in the archived chain.
+	// ArchiveLatestSealedBlockID is additionally persisted here, consider it a checksum ;-)
 	ArchiveLatestSealedBlockID = flow.Identifier{} // TODO: replace with actual value
 
 	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
 	ArchiveLatestFinalizedHeight uint64 = 1100 // TODO: replace with actual value
 	// ArchiveLatestFinalizedView is the view of the latest finalized block in the archived chain.
 	ArchiveLatestFinalizedView uint64 = 1100 // TODO: replace with actual value
-	// ArchiveLatestFinalizedBlockID is the ID of the latest finalized block in the archived chain.
+	// ArchiveLatestFinalizedBlockID is additionally persisted here, consider it a checksum ;-)
 	ArchiveLatestFinalizedBlockID = flow.Identifier{} // TODO: replace with actual value
+
 )
 
 // ErrChainArchived is returned when attempting to write to an archived chain.
