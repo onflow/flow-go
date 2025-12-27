@@ -2,7 +2,6 @@ package handler_test
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 	"testing"
 
@@ -599,7 +598,7 @@ func TestHandler_COA(t *testing.T) {
 				require.Equal(t, bal, foa.Balance())
 
 				testContract := testutils.GetStorageTestContract(t)
-				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
+				result := foa.Deploy(testContract.ByteCode, types.GasLimit(gethParams.MaxTxGas), types.NewBalanceFromUFix64(0))
 				require.NotNil(t, result.DeployedContractAddress)
 				addr := *result.DeployedContractAddress
 				// skip first few bytes as they are deploy codes
@@ -610,13 +609,13 @@ func TestHandler_COA(t *testing.T) {
 				_ = foa.Call(
 					addr,
 					testContract.MakeCallData(t, "store", num),
-					math.MaxUint64,
+					types.GasLimit(gethParams.MaxTxGas),
 					types.NewBalanceFromUFix64(0))
 
 				res := foa.Call(
 					addr,
 					testContract.MakeCallData(t, "retrieve"),
-					math.MaxUint64,
+					types.GasLimit(gethParams.MaxTxGas),
 					types.NewBalanceFromUFix64(0))
 
 				require.Equal(t, num, res.ReturnedData.AsBigInt())
@@ -645,7 +644,7 @@ func TestHandler_COA(t *testing.T) {
 
 				arch := handler.MakePrecompileAddress(1)
 
-				ret := foa.Call(arch, precompiles.FlowBlockHeightFuncSig[:], math.MaxUint64, types.NewBalanceFromUFix64(0))
+				ret := foa.Call(arch, precompiles.FlowBlockHeightFuncSig[:], types.GasLimit(gethParams.MaxTxGas), types.NewBalanceFromUFix64(0))
 				require.Equal(t, big.NewInt(int64(blockHeight)), new(big.Int).SetBytes(ret.ReturnedData))
 
 				events := backend.Events()
@@ -697,7 +696,7 @@ func TestHandler_COA(t *testing.T) {
 				foa.Deposit(vault)
 
 				testContract := testutils.GetStorageTestContract(t)
-				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
+				result := foa.Deploy(testContract.ByteCode, types.GasLimit(gethParams.MaxTxGas), types.EmptyBalance)
 				require.NotNil(t, result.DeployedContractAddress)
 				addr := *result.DeployedContractAddress
 				require.Equal(t, types.StatusSuccessful, result.Status)
@@ -706,7 +705,7 @@ func TestHandler_COA(t *testing.T) {
 				ret := foa.Call(
 					addr,
 					testContract.MakeCallData(t, "random"),
-					math.MaxUint64,
+					types.GasLimit(gethParams.MaxTxGas),
 					types.EmptyBalance)
 
 				require.Equal(t, random.Bytes(), []byte(ret.ReturnedData))
@@ -1178,10 +1177,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 					acc.Call(types.EmptyAddress, nil, 1000, types.EmptyBalance)
 
 					backend.ExpectedSpan(t, trace.FVMEVMDeposit)
-					acc.Deposit(types.NewFlowTokenVault(types.EmptyBalance))
+					acc.Deposit(types.NewFlowTokenVault(types.OneFlow()))
 
 					backend.ExpectedSpan(t, trace.FVMEVMWithdraw)
-					acc.Withdraw(types.EmptyBalance)
+					acc.Withdraw(types.OneFlow())
 
 					backend.ExpectedSpan(t, trace.FVMEVMDeploy)
 					acc.Deploy(nil, 1, types.EmptyBalance)

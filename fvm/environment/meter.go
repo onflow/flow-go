@@ -77,6 +77,7 @@ type Meter interface {
 
 	ComputationIntensities() meter.MeteredComputationIntensities
 	ComputationAvailable(common.ComputationUsage) bool
+	ComputationRemaining(kind common.ComputationKind) uint64
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
@@ -104,6 +105,10 @@ func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensi
 
 func (meter *meterImpl) ComputationAvailable(usage common.ComputationUsage) bool {
 	return meter.txnState.ComputationAvailable(usage)
+}
+
+func (meter *meterImpl) ComputationRemaining(kind common.ComputationKind) uint64 {
+	return meter.txnState.ComputationRemaining(kind)
 }
 
 func (meter *meterImpl) ComputationUsed() (uint64, error) {

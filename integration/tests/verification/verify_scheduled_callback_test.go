@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	sdk "github.com/onflow/flow-go-sdk"
-
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,13 +31,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	s.T().Logf("got blockA height %v ID %v", blockA.HeaderBody.Height, blockA.ID())
 
 	// Deploy the test contract first
-	err := lib.DeployScheduledCallbackTestContract(
-		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
-		sdk.Address(sc.FlowToken.Address),
-		sdk.Address(sc.FungibleToken.Address),
-		sdk.Identifier(s.net.Root().ID()),
-	)
+	_, err := lib.DeployScheduledCallbackTestContract(s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not deploy test contract")
 
 	// Wait for next height finalized before scheduling callback
@@ -50,13 +42,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	futureTimestamp := time.Now().Unix() + scheduleDelta
 
 	s.T().Logf("scheduling callback at timestamp: %v, current timestamp: %v", futureTimestamp, time.Now().Unix())
-	callbackID, err := lib.ScheduleCallbackAtTimestamp(
-		futureTimestamp,
-		s.AccessClient(),
-		sdk.Address(sc.FlowCallbackScheduler.Address),
-		sdk.Address(sc.FlowToken.Address),
-		sdk.Address(sc.FungibleToken.Address),
-	)
+	callbackID, err := lib.ScheduleCallbackAtTimestamp(futureTimestamp, s.AccessClient(), sc)
 	require.NoError(s.T(), err, "could not schedule callback transaction")
 	s.T().Logf("scheduled callback with ID: %d", callbackID)
 
@@ -71,7 +57,7 @@ func (s *VerifyScheduledCallbackSuite) TestVerifyScheduledCallback() {
 	}, 30*time.Second, 1000*time.Millisecond)
 
 	// make sure callback executed event was emitted
-	eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.Executed", sc.FlowCallbackScheduler.Address)
+	eventTypeString := fmt.Sprintf("A.%v.FlowTransactionScheduler.Executed", sc.FlowTransactionScheduler.Address)
 	events, err := s.AccessClient().GetEventsForHeightRange(context.Background(), eventTypeString, blockA.HeaderBody.Height, sealedBlock.Height)
 	require.NoError(s.T(), err)
 

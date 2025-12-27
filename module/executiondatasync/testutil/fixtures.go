@@ -7,9 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	edprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -108,7 +109,7 @@ func (tf *TestFixture) accumulateRegisterEntries(
 //   - Every 3rd transaction is failed
 //   - There are tx error messages for all failed transactions
 //   - There is an execution result for the block, whose ExecutionDataID matches the BlockExecutionData
-func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentHeader *flow.Header) *TestFixture {
+func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentBlock *flow.Block) *TestFixture {
 	collectionCount := 4
 	chunkExecutionDatas := make([]*execution_data.ChunkExecutionData, 0, collectionCount+1)
 
@@ -122,6 +123,7 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentHeader *flo
 	for i, collection := range collections {
 		chunkData := g.ChunkExecutionDatas().Fixture(
 			fixtures.ChunkExecutionData.WithCollection(collection),
+			fixtures.ChunkExecutionData.WithStartTxIndex(uint32(txCount)),
 		)
 		// use the same path for the first ledger payload in each chunk. the indexer should chose the
 		// last value in the register entry.
@@ -151,7 +153,10 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentHeader *flo
 		)
 		scheduledTransactionIDs[i] = id
 	}
-	systemCollection, err := blueprints.SystemCollection(g.ChainID().Chain(), pendingExecutionEvents)
+	versionedSystemCollection := systemcollection.Default(g.ChainID())
+	systemCollection, err := versionedSystemCollection.
+		ByHeight(parentBlock.Height).
+		SystemCollection(g.ChainID().Chain(), access.StaticEventProvider(pendingExecutionEvents))
 	require.NoError(t, err)
 
 	systemResults := g.LightTransactionResults().ForTransactions(systemCollection.Transactions)
@@ -165,9 +170,15 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentHeader *flo
 	chunkExecutionDatas = append(chunkExecutionDatas, systemChunk)
 
 	// generate the block containing guarantees for the user collections
-	payload := g.Payloads().Fixture(fixtures.Payload.WithGuarantees(guarantees...))
+	payload := g.Payloads().Fixture(
+		fixtures.Payload.WithProtocolStateID(parentBlock.Payload.ProtocolStateID),
+		fixtures.Payload.WithGuarantees(guarantees...),
+		fixtures.Payload.WithReceiptStubs(),
+		fixtures.Payload.WithResults(),
+		fixtures.Payload.WithSeals(),
+	)
 	block := g.Blocks().Fixture(
-		fixtures.Block.WithParentHeader(parentHeader),
+		fixtures.Block.WithParentHeader(parentBlock.ToHeader()),
 		fixtures.Block.WithPayload(payload),
 	)
 
