@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 const (
@@ -185,7 +185,7 @@ func NewHeightBasedSubscription(bufferSize int, firstHeight uint64, getData GetD
 
 // Next returns the value for the next height from the subscription
 func (s *HeightBasedSubscription) Next(ctx context.Context) (interface{}, error) {
-	if s.nextHeight > badger.HardcodedSealedHeight {
+	if s.nextHeight > operation.ArchiveLatestSealedHeight {
 		return nil, fmt.Errorf("height %d is after the hardfork", s.nextHeight)
 	}
 
