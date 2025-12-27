@@ -81,7 +81,7 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 	if err != nil {
 		return err
 	}
-	// Check if block's view is beyond the archived threshold
+	// ARCHIVE THRESHOLD: Check if block's view is beyond the archived threshold
 	if header.View > ArchiveLatestFinalizedView {
 		return storage.ErrNotFound
 	}
@@ -164,7 +164,7 @@ func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier
 //   - [storage.ErrNotFound] if no certified block for the specified view is known,
 //     or if the view exceeds the archive threshold.
 func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Identifier) error {
-	// Check if view is beyond the archived threshold
+	// ARCHIVE THRESHOLD: Check if view is beyond the archived threshold
 	if view > ArchiveLatestFinalizedView {
 		return storage.ErrNotFound
 	}
@@ -179,10 +179,10 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 
 	var header flow.Header
 	err := RetrieveHeader(r, blockID, &header)
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil
@@ -218,15 +218,11 @@ func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Ident
 //   - [storage.ErrNotFound] if no block is known that contains the specified collection ID,
 //     or if the block's view exceeds the archive threshold.
 func LookupBlockContainingCollectionGuarantee(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
-	// return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
-
-	err := RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
-	if err != nil {
-		return err
-	}
-	// Use RetrieveHeader to check if block's view is beyond the archived threshold
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
 	var header flow.Header
 	return RetrieveHeader(r, *blockID, &header)
+
+	return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
@@ -239,25 +235,16 @@ func FindHeaders(r storage.Reader, filter func(header *flow.Header) bool, found 
 		if err != nil {
 			return true, err
 		}
-		// Skip headers with view beyond the archived threshold
+
+		// ARCHIVE THRESHOLD: Skip headers with view beyond the archived threshold
 		if h.View > ArchiveLatestFinalizedView {
 			return false, nil
 		}
+
 		if filter(&h) {
 			*found = append(*found, h)
 		}
 		return false, nil
 	}, storage.DefaultIteratorOptions())
 
-	// return TraverseByPrefix(r, MakePrefix(codeHeader), func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
-	// 	var h flow.Header
-	// 	err = getValue(&h)
-	// 	if err != nil {
-	// 		return true, err
-	// 	}
-	// 	if filter(&h) {
-	// 		*found = append(*found, h)
-	// 	}
-	// 	return false, nil
-	// }, storage.DefaultIteratorOptions())
 }
