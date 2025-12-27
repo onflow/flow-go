@@ -250,7 +250,7 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 		}
 		_, err = t.blocks.ByCollectionID(lightCollection.ID())
 		if err != nil {
-			if errors.Is(err, badger.ErrBlockAfterHardfork) {
+			if operation.IsBeyondArchiveThreshold(err) {
 				return nil, status.Errorf(codes.NotFound, "transaction is from after the hardfork")
 			}
 			if !errors.Is(err, storage.ErrNotFound) {
@@ -303,7 +303,7 @@ func (t *Transactions) lookupScheduledTransaction(ctx context.Context, txID flow
 
 	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
-		if errors.Is(err, badger.ErrBlockAfterHardfork) {
+		if operation.IsBeyondArchiveThreshold(err) {
 			return nil, false, status.Errorf(codes.NotFound, "scheduled transaction block is after the hardfork")
 		}
 
@@ -434,7 +434,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	// 2. lookup the block containing the collection.
 	block, err := t.blocks.ByCollectionID(collectionID)
 	if err != nil {
-		if errors.Is(err, badger.ErrBlockAfterHardfork) {
+		if operation.IsBeyondArchiveThreshold(err) {
 			return nil, nil, status.Errorf(codes.NotFound, "block is after the hardfork")
 		}
 
