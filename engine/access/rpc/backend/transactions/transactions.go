@@ -549,7 +549,7 @@ func (t *Transactions) lookupScheduledTransactionResult(
 
 	header, err := t.state.AtBlockID(scheduledTxBlockID).Head()
 	if err != nil {
-		if errors.Is(err, badger.ErrBlockAfterHardfork) {
+		if operation.IsBeyondArchiveThreshold(err) {
 			return nil, false, status.Errorf(codes.NotFound, "scheduled transaction block is after the hardfork")
 		}
 
