@@ -1,8 +1,6 @@
 package operation
 
 import (
-	"fmt"
-
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,14 +15,28 @@ import (
 //
 // No errors are expected during normal operation.
 func InsertSeal(w storage.Writer, sealID flow.Identifier, seal *flow.Seal) error {
-	return UpsertByKey(w, MakePrefix(codeSeal, sealID), seal)
+	// return UpsertByKey(w, MakePrefix(codeSeal, sealID), seal)
+	return ErrChainArchived
 }
 
 // RetrieveSeal retrieves the [flow.Seal] by its ID.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no seal with the specified `sealID` is known.
 func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) error {
-	return RetrieveByKey(r, MakePrefix(codeSeal, sealID), seal)
+	var s flow.Seal
+	err := RetrieveByKey(r, MakePrefix(codeSeal, sealID), &s)
+	if err != nil {
+		return err
+	}
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	var header flow.Header
+	err = RetrieveHeader(r, s.BlockID, &header)
+	if err != nil {
+		return err
+	} // block is known, i.e. confirmed to be below archive threshold
+
+	*seal = s
+	return nil
 }
 
 // IndexPayloadSeals indexes the list of Seals that were included in the specified block by the block ID.
@@ -43,11 +55,12 @@ func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) err
 //
 // No errors are expected during normal operation.
 func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealIDs []flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
-			blockID, storage.LockInsertBlock)
-	}
-	return UpsertByKey(w, MakePrefix(codePayloadSeals, blockID), sealIDs)
+	//if !lctx.HoldsLock(storage.LockInsertBlock) {
+	//	return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+	//		blockID, storage.LockInsertBlock)
+	//}
+	//return UpsertByKey(w, MakePrefix(codePayloadSeals, blockID), sealIDs)
+	return ErrChainArchived
 }
 
 // LookupPayloadSeals retrieves the list of Seals that were included in the payload
@@ -57,6 +70,13 @@ func IndexPayloadSeals(lctx lockctx.Proof, w storage.Writer, blockID flow.Identi
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]flow.Identifier) error {
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	var h flow.Header
+	err := RetrieveHeader(r, blockID, &h)
+	if err != nil {
+		return err
+	} // block is known, i.e. confirmed to be below archive threshold
+
 	return RetrieveByKey(r, MakePrefix(codePayloadSeals, blockID), sealIDs)
 }
 
@@ -76,11 +96,12 @@ func LookupPayloadSeals(r storage.Reader, blockID flow.Identifier, sealIDs *[]fl
 //
 // No errors are expected during normal operation.
 func IndexPayloadReceipts(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, receiptIDs []flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
-			blockID, storage.LockInsertBlock)
-	}
-	return UpsertByKey(w, MakePrefix(codePayloadReceipts, blockID), receiptIDs)
+	//if !lctx.HoldsLock(storage.LockInsertBlock) {
+	//	return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+	//		blockID, storage.LockInsertBlock)
+	//}
+	//return UpsertByKey(w, MakePrefix(codePayloadReceipts, blockID), receiptIDs)
+	return ErrChainArchived
 }
 
 // IndexPayloadResults indexes the list of Execution Results that were included in the specified block by the block ID.
@@ -99,11 +120,12 @@ func IndexPayloadReceipts(lctx lockctx.Proof, w storage.Writer, blockID flow.Ide
 //
 // No errors are expected during normal operation.
 func IndexPayloadResults(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, resultIDs []flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
-			blockID, storage.LockInsertBlock)
-	}
-	return UpsertByKey(w, MakePrefix(codePayloadResults, blockID), resultIDs)
+	//if !lctx.HoldsLock(storage.LockInsertBlock) {
+	//	return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+	//		blockID, storage.LockInsertBlock)
+	//}
+	//return UpsertByKey(w, MakePrefix(codePayloadResults, blockID), resultIDs)
+	return ErrChainArchived
 }
 
 // IndexPayloadProtocolStateID indexes the given Protocol State ID by the block ID.
@@ -122,11 +144,12 @@ func IndexPayloadResults(lctx lockctx.Proof, w storage.Writer, blockID flow.Iden
 //
 // No errors are expected during normal operation.
 func IndexPayloadProtocolStateID(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, stateID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
-			blockID, storage.LockInsertBlock)
-	}
-	return UpsertByKey(w, MakePrefix(codePayloadProtocolStateID, blockID), stateID)
+	//if !lctx.HoldsLock(storage.LockInsertBlock) {
+	//	return fmt.Errorf("cannot index seal for blockID %v without holding lock %s",
+	//		blockID, storage.LockInsertBlock)
+	//}
+	//return UpsertByKey(w, MakePrefix(codePayloadProtocolStateID, blockID), stateID)
+	return ErrChainArchived
 }
 
 // LookupPayloadProtocolStateID retrieves the Protocol State ID for the specified block.
@@ -136,6 +159,13 @@ func IndexPayloadProtocolStateID(lctx lockctx.Proof, w storage.Writer, blockID f
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadProtocolStateID(r storage.Reader, blockID flow.Identifier, stateID *flow.Identifier) error {
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	var h flow.Header
+	err := RetrieveHeader(r, blockID, &h)
+	if err != nil {
+		return err
+	} // block is known, i.e. confirmed to be below archive threshold
+
 	return RetrieveByKey(r, MakePrefix(codePayloadProtocolStateID, blockID), stateID)
 }
 
@@ -144,6 +174,13 @@ func LookupPayloadProtocolStateID(r storage.Reader, blockID flow.Identifier, sta
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block.
 func LookupPayloadReceipts(r storage.Reader, blockID flow.Identifier, receiptIDs *[]flow.Identifier) error {
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	var h flow.Header
+	err := RetrieveHeader(r, blockID, &h)
+	if err != nil {
+		return err
+	} // block is known, i.e. confirmed to be below archive threshold
+
 	return RetrieveByKey(r, MakePrefix(codePayloadReceipts, blockID), receiptIDs)
 }
 
@@ -152,6 +189,13 @@ func LookupPayloadReceipts(r storage.Reader, blockID flow.Identifier, receiptIDs
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if `blockID` does not refer to a known block
 func LookupPayloadResults(r storage.Reader, blockID flow.Identifier, resultIDs *[]flow.Identifier) error {
+	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
+	var h flow.Header
+	err := RetrieveHeader(r, blockID, &h)
+	if err != nil {
+		return err
+	} // block is known, i.e. confirmed to be below archive threshold
+
 	return RetrieveByKey(r, MakePrefix(codePayloadResults, blockID), resultIDs)
 }
 
@@ -171,10 +215,11 @@ func LookupPayloadResults(r storage.Reader, blockID flow.Identifier, resultIDs *
 //
 // No errors are expected during normal operation.
 func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.Identifier, sealID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
-	}
-	return UpsertByKey(w, MakePrefix(codeBlockIDToLatestSealID, blockID), sealID)
+	//if !lctx.HoldsLock(storage.LockInsertBlock) {
+	//	return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	//}
+	//return UpsertByKey(w, MakePrefix(codeBlockIDToLatestSealID, blockID), sealID)
+	return ErrChainArchived
 }
 
 // LookupLatestSealAtBlock finds the highest seal that was included in the fork up to (and including) blockID.
@@ -185,13 +230,13 @@ func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 //   - [storage.ErrNotFound] if the specified block is unknown
 func LookupLatestSealAtBlock(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
 	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
-	var header flow.Header
-	err := RetrieveHeader(r, blockID, &header)
+	var h flow.Header
+	err := RetrieveHeader(r, blockID, &h)
 	if err != nil {
 		return err
 	} // block is known, i.e. confirmed to be below archive threshold
 
-	return RetrieveByKey(r, MakePrefix(codeBlockIDToLatestSealID, blockID), &sealID)
+	return RetrieveByKey(r, MakePrefix(codeBlockIDToLatestSealID, blockID), sealID)
 }
 
 // IndexFinalizedSealByBlockID indexes the _finalized_ seal by the sealed block ID.
@@ -211,7 +256,9 @@ func LookupLatestSealAtBlock(r storage.Reader, blockID flow.Identifier, sealID *
 //
 // No errors are expected during normal operation.
 func IndexFinalizedSealByBlockID(w storage.Writer, sealedBlockID flow.Identifier, sealID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), sealID)
+	//return UpsertByKey(w, MakePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), sealID)
+
+	return ErrChainArchived
 }
 
 // LookupBySealedBlockID returns the finalized seal for the specified FINALIZED block ID.
@@ -223,11 +270,11 @@ func IndexFinalizedSealByBlockID(w storage.Writer, sealedBlockID flow.Identifier
 //   - [storage.ErrNotFound] if no seal for the specified block is known.
 func LookupBySealedBlockID(r storage.Reader, blockID flow.Identifier, sealID *flow.Identifier) error {
 	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
-	var header flow.Header
-	err := RetrieveHeader(r, blockID, &header)
+	var h flow.Header
+	err := RetrieveHeader(r, blockID, &h)
 	if err != nil {
 		return err
 	} // block is known, i.e. confirmed to be below archive threshold
 
-	return RetrieveByKey(r, MakePrefix(codeBlockIDToFinalizedSeal, blockID), &sealID)
+	return RetrieveByKey(r, MakePrefix(codeBlockIDToFinalizedSeal, blockID), sealID)
 }
