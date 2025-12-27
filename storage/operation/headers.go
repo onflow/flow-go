@@ -3,7 +3,6 @@ package operation
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -25,17 +24,16 @@ var _ = fmt.Errorf
 // Setting the view and height to [math.MaxUint64] effectively disables the archive chuttoff checks and allows unrestricted data reads
 var (
 	// ArchiveLatestSealedHeight is the height of the latest sealed block in the archived chain.
-	ArchiveLatestSealedHeight uint64 = uint64(math.MaxUint64) // TODO: replace with actual value
+	ArchiveLatestSealedHeight uint64 = 137363395
 	// ArchiveLatestSealedBlockID is additionally persisted here, consider it a checksum ;-)
-	ArchiveLatestSealedBlockID = flow.Identifier{} // TODO: replace with actual value
+	// ArchiveLatestSealedBlockID = 42914925ac2b5d3b27052af3f94c8346d9b3e6aea741c50d71a9802e95983eb7
 
 	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedHeight uint64 = uint64(math.MaxUint64) // TODO: replace with actual value
+	ArchiveLatestFinalizedHeight uint64 = 137363402
 	// ArchiveLatestFinalizedView is the view of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedView uint64 = uint64(math.MaxUint64) // TODO: replace with actual value
+	ArchiveLatestFinalizedView uint64 = 49385088
 	// ArchiveLatestFinalizedBlockID is additionally persisted here, consider it a checksum ;-)
-	ArchiveLatestFinalizedBlockID = flow.Identifier{} // TODO: replace with actual value
-
+	// ArchiveLatestFinalizedBlockID = 70b263efa8f1c19372bb479e2a414b7811e6d6cd26f60a4ccbedadc16965b59d
 )
 
 // ErrChainArchived is returned when attempting to write to an archived chain.
