@@ -13,8 +13,7 @@ import (
 // Suppress unused import warning - fmt is used in commented-out code
 var _ = fmt.Errorf
 
-// Archive threshold constants
-// MANUALLY SPECIFIED: no consistency checks!!
+// Archive threshold constants, MANUALLY SPECIFIED: no consistency checks!!
 // It is recommended to set the latest sealed and latest finalized block as they would be under normal protocol operations.
 // For correctness, the latest sealed block must be either equal to the latest finalized block or its ancestor. However, it is
 // recommended, to avoid pruning seals. Hence, the seal for the latest sealed block should be included either in the latest
