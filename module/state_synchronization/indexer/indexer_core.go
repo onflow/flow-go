@@ -320,7 +320,7 @@ func collectScheduledTransactions(
 	chainID flow.ChainID,
 	height uint64,
 	systemChunkResults []flow.LightTransactionResult,
-	systemChunkEvents []flow.Event,
+	systemChunkEvents flow.EventsList,
 ) (map[flow.Identifier]uint64, error) {
 	if len(systemChunkResults) == 0 {
 		return nil, fmt.Errorf("system chunk contained 0 transaction results")
