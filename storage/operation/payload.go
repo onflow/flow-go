@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -189,9 +188,6 @@ func LookupLatestSealAtBlock(r storage.Reader, blockID flow.Identifier, sealID *
 	var header flow.Header
 	err := RetrieveHeader(r, blockID, &header)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return storage.ErrNotFound
-		}
 		return err
 	} // block is known, i.e. confirmed to be below archive threshold
 
@@ -230,9 +226,6 @@ func LookupBySealedBlockID(r storage.Reader, blockID flow.Identifier, sealID *fl
 	var header flow.Header
 	err := RetrieveHeader(r, blockID, &header)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return storage.ErrNotFound
-		}
 		return err
 	} // block is known, i.e. confirmed to be below archive threshold
 
