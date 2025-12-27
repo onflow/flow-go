@@ -149,7 +149,7 @@ func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 
 // LookupBlockHeight retrieves finalized blocks by height.
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound] if no finalized block for the specified height is known,
+//   - [storage.ErrNotFound] if no finalized block for the specified height is known.
 //     or if the height exceeds the archive threshold.
 func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier) error {
 	// Check if height is beyond the archived threshold
@@ -161,7 +161,7 @@ func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier
 
 // LookupCertifiedBlockByView retrieves the certified block by view. (Certified blocks are blocks that have received QC.)
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound] if no certified block for the specified view is known,
+//   - [storage.ErrNotFound] if no certified block for the specified view is known.
 //     or if the view exceeds the archive threshold.
 func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Identifier) error {
 	// ARCHIVE THRESHOLD: Check if view is beyond the archived threshold
@@ -215,7 +215,7 @@ func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Ident
 // (one-to-many mapping) for soft finality and the mature protocol.
 //
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound] if no block is known that contains the specified collection ID,
+//   - [storage.ErrNotFound] if no block is known that contains the specified collection ID.
 //     or if the block's view exceeds the archive threshold.
 func LookupBlockContainingCollectionGuarantee(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
 	// ARCHIVE THRESHOLD: Use RetrieveHeader to check if block's view is beyond the archived threshold
@@ -226,7 +226,7 @@ func LookupBlockContainingCollectionGuarantee(r storage.Reader, collID flow.Iden
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
-// them to the `found` slice if `filter` returned true.
+// them to the `found` slice if `filter` returned true
 // Headers with view exceeding the archive threshold are excluded from iteration.
 func FindHeaders(r storage.Reader, filter func(header *flow.Header) bool, found *[]flow.Header) error {
 	return TraverseByPrefix(r, MakePrefix(codeHeader), func(key []byte, getValue func(destVal any) error) (bail bool, err error) {
@@ -246,5 +246,4 @@ func FindHeaders(r storage.Reader, filter func(header *flow.Header) bool, found 
 		}
 		return false, nil
 	}, storage.DefaultIteratorOptions())
-
 }
