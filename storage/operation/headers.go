@@ -3,6 +3,7 @@ package operation
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -18,17 +19,20 @@ var _ = fmt.Errorf
 // For correctness, the latest sealed block must be either equal to the latest finalized block or its ancestor. However, it is
 // recommended, to avoid pruning seals. Hence, the seal for the latest sealed block should be included either in the latest
 // finalized block or one of its ancestors.
-// Blocks with views/heights above these thresholds will return storage.ErrNotFound.
+//
+// Blocks with views/heights above these thresholds will return [storage.ErrNotFound].
+//
+// Setting the view and height to [math.MaxUint64] effectively disables the archive chuttoff checks and allows unrestricted data reads
 var (
 	// ArchiveLatestSealedHeight is the height of the latest sealed block in the archived chain.
-	ArchiveLatestSealedHeight uint64 = 1000 // TODO: replace with actual value
+	ArchiveLatestSealedHeight uint64 = uint64(math.MaxUint64) // TODO: replace with actual value
 	// ArchiveLatestSealedBlockID is additionally persisted here, consider it a checksum ;-)
 	ArchiveLatestSealedBlockID = flow.Identifier{} // TODO: replace with actual value
 
 	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedHeight uint64 = 1100 // TODO: replace with actual value
+	ArchiveLatestFinalizedHeight uint64 = uint64(math.MaxUint64) // TODO: replace with actual value
 	// ArchiveLatestFinalizedView is the view of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedView uint64 = 1100 // TODO: replace with actual value
+	ArchiveLatestFinalizedView uint64 = uint64(math.MaxUint64) // TODO: replace with actual value
 	// ArchiveLatestFinalizedBlockID is additionally persisted here, consider it a checksum ;-)
 	ArchiveLatestFinalizedBlockID = flow.Identifier{} // TODO: replace with actual value
 
