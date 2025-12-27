@@ -44,12 +44,17 @@ type BeyondArchiveThreshold struct {
 	err error
 }
 
+// NewBeyondArchiveThreshold instantiates a BeyondArchiveThreshold error
+// with the default message wrapping [storage.ErrNotFound].
 func NewBeyondArchiveThreshold() error {
 	return BeyondArchiveThreshold{
 		err: fmt.Errorf("requested information beyond pruning threshold: %w", storage.ErrNotFound),
 	}
 }
 
+// NewBeyondArchiveThresholdf instantiates a BeyondArchiveThreshold error with a formatted message.
+// This constructor permits to wrap errors other than the default [storage.ErrNotFound]. The caller
+// must ENSURE to wrap an appropriate error, following the semantics as `fmt.Errorf(msg, args...)`.
 func NewBeyondArchiveThresholdf(msg string, args ...interface{}) error {
 	return BeyondArchiveThreshold{
 		err: fmt.Errorf(msg, args...),
