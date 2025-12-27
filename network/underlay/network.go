@@ -556,12 +556,6 @@ func (n *Network) Receive(msg network.IncomingMessageScope) error {
 
 	// drop all incoming messages from the network to avoid the historic AN from attempting to process new data.
 	return nil
-
-	err := n.processNetworkMessage(msg)
-	if err != nil {
-		return fmt.Errorf("could not process message: %w", err)
-	}
-	return nil
 }
 
 func (n *Network) processNetworkMessage(msg network.IncomingMessageScope) error {

@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/onflow/flow-go/state/protocol/badger"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/state/protocol/badger"
 )
 
 const (
@@ -185,7 +186,7 @@ func NewHeightBasedSubscription(bufferSize int, firstHeight uint64, getData GetD
 // Next returns the value for the next height from the subscription
 func (s *HeightBasedSubscription) Next(ctx context.Context) (interface{}, error) {
 	if s.nextHeight > badger.HardcodedSealedHeight {
-		return nil, fmt.Errorf("height %d is after the hardfork: %w", s.nextHeight)
+		return nil, fmt.Errorf("height %d is after the hardfork", s.nextHeight)
 	}
 
 	v, err := s.getData(ctx, s.nextHeight)
