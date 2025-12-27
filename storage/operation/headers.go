@@ -52,23 +52,23 @@ var ErrChainArchived = errors.New("chain has been archived, no extensions allowe
 // of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
 // No other errors are expected during normal operation.
 func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
-	return ErrChainArchived
+	//held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	//if !held {
+	//	return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
+	//}
+	//
+	//key := MakePrefix(codeHeader, headerID)
+	//exist, err := KeyExists(rw.GlobalReader(), key)
+	//if err != nil {
+	//	return err
+	//}
+	//if exist {
+	//	return fmt.Errorf("header already exists: %w", storage.ErrAlreadyExists)
+	//}
+	//
+	//return UpsertByKey(rw.Writer(), key, header)
 
-	// held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
-	// if !held {
-	// 	return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
-	// }
-	//
-	// key := MakePrefix(codeHeader, headerID)
-	// exist, err := KeyExists(rw.GlobalReader(), key)
-	// if err != nil {
-	// 	return err
-	// }
-	// if exist {
-	// 	return fmt.Errorf("header already exists: %w", storage.ErrAlreadyExists)
-	// }
-	//
-	// return UpsertByKey(rw.Writer(), key, header)
+	return ErrChainArchived
 }
 
 // RetrieveHeader retrieves the header of the block with the specified ID.
@@ -99,24 +99,23 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 // [storage.ErrAlreadyExists] if an entry for the given height already exists in the database.
 // No other errors are expected during normal operation.
 func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
-	return ErrChainArchived
+	//if !lctx.HoldsLock(storage.LockFinalizeBlock) {
+	//	return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
+	//}
+	//var existingID flow.Identifier
+	//key := MakePrefix(codeHeightToBlock, height)
+	//err := RetrieveByKey(rw.GlobalReader(), key, &existingID)
+	//if err == nil {
+	//	return fmt.Errorf("block ID already exists for height %d with existing ID %v, cannot reindex with blockID %v: %w",
+	//		height, existingID, blockID, storage.ErrAlreadyExists)
+	//}
+	//if !errors.Is(err, storage.ErrNotFound) {
+	//	return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
+	//}
+	//
+	//return UpsertByKey(rw.Writer(), key, blockID)
 
-	// if !lctx.HoldsLock(storage.LockFinalizeBlock) {
-	// 	return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)
-	// }
-	//
-	// var existingID flow.Identifier
-	// key := MakePrefix(codeHeightToBlock, height)
-	// err := RetrieveByKey(rw.GlobalReader(), key, &existingID)
-	// if err == nil {
-	// 	return fmt.Errorf("block ID already exists for height %d with existing ID %v, cannot reindex with blockID %v: %w",
-	// 		height, existingID, blockID, storage.ErrAlreadyExists)
-	// }
-	// if !errors.Is(err, storage.ErrNotFound) {
-	// 	return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
-	// }
-	//
-	// return UpsertByKey(rw.Writer(), key, blockID)
+	return ErrChainArchived
 }
 
 // IndexCertifiedBlockByView indexes a CERTIFIED block by its view.
@@ -130,24 +129,24 @@ func IndexFinalizedBlockByHeight(lctx lockctx.Proof, rw storage.ReaderBatchWrite
 // Returns [storage.ErrAlreadyExists] if an ID has already been finalized for this view.
 // No other errors are expected during normal operation.
 func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter, view uint64, blockID flow.Identifier) error {
-	return ErrChainArchived
+	//if !lctx.HoldsLock(storage.LockInsertBlock) {
+	//	return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	//}
+	//
+	//var existingID flow.Identifier
+	//key := MakePrefix(codeCertifiedBlockByView, view)
+	//err := RetrieveByKey(rw.GlobalReader(), key, &existingID)
+	//if err == nil {
+	//	return fmt.Errorf("block ID already exists for view %d with existingID %v, cannot reindex with blockID %v: %w",
+	//		view, existingID, blockID, storage.ErrAlreadyExists)
+	//}
+	//if !errors.Is(err, storage.ErrNotFound) {
+	//	return fmt.Errorf("failed to check existing block ID for view %d: %w", view, err)
+	//}
+	//
+	//return UpsertByKey(rw.Writer(), key, blockID)
 
-	// if !lctx.HoldsLock(storage.LockInsertBlock) {
-	// 	return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
-	// }
-	//
-	// var existingID flow.Identifier
-	// key := MakePrefix(codeCertifiedBlockByView, view)
-	// err := RetrieveByKey(rw.GlobalReader(), key, &existingID)
-	// if err == nil {
-	// 	return fmt.Errorf("block ID already exists for view %d with existingID %v, cannot reindex with blockID %v: %w",
-	// 		view, existingID, blockID, storage.ErrAlreadyExists)
-	// }
-	// if !errors.Is(err, storage.ErrNotFound) {
-	// 	return fmt.Errorf("failed to check existing block ID for view %d: %w", view, err)
-	// }
-	//
-	// return UpsertByKey(rw.Writer(), key, blockID)
+	return ErrChainArchived
 }
 
 // LookupBlockHeight retrieves finalized blocks by height.
