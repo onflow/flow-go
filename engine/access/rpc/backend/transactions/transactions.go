@@ -251,7 +251,7 @@ func (t *Transactions) GetTransaction(ctx context.Context, txID flow.Identifier)
 		_, err = t.blocks.ByCollectionID(lightCollection.ID())
 		if err != nil {
 			if errors.Is(err, badger.ErrBlockAfterHardfork) {
-				return nil, status.Errorf(codes.NotFound, "transaction if from after the hardfork")
+				return nil, status.Errorf(codes.NotFound, "transaction is from after the hardfork")
 			}
 			if !errors.Is(err, storage.ErrNotFound) {
 				return nil, status.Errorf(codes.Internal, "could not find block for collection %s: %v", lightCollection.ID(), err)
