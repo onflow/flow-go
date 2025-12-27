@@ -86,8 +86,6 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 		return storage.ErrNotFound
 	}
 	return nil
-
-	// return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
 
 // IndexFinalizedBlockByHeight indexes a block by its height. It must ONLY be called on FINALIZED BLOCKS.
@@ -159,8 +157,6 @@ func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier
 		return storage.ErrNotFound
 	}
 	return RetrieveByKey(r, MakePrefix(codeHeightToBlock, height), blockID)
-
-	// return RetrieveByKey(r, MakePrefix(codeHeightToBlock, height), blockID)
 }
 
 // LookupCertifiedBlockByView retrieves the certified block by view. (Certified blocks are blocks that have received QC.)
@@ -173,29 +169,23 @@ func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Ide
 		return storage.ErrNotFound
 	}
 	return RetrieveByKey(r, MakePrefix(codeCertifiedBlockByView, view), blockID)
-
-	// return RetrieveByKey(r, MakePrefix(codeCertifiedBlockByView, view), blockID)
 }
 
 // BlockExists checks whether the block exists in the database.
 // Returns false if the block's view exceeds the archive threshold.
 // No errors are expected during normal operation.
 func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
+	// return KeyExists(r, MakePrefix(codeHeader, blockID))
+
 	var header flow.Header
-	err := RetrieveByKey(r, MakePrefix(codeHeader, blockID), &header)
+	err := RetrieveHeader(r, blockID, &header)
 	if errors.Is(err, storage.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	// Check if block's view is beyond the archived threshold
-	if header.View > ArchiveLatestFinalizedView {
-		return false, nil
-	}
 	return true, nil
-
-	// return KeyExists(r, MakePrefix(codeHeader, blockID))
 }
 
 // IndexBlockContainingCollectionGuarantee produces a mapping from the ID of a [flow.CollectionGuarantee] to the block ID containing this guarantee.
@@ -212,9 +202,8 @@ func BlockExists(r storage.Reader, blockID flow.Identifier) (bool, error) {
 // Expected errors during normal operations:
 // TODO: return [storage.ErrAlreadyExists] or [storage.ErrDataMismatch]
 func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Identifier, blockID flow.Identifier) error {
-	return ErrChainArchived
-
 	// return UpsertByKey(w, MakePrefix(codeCollectionBlock, collID), blockID)
+	return ErrChainArchived
 }
 
 // LookupBlockContainingCollectionGuarantee retrieves the block containing the [flow.CollectionGuarantee] with the given ID.
@@ -229,25 +218,15 @@ func IndexBlockContainingCollectionGuarantee(w storage.Writer, collID flow.Ident
 //   - [storage.ErrNotFound] if no block is known that contains the specified collection ID,
 //     or if the block's view exceeds the archive threshold.
 func LookupBlockContainingCollectionGuarantee(r storage.Reader, collID flow.Identifier, blockID *flow.Identifier) error {
+	// return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
+
 	err := RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
 	if err != nil {
 		return err
 	}
-	// Retrieve the header to check if block's view is beyond the archived threshold
+	// Use RetrieveHeader to check if block's view is beyond the archived threshold
 	var header flow.Header
-	err = RetrieveByKey(r, MakePrefix(codeHeader, *blockID), &header)
-	if err != nil {
-		// If we can't retrieve the header, the index is inconsistent - return the block ID anyway
-		// This maintains backwards compatibility with existing behavior
-		return nil
-	}
-	if header.View > ArchiveLatestFinalizedView {
-		*blockID = flow.Identifier{} // Clear the output
-		return storage.ErrNotFound
-	}
-	return nil
-
-	// return RetrieveByKey(r, MakePrefix(codeCollectionBlock, collID), blockID)
+	return RetrieveHeader(r, *blockID, &header)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
