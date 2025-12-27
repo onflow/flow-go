@@ -558,37 +558,37 @@ func (n *Network) Receive(msg network.IncomingMessageScope) error {
 	return nil
 }
 
-func (n *Network) processNetworkMessage(msg network.IncomingMessageScope) error {
-	// checks the cache for deduplication and adds the message if not already present
-	if !n.receiveCache.Add(msg.EventID()) {
-		// drops duplicate message
-		n.logger.Debug().
-			Hex("sender_id", logging.ID(msg.OriginId())).
-			Hex("event_id", msg.EventID()).
-			Str("channel", msg.Channel().String()).
-			Msg("dropping message due to duplication")
+// func (n *Network) processNetworkMessage(msg network.IncomingMessageScope) error {
+// 	// checks the cache for deduplication and adds the message if not already present
+// 	if !n.receiveCache.Add(msg.EventID()) {
+// 		// drops duplicate message
+// 		n.logger.Debug().
+// 			Hex("sender_id", logging.ID(msg.OriginId())).
+// 			Hex("event_id", msg.EventID()).
+// 			Str("channel", msg.Channel().String()).
+// 			Msg("dropping message due to duplication")
 
-		n.metrics.DuplicateInboundMessagesDropped(msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
+// 		n.metrics.DuplicateInboundMessagesDropped(msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
 
-		return nil
-	}
+// 		return nil
+// 	}
 
-	// create queue message
-	qm := queue.QMessage{
-		Payload:  msg.DecodedPayload(),
-		Size:     msg.Size(),
-		Target:   msg.Channel(),
-		SenderID: msg.OriginId(),
-	}
+// 	// create queue message
+// 	qm := queue.QMessage{
+// 		Payload:  msg.DecodedPayload(),
+// 		Size:     msg.Size(),
+// 		Target:   msg.Channel(),
+// 		SenderID: msg.OriginId(),
+// 	}
 
-	// insert the message in the queue
-	err := n.queue.Insert(qm)
-	if err != nil {
-		return fmt.Errorf("failed to insert message in queue: %w", err)
-	}
+// 	// insert the message in the queue
+// 	err := n.queue.Insert(qm)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to insert message in queue: %w", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // UnicastOnChannel sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
