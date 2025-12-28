@@ -295,7 +295,7 @@ func (impl *contractUpdaterStubsImpl) GetRestrictedAccounts() (map[flow.Address]
 
 	addresses, ok := cadenceValueToAddressMap(value)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert restricted accounts")
+		return nil, fmt.Errorf("failed to convert restricted accounts: expected [Address], got %s", value)
 	}
 
 	return addresses, nil
