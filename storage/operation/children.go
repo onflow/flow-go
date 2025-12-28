@@ -49,41 +49,41 @@ func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, bloc
 
 // indexBlockByParent is the internal function that implements the indexing logic for both regular blocks and cluster blocks.
 // the caller must ensure the required locks are held to prevent concurrent writes to the [codeBlockChildren] key space.
-func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	// By convention, the parentID being [flow.ZeroID] means that the block is a root block that has no parent.
-	// This is the case for genesis blocks and cluster root blocks. In this case, we don't need to index anything.
-	if parentID == flow.ZeroID {
-		return nil
-	}
-
-	// If the parent block is not zero, depending on whether the parent block has
-	// children or not, we will either update the index or insert the index.
-	var childrenIDs flow.IdentifierList
-	err := RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
-	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not look up block children: %w", err)
-		}
-	}
-
-	// check we don't add a duplicate
-	for _, dupID := range childrenIDs {
-		if blockID == dupID {
-			return storage.ErrAlreadyExists
-		}
-	}
-
-	// adding the new block to be another child of the parent
-	childrenIDs = append(childrenIDs, blockID)
-
-	// saving the index
-	err = UpsertByKey(rw.Writer(), MakePrefix(codeBlockChildren, parentID), childrenIDs)
-	if err != nil {
-		return fmt.Errorf("could not update children index: %w", err)
-	}
-
-	return nil
-}
+//func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
+//	// By convention, the parentID being [flow.ZeroID] means that the block is a root block that has no parent.
+//	// This is the case for genesis blocks and cluster root blocks. In this case, we don't need to index anything.
+//	if parentID == flow.ZeroID {
+//		return nil
+//	}
+//
+//	// If the parent block is not zero, depending on whether the parent block has
+//	// children or not, we will either update the index or insert the index.
+//	var childrenIDs flow.IdentifierList
+//	err := RetrieveBlockChildren(rw.GlobalReader(), parentID, &childrenIDs)
+//	if err != nil {
+//		if !errors.Is(err, storage.ErrNotFound) {
+//			return fmt.Errorf("could not look up block children: %w", err)
+//		}
+//	}
+//
+//	// check we don't add a duplicate
+//	for _, dupID := range childrenIDs {
+//		if blockID == dupID {
+//			return storage.ErrAlreadyExists
+//		}
+//	}
+//
+//	// adding the new block to be another child of the parent
+//	childrenIDs = append(childrenIDs, blockID)
+//
+//	// saving the index
+//	err = UpsertByKey(rw.Writer(), MakePrefix(codeBlockChildren, parentID), childrenIDs)
+//	if err != nil {
+//		return fmt.Errorf("could not update children index: %w", err)
+//	}
+//
+//	return nil
+//}
 
 // RetrieveBlockChildren retrieves the list of child block IDs for the specified parent block.
 //
