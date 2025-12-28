@@ -165,7 +165,7 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 
 		// if any restricted account had changes, fail the transaction
 		if _, ok := restrictedAccounts[address]; ok {
-			return fmt.Errorf("account %s is restricted", address)
+			return errors.NewAccountRestrictedError(address)
 		}
 	}
 
