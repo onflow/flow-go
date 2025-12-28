@@ -92,8 +92,17 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 // Note, this would mean either the block does not exist or the block exists but has no children.
 // The caller has to check if the block exists by other means if needed.
 //
-// [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound] is returned if and only if
-// the block is stored but its view exceeds the archive threshold.
+// [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound] is returned in the following situations:
+//  0. If `blockID` does not exist in the database at all, we return [storage.ErrNotFound] (consistent with other behaviour).
+//  1. If `blockID` is beyond the archive threshold, we get [storage.ErrNotFound] wrapped in [BeyondArchiveThresholdError]
+//     (extension of the old behaviour, downwards compatible).
+//  2. If any of the indexed children of `blockID` is beyond the archive threshold, it is excluded from `childrenIDs`.
+//     (extension of the old behaviour, downwards compatible).
+//  3. If all children of `blockID` are beyond the archive threshold, [RetrieveBlockChildren] emulates the situation where
+//     a known block has no known children. In that case, the index is simply not populated in the database, resulting in
+//     a [storage.ErrNotFound]. Depending on no children are indexed in the database or all children are beyond the archive
+//     threshold, we return either a brare [storage.ErrNotFound] or one wrapped in [BeyondArchiveThresholdError] respectively.
+//     (extension of the old behaviour, downwards compatible).
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
 	// ARCHIVE THRESHOLD: This code is intended to withold blocks beyond the view of a "latest finalized block". We simply
 	// pretend those blocks do not exist, which emulates a situation where the node has not yet received those blocks.
@@ -140,6 +149,12 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 		}
 
 		filteredDescendantIDs = append(filteredDescendantIDs, childID) // child block is within archive threshold, keep it
+	}
+
+	// After filtering, the slice might be empty. Then, we return [storage.ErrNotFound] for consistency. This which emulates the situation
+	// where a known block has no known children. However, as there were children before, we wrap it in an [BeyondArchiveThresholdError].
+	if len(filteredDescendantIDs) == 0 {
+		return NewBeyondArchiveThresholdf("block has no children within the archive's boundary: %w", storage.ErrNotFound)
 	}
 
 	*childrenIDs = filteredDescendantIDs
