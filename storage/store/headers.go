@@ -122,6 +122,38 @@ func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return h.retrieveTx(blockID)
 }
 
+// CertifiedByBlockID is a temporary extension for Archival nodes with truncated chains.
+// Returns the header with the given ID and in addition a QC for this header. If either
+// the header or QC is not found, an error is returned.
+// It is available for finalized blocks and those pending finalization.
+// Error returns:
+//   - [storage.ErrNotFound] no header with the given ID is known or QC for it is found.
+//   - [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound] if and only if
+//     the block with `blockID` is stored but its view exceeds the archive threshold.
+func (h *Headers) CertifiedByBlockID(blockID flow.Identifier) (*flow.Header, *flow.QuorumCertificate, error) {
+	// ARCHIVE THRESHOLD: already maintained by [operation.RetrieveHeader] (called by `retrieveTx`) and
+	// [operation.RetrieveQuorumCertificate]. They return [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound]
+	// if and only if the block is stored but its view exceeds the archive threshold.
+
+	header, err := h.retrieveTx(blockID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not retrieve certified header: %w", err)
+	}
+
+	// Reading QCs is denied with a [BeyondArchiveThresholdError] if and only if the block that is certified
+	// is beyond the archive boundary. Typically, the QC is embedded into child blocks, to which we deny access.
+	// However, we are still fine to use QCs independently of when they were procured as long as they *pertain*
+	// to blocks within the archive boundary. So even for the latest finalized block that os within the archive's
+	// boundary, we can still retrieve its QC as long as the finalized block itself is within
+	var qc flow.QuorumCertificate
+	err = operation.RetrieveQuorumCertificate(h.db.Reader(), blockID, &qc)
+	if err != nil {
+		return nil, nil, fmt.Errorf("no QC for certified header: %w", err)
+	}
+
+	return header, &qc, nil
+}
+
 // ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
 // It is available for finalized blocks and those pending finalization.
 // Error returns:

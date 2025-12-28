@@ -159,20 +159,36 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		return &certifiedRoot, nil
 	}
 
+	// EXCEPTION FOR ARCHIVE THRESHOLD:
 	// find a valid child of the finalized block in order to get its QC
-	children, err := headers.ByParentID(final.ID())
-	if err != nil {
-		// a finalized block must have a valid child, if err happens, we exit
-		return nil, fmt.Errorf("could not get children for finalized block (ID: %v, view: %v): %w", final.ID(), final.View, err)
-	}
-	if len(children) == 0 {
-		return nil, fmt.Errorf("finalized block has no children")
-	}
+	//children, err := headers.ByParentID(final.ID())
+	//if err != nil {
+	//	// a finalized block must have a valid child, if err happens, we exit
+	//	return nil, fmt.Errorf("could not get children for finalized block (ID: %v, view: %v): %w", final.ID(), final.View, err)
+	//}
+	//
+	//if len(children) == 0 {
+	//	return nil, fmt.Errorf("finalized block has no children")
+	//}
 
-	child := model.BlockFromFlow(children[0])
+	// EXCEPTION FOR ARCHIVE THRESHOLD: Since we are working with an archived chain, where the archive only spans a limited range of views,
+	// finalization extends beyond the archive boundary. In this case, it is possible that the finalized block has no *known* children
+	// within the limits of the archive.
+	// Even with the following generalized implementation, normal consensus is still safe. The
+	// implementation is just marginally less resilient against bugs in other components or state corruption.
+
+	finalID := final.ID()
+	_, certifyingQC, err := headers.CertifiedByBlockID(finalID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve certified header of the latest finalized block: %w", err)
+	}
+	// sanity check:
+	if certifyingQC.BlockID != finalID || certifyingQC.View != final.View {
+		return nil, fmt.Errorf("missmatch between quorum certificate and finalized block")
+	}
 
 	// create the root block to use
-	trustedRoot, err := model.NewCertifiedBlock(model.BlockFromFlow(final), child.QC)
+	trustedRoot, err := model.NewCertifiedBlock(model.BlockFromFlow(final), certifyingQC)
 	if err != nil {
 		return nil, fmt.Errorf("constructing certified root block failed: %w", err)
 	}

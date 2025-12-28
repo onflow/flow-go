@@ -80,18 +80,18 @@ type BeyondArchiveThresholdError struct {
 	err error
 }
 
-// NewBeyondArchiveThreshold instantiates a BeyondArchiveThresholdError error
+// NewBeyondArchiveThresholdError instantiates a BeyondArchiveThresholdError error
 // with the default message wrapping [storage.ErrNotFound].
-func NewBeyondArchiveThreshold() error {
+func NewBeyondArchiveThresholdError() error {
 	return BeyondArchiveThresholdError{
 		err: fmt.Errorf("requested information beyond pruning threshold: %w", storage.ErrNotFound),
 	}
 }
 
-// NewBeyondArchiveThresholdf instantiates a BeyondArchiveThresholdError error with a formatted message.
+// NewBeyondArchiveThresholdErrorf instantiates a BeyondArchiveThresholdError error with a formatted message.
 // This constructor permits to wrap errors other than the default [storage.ErrNotFound]. The caller
 // must ENSURE to wrap an appropriate error, following the semantics as `fmt.Errorf(msg, args...)`.
-func NewBeyondArchiveThresholdf(msg string, args ...interface{}) error {
+func NewBeyondArchiveThresholdErrorf(msg string, args ...interface{}) error {
 	return BeyondArchiveThresholdError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -157,7 +157,7 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 	}
 	// ARCHIVE THRESHOLD: Check if block's view is beyond the archived threshold
 	if h.View > ArchiveLatestFinalizedView {
-		return NewBeyondArchiveThreshold()
+		return NewBeyondArchiveThresholdError()
 	}
 	*header = h
 	return nil
@@ -230,7 +230,7 @@ func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier) error {
 	// Check if height is beyond the archived threshold
 	if height > ArchiveLatestFinalizedHeight {
-		return NewBeyondArchiveThreshold()
+		return NewBeyondArchiveThresholdError()
 	}
 	return RetrieveByKey(r, MakePrefix(codeHeightToBlock, height), blockID)
 }
@@ -243,7 +243,7 @@ func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier
 func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Identifier) error {
 	// ARCHIVE THRESHOLD: Check if view is beyond the archived threshold
 	if view > ArchiveLatestFinalizedView {
-		return NewBeyondArchiveThreshold()
+		return NewBeyondArchiveThresholdError()
 	}
 	return RetrieveByKey(r, MakePrefix(codeCertifiedBlockByView, view), blockID)
 }
