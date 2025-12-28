@@ -307,6 +307,10 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 // Since all blocks are fully validated before being inserted to the state,
 // all returned blocks are validated.
 //
+// It returns [storage.ErrNotFound] if no children are known. Note, this could
+// either mean that the block does not exist or the block exists but has no
+// children. The caller has to check if the block exists by other means if needed.
+//
 // CAUTION: the list of descendants is constructed for each call via database reads,
 // and may be expensive to compute, especially if the reference block is older.
 //
@@ -323,6 +327,8 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 // CAUTION: this function behaves only correctly for known blocks (see constructor).
 // No error returns are expected during normal operation.
 func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, error) {
+	// ARCHIVE THRESHOLD: already maintained by [RetrieveBlockChildren]
+	// [RetrieveBlockChildren] is entirely downwards compatible.
 	var descendantIDs flow.IdentifierList
 	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &descendantIDs)
 	if err != nil {
