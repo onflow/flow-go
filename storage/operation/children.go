@@ -19,11 +19,13 @@ import (
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if the blockID is already indexed as a child of the parent
 func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
-	}
+	// if !lctx.HoldsLock(storage.LockInsertBlock) {
+	// 	return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	// }
+	//
+	// return indexBlockByParent(rw, blockID, parentID)
 
-	return indexBlockByParent(rw, blockID, parentID)
+	return ErrChainArchived
 }
 
 // IndexNewClusterBlock populates the parent-child index for cluster blocks, aka collections, by adding the given
@@ -36,11 +38,13 @@ func IndexNewBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flo
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if the blockID is already indexed as a child of the parent
 func IndexNewClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, parentID flow.Identifier) error {
-	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
-		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
-	}
+	// if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) {
+	// 	return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
+	// }
+	//
+	// return indexBlockByParent(rw, blockID, parentID)
 
-	return indexBlockByParent(rw, blockID, parentID)
+	return ErrChainArchived
 }
 
 // indexBlockByParent is the internal function that implements the indexing logic for both regular blocks and cluster blocks.
@@ -87,8 +91,24 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 // It returns [storage.ErrNotFound] if the block has no children.
 // Note, this would mean either the block does not exist or the block exists but has no children.
 // The caller has to check if the block exists by other means if needed.
+//
+// [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound] is returned if and only if
+// the block is stored but its view exceeds the archive threshold.
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
-	err := RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), childrenIDs)
+	// ARCHIVE THRESHOLD: This code is intended to withold blocks beyond the view of a "latest finalized block". We simply
+	// pretend those blocks do not exist, which emulates a situation where the node has not yet received those blocks.
+	var h flow.Header
+	err := RetrieveHeader(r, blockID, &h)
+	if err != nil {
+		// RetrieveHeader returns [BeyondArchiveThresholdError] if block is in the database but beyond the archive threshold.
+		// A [storage.ErrNotFound] is returned if the block is not in the database at all. We can just propagate these errors:
+		return err
+	} // block is known, i.e. confirmed to be within archive boundaries
+
+	// CAUTION: the following index was written at a time when the block's children were still actively consumed. We
+	// don't want to alter the data, just pretend the children beyond the archive's boundary haven't been received yet.
+	var unsaveDescendantIDs flow.IdentifierList
+	err = RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), &unsaveDescendantIDs)
 	if err != nil {
 		// when indexing new block, we don't create an index for the block if it has no children
 		// so we can't distinguish between a block that doesn't exist and a block that exists but has no children
@@ -100,9 +120,28 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 		return fmt.Errorf("could not retrieve block children: %w", err)
 	}
 
-	if len(*childrenIDs) == 0 {
+	// we have retrieved some slice of children IDs. It shouldn't be empty, but just in case it is, we return [storage.ErrNotFound] for consistency.
+	if len(unsaveDescendantIDs) == 0 {
 		return fmt.Errorf("the block has no children: %w", storage.ErrNotFound)
 	}
 
+	// filtering out children that are beyond archive threshold
+	var filteredDescendantIDs flow.IdentifierList
+	for _, childID := range unsaveDescendantIDs {
+		var childHeader flow.Header
+		err = RetrieveHeader(r, childID, &childHeader)
+		if err != nil {
+			// This is an over-permissive check: we utilize the fact that any [BeyondArchiveThresholdError] returned by [RetrieveHeader]
+			// _wraps_ a [storage.ErrNotFound] error. Thus, we can simply check for broader class of [storage.ErrNotFound] sentinels here.
+			if errors.Is(err, storage.ErrNotFound) {
+				continue // child block is beyond archive threshold: pretend it does not exist
+			}
+			return fmt.Errorf("could not retrieve child block header: %w", err)
+		}
+
+		filteredDescendantIDs = append(filteredDescendantIDs, childID) // child block is within archive threshold, keep it
+	}
+
+	*childrenIDs = filteredDescendantIDs
 	return nil
 }
