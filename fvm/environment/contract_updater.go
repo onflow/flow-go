@@ -75,6 +75,7 @@ type ContractUpdater interface {
 	RemoveAccountContractCode(location common.AddressLocation) error
 
 	Commit() (ContractUpdates, error)
+	GetFrozenAccounts() (map[flow.Address]struct{}, error)
 
 	Reset()
 }
@@ -116,6 +117,13 @@ func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
 		location)
 }
 
+func (updater ParseRestrictedContractUpdater) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+	return parseRestrict1Ret(
+		updater.txnState,
+		trace.FVMEnvGetFrozenAccounts,
+		updater.impl.GetFrozenAccounts)
+}
+
 func (updater ParseRestrictedContractUpdater) Commit() (
 	ContractUpdates,
 	error,
@@ -142,6 +150,11 @@ func (NoContractUpdater) RemoveAccountContractCode(
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
+func (NoContractUpdater) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+	// this is for scripts
+	return map[flow.Address]struct{}{}, nil
+}
+
 func (NoContractUpdater) Commit() (ContractUpdates, error) {
 	return ContractUpdates{}, nil
 }
@@ -155,6 +168,7 @@ type ContractUpdaterStubs interface {
 	RestrictedRemovalEnabled() bool
 
 	GetAuthorizedAccounts(path cadence.Path) []flow.Address
+	GetFrozenAccounts() (map[flow.Address]struct{}, error)
 }
 
 type contractUpdaterStubsImpl struct {
@@ -254,6 +268,39 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 		return defaultAccounts
 	}
 	return addresses
+}
+
+// GetFrozenAccounts This should be on its own struct
+func (impl *contractUpdaterStubsImpl) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+	// set default to service account only
+	service := impl.chain.ServiceAddress()
+
+	path := blueprints.FrozenAccountsPath
+
+	runtime := impl.runtime.BorrowCadenceRuntime()
+	defer impl.runtime.ReturnCadenceRuntime(runtime)
+
+	value, err := runtime.ReadStored(
+		common.MustBytesToAddress(service.Bytes()),
+		path)
+
+	const errMsg = "failed to read frozen accounts from " +
+		"service account"
+
+	if err != nil {
+		return make(map[flow.Address]struct{}), fmt.Errorf(errMsg)
+	}
+	// value == nil => no array is present at location
+	// this is valid
+	if value == nil {
+		return make(map[flow.Address]struct{}), nil
+	}
+
+	addresses, ok := cadenceValueToAddressMap(value)
+	if !ok {
+		return make(map[flow.Address]struct{}), fmt.Errorf(errMsg)
+	}
+	return addresses, nil
 }
 
 type ContractUpdaterImpl struct {
@@ -542,6 +589,26 @@ func cadenceValueToAddressSlice(value cadence.Value) (
 			return nil, false
 		}
 		addresses = append(addresses, flow.ConvertAddress(a))
+	}
+	return addresses, true
+}
+
+func cadenceValueToAddressMap(value cadence.Value) (
+	map[flow.Address]struct{},
+	bool,
+) {
+	v, ok := value.(cadence.Array)
+	if !ok {
+		return nil, false
+	}
+
+	addresses := make(map[flow.Address]struct{}, len(v.Values))
+	for _, value := range v.Values {
+		a, ok := value.(cadence.Address)
+		if !ok {
+			return nil, false
+		}
+		addresses[flow.ConvertAddress(a)] = struct{}{}
 	}
 	return addresses, true
 }

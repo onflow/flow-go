@@ -46,7 +46,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0, nil)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0, nil)
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK (dedup payer)", func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, owner, 0)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, owner, 0, nil)
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
@@ -97,7 +97,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0, nil)
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("capacity > storage -> OK (payer not updated)", func(t *testing.T) {
@@ -116,7 +116,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		executionSnapshot = &snapshot.ExecutionSnapshot{}
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, owner, 1)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, owner, 1, nil)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK (payer not updated)", func(t *testing.T) {
@@ -135,7 +135,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		executionSnapshot = &snapshot.ExecutionSnapshot{}
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, owner, 1000)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, owner, 1000, nil)
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("if ctx LimitAccountStorage false-> OK", func(t *testing.T) {
@@ -153,7 +153,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0, nil)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run(
@@ -173,7 +173,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 			)
 
 			d := &fvm.TransactionStorageLimiter{}
-			err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+			err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0, nil)
 			require.Error(
 				t,
 				err,
@@ -210,12 +210,12 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 
 		// if EVM is disabled don't skip the storage check
-		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0, nil)
 		require.Error(t, err)
 
 		// if EVM is enabled skip the storage check
 		ctx := fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
-		err = d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+		err = d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0, nil)
 		require.NoError(t, err)
 	})
 }

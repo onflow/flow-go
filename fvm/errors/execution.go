@@ -65,6 +65,18 @@ func NewInsufficientPayerBalanceError(
 	)
 }
 
+// NewAccountFrozenError constructs a new CodedError which
+// indicates that the payer has insufficient balance to attempt transaction execution.
+func NewAccountFrozenError(
+	acc flow.Address,
+) CodedError {
+	return NewCodedError(
+		ErrCodeAccountIsFrozenError,
+		"account (%s) is frozen",
+		acc,
+	)
+}
+
 // IsInsufficientPayerBalanceError returns true if error has this code.
 func IsInsufficientPayerBalanceError(err error) bool {
 	return HasErrorCode(err, ErrCodeInsufficientPayerBalance)

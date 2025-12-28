@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -358,9 +359,22 @@ func (executor *transactionExecutor) normalExecution() (
 	err error,
 ) {
 	var maxTxFees uint64
+	var frozenAccounts map[flow.Address]struct{}
 	// run with limits disabled since this is a static cost check
 	// and should be accounted for in the inclusion cost.
 	executor.txnState.RunWithMeteringDisabled(func() {
+		frozenAccounts, err = executor.env.GetFrozenAccounts()
+		if err != nil {
+			err = fmt.Errorf("getting frozen accounts failed: %w", err)
+			return
+		}
+
+		// if payer is frozen, fail the transaction early
+		if _, ok := frozenAccounts[executor.proc.Transaction.Payer]; ok {
+			err = errors.NewAccountFrozenError(executor.proc.Transaction.Payer)
+			return
+		}
+
 		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(
 			executor.proc,
 			executor.txnState,
@@ -418,7 +432,8 @@ func (executor *transactionExecutor) normalExecution() (
 		executor.env,
 		bodySnapshot,
 		executor.proc.Transaction.Payer,
-		maxTxFees)
+		maxTxFees,
+		frozenAccounts)
 
 	if err != nil {
 		return

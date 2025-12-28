@@ -79,6 +79,8 @@ type Environment interface {
 		error,
 	)
 
+	GetFrozenAccounts() (map[flow.Address]struct{}, error)
+
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
 	// EventEmitter) to initial state.
 	Reset()
