@@ -154,6 +154,12 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 	}
 
 	for i, address := range addresses {
+
+		// if any restricted account had changes, fail the transaction
+		if _, ok := restrictedAccounts[address]; ok {
+			return errors.NewAccountRestrictedError(address)
+		}
+
 		capacity := environment.StorageMBUFixToBytesUInt(resultArray.Values[i])
 
 		if usages[i] > capacity {
@@ -161,11 +167,6 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 				address,
 				usages[i],
 				capacity)
-		}
-
-		// if any restricted account had changes, fail the transaction
-		if _, ok := restrictedAccounts[address]; ok {
-			return errors.NewAccountRestrictedError(address)
 		}
 	}
 
