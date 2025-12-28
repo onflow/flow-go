@@ -21,6 +21,7 @@ type signatureType struct {
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
+	// TODO(tarak): duplicate use - remove?
 	aggregateWeights map[flow.Address]int
 }
 
@@ -97,6 +98,7 @@ func newSignatureEntries(
 	map[flow.Address]int,
 	error,
 ) {
+	// TODO(tarak): allocations are returned empty maps - move the key weight aggregation here?
 	payloadWeights := make(map[flow.Address]int, len(payloadSignatures))
 	envelopeWeights := make(map[flow.Address]int, len(envelopeSignatures))
 
@@ -216,9 +218,15 @@ func (v *TransactionVerifier) verifyTransaction(
 	var envelopeWeights map[flow.Address]int
 	var err error
 
+	// the following logic adds a special override for the service account that allows it to modify accounts
+	// on behalf of transaction authorizers without requiring their signatures. this is an extra
+	// ordinary update that is added for the specific purpose of unwinding the impacts of the fraudulent
+	// transactions executed during the incident window.
 	serviceAccountOveride := false
 	if len(tx.Authorizers) >= 1 &&
+		// first authorizer
 		tx.Authorizers[0] == serviceAddress &&
+		// payer and proposer
 		tx.Payer == serviceAddress &&
 		tx.ProposalKey.Address == serviceAddress {
 
@@ -286,6 +294,8 @@ func (v *TransactionVerifier) verifyTransaction(
 			continue
 		}
 
+		// if the special service account override is enabled, other authorizers than the serveice account
+		// are not checked for weights
 		if serviceAccountOveride && addr != serviceAddress {
 			exists, err := accounts.Exists(addr)
 			if err != nil {
@@ -424,6 +434,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 			break
 		}
 
+		// TODO(tarak): should be moved to "newSignatureEntries" ?
 		entry.aggregateWeights[entry.Address] += entry.accountKey.Weight
 	}
 
@@ -450,5 +461,6 @@ func (v *TransactionVerifier) hasSufficientKeyWeight(
 	address flow.Address,
 	keyWeightThreshold int,
 ) bool {
+	fmt.Println(weights[address], keyWeightThreshold)
 	return weights[address] >= keyWeightThreshold
 }
