@@ -39,6 +39,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 	snapshot *snapshot.ExecutionSnapshot,
 	payer flow.Address,
 	maxTxFees uint64,
+	restrictedAccounts map[flow.Address]struct{},
 ) error {
 	if !env.LimitAccountStorage() {
 		return nil
@@ -46,7 +47,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 
 	defer env.StartChildSpan(trace.FVMTransactionStorageUsedCheck).End()
 
-	err := limiter.checkStorageLimits(ctx, env, snapshot, payer, maxTxFees)
+	err := limiter.checkStorageLimits(ctx, env, snapshot, payer, maxTxFees, restrictedAccounts)
 	if err != nil {
 		return fmt.Errorf("storage limit check failed: %w", err)
 	}
@@ -112,6 +113,7 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 	snapshot *snapshot.ExecutionSnapshot,
 	payer flow.Address,
 	maxTxFees uint64,
+	restrictedAccounts map[flow.Address]struct{},
 ) error {
 	addresses := limiter.getStorageCheckAddresses(ctx, snapshot, payer, maxTxFees)
 
@@ -152,6 +154,12 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 	}
 
 	for i, address := range addresses {
+
+		// if any restricted account had changes, fail the transaction
+		if _, ok := restrictedAccounts[address]; ok {
+			return errors.NewAccountRestrictedError(address)
+		}
+
 		capacity := environment.StorageMBUFixToBytesUInt(resultArray.Values[i])
 
 		if usages[i] > capacity {

@@ -4285,3 +4285,123 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 			require.Equal(t, expectedBlockHashListBucket, newBlockHashListBucket)
 		}))
 }
+
+func TestAccountRestricting(t *testing.T) {
+
+	t.Parallel()
+
+	chain := flow.Mainnet.Chain()
+
+	t.Run(
+		"set and reject",
+		newVMTest().
+			withContextOptions(
+				fvm.WithChain(chain),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false)).
+			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				var accounts []flow.Address
+				snapshotTree, accounts, err = testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
+				require.NoError(t, err)
+
+				restrictedAddress := accounts[0]
+
+				// First, try to run a transaction from the address to be restricted to ensure it works
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript([]byte(`
+						transaction {
+							prepare(account: auth(Capabilities, Storage) &Account) {
+								log("This should not execute")
+							}
+						}
+					`)).
+					SetPayer(restrictedAddress).
+					AddAuthorizer(restrictedAddress)
+
+				err = testutil.SignTransaction(txBodyBuilder, accounts[0], privateKeys[0], 0)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				_, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+				// The transaction should succeed, the account is not restricted yet
+				require.NoError(t, output.Err)
+
+				// Set the restricted address in the service account's storage
+
+				restrictedAddresses := cadence.NewArray([]cadence.Value{
+					cadence.Address(restrictedAddress),
+				}).WithType(cadence.NewVariableSizedArrayType(cadence.AddressType))
+
+				txBodyBuilder = flow.NewTransactionBodyBuilder().
+					SetScript([]byte(`
+                        transaction(addresses: [Address]) {
+                            prepare(account: auth(Storage) &Account) {
+                                account.storage.save(addresses, to: /storage/restrictedAccounts)
+                            }
+                        }
+                    `)).
+					SetPayer(chain.ServiceAddress()).
+					AddAuthorizer(chain.ServiceAddress()).
+					AddArgument(jsoncdc.MustEncode(restrictedAddresses))
+
+				err = testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err = txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				snapshotTree = snapshotTree.Append(executionSnapshot)
+
+				// Now try to run a transaction from the restricted address again
+
+				txBodyBuilder = flow.NewTransactionBodyBuilder().
+					SetScript([]byte(`
+						transaction {
+							prepare(account: auth(Capabilities, Storage) &Account) {
+								log("This should not execute")
+							}
+						}
+					`)).
+					SetPayer(restrictedAddress).
+					AddAuthorizer(restrictedAddress)
+
+				err = testutil.SignTransaction(txBodyBuilder, accounts[0], privateKeys[0], 0)
+				require.NoError(t, err)
+
+				txBody, err = txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				_, output, err = vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+				// The transaction should be rejected due to the account being restricted
+				require.Error(t, output.Err)
+			}),
+	)
+}

@@ -22,6 +22,10 @@ var IsContractDeploymentRestrictedPath = cadence.Path{
 	Domain:     common.PathDomainStorage,
 	Identifier: "isContractDeploymentRestricted",
 }
+var RestrictedAccountsPath = cadence.Path{
+	Domain:     common.PathDomainStorage,
+	Identifier: "restrictedAccounts",
+}
 
 //go:embed scripts/setContractOperationAuthorizersTransactionTemplate.cdc
 var setContractOperationAuthorizersTransactionTemplate string

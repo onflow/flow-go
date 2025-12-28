@@ -40,6 +40,10 @@ func (p testContractUpdaterStubs) GetAuthorizedAccounts(
 	return p.removalAuthorized
 }
 
+func (p testContractUpdaterStubs) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
+	return nil, nil
+}
+
 func TestContract_ChildMergeFunctionality(t *testing.T) {
 	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)

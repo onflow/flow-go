@@ -10,6 +10,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
@@ -358,9 +360,22 @@ func (executor *transactionExecutor) normalExecution() (
 	err error,
 ) {
 	var maxTxFees uint64
+	var restrictedAccounts map[flow.Address]struct{}
 	// run with limits disabled since this is a static cost check
 	// and should be accounted for in the inclusion cost.
 	executor.txnState.RunWithMeteringDisabled(func() {
+		restrictedAccounts, err = executor.env.GetRestrictedAccounts()
+		if err != nil {
+			err = fmt.Errorf("getting restricted accounts failed: %w", err)
+			return
+		}
+
+		// if payer is restricted, fail the transaction early
+		if _, ok := restrictedAccounts[executor.proc.Transaction.Payer]; ok {
+			err = errors.NewAccountRestrictedError(executor.proc.Transaction.Payer)
+			return
+		}
+
 		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(
 			executor.proc,
 			executor.txnState,
@@ -418,7 +433,8 @@ func (executor *transactionExecutor) normalExecution() (
 		executor.env,
 		bodySnapshot,
 		executor.proc.Transaction.Payer,
-		maxTxFees)
+		maxTxFees,
+		restrictedAccounts)
 
 	if err != nil {
 		return

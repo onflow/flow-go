@@ -191,6 +191,7 @@ const (
 	FVMEnvUpdateAccountContractCode   SpanName = "fvm.env.updateAccountContractCode"
 	FVMEnvGetAccountContractCode      SpanName = "fvm.env.getAccountContractCode"
 	FVMEnvRemoveAccountContractCode   SpanName = "fvm.env.removeAccountContractCode"
+	FVMEnvGetRestrictedAccounts       SpanName = "fvm.env.getRestrictedAccounts"
 	FVMEnvGetSigningAccounts          SpanName = "fvm.env.getSigningAccounts"
 
 	FVMEVMDeployCOA SpanName = "fvm.evm.deployCOA"

@@ -6,6 +6,8 @@ import (
 	common "github.com/onflow/cadence/common"
 	environment "github.com/onflow/flow-go/fvm/environment"
 
+	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -31,6 +33,36 @@ func (_m *ContractUpdater) Commit() (environment.ContractUpdates, error) {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(environment.ContractUpdates)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRestrictedAccounts provides a mock function with no fields
+func (_m *ContractUpdater) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRestrictedAccounts")
+	}
+
+	var r0 map[flow.Address]struct{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (map[flow.Address]struct{}, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() map[flow.Address]struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[flow.Address]struct{})
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {

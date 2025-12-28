@@ -65,6 +65,18 @@ func NewInsufficientPayerBalanceError(
 	)
 }
 
+// NewAccountRestrictedError constructs a new CodedError which
+// indicates that the account is restricted from performing the attempted operation.
+func NewAccountRestrictedError(
+	acc flow.Address,
+) CodedError {
+	return NewCodedError(
+		ErrCodeAccountIsRestrictedError,
+		"account (%s) is restricted",
+		acc,
+	)
+}
+
 // IsInsufficientPayerBalanceError returns true if error has this code.
 func IsInsufficientPayerBalanceError(err error) bool {
 	return HasErrorCode(err, ErrCodeInsufficientPayerBalance)
