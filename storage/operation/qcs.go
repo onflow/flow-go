@@ -57,11 +57,11 @@ func InsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, q
 //     the block is stored but its view exceeds the archive threshold.
 func RetrieveQuorumCertificate(r storage.Reader, blockID flow.Identifier, qc *flow.QuorumCertificate) error {
 	var q flow.QuorumCertificate
-	err := RetrieveByKey(r, MakePrefix(codeBlockIDToQuorumCertificate, blockID), q)
+	err := RetrieveByKey(r, MakePrefix(codeBlockIDToQuorumCertificate, blockID), &q)
 	if err != nil {
 		return err
 	}
-	if qc.View > ArchiveLatestFinalizedView {
+	if q.View > ArchiveLatestFinalizedView {
 		return NewBeyondArchiveThresholdErrorf("QC is for block beyond archive threshold: %w", storage.ErrNotFound)
 	}
 
