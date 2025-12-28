@@ -99,13 +99,13 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 //  2. If any of the indexed children of `blockID` is beyond the archive threshold, it is excluded from `childrenIDs`.
 //     (extension of the old behaviour, downwards compatible).
 //  3. If all children of `blockID` are beyond the archive threshold, [RetrieveBlockChildren] emulates the situation where
-//     a known block has no known children. In that case, the index is simply not populated in the database, resulting in
-//     a [storage.ErrNotFound]. Depending on no children are indexed in the database or all children are beyond the archive
-//     threshold, we return either a brare [storage.ErrNotFound] or one wrapped in [BeyondArchiveThresholdError] respectively.
-//     (extension of the old behaviour, downwards compatible).
+//     a known block has no known children. In that case, the index would not be populated in the database, resulting in
+//     a [storage.ErrNotFound]. Depending on whether (i) no children are indexed in the database or (ii) all children are
+//     beyond the archive threshold, we return either (i) a bare [storage.ErrNotFound] or (ii) a [storage.ErrNotFound]
+//     wrapped in [BeyondArchiveThresholdError] respectively. (extension of the old behaviour, downwards compatible).
 func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenIDs *flow.IdentifierList) error {
-	// ARCHIVE THRESHOLD: This code is intended to withold blocks beyond the view of a "latest finalized block". We simply
-	// pretend those blocks do not exist, which emulates a situation where the node has not yet received those blocks.
+	// ARCHIVE THRESHOLD: This code is intended to withold blocks beyond the view of a "latest finalized block".
+	// We emulate the situation, where the node has not yet received those blocks.
 	var h flow.Header
 	err := RetrieveHeader(r, blockID, &h)
 	if err != nil {
@@ -115,7 +115,7 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 	} // block is known, i.e. confirmed to be within archive boundaries
 
 	// CAUTION: the following index was written at a time when the block's children were still actively consumed. We
-	// don't want to alter the data, just pretend the children beyond the archive's boundary haven't been received yet.
+	// don't alter the database; just pretend the children beyond the archive's boundary haven't been received yet:
 	var unsaveDescendantIDs flow.IdentifierList
 	err = RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), &unsaveDescendantIDs)
 	if err != nil {
@@ -129,13 +129,13 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 		return fmt.Errorf("could not retrieve block children: %w", err)
 	}
 
-	// we have retrieved some slice of children IDs. It shouldn't be empty, but just in case it is, we return [storage.ErrNotFound] for consistency.
+	// We have retrieved some slice of children IDs. It shouldn't be empty, but in case it is, we return [storage.ErrNotFound] for consistency.
 	if len(unsaveDescendantIDs) == 0 {
 		return fmt.Errorf("the block has no children: %w", storage.ErrNotFound)
 	}
 
-	// filtering out children that are beyond archive threshold
-	var filteredDescendantIDs flow.IdentifierList
+	// filtering out children that are beyond archive threshold:
+	var filteredDescendantIDs = make(flow.IdentifierList, 0, len(unsaveDescendantIDs))
 	for _, childID := range unsaveDescendantIDs {
 		var childHeader flow.Header
 		err = RetrieveHeader(r, childID, &childHeader)
