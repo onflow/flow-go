@@ -224,6 +224,9 @@ func (e *Manager) QueryExecutor() query.Executor {
 }
 
 func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCallbacksEnabled bool) []fvm.Option {
+	// temporary disabled EVM on mainnet
+	evmEnabled := chainID != flow.Mainnet
+
 	options := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
 		fvm.WithReusableCadenceRuntimePool(
@@ -232,7 +235,7 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCall
 				runtime.Config{},
 			),
 		),
-		fvm.WithEVMEnabled(true),
+		fvm.WithEVMEnabled(evmEnabled),
 		fvm.WithScheduleCallbacksEnabled(scheduleCallbacksEnabled),
 	}
 
