@@ -25,15 +25,37 @@ var _ = fmt.Errorf
 var (
 	// ArchiveLatestSealedHeight is the height of the latest sealed block in the archived chain.
 	ArchiveLatestSealedHeight uint64 = 137363395
+	// ArchiveLatestSealedView is the view of the latest sealed block in the archived chain.
+	ArchiveLatestSealedView uint64 = 49385081
 	// ArchiveLatestSealedBlockID is additionally persisted here, consider it a checksum ;-)
 	// ArchiveLatestSealedBlockID = 42914925ac2b5d3b27052af3f94c8346d9b3e6aea741c50d71a9802e95983eb7
 
+	// The following would be a configuration that could hypothetically occur under normal protocol
+	// operations. Unfortunately, it is not practical (see 'Update' section below).
+	//
 	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedHeight uint64 = 137363402
+	// ArchiveLatestFinalizedHeight uint64 = 137363402
 	// ArchiveLatestFinalizedView is the view of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedView uint64 = 49385088
+	// ArchiveLatestFinalizedView uint64 = 49385088
 	// ArchiveLatestFinalizedBlockID is additionally persisted here, consider it a checksum ;-)
 	// ArchiveLatestFinalizedBlockID = 70b263efa8f1c19372bb479e2a414b7811e6d6cd26f60a4ccbedadc16965b59d
+
+	// UPDATE:
+	// Despite best efforts, it didn't work out to configuring the thresholds similarly to how they could
+	// occur under normal protocol operations. Details:
+	//   • Block with height 137363395 (abbreviated "1…395") is the parent of mainnet 28's root block.
+	//   • The block with the exploit is at height 1…398.
+	//   • block 1…402 seals 1…395
+	// The smallest common denominator is that execution state queries via the Access API typically retrieve
+	// the header and block. Beyond that, it gets very case-dependent. We anyway don't want to expose blocks past
+	// height 1…395, because they could be conflicting with finalized blocks from mainnet 28.
+	// However, we still want to be able to retrieve sealed results for block up to and including 1…395.
+	// And the Access API should know those results to be sealed.
+
+	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
+	ArchiveLatestFinalizedHeight uint64 = ArchiveLatestSealedHeight
+	// ArchiveLatestFinalizedView is the view of the latest finalized block in the archived chain.
+	ArchiveLatestFinalizedView uint64 = ArchiveLatestSealedView
 )
 
 // ErrChainArchived is returned when attempting to write to an archived chain.
