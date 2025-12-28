@@ -25,54 +25,89 @@ var _ = fmt.Errorf
 var (
 	// ArchiveLatestSealedHeight is the height of the latest sealed block in the archived chain.
 	ArchiveLatestSealedHeight uint64 = 137363395
+	// ArchiveLatestSealedView is the view of the latest sealed block in the archived chain.
+	ArchiveLatestSealedView uint64 = 49385081
 	// ArchiveLatestSealedBlockID is additionally persisted here, consider it a checksum ;-)
 	// ArchiveLatestSealedBlockID = 42914925ac2b5d3b27052af3f94c8346d9b3e6aea741c50d71a9802e95983eb7
 
+	// The following would be a configuration that could hypothetically occur under normal protocol
+	// operations. Unfortunately, it is not practical (see 'Update' section below).
+	//
 	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedHeight uint64 = 137363402
+	// ArchiveLatestFinalizedHeight uint64 = 137363402
 	// ArchiveLatestFinalizedView is the view of the latest finalized block in the archived chain.
-	ArchiveLatestFinalizedView uint64 = 49385088
+	// ArchiveLatestFinalizedView uint64 = 49385088
 	// ArchiveLatestFinalizedBlockID is additionally persisted here, consider it a checksum ;-)
 	// ArchiveLatestFinalizedBlockID = 70b263efa8f1c19372bb479e2a414b7811e6d6cd26f60a4ccbedadc16965b59d
+
+	// UPDATE:
+	// Despite best efforts, it didn't work out to configuring the thresholds similarly to how they could
+	// occur under normal protocol operations. Details:
+	//   • Block with height 137363395 (abbreviated "1…395") is the parent of mainnet 28's root block.
+	//   • The block with the exploit is at height 1…398.
+	//   • block 1…402 seals 1…395
+	// The smallest common denominator is that execution state queries via the Access API typically retrieve
+	// the header and block. Beyond that, it gets very case-dependent. We anyway don't want to expose blocks past
+	// height 1…395, because they could be conflicting with finalized blocks from mainnet 28.
+	// However, we still want to be able to retrieve sealed results for block up to and including 1…395.
+	// And the Access API should know those results to be sealed.
+	//
+	// CAUTION:
+	// Those situations are illegal within the protocol except for the root block, which we explicitly handle.
+	// The root block has no ancestors, and we might detect a root block as such by inspecting whether sealed
+	// and finalized height as of this block are identical. We might be coincidentally mirroring this condition
+	// here. Hence, there is theoretically a bunch of stuff that could break depending on the implementation
+	// checks .... Because for spork root blocks some implementation have different logic paths, which we do
+	// not want to accidentally trigger here with the _final_ block of the spork.
+	//
+	// The implications of this configuration are not fully understood. However, the available data is more
+	// restrictive (conservative) than it normally would be under a comparable scenario during normal protocol
+	// operations. Hence, it is expected that this configuration is safe, albeit potentially causing occasional
+	// crashes when reading expected data is denied.
+
+	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
+	ArchiveLatestFinalizedHeight uint64 = ArchiveLatestSealedHeight
+	// ArchiveLatestFinalizedView is the view of the latest finalized block in the archived chain.
+	ArchiveLatestFinalizedView uint64 = ArchiveLatestSealedView
 )
 
 // ErrChainArchived is returned when attempting to write to an archived chain.
 var ErrChainArchived = errors.New("chain has been archived, no extensions allowed")
 
-// BeyondArchiveThreshold is intended as a wrapper around [storage.ErrNotFound] to indicate that
+// BeyondArchiveThresholdError is intended as a wrapper around [storage.ErrNotFound] to indicate that
 // this request was found in the database but held back due to being beyond the archive cutoff.
-type BeyondArchiveThreshold struct {
+type BeyondArchiveThresholdError struct {
 	err error
 }
 
-// NewBeyondArchiveThreshold instantiates a BeyondArchiveThreshold error
+// NewBeyondArchiveThreshold instantiates a BeyondArchiveThresholdError error
 // with the default message wrapping [storage.ErrNotFound].
 func NewBeyondArchiveThreshold() error {
-	return BeyondArchiveThreshold{
+	return BeyondArchiveThresholdError{
 		err: fmt.Errorf("requested information beyond pruning threshold: %w", storage.ErrNotFound),
 	}
 }
 
-// NewBeyondArchiveThresholdf instantiates a BeyondArchiveThreshold error with a formatted message.
+// NewBeyondArchiveThresholdf instantiates a BeyondArchiveThresholdError error with a formatted message.
 // This constructor permits to wrap errors other than the default [storage.ErrNotFound]. The caller
 // must ENSURE to wrap an appropriate error, following the semantics as `fmt.Errorf(msg, args...)`.
 func NewBeyondArchiveThresholdf(msg string, args ...interface{}) error {
-	return BeyondArchiveThreshold{
+	return BeyondArchiveThresholdError{
 		err: fmt.Errorf(msg, args...),
 	}
 }
 
-func (e BeyondArchiveThreshold) Unwrap() error {
+func (e BeyondArchiveThresholdError) Unwrap() error {
 	return e.err
 }
 
-func (e BeyondArchiveThreshold) Error() string {
+func (e BeyondArchiveThresholdError) Error() string {
 	return e.err.Error()
 }
 
-// IsBeyondArchiveThreshold returns whether the given error is an BeyondArchiveThreshold error
+// IsBeyondArchiveThreshold returns whether the given error is an BeyondArchiveThresholdError error
 func IsBeyondArchiveThreshold(err error) bool {
-	var errBeyondArchiveThreshold BeyondArchiveThreshold
+	var errBeyondArchiveThreshold BeyondArchiveThresholdError
 	return errors.As(err, &errBeyondArchiveThreshold)
 }
 
@@ -110,8 +145,9 @@ func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flo
 
 // RetrieveHeader retrieves the header of the block with the specified ID.
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound] if no block with the specified `blockID` is known,
-//     or if the block's view exceeds the archive threshold.
+//   - [storage.ErrNotFound] if no block with the specified `blockID` is known.
+//   - [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound] if and only if
+//     the block is stored but its view exceeds the archive threshold.
 //   - generic error in case of unexpected failure from the database layer
 func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Header) error {
 	var h flow.Header
@@ -189,7 +225,8 @@ func IndexCertifiedBlockByView(lctx lockctx.Proof, rw storage.ReaderBatchWriter,
 // LookupBlockHeight retrieves finalized blocks by height.
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no finalized block for the specified height is known.
-//     or if the height exceeds the archive threshold.
+//   - [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound] if and only if
+//     the block is stored but its view exceeds the archive threshold.
 func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier) error {
 	// Check if height is beyond the archived threshold
 	if height > ArchiveLatestFinalizedHeight {
@@ -201,7 +238,8 @@ func LookupBlockHeight(r storage.Reader, height uint64, blockID *flow.Identifier
 // LookupCertifiedBlockByView retrieves the certified block by view. (Certified blocks are blocks that have received QC.)
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no certified block for the specified view is known.
-//     or if the view exceeds the archive threshold.
+//   - [BeyondArchiveThresholdError] wrapping [storage.ErrNotFound] if and only if
+//     the block is stored but its view exceeds the archive threshold.
 func LookupCertifiedBlockByView(r storage.Reader, view uint64, blockID *flow.Identifier) error {
 	// ARCHIVE THRESHOLD: Check if view is beyond the archived threshold
 	if view > ArchiveLatestFinalizedView {
