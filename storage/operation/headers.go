@@ -51,6 +51,19 @@ var (
 	// height 1…395, because they could be conflicting with finalized blocks from mainnet 28.
 	// However, we still want to be able to retrieve sealed results for block up to and including 1…395.
 	// And the Access API should know those results to be sealed.
+	//
+	// CAUTION:
+	// Those situations are illegal within the protocol except for the root block, which we explicitly handle.
+	// The root block has no ancestors, and we might detect a root block as such by inspecting whether sealed
+	// and finalized height as of this block are identical. We might be coincidentally mirroring this condition
+	// here. Hence, there is theoretically a bunch of stuff that could break depending on the implementation
+	// checks .... Because for spork root blocks some implementation have different logic paths, which we do
+	// not want to accidentally trigger here with the _final_ block of the spork.
+	//
+	// The implications of this configuration are not fully understood. However, the available data is more
+	// restrictive (conservative) than it normally would be under a comparable scenario during normal protocol
+	// operations. Hence, it is expected that this configuration is safe, albeit potentially causing occasional
+	// crashes when reading expected data is denied.
 
 	// ArchiveLatestFinalizedHeight is the height of the latest finalized block in the archived chain.
 	ArchiveLatestFinalizedHeight uint64 = ArchiveLatestSealedHeight
