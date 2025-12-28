@@ -114,7 +114,7 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 		return err
 	} // block is known, i.e. confirmed to be within archive boundaries
 
-	// CAUTION: the following index was written at a time when the block's children were still actively consumed. We
+	// CAUTION: the following index was persisted at a time when the block's children were still actively consumed. We
 	// don't alter the database; just pretend the children beyond the archive's boundary haven't been received yet:
 	var unsaveDescendantIDs flow.IdentifierList
 	err = RetrieveByKey(r, MakePrefix(codeBlockChildren, blockID), &unsaveDescendantIDs)
