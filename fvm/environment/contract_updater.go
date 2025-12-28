@@ -283,12 +283,10 @@ func (impl *contractUpdaterStubsImpl) GetRestrictedAccounts() (map[flow.Address]
 	value, err := runtime.ReadStored(
 		common.Address(service),
 		path)
-
-	const errMsg = "failed to read restricted accounts from service account"
-
 	if err != nil {
-		return nil, fmt.Errorf(errMsg)
+		return nil, fmt.Errorf("failed to read restricted accounts from service account: %w", err)
 	}
+
 	// value == nil => no array is present at location
 	// this is valid
 	if value == nil {
@@ -297,8 +295,9 @@ func (impl *contractUpdaterStubsImpl) GetRestrictedAccounts() (map[flow.Address]
 
 	addresses, ok := cadenceValueToAddressMap(value)
 	if !ok {
-		return nil, fmt.Errorf(errMsg)
+		return nil, fmt.Errorf("failed to convert restricted accounts")
 	}
+
 	return addresses, nil
 }
 
