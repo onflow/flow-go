@@ -152,7 +152,7 @@ func (NoContractUpdater) RemoveAccountContractCode(
 
 func (NoContractUpdater) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
 	// this is for scripts
-	return map[flow.Address]struct{}{}, nil
+	return nil, nil
 }
 
 func (NoContractUpdater) Commit() (ContractUpdates, error) {
@@ -281,24 +281,24 @@ func (impl *contractUpdaterStubsImpl) GetFrozenAccounts() (map[flow.Address]stru
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.ReadStored(
-		common.MustBytesToAddress(service.Bytes()),
+		common.Address(service),
 		path)
 
 	const errMsg = "failed to read frozen accounts from " +
 		"service account"
 
 	if err != nil {
-		return make(map[flow.Address]struct{}), fmt.Errorf(errMsg)
+		return nil, fmt.Errorf(errMsg)
 	}
 	// value == nil => no array is present at location
 	// this is valid
 	if value == nil {
-		return make(map[flow.Address]struct{}), nil
+		return nil, nil
 	}
 
 	addresses, ok := cadenceValueToAddressMap(value)
 	if !ok {
-		return make(map[flow.Address]struct{}), fmt.Errorf(errMsg)
+		return nil, fmt.Errorf(errMsg)
 	}
 	return addresses, nil
 }
@@ -608,7 +608,7 @@ func cadenceValueToAddressMap(value cadence.Value) (
 		if !ok {
 			return nil, false
 		}
-		addresses[flow.ConvertAddress(a)] = struct{}{}
+		addresses[flow.Address(a)] = struct{}{}
 	}
 	return addresses, true
 }

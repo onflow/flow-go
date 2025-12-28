@@ -41,7 +41,7 @@ func (p testContractUpdaterStubs) GetAuthorizedAccounts(
 }
 
 func (p testContractUpdaterStubs) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
-	return map[flow.Address]struct{}{}, nil
+	return nil, nil
 }
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
