@@ -200,22 +200,24 @@ access(all) contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            let amount = from.balance
-            if amount == 0.0 {
-                destroy from
-                return
-            }
-            let depositedUUID = from.uuid
-            InternalEVM.deposit(
-                from: <-from,
-                to: self.bytes
-            )
-            emit FLOWTokensDeposited(
-                address: self.toString(),
-                amount: amount,
-                depositedUUID: depositedUUID,
-                balanceAfterInAttoFlow: self.balance().attoflow
-            )
+            panic("EVM deposits are temporarily disabled")
+
+            //let amount = from.balance
+            //if amount == 0.0 {
+            //    destroy from
+            //    return
+            //}
+            //let depositedUUID = from.uuid
+            //InternalEVM.deposit(
+            //    from: <-from,
+            //    to: self.bytes
+            //)
+            //emit FLOWTokensDeposited(
+            //    address: self.toString(),
+            //    amount: amount,
+            //    depositedUUID: depositedUUID,
+            //    balanceAfterInAttoFlow: self.balance().attoflow
+            //)
         }
 
         /// Serializes the address to a hex string without the 0x prefix
@@ -503,7 +505,9 @@ access(all) contract EVM {
         /// @return the token decimals of the ERC20
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            self.address().deposit(from: <-from)
+            panic("EVM deposits are temporarily disabled")
+
+            //self.address().deposit(from: <-from)
         }
 
         /// Gets the EVM address of the cadence owned account behind an entitlement,
@@ -527,20 +531,22 @@ access(all) contract EVM {
         /// @return A FlowToken Vault with the requested balance
         access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
-            if balance.isZero() {
-                return <-FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
-            }
-            let vault <- InternalEVM.withdraw(
-                from: self.addressBytes,
-                amount: balance.attoflow
-            ) as! @FlowToken.Vault
-            emit FLOWTokensWithdrawn(
-                address: self.address().toString(),
-                amount: balance.inFLOW(),
-                withdrawnUUID: vault.uuid,
-                balanceAfterInAttoFlow: self.balance().attoflow
-            )
-            return <-vault
+            panic("EVM withdrawals are temporarily disabled")
+
+            //if balance.isZero() {
+            //    return <-FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+            //}
+            //let vault <- InternalEVM.withdraw(
+            //    from: self.addressBytes,
+            //    amount: balance.attoflow
+            //) as! @FlowToken.Vault
+            //emit FLOWTokensWithdrawn(
+            //    address: self.address().toString(),
+            //    amount: balance.inFLOW(),
+            //    withdrawnUUID: vault.uuid,
+            //    balanceAfterInAttoFlow: self.balance().attoflow
+            //)
+            //return <-vault
         }
 
         /// Deploys a contract to the EVM environment.
@@ -558,12 +564,14 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
-            return InternalEVM.deploy(
-                from: self.addressBytes,
-                code: code,
-                gasLimit: gasLimit,
-                value: value.attoflow
-            ) as! Result
+            panic("EVM transactions are temporarily disabled")
+
+            //return InternalEVM.deploy(
+            //    from: self.addressBytes,
+            //    code: code,
+            //    gasLimit: gasLimit,
+            //    value: value.attoflow
+            //) as! Result
         }
 
         /// Calls a function with the given data.
@@ -575,13 +583,15 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
-            return InternalEVM.call(
-                from: self.addressBytes,
-                to: to.bytes,
-                data: data,
-                gasLimit: gasLimit,
-                value: value.attoflow
-            ) as! Result
+            panic("EVM transactions are temporarily disabled")
+
+            //return InternalEVM.call(
+            //    from: self.addressBytes,
+            //    to: to.bytes,
+            //    data: data,
+            //    gasLimit: gasLimit,
+            //    value: value.attoflow
+            //) as! Result
         }
 
         /// Calls a contract function with the given data.
@@ -689,10 +699,12 @@ access(all) contract EVM {
     /// @return: The transaction result
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
-        return InternalEVM.run(
-                tx: tx,
-                coinbase: coinbase.bytes
-        ) as! Result
+        panic("EVM transactions are temporarily disabled")
+
+        //return InternalEVM.run(
+        //        tx: tx,
+        //        coinbase: coinbase.bytes
+        //) as! Result
     }
 
     /// mustRun runs the transaction using EVM.run
@@ -702,12 +714,14 @@ access(all) contract EVM {
     /// of the execution (status: failed).
     access(all)
     fun mustRun(tx: [UInt8], coinbase: EVMAddress): Result {
-        let runResult = self.run(tx: tx, coinbase: coinbase)
-        assert(
-            runResult.status == Status.failed || runResult.status == Status.successful,
-            message: "EVM.mustRun(): The provided transaction is not valid for execution"
-        )
-        return runResult
+        panic("EVM transactions are temporarily disabled")
+
+        //let runResult = self.run(tx: tx, coinbase: coinbase)
+        //assert(
+        //    runResult.status == Status.failed || runResult.status == Status.successful,
+        //    message: "EVM.mustRun(): The provided transaction is not valid for execution"
+        //)
+        //return runResult
     }
 
     /// Simulates running unsigned RLP-encoded transaction using
@@ -747,10 +761,12 @@ access(all) contract EVM {
     /// An invalid transaction is not executed and not included in the block.
     access(all)
     fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
-        return InternalEVM.batchRun(
-            txs: txs,
-            coinbase: coinbase.bytes,
-        ) as! [Result]
+        panic("EVM transactions are temporarily disabled")
+
+        //return InternalEVM.batchRun(
+        //    txs: txs,
+        //    coinbase: coinbase.bytes,
+        //) as! [Result]
     }
 
     access(all)
