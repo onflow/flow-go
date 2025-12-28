@@ -154,7 +154,7 @@ func RetrieveBlockChildren(r storage.Reader, blockID flow.Identifier, childrenID
 	// After filtering, the slice might be empty. Then, we return [storage.ErrNotFound] for consistency. This which emulates the situation
 	// where a known block has no known children. However, as there were children before, we wrap it in an [BeyondArchiveThresholdError].
 	if len(filteredDescendantIDs) == 0 {
-		return NewBeyondArchiveThresholdf("block has no children within the archive's boundary: %w", storage.ErrNotFound)
+		return NewBeyondArchiveThresholdErrorf("block has no children within the archive's boundary: %w", storage.ErrNotFound)
 	}
 
 	*childrenIDs = filteredDescendantIDs
