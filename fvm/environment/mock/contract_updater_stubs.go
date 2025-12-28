@@ -35,12 +35,12 @@ func (_m *ContractUpdaterStubs) GetAuthorizedAccounts(path cadence.Path) []flow.
 	return r0
 }
 
-// GetFrozenAccounts provides a mock function with no fields
-func (_m *ContractUpdaterStubs) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+// GetRestrictedAccounts provides a mock function with no fields
+func (_m *ContractUpdaterStubs) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetFrozenAccounts")
+		panic("no return value specified for GetRestrictedAccounts")
 	}
 
 	var r0 map[flow.Address]struct{}

@@ -75,7 +75,7 @@ type ContractUpdater interface {
 	RemoveAccountContractCode(location common.AddressLocation) error
 
 	Commit() (ContractUpdates, error)
-	GetFrozenAccounts() (map[flow.Address]struct{}, error)
+	GetRestrictedAccounts() (map[flow.Address]struct{}, error)
 
 	Reset()
 }
@@ -117,11 +117,11 @@ func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
 		location)
 }
 
-func (updater ParseRestrictedContractUpdater) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+func (updater ParseRestrictedContractUpdater) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
 	return parseRestrict1Ret(
 		updater.txnState,
-		trace.FVMEnvGetFrozenAccounts,
-		updater.impl.GetFrozenAccounts)
+		trace.FVMEnvGetRestrictedAccounts,
+		updater.impl.GetRestrictedAccounts)
 }
 
 func (updater ParseRestrictedContractUpdater) Commit() (
@@ -150,7 +150,7 @@ func (NoContractUpdater) RemoveAccountContractCode(
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
-func (NoContractUpdater) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+func (NoContractUpdater) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
 	// this is for scripts
 	return nil, nil
 }
@@ -168,7 +168,7 @@ type ContractUpdaterStubs interface {
 	RestrictedRemovalEnabled() bool
 
 	GetAuthorizedAccounts(path cadence.Path) []flow.Address
-	GetFrozenAccounts() (map[flow.Address]struct{}, error)
+	GetRestrictedAccounts() (map[flow.Address]struct{}, error)
 }
 
 type contractUpdaterStubsImpl struct {
@@ -270,12 +270,12 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 	return addresses
 }
 
-// GetFrozenAccounts This should be on its own struct
-func (impl *contractUpdaterStubsImpl) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+// GetRestrictedAccounts This should be on its own struct
+func (impl *contractUpdaterStubsImpl) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
 	// set default to service account only
 	service := impl.chain.ServiceAddress()
 
-	path := blueprints.FrozenAccountsPath
+	path := blueprints.RestrictedAccountsPath
 
 	runtime := impl.runtime.BorrowCadenceRuntime()
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
@@ -284,8 +284,7 @@ func (impl *contractUpdaterStubsImpl) GetFrozenAccounts() (map[flow.Address]stru
 		common.Address(service),
 		path)
 
-	const errMsg = "failed to read frozen accounts from " +
-		"service account"
+	const errMsg = "failed to read restricted accounts from service account"
 
 	if err != nil {
 		return nil, fmt.Errorf(errMsg)

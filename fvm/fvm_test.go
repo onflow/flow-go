@@ -4286,7 +4286,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 		}))
 }
 
-func TestAccountFreezing(t *testing.T) {
+func TestAccountRestricting(t *testing.T) {
 
 	t.Parallel()
 
@@ -4314,9 +4314,9 @@ func TestAccountFreezing(t *testing.T) {
 					chain)
 				require.NoError(t, err)
 
-				frozenAddress := accounts[0]
+				restrictedAddress := accounts[0]
 
-				// First, try to run a transaction from the address to be frozen to ensure it works
+				// First, try to run a transaction from the address to be restricted to ensure it works
 
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
 					SetScript([]byte(`
@@ -4326,8 +4326,8 @@ func TestAccountFreezing(t *testing.T) {
 							}
 						}
 					`)).
-					SetPayer(frozenAddress).
-					AddAuthorizer(frozenAddress)
+					SetPayer(restrictedAddress).
+					AddAuthorizer(restrictedAddress)
 
 				err = testutil.SignTransaction(txBodyBuilder, accounts[0], privateKeys[0], 0)
 				require.NoError(t, err)
@@ -4340,26 +4340,26 @@ func TestAccountFreezing(t *testing.T) {
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
 				require.NoError(t, err)
-				// The transaction should succeed, the account is not frozen yet
+				// The transaction should succeed, the account is not restricted yet
 				require.NoError(t, output.Err)
 
-				// Set the frozen address in the service account's storage
+				// Set the restricted address in the service account's storage
 
-				frozenAddresses := cadence.NewArray([]cadence.Value{
-					cadence.Address(frozenAddress),
+				restrictedAddresses := cadence.NewArray([]cadence.Value{
+					cadence.Address(restrictedAddress),
 				}).WithType(cadence.NewVariableSizedArrayType(cadence.AddressType))
 
 				txBodyBuilder = flow.NewTransactionBodyBuilder().
 					SetScript([]byte(`
                         transaction(addresses: [Address]) {
                             prepare(account: auth(Storage) &Account) {
-                                account.storage.save(addresses, to: /storage/frozenAccounts)
+                                account.storage.save(addresses, to: /storage/restrictedAccounts)
                             }
                         }
                     `)).
 					SetPayer(chain.ServiceAddress()).
 					AddAuthorizer(chain.ServiceAddress()).
-					AddArgument(jsoncdc.MustEncode(frozenAddresses))
+					AddArgument(jsoncdc.MustEncode(restrictedAddresses))
 
 				err = testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
 				require.NoError(t, err)
@@ -4376,7 +4376,7 @@ func TestAccountFreezing(t *testing.T) {
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				// Now try to run a transaction from the frozen address again
+				// Now try to run a transaction from the restricted address again
 
 				txBodyBuilder = flow.NewTransactionBodyBuilder().
 					SetScript([]byte(`
@@ -4386,8 +4386,8 @@ func TestAccountFreezing(t *testing.T) {
 							}
 						}
 					`)).
-					SetPayer(frozenAddress).
-					AddAuthorizer(frozenAddress)
+					SetPayer(restrictedAddress).
+					AddAuthorizer(restrictedAddress)
 
 				err = testutil.SignTransaction(txBodyBuilder, accounts[0], privateKeys[0], 0)
 				require.NoError(t, err)
@@ -4400,7 +4400,7 @@ func TestAccountFreezing(t *testing.T) {
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
 				require.NoError(t, err)
-				// The transaction should be rejected due to the account being frozen
+				// The transaction should be rejected due to the account being restricted
 				require.Error(t, output.Err)
 			}),
 	)

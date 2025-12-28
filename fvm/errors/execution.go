@@ -65,14 +65,14 @@ func NewInsufficientPayerBalanceError(
 	)
 }
 
-// NewAccountFrozenError constructs a new CodedError which
-// indicates that the payer has insufficient balance to attempt transaction execution.
-func NewAccountFrozenError(
+// NewAccountRestrictedError constructs a new CodedError which
+// indicates that the account is restricted from performing the attempted operation.
+func NewAccountRestrictedError(
 	acc flow.Address,
 ) CodedError {
 	return NewCodedError(
-		ErrCodeAccountIsFrozenError,
-		"account (%s) is frozen",
+		ErrCodeAccountIsRestrictedError,
+		"account (%s) is restricted",
 		acc,
 	)
 }

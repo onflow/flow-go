@@ -95,7 +95,7 @@ const (
 	ErrCodeInvalidInternalStateAccessError           ErrorCode = 1116
 	// 1117 was never deployed and is free to use
 	ErrCodeInsufficientPayerBalance ErrorCode = 1118
-	ErrCodeAccountIsFrozenError     ErrorCode = 1119
+	ErrCodeAccountIsRestrictedError ErrorCode = 1119
 
 	// accounts errors 1200 - 1250
 	// Deprecated: No longer used.

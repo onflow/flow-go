@@ -44,12 +44,12 @@ func (_m *ContractUpdater) Commit() (environment.ContractUpdates, error) {
 	return r0, r1
 }
 
-// GetFrozenAccounts provides a mock function with no fields
-func (_m *ContractUpdater) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+// GetRestrictedAccounts provides a mock function with no fields
+func (_m *ContractUpdater) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetFrozenAccounts")
+		panic("no return value specified for GetRestrictedAccounts")
 	}
 
 	var r0 map[flow.Address]struct{}

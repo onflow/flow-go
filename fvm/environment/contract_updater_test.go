@@ -40,7 +40,7 @@ func (p testContractUpdaterStubs) GetAuthorizedAccounts(
 	return p.removalAuthorized
 }
 
-func (p testContractUpdaterStubs) GetFrozenAccounts() (map[flow.Address]struct{}, error) {
+func (p testContractUpdaterStubs) GetRestrictedAccounts() (map[flow.Address]struct{}, error) {
 	return nil, nil
 }
 
