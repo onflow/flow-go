@@ -47,14 +47,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 
 	defer env.StartChildSpan(trace.FVMTransactionStorageUsedCheck).End()
 
-	err := limiter.checkStorageLimits(
-		ctx,
-		env,
-		snapshot,
-		payer,
-		maxTxFees,
-		restrictedAccounts,
-	)
+	err := limiter.checkStorageLimits(ctx, env, snapshot, payer, maxTxFees, restrictedAccounts)
 	if err != nil {
 		return fmt.Errorf("storage limit check failed: %w", err)
 	}
@@ -160,17 +153,14 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 		return fmt.Errorf("number of addresses does not match number of result")
 	}
 
-	// this should be the second line of this function for efficiency,
-	// but if we move it up we need to deploy this with an HCU
-	for _, address := range addresses {
+	for i, address := range addresses {
 		// if any restricted account had changes, fail the transaction
-		// if the payer was the service account the list of restrictedAccounts will be nil
+		// todo(JanezP): ideally this would be checked for all account in the second line
+		// of this function, for efficiency sake, but changing this now might cause a fork
+		// when deployed with a rolling deploy.
 		if _, ok := restrictedAccounts[address]; ok {
 			return errors.NewAccountRestrictedError(address)
 		}
-	}
-
-	for i, address := range addresses {
 
 		capacity := environment.StorageMBUFixToBytesUInt(resultArray.Values[i])
 
