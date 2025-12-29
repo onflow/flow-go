@@ -54,7 +54,10 @@ type ExecutionResultInfoProvider interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [common.InsufficientExecutionReceipts]: Found insufficient receipts for given block ID.
-	//   - [storage.ErrNotFound]: If the request is for the spork root block and the node was bootstrapped
-	//     from a newer block.
+	//   - [storage.ErrNotFound]: If the data was not found.
+	//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
+	//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+	//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
+	//     sealed but no execution result can satisfy the provided criteria.
 	ExecutionResultInfo(blockID flow.Identifier, criteria Criteria) (*ExecutionResultInfo, error)
 }

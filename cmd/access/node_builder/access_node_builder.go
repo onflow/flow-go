@@ -1782,6 +1782,7 @@ func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAc
 			node.Logger,
 			node.State,
 			node.Storage.Receipts,
+			node.Storage.Headers,
 			execNodeSelector,
 			operatorCriteria,
 		)
