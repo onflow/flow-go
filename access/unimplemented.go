@@ -183,18 +183,21 @@ func (u *UnimplementedAPI) GetTransactionsByBlockID(ctx context.Context, blockID
 }
 
 // GetTransactionResult returns an unimplemented error.
-func (u *UnimplementedAPI) GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetTransactionResult not implemented")
+func (u *UnimplementedAPI) GetTransactionResult(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, encodingVersion entities.EventEncodingVersion, _ optimistic_sync.Criteria,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetTransactionResult not implemented")
 }
 
 // GetTransactionResultByIndex returns an unimplemented error.
-func (u *UnimplementedAPI) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetTransactionResultByIndex not implemented")
+func (u *UnimplementedAPI) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, encodingVersion entities.EventEncodingVersion, _ optimistic_sync.Criteria,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetTransactionResultByIndex not implemented")
 }
 
 // GetTransactionResultsByBlockID returns an unimplemented error.
-func (u *UnimplementedAPI) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion) ([]*accessmodel.TransactionResult, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetTransactionResultsByBlockID not implemented")
+func (u *UnimplementedAPI) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, encodingVersion entities.EventEncodingVersion, _ optimistic_sync.Criteria,
+) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
+	return nil, nil, status.Error(codes.Unimplemented, "method GetTransactionResultsByBlockID not implemented")
 }
 
 // GetSystemTransaction returns an unimplemented error.

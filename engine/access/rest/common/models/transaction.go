@@ -20,8 +20,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *accessmodel.Transacti
 	// if transaction result is provided then add that to the response, else add the result link to the expandable
 	t.Expandable = &TransactionExpandable{}
 	if txr != nil {
-		var txResult TransactionResult
-		txResult.Build(txr, tx.ID(), link)
+		txResult := NewTransactionResult(txr, tx.ID(), link, nil, false) // TODO(Uliana): Should tx result in tx transaction include the metadata
 		t.Result = &txResult
 	} else {
 		resultLink, _ := link.TransactionResultLink(tx.ID())
@@ -85,30 +84,46 @@ func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 	t.ExtensionData = util.ToBase64(sig.ExtensionData)
 }
 
-func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.Identifier, link LinkGenerator) {
+// NewTransactionResult builds the REST API response model for GetTransactionResult.
+func NewTransactionResult(
+	txr *accessmodel.TransactionResult,
+	txID flow.Identifier,
+	link LinkGenerator,
+	metadata *accessmodel.ExecutorMetadata,
+	shouldIncludeMetadata bool,
+) TransactionResult {
 	var status TransactionStatus
 	status.Build(txr.Status)
 
 	var execution TransactionExecution
 	execution.Build(txr)
 
+	var meta *Metadata
+	if shouldIncludeMetadata {
+		meta = NewMetadata(metadata)
+	}
+	self, _ := SelfLink(txID, link.TransactionResultLink)
+
+	transactionResult := TransactionResult{
+		Status:          &status,
+		Execution:       &execution,
+		StatusCode:      int32(txr.StatusCode),
+		ErrorMessage:    txr.ErrorMessage,
+		ComputationUsed: util.FromUint(uint64(0)), // todo: define this
+		Events:          NewEvents(txr.Events),
+		Links:           self,
+		Metadata:        meta,
+	}
+
 	if txr.BlockID != flow.ZeroID { // don't send back 0 ID
-		t.BlockId = txr.BlockID.String()
+		transactionResult.BlockId = txr.BlockID.String()
 	}
 
 	if txr.CollectionID != flow.ZeroID { // don't send back 0 ID
-		t.CollectionId = txr.CollectionID.String()
+		transactionResult.CollectionId = txr.CollectionID.String()
 	}
 
-	t.Status = &status
-	t.Execution = &execution
-	t.StatusCode = int32(txr.StatusCode)
-	t.ErrorMessage = txr.ErrorMessage
-	t.ComputationUsed = util.FromUint(uint64(0)) // todo: define this
-	t.Events = NewEvents(txr.Events)
-
-	self, _ := SelfLink(txID, link.TransactionResultLink)
-	t.Links = self
+	return transactionResult
 }
 
 func (t *TransactionStatus) Build(status flow.TransactionStatus) {

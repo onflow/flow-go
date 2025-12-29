@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/storage"
@@ -20,8 +21,6 @@ var _ optimistic_sync.Snapshot = (*Mock)(nil)
 
 func NewSnapshotMock(
 	events storage.EventsReader,
-	collections storage.CollectionsReader,
-	transactions storage.TransactionsReader,
 	lightTransactionResults storage.LightTransactionResultsReader,
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader,
 	registersAsyncStore *execution.RegistersAsyncStore,
@@ -29,8 +28,6 @@ func NewSnapshotMock(
 ) *Mock {
 	return &Mock{
 		events:                         events,
-		collections:                    collections,
-		transactions:                   transactions,
 		lightTransactionResults:        lightTransactionResults,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		registersAsyncStore:            registersAsyncStore,
@@ -40,14 +37,6 @@ func NewSnapshotMock(
 
 func (s *Mock) Events() storage.EventsReader {
 	return s.events
-}
-
-func (s *Mock) Collections() storage.CollectionsReader {
-	return s.collections
-}
-
-func (s *Mock) Transactions() storage.TransactionsReader {
-	return s.transactions
 }
 
 func (s *Mock) LightTransactionResults() storage.LightTransactionResultsReader {
@@ -67,3 +56,7 @@ func (s *Mock) Registers() (storage.RegisterSnapshotReader, error) {
 }
 
 func (s *Mock) BlockExecutionData() optimistic_sync.BlockExecutionDataReader { return s.executionData }
+
+func (s *Mock) BlockStatus() flow.BlockStatus {
+	return flow.BlockStatusFinalized
+}

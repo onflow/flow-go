@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -33,10 +32,13 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/executiondatasync/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -84,10 +86,8 @@ type TransactionsFunctionalSuite struct {
 	txErrorMessages       storage.TransactionResultErrorMessages
 	scheduledTransactions storage.ScheduledTransactions
 
-	eventsIndex            *index.EventsIndex
-	txResultsIndex         *index.TransactionResultsIndex
-	validatorBlocks        *validator.ProtocolStateBlocks
-	txErrorMessageProvider error_messages.Provider
+	eventsIndex     *index.EventsIndex
+	validatorBlocks *validator.ProtocolStateBlocks
 
 	state               *protocol.State
 	rootSnapshot        *inmem.Snapshot
@@ -103,6 +103,14 @@ type TransactionsFunctionalSuite struct {
 
 	mockState  *protocolmock.State
 	execClient *accessmock.ExecutionAPIClient
+
+	criteria                optimistic_sync.Criteria
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	executionDataSnapshot   *osyncmock.Snapshot
+	expectedMetadata        *accessmodel.ExecutorMetadata
+	executionResult         *flow.ExecutionResult
+	executionResultInfo     *optimistic_sync.ExecutionResultInfo
 }
 
 func (s *TransactionsFunctionalSuite) SetupTest() {
@@ -141,10 +149,7 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.eventsIndex = index.NewEventsIndex(reporter, s.events)
-	s.txResultsIndex = index.NewTransactionResultsIndex(reporter, s.results)
 	s.validatorBlocks = validator.NewProtocolStateBlocks(s.state, reporter)
-
-	s.txErrorMessageProvider = error_messages.NewTxErrorMessageProvider(s.log, s.txErrorMessages, nil, nil, nil, nil)
 
 	s.participants = s.g.Identities().List(5, fixtures.Identity.WithAllRoles())
 	s.rootSnapshot = unittest.RootSnapshotFixtureWithChainID(s.participants, s.g.ChainID())
@@ -258,6 +263,21 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.nodeProvider = commonrpc.NewExecutionNodeIdentitiesProvider(s.log, s.mockState, s.receipts, nil, nil)
 
 	s.execClient = accessmock.NewExecutionAPIClient(s.T())
+
+	executionNodes := s.participants.Filter(filter.HasRole[flow.Identity](flow.RoleExecution))
+	s.executionResult = unittest.ExecutionResultFixture()
+	s.executionResultInfo = &optimistic_sync.ExecutionResultInfo{
+		ExecutionResultID: s.executionResult.ID(),
+		ExecutionNodes:    executionNodes.ToSkeleton(),
+	}
+	s.criteria = optimistic_sync.Criteria{}
+	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+	s.expectedMetadata = &accessmodel.ExecutorMetadata{
+		ExecutionResultID: s.executionResult.ID(),
+		ExecutorIDs:       executionNodes.NodeIDs(),
+	}
 }
 
 func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
@@ -282,25 +302,25 @@ func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
 		Transactions:                 s.transactions,
 		ScheduledTransactions:        s.scheduledTransactions,
 		SystemCollections:            s.systemCollection,
-		TxErrorMessageProvider:       s.txErrorMessageProvider,
 		TxValidator:                  txValidator,
 		TxStatusDeriver:              s.txStatusDeriver,
-		EventsIndex:                  s.eventsIndex,
-		TxResultsIndex:               s.txResultsIndex,
 		ScheduledTransactionsEnabled: true,
+		ExecutionStateCache:          s.executionStateCache,
+		ExecutionResultProvider:      s.executionResultProvider,
 	}
 }
 
+// TODO: this test helper should be refactored by removing .Maybe() mock calls, after all endpoints will be refactored to use fork-aware approach
 func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
 	blockID := s.tf.Block.ID()
 
 	connectionFactory := connectionmock.NewConnectionFactory(s.T())
-	connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil)
+	connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil).Once()
 	nodeCommunicator := node_communicator.NewNodeCommunicator(false)
 
 	stateParams := protocolmock.NewParams(s.T())
-	stateParams.On("FinalizedRoot").Return(s.rootBlock.ToHeader())
-	s.mockState.On("Params").Return(stateParams)
+	stateParams.On("FinalizedRoot").Return(s.rootBlock.ToHeader()).Maybe()
+	s.mockState.On("Params").Return(stateParams).Maybe()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewENTransactionProvider(
@@ -318,14 +338,14 @@ func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
 	snapshot := protocolmock.NewSnapshot(s.T())
 	snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 		return s.participants.Filter(filter), nil
-	})
-	s.mockState.On("AtBlockID", blockID).Return(snapshot)
+	}).Maybe()
+	s.mockState.On("AtBlockID", blockID).Return(snapshot).Maybe()
 
 	finalizedSnapshot := protocolmock.NewSnapshot(s.T())
 	finalizedSnapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 		return s.participants.Filter(filter), nil
-	})
-	s.mockState.On("Final").Return(finalizedSnapshot)
+	}).Maybe()
+	s.mockState.On("Final").Return(finalizedSnapshot).Maybe()
 
 	return params
 }
@@ -417,17 +437,36 @@ func (s *TransactionsFunctionalSuite) expectedResultForIndex(index int, encoding
 }
 
 func (s *TransactionsFunctionalSuite) TestTransactionResult_Local() {
-	block := s.tf.Block
 	blockID := s.tf.Block.ID()
-
 	collection := s.tf.ExpectedCollections[0]
 	collectionID := collection.ID()
-
 	txID := s.tf.ExpectedResults[1].TransactionID
 
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+	s.executionResultProvider.
+		On("ExecutionResultInfo", blockID, s.criteria).
+		Return(s.executionResultInfo, nil).
+		Once()
+
+	s.executionStateCache.
+		On("Snapshot", s.executionResult.ID()).
+		Return(s.executionDataSnapshot, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("LightTransactionResults").
+		Return(s.results, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("Events").
+		Return(s.events, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("BlockStatus").
+		Return(flow.BlockStatusUnknown, nil).
+		Once()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
@@ -435,28 +474,50 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_Local() {
 		s.collections,
 		s.blocks,
 		s.eventsIndex,
-		s.txResultsIndex,
-		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.executionStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
-	result, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, collectionID, entities.EventEncodingVersion_JSON_CDC_V0)
+	result, metadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, collectionID, entities.EventEncodingVersion_JSON_CDC_V0, s.criteria)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedResult, result)
+	s.Require().Equal(s.expectedMetadata, metadata)
 }
 
 func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_Local() {
-	block := s.tf.Block
 	blockID := s.tf.Block.ID()
 
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+
+	s.executionResultProvider.
+		On("ExecutionResultInfo", blockID, s.criteria).
+		Return(s.executionResultInfo, nil).
+		Once()
+
+	s.executionStateCache.
+		On("Snapshot", s.executionResult.ID()).
+		Return(s.executionDataSnapshot, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("LightTransactionResults").
+		Return(s.results, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("Events").
+		Return(s.events, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("BlockStatus").
+		Return(flow.BlockStatusUnknown, nil).
+		Once()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
@@ -464,23 +525,22 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_Local() {
 		s.collections,
 		s.blocks,
 		s.eventsIndex,
-		s.txResultsIndex,
-		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.executionStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
-	result, err := txBackend.GetTransactionResultByIndex(context.Background(), blockID, 1, entities.EventEncodingVersion_JSON_CDC_V0)
+	result, metadata, err := txBackend.GetTransactionResultByIndex(context.Background(), blockID, 1, entities.EventEncodingVersion_JSON_CDC_V0, s.criteria)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedResult, result)
+	s.Require().Equal(s.expectedMetadata, metadata)
 }
 
 func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
-	block := s.tf.Block
 	blockID := s.tf.Block.ID()
 
 	expectedResults := make([]*accessmodel.TransactionResult, len(s.tf.ExpectedResults))
@@ -488,8 +548,35 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
 	}
 
-	s.reporter.On("HighestIndexedHeight").Return(block.Height, nil)
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Height, nil)
+	s.executionResultProvider.
+		On("ExecutionResultInfo", blockID, s.criteria).
+		Return(s.executionResultInfo, nil).
+		Once()
+
+	s.executionStateCache.
+		On("Snapshot", s.executionResult.ID()).
+		Return(s.executionDataSnapshot, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("LightTransactionResults").
+		Return(s.results, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("TransactionResultErrorMessages").
+		Return(s.txErrorMessages, nil).
+		Once()
+
+	s.executionDataSnapshot.
+		On("Events").
+		Return(s.events, nil).
+		Times(len(s.tf.ExpectedResults))
+
+	s.executionDataSnapshot.
+		On("BlockStatus").
+		Return(flow.BlockStatusUnknown, nil).
+		Once()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewLocalTransactionProvider(
@@ -497,19 +584,19 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_Local() {
 		s.collections,
 		s.blocks,
 		s.eventsIndex,
-		s.txResultsIndex,
-		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.executionStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
-	results, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockID, entities.EventEncodingVersion_JSON_CDC_V0)
+	results, metadata, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockID, entities.EventEncodingVersion_JSON_CDC_V0, s.criteria)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedResults, results)
+	s.Require().Equal(s.expectedMetadata, metadata)
 }
 
 func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
@@ -537,11 +624,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 		s.collections,
 		s.blocks,
 		s.eventsIndex,
-		s.txResultsIndex,
-		s.txErrorMessageProvider,
 		params.SystemCollections,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.executionStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -564,11 +650,10 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Local()
 		s.collections,
 		s.blocks,
 		s.eventsIndex,
-		s.txResultsIndex,
-		s.txErrorMessageProvider,
 		s.systemCollection,
 		s.txStatusDeriver,
 		s.g.ChainID(),
+		s.executionStateCache,
 	)
 
 	txBackend, err := NewTransactionsBackend(params)
@@ -610,15 +695,22 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_ExecutionNode() {
 
 	s.execClient.
 		On("GetTransactionResult", mock.Anything, expectedRequest).
-		Return(nodeResponse, nil)
+		Return(nodeResponse, nil).
+		Once()
+
+	s.executionResultProvider.
+		On("ExecutionResultInfo", blockID, s.criteria).
+		Return(s.executionResultInfo, nil).
+		Once()
 
 	params := s.defaultExecutionNodeParams()
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
-	result, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, collectionID, entities.EventEncodingVersion_JSON_CDC_V0)
+	result, metadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, collectionID, entities.EventEncodingVersion_JSON_CDC_V0, s.criteria)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedResult, result)
+	s.Require().Equal(s.expectedMetadata, metadata)
 }
 
 func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode() {
@@ -640,15 +732,22 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 
 	s.execClient.
 		On("GetTransactionResultByIndex", mock.Anything, expectedRequest).
-		Return(nodeResponse, nil)
+		Return(nodeResponse, nil).
+		Once()
+
+	s.executionResultProvider.
+		On("ExecutionResultInfo", blockID, s.criteria).
+		Return(s.executionResultInfo, nil).
+		Once()
 
 	params := s.defaultExecutionNodeParams()
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
-	result, err := txBackend.GetTransactionResultByIndex(context.Background(), blockID, 1, entities.EventEncodingVersion_JSON_CDC_V0)
+	result, metadata, err := txBackend.GetTransactionResultByIndex(context.Background(), blockID, 1, entities.EventEncodingVersion_JSON_CDC_V0, s.criteria)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedResult, result)
+	s.Require().Equal(s.expectedMetadata, metadata)
 }
 
 func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode_Errors() {
@@ -656,6 +755,11 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 		blockID := s.tf.Block.ID()
 		env := systemcontracts.SystemContractsForChain(s.g.ChainID()).AsTemplateEnv()
 		pendingExecuteEventType := blueprints.PendingExecutionEventType(env)
+
+		s.executionResultProvider.
+			On("ExecutionResultInfo", blockID, s.criteria).
+			Return(s.executionResultInfo, nil).
+			Once()
 
 		eventsExpectedErr := status.Error(
 			codes.Unavailable,
@@ -669,9 +773,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 
 		expectedErr := fmt.Errorf("failed to get process transactions events: rpc error: code = Unavailable desc = failed to retrieve result from any execution node: 1 error occurred:\n\t* %w\n\n", eventsExpectedErr)
 		index := uint32(20) // case when user transactions is not within the guarantees
-		result, err := txBackend.GetTransactionResultByIndex(context.Background(), blockID, index, entities.EventEncodingVersion_JSON_CDC_V0)
+		result, metadata, err := txBackend.GetTransactionResultByIndex(context.Background(), blockID, index, entities.EventEncodingVersion_JSON_CDC_V0, s.criteria)
 		s.Require().Error(err)
 		s.Require().Nil(result)
+		s.Require().Nil(metadata)
 
 		s.Require().Equal(codes.Unavailable, status.Code(err))
 		s.Require().Equal(expectedErr.Error(), err.Error())
@@ -704,15 +809,22 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 
 	s.execClient.
 		On("GetTransactionResultsByBlockID", mock.Anything, expectedRequest).
-		Return(nodeResponse, nil)
+		Return(nodeResponse, nil).
+		Once()
+
+	s.executionResultProvider.
+		On("ExecutionResultInfo", blockID, s.criteria).
+		Return(s.executionResultInfo, nil).
+		Once()
 
 	params := s.defaultExecutionNodeParams()
 	txBackend, err := NewTransactionsBackend(params)
 	s.Require().NoError(err)
 
-	result, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockID, entities.EventEncodingVersion_JSON_CDC_V0)
+	result, metadata, err := txBackend.GetTransactionResultsByBlockID(context.Background(), blockID, entities.EventEncodingVersion_JSON_CDC_V0, s.criteria)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedResults, result)
+	s.Require().Equal(s.expectedMetadata, metadata)
 }
 
 func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() {
@@ -747,11 +859,13 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 	}
 
 	nodeResponse := &execproto.GetEventsForBlockIDsResponse{
-		Results: []*execproto.GetEventsForBlockIDsResponse_Result{{
-			BlockId:     blockID[:],
-			BlockHeight: block.Height,
-			Events:      events,
-		}},
+		Results: []*execproto.GetEventsForBlockIDsResponse_Result{
+			{
+				BlockId:     blockID[:],
+				BlockHeight: block.Height,
+				Events:      events,
+			},
+		},
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
 
