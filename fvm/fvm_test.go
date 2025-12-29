@@ -4415,9 +4415,13 @@ func TestAccountRestricting(t *testing.T) {
 						}
 					`)).
 					SetPayer(chain.ServiceAddress()).
-					AddAuthorizer(restrictedAddress)
+					AddAuthorizer(restrictedAddress).
+					SetProposalKey(restrictedAddress, 0, 1)
 
-				// TODO: sign with payer = service account and authorizer = restricted address
+				err = testutil.SignPayload(txBodyBuilder, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+				err = testutil.SignEnvelope(txBodyBuilder, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
 
 				txBody, err = txBodyBuilder.Build()
 				require.NoError(t, err)
