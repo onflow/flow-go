@@ -45,6 +45,7 @@ type TransactionInfo interface {
 	LimitAccountStorage() bool
 
 	IsServiceAccountAuthorizer() bool
+	IsServiceAccountPayer() bool
 
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
@@ -86,6 +87,10 @@ func (info ParseRestrictedTransactionInfo) IsServiceAccountAuthorizer() bool {
 	return info.impl.IsServiceAccountAuthorizer()
 }
 
+func (info ParseRestrictedTransactionInfo) IsServiceAccountPayer() bool {
+	return info.impl.IsServiceAccountPayer()
+}
+
 func (info ParseRestrictedTransactionInfo) GetSigningAccounts() (
 	[]common.Address,
 	error,
@@ -105,6 +110,7 @@ type transactionInfo struct {
 
 	runtimeAuthorizers         []common.Address
 	isServiceAccountAuthorizer bool
+	isServiceAccountPayer      bool
 }
 
 func NewTransactionInfo(
@@ -113,26 +119,27 @@ func NewTransactionInfo(
 	serviceAccount flow.Address,
 ) TransactionInfo {
 
-	isServiceAccountAuthorizer := false
 	runtimeAddresses := make(
 		[]common.Address,
 		0,
 		len(params.TxBody.Authorizers))
 
+	var isServiceAccountAuthorizer bool
 	for _, auth := range params.TxBody.Authorizers {
-		runtimeAddresses = append(
-			runtimeAddresses,
-			common.MustBytesToAddress(auth.Bytes()))
+		runtimeAddresses = append(runtimeAddresses, common.Address(auth))
 		if auth == serviceAccount {
 			isServiceAccountAuthorizer = true
 		}
 	}
+
+	isServiceAccountPayer := params.TxBody.Payer == serviceAccount
 
 	return &transactionInfo{
 		params:                     params,
 		tracer:                     tracer,
 		runtimeAuthorizers:         runtimeAddresses,
 		isServiceAccountAuthorizer: isServiceAccountAuthorizer,
+		isServiceAccountPayer:      isServiceAccountPayer,
 	}
 }
 
@@ -154,6 +161,10 @@ func (info *transactionInfo) LimitAccountStorage() bool {
 
 func (info *transactionInfo) IsServiceAccountAuthorizer() bool {
 	return info.isServiceAccountAuthorizer
+}
+
+func (info *transactionInfo) IsServiceAccountPayer() bool {
+	return info.isServiceAccountPayer
 }
 
 func (info *transactionInfo) GetSigningAccounts() ([]common.Address, error) {
@@ -186,6 +197,10 @@ func (NoTransactionInfo) LimitAccountStorage() bool {
 }
 
 func (NoTransactionInfo) IsServiceAccountAuthorizer() bool {
+	return false
+}
+
+func (NoTransactionInfo) IsServiceAccountPayer() bool {
 	return false
 }
 

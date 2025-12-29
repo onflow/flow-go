@@ -38,6 +38,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 	env environment.Environment,
 	snapshot *snapshot.ExecutionSnapshot,
 	payer flow.Address,
+	isServiceAccountPayer bool,
 	maxTxFees uint64,
 	restrictedAccounts map[flow.Address]struct{},
 ) error {
@@ -47,7 +48,15 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 
 	defer env.StartChildSpan(trace.FVMTransactionStorageUsedCheck).End()
 
-	err := limiter.checkStorageLimits(ctx, env, snapshot, payer, maxTxFees, restrictedAccounts)
+	err := limiter.checkStorageLimits(
+		ctx,
+		env,
+		snapshot,
+		payer,
+		isServiceAccountPayer,
+		maxTxFees,
+		restrictedAccounts,
+	)
 	if err != nil {
 		return fmt.Errorf("storage limit check failed: %w", err)
 	}
@@ -112,6 +121,7 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 	env environment.Environment,
 	snapshot *snapshot.ExecutionSnapshot,
 	payer flow.Address,
+	isServiceAccountPayer bool,
 	maxTxFees uint64,
 	restrictedAccounts map[flow.Address]struct{},
 ) error {
@@ -153,12 +163,17 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 		return fmt.Errorf("number of addresses does not match number of result")
 	}
 
-	for i, address := range addresses {
-
-		// if any restricted account had changes, fail the transaction
-		if _, ok := restrictedAccounts[address]; ok {
-			return errors.NewAccountRestrictedError(address)
+	// if the payer is not the service account, check for restricted accounts
+	if !isServiceAccountPayer {
+		for _, address := range addresses {
+			// if any restricted account had changes, fail the transaction
+			if _, ok := restrictedAccounts[address]; ok {
+				return errors.NewAccountRestrictedError(address)
+			}
 		}
+	}
+
+	for i, address := range addresses {
 
 		capacity := environment.StorageMBUFixToBytesUInt(resultArray.Values[i])
 

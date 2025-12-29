@@ -4402,6 +4402,34 @@ func TestAccountRestricting(t *testing.T) {
 				require.NoError(t, err)
 				// The transaction should be rejected due to the account being restricted
 				require.Error(t, output.Err)
+
+				// But if the payer is the service account,
+				// then the transaction from the restricted address should succeed
+
+				txBodyBuilder = flow.NewTransactionBodyBuilder().
+					SetScript([]byte(`
+						transaction {
+							prepare(account: auth(Capabilities, Storage) &Account) {
+								log("This should execute")
+							}
+						}
+					`)).
+					SetPayer(chain.ServiceAddress()).
+					AddAuthorizer(restrictedAddress)
+
+				// TODO: sign with payer = service account and authorizer = restricted address
+
+				txBody, err = txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				_, output, err = vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+				// The transaction should succeed due to the account being restricted,
+				// but the payer is the service account
+				require.NoError(t, output.Err)
 			}),
 	)
 }

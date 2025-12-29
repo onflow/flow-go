@@ -365,16 +365,20 @@ func (executor *transactionExecutor) normalExecution() (
 	// run with limits disabled since this is a static cost check
 	// and should be accounted for in the inclusion cost.
 	executor.txnState.RunWithMeteringDisabled(func() {
-		restrictedAccounts, err = executor.env.GetRestrictedAccounts()
-		if err != nil {
-			err = fmt.Errorf("getting restricted accounts failed: %w", err)
-			return
-		}
 
-		// if payer is restricted, fail the transaction early
-		if _, ok := restrictedAccounts[executor.proc.Transaction.Payer]; ok {
-			err = errors.NewAccountRestrictedError(executor.proc.Transaction.Payer)
-			return
+		// if the payer is not the service account, check for restricted accounts
+		if !executor.env.IsServiceAccountPayer() {
+			restrictedAccounts, err = executor.env.GetRestrictedAccounts()
+			if err != nil {
+				err = fmt.Errorf("getting restricted accounts failed: %w", err)
+				return
+			}
+
+			// if payer is restricted, fail the transaction early
+			if _, ok := restrictedAccounts[executor.proc.Transaction.Payer]; ok {
+				err = errors.NewAccountRestrictedError(executor.proc.Transaction.Payer)
+				return
+			}
 		}
 
 		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(
@@ -434,6 +438,7 @@ func (executor *transactionExecutor) normalExecution() (
 		executor.env,
 		bodySnapshot,
 		executor.proc.Transaction.Payer,
+		executor.env.IsServiceAccountPayer(),
 		maxTxFees,
 		restrictedAccounts)
 
