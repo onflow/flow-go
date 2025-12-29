@@ -378,11 +378,13 @@ func (executor *transactionExecutor) normalExecution() (
 			return
 		}
 
-		restrictedAccounts = nil
 		// if the payer is not the service account, check for restricted accounts.
 		// if the payer is the service account no accounts are considered restricted
-		// (setting the restrictedAccounts to nil above).
-		if executor.proc.Transaction.Payer != executor.ctx.Chain.ServiceAddress() {
+		// (setting the restrictedAccounts to nil below).
+		if executor.proc.Transaction.Payer == executor.ctx.Chain.ServiceAddress() {
+			// If the payer is the service account, no accounts are restricted
+			restrictedAccounts = nil
+		} else {
 			// if payer is restricted, fail the transaction early
 			if _, ok := restrictedAccounts[executor.proc.Transaction.Payer]; ok {
 				err = errors.NewAccountRestrictedError(executor.proc.Transaction.Payer)
