@@ -152,6 +152,7 @@ func (executor *transactionExecutor) preprocess() error {
 	if executor.AuthorizationChecksEnabled {
 		err := executor.CheckAuthorization(
 			executor.ctx.TracerSpan,
+			executor.ctx.Chain,
 			executor.proc,
 			executor.txnState,
 			executor.AccountKeyWeightThreshold)
