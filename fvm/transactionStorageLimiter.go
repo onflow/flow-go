@@ -154,8 +154,10 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 	}
 
 	for i, address := range addresses {
-
 		// if any restricted account had changes, fail the transaction
+		// todo(JanezP): ideally this would be checked for all account in the second line
+		// of this function, for efficiency sake, but changing this now might cause a fork
+		// when deployed with a rolling deploy.
 		if _, ok := restrictedAccounts[address]; ok {
 			return errors.NewAccountRestrictedError(address)
 		}

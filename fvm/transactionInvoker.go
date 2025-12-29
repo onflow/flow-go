@@ -365,16 +365,31 @@ func (executor *transactionExecutor) normalExecution() (
 	// run with limits disabled since this is a static cost check
 	// and should be accounted for in the inclusion cost.
 	executor.txnState.RunWithMeteringDisabled(func() {
+
+		// The code below should have the following behaviour
+		// if the service account is the payer no account are restricted for the transaction
+		// if the service account is not the payer get the restricted accounts from the state and use them.
+		//
+		// this has a temporary inefficiency where we retrieve the RestrictedAccounts even if the service account is the payer
+		// this is in order to not change the registers read and thus enable a rolling upgrade.
 		restrictedAccounts, err = executor.env.GetRestrictedAccounts()
 		if err != nil {
 			err = fmt.Errorf("getting restricted accounts failed: %w", err)
 			return
 		}
 
-		// if payer is restricted, fail the transaction early
-		if _, ok := restrictedAccounts[executor.proc.Transaction.Payer]; ok {
-			err = errors.NewAccountRestrictedError(executor.proc.Transaction.Payer)
-			return
+		// if the payer is not the service account, check for restricted accounts.
+		// if the payer is the service account no accounts are considered restricted
+		// (setting the restrictedAccounts to nil below).
+		if executor.proc.Transaction.Payer == executor.ctx.Chain.ServiceAddress() {
+			// If the payer is the service account, no accounts are restricted
+			restrictedAccounts = nil
+		} else {
+			// if payer is restricted, fail the transaction early
+			if _, ok := restrictedAccounts[executor.proc.Transaction.Payer]; ok {
+				err = errors.NewAccountRestrictedError(executor.proc.Transaction.Payer)
+				return
+			}
 		}
 
 		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(

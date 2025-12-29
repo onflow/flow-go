@@ -113,16 +113,14 @@ func NewTransactionInfo(
 	serviceAccount flow.Address,
 ) TransactionInfo {
 
-	isServiceAccountAuthorizer := false
 	runtimeAddresses := make(
 		[]common.Address,
 		0,
 		len(params.TxBody.Authorizers))
 
+	var isServiceAccountAuthorizer bool
 	for _, auth := range params.TxBody.Authorizers {
-		runtimeAddresses = append(
-			runtimeAddresses,
-			common.MustBytesToAddress(auth.Bytes()))
+		runtimeAddresses = append(runtimeAddresses, common.Address(auth))
 		if auth == serviceAccount {
 			isServiceAccountAuthorizer = true
 		}
