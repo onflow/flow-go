@@ -16,15 +16,20 @@ import (
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -2204,4 +2209,199 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				require.Equal(t, uint64(1), seqNumErr.CurrentSeqNumber())
 			}),
 	)
+}
+
+// Temporary test to verify that service account overrides are correctly handled.
+func TestServiceAccountOverrides(t *testing.T) {
+	t.Parallel()
+
+	chain, _ := createChainAndVm(flow.Testnet)
+
+	txnState := testutils.NewSimpleTransaction(nil)
+	accounts := environment.NewAccounts(txnState)
+
+	// full weight for account keys
+	fullWeight := 1000
+
+	ctx := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithAuthorizationChecksEnabled(true),
+		fvm.WithAccountKeyWeightThreshold(fullWeight),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithTransactionBodyExecutionEnabled(false))
+
+	hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA3_256, flow.TransactionTagString)
+	require.NoError(t, err)
+
+	// create accounts
+	n := 5
+	addresses := make([]flow.Address, n)
+	keys := make([]*flow.AccountPrivateKey, n)
+	for i := 0; i < n; i++ {
+		if i == 0 {
+			// index 0 is for the service account
+			addresses[i] = chain.ServiceAddress()
+		} else {
+			addresses[i] = unittest.RandomAddressFixture()
+		}
+		keys[i], err = unittest.AccountKeyDefaultFixture()
+		require.NoError(t, err)
+		err = accounts.Create([]flow.AccountPublicKey{keys[i].PublicKey(fullWeight)}, addresses[i])
+		require.NoError(t, err)
+	}
+
+	// sign the envelope and return the updated transaction (account index 0 is the service account)
+	signEnvleope := func(accountIndex int, keyIndex uint32, tx *flow.TransactionBody) *flow.TransactionBody {
+		sig, err := keys[accountIndex].PrivateKey.Sign(tx.EnvelopeMessage(), hasher)
+		require.NoError(t, err)
+
+		envelopeSig := flow.TransactionSignature{
+			Address:     addresses[accountIndex],
+			SignerIndex: 0,
+			KeyIndex:    keyIndex,
+			Signature:   sig,
+		}
+		tx.EnvelopeSignatures = []flow.TransactionSignature{envelopeSig}
+		return tx
+	}
+
+	run := func(
+		body *flow.TransactionBody,
+		ctx fvm.Context,
+		txn storage.TransactionPreparer,
+	) error {
+		executor := fvm.Transaction(body, 0).NewExecutor(ctx, txn)
+		err := fvm.Run(executor)
+		require.NoError(t, err)
+		return executor.Output().Err
+	}
+
+	t.Run("authorizer signature missing - payer and proposer are different", func(t *testing.T) {
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        addresses[1],
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:       addresses[2],
+			Authorizers: []flow.Address{addresses[3]},
+		}
+
+		// valid proposer signature
+		sig, err := keys[1].PrivateKey.Sign(tx.PayloadMessage(), hasher) // valid signature
+		require.NoError(t, err)
+
+		payloadSig := flow.TransactionSignature{
+			Address:     addresses[1],
+			SignerIndex: 0,
+			KeyIndex:    0,
+			Signature:   sig,
+		}
+		tx.PayloadSignatures = []flow.TransactionSignature{payloadSig}
+
+		// valid payer signature
+		tx = signEnvleope(2, 0, tx)
+
+		// authorizer signature is missing
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "authorizer account does not have sufficient signatures")
+	})
+
+	t.Run("authorizer signature missing - payer and proposer are equal", func(t *testing.T) {
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        addresses[1],
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:       addresses[1],
+			Authorizers: []flow.Address{addresses[3]},
+		}
+
+		// valid payer signature (envelope only)
+		tx = signEnvleope(1, 0, tx)
+
+		// authorizer signature is missing
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "authorizer account does not have sufficient signatures")
+	})
+
+	t.Run("authorizer signature missing - payer and proposer are the service account - first authorizer is NOT service account", func(t *testing.T) {
+
+		// service account is an NOT an authorizer
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        addresses[0],
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:       addresses[0],
+			Authorizers: []flow.Address{addresses[3]},
+		}
+
+		// valid payer signature (envelope only)
+		tx = signEnvleope(0, 0, tx)
+
+		// authorizer signature is missing
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "authorizer account does not have sufficient signatures")
+
+		// service account is an authorizer but NOT the first one
+		tx.Authorizers = []flow.Address{addresses[3], addresses[0]}
+
+		// valid payer signature (envelope only)
+		tx = signEnvleope(0, 0, tx)
+
+		// authorizer signature is missing
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "authorizer account does not have sufficient signatures")
+	})
+
+	t.Run("authorizer signature bypassed - payer, proposer and first authorizer are the service account", func(t *testing.T) {
+
+		// service account is the only authorizer
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        addresses[0],
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:       addresses[0],
+			Authorizers: []flow.Address{addresses[0]},
+		}
+
+		// valid payer signature (envelope only)
+		tx = signEnvleope(0, 0, tx)
+
+		// authorizer signature is missing
+		err = run(tx, ctx, txnState)
+		require.NoError(t, err)
+
+		// service account is the first authorizer
+		tx.Authorizers = []flow.Address{addresses[0], addresses[3], addresses[2]}
+
+		// valid payer signature (envelope only)
+		tx = signEnvleope(0, 0, tx)
+
+		// authorizer signature is missing
+		err = run(tx, ctx, txnState)
+		require.NoError(t, err)
+
+		// service account key with partial weight is rejected
+		err = accounts.AppendAccountPublicKey(addresses[0], keys[0].PublicKey(fullWeight/2)) // same key added as index 1 with partial weight
+		require.NoError(t, err)
+
+		tx.ProposalKey.KeyIndex = 1 // switch to the new account key
+		// valid payer signature (envelope only)
+		tx = signEnvleope(0, 1, tx)
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContainsf(t, err, "", "payer account does not have sufficient signatures (%d < %d)", fullWeight/2, fullWeight)
+	})
 }

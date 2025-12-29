@@ -461,6 +461,5 @@ func (v *TransactionVerifier) hasSufficientKeyWeight(
 	address flow.Address,
 	keyWeightThreshold int,
 ) bool {
-	fmt.Println(weights[address], keyWeightThreshold)
 	return weights[address] >= keyWeightThreshold
 }
