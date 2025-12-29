@@ -160,6 +160,8 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 		return fmt.Errorf("number of addresses does not match number of result")
 	}
 
+	// this should be the second line of this function for efficiency,
+	// but if we move it up we need to deploy this with an HCU
 	for _, address := range addresses {
 		// if any restricted account had changes, fail the transaction
 		// if the payer was the service account the list of restrictedAccounts will be nil
