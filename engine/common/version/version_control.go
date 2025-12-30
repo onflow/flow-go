@@ -56,6 +56,7 @@ var defaultCompatibilityOverrides = map[string]struct{}{
 	"0.43.1":  {}, // testnet only
 	"0.44.0":  {}, // mainnet, testnet
 	"0.44.1":  {}, // mainnet, testnet
+	"0.44.7":  {}, // mainnet, testnet
 }
 
 // VersionControl manages the version control system for the node.
