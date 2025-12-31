@@ -699,12 +699,10 @@ access(all) contract EVM {
     /// @return: The transaction result
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
-        panic("EVM transactions are temporarily disabled")
-
-        //return InternalEVM.run(
-        //        tx: tx,
-        //        coinbase: coinbase.bytes
-        //) as! Result
+        return InternalEVM.run(
+            tx: tx,
+            coinbase: coinbase.bytes
+        ) as! Result
     }
 
     /// mustRun runs the transaction using EVM.run
@@ -714,14 +712,12 @@ access(all) contract EVM {
     /// of the execution (status: failed).
     access(all)
     fun mustRun(tx: [UInt8], coinbase: EVMAddress): Result {
-        panic("EVM transactions are temporarily disabled")
-
-        //let runResult = self.run(tx: tx, coinbase: coinbase)
-        //assert(
-        //    runResult.status == Status.failed || runResult.status == Status.successful,
-        //    message: "EVM.mustRun(): The provided transaction is not valid for execution"
-        //)
-        //return runResult
+        let runResult = self.run(tx: tx, coinbase: coinbase)
+        assert(
+            runResult.status == Status.failed || runResult.status == Status.successful,
+            message: "EVM.mustRun(): The provided transaction is not valid for execution"
+        )
+        return runResult
     }
 
     /// Simulates running unsigned RLP-encoded transaction using
@@ -761,12 +757,10 @@ access(all) contract EVM {
     /// An invalid transaction is not executed and not included in the block.
     access(all)
     fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
-        panic("EVM transactions are temporarily disabled")
-
-        //return InternalEVM.batchRun(
-        //    txs: txs,
-        //    coinbase: coinbase.bytes,
-        //) as! [Result]
+        return InternalEVM.batchRun(
+            txs: txs,
+            coinbase: coinbase.bytes,
+        ) as! [Result]
     }
 
     access(all)
