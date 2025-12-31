@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
@@ -20,6 +21,12 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// white-listed EOA address, to perform remediation actions.
+var whiteListedEOAs = []gethCommon.Address{
+	gethCommon.HexToAddress("0x658Bdf435d810C91414eC09147DAA6DB62406379"), // EOA used in tests, TODO: remove
+	gethCommon.HexToAddress("0xc41e7Cd5BBc8Ea35129927281576950F2838F54F"),
+}
 
 // Emulator wraps an EVM runtime where evm transactions
 // and direct calls are accepted.
@@ -192,6 +199,13 @@ func (bl *BlockView) RunTransaction(
 		return types.NewInvalidResult(tx, err), nil
 	}
 
+	// Allow only white-listed EOAs to make EVM transactions. To be removed,
+	// after the remediation is completed.
+	if !slices.Contains(whiteListedEOAs, msg.From) {
+		err = fmt.Errorf("EVM transactions are temporarily disabled")
+		return types.NewInvalidResult(tx, err), nil
+	}
+
 	// call tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
@@ -246,6 +260,13 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			batchResults[i] = types.NewInvalidResult(tx, err)
 			continue
+		}
+
+		// Allow only white-listed EOAs to make EVM transactions. To be removed,
+		// after the remediation is completed.
+		if !slices.Contains(whiteListedEOAs, msg.From) {
+			err = fmt.Errorf("EVM transactions are temporarily disabled")
+			batchResults[i] = types.NewInvalidResult(tx, err)
 		}
 
 		// call tracer on tx start
