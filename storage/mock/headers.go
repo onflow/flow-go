@@ -162,6 +162,45 @@ func (_m *Headers) ByView(view uint64) (*flow.Header, error) {
 	return r0, r1
 }
 
+// CertifiedByBlockID provides a mock function with given fields: blockID
+func (_m *Headers) CertifiedByBlockID(blockID flow.Identifier) (*flow.Header, *flow.QuorumCertificate, error) {
+	ret := _m.Called(blockID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CertifiedByBlockID")
+	}
+
+	var r0 *flow.Header
+	var r1 *flow.QuorumCertificate
+	var r2 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.Header, *flow.QuorumCertificate, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Header); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) *flow.QuorumCertificate); ok {
+		r1 = rf(blockID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*flow.QuorumCertificate)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(flow.Identifier) error); ok {
+		r2 = rf(blockID)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // Exists provides a mock function with given fields: blockID
 func (_m *Headers) Exists(blockID flow.Identifier) (bool, error) {
 	ret := _m.Called(blockID)

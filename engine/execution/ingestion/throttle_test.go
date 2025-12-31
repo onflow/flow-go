@@ -218,6 +218,19 @@ func (h *headerStore) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return header, nil
 }
 
+func (h *headerStore) CertifiedByBlockID(blockID flow.Identifier) (*flow.Header, *flow.QuorumCertificate, error) {
+	header, ok := h.byID[blockID]
+	if !ok {
+		return nil, nil, fmt.Errorf("block %v not found", blockID)
+	}
+	// Return a dummy QC for testing purposes
+	qc := &flow.QuorumCertificate{
+		View:    header.View,
+		BlockID: blockID,
+	}
+	return header, qc, nil
+}
+
 func (h *headerStore) ByHeight(height uint64) (*flow.Header, error) {
 	header, ok := h.byHeight[height]
 	if !ok {
