@@ -29,6 +29,7 @@ var whiteListedEOAs = []gethCommon.Address{
 	gethCommon.HexToAddress("0x5f5fee81e063579a41b85403b020106645290cf4"),
 	gethCommon.HexToAddress("0x13d1d3ccbeb26bdf254a2420a3ec0c4c64019cee"),
 	gethCommon.HexToAddress("0x0d5c204c9c37ba01341d5d7a2d32b1b101a4a50a"),
+	gethCommon.HexToAddress("0x7059517576711951D6ab03e5eAbdd757e2572E3c"),
 }
 
 // Emulator wraps an EVM runtime where evm transactions
