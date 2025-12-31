@@ -271,6 +271,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if !slices.Contains(whiteListedEOAs, msg.From) {
 			err = fmt.Errorf("EVM transactions are temporarily disabled")
 			batchResults[i] = types.NewInvalidResult(tx, err)
+			continue
 		}
 
 		// call tracer on tx start
