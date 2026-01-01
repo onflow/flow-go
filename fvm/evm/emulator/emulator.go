@@ -28,6 +28,10 @@ var restrictedEOAs = []gethCommon.Address{
 	gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6"),
 }
 
+var restrictedEOAError = fmt.Errorf(
+	"this account has been restricted by the Community Governance Council in connection to a protocol exploit, please reach out to security@flowfoundation.com for inquiries or information related to the attack",
+)
+
 // Emulator wraps an EVM runtime where evm transactions
 // and direct calls are accepted.
 type Emulator struct {
@@ -201,8 +205,7 @@ func (bl *BlockView) RunTransaction(
 
 	// Restrict access to EVM, for EOAs with proven malicious activity
 	if slices.Contains(restrictedEOAs, msg.From) {
-		err = fmt.Errorf("EOA is restricted due to malicious activity")
-		return types.NewInvalidResult(tx, err), nil
+		return types.NewInvalidResult(tx, restrictedEOAError), nil
 	}
 
 	// call tracer
@@ -263,8 +266,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 
 		// Restrict access to EVM, for EOAs with proven malicious activity
 		if slices.Contains(restrictedEOAs, msg.From) {
-			err = fmt.Errorf("EOA is restricted due to malicious activity")
-			batchResults[i] = types.NewInvalidResult(tx, err)
+			batchResults[i] = types.NewInvalidResult(tx, restrictedEOAError)
 			continue
 		}
 
