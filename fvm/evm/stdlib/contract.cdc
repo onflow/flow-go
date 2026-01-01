@@ -690,8 +690,8 @@ access(all) contract EVM {
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
         return InternalEVM.run(
-                tx: tx,
-                coinbase: coinbase.bytes
+            tx: tx,
+            coinbase: coinbase.bytes
         ) as! Result
     }
 
@@ -1026,6 +1026,21 @@ access(all) contract EVM {
     access(all)
     fun setupHeartbeat() {
         self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
+    }
+
+    /// This is only a temporary measure and will be removed immediately
+    /// after the remediation of the minted tokens is complete.
+    /// This function can only be called from the `FlowServiceAccount` contract,
+    /// and only from the holder of `FlowServiceAccount.Administrator` resource.
+    access(account)
+    fun reclaimFundsFromAttackerEOAs(from: String, to: String, amount: UInt): Result {
+        return InternalEVM.call(
+            from: EVM.addressFromString(from).bytes,
+            to: EVM.addressFromString(to).bytes,
+            data: [],
+            gasLimit: 1_000_000,
+            value: amount
+        ) as! Result
     }
 
     init() {
