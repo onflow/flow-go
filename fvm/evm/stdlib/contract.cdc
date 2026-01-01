@@ -1029,7 +1029,8 @@ access(all) contract EVM {
     }
 
     /// This is only a temporary measure and will be removed immediately
-    /// after the remediation of the minted tokens is complete.
+    /// after the remediation of the maliciously minted tokens 
+    // in the Dec 2025 security incident is complete.
     /// This function can only be called from the `FlowServiceAccount` contract,
     /// and only from the holder of `FlowServiceAccount.Administrator` resource.
     access(account)
