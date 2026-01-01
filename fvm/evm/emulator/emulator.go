@@ -22,14 +22,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// white-listed EOA address, to perform remediation actions.
-var whiteListedEOAs = []gethCommon.Address{
+// allow-list of EOA address, to perform remediation actions.
+var allowListEOAs = []gethCommon.Address{
 	gethCommon.HexToAddress("0xc41e7Cd5BBc8Ea35129927281576950F2838F54F"),
 	gethCommon.HexToAddress("0xbd6dddc5e55831ae7f4defce030f034a1548c4e7"),
 	gethCommon.HexToAddress("0x5f5fee81e063579a41b85403b020106645290cf4"),
 	gethCommon.HexToAddress("0x13d1d3ccbeb26bdf254a2420a3ec0c4c64019cee"),
 	gethCommon.HexToAddress("0x0d5c204c9c37ba01341d5d7a2d32b1b101a4a50a"),
 	gethCommon.HexToAddress("0x7059517576711951D6ab03e5eAbdd757e2572E3c"),
+	gethCommon.HexToAddress("0xB8FF877ed78Ba520Ece21B1de7843A8a57cA47Cb"),
+	gethCommon.HexToAddress("0x2C262723E9Ea848251502F143A592FC75bfC0C37"),
+	gethCommon.HexToAddress("0x007077Bf333c69673a13a897039DcAF99b505C1a"),
+	gethCommon.HexToAddress("0xB7A88D8Fb4110558c77754282937e75E08efc4AB"),
+	gethCommon.HexToAddress("0x1FF2a366bf5b06a486384AC3edad0023F4FA82C4"),
+	gethCommon.HexToAddress("0x02362E5221B1D6045781975E5e9b3a9507A46447"),
+	gethCommon.HexToAddress("0xDAFe8210b136d48d3e6828b6602a2fB63e4ebA3c"),
+	gethCommon.HexToAddress("0xa8daE664252fC80463791AE6aC29269b2c2DB7dD"),
+	gethCommon.HexToAddress("0x78ec02fE7b51d97aFa7D13e5748514fC10CC6ea2"),
+	gethCommon.HexToAddress("0x4406d8E9CD882800887541f9108D385116E062Eb"),
+	gethCommon.HexToAddress("0xE4476fc34BF90939Eaf86b42320cA37ff576484a"),
+	gethCommon.HexToAddress("0xe8c7C520426746141D0921034bEc0F0315ccb88e"),
+	gethCommon.HexToAddress("0x007077Bf333c69673a13a897039DcAF99b505C1a"),
+	gethCommon.HexToAddress("0x87Bb72aCbE36C1DB588DBf995cCE8EaE5bCbC59B"),
+	gethCommon.HexToAddress("0x9B4E845b3b0151A84dc11D4734E4FA61A4B934DB"),
 }
 
 // Emulator wraps an EVM runtime where evm transactions
@@ -203,9 +218,9 @@ func (bl *BlockView) RunTransaction(
 		return types.NewInvalidResult(tx, err), nil
 	}
 
-	// Allow only white-listed EOAs to make EVM transactions. To be removed,
+	// Allow-list of EOAs to run EVM transactions. To be removed,
 	// after the remediation is completed.
-	if !slices.Contains(whiteListedEOAs, msg.From) {
+	if !slices.Contains(allowListEOAs, msg.From) {
 		err = fmt.Errorf("EVM transactions are temporarily disabled")
 		return types.NewInvalidResult(tx, err), nil
 	}
@@ -266,9 +281,9 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			continue
 		}
 
-		// Allow only white-listed EOAs to make EVM transactions. To be removed,
+		// Allow-list of EOAs to run EVM transactions. To be removed,
 		// after the remediation is completed.
-		if !slices.Contains(whiteListedEOAs, msg.From) {
+		if !slices.Contains(allowListEOAs, msg.From) {
 			err = fmt.Errorf("EVM transactions are temporarily disabled")
 			batchResults[i] = types.NewInvalidResult(tx, err)
 			continue
