@@ -45,6 +45,7 @@ var allowListEOAs = []gethCommon.Address{
 	gethCommon.HexToAddress("0x007077Bf333c69673a13a897039DcAF99b505C1a"),
 	gethCommon.HexToAddress("0x87Bb72aCbE36C1DB588DBf995cCE8EaE5bCbC59B"),
 	gethCommon.HexToAddress("0x9B4E845b3b0151A84dc11D4734E4FA61A4B934DB"),
+	gethCommon.HexToAddress("0x339d413CCEfD986b1B3647A9cfa9CBbE70A30749"),
 }
 
 // Emulator wraps an EVM runtime where evm transactions
