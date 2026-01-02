@@ -39,7 +39,7 @@ func TestIsRestrictedEOA(t *testing.T) {
 		addr1 := gethCommon.HexToAddress("0x2e7C4b71397f10c93dC0C2ba6f8f179A47F994e1")
 		addr2 := gethCommon.HexToAddress("0x2e7c4b71397f10c93dc0c2ba6f8f179a47f994e1")
 		require.Equal(t, addr1, addr2, "addresses should be equal regardless of case")
-		
+
 		result1 := isRestrictedEOA(addr1)
 		result2 := isRestrictedEOA(addr2)
 		assert.Equal(t, result1, result2, "results should be the same for same address")
@@ -80,4 +80,3 @@ func TestIsRestrictedEOA(t *testing.T) {
 		}
 	})
 }
-
