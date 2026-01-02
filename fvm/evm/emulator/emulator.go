@@ -28,7 +28,7 @@ var restrictedEOAs = []gethCommon.Address{
 	gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6"),
 }
 
-var restrictedEOAError = fmt.Errorf(
+var restrictedEOAError = errors.New(
 	"this account has been restricted by the Community Governance Council in connection to a protocol exploit, please reach out to security@flowfoundation.com for inquiries or information related to the attack",
 )
 
