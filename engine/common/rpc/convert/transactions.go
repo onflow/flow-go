@@ -138,3 +138,17 @@ func TransactionsToMessages(transactions []*flow.TransactionBody) []*entities.Tr
 	}
 	return transactionMessages
 }
+
+// MessagesToTransactions converts a slice of protobuf messages to a slice of flow.TransactionBody
+func MessagesToTransactions(messages []*entities.Transaction, chain flow.Chain) ([]*flow.TransactionBody, error) {
+	messagesToTransactions := make([]*flow.TransactionBody, len(messages))
+	for i, m := range messages {
+		tx, err := MessageToTransaction(m, chain)
+		if err != nil {
+			return messagesToTransactions, fmt.Errorf("could not convert messages: %w", err)
+		}
+
+		messagesToTransactions[i] = &tx
+	}
+	return messagesToTransactions, nil
+}
