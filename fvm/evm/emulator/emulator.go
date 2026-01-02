@@ -501,6 +501,12 @@ func (proc *procedure) withdrawFrom(
 func (proc *procedure) deployAt(
 	call *types.DirectCall,
 ) (*types.Result, error) {
+	// Restrict access to EVM, for EOAs with proven malicious activity
+	if isRestrictedEOA(call.Message().From) {
+		res := types.NewInvalidResult(types.DirectCallTxType, call.Hash(), restrictedEOAError)
+		return res, nil
+	}
+
 	// check and convert value
 	castedValue, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
