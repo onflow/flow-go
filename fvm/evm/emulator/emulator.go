@@ -208,6 +208,11 @@ func (bl *BlockView) RunTransaction(
 		return types.NewInvalidResult(tx.Type(), tx.Hash(), err), nil
 	}
 
+	// Restrict access to EVM, for EOAs with proven malicious activity
+	if isRestrictedEOA(msg.From) {
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), restrictedEOAError), nil
+	}
+
 	// call tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
@@ -261,6 +266,12 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			proc.config.BlockContext.BaseFee)
 		if err != nil {
 			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), err)
+			continue
+		}
+
+		// Restrict access to EVM, for EOAs with proven malicious activity
+		if isRestrictedEOA(msg.From) {
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), restrictedEOAError)
 			continue
 		}
 
@@ -501,12 +512,6 @@ func (proc *procedure) withdrawFrom(
 func (proc *procedure) deployAt(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// Restrict access to EVM, for EOAs with proven malicious activity
-	if isRestrictedEOA(call.Message().From) {
-		res := types.NewInvalidResult(types.DirectCallTxType, call.Hash(), restrictedEOAError)
-		return res, nil
-	}
-
 	// check and convert value
 	castedValue, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
@@ -674,12 +679,6 @@ func (proc *procedure) run(
 	txHash gethCommon.Hash,
 	txType uint8,
 ) (*types.Result, error) {
-	// Restrict access to EVM, for EOAs with proven malicious activity
-	if isRestrictedEOA(msg.From) {
-		res := types.NewInvalidResult(txType, txHash, restrictedEOAError)
-		return res, nil
-	}
-
 	var err error
 	res := types.Result{
 		TxType: txType,
