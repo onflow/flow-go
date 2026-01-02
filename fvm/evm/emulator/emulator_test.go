@@ -1514,17 +1514,11 @@ func TestIsRestrictedEOA(t *testing.T) {
 
 					res, err := blk.DirectCall(call)
 					require.NoError(t, err)
-					// Note: deployAt doesn't call proc.run(), so restriction check doesn't happen
-					// This test documents current behavior - restriction should ideally be checked earlier
-					// For now, it may succeed or fail for other reasons, but not restriction
-					if res.Invalid() {
-						// If it fails, it should be for restriction (but currently it doesn't check)
-						// This test will pass if restriction check is added to deployAt
-						if res.ValidationError != nil {
-							// Currently deployAt doesn't check restriction, so this may not contain "restricted"
-							// This is a known limitation
-						}
-					}
+					require.True(t, res.Invalid(), "DeployCallWithTargetAddress with restricted address should be rejected")
+					require.NotNil(t, res.ValidationError)
+					require.Contains(t, res.ValidationError.Error(), "restricted")
+					require.Equal(t, uint64(types.InvalidTransactionGasCost), res.GasConsumed,
+						"DeployCallWithTargetAddress should consume invalid transaction gas cost")
 				})
 
 				t.Run("all SubTypes with restricted address should be rejected", func(t *testing.T) {
