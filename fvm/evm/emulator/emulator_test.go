@@ -1448,7 +1448,7 @@ func TestIsRestrictedEOA(t *testing.T) {
 					call := types.NewWithdrawCall(
 						bridgeAddr,
 						types.NewAddress(restrictedAddr1), // restricted address as withdrawer
-						types.MakeBigIntInFlow(1), // 1 Flow
+						types.MakeBigIntInFlow(1),         // 1 Flow
 						0,
 					)
 
