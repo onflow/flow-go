@@ -203,10 +203,30 @@ func (executor *scriptExecutor) executeScript() error {
 	chainID := executor.ctx.Chain.ChainID()
 
 	if executor.ctx.EVMEnabled {
+		// Setup InternalEVM in both environments because:
+		// - Scripts execute in ScriptRuntimeEnv
+		// - But system contract invocations (e.g., getAccount().balance) use TxRuntimeEnv
+
+		// Setup InternalEVM in ScriptRuntimeEnv (for script execution)
 		err := evm.SetupEnvironment(
 			chainID,
 			executor.env,
 			rt.ScriptRuntimeEnv,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Setup InternalEVM in TxRuntimeEnv (for system contract invocations)
+		// This solves the problem where FlowServiceAccount (which imports EVM) needs
+		// InternalEVM to be available during dependency checking when invoked via
+		// system contracts (e.g., getAccount().balance). Without this, type checking
+		// fails with "cannot find variable in this scope: `InternalEVM`" because
+		// system contract invocations use TxRuntimeEnv, not ScriptRuntimeEnv.
+		err = evm.SetupEnvironment(
+			chainID,
+			executor.env,
+			rt.TxRuntimeEnv,
 		)
 		if err != nil {
 			return err
