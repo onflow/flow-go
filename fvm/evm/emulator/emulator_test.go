@@ -1320,3 +1320,107 @@ func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {
 func (mp *MockedPrecompiled) Name() string {
 	return precompiles.CADENCE_ARCH_PRECOMPILE_NAME
 }
+
+func TestIsRestrictedEOA(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
+				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+
+				// Restricted addresses from the emulator package
+				restrictedAddr1 := gethCommon.HexToAddress("0x2e7C4b71397f10c93dC0C2ba6f8f179A47F994e1")
+				restrictedAddr2 := gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6")
+				nonRestrictedAddr := gethCommon.HexToAddress("0x1234567890123456789012345678901234567890")
+
+				toAddr := testutils.RandomAddress(t)
+
+				t.Run("restricted address 1 should be rejected via DirectCall", func(t *testing.T) {
+					blk, err := em.NewBlockView(ctx)
+					require.NoError(t, err)
+
+					call := types.NewContractCall(
+						types.NewAddress(restrictedAddr1),
+						toAddr,
+						nil,
+						1_000_000,
+						big.NewInt(0),
+						0,
+					)
+
+					res, err := blk.DirectCall(call)
+					require.NoError(t, err)
+					require.True(t, res.Invalid(), "restricted address should result in invalid transaction")
+					require.NotNil(t, res.ValidationError, "should have validation error")
+					require.Contains(t, res.ValidationError.Error(), "restricted")
+					require.Contains(t, res.ValidationError.Error(), "Community Governance Council")
+				})
+
+				t.Run("restricted address 2 should be rejected via DirectCall", func(t *testing.T) {
+					blk, err := em.NewBlockView(ctx)
+					require.NoError(t, err)
+
+					call := types.NewContractCall(
+						types.NewAddress(restrictedAddr2),
+						toAddr,
+						nil,
+						1_000_000,
+						big.NewInt(0),
+						0,
+					)
+
+					res, err := blk.DirectCall(call)
+					require.NoError(t, err)
+					require.True(t, res.Invalid(), "restricted address should result in invalid transaction")
+					require.NotNil(t, res.ValidationError, "should have validation error")
+					require.Contains(t, res.ValidationError.Error(), "restricted")
+					require.Contains(t, res.ValidationError.Error(), "Community Governance Council")
+				})
+
+				t.Run("non-restricted address should not be rejected", func(t *testing.T) {
+					blk, err := em.NewBlockView(ctx)
+					require.NoError(t, err)
+
+					call := types.NewContractCall(
+						types.NewAddress(nonRestrictedAddr),
+						toAddr,
+						nil,
+						1_000_000,
+						big.NewInt(0),
+						0,
+					)
+
+					res, err := blk.DirectCall(call)
+					require.NoError(t, err)
+					// Non-restricted address should not be invalid due to restriction
+					// (it may fail for other reasons like insufficient balance, but not restriction)
+					if res.Invalid() {
+						require.NotContains(t, res.ValidationError.Error(), "restricted",
+							"non-restricted address should not have restriction error")
+						require.NotContains(t, res.ValidationError.Error(), "Community Governance Council",
+							"non-restricted address should not have restriction error")
+					}
+				})
+
+				t.Run("restricted address should consume invalid transaction gas cost", func(t *testing.T) {
+					blk, err := em.NewBlockView(ctx)
+					require.NoError(t, err)
+
+					call := types.NewContractCall(
+						types.NewAddress(restrictedAddr1),
+						toAddr,
+						nil,
+						1_000_000,
+						big.NewInt(0),
+						0,
+					)
+
+					res, err := blk.DirectCall(call)
+					require.NoError(t, err)
+					require.True(t, res.Invalid())
+					require.Equal(t, uint64(types.InvalidTransactionGasCost), res.GasConsumed,
+						"restricted address should consume invalid transaction gas cost")
+				})
+			})
+		})
+	})
+}
