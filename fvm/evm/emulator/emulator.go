@@ -264,12 +264,6 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			continue
 		}
 
-		// Restrict access to EVM, for EOAs with proven malicious activity
-		if slices.Contains(restrictedEOAs, msg.From) {
-			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), restrictedEOAError)
-			continue
-		}
-
 		// call tracer on tx start
 		if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
