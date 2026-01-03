@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
@@ -20,6 +21,21 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// List of EOAs with restricted access to EVM, due to malicious activity.
+var restrictedEOAs = []gethCommon.Address{
+	gethCommon.HexToAddress("0x2e7C4b71397f10c93dC0C2ba6f8f179A47F994e1"),
+	gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6"),
+}
+
+var restrictedEOAError = errors.New(
+	"this account has been restricted by the Community Governance Council in connection to a protocol exploit, please reach out to security@flowfoundation.com for inquiries or information related to the attack",
+)
+
+// isRestrictedEOA checks if the given address is in the restricted EOAs list
+func isRestrictedEOA(addr gethCommon.Address) bool {
+	return slices.Contains(restrictedEOAs, addr)
+}
 
 // Emulator wraps an EVM runtime where evm transactions
 // and direct calls are accepted.
@@ -189,7 +205,12 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return types.NewInvalidResult(tx, err), nil
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), err), nil
+	}
+
+	// Restrict access to EVM, for EOAs with proven malicious activity
+	if isRestrictedEOA(msg.From) {
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), restrictedEOAError), nil
 	}
 
 	// call tracer
@@ -244,7 +265,13 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			GetSigner(bl.config),
 			proc.config.BlockContext.BaseFee)
 		if err != nil {
-			batchResults[i] = types.NewInvalidResult(tx, err)
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), err)
+			continue
+		}
+
+		// Restrict access to EVM, for EOAs with proven malicious activity
+		if isRestrictedEOA(msg.From) {
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), restrictedEOAError)
 			continue
 		}
 
@@ -385,7 +412,8 @@ func (proc *procedure) mintTo(
 	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrInvalidBalance,
 		), nil
 	}
@@ -430,7 +458,8 @@ func (proc *procedure) withdrawFrom(
 	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrInvalidBalance,
 		), nil
 	}
@@ -438,7 +467,8 @@ func (proc *procedure) withdrawFrom(
 	// check balance is not prone to rounding error
 	if !types.AttoFlowBalanceIsValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrWithdrawBalanceRounding,
 		), nil
 	}
@@ -486,7 +516,8 @@ func (proc *procedure) deployAt(
 	castedValue, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrInvalidBalance,
 		), nil
 	}
