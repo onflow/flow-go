@@ -553,7 +553,6 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	for _, prop := range []*flow.Proposal{proposal0, proposal1, proposal2, proposal3} {
 		hotstuffProposal := model.SignedProposalFromBlock(prop)
-		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 	}
@@ -591,6 +590,11 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 
 	// process all the descendants
 	for _, proposal := range proposals {
+
+		// each proposal has to be validated once
+		hotstuffProposal := model.SignedProposalFromBlock(proposal)
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
+
 		// process and make sure no error occurs (as they are unverifiable)
 		err := cs.core.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 			OriginID: originID,
@@ -599,13 +603,12 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
-		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", model.SignedProposalFromBlock(proposal))
+		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", hotstuffProposal)
 	}
 
 	// check that we submit each proposal in a valid order
 	//  - we must process the missingProposal parent first
 	//  - we can process the children next, in any order
-	cs.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(4)
 
 	calls := 0                                   // track # of calls to SubmitProposal
 	unprocessed := map[flow.Identifier]struct{}{ // track un-processed proposals
@@ -631,6 +634,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 
 	// process the root proposal
+	cs.validator.On("ValidateProposal", model.SignedProposalFromBlock(missingProposal)).Return(nil).Once()
 	err := cs.core.OnBlockProposal(flow.Slashable[*flow.Proposal]{
 		OriginID: originID,
 		Message:  missingProposal,

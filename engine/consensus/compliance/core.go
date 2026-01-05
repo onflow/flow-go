@@ -232,6 +232,45 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
+	hotstuffProposal := model.SignedProposalFromBlock(proposal.Message)
+	err = c.validator.ValidateProposal(hotstuffProposal)
+	if err != nil {
+		if invalidBlockErr, ok := model.AsInvalidProposalError(err); ok {
+			log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+
+			// notify consumers about invalid block
+			c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
+				OriginID: proposal.OriginID,
+				Message:  *invalidBlockErr,
+			})
+
+			// notify VoteAggregator about the invalid block
+			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromBlock(proposal.Message))
+			if err != nil {
+				if mempool.IsBelowPrunedThresholdError(err) {
+					log.Warn().Msg("received invalid block, but is below pruned threshold")
+					return nil
+				}
+				return fmt.Errorf("unexpected error notifying vote aggregator about invalid block: %w", err)
+			}
+			return nil
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We have received a proposal, but we don't know the epoch its view is within.
+			// We know:
+			//  - the parent of this block is valid and was appended to the state (ie. we knew the epoch for it)
+			//  - if we then see this for the child, one of two things must have happened:
+			//    1. the proposer maliciously created the block for a view very far in the future (it's invalid)
+			//      -> in this case we can disregard the block
+			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
+			//       (breaking a critical assumption - see FinalizationSafetyThreshold in protocol.Params for details)
+			//      -> in this case, the network has encountered a critical failure
+			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
+			return nil
+		}
+		return fmt.Errorf("unexpected error validating proposal: %w", err)
+	}
+
 	// At this point we are dealing with a block proposal that is neither present in the cache nor on disk.
 	// There are three possibilities if the proposal is stored neither in cache nor on disk:
 	// 1. The proposal is connected to the finalized state => we perform the further processing and pass it to the hotstuff layer.
@@ -369,28 +408,6 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 	)
 	defer span.End()
 
-	hotstuffProposal := model.SignedProposalFromBlock(proposal)
-	err := c.validator.ValidateProposal(hotstuffProposal)
-	if err != nil {
-		if model.IsInvalidProposalError(err) {
-			return err
-		}
-		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			// We have received a proposal, but we don't know the epoch its view is within.
-			// We know:
-			//  - the parent of this block is valid and was appended to the state (ie. we knew the epoch for it)
-			//  - if we then see this for the child, one of two things must have happened:
-			//    1. the proposer maliciously created the block for a view very far in the future (it's invalid)
-			//      -> in this case we can disregard the block
-			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
-			//       (breaking a critical assumption - see FinalizationSafetyThreshold in protocol.Params for details)
-			//      -> in this case, the network has encountered a critical failure
-			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
-			return engine.NewUnverifiableInputError("unverifiable proposal with view from unknown epoch: %w", err)
-		}
-		return fmt.Errorf("unexpected error validating proposal: %w", err)
-	}
-
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -404,8 +421,9 @@ func (c *Core) processBlockProposal(proposal *flow.Proposal) error {
 		Logger()
 	log.Debug().Msg("processing block proposal")
 
+	hotstuffProposal := model.SignedProposalFromBlock(proposal)
 	// see if the block is a valid extension of the protocol state
-	err = c.state.Extend(ctx, proposal)
+	err := c.state.Extend(ctx, proposal)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the protocol state, then the block is invalid
