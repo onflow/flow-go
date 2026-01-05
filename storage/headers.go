@@ -26,16 +26,18 @@ type Headers interface {
 	//  - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 	ByHeight(height uint64) (*flow.Header, error)
 
-	// ByView returns the block with the given view. It is only available for certified blocks.
+	// ByView returns the block with the given view. It is only available for certified blocks on a consensus chain.
 	// Certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
 	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 	// even for non-finalized blocks.
 	//
 	// Expected errors during normal operations:
 	//   - [storage.ErrNotFound] if no certified block is known at given view.
+	//   - [storage.ErrNotAvailableForClusterConsensus] if called on a cluster Headers instance (created by store.NewClusterHeaders)
 	ByView(view uint64) (*flow.Header, error)
 
 	// Exists returns true if a header with the given ID has been stored.
+	// NOTE: this method does not distinguish between cluster and consensus headers.
 	// No errors are expected during normal operation.
 	Exists(blockID flow.Identifier) (bool, error)
 

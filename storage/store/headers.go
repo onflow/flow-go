@@ -29,7 +29,7 @@ var _ storage.Headers = (*Headers)(nil)
 
 // NewHeaders creates a Headers instance, which stores block headers.
 // It supports storing, caching and retrieving by block ID, and additionally indexes by header height and view.
-// Must be initialized with a non-cluster chainID; see [cluster.IsCanonicalClusterID].
+// Must be initialized with a non-cluster chainID; see [flow.AllChainIDs] and [cluster.IsCanonicalClusterID].
 func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
 	if cluster.IsCanonicalClusterID(chainID) {
 		panic("NewHeaders called on cluster chain ID - use NewClusterHeaders instead")
@@ -58,6 +58,7 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 
 // NewClusterHeaders creates a Headers instance for a collection cluster chain, which stores block headers for cluster blocks.
 // It supports storing, caching and retrieving by block ID, and additionally an index by header height.
+// It does NOT support retrieving by view.
 // Must be initialized with a valid cluster chain ID; see [cluster.IsCanonicalClusterID]
 func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
 	if !cluster.IsCanonicalClusterID(chainID) {
@@ -79,7 +80,7 @@ func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flo
 	}
 	retrieveView := func(r storage.Reader, height uint64) (flow.Identifier, error) {
 		var id flow.Identifier
-		return id, fmt.Errorf("retrieve by view not implemented for cluster headers")
+		return id, storage.ErrNotAvailableForClusterConsensus
 	}
 	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView)
 }
@@ -221,6 +222,7 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 //
 // Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no certified block is known at given view.
+//   - [storage.ErrNotAvailableForClusterConsensus] if called on a cluster Headers instance (created by [NewClusterHeaders])
 func (h *Headers) ByView(view uint64) (*flow.Header, error) {
 	blockID, err := h.viewCache.Get(h.db.Reader(), view)
 	if err != nil {
@@ -230,6 +232,7 @@ func (h *Headers) ByView(view uint64) (*flow.Header, error) {
 }
 
 // Exists returns true if a header with the given ID has been stored.
+// NOTE: this method does not distinguish between cluster and consensus headers.
 // No errors are expected during normal operation.
 func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
 	// if the block is in the cache, return true

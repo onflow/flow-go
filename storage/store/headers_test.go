@@ -83,6 +83,14 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 		actual, err := headers.ByView(block.View)
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
+
+		// verify error sentinel of cluster Headers ByView
+		clusterChainID := cluster.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
+		clusterHeaders := store.NewClusterHeaders(metrics, db, clusterChainID)
+		_, err = clusterHeaders.ByView(block.View)
+		require.ErrorIs(t, err, storage.ErrNotAvailableForClusterConsensus)
+		_, err = clusterHeaders.ByView(block.View + 1)
+		require.ErrorIs(t, err, storage.ErrNotAvailableForClusterConsensus)
 	})
 }
 
@@ -210,7 +218,6 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 		require.Len(t, children, 1)
 		require.Equal(t, child.ToHeader(), children[0])
 
-		// Test that child1 returns its direct children (grandchild1, grandchild2)
 		// Test that child returns its direct children (grandchild1, grandchild2)
 		grandchildren, err := headers.ByParentID(child.ID())
 		require.NoError(t, err)
