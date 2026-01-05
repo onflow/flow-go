@@ -37,13 +37,13 @@ type signatureContinuation struct {
 	// signatureEntry is the initial input.
 	signatureEntry
 
-	// accountKey is set by getAccountKeys().
+	// accountKey is set by getAccountKeysAndAggregateWeights().
 	accountKey flow.RuntimeAccountPublicKey
 
-	// invokedVerify and verifyErr are set by verifySignaturesAndAggregateWeights().  Note
-	// that	verifySignaturesAndAggregateWeights() is always called after getAccountKeys()
+	// invokedVerify and verifyErr are set by verifySignatures().  Note
+	// that	verifySignatures() is always called after getAccountKeysAndAggregateWeights()
 	// (i.e., accountKey is always initialized by the time
-	// verifySignaturesAndAggregateWeights is called).
+	// verifySignatures is called).
 	invokedVerify bool
 	verifyErr     errors.CodedError
 }
@@ -228,18 +228,12 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	// at this point, account keys are guaranteed to be unique across all signatures
-	err = v.getAccountKeys(txnState, accounts, signatures, tx.ProposalKey)
+	err = v.getAccountKeysAndAggregateWeights(txnState, accounts, signatures, tx.ProposalKey)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
 	}
 
-	// Verify all cryptographic signatures against account public key
-	//  and aggregate weights concurrently (but does not check weight thresholds yet)
-	err = v.verifySignaturesAndAggregateWeights(signatures)
-	if err != nil {
-		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
-	}
-
+	// all authorizers must have sufficient weights
 	for _, addr := range tx.Authorizers {
 		// Skip this authorizer if it is also the payer. In the case where an account is
 		// both a PAYER as well as an AUTHORIZER or PROPOSER, that account is required
@@ -257,6 +251,7 @@ func (v *TransactionVerifier) verifyTransaction(
 		}
 	}
 
+	// payer must have sufficient weights
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer, keyWeightThreshold) {
 		// TODO change this to payer error (needed for fees)
 		return errors.NewAccountAuthorizationErrorf(
@@ -266,12 +261,19 @@ func (v *TransactionVerifier) verifyTransaction(
 			keyWeightThreshold)
 	}
 
+	// Verify all cryptographic signatures against account public keys (concurrently)
+	// and fail if at least one signature is invalid
+	err = v.verifySignatures(signatures)
+	if err != nil {
+		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
+	}
+
 	return nil
 }
 
-// getAccountKeys gets the signatures' account keys and populate the account
-// keys into the signature continuation structs.
-func (v *TransactionVerifier) getAccountKeys(
+// getAccountKeysAndAggregateWeights gets the signatures' account keys and populate the
+// keys and their weights into the signature continuation structs.
+func (v *TransactionVerifier) getAccountKeysAndAggregateWeights(
 	_ storage.TransactionPreparer,
 	accounts environment.Accounts,
 	signatures []*signatureContinuation,
@@ -292,6 +294,8 @@ func (v *TransactionVerifier) getAccountKeys(
 		}
 
 		signature.accountKey = accountKey
+		// aggregateWeight
+		signature.aggregateWeights[signature.Address] += accountKey.Weight
 
 		if !foundProposalSignature && signature.matches(proposalKey) {
 			foundProposalSignature = true
@@ -307,9 +311,9 @@ func (v *TransactionVerifier) getAccountKeys(
 	return nil
 }
 
-// verifySignaturesAndAggregateWeights verifies the given cryptographic signature continuations (concurrently)
-// and aggregate the valid signatures' weights.
-func (v *TransactionVerifier) verifySignaturesAndAggregateWeights(
+// verifySignatures verifies the given cryptographic signature continuations (concurrently).
+// It returns an error if at least one signature is invalid and no error if all signatures are valid.
+func (v *TransactionVerifier) verifySignatures(
 	signatures []*signatureContinuation,
 ) error {
 	toVerifyChan := make(chan *signatureContinuation, len(signatures))
@@ -373,8 +377,6 @@ func (v *TransactionVerifier) verifySignaturesAndAggregateWeights(
 			foundError = true
 			break
 		}
-
-		entry.aggregateWeights[entry.Address] += entry.accountKey.Weight
 	}
 
 	if !foundError {

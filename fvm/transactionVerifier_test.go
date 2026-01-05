@@ -48,6 +48,10 @@ func TestTransactionVerification(t *testing.T) {
 	address2, privKey2 := newAccount(t, accounts)
 	address3, privKey3 := newAccount(t, accounts)
 
+	// add a partial weight key for address1 for later tests
+	err := accounts.AppendAccountPublicKey(address1, privKey1.PublicKey(fullWeight/2))
+	require.NoError(t, err)
+
 	run := func(
 		body *flow.TransactionBody,
 		ctx fvm.Context,
@@ -359,14 +363,10 @@ func TestTransactionVerification(t *testing.T) {
 	t.Run("payer with not enough weights", func(t *testing.T) {
 		payer := address1
 
-		// use partial weight key for address1
-		err := accounts.AppendAccountPublicKey(address1, privKey3.PublicKey(fullWeight/2))
-		require.NoError(t, err)
-
 		tx := &flow.TransactionBody{
 			ProposalKey: flow.ProposalKey{
 				Address:        payer,
-				KeyIndex:       1,
+				KeyIndex:       1, // partial weight key
 				SequenceNumber: 0,
 			},
 			Payer: payer,
@@ -392,6 +392,35 @@ func TestTransactionVerification(t *testing.T) {
 		err = run(tx, ctx, txnState)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights")
+	})
+
+	t.Run("weights are checked before signatures", func(t *testing.T) {
+		// use a key with partial weight and an invalid signature and make sure
+		// the weight error is returned before the signature error
+		payer := address1
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        payer,
+				KeyIndex:       1, // partial weight key
+				SequenceNumber: 0,
+			},
+			Payer: payer,
+		}
+
+		sig1 := flow.TransactionSignature{
+			Address:     payer,
+			SignerIndex: 0,
+			KeyIndex:    1, // partial weight key
+			// empty signature is invalid signature
+		}
+
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+		ctx := newContext()
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights not invald signature")
 	})
 
 	// test that Transaction Signature verification uses the correct domain tag for verification
