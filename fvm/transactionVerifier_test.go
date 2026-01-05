@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/crypto/hash"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -27,26 +28,25 @@ func newContext() fvm.Context {
 		fvm.WithTransactionBodyExecutionEnabled(false))
 }
 
+func newAccount(t *testing.T, accounts *environment.StatefulAccounts) (flow.Address, *flow.AccountPrivateKey) {
+	address := unittest.RandomAddressFixture()
+	privKey, err := unittest.AccountKeyDefaultFixture()
+	require.NoError(t, err)
+	err = accounts.Create([]flow.AccountPublicKey{privKey.PublicKey(fullWeight)}, address)
+	require.NoError(t, err)
+	return address, privKey
+}
+
 func TestTransactionVerification(t *testing.T) {
 	t.Parallel()
 
 	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 
-	// create 2 accounts
-	address1 := flow.HexToAddress("1234")
-	privKey1, err := unittest.AccountKeyDefaultFixture()
-	require.NoError(t, err)
-
-	err = accounts.Create([]flow.AccountPublicKey{privKey1.PublicKey(fullWeight)}, address1)
-	require.NoError(t, err)
-
-	address2 := flow.HexToAddress("1235")
-	privKey2, err := unittest.AccountKeyDefaultFixture()
-	require.NoError(t, err)
-
-	err = accounts.Create([]flow.AccountPublicKey{privKey2.PublicKey(fullWeight)}, address2)
-	require.NoError(t, err)
+	// create 4 accounts
+	address1, privKey1 := newAccount(t, accounts)
+	address2, privKey2 := newAccount(t, accounts)
+	address3, privKey3 := newAccount(t, accounts)
 
 	run := func(
 		body *flow.TransactionBody,
@@ -78,7 +78,7 @@ func TestTransactionVerification(t *testing.T) {
 		}
 
 		ctx := newContext()
-		err = run(tx, ctx, txnState)
+		err := run(tx, ctx, txnState)
 		require.ErrorContains(
 			t,
 			err,
@@ -104,7 +104,7 @@ func TestTransactionVerification(t *testing.T) {
 		}
 
 		ctx := newContext()
-		err = run(tx, ctx, txnState)
+		err := run(tx, ctx, txnState)
 		require.ErrorContains(
 			t,
 			err,
@@ -232,12 +232,69 @@ func TestTransactionVerification(t *testing.T) {
 		}
 
 		ctx := newContext()
-		err = run(tx, ctx, txnState)
+		err := run(tx, ctx, txnState)
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
 		assert.ErrorContainsf(t, err, fmt.Sprintf("on account %s", proposer), "should mention the proposer address %s", proposer)
+	})
+
+	t.Run("missing authorizer signatures", func(t *testing.T) {
+		payer := address1
+		address4 := unittest.RandomAddressFixture()
+		authorizers := []flow.Address{address2, address3, address4}
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        payer,
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:       payer,
+			Authorizers: authorizers,
+		}
+
+		// assign a valid payload signature
+		hasher, err := crypto.NewPrefixedHashing(hash.SHA3_256, flow.TransactionTagString)
+		require.NoError(t, err)
+
+		validSig, err := privKey2.PrivateKey.Sign(tx.PayloadMessage(), hasher) // valid signature
+		require.NoError(t, err)
+		sig2 := flow.TransactionSignature{
+			Address:     address2,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			Signature:   validSig,
+		}
+
+		validSig, err = privKey3.PrivateKey.Sign(tx.PayloadMessage(), hasher) // valid signature
+		require.NoError(t, err)
+		sig3 := flow.TransactionSignature{
+			Address:     address3,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			Signature:   validSig,
+		}
+
+		tx.PayloadSignatures = []flow.TransactionSignature{sig2, sig3} // address from address4 is missing
+
+		validSig, err = privKey1.PrivateKey.Sign(tx.EnvelopeMessage(), hasher) // valid signature
+		require.NoError(t, err)
+
+		sig1 := flow.TransactionSignature{
+			Address:     payer,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			Signature:   validSig,
+		}
+
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+		ctx := newContext()
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContainsf(t, err, fmt.Sprintf("authorization failed for account %s", address4), "should mention an authorizer error")
 	})
 
 	// test that Transaction Signature verification uses the correct domain tag for verification
