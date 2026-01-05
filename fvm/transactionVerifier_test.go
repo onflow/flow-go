@@ -297,6 +297,103 @@ func TestTransactionVerification(t *testing.T) {
 		assert.ErrorContainsf(t, err, fmt.Sprintf("authorization failed for account %s", address4), "should mention an authorizer error")
 	})
 
+	t.Run("one authorizer with not enough weights", func(t *testing.T) {
+		payer := address1
+		authorizers := []flow.Address{address2, address3}
+
+		// use partial weight key for address3
+		err := accounts.AppendAccountPublicKey(address3, privKey3.PublicKey(fullWeight/2))
+		require.NoError(t, err)
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        payer,
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:       payer,
+			Authorizers: authorizers,
+		}
+
+		// assign a valid payload signature
+		hasher, err := crypto.NewPrefixedHashing(hash.SHA3_256, flow.TransactionTagString)
+		require.NoError(t, err)
+
+		validSig, err := privKey2.PrivateKey.Sign(tx.PayloadMessage(), hasher) // valid signature
+		require.NoError(t, err)
+		sig2 := flow.TransactionSignature{
+			Address:     address2,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			Signature:   validSig,
+		}
+
+		validSig, err = privKey3.PrivateKey.Sign(tx.PayloadMessage(), hasher) // valid signature
+		require.NoError(t, err)
+		sig3 := flow.TransactionSignature{
+			Address:     address3,
+			SignerIndex: 0,
+			KeyIndex:    1, // partial weight key
+			Signature:   validSig,
+		}
+
+		tx.PayloadSignatures = []flow.TransactionSignature{sig2, sig3}
+		validSig, err = privKey1.PrivateKey.Sign(tx.EnvelopeMessage(), hasher) // valid signature
+		require.NoError(t, err)
+
+		sig1 := flow.TransactionSignature{
+			Address:     payer,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			Signature:   validSig,
+		}
+
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+		ctx := newContext()
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "authorizer account does not have sufficient signatures", "error should be about insufficient authorizer weights")
+	})
+
+	t.Run("payer with not enough weights", func(t *testing.T) {
+		payer := address1
+
+		// use partial weight key for address1
+		err := accounts.AppendAccountPublicKey(address1, privKey3.PublicKey(fullWeight/2))
+		require.NoError(t, err)
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        payer,
+				KeyIndex:       1,
+				SequenceNumber: 0,
+			},
+			Payer: payer,
+		}
+
+		// assign a valid payload signature
+		hasher, err := crypto.NewPrefixedHashing(hash.SHA3_256, flow.TransactionTagString)
+		require.NoError(t, err)
+
+		validSig, err := privKey1.PrivateKey.Sign(tx.EnvelopeMessage(), hasher) // valid signature
+		require.NoError(t, err)
+
+		sig1 := flow.TransactionSignature{
+			Address:     payer,
+			SignerIndex: 0,
+			KeyIndex:    1, // partial weight key
+			Signature:   validSig,
+		}
+
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+		ctx := newContext()
+		err = run(tx, ctx, txnState)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights")
+	})
+
 	// test that Transaction Signature verification uses the correct domain tag for verification
 	// i.e the message verification reconstruction logic uses the right tag (check signatureContinuation.verify() )
 	t.Run("tag combinations", func(t *testing.T) {
