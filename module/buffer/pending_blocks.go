@@ -56,8 +56,11 @@ func (v proposalVertex[T]) Parent() (flow.Identifier, uint64) {
 // which puts an upper limit on what views we will accept when adding blocks. However, this only
 // limits the depth of the tree, but not thw tree's width. A byzantine proposer might create
 // lots of conflicting blocks (valid or invalid). We prevent unbounded memory growth from such
-// attacks by ...
-// TODO: ↑
+// attacks by limiting how many proposals are stored per one view. For this particular implementation we
+// are storing one proposal per view. Strictly speaking there could be multiple valid proposals for single view
+// from single proposer, and we don't know which one will be certified. We rely on syncing of certified blocks
+// to guarantee liveness of the system. If by accident a node has cached a proposal which won't be certified it will
+// eventually receive it as a certified block from the sync engine.
 //
 // Safe for concurrent use.
 type GenericPendingBlocks[T flow.HashablePayload] struct {
@@ -110,12 +113,15 @@ func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[*flow.GenericProposal
 		)
 	}
 
-	b.forest.AddVertex(newProposalVertex(block))
+	// to ensure that we store one proposal per view, we are adding a vertex iff there is no vertex at the given level,
+	// this guarantees that we store single proposal per view.
+	if b.forest.GetNumberOfVerticesAtLevel(blockView) == 0 {
+		b.forest.AddVertex(newProposalVertex(block))
+	}
 	return nil
 }
 
-// ByID returns the block with the given ID, if it exists.
-// Otherwise returns (nil, false)
+// ByID returns the block with the given ID, if it exists, otherwise returns (nil, false).
 func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[*flow.GenericProposal[T]], bool) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
