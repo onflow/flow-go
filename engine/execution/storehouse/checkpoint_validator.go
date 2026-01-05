@@ -141,7 +141,7 @@ func validatingRegisterInStore(ctx context.Context, log zerolog.Logger, store ex
 					mismatchErrorCount.Add(1)
 				} else {
 					// non-mismatch error: this is an exception, crash the process
-					log.Fatal().Err(err).Msg("unexpected error during validation")
+					return fmt.Errorf("exception when validating register: %w", err)
 				}
 			}
 		}
