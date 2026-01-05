@@ -83,7 +83,8 @@ func NewPendingBlocks(finalizedView uint64, activeViewRangeSize uint64) *Pending
 
 func NewPendingClusterBlocks(finalizedView uint64, activeViewRangeSize uint64) *PendingClusterBlocks {
 	return &PendingClusterBlocks{
-		lock:                new(sync.Mutex),
+		lock: new(sync.Mutex),
+		// LevelledForest's lowestLevel is inclusive, so add 1 here
 		forest:              forest.NewLevelledForest(finalizedView + 1),
 		activeViewRangeSize: activeViewRangeSize,
 	}
