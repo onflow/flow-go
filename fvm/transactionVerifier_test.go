@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
@@ -16,6 +17,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const fullWeight = 1000
+
+func newContext() fvm.Context {
+	return fvm.NewContext(
+		fvm.WithAuthorizationChecksEnabled(true),
+		fvm.WithAccountKeyWeightThreshold(fullWeight),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithTransactionBodyExecutionEnabled(false))
+}
+
 func TestTransactionVerification(t *testing.T) {
 	t.Parallel()
 
@@ -27,14 +38,14 @@ func TestTransactionVerification(t *testing.T) {
 	privKey1, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	err = accounts.Create([]flow.AccountPublicKey{privKey1.PublicKey(1000)}, address1)
+	err = accounts.Create([]flow.AccountPublicKey{privKey1.PublicKey(fullWeight)}, address1)
 	require.NoError(t, err)
 
 	address2 := flow.HexToAddress("1235")
 	privKey2, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	err = accounts.Create([]flow.AccountPublicKey{privKey2.PublicKey(1000)}, address2)
+	err = accounts.Create([]flow.AccountPublicKey{privKey2.PublicKey(fullWeight)}, address2)
 	require.NoError(t, err)
 
 	run := func(
@@ -66,11 +77,7 @@ func TestTransactionVerification(t *testing.T) {
 			PayloadSignatures: []flow.TransactionSignature{sig, sig},
 		}
 
-		ctx := fvm.NewContext(
-			fvm.WithAuthorizationChecksEnabled(true),
-			fvm.WithAccountKeyWeightThreshold(1000),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+		ctx := newContext()
 		err = run(tx, ctx, txnState)
 		require.ErrorContains(
 			t,
@@ -96,11 +103,7 @@ func TestTransactionVerification(t *testing.T) {
 			EnvelopeSignatures: []flow.TransactionSignature{sig},
 		}
 
-		ctx := fvm.NewContext(
-			fvm.WithAuthorizationChecksEnabled(true),
-			fvm.WithAccountKeyWeightThreshold(1000),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+		ctx := newContext()
 		err = run(tx, ctx, txnState)
 		require.ErrorContains(
 			t,
@@ -109,13 +112,16 @@ func TestTransactionVerification(t *testing.T) {
 	})
 
 	t.Run("invalid envelope signature", func(t *testing.T) {
+		proposer := address1
+		payer := address2
+
 		tx := &flow.TransactionBody{
 			ProposalKey: flow.ProposalKey{
-				Address:        address1,
+				Address:        proposer,
 				KeyIndex:       0,
 				SequenceNumber: 0,
 			},
-			Payer: address2,
+			Payer: payer,
 		}
 
 		// assign a valid payload signature
@@ -125,14 +131,14 @@ func TestTransactionVerification(t *testing.T) {
 		require.NoError(t, err)
 
 		sig1 := flow.TransactionSignature{
-			Address:     address1,
+			Address:     proposer,
 			SignerIndex: 0,
 			KeyIndex:    0,
 			Signature:   validSig,
 		}
 
 		sig2 := flow.TransactionSignature{
-			Address:     address2,
+			Address:     payer,
 			SignerIndex: 0,
 			KeyIndex:    0,
 			// invalid signature
@@ -141,20 +147,20 @@ func TestTransactionVerification(t *testing.T) {
 		tx.PayloadSignatures = []flow.TransactionSignature{sig1}
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
-		ctx := fvm.NewContext(
-			fvm.WithAuthorizationChecksEnabled(true),
-			fvm.WithAccountKeyWeightThreshold(1000),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+		ctx := newContext()
 		err = run(tx, ctx, txnState)
 		require.Error(t, err)
 		require.True(t, errors.IsInvalidEnvelopeSignatureError(err))
+		assert.ErrorContainsf(t, err, fmt.Sprintf("on account %s", payer), "should mention the proposer address %s", payer)
 	})
 
 	t.Run("invalid payload signature", func(t *testing.T) {
 
+		proposer := address1
+		payer := address2
+
 		sig1 := flow.TransactionSignature{
-			Address:     address1,
+			Address:     proposer,
 			SignerIndex: 0,
 			KeyIndex:    0,
 			// invalid signature
@@ -162,11 +168,11 @@ func TestTransactionVerification(t *testing.T) {
 
 		tx := &flow.TransactionBody{
 			ProposalKey: flow.ProposalKey{
-				Address:        address1,
+				Address:        proposer,
 				KeyIndex:       0,
 				SequenceNumber: 0,
 			},
-			Payer: address2,
+			Payer: payer,
 		}
 
 		// assign a valid envelope signature
@@ -176,7 +182,7 @@ func TestTransactionVerification(t *testing.T) {
 		require.NoError(t, err)
 
 		sig2 := flow.TransactionSignature{
-			Address:     address2,
+			Address:     payer,
 			SignerIndex: 0,
 			KeyIndex:    0,
 			Signature:   validSig,
@@ -185,14 +191,11 @@ func TestTransactionVerification(t *testing.T) {
 		tx.PayloadSignatures = []flow.TransactionSignature{sig1}
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
-		ctx := fvm.NewContext(
-			fvm.WithAuthorizationChecksEnabled(true),
-			fvm.WithAccountKeyWeightThreshold(1000),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+		ctx := newContext()
 		err = run(tx, ctx, txnState)
 		require.Error(t, err)
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
+		assert.ErrorContainsf(t, err, fmt.Sprintf("on account %s", proposer), "should mention the proposer address %s", proposer)
 	})
 
 	t.Run("invalid payload and envelope signatures", func(t *testing.T) {
@@ -200,15 +203,18 @@ func TestTransactionVerification(t *testing.T) {
 		// The test should be updated once the FVM updates the order of validating signatures:
 		// envelope needs to be checked first and payload later.
 
+		proposer := address1
+		payer := address2
+
 		sig1 := flow.TransactionSignature{
-			Address:     address1,
+			Address:     proposer,
 			SignerIndex: 0,
 			KeyIndex:    0,
 			// invalid signature
 		}
 
 		sig2 := flow.TransactionSignature{
-			Address:     address2,
+			Address:     payer,
 			SignerIndex: 0,
 			KeyIndex:    0,
 			// invalid signature
@@ -216,7 +222,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		tx := &flow.TransactionBody{
 			ProposalKey: flow.ProposalKey{
-				Address:        address1,
+				Address:        proposer,
 				KeyIndex:       0,
 				SequenceNumber: 0,
 			},
@@ -225,16 +231,13 @@ func TestTransactionVerification(t *testing.T) {
 			EnvelopeSignatures: []flow.TransactionSignature{sig2},
 		}
 
-		ctx := fvm.NewContext(
-			fvm.WithAuthorizationChecksEnabled(true),
-			fvm.WithAccountKeyWeightThreshold(1000),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+		ctx := newContext()
 		err = run(tx, ctx, txnState)
 		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
+		assert.ErrorContainsf(t, err, fmt.Sprintf("on account %s", proposer), "should mention the proposer address %s", proposer)
 	})
 
 	// test that Transaction Signature verification uses the correct domain tag for verification
@@ -285,11 +288,7 @@ func TestTransactionVerification(t *testing.T) {
 				// set the signature into the transaction
 				tx.EnvelopeSignatures[0].Signature = sig
 
-				ctx := fvm.NewContext(
-					fvm.WithAuthorizationChecksEnabled(true),
-					fvm.WithAccountKeyWeightThreshold(1000),
-					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-					fvm.WithTransactionBodyExecutionEnabled(false))
+				ctx := newContext()
 				err = run(tx, ctx, txnState)
 				if c.validity {
 					require.NoError(t, err)
