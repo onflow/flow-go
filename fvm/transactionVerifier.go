@@ -17,7 +17,7 @@ import (
 )
 
 type signatureType struct {
-	payload []byte
+	message []byte
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
@@ -40,10 +40,10 @@ type signatureContinuation struct {
 	// accountKey is set by getAccountKeys().
 	accountKey flow.RuntimeAccountPublicKey
 
-	// invokedVerify and verifyErr are set by verifyAccountSignatures().  Note
-	// that	verifyAccountSignatures() is always called after getAccountKeys()
+	// invokedVerify and verifyErr are set by verifySignaturesAndAggregateWeights().  Note
+	// that	verifySignaturesAndAggregateWeights() is always called after getAccountKeys()
 	// (i.e., accountKey is always initialized by the time
-	// verifyAccountSignatures is called).
+	// verifySignaturesAndAggregateWeights is called).
 	invokedVerify bool
 	verifyErr     errors.CodedError
 }
@@ -66,7 +66,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 
 	entry.invokedVerify = true
 
-	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.payload)
+	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.message)
 	if !valid {
 		entry.verifyErr = entry.newError(fmt.Errorf("signature extension data is not valid"))
 	}
@@ -97,6 +97,7 @@ func newSignatureEntries(
 	map[flow.Address]int,
 	error,
 ) {
+	// weight maps are assigned to entries in this function, but are returned as empty maps
 	payloadWeights := make(map[flow.Address]int, len(payloadSignatures))
 	envelopeWeights := make(map[flow.Address]int, len(envelopeSignatures))
 
@@ -125,7 +126,7 @@ func newSignatureEntries(
 	}
 
 	numSignatures := len(payloadSignatures) + len(envelopeSignatures)
-	signatures := make([]*signatureContinuation, 0, numSignatures)
+	signatureContinuations := make([]*signatureContinuation, 0, numSignatures)
 
 	type uniqueKey struct {
 		address flow.Address
@@ -153,11 +154,11 @@ func newSignatureEntries(
 					fmt.Errorf("duplicate signatures are provided for the same key"))
 			}
 			duplicate[key] = struct{}{}
-			signatures = append(signatures, entry)
+			signatureContinuations = append(signatureContinuations, entry)
 		}
 	}
 
-	return signatures, payloadWeights, envelopeWeights, nil
+	return signatureContinuations, payloadWeights, envelopeWeights, nil
 }
 
 // TransactionVerifier verifies the content of the transaction by
@@ -207,6 +208,9 @@ func (v *TransactionVerifier) verifyTransaction(
 		return errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 	}
 
+	// return the signature entries (both payload and envelope) and empty weight maps
+	// that will be used to aggregate weights during signature verification.
+	// the account keys are deduplicated during this call.
 	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
@@ -223,12 +227,15 @@ func (v *TransactionVerifier) verifyTransaction(
 		return nil
 	}
 
+	// at this point, account keys are guaranteed to be unique across all signatures
 	err = v.getAccountKeys(txnState, accounts, signatures, tx.ProposalKey)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
 	}
 
-	err = v.verifyAccountSignatures(signatures)
+	// Verify all cryptographic signatures against account public key
+	//  and aggregate weights concurrently (but does not check weight thresholds yet)
+	err = v.verifySignaturesAndAggregateWeights(signatures)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
 	}
@@ -300,9 +307,9 @@ func (v *TransactionVerifier) getAccountKeys(
 	return nil
 }
 
-// verifyAccountSignatures verifies the given signature continuations and
-// aggregate the valid signatures' weights.
-func (v *TransactionVerifier) verifyAccountSignatures(
+// verifySignaturesAndAggregateWeights verifies the given cryptographic signature continuations (concurrently)
+// and aggregate the valid signatures' weights.
+func (v *TransactionVerifier) verifySignaturesAndAggregateWeights(
 	signatures []*signatureContinuation,
 ) error {
 	toVerifyChan := make(chan *signatureContinuation, len(signatures))
