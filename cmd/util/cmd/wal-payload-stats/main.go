@@ -161,4 +161,3 @@ func main() {
 	fmt.Printf("  non-empty values:  %d\n", nonEmptyCount)
 	fmt.Printf("  total payloads:    %d\n", nilCount+emptySliceCount+nonEmptyCount)
 }
-
