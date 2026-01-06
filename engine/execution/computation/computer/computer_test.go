@@ -703,6 +703,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				fvm.WithReusableCadenceRuntimePool(
 					reusableRuntime.NewCustomReusableCadenceRuntimePool(
 						0,
+						execCtx.Chain,
 						runtime.Config{},
 						func(_ runtime.Config) runtime.Runtime {
 							return emittingRuntime
@@ -817,6 +818,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					execCtx.Chain,
 					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
@@ -931,6 +933,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					execCtx.Chain,
 					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt

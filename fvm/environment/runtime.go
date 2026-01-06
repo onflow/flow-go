@@ -4,16 +4,18 @@ import (
 	cadenceRuntime "github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type RuntimeParams struct {
 	runtime.ReusableCadenceRuntimePool
 }
 
-func DefaultRuntimeParams() RuntimeParams {
+func DefaultRuntimeParams(chain flow.Chain) RuntimeParams {
 	return RuntimeParams{
 		ReusableCadenceRuntimePool: runtime.NewReusableCadenceRuntimePool(
 			0,
+			chain,
 			cadenceRuntime.Config{},
 		),
 	}

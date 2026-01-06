@@ -112,7 +112,7 @@ func DefaultEnvironmentParams() EnvironmentParams {
 	return EnvironmentParams{
 		Chain:                    chainID.Chain(),
 		ServiceAccountEnabled:    true,
-		RuntimeParams:            DefaultRuntimeParams(),
+		RuntimeParams:            DefaultRuntimeParams(chainID.Chain()),
 		ProgramLoggerParams:      DefaultProgramLoggerParams(),
 		EventEmitterParams:       DefaultEventEmitterParams(),
 		BlockInfoParams:          DefaultBlockInfoParams(),
