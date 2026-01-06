@@ -690,10 +690,9 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		suite.Require().NoError(err)
 
 		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
-		suite.Require().ErrorIs(err, expectedErr)
+		suite.Require().Equal(expectedErr, err)
 		suite.Require().Nil(res)
 		suite.Require().Nil(resMetadata)
-		suite.Require().Equal(expectedErr, err)
 	})
 
 	suite.Run("execution result info returns data not found", func() {
@@ -774,10 +773,15 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 			Return(snapshot, nil).
 			Once()
 
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(expectedResult, nil)
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, suite.executionResultInfo).
+			Return(expectedResult, suite.expectedMetadata, nil)
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -799,6 +803,11 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 			Return(flow.ZeroID, expectedErr).
 			Once()
 
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 
@@ -818,13 +827,18 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 			Return(blockID, nil).
 			Once()
 
+		incorrectBlockID := suite.g.Identifiers().Fixture()
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", incorrectBlockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		incorrectBlockID := suite.g.Identifiers().Fixture()
 		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, incorrectBlockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
@@ -846,6 +860,11 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 			Return(snapshot, nil).
 			Once()
 
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 
@@ -856,7 +875,7 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 			fmt.Errorf("failed to get scheduled transaction's block from storage: %w", storage.ErrNotFound))
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
 
-		res, resMetadata, err := txBackend.GetTransactionResult(signalerCtx, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
+		res, resMetadata, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err) // specific error doesn't matter since it's thrown
 		suite.Require().Nil(res)
 		suite.Require().Nil(resMetadata)
@@ -878,10 +897,15 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 			Return(snapshot, nil).
 			Once()
 
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(nil, expectedErr)
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, suite.executionResultInfo).
+			Return(nil, nil, expectedErr)
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
