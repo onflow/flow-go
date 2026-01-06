@@ -2,7 +2,10 @@
 //
 // Usage:
 //
-//	go run cmd/util/cmd/wal-payload-stats/main.go --wal-dir /path/to/wal --from 0 --to 100
+//	go run cmd/util/cmd/wal-payload-stats/main.go --wal-dir /path/to/wal --from 7298 --to 7298
+//
+// Note: Segment numbers should be specified as integers (e.g., 7298), not as filenames (e.g., 00007298).
+// The utility automatically converts segment numbers to the zero-padded 8-digit filenames.
 //
 // The utility prints three counts:
 //  1. Number of payloads with nil values
@@ -52,6 +55,45 @@ func main() {
 	if toSegment < fromSegment {
 		logger.Fatal().Msg("to segment must be >= from segment")
 	}
+
+	// Check available segments
+	first, last, err := prometheusWAL.Segments(walDir)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to get available segments")
+	}
+
+	if first < 0 {
+		logger.Fatal().Msg("No WAL segments found in directory")
+	}
+
+	logger.Info().
+		Int("available_first", first).
+		Int("available_last", last).
+		Msg("Available WAL segments")
+
+	// Validate requested range against available segments
+	if fromSegment < first {
+		logger.Warn().
+			Int("requested_from", fromSegment).
+			Int("available_first", first).
+			Msg("Requested 'from' segment is before first available segment, using first available")
+		fromSegment = first
+	}
+	if toSegment > last {
+		logger.Warn().
+			Int("requested_to", toSegment).
+			Int("available_last", last).
+			Msg("Requested 'to' segment is after last available segment, using last available")
+		toSegment = last
+	}
+
+	// Log which segment files will be read
+	logger.Info().
+		Str("from_file", prometheusWAL.SegmentName(walDir, fromSegment)).
+		Str("to_file", prometheusWAL.SegmentName(walDir, toSegment)).
+		Int("from_segment", fromSegment).
+		Int("to_segment", toSegment).
+		Msg("Reading WAL segment files")
 
 	// Create segment range reader
 	sr, err := prometheusWAL.NewSegmentsRangeReader(logger, prometheusWAL.SegmentRange{
