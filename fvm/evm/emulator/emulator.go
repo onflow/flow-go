@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
@@ -21,21 +20,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-// List of EOAs with restricted access to EVM, due to malicious activity.
-var restrictedEOAs = []gethCommon.Address{
-	gethCommon.HexToAddress("0x2e7C4b71397f10c93dC0C2ba6f8f179A47F994e1"),
-	gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6"),
-}
-
-var restrictedEOAError = errors.New(
-	"this account has been restricted by the Community Governance Council in connection to a protocol exploit, please reach out to security@flowfoundation.com for inquiries or information related to the attack",
-)
-
-// isRestrictedEOA checks if the given address is in the restricted EOAs list
-func isRestrictedEOA(addr gethCommon.Address) bool {
-	return slices.Contains(restrictedEOAs, addr)
-}
 
 // Emulator wraps an EVM runtime where evm transactions
 // and direct calls are accepted.
@@ -70,6 +54,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithTransactionTracer(ctx.Tracer),
 		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
 		WithBlockTxCountSoFar(ctx.TxCountSoFar),
+		WithRestrictedEOAs(restrictedEOAs),
 	)
 }
 
@@ -209,8 +194,8 @@ func (bl *BlockView) RunTransaction(
 	}
 
 	// Restrict access to EVM, for EOAs with proven malicious activity
-	if isRestrictedEOA(msg.From) {
-		return types.NewInvalidResult(tx.Type(), tx.Hash(), restrictedEOAError), nil
+	if bl.config.IsRestrictedEOA(msg.From) {
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA), nil
 	}
 
 	// call tracer
@@ -270,8 +255,8 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		}
 
 		// Restrict access to EVM, for EOAs with proven malicious activity
-		if isRestrictedEOA(msg.From) {
-			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), restrictedEOAError)
+		if bl.config.IsRestrictedEOA(msg.From) {
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA)
 			continue
 		}
 

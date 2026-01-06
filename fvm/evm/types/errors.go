@@ -112,6 +112,10 @@ var (
 
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
+
+	ErrRestrictedEOA = errors.New(
+		"this account has been restricted by the Community Governance Council in connection to a protocol exploit, please reach out to security@flowfoundation.com for inquiries or information related to the attack",
+	)
 )
 
 // StateError is a non-fatal error, returned when a state operation
