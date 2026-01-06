@@ -24,6 +24,8 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -83,13 +85,20 @@ func main() {
 	// Initialize storages
 	storages := common.InitStorages(db)
 
+	// Create a small execution data mempool cache for the utility
+	execDataMempoolCache := herocache.NewBlockExecutionData(
+		100, // small cache limit for utility
+		logger,
+		metrics.NewNoopCollector(),
+	)
+
 	// Create execution data cache
 	execDataCache := execdatacache.NewExecutionDataCache(
 		executionDataStore,
 		storages.Headers,
 		storages.Seals,
 		storages.Results,
-		nil, // no mempool cache needed for utility
+		execDataMempoolCache,
 	)
 
 	// Count payloads by value type
