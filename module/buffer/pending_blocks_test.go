@@ -33,9 +33,17 @@ func (suite *PendingBlocksSuite) block() flow.Slashable[*flow.Proposal] {
 	return unittest.AsSlashable(unittest.ProposalFromBlock(block))
 }
 
-// blockWithParent creates a new block proposal with the given parent header.
-func (suite *PendingBlocksSuite) blockWithParent(parent *flow.Header) flow.Slashable[*flow.Proposal] {
+// blockWithParent creates a new block proposal with the given parent header and unique view.
+// It's essential for correct testing of this structure since it stores one proposal per view.
+func (suite *PendingBlocksSuite) blockWithParent(parent *flow.Header, usedViews map[uint64]struct{}) flow.Slashable[*flow.Proposal] {
 	block := unittest.BlockWithParentFixture(parent)
+	for {
+		if _, hasForbiddenView := usedViews[block.View]; !hasForbiddenView {
+			break
+		}
+		block.View++
+	}
+	usedViews[block.View] = struct{}{} // add the block's view to `usedViews` to prevent future re-usage
 	return unittest.AsSlashable(unittest.ProposalFromBlock(block))
 }
 
@@ -98,7 +106,7 @@ func (suite *PendingBlocksSuite) TestAddExceedsActiveViewRangeSize() {
 	// Create a parent header and then a block that exceeds the active view range size
 	parentHeader := unittest.BlockHeaderFixture()
 	parentHeader.View = finalizedView + 50
-	block := suite.blockWithParent(parentHeader)
+	block := suite.blockWithParent(parentHeader, map[uint64]struct{}{})
 	block.Message.Block.View = finalizedView + activeViewRangeSize + 1
 
 	err := buffer.Add(block)
@@ -120,7 +128,7 @@ func (suite *PendingBlocksSuite) TestAddWithinActiveViewRangeSize() {
 	// Create a parent header and then a block that is exactly at the limit
 	parentHeader := unittest.BlockHeaderFixture()
 	parentHeader.View = finalizedView + 50
-	block := suite.blockWithParent(parentHeader)
+	block := suite.blockWithParent(parentHeader, map[uint64]struct{}{})
 	block.Message.Block.View = finalizedView + activeViewRangeSize
 
 	err := buffer.Add(block)
@@ -141,7 +149,7 @@ func (suite *PendingBlocksSuite) TestAddWithZeroActiveViewRangeSize() {
 	// Create a parent header and then a block that is very far ahead
 	parentHeader := unittest.BlockHeaderFixture()
 	parentHeader.View = finalizedView + 500_000
-	block := suite.blockWithParent(parentHeader)
+	block := suite.blockWithParent(parentHeader, map[uint64]struct{}{})
 	block.Message.Block.View = finalizedView + 1_000_000
 
 	err := buffer.Add(block)
@@ -173,11 +181,12 @@ func (suite *PendingBlocksSuite) TestByID() {
 func (suite *PendingBlocksSuite) TestByParentID() {
 	parent := suite.block()
 	suite.Require().NoError(suite.buffer.Add(parent))
+	usedViews := make(map[uint64]struct{})
 
 	// Create multiple children of the parent
-	child1 := suite.blockWithParent(parent.Message.Block.ToHeader())
-	child2 := suite.blockWithParent(parent.Message.Block.ToHeader())
-	grandchild := suite.blockWithParent(child1.Message.Block.ToHeader())
+	child1 := suite.blockWithParent(parent.Message.Block.ToHeader(), usedViews)
+	child2 := suite.blockWithParent(parent.Message.Block.ToHeader(), usedViews)
+	grandchild := suite.blockWithParent(child1.Message.Block.ToHeader(), usedViews)
 	unrelated := suite.block()
 
 	suite.Require().NoError(suite.buffer.Add(child1))
@@ -208,9 +217,10 @@ func (suite *PendingBlocksSuite) TestByParentID() {
 func (suite *PendingBlocksSuite) TestByParentIDOnlyDirectChildren() {
 	parent := suite.block()
 	suite.Require().NoError(suite.buffer.Add(parent))
+	usedViews := make(map[uint64]struct{})
 
-	child := suite.blockWithParent(parent.Message.Block.ToHeader())
-	grandchild := suite.blockWithParent(child.Message.Block.ToHeader())
+	child := suite.blockWithParent(parent.Message.Block.ToHeader(), usedViews)
+	grandchild := suite.blockWithParent(child.Message.Block.ToHeader(), usedViews)
 
 	suite.Require().NoError(suite.buffer.Add(child))
 	suite.Require().NoError(suite.buffer.Add(grandchild))
@@ -232,6 +242,7 @@ func (suite *PendingBlocksSuite) TestByParentIDOnlyDirectChildren() {
 func (suite *PendingBlocksSuite) TestPruneByView() {
 	const N = 100 // number of blocks to test with
 	blocks := make([]flow.Slashable[*flow.Proposal], 0, N)
+	usedViews := make(map[uint64]struct{})
 
 	// Build a buffer with various blocks
 	for i := 0; i < N; i++ {
@@ -246,7 +257,7 @@ func (suite *PendingBlocksSuite) TestPruneByView() {
 		// 90% of the time, build on an existing block
 		if i%2 == 1 && len(blocks) > 0 {
 			parent := blocks[rand.Intn(len(blocks))]
-			block := suite.blockWithParent(parent.Message.Block.ToHeader())
+			block := suite.blockWithParent(parent.Message.Block.ToHeader(), usedViews)
 			suite.Require().NoError(suite.buffer.Add(block))
 			blocks = append(blocks, block)
 		}
@@ -280,7 +291,7 @@ func (suite *PendingBlocksSuite) TestPruneByViewBelowFinalizedView() {
 	// Add some blocks above finalized view
 	parent := unittest.BlockHeaderFixture()
 	parent.View = finalizedView + 10
-	block := suite.blockWithParent(parent)
+	block := suite.blockWithParent(parent, map[uint64]struct{}{})
 	suite.Require().NoError(buffer.Add(block))
 
 	// Prune at finalized view should succeed
@@ -295,18 +306,18 @@ func (suite *PendingBlocksSuite) TestPruneByViewBelowFinalizedView() {
 
 // TestPruneByViewMultipleTimes tests that pruning multiple times works correctly.
 func (suite *PendingBlocksSuite) TestPruneByViewMultipleTimes() {
+	usedViews := make(map[uint64]struct{})
 	// Create blocks at different views
 	parentHeader := unittest.BlockHeaderFixture()
 	parentHeader.View = 10
-	parent := suite.blockWithParent(parentHeader)
+	parent := suite.blockWithParent(parentHeader, usedViews)
 	suite.Require().NoError(suite.buffer.Add(parent))
 
 	// Create children - views will be automatically set to be greater than parent
-	child1 := suite.blockWithParent(parent.Message.Block.ToHeader())
-	child1.Message.Block.View++
+	child1 := suite.blockWithParent(parent.Message.Block.ToHeader(), usedViews)
 	suite.Require().NoError(suite.buffer.Add(child1))
 
-	child2 := suite.blockWithParent(parent.Message.Block.ToHeader())
+	child2 := suite.blockWithParent(parent.Message.Block.ToHeader(), usedViews)
 	suite.Require().NoError(suite.buffer.Add(child2))
 
 	// Get actual views
@@ -411,7 +422,7 @@ func (suite *PendingBlocksSuite) TestAddAfterPrune() {
 	suite.Assert().False(ok)
 
 	// Add a new block after pruning with view above pruned view
-	block2 := suite.blockWithParent(block1.Message.Block.ToHeader())
+	block2 := suite.blockWithParent(block1.Message.Block.ToHeader(), map[uint64]struct{}{})
 	suite.Require().NoError(suite.buffer.Add(block2))
 
 	// Verify new block is added

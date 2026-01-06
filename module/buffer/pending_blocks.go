@@ -94,7 +94,7 @@ func NewPendingClusterBlocks(finalizedView uint64, activeViewRangeSize uint64) *
 }
 
 // Add adds the input block to the block buffer.
-// If the block already exists, or is below the finalized view, this is a no-op.
+// If the block already exists, is below the finalized view, or another block for this view has been already stored this is a no-op.
 // Errors returns:
 //   - mempool.BeyondActiveRangeError if block.View > finalizedView + activeViewRangeSize (when activeViewRangeSize > 0)
 func (b *GenericPendingBlocks[T]) Add(block flow.Slashable[*flow.GenericProposal[T]]) error {
