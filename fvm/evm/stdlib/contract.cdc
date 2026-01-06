@@ -1044,22 +1044,6 @@ access(all) contract EVM {
         ) as! Result
     }
 
-    /// This is only a temporary measure and will be removed immediately
-    /// after the remediation of the illicit tokens
-    // in the Dec 2025 security incident is complete.
-    /// This function can only be called from the `FlowServiceAccount` contract,
-    /// and only from the holder of `FlowServiceAccount.Administrator` resource.
-    access(account)
-    fun reclaimERC20FromAttackerEOAs(from: String, to: String, data: [UInt8]): Result {
-        return InternalEVM.call(
-            from: EVM.addressFromString(from).bytes,
-            to: EVM.addressFromString(to).bytes,
-            data: data,
-            gasLimit: 16_000_000,
-            value: UInt(0)
-        ) as! Result
-    }
-
     init() {
         self.setupHeartbeat()
     }
