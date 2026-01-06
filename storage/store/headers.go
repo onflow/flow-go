@@ -27,7 +27,7 @@ type Headers struct {
 
 var _ storage.Headers = (*Headers)(nil)
 
-// NewHeaders creates a Headers instance, which stores block headers.
+// NewHeaders creates a Headers instance, which manages block headers of the main consensus (not cluster consensus).
 // It supports storing, caching and retrieving by block ID, and additionally indexes by header height and view.
 // Must be initialized with a non-cluster chainID; see [flow.AllChainIDs] and [cluster.IsCanonicalClusterID].
 func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
