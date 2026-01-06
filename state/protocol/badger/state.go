@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/datastore"
@@ -991,42 +992,35 @@ func IsBootstrapped(db storage.DB) (bool, error) {
 
 // GetChainIDFromLatestFinalizedHeader attempts to retrieve the consensus chainID
 // from the latest finalized header in the database, before storage or protocol state have been initialized.
-// Expected errors during normal operations:
-// - [storage.ErrNotFound] if the node is not bootstrapped.
+// This should ONLY be called on a bootstrapped node, determined by [IsBootstrapped].
+// No errors expected during normal operations.
 func GetChainIDFromLatestFinalizedHeader(db storage.DB) (flow.ChainID, error) {
 	h, err := GetLatestFinalizedHeader(db)
 	if err != nil {
-		return "", err
+		return "", irrecoverable.NewException(err)
 	}
 	return h.ChainID, nil
 }
 
 // GetLatestFinalizedHeader attempts to retrieve the latest finalized header
 // without going through the storage.Headers interface.
-// Expected errors during normal operations:
-// - [storage.ErrNotFound] if the node is not bootstrapped.
+// No errors expected during normal operations.
 func GetLatestFinalizedHeader(db storage.DB) (*flow.Header, error) {
 	var finalized uint64
 	r := db.Reader()
 	err := operation.RetrieveFinalizedHeight(r, &finalized)
 	if err != nil {
-		return nil, err
+		return nil, irrecoverable.NewExceptionf("could not retrieve finalized height: %w", err)
 	}
 	var id flow.Identifier
 	err = operation.LookupBlockHeight(r, finalized, &id)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("could not retrieve finalized header: not present in height index")
-		}
-		return nil, err
+		return nil, irrecoverable.NewExceptionf("could not retrieve blockID of finalized block: %w", err)
 	}
 	var header flow.Header
 	err = operation.RetrieveHeader(r, id, &header)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("could not retrieve finalized header: block not known")
-		}
-		return nil, err
+		return nil, irrecoverable.NewExceptionf("could not retrieve finalized block: %w", err)
 	}
 	return &header, nil
 }
