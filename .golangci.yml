@@ -33,7 +33,6 @@ linters:
         - -ST1012 # error var factoryError should have name of the form errFoo" were hidden
         - -ST1016 # methods on the same type should have the same receiver name (seen 45x "db", 4x "s") (staticcheck)
         - -ST1017 # don't use Yoda conditions" were hidden
-        - -ST1019 # other import of \"github.com/onflow/flow-go/model/bootstrap\"" were hidden
         - -ST1023 # should omit type flow.IdentifierList from declaration; it will be inferred from the right-hand side" were hidden
     custom:
       structwrite:

@@ -23,7 +23,6 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -723,11 +722,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 }
 
 func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName string) error {
-	container := net.ContainerByName(containerName)
-	if container == nil {
+	c := net.ContainerByName(containerName)
+	if c == nil {
 		return fmt.Errorf("%s container not found", containerName)
 	}
-	return net.cli.ContainerStop(ctx, container.ID, dockercontainer.StopOptions{})
+	return net.cli.ContainerStop(ctx, c.ID, container.StopOptions{})
 }
 
 type ObserverConfig struct {

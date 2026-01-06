@@ -67,7 +67,6 @@ import (
 	ledgerpkg "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
-	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -78,7 +77,6 @@ import (
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
-	execdatastorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -168,7 +166,7 @@ type ExecutionNode struct {
 	executionDataStore     execution_data.ExecutionDataStore
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore execdatastorage.DatastoreManager
+	executionDataDatastore edstorage.DatastoreManager
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
@@ -1397,8 +1395,8 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		err := wal.CheckpointHasRootHash(
 			node.Logger,
-			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
-			bootstrapFilenames.FilenameWALRootCheckpoint,
+			path.Join(node.BootstrapDir, modelbootstrap.DirnameExecutionState),
+			modelbootstrap.FilenameWALRootCheckpoint,
 			ledgerpkg.RootHash(node.RootSeal.FinalState),
 		)
 		if err != nil {
@@ -1476,18 +1474,18 @@ func copyBootstrapState(dir, trie string) error {
 	firstCheckpointFilename := "00000000"
 
 	fileExists := func(fileName string) bool {
-		_, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, fileName))
+		_, err := os.Stat(filepath.Join(dir, modelbootstrap.DirnameExecutionState, fileName))
 		return err == nil
 	}
 
 	// if there is a root checkpoint file, then copy that file over
-	if fileExists(bootstrapFilenames.FilenameWALRootCheckpoint) {
-		filename = bootstrapFilenames.FilenameWALRootCheckpoint
+	if fileExists(modelbootstrap.FilenameWALRootCheckpoint) {
+		filename = modelbootstrap.FilenameWALRootCheckpoint
 	} else if fileExists(firstCheckpointFilename) {
 		// else if there is a checkpoint file, then copy that file over
 		filename = firstCheckpointFilename
 	} else {
-		filePath := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, firstCheckpointFilename)
+		filePath := filepath.Join(dir, modelbootstrap.DirnameExecutionState, firstCheckpointFilename)
 
 		// include absolute path of the missing file in the error message
 		absPath, err := filepath.Abs(filePath)
@@ -1499,7 +1497,7 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// copy from the bootstrap folder to the execution state folder
-	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+	from, to := path.Join(dir, modelbootstrap.DirnameExecutionState), trie
 
 	log.Info().Str("dir", dir).Str("trie", trie).
 		Msgf("linking checkpoint file %v from directory: %v, to: %v", filename, from, to)
