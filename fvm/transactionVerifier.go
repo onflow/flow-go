@@ -17,7 +17,7 @@ import (
 )
 
 type signatureType struct {
-	message []byte
+	payload []byte
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
@@ -66,7 +66,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 
 	entry.invokedVerify = true
 
-	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.message)
+	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.payload)
 	if !valid {
 		entry.verifyErr = entry.newError(fmt.Errorf("signature extension data is not valid"))
 	}
@@ -86,20 +86,27 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 	return entry.verifyErr
 }
 
-func newSignatureEntries(
-	payloadSignatures []flow.TransactionSignature,
-	payloadMessage []byte,
-	envelopeSignatures []flow.TransactionSignature,
-	envelopeMessage []byte,
-) (
+// newSignatureEntries creates a list of signatureContinuation entries and deduplicate signatures
+// per account key.
+// The function returns an error if:
+// - there are duplicate signatures for the same account key (address and key index pair)
+// - a signature is provided for an account that is not a payer, proposer or authorizer
+func newSignatureEntries(tx *flow.TransactionBody) (
 	[]*signatureContinuation,
 	map[flow.Address]int,
 	map[flow.Address]int,
 	error,
 ) {
+	transactionAddresses := make(map[flow.Address]struct{})
+	transactionAddresses[tx.Payer] = struct{}{}
+	transactionAddresses[tx.ProposalKey.Address] = struct{}{}
+	for _, addr := range tx.Authorizers {
+		transactionAddresses[addr] = struct{}{}
+	}
+
 	// weight maps are assigned to entries in this function, but are returned as empty maps
-	payloadWeights := make(map[flow.Address]int, len(payloadSignatures))
-	envelopeWeights := make(map[flow.Address]int, len(envelopeSignatures))
+	payloadWeights := make(map[flow.Address]int, len(tx.PayloadSignatures))
+	envelopeWeights := make(map[flow.Address]int, len(tx.EnvelopeSignatures))
 
 	type pair struct {
 		signatureType
@@ -109,23 +116,23 @@ func newSignatureEntries(
 	list := []pair{
 		{
 			signatureType{
-				payloadMessage,
+				tx.PayloadMessage(),
 				errors.NewInvalidPayloadSignatureError,
 				payloadWeights,
 			},
-			payloadSignatures,
+			tx.PayloadSignatures,
 		},
 		{
 			signatureType{
-				envelopeMessage,
+				tx.EnvelopeMessage(),
 				errors.NewInvalidEnvelopeSignatureError,
 				envelopeWeights,
 			},
-			envelopeSignatures,
+			tx.EnvelopeSignatures,
 		},
 	}
 
-	numSignatures := len(payloadSignatures) + len(envelopeSignatures)
+	numSignatures := len(tx.PayloadSignatures) + len(tx.EnvelopeSignatures)
 	signatureContinuations := make([]*signatureContinuation, 0, numSignatures)
 
 	type uniqueKey struct {
@@ -143,12 +150,19 @@ func newSignatureEntries(
 				},
 			}
 
+			// check signature address is either payer, proposer or authorizer
+			_, ok := transactionAddresses[signature.Address]
+			if !ok {
+				return nil, nil, nil, entry.newError(
+					fmt.Errorf("signature is provided for account %s that is neither payer nor authorizer nor proposer", signature.Address))
+			}
+
 			key := uniqueKey{
 				address: signature.Address,
 				index:   signature.KeyIndex,
 			}
 
-			_, ok := duplicate[key]
+			_, ok = duplicate[key]
 			if ok {
 				return nil, nil, nil, entry.newError(
 					fmt.Errorf("duplicate signatures are provided for the same key"))
@@ -211,12 +225,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	// return the signature entries (both payload and envelope) and empty weight maps
 	// that will be used to aggregate weights during signature verification.
 	// the account keys are deduplicated during this call.
-	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(
-		tx.PayloadSignatures,
-		tx.PayloadMessage(),
-		tx.EnvelopeSignatures,
-		tx.EnvelopeMessage(),
-	)
+	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(tx)
 	if err != nil {
 		return err
 	}

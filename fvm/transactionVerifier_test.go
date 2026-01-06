@@ -153,7 +153,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err = run(tx, ctx, txnState)
-		require.Error(t, err)
+
 		require.True(t, errors.IsInvalidEnvelopeSignatureError(err))
 		assert.ErrorContainsf(t, err, fmt.Sprintf("on account %s", payer), "should mention the proposer address %s", payer)
 	})
@@ -197,7 +197,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err = run(tx, ctx, txnState)
-		require.Error(t, err)
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
 		assert.ErrorContainsf(t, err, fmt.Sprintf("on account %s", proposer), "should mention the proposer address %s", proposer)
 	})
@@ -237,7 +236,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err := run(tx, ctx, txnState)
-		require.Error(t, err)
 
 		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
@@ -297,7 +295,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err = run(tx, ctx, txnState)
-		require.Error(t, err)
 		assert.ErrorContainsf(t, err, fmt.Sprintf("authorization failed for account %s", address4), "should mention an authorizer error")
 	})
 
@@ -356,7 +353,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err = run(tx, ctx, txnState)
-		require.Error(t, err)
 		assert.ErrorContains(t, err, "authorizer account does not have sufficient signatures", "error should be about insufficient authorizer weights")
 	})
 
@@ -390,7 +386,6 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err = run(tx, ctx, txnState)
-		require.Error(t, err)
 		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights")
 	})
 
@@ -419,8 +414,66 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err = run(tx, ctx, txnState)
-		require.Error(t, err)
 		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights not invald signature")
+	})
+
+	t.Run("signature from unrelated address", func(t *testing.T) {
+		payer := address1
+		proposer := address2
+		authorizers := []flow.Address{address3}
+		unrelated := unittest.RandomAddressFixture()
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        proposer,
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer:       payer,
+			Authorizers: authorizers,
+		}
+
+		// proposer signature
+		sig2 := flow.TransactionSignature{
+			Address:     proposer,
+			SignerIndex: 0,
+			KeyIndex:    0,
+		}
+
+		// authotizer signature
+		sig3 := flow.TransactionSignature{
+			Address:     authorizers[0],
+			SignerIndex: 0,
+			KeyIndex:    0,
+		}
+
+		// unrelated account signature
+		sig4 := flow.TransactionSignature{
+			Address:     unrelated,
+			SignerIndex: 0,
+			KeyIndex:    0,
+		}
+
+		sig1 := flow.TransactionSignature{
+			Address:     payer,
+			SignerIndex: 0,
+			KeyIndex:    0,
+		}
+
+		// unrelated account signature is included as a payload signature
+		tx.PayloadSignatures = []flow.TransactionSignature{sig2, sig3, sig4}
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+		ctx := newContext()
+		err = run(tx, ctx, txnState)
+		assert.ErrorContains(t, err, "that is neither payer nor authorizer nor proposer", "error should be about unrelated account signature")
+
+		// unrelated account signature is included as an envelope signature
+		tx.PayloadSignatures = []flow.TransactionSignature{sig2, sig3}
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig1, sig4}
+
+		err = run(tx, ctx, txnState)
+		assert.ErrorContains(t, err, "that is neither payer nor authorizer nor proposer", "error should be about unrelated account signature")
 	})
 
 	// test that Transaction Signature verification uses the correct domain tag for verification
