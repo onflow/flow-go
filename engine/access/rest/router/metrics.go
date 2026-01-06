@@ -6,29 +6,32 @@ import (
 	"strings"
 )
 
-// the following logic is used to match the URL with the correct route for metrics collection.
+// routeMatcher ties together an HTTP method with a compiled regex for the path and the route name.
+type routeMatcher struct {
+	method string
+	re     *regexp.Regexp
+	name   string
+}
 
-var routePatterns []*regexp.Regexp
-var routeNameMap map[*regexp.Regexp]string
+var matchers []routeMatcher
 
 func init() {
-	routePatterns = make([]*regexp.Regexp, 0, len(Routes)+len(WSLegacyRoutes))
-	routeNameMap = make(map[*regexp.Regexp]string)
+	matchers = make([]routeMatcher, 0, len(Routes)+len(WSLegacyRoutes))
 
-	// Convert REST route patterns to regex patterns for matching
-	for _, r := range Routes {
-		regexPattern := patternToRegex(r.Pattern)
-		re := regexp.MustCompile("^" + regexPattern + "$")
-		routePatterns = append(routePatterns, re)
-		routeNameMap[re] = r.Name
+	add := func(method, pattern, name string) {
+		regexPattern := "^" + patternToRegex(pattern) + "$"
+		matchers = append(matchers, routeMatcher{
+			method: method,
+			re:     regexp.MustCompile(regexPattern),
+			name:   name,
+		})
 	}
 
-	// Convert WebSocket route patterns to regex patterns for matching
+	for _, r := range Routes {
+		add(r.Method, r.Pattern, r.Name)
+	}
 	for _, r := range WSLegacyRoutes {
-		regexPattern := patternToRegex(r.Pattern)
-		re := regexp.MustCompile("^" + regexPattern + "$")
-		routePatterns = append(routePatterns, re)
-		routeNameMap[re] = r.Name
+		add(r.Method, r.Pattern, r.Name)
 	}
 }
 
@@ -46,13 +49,27 @@ func patternToRegex(pattern string) string {
 	return escaped
 }
 
-// URLToRoute matches the URL against route patterns and returns the matching route name
-func URLToRoute(url string) (string, error) {
+// MethodURLToRoute matches (method, url) against compiled route regexes and returns the route name.
+func MethodURLToRoute(method, url string) (string, error) {
 	path := strings.TrimPrefix(url, "/v1")
-	for _, pattern := range routePatterns {
-		if pattern.MatchString(path) {
-			return routeNameMap[pattern], nil
+
+	if method == "" {
+		for _, m := range matchers {
+			if m.re.MatchString(path) {
+				return m.name, nil
+			}
+		}
+		return "", fmt.Errorf("no matching route found for URL: %s", url)
+	}
+
+	for _, m := range matchers {
+		if m.method != method {
+			continue
+		}
+		if m.re.MatchString(path) {
+			return m.name, nil
 		}
 	}
-	return "", fmt.Errorf("no matching route found for URL: %s", url)
+
+	return "", fmt.Errorf("no matching route found for method %s and URL: %s", method, url)
 }
