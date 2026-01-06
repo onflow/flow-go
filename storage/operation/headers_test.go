@@ -72,12 +72,12 @@ func TestClusterHeaderInsertCheckRetrieve(t *testing.T) {
 func TestHeaderInsertWrongLock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		// without lock
-		lctx := lockManager.NewContext()
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+		// without any locks
+		err := unittest.WithLocks(t, lockManager, []string{}, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+			})
 		})
-		lctx.Release()
 		require.Error(t, err)
 		// wrong lock
 		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
@@ -92,12 +92,12 @@ func TestHeaderInsertWrongLock(t *testing.T) {
 func TestClusterHeaderInsertWrongLock(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
-		// without lock
-		lctx := lockManager.NewContext()
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+		// without any locks
+		err := unittest.WithLocks(t, lockManager, []string{}, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+			})
 		})
-		lctx.Release()
 		require.Error(t, err)
 		// wrong lock
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
