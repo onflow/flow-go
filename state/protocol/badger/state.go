@@ -980,7 +980,7 @@ func newState(
 func IsBootstrapped(db storage.DB) (bool, error) {
 	var finalized uint64
 	err := operation.RetrieveFinalizedHeight(db.Reader(), &finalized)
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, operation.IncompleteStateError) {
 		return false, nil
 	}
 	if err != nil {

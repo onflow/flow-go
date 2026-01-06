@@ -14,6 +14,24 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func TestNonBootstrappedFinalizedRetrieve(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		var retrieved uint64
+		err := operation.RetrieveFinalizedHeight(db.Reader(), &retrieved)
+		require.ErrorIs(t, err, operation.IncompleteStateError)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
+func TestNonBootstrappedSealedRetrieve(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		var retrieved uint64
+		err := operation.RetrieveSealedHeight(db.Reader(), &retrieved)
+		require.ErrorIs(t, err, operation.IncompleteStateError)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
 func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()

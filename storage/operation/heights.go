@@ -9,6 +9,17 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+var (
+	// IncompleteStateError indicates that some information cannot be retrieved from the database,
+	// which the protocol mandates to be present. This can be a symptom of a corrupted state
+	// or an incorrectly / incompletely bootstrapped node. In most cases, this is an exception.
+	//
+	// ATTENTION: in most cases, [IncompleteStateError] error is a symptom of a corrupted state
+	// or an incorrectly / incompletely bootstrapped node. Typically, this is an unexpected exception
+	// and should not be checked for the same way as benign sentinel errors.
+	IncompleteStateError = errors.New("data required by protocol is missing in database")
+)
+
 // UpsertFinalizedHeight upserts the finalized height index, overwriting the current value.
 // Updates to this index must strictly increase the finalized height.
 // To enforce this, the caller must check the current finalized height while holding [storage.LockFinalizeBlock].
@@ -19,8 +30,27 @@ func UpsertFinalizedHeight(lctx lockctx.Proof, w storage.Writer, height uint64) 
 	return UpsertByKey(w, MakePrefix(codeFinalizedHeight), height)
 }
 
+// RetrieveFinalizedHeight reads height of the latest finalized block directly from the database.
+//
+// During bootstrapping, the latest finalized block and its height are indexed and thereafter the
+// latest finalized height is only updated (but never removed). Hence, for a properly bootstrapped
+// node, this function should _always_ return a proper value.
+//
+// CAUTION: This function should only be called on properly bootstrapped nodes. If the state is
+// corrupted or the node is not properly bootstrapped, this function may return [IncompleteStateError].
+// The reason for not returning [storage.ErrNotFound] directly is to avoid confusion between an often
+// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present.
+//
+// No error returns are expected during normal operations.
 func RetrieveFinalizedHeight(r storage.Reader, height *uint64) error {
-	return RetrieveByKey(r, MakePrefix(codeFinalizedHeight), height)
+	var h uint64
+	err := RetrieveByKey(r, MakePrefix(codeFinalizedHeight), &h)
+	if err != nil {
+		// mask the lower-level error to prevent confusion with the often benign `storage.ErrNotFound`:
+		return fmt.Errorf("latest finalized height could not be read, which should never happen for bootstrapped nodes: %w", IncompleteStateError)
+	}
+	*height = h
+	return nil
 }
 
 // UpsertSealedHeight upserts the latest sealed height, OVERWRITING the current value.
@@ -33,8 +63,27 @@ func UpsertSealedHeight(lctx lockctx.Proof, w storage.Writer, height uint64) err
 	return UpsertByKey(w, MakePrefix(codeSealedHeight), height)
 }
 
+// RetrieveSealedHeight reads height of the latest sealed block directly from the database.
+//
+// During bootstrapping, the latest sealed block and its height are indexed and thereafter the
+// latest sealed height is only updated (but never removed). Hence, for a properly bootstrapped
+// node, this function should _always_ return a proper value.
+//
+// CAUTION: This function should only be called on properly bootstrapped nodes. If the state is
+// corrupted or the node is not properly bootstrapped, this function may return [IncompleteStateError].
+// The reason for not returning [storage.ErrNotFound] directly is to avoid confusion between an often
+// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present.
+//
+// No error returns are expected during normal operations.
 func RetrieveSealedHeight(r storage.Reader, height *uint64) error {
-	return RetrieveByKey(r, MakePrefix(codeSealedHeight), height)
+	var h uint64
+	err := RetrieveByKey(r, MakePrefix(codeSealedHeight), &h)
+	if err != nil {
+		// mask the lower-level error to prevent confusion with the often benign `storage.ErrNotFound`:
+		return fmt.Errorf("latest sealed height could not be read, which should never happen for bootstrapped nodes: %w", IncompleteStateError)
+	}
+	*height = h
+	return nil
 }
 
 // InsertEpochFirstHeight inserts the height of the first block in the given epoch.
