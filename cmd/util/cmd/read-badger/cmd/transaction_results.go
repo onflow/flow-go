@@ -26,7 +26,7 @@ var transactionResultsCmd = &cobra.Command{
 	Short: "get transaction-result by block ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+			chainID, err := badgerstate.GetChainID(db)
 			if err != nil {
 				return err
 			}

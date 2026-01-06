@@ -145,7 +145,7 @@ func initStorages(db storage.DB, executionDataDir string) (
 	io.Closer,
 	error,
 ) {
-	chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+	chainID, err := badgerstate.GetChainID(db)
 	if err != nil {
 		return nil, nil, nil, err
 	}

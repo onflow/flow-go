@@ -96,7 +96,7 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64, lockManage
 
 func createStorages(db storage.DB, lockManager lockctx.Manager) (
 	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, error) {
-	chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+	chainID, err := badgerstate.GetChainID(db)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

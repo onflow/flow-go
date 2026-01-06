@@ -49,7 +49,7 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	}
 	defer db.Close()
 
-	chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+	chainID, err := badgerstate.GetChainID(db)
 	if err != nil {
 		return err
 	}

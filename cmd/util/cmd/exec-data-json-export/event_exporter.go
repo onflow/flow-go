@@ -31,7 +31,7 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
 	return common.WithStorage(dbPath, func(db storage.DB) error {
-		chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+		chainID, err := badgerstate.GetChainID(db)
 		if err != nil {
 			return err
 		}

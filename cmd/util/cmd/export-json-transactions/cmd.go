@@ -68,7 +68,7 @@ func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir s
 
 	// init dependencies
 	return common.WithStorage(flagDatadir, func(db storage.DB) error {
-		chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+		chainID, err := badgerstate.GetChainID(db)
 		if err != nil {
 			return err
 		}

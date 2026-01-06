@@ -990,11 +990,11 @@ func IsBootstrapped(db storage.DB) (bool, error) {
 	return true, nil
 }
 
-// GetChainIDFromLatestFinalizedHeader attempts to retrieve the consensus chainID
+// GetChainID attempts to retrieve the consensus chainID
 // from the latest finalized header in the database, before storage or protocol state have been initialized.
 // This should ONLY be called on a bootstrapped node, determined by [IsBootstrapped].
 // No errors expected during normal operations.
-func GetChainIDFromLatestFinalizedHeader(db storage.DB) (flow.ChainID, error) {
+func GetChainID(db storage.DB) (flow.ChainID, error) {
 	h, err := GetLatestFinalizedHeader(db)
 	if err != nil {
 		return "", irrecoverable.NewException(err)

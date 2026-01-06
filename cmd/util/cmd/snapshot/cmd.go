@@ -48,7 +48,7 @@ func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
 
 	return common.WithStorage(flagDatadir, func(db storage.DB) error {
-		chainID, err := badgerstate.GetChainIDFromLatestFinalizedHeader(db)
+		chainID, err := badgerstate.GetChainID(db)
 		if err != nil {
 			return err
 		}

@@ -1195,7 +1195,7 @@ func (fnb *FlowNodeBuilder) determineChainID() error {
 		return err
 	}
 	if bootstrapped {
-		chainID, err := badgerState.GetChainIDFromLatestFinalizedHeader(fnb.ProtocolDB)
+		chainID, err := badgerState.GetChainID(fnb.ProtocolDB)
 		if err != nil {
 			return err
 		}
