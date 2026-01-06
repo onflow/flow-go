@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
@@ -210,7 +211,10 @@ func GetAccount(
 	*flow.Account,
 	error,
 ) {
-	env, _ := getScriptEnvironment(ctx, storageSnapshot)
+	env, _, err := getScriptEnvironment(ctx, storageSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account: %w", err)
+	}
 
 	account, err := env.GetAccount(address)
 	if err != nil {
@@ -235,7 +239,10 @@ func GetAccountBalance(
 	uint64,
 	error,
 ) {
-	env, _ := getScriptEnvironment(ctx, storageSnapshot)
+	env, _, err := getScriptEnvironment(ctx, storageSnapshot)
+	if err != nil {
+		return 0, fmt.Errorf("cannot get account balance: %w", err)
+	}
 
 	accountBalance, err := env.GetAccountBalance(common.Address(address))
 
@@ -254,7 +261,10 @@ func GetAccountAvailableBalance(
 	uint64,
 	error,
 ) {
-	env, _ := getScriptEnvironment(ctx, storageSnapshot)
+	env, _, err := getScriptEnvironment(ctx, storageSnapshot)
+	if err != nil {
+		return 0, fmt.Errorf("cannot get account available balance: %w", err)
+	}
 
 	accountBalance, err := env.GetAccountAvailableBalance(common.Address(address))
 
@@ -273,7 +283,10 @@ func GetAccountKeys(
 	[]flow.AccountPublicKey,
 	error,
 ) {
-	_, accountInfo := getScriptEnvironment(ctx, storageSnapshot)
+	_, accountInfo, err := getScriptEnvironment(ctx, storageSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account keys: %w", err)
+	}
 	accountKeys, err := accountInfo.GetAccountKeys(address)
 
 	if err != nil {
@@ -292,7 +305,10 @@ func GetAccountKey(
 	*flow.AccountPublicKey,
 	error,
 ) {
-	_, accountInfo := getScriptEnvironment(ctx, storageSnapshot)
+	_, accountInfo, err := getScriptEnvironment(ctx, storageSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account key: %w", err)
+	}
 	accountKey, err := accountInfo.GetAccountKeyByIndex(address, keyIndex)
 
 	if err != nil {
@@ -306,7 +322,7 @@ func GetAccountKey(
 func getScriptEnvironment(
 	ctx Context,
 	storageSnapshot snapshot.StorageSnapshot,
-) (environment.Environment, environment.AccountInfo) {
+) (environment.Environment, environment.AccountInfo, error) {
 	blockDatabase := storage.NewBlockDatabase(
 		storageSnapshot,
 		0,
@@ -326,5 +342,31 @@ func getScriptEnvironment(
 		ctx.EnvironmentParams,
 		storageTxn)
 
-	return env, env.AccountInfo
+	// Setup EVM for GetAccount calls.
+	// GetAccount loads accounts which validates their contracts.
+	// Contracts like EVM reference InternalEVM, so we must register it.
+	chainID := ctx.Chain.ChainID()
+	cadenceRuntime := env.BorrowCadenceRuntime()
+	defer env.ReturnCadenceRuntime(cadenceRuntime)
+	
+	// Setup both ScriptRuntimeEnv and TxRuntimeEnv (like script.go does)
+	err := evm.SetupEnvironment(
+		chainID,
+		env,
+		cadenceRuntime.ScriptRuntimeEnv,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to setup EVM environment: %w", err)
+	}
+	
+	err = evm.SetupEnvironment(
+		chainID,
+		env,
+		cadenceRuntime.TxRuntimeEnv,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to setup EVM environment: %w", err)
+	}
+
+	return env, env.AccountInfo, nil
 }
