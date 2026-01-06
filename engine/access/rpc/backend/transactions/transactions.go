@@ -404,7 +404,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	encodingVersion entities.EventEncodingVersion,
 	executionResultInfo *optimistic_sync.ExecutionResultInfo,
 ) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, *flow.TransactionBody, error) {
-	// 1. lookup the the collection that contains the transaction. if it is not found, then the
+	// 1. lookup the collection that contains the transaction. if it is not found, then the
 	// collection is not yet indexed and the transaction is either unknown or pending.
 	//
 	// BFT corner case: Only the first finalized collection to contain the transaction is indexed.
@@ -592,7 +592,17 @@ func (t *Transactions) getUnknownUserTransactionResult(
 
 	// The transaction does not exist locally, so check if the block or collection help identify its status.
 	// If we know the queried block or collection exist locally, then we can avoid querying historical Access Node.
-	if blockID != flow.ZeroID {
+
+	//t.state.Final().Head()
+
+	latestFinalizedHeader, err := t.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup latest finalized header: %w", err)
+	}
+	finalizedHeaderBlockID := latestFinalizedHeader.ID()
+
+	//if blockID != flow.ZeroID {
+	if blockID != finalizedHeaderBlockID {
 		_, err := t.blocks.ByID(blockID)
 		if err == nil {
 			// the user's specified block exists locally, so assume the tx is not yet indexed
