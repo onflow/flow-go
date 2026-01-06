@@ -33,12 +33,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize logger
+	logger := zerolog.Nop()
+
+	// Log input
+	log.Info().
+		Str("checkpoint_path", checkpointPath).
+		Msg("Starting checkpoint payload analysis")
+
 	// Extract directory and filename from the checkpoint path
 	dir := filepath.Dir(checkpointPath)
 	fileName := filepath.Base(checkpointPath)
 
-	// Initialize logger
-	logger := zerolog.Nop()
+	log.Info().
+		Str("checkpoint_dir", dir).
+		Str("checkpoint_file", fileName).
+		Msg("Parsed checkpoint path")
 
 	// Read root hash(es) from checkpoint
 	rootHashes, err := wal.ReadTriesRootHash(logger, dir, fileName)
