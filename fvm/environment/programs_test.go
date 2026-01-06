@@ -141,7 +141,7 @@ func getTestContract(
 	error,
 ) {
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
-		environment.DefaultEnvironmentParams(),
+		fvm.DefaultEnvironmentParams(),
 		snapshot)
 	return env.GetAccountContractCode(location)
 }

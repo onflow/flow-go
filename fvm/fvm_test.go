@@ -3873,7 +3873,7 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 		env := environment.NewScriptEnv(
 			context.TODO(),
 			tracing.NewMockTracerSpan(),
-			environment.DefaultEnvironmentParams(),
+			fvm.DefaultEnvironmentParams(),
 			nil,
 		)
 
@@ -3902,7 +3902,7 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 		env := environment.NewScriptEnv(
 			context.TODO(),
 			tracing.NewMockTracerSpan(),
-			environment.DefaultEnvironmentParams(),
+			fvm.DefaultEnvironmentParams(),
 			nil,
 		)
 

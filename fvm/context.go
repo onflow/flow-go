@@ -80,9 +80,26 @@ func defaultContext() Context {
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
 		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
-		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
+		EnvironmentParams:                 DefaultEnvironmentParams(),
 	}
 	return ctx
+}
+
+// DefaultEnvironmentParams creates environment.EnvironmentParams that serve as base settings
+// for EnvironmentParams and can be used as is for tests.
+func DefaultEnvironmentParams() environment.EnvironmentParams {
+	const chainID = flow.Mainnet
+	return environment.EnvironmentParams{
+		Chain:                    chainID.Chain(),
+		ServiceAccountEnabled:    true,
+		RuntimeParams:            reusableRuntime.DefaultRuntimeParams(chainID.Chain()),
+		ProgramLoggerParams:      environment.DefaultProgramLoggerParams(),
+		EventEmitterParams:       environment.DefaultEventEmitterParams(),
+		BlockInfoParams:          environment.DefaultBlockInfoParams(),
+		TransactionInfoParams:    environment.DefaultTransactionInfoParams(),
+		ContractUpdaterParams:    environment.DefaultContractUpdaterParams(),
+		ExecutionVersionProvider: environment.ZeroExecutionVersionProvider{},
+	}
 }
 
 // An Option sets a configuration parameter for a virtual machine context.

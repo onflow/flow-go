@@ -5,25 +5,18 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
+	"github.com/onflow/flow-go/fvm/environment"
 )
-
-// Note: this is a subset of environment.Environment, redeclared to handle
-// circular dependency.
-type Environment interface {
-	runtime.Interface
-	common.Gauge
-
-	RandomSourceHistory() ([]byte, error)
-	TxIndex() uint32
-}
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
 	TxRuntimeEnv     runtime.Environment
 	ScriptRuntimeEnv runtime.Environment
 
-	fvmEnv Environment
+	fvmEnv environment.Environment
 }
+
+var _ environment.ReusableCadenceRuntime = (*ReusableCadenceRuntime)(nil)
 
 func NewReusableCadenceRuntime(
 	rt runtime.Runtime,
@@ -49,8 +42,16 @@ func (reusable *ReusableCadenceRuntime) declareStandardLibraryFunctions() {
 
 }
 
-func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv Environment) {
+func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv environment.Environment) {
 	reusable.fvmEnv = fvmEnv
+}
+
+func (reusable *ReusableCadenceRuntime) CadenceTXEnv() runtime.Environment {
+	return reusable.TxRuntimeEnv
+}
+
+func (reusable *ReusableCadenceRuntime) CadenceScriptEnv() runtime.Environment {
+	return reusable.ScriptRuntimeEnv
 }
 
 func (reusable *ReusableCadenceRuntime) ReadStored(
