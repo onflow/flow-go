@@ -23,8 +23,8 @@ func TestConvertAddress(t *testing.T) {
 
 	assert.NotEqual(t, cadenceAddress, runtimeAddress)
 
-	assert.Equal(t, expected, ConvertAddress(cadenceAddress))
-	assert.Equal(t, expected, ConvertAddress(runtimeAddress))
+	assert.Equal(t, expected, Address(cadenceAddress))
+	assert.Equal(t, expected, Address(runtimeAddress))
 }
 
 func TestBytesToAddress(t *testing.T) {

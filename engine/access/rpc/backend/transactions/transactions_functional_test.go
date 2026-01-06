@@ -11,9 +11,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/access/validator"
@@ -28,14 +29,13 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/access"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
-	testutil "github.com/onflow/flow-go/module/executiondatasync/testutil"
+	"github.com/onflow/flow-go/module/executiondatasync/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
@@ -345,7 +345,7 @@ func scheduledTransactionFromEvents(
 ) (*flow.TransactionBody, error) {
 	systemCollection, err := systemcollection.Default(chainID).
 		ByHeight(blockHeight).
-		SystemCollection(chainID.Chain(), access.StaticEventProvider(events))
+		SystemCollection(chainID.Chain(), accessmodel.StaticEventProvider(events))
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +521,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_Local() {
 	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
 	systemCollection, err := versionedSystemCollection.
 		ByHeight(block.Height).
-		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
+		SystemCollection(s.g.ChainID().Chain(), accessmodel.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -592,7 +592,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_ExecutionNode() {
 	txID := s.tf.ExpectedResults[1].TransactionID
 
 	accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(1, entities.EventEncodingVersion_CCF_V0))
-	nodeResponse := &execution.GetTransactionResultResponse{
+	nodeResponse := &execproto.GetTransactionResultResponse{
 		StatusCode:           accessResponse.StatusCode,
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
@@ -622,7 +622,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 	blockID := s.tf.Block.ID()
 
 	accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(1, entities.EventEncodingVersion_CCF_V0))
-	nodeResponse := &execution.GetTransactionResultResponse{
+	nodeResponse := &execproto.GetTransactionResultResponse{
 		StatusCode:           accessResponse.StatusCode,
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
@@ -648,14 +648,41 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 	s.Require().Equal(expectedResult, result)
 }
 
+func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode_Errors() {
+	s.T().Run("failed to get events from EN", func(t *testing.T) {
+		blockID := s.tf.Block.ID()
+		env := systemcontracts.SystemContractsForChain(s.g.ChainID()).AsTemplateEnv()
+		pendingExecuteEventType := blueprints.PendingExecutionEventType(env)
+
+		eventsExpectedErr := status.Error(
+			codes.Unavailable,
+			"there are no available nodes",
+		)
+		s.setupExecutionGetEventsRequestFailed(blockID, pendingExecuteEventType, eventsExpectedErr)
+
+		params := s.defaultExecutionNodeParams()
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		expectedErr := fmt.Errorf("failed to get process transactions events: rpc error: code = Unavailable desc = failed to retrieve result from any execution node: 1 error occurred:\n\t* %w\n\n", eventsExpectedErr)
+		index := uint32(20) // case when user transactions is not within the guarantees
+		result, err := txBackend.GetTransactionResultByIndex(context.Background(), blockID, index, entities.EventEncodingVersion_JSON_CDC_V0)
+		s.Require().Error(err)
+		s.Require().Nil(result)
+
+		s.Require().Equal(codes.Unavailable, status.Code(err))
+		s.Require().Equal(expectedErr.Error(), err.Error())
+	})
+}
+
 func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionNode() {
 	blockID := s.tf.Block.ID()
 
 	expectedResults := make([]*accessmodel.TransactionResult, len(s.tf.ExpectedResults))
-	nodeResults := make([]*execution.GetTransactionResultResponse, len(s.tf.ExpectedResults))
+	nodeResults := make([]*execproto.GetTransactionResultResponse, len(s.tf.ExpectedResults))
 	for i := range s.tf.ExpectedResults {
 		accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(i, entities.EventEncodingVersion_CCF_V0))
-		nodeResults[i] = &execution.GetTransactionResultResponse{
+		nodeResults[i] = &execproto.GetTransactionResultResponse{
 			StatusCode:   accessResponse.StatusCode,
 			ErrorMessage: accessResponse.ErrorMessage,
 			Events:       accessResponse.Events,
@@ -663,7 +690,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
 	}
 
-	nodeResponse := &execution.GetTransactionResultsResponse{
+	nodeResponse := &execproto.GetTransactionResultsResponse{
 		TransactionResults:   nodeResults,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
@@ -697,7 +724,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 	versionedSystemCollection := systemcollection.Default(s.g.ChainID())
 	systemCollection, err := versionedSystemCollection.
 		ByHeight(block.Height).
-		SystemCollection(s.g.ChainID().Chain(), access.StaticEventProvider(s.tf.ExpectedEvents))
+		SystemCollection(s.g.ChainID().Chain(), accessmodel.StaticEventProvider(s.tf.ExpectedEvents))
 	s.Require().NoError(err)
 	expectedTransactions = append(expectedTransactions, systemCollection.Transactions...)
 
@@ -716,18 +743,20 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 		}
 	}
 
-	nodeResponse := &execution.GetEventsForBlockIDsResponse{
-		Results: []*execution.GetEventsForBlockIDsResponse_Result{{
-			BlockId:     blockID[:],
-			BlockHeight: block.Height,
-			Events:      events,
-		}},
+	nodeResponse := &execproto.GetEventsForBlockIDsResponse{
+		Results: []*execproto.GetEventsForBlockIDsResponse_Result{
+			{
+				BlockId:     blockID[:],
+				BlockHeight: block.Height,
+				Events:      events,
+			},
+		},
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
 
 	s.execClient.
 		On("GetEventsForBlockIDs", mock.Anything, expectedRequest).
-		Return(nodeResponse, nil)
+		Return(nodeResponse, nil).Once()
 
 	params := s.defaultExecutionNodeParams()
 	txBackend, err := NewTransactionsBackend(params)
@@ -738,6 +767,32 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 	s.Require().Equal(expectedTransactions, results)
 }
 
+func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode_Errors() {
+	s.T().Run("failed to get events from EN", func(t *testing.T) {
+		blockID := s.tf.Block.ID()
+		env := systemcontracts.SystemContractsForChain(s.g.ChainID()).AsTemplateEnv()
+		pendingExecuteEventType := blueprints.PendingExecutionEventType(env)
+
+		eventsExpectedErr := status.Error(
+			codes.Unavailable,
+			"there are no available nodes",
+		)
+		s.setupExecutionGetEventsRequestFailed(blockID, pendingExecuteEventType, eventsExpectedErr)
+
+		params := s.defaultExecutionNodeParams()
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		expectedErr := fmt.Errorf("failed to get process transactions events: rpc error: code = Unavailable desc = failed to retrieve result from any execution node: 1 error occurred:\n\t* %w\n\n", eventsExpectedErr)
+		results, err := txBackend.GetTransactionsByBlockID(context.Background(), blockID)
+		s.Require().Error(err)
+		s.Require().Nil(results)
+
+		s.Require().Equal(codes.Unavailable, status.Code(err))
+		s.Require().Equal(expectedErr.Error(), err.Error())
+	})
+}
+
 func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_ExecutionNode() {
 	block := s.tf.Block
 	blockID := block.ID()
@@ -745,30 +800,13 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 	env := systemcontracts.SystemContractsForChain(s.g.ChainID()).AsTemplateEnv()
 	pendingExecuteEventType := blueprints.PendingExecutionEventType(env)
 
-	expectedRequest := &execproto.GetEventsForBlockIDsRequest{
-		Type:     string(pendingExecuteEventType),
-		BlockIds: [][]byte{blockID[:]},
-	}
-
-	events := make([]*entities.Event, 0)
+	events := make([]flow.Event, 0)
 	for _, event := range s.tf.ExpectedEvents {
 		if blueprints.IsPendingExecutionEvent(env, event) {
-			events = append(events, convert.EventToMessage(event))
+			events = append(events, event)
 		}
 	}
-
-	nodeResponse := &execution.GetEventsForBlockIDsResponse{
-		Results: []*execution.GetEventsForBlockIDsResponse_Result{{
-			BlockId:     blockID[:],
-			BlockHeight: block.Height,
-			Events:      events,
-		}},
-		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-	}
-
-	s.execClient.
-		On("GetEventsForBlockIDs", mock.Anything, expectedRequest).
-		Return(nodeResponse, nil)
+	s.setupExecutionGetEventsRequest(blockID, pendingExecuteEventType, block.Height, events)
 
 	params := s.defaultExecutionNodeParams()
 	txBackend, err := NewTransactionsBackend(params)
@@ -784,4 +822,73 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 
 		break // call for the first scheduled transaction iterated
 	}
+}
+
+func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_ExecutionNode_Errors() {
+	s.T().Run("failed to get events from EN", func(t *testing.T) {
+		block := s.tf.Block
+		blockID := block.ID()
+		env := systemcontracts.SystemContractsForChain(s.g.ChainID()).AsTemplateEnv()
+		pendingExecuteEventType := blueprints.PendingExecutionEventType(env)
+
+		eventsExpectedErr := status.Error(
+			codes.Unavailable,
+			"there are no available nodes",
+		)
+		s.setupExecutionGetEventsRequestFailed(blockID, pendingExecuteEventType, eventsExpectedErr)
+
+		params := s.defaultExecutionNodeParams()
+		txBackend, err := NewTransactionsBackend(params)
+		s.Require().NoError(err)
+
+		expectedErr := fmt.Errorf("rpc error: code = Unavailable desc = failed to retrieve result from any execution node: 1 error occurred:\n\t* %w\n\n", eventsExpectedErr)
+		for _, scheduledTxID := range s.tf.ExpectedScheduledTransactions {
+			results, err := txBackend.GetScheduledTransaction(context.Background(), scheduledTxID)
+			s.Require().Error(err)
+			s.Require().Nil(results)
+
+			s.Require().Equal(codes.Unavailable, status.Code(err))
+			s.Require().Equal(expectedErr.Error(), err.Error())
+
+			break // call for the first scheduled transaction iterated
+		}
+	})
+}
+
+func (s *TransactionsFunctionalSuite) setupExecutionGetEventsRequest(blockID flow.Identifier, eventType flow.EventType, blockHeight uint64, events []flow.Event) {
+	eventMessages := make([]*entities.Event, len(events))
+	for i, event := range events {
+		eventMessages[i] = convert.EventToMessage(event)
+	}
+
+	request := &execproto.GetEventsForBlockIDsRequest{
+		Type:     string(eventType),
+		BlockIds: [][]byte{blockID[:]},
+	}
+	expectedResponse := &execproto.GetEventsForBlockIDsResponse{
+		Results: []*execproto.GetEventsForBlockIDsResponse_Result{
+			{
+				BlockId:     blockID[:],
+				BlockHeight: blockHeight,
+				Events:      eventMessages,
+			},
+		},
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	}
+
+	s.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, request).
+		Return(expectedResponse, nil).
+		Once()
+}
+
+func (s *TransactionsFunctionalSuite) setupExecutionGetEventsRequestFailed(blockID flow.Identifier, eventType flow.EventType, expectedErr error) {
+	expectedRequest := &execproto.GetEventsForBlockIDsRequest{
+		Type:     string(eventType),
+		BlockIds: [][]byte{blockID[:]},
+	}
+
+	s.execClient.
+		On("GetEventsForBlockIDs", mock.Anything, expectedRequest).
+		Return(nil, expectedErr).Once()
 }

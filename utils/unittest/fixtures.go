@@ -1616,7 +1616,7 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 func TransactionBodyListFixture(n int) []flow.TransactionBody {
 	l := make([]flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
-		l[i] = TransactionBodyFixture()
+		l[i] = TransactionFixture()
 	}
 
 	return l
@@ -2642,7 +2642,7 @@ func MachineAccountFixture(t *testing.T) (
 ) {
 	info := NodeMachineAccountInfoFixture()
 
-	bal, err := cadence.NewUFix64("0.5")
+	bal, err := cadence.NewUFix64("5.0")
 	require.NoError(t, err)
 
 	acct := &sdk.Account{

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 
 	"github.com/coreos/go-semver/semver"
@@ -188,8 +190,14 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "start and end version set, start ignored due to override",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.3",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.1": {}},
 			expectedStart: sealedRootBlockHeight,
@@ -199,8 +207,14 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "start and end version set, end ignored due to override",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.3",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.3": {}},
 			expectedStart: sealedRootBlockHeight + 12,
@@ -210,9 +224,18 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "start and end version set, middle envent ignored due to override",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
-				VersionBeaconEvent(latestBlockHeight-3, flow.VersionBoundary{BlockHeight: latestBlockHeight - 1, Version: "0.0.3"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.4"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1",
+				}),
+				VersionBeaconEvent(latestBlockHeight-3, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 1,
+					Version:     "0.0.3",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.4",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.3": {}},
 			expectedStart: sealedRootBlockHeight + 12,
@@ -222,12 +245,31 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "pre-release version matches overrides",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1-pre-release.0"}),
-				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight + 12,
+					Version:     "0.0.1-pre-release.0",
+				}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{
+					BlockHeight: latestBlockHeight - 8,
+					Version:     "0.0.3",
+				}),
 			},
 			overrides:     map[string]struct{}{"0.0.1": {}},
 			expectedStart: sealedRootBlockHeight,
 			expectedEnd:   latestBlockHeight - 9,
+		},
+		{
+			name:        "version boundary height is lower than spork root height",
+			nodeVersion: "0.0.1",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{
+					BlockHeight: sealedRootBlockHeight - 10,
+					Version:     "0.0.1",
+				}),
+			},
+			overrides:     map[string]struct{}{},
+			expectedStart: sealedRootBlockHeight,
+			expectedEnd:   latestBlockHeight,
 		},
 	}
 
@@ -276,6 +318,39 @@ func TestVersionControlInitialization(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestVersionControlStartHeight verifies that StartHeight correctly resolves the
+// effective starting block height based on an optional start boundary and the
+// sealed root block height.
+//
+// Test cases:
+//  1. When no start boundary is set, the sealed root block height is returned.
+//  2. When the start boundary is higher than the sealed root, the start boundary is used.
+//  3. When the start boundary is lower than the sealed root, the result is clamped to the sealed root.
+func TestVersionControlStartHeight(t *testing.T) {
+	vc := &VersionControl{}
+
+	t.Run("no start boundary → sealed root returned", func(t *testing.T) {
+		vc.startHeight = atomic.NewUint64(NoHeight)
+		vc.sealedRootBlockHeight = atomic.NewUint64(1000)
+
+		require.Equal(t, uint64(1000), vc.StartHeight())
+	})
+
+	t.Run("start boundary above sealed root", func(t *testing.T) {
+		vc.startHeight = atomic.NewUint64(1200)
+		vc.sealedRootBlockHeight = atomic.NewUint64(1000)
+
+		require.Equal(t, uint64(1200), vc.StartHeight())
+	})
+
+	t.Run("start boundary below sealed root → clamp to sealed root", func(t *testing.T) {
+		vc.startHeight = atomic.NewUint64(900)
+		vc.sealedRootBlockHeight = atomic.NewUint64(1000)
+
+		require.Equal(t, uint64(1000), vc.StartHeight())
+	})
 }
 
 // TestVersionControlInitializationWithErrors tests the initialization process of the VersionControl component with error cases

@@ -27,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
+var flowTokenAddress = common.Address(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address)
 var randomBeaconAddress = systemcontracts.SystemContractsForChain(flow.Emulator).RandomBeaconHistory.Address
 
 const defaultChainID = flow.Testnet
