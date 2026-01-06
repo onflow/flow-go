@@ -114,7 +114,7 @@ var (
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 
 	ErrRestrictedEOA = errors.New(
-		"this account has been restricted by the Community Governance Council in connection to a protocol exploit, please reach out to security@flowfoundation.com for inquiries or information related to the attack",
+		"this account has been restricted by the Community Governance Council in connection to malicious activity, please reach out to security@flowfoundation.com for inquiries",
 	)
 )
 
