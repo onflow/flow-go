@@ -33,6 +33,8 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -71,15 +73,20 @@ type Suite struct {
 	txResultCache         *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	lastFullBlockHeight   *counters.PersistentStrictMonotonicCounter
 
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	criteria                optimistic_sync.Criteria
+	expectedMetadata        *accessmodel.ExecutorMetadata
+	executionResult         *flow.ExecutionResult
+	executionResultInfo     *optimistic_sync.ExecutionResultInfo
+
 	executionAPIClient        *accessmock.ExecutionAPIClient
 	historicalAccessAPIClient *accessmock.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
 
-	reporter       *syncmock.IndexReporter
-	indexReporter  *index.Reporter
-	eventsIndex    *index.EventsIndex
-	txResultsIndex *index.TransactionResultsIndex
+	reporter      *syncmock.IndexReporter
+	indexReporter *index.Reporter
 
 	errorMessageProvider error_messages.Provider
 
@@ -124,6 +131,22 @@ func (suite *Suite) SetupTest() {
 	suite.historicalAccessAPIClient = accessmock.NewAccessAPIClient(suite.T())
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
+	suite.executionResultProvider = osyncmock.NewExecutionResultProvider(suite.T())
+	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+	suite.criteria = optimistic_sync.Criteria{}
+
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	suite.executionResult = unittest.ExecutionResultFixture()
+	suite.executionResultInfo = &optimistic_sync.ExecutionResultInfo{
+		ExecutionResultID: suite.executionResult.ID(),
+		ExecutionNodes:    executionNodes.ToSkeleton(),
+	}
+
+	suite.expectedMetadata = &accessmodel.ExecutorMetadata{
+		ExecutionResultID: suite.executionResult.ID(),
+		ExecutorIDs:       executionNodes.NodeIDs(),
+	}
+
 	txResCache, err := lru.New[flow.Identifier, *accessmodel.TransactionResult](10)
 	suite.Require().NoError(err)
 	suite.txResultCache = txResCache
@@ -132,8 +155,7 @@ func (suite *Suite) SetupTest() {
 	suite.indexReporter = index.NewReporter()
 	err = suite.indexReporter.Initialize(suite.reporter)
 	suite.Require().NoError(err)
-	suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
-	suite.txResultsIndex = index.NewTransactionResultsIndex(suite.indexReporter, suite.lightTxResults)
+	//suite.eventsIndex = index.NewEventsIndex(suite.indexReporter, suite.events)
 
 	suite.scheduledTransactionsEnabled = true
 
@@ -227,26 +249,24 @@ func (suite *Suite) defaultTransactionsParams() Params {
 	suite.Require().NoError(err)
 
 	return Params{
-		Log:     suite.log,
-		Metrics: metrics.NewNoopCollector(),
-		State:   suite.state,
-		ChainID: flow.Testnet,
-		// SystemCollection:             suite.defaultSystemCollection,
+		Log:                          suite.log,
+		Metrics:                      metrics.NewNoopCollector(),
+		State:                        suite.state,
+		ChainID:                      flow.Testnet,
+		SystemCollections:            versionedSystemCollections,
 		NodeCommunicator:             node_communicator.NewNodeCommunicator(false),
 		ConnFactory:                  suite.connectionFactory,
 		NodeProvider:                 nodeProvider,
 		Blocks:                       suite.blocks,
 		Collections:                  suite.collections,
 		Transactions:                 suite.transactions,
-		TxErrorMessageProvider:       suite.errorMessageProvider,
 		ScheduledTransactions:        suite.scheduledTransactions,
 		TxResultCache:                suite.txResultCache,
 		TxValidator:                  txValidator,
 		TxStatusDeriver:              txStatusDeriver,
-		EventsIndex:                  suite.eventsIndex,
-		TxResultsIndex:               suite.txResultsIndex,
+		ExecutionStateCache:          suite.executionStateCache,
+		ExecutionResultProvider:      suite.executionResultProvider,
 		ScheduledTransactionsEnabled: suite.scheduledTransactionsEnabled,
-		SystemCollections:            versionedSystemCollections,
 	}
 }
 
@@ -577,6 +597,11 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		snapshot := protocolmock.NewSnapshot(suite.T())
 		snapshot.On("Head").Return(block.ToHeader(), nil)
 
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
@@ -584,7 +609,7 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, suite.executionResultInfo).
 			Return(expectedResult, nil)
 
 		params := suite.defaultTransactionsParams()
@@ -593,9 +618,11 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedResult, res)
+		suite.Require().Equal(suite.expectedMetadata, resMetadata)
 	})
 
 	suite.Run("provider error", func() {
@@ -620,7 +647,8 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().ErrorIs(err, expectedErr)
 		suite.Require().Nil(res)
 		suite.Require().Equal(expectedErr, err)
@@ -641,8 +669,9 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Nil(res)
 	})
@@ -654,8 +683,9 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().Equal(codes.InvalidArgument, status.Code(err))
 		suite.Require().Nil(res)
 	})
@@ -703,8 +733,9 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().Equal(expectedResult, res)
 	})
 
@@ -722,10 +753,11 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("scheduled tx block mismatch", func() {
@@ -741,10 +773,11 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 		suite.Require().NoError(err)
 
 		incorrectBlockID := suite.g.Identifiers().Fixture()
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, incorrectBlockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, incorrectBlockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("scheduled tx block not found exception", func() {
@@ -771,9 +804,10 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 			fmt.Errorf("failed to get scheduled transaction's block from storage: %w", storage.ErrNotFound))
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
 
-		res, err := txBackend.GetTransactionResult(signalerCtx, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
-		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		res, resMetadata, err := txBackend.GetTransactionResult(signalerCtx, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
+		suite.Require().Error(err) // specific error doesn't matter since it's thrown
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("provider error", func() {
@@ -803,9 +837,10 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().ErrorIs(err, expectedErr)
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 }
 
@@ -864,8 +899,9 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().Equal(expectedResult, res)
 	})
 
@@ -896,8 +932,9 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().Equal(expectedResult, res)
 	})
 
@@ -931,8 +968,9 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		expected := *expectedResult
 		expected.Status = flow.TransactionStatusFinalized
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
+		suite.Require().NotNil(resMetadata)
 		suite.Require().Equal(expected, *res)
 	})
 
@@ -949,10 +987,11 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		suite.Require().NoError(err)
 
 		incorrectCollectionID := suite.g.Identifiers().Fixture()
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, incorrectCollectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, incorrectCollectionID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("block ID mismatch", func() {
@@ -973,10 +1012,11 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		suite.Require().NoError(err)
 
 		incorrectBlockID := suite.g.Identifiers().Fixture()
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, incorrectBlockID, collectionID, encodingVersion)
+		res, resmetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, incorrectBlockID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resmetadata)
 	})
 
 	suite.Run("collection lookup error", func() {
@@ -992,10 +1032,11 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("block lookup failure throws exception", func() {
@@ -1019,9 +1060,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedErr)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
 
-		res, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion)
-		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		res, resMetadata, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion, suite.criteria)
+		suite.Require().Error(err) // specific error doesn't matter since it's thrown
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("tx body lookup failure throws exception", func() {
@@ -1048,9 +1090,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), expectedErr)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
 
-		res, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(signalerCtx, txID, blockID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("provider error", func() {
@@ -1082,9 +1125,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().ErrorIs(err, expectedErr)
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 }
 
@@ -1145,9 +1189,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedResult, res)
+		suite.Require().NotNil(resMetadata)
 	})
 
 	suite.Run("transaction lookup error", func() {
@@ -1163,10 +1208,11 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("pending block with derive status exception", func() {
@@ -1193,9 +1239,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 			fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup final header: %w", storage.ErrNotFound)))
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
 
-		res, err := txBackend.GetTransactionResult(signalerCtx, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
-		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		res, resMetadata, err := txBackend.GetTransactionResult(signalerCtx, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
+		suite.Require().Error(err) // specific error doesn't matter since it's thrown
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("unknown tx in known block", func() {
@@ -1220,9 +1267,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 			Status:        flow.TransactionStatusUnknown,
 		}
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedResult, res)
+		suite.Require().NotNil(resMetadata)
 	})
 
 	suite.Run("block lookup error", func() {
@@ -1244,10 +1292,11 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, flow.ZeroID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("unknown tx in known collection", func() {
@@ -1267,10 +1316,11 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, collectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("collection lookup error", func() {
@@ -1292,10 +1342,11 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		res, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, collectionID, encodingVersion)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, collectionID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 }
 
@@ -1354,9 +1405,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		resp, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedFoundResponse, resp)
+		suite.Require().NotNil(resMetadata)
 	})
 
 	suite.Run("result not found", func() {
@@ -1371,9 +1423,10 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 		txBackend, err := NewTransactionsBackend(params)
 		suite.Require().NoError(err)
 
-		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		resp, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedNotFoundResponse, resp)
+		suite.Require().NotNil(resMetadata)
 	})
 
 	suite.Run("success result is cached", func() {
@@ -1397,14 +1450,16 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 		suite.Require().NoError(err)
 
 		// first call should populate the cache
-		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		resp, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedFoundResponse, resp)
+		suite.Require().NotNil(resMetadata)
 
 		// second call should return the cached result
-		resp, err = txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		resp, resMetadata, err = txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedFoundResponse, resp)
+		suite.Require().NotNil(resMetadata)
 	})
 
 	suite.Run("not found result is cached", func() {
@@ -1428,14 +1483,16 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 		suite.Require().NoError(err)
 
 		// first call should populate the cache
-		resp, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		resp, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedNotFoundResponse, resp)
+		suite.Require().NotNil(resMetadata)
 
 		// second call should return the cached result
-		resp, err = txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion)
+		resp, resMetadata, err = txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedNotFoundResponse, resp)
+		suite.Require().NotNil(resMetadata)
 	})
 }
 
