@@ -2,7 +2,7 @@
 //
 // Usage:
 //
-//	go run cmd/util/cmd/checkpoint-payload-stats/main.go --checkpoint /path/to/root.checkpoint
+//	go run cmd/util/cmd/checkpoint-payload-stats/main.go --checkpoint /path/to/root.checkpoint [--worker-count 100]
 //
 // The utility prints three counts:
 //  1. Number of payloads with nil values
@@ -17,14 +17,15 @@ import (
 	"path/filepath"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
 func main() {
 	var checkpointPath string
+	var workerCount int
 	flag.StringVar(&checkpointPath, "checkpoint", "", "Path to root checkpoint file (e.g., /path/to/root.checkpoint)")
+	flag.IntVar(&workerCount, "worker-count", 100, "Channel buffer size for leaf node processing")
 	flag.Parse()
 
 	if checkpointPath == "" {
@@ -33,19 +34,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize logger
-	logger := zerolog.Nop()
+	// Initialize logger with timestamps to stderr
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	// Log input
-	log.Info().
+	logger.Info().
 		Str("checkpoint_path", checkpointPath).
+		Int("worker_count", workerCount).
 		Msg("Starting checkpoint payload analysis")
 
 	// Extract directory and filename from the checkpoint path
 	dir := filepath.Dir(checkpointPath)
 	fileName := filepath.Base(checkpointPath)
 
-	log.Info().
+	logger.Info().
 		Str("checkpoint_dir", dir).
 		Str("checkpoint_file", fileName).
 		Msg("Parsed checkpoint path")
@@ -53,15 +55,15 @@ func main() {
 	// Read root hash(es) from checkpoint
 	rootHashes, err := wal.ReadTriesRootHash(logger, dir, fileName)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to read root hash from checkpoint")
+		logger.Fatal().Err(err).Msg("Failed to read root hash from checkpoint")
 	}
 
 	if len(rootHashes) == 0 {
-		log.Fatal().Msg("No root hash found in checkpoint file")
+		logger.Fatal().Msg("No root hash found in checkpoint file")
 	}
 
 	if len(rootHashes) > 1 {
-		log.Warn().
+		logger.Warn().
 			Int("root_count", len(rootHashes)).
 			Msg("Checkpoint contains multiple root hashes, using the first one")
 	}
@@ -69,13 +71,13 @@ func main() {
 	rootHash := rootHashes[0]
 
 	// Create channel for leaf nodes
-	leafNodeChan := make(chan *wal.LeafNode, 100)
+	leafNodeChan := make(chan *wal.LeafNode, workerCount)
 
 	// Read leaf nodes in a goroutine
 	go func() {
 		err := wal.OpenAndReadLeafNodesFromCheckpointV6(leafNodeChan, dir, fileName, rootHash, logger)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to read leaf nodes from checkpoint")
+			logger.Fatal().Err(err).Msg("Failed to read leaf nodes from checkpoint")
 		}
 	}()
 
