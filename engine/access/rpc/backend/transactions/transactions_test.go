@@ -596,21 +596,20 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 	suite.Run("happy path", func() {
 		snapshot := protocolmock.NewSnapshot(suite.T())
 		snapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
 
 		suite.executionResultProvider.
 			On("ExecutionResultInfo", blockID, suite.criteria).
 			Return(suite.executionResultInfo, nil).
 			Once()
 
-		suite.state.
-			On("AtBlockID", blockID).
-			Return(snapshot, nil).
-			Once()
-
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
 			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, suite.executionResultInfo).
-			Return(expectedResult, nil)
+			Return(expectedResult, suite.expectedMetadata, nil)
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -619,6 +618,44 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		suite.Require().NoError(err)
 
 		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
+		suite.Require().NotNil(resMetadata)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedResult, res)
+		suite.Require().Equal(suite.expectedMetadata, resMetadata)
+	})
+
+	suite.Run("happy case block not provided", func() {
+		blocks := suite.g.Blocks().List(3)
+		finalizedBlock := blocks[0]
+		finalizedBlockID := finalizedBlock.ID()
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(finalizedBlock.ToHeader(), nil)
+		suite.state.On("Final").Return(finalSnapshot, nil).Once()
+
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(finalizedBlock.ToHeader(), nil)
+		suite.state.
+			On("AtBlockID", finalizedBlockID).
+			Return(snapshot, nil).
+			Once()
+
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", finalizedBlockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
+		provider := providermock.NewTransactionProvider(suite.T())
+		provider.
+			On("TransactionResult", mock.Anything, finalizedBlock.ToHeader(), txID, flow.ZeroID, encodingVersion, suite.executionResultInfo).
+			Return(expectedResult, suite.expectedMetadata, nil)
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = provider
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NotNil(resMetadata)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedResult, res)
@@ -636,10 +673,15 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 			Return(snapshot, nil).
 			Once()
 
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(nil, expectedErr)
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, suite.executionResultInfo).
+			Return(nil, nil, expectedErr)
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -648,10 +690,29 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		suite.Require().NoError(err)
 
 		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
-		suite.Require().NotNil(resMetadata)
 		suite.Require().ErrorIs(err, expectedErr)
 		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 		suite.Require().Equal(expectedErr, err)
+	})
+
+	suite.Run("execution result info returns data not found", func() {
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		params := suite.defaultTransactionsParams()
+		params.TxProvider = providermock.NewTransactionProvider(suite.T())
+
+		txBackend, err := NewTransactionsBackend(params)
+		suite.Require().NoError(err)
+
+		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
+		suite.Require().Error(err)
+		suite.ErrorIs(err, storage.ErrNotFound)
+		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("block not found exception", func() {
@@ -663,6 +724,11 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 			Return(snapshot, nil).
 			Once()
 
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 
@@ -671,23 +737,9 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 
 		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().Error(err)
-		suite.Require().NotNil(resMetadata)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Nil(res)
-	})
-
-	suite.Run("block not provided", func() {
-		params := suite.defaultTransactionsParams()
-		params.TxProvider = providermock.NewTransactionProvider(suite.T())
-
-		txBackend, err := NewTransactionsBackend(params)
-		suite.Require().NoError(err)
-
-		res, resMetadata, err := txBackend.GetTransactionResult(context.Background(), txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
-		suite.Require().Error(err)
-		suite.Require().NotNil(resMetadata)
-		suite.Require().Equal(codes.InvalidArgument, status.Code(err))
-		suite.Require().Nil(res)
+		suite.Require().Nil(resMetadata)
 	})
 }
 
