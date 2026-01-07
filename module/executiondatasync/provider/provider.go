@@ -3,16 +3,13 @@ package provider
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ipfs/go-cid"
-	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
@@ -269,19 +266,6 @@ func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
 		return flow.ZeroID, fmt.Errorf("failed to serialize execution data root: %w", err)
 	}
 
-	// Debug: log the serialized root
-	h := hash.NewSHA3_256()
-	_, _ = h.Write(buf.Bytes())
-	fmt.Printf("[DEBUG Provider] addExecutionDataRoot blockID=%x numChunks=%d serializedLen=%d serializedHash=%x\n",
-		edRoot.BlockID[:], len(edRoot.ChunkExecutionDataIDs), buf.Len(), h.SumHash())
-	for i, chunkCID := range edRoot.ChunkExecutionDataIDs {
-		fmt.Printf("[DEBUG Provider] addExecutionDataRoot blockID=%x chunkCID[%d]=%s\n", edRoot.BlockID[:], i, chunkCID.String())
-	}
-
-	if buf.Len() > p.maxBlobSize {
-		return flow.ZeroID, errors.New("execution data root blob exceeds maximum allowed size")
-	}
-
 	rootBlob := blobs.NewBlob(buf.Bytes())
 	if blobCh != nil {
 		blobCh <- rootBlob
@@ -292,8 +276,6 @@ func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
 		return flow.ZeroID, fmt.Errorf("failed to convert root blob cid to id: %w", err)
 	}
 
-	fmt.Printf("[DEBUG Provider] addExecutionDataRoot blockID=%x rootID=%x rootBlobCid=%s\n", edRoot.BlockID[:], rootID[:], rootBlob.Cid().String())
-
 	return rootID, nil
 }
 
@@ -302,14 +284,7 @@ func (p *ExecutionDataCIDProvider) addChunkExecutionData(
 	ced *execution_data.ChunkExecutionData,
 	blobCh chan<- blobs.Blob,
 ) (cid.Cid, error) {
-	// Debug: log serialized bytes of each field
-	p.logChunkExecutionDataFields(blockID, ced)
-
 	cids, err := p.addBlobs(ced, blobCh)
-	fmt.Printf("[DEBUG Provider] blockID=%x addBlobs returned %d cids\n", blockID[:], len(cids))
-	for i, c := range cids {
-		fmt.Printf("[DEBUG Provider] blockID=%x cid[%d]=%s\n", blockID[:], i, c.String())
-	}
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to add chunk execution data blobs: %w", err)
 	}
@@ -323,104 +298,6 @@ func (p *ExecutionDataCIDProvider) addChunkExecutionData(
 			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
-}
-
-// logChunkExecutionDataFields logs the serialized bytes hash of each field in ChunkExecutionData for debugging.
-func (p *ExecutionDataCIDProvider) logChunkExecutionDataFields(blockID flow.Identifier, ced *execution_data.ChunkExecutionData) {
-	// Collection
-	var collectionHash []byte
-	if ced.Collection != nil {
-		buf := new(bytes.Buffer)
-		_ = p.serializer.Serialize(buf, ced.Collection)
-		h := hash.NewSHA3_256()
-		_, _ = h.Write(buf.Bytes())
-		collectionHash = h.SumHash()
-	}
-
-	// Events
-	var eventsHash []byte
-	{
-		buf := new(bytes.Buffer)
-		_ = p.serializer.Serialize(buf, ced.Events)
-		h := hash.NewSHA3_256()
-		_, _ = h.Write(buf.Bytes())
-		eventsHash = h.SumHash()
-	}
-
-	// TrieUpdate
-	var trieUpdateHash []byte
-	var trieUpdateLen int
-	if ced.TrieUpdate != nil {
-		buf := new(bytes.Buffer)
-		_ = p.serializer.Serialize(buf, ced.TrieUpdate)
-		trieUpdateLen = buf.Len()
-		h := hash.NewSHA3_256()
-		_, _ = h.Write(buf.Bytes())
-		trieUpdateHash = h.SumHash()
-	}
-
-	// TransactionResults
-	var txResultsHash []byte
-	{
-		buf := new(bytes.Buffer)
-		_ = p.serializer.Serialize(buf, ced.TransactionResults)
-		h := hash.NewSHA3_256()
-		_, _ = h.Write(buf.Bytes())
-		txResultsHash = h.SumHash()
-	}
-
-	// Full ChunkExecutionData
-	var cedHash []byte
-	var cedLen int
-	var cedBytes []byte
-	{
-		buf := new(bytes.Buffer)
-		_ = p.serializer.Serialize(buf, ced)
-		cedBytes = buf.Bytes()
-		cedLen = len(cedBytes)
-		h := hash.NewSHA3_256()
-		_, _ = h.Write(cedBytes)
-		cedHash = h.SumHash()
-	}
-
-	// Log each payload CBOR individually
-	if ced.TrieUpdate != nil {
-		for i, payload := range ced.TrieUpdate.Payloads {
-			if payload != nil {
-				val := payload.Value()
-				var valType string
-				if val == nil {
-					valType = "NIL"
-				} else if len(val) == 0 {
-					valType = "EMPTY_SLICE"
-				} else {
-					valType = fmt.Sprintf("LEN_%d", len(val))
-				}
-				cborBytes, _ := payload.MarshalCBOR()
-				h := hash.NewSHA3_256()
-				_, _ = h.Write(cborBytes)
-				fmt.Printf("[DEBUG Provider] blockID=%x payload[%d] valueType=%s cborLen=%d cborHash=%x cborBytes=%x\n", blockID[:], i, valType, len(cborBytes), h.SumHash(), cborBytes)
-			}
-		}
-	}
-
-	// Serialize TrieUpdate using ledger.EncodeTrieUpdate for comparison
-	var trieUpdateBinaryHash []byte
-	var trieUpdateBinaryLen int
-	if ced.TrieUpdate != nil {
-		trieUpdateBytes := ledger.EncodeTrieUpdate(ced.TrieUpdate)
-		trieUpdateBinaryLen = len(trieUpdateBytes)
-		h := hash.NewSHA3_256()
-		_, _ = h.Write(trieUpdateBytes)
-		trieUpdateBinaryHash = h.SumHash()
-	}
-
-	var trieRootHash []byte
-	if ced.TrieUpdate != nil {
-		trieRootHash = ced.TrieUpdate.RootHash[:]
-	}
-	fmt.Printf("[DEBUG Provider] blockID=%x trieRootHash=%x collectionHash=%x eventsHash=%x trieUpdateHash=%x trieUpdateLen=%d txResultsHash=%x cedLen=%d cedHash=%x trieUpdateBinaryLen=%d trieUpdateBinaryHash=%x cedBytes=%x\n",
-		blockID[:], trieRootHash, collectionHash, eventsHash, trieUpdateHash, trieUpdateLen, txResultsHash, cedLen, cedHash, trieUpdateBinaryLen, trieUpdateBinaryHash, cedBytes)
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and sends them to the given channel.
