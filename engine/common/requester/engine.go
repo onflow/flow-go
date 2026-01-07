@@ -559,8 +559,8 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// build a list of needed entities; if not available, process anyway,
-	// but in that case we can't re-queue missing items
+	// Build a list of needed entities; if not available, proceed anyway, but in that case we
+	// can't re-queue missing items. Note: we still only process requested items (see code below)
 	needed := make(map[flow.Identifier]struct{})
 	req, exists := e.requests[res.Nonce]
 	if exists {
