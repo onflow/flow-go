@@ -143,7 +143,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	// The compliance engine must be resilient to the following classes of resource exhaustion attacks:
 	//  1. A byzantine proposers might attempt to create blocks at many different future views. Mitigations:
 	//     • Only proposals whose proposer is the valid leader for the respective view should pass the compliance
-	//     engine. Block that are not proposed by a valid leader are outright reject and we create a slashing
+	//     engine. Block that are not proposed by a valid leader are outright reject, and we create a slashing
 	//     challenge against the proposer. This filtering should be done by the compliance engine. Such blocks
 	//     should never reach the higher-level business logic.
 	//     • A byzantine proposer might attempt to create blocks for a large number of different future views,
@@ -154,7 +154,16 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	//     invalid QC / TC. Valid blocks will eventually be retrieved via sync again, once the local finalized
 	//     view catches up, even if they were dropped at first.
 	//  2. A byzantine proposers might spam us with many different _valid_ blocks for the same view, for which
-	//     it is the leader. This is particularly dangerous for
+	//     it is the leader. This is particularly dangerous since each block is valid, and we don't know which block
+	//     will get certified so for protocol liveness we need to store them all. This leads to a potentially
+	//     unlimited number of valid blocks that are ingested in the cache of pending blocks which will lead to
+	//     a memory overflow and panic. To prevent this our data structure([PendingBlockBuffer]) accepts proposals
+	//     only in a limited view window, this prevents growing the tree of pending blocks in depth, the depth is limited
+	//     by the window size. The width of the tree is limited by storing only a single proposal per view.
+	//     Strictly speaking this is not enough since if other proposal got certified we can't make progress. To deal
+	//     with this situation we rely on syncing of certified blocks. Eventually, a certified block will be synced
+	//     and even though we have stored other proposal for that view, we will still be able to make progress since
+	//     we have obtained the certified block(at most one block per view can get certified).
 	//
 
 	block := proposal.Message.Block
