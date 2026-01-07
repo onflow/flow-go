@@ -638,7 +638,7 @@ func (e *blockComputer) executeProcessCallback(
 
 	txnIndex++
 
-	txn, err := e.executeTransactionInternal(blockSpan, database, request, 0)
+	txn, err := e.executeTransactionInternal(blockSpan, database, request, 1)
 	if err != nil {
 		snapshotTime := logical.Time(0)
 		if txn != nil {

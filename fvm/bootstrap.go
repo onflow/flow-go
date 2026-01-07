@@ -249,6 +249,7 @@ func Bootstrap(
 				ServiceAccountPublicKeys:       []flow.AccountPublicKey{serviceAccountPublicKey},
 				FungibleTokenAccountPublicKeys: []flow.AccountPublicKey{serviceAccountPublicKey},
 				FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
+				FlowFeesAccountPublicKeys:      []flow.AccountPublicKey{serviceAccountPublicKey},
 				NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
 			},
 			transactionFees:     BootstrapProcedureFeeParameters{0, 0, 0},
