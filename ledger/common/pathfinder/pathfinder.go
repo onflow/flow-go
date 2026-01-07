@@ -3,11 +3,14 @@ package pathfinder
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // PathByteSize captures number of bytes each path takes
@@ -65,7 +68,7 @@ func UpdateToTrieUpdate(u *ledger.Update, version uint8) (*ledger.TrieUpdate, er
 		return nil, err
 	}
 
-	payloads, err := UpdateToPayloads(u)
+	payloads, err := UpdateToPayloads(u, version)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +120,8 @@ func PathsFromPayloads(payloads []*ledger.Payload, version uint8) ([]ledger.Path
 // UpdateToPayloads constructs an slice of payloads given ledger update.
 // It normalizes all values by replacing nil with []byte{} to ensure
 // consistency across all serialization formats (WAL, checkpoints, execution data).
-func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
+// When normalization triggers, it logs the key, owner, and payload path using the default zerolog logger.
+func UpdateToPayloads(update *ledger.Update, pathFinderVersion uint8) ([]*ledger.Payload, error) {
 	keys := update.Keys()
 	values := update.Values()
 	payloads := make([]*ledger.Payload, len(keys))
@@ -127,6 +131,23 @@ func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 		// This ensures consistency across all serialization formats
 		if val == nil {
 			val = []byte{}
+
+			// Log normalization event with key, owner, and path
+			key := keys[i]
+			path, err := KeyToPath(key, pathFinderVersion)
+			if err == nil {
+				// Try to convert to RegisterID for better logging
+				regID, err := convert.LedgerKeyToRegisterID(key)
+				if err == nil {
+					ownerAddr := flow.BytesToAddress([]byte(regID.Owner))
+					fmt.Printf("Normalized nil value to empty slice in payload: key=%s owner=%s path=%s\n",
+						regID.Key, ownerAddr.String(), hex.EncodeToString(path[:]))
+				} else {
+					// Fallback: log with canonical form if RegisterID conversion fails
+					fmt.Printf("Normalized nil value to empty slice in payload: key_canonical=%s path=%s\n",
+						key.String(), hex.EncodeToString(path[:]))
+				}
+			}
 		}
 		payload := ledger.NewPayload(keys[i], val)
 		payloads[i] = payload
