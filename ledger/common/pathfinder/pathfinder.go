@@ -3,14 +3,11 @@ package pathfinder
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // PathByteSize captures number of bytes each path takes
@@ -126,30 +123,7 @@ func UpdateToPayloads(update *ledger.Update, pathFinderVersion uint8) ([]*ledger
 	values := update.Values()
 	payloads := make([]*ledger.Payload, len(keys))
 	for i := range keys {
-		val := values[i]
-		// Normalize nil to empty slice at the root: replace nil with []byte{}
-		// This ensures consistency across all serialization formats
-		if val == nil {
-			val = []byte{}
-
-			// Log normalization event with key, owner, and path
-			key := keys[i]
-			path, err := KeyToPath(key, pathFinderVersion)
-			if err == nil {
-				// Try to convert to RegisterID for better logging
-				regID, err := convert.LedgerKeyToRegisterID(key)
-				if err == nil {
-					ownerAddr := flow.BytesToAddress([]byte(regID.Owner))
-					fmt.Printf("Normalized nil value to empty slice in payload: key=%s owner=%s path=%s\n",
-						regID.Key, ownerAddr.String(), hex.EncodeToString(path[:]))
-				} else {
-					// Fallback: log with canonical form if RegisterID conversion fails
-					fmt.Printf("Normalized nil value to empty slice in payload: key_canonical=%s path=%s\n",
-						key.String(), hex.EncodeToString(path[:]))
-				}
-			}
-		}
-		payload := ledger.NewPayload(keys[i], val)
+		payload := ledger.NewPayload(keys[i], values[i])
 		payloads[i] = payload
 	}
 	return payloads, nil
