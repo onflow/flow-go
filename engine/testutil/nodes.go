@@ -457,6 +457,10 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
 	require.NoError(t, err)
 
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	// request receipts from execution nodes
 	receiptRequester, err := requester.New(
@@ -675,6 +679,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.LockManager,
 	)
 
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	requestEngine, err := requester.New(
 		node.Log.With().Str("entity", "collection").Logger(), node.Metrics, node.Net, node.Me, node.State,

@@ -5,8 +5,8 @@ import (
 )
 
 // Requester provides an interface to request entities from other nodes in the network.
-// Once requested, the Requester handles sending request messages and retrying requests.
-// Requested entities are passed to a Hander function, which is configured elsewhere (see [module/requester.Engine.WithHandle]).
+// When the Requester is instructed to retrieve some entity, the Requester handles sending request messages and retrying requests.
+// Requested entities are passed to a Handler function, which is configured elsewhere (see [module/requester.Engine.WithHandle]).
 type Requester interface {
 	// EntityByID will enqueue the given entity for request by its ID (content hash).
 	// The selector will be applied to the subset of valid providers configured globally for the Requester instance.

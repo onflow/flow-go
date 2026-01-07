@@ -41,6 +41,7 @@ type CreateFunc func() flow.Entity
 // Engine is a generic requester engine, handling the requesting of entities
 // on the flow network. It is the `request` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
+// All exported methods are concurrency safe.
 type Engine struct {
 	*component.ComponentManager
 	mu             sync.Mutex
@@ -69,6 +70,15 @@ var _ network.MessageProcessor = (*Engine)(nil)
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
+//
+// IMPORTANT:
+//   - The injected [engine.MessageStore] is used to queue incoming responses from potentially byzantine peers.
+//     The backing implementation must be fully BFT, including resilience against resource exhaustion attacks and targeted
+//     cache eviction attacks. Hero data structures are generally not suitable, as most of them are not BFT at the time
+//     of writing (see www.notion.so/flowfoundation/Intro-to-heap-friendly-hero-structures-d1e420752ce6470f857e848ad1e60213 ).
+//   - Challenging, borderline overload scenarios should be anticipated. The injected [engine.MessageStore] must have bounded
+//     size and drop messages when full (instead of blocking). The requester engine will log warnings when messages are dropped.
+//
 // No error returns are expected during normal operations.
 func New(
 	log zerolog.Logger,
@@ -180,8 +190,11 @@ func (e *Engine) WithHandle(handle HandleFunc) {
 	e.handle = handle
 }
 
-// Process processes the given message from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// Process queues the given message from the node with the given origin ID for asynchronous processing.
+// If the injected `requestQueue` is full, the message is dropped and a warning is logged.
+// For inputs of unexpected type, a warning is logged and the message is dropped.
+//
+// No error returns are expected during normal operations.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ShutdownSignal():
@@ -209,7 +222,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	return nil
 }
 
-// processQueuedRequestsShovellerWorker runs as a dedicated worker for [component.ComponentManager].
+// processQueuedRequestsShovellerWorker requires a dedicated worker from the [component.ComponentManager].
 // It tracks when there is available work and performs dispatch of incoming messages.
 func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
@@ -227,8 +240,8 @@ func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.Signaler
 	}
 }
 
-// processAvailableMessages is called when there are messages in the queue that are ready to be processed.
-// All unexpected errors are reported to the SignalerContext.
+// processAvailableMessages consumes all messages from the `requestQueue` waiting to be processed (or aborts in case 
+// of shutdown). All unexpected errors are reported to the SignalerContext.
 func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
@@ -266,7 +279,8 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 }
 
 // EntityByID will enqueue the given entity for request by its ID (content hash).
-// The selector will be applied to the subset of valid providers configured globally for the Requester instance.
+// We permit request data only from non-ejected, staked nodes (excluding observer variants of roles
+// and the requesting node itself). The selector will be applied to the resulting set of peers.
 // This allows finer-grained control over which providers to request from on a per-entity basis.
 // Use `filter.Any` if no additional restrictions are required.
 // Received entities will be verified for integrity using their ID function.
@@ -275,15 +289,23 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 }
 
 // EntityBySecondaryKey will enqueue the given entity for request by some secondary identifier (NOT its content hash).
-// The selector will be applied to the subset of valid providers configured globally for the Requester instance.
+// We permit request data only from non-ejected, staked nodes (excluding observer variants of roles
+// and the requesting node itself). The selector will be applied to the resulting set of peers.
 // This allows finer-grained control over which providers to request from on a per-entity basis.
 // Use `filter.Any` if no additional restrictions are required.
-// Received entities WILL NOT be verified for integrity using their ID function.
+// It is the CALLER's RESPONSIBILITY to verify integrity (and authenticity if applicable) of the received data
+// which might be provided by a byzantine peer.
 func (e *Engine) EntityBySecondaryKey(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(key, selector, false)
 }
 
-// addEntityRequest adds request in in-memory storage of pending items to be requested.
+// addEntityRequest adds the entity identified by `queryKey` to the pool of data to be requested.
+// Items to be requested are held in memory and forgotten during a restart.  
+// Idempotent w.r.t. `queryKey` (if prior request is still ongoing, we just continue trying). Aside
+// from acquiring a lock, this function returns almost immediately. The actual requests are done
+// asynchronously.  
+// ATTENTION: If `queryKeyIsContentHash` is `false`, it is the CALLER's RESPONSIBILITY to verify
+// integrity (and authenticity if applicable) of the received data!
 // Concurrency safe.
 func (e *Engine) addEntityRequest(queryKey flow.Identifier, selector flow.IdentityFilter[flow.Identity], queryKeyIsContentHash bool) {
 	e.mu.Lock()
@@ -315,7 +337,8 @@ func (e *Engine) Force() {
 		return
 	}
 
-	// using Launch to ensure the caller won't be blocked
+	// Go routine ensures that the caller won't be blocked. At most one goroutine will be consumed, 
+	// because if another goroutine is already active, a newly spawned routine will immediately be done. 
 	go func() {
 		// using atomic bool to ensure there is at most one caller would trigger dispatching requests
 		if e.forcedDispatchOngoing.CompareAndSwap(false, true) {
@@ -337,7 +360,7 @@ func (e *Engine) Force() {
 	}()
 }
 
-// poll runs as a dedicated worker for [component.ComponentManager]. It performs dispatch of pending requests using a timer.
+// poll runs inside a dedicated worker owned by the [component.ComponentManager]. It performs dispatch of pending requests using a timer.
 func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.handle == nil {
 		ctx.Throw(fmt.Errorf("must initialize requester engine with handler"))
@@ -369,7 +392,7 @@ func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 }
 
 // dispatchRequest dispatches a subset of requests (selection based on internal heuristic).
-// While `dispatchRequest` sends a request (covering some but not necessarily all items),
+// We send request(s) covering some but not necessarily all items,
 // if and only if there is something to request. In other words it cannot happen that
 // `dispatchRequest` sends no request, but there is something to be requested.
 // The boolean return value indicates whether a request was dispatched at all.
