@@ -26,7 +26,8 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db, flow.Emulator)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		blocks := all.Blocks
 		guarantees := all.Guarantees
 
@@ -38,7 +39,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		proposal := unittest.ProposalFromBlock(block)
 
 		// attempt to retrieve (still) unknown guarantee
-		_, err := s.ByCollectionID(guarantee1.CollectionID)
+		_, err = s.ByCollectionID(guarantee1.CollectionID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
@@ -92,7 +93,8 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db, flow.Emulator)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		blocks := all.Blocks
 		store1 := all.Guarantees
 		expected := unittest.CollectionGuaranteeFixture()
@@ -100,7 +102,7 @@ func TestStoreDuplicateGuarantee(t *testing.T) {
 		proposal := unittest.ProposalFromBlock(block)
 
 		// store guarantee
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
@@ -131,14 +133,15 @@ func TestStoreConflictingGuarantee(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db, flow.Emulator)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		blocks := all.Blocks
 		store1 := all.Guarantees
 		expected := unittest.CollectionGuaranteeFixture()
 		block := unittest.BlockWithGuaranteesFixture([]*flow.CollectionGuarantee{expected})
 		proposal := unittest.ProposalFromBlock(block)
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})

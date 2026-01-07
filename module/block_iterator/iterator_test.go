@@ -41,7 +41,8 @@ func TestIterateHeight(t *testing.T) {
 		// create iterator
 		// b0 is the root block, iterate from b1 to b3
 		iterRange := module.IteratorRange{Start: b1.Height, End: b3.Height}
-		headers := store.NewHeaders(&metrics.NoopCollector{}, db, flow.Emulator)
+		headers, err := store.NewHeaders(&metrics.NoopCollector{}, db, flow.Emulator)
+		require.NoError(t, err)
 		getBlockIDByIndex := func(height uint64) (flow.Identifier, bool, error) {
 			blockID, err := headers.BlockIDByHeight(height)
 			if err != nil {

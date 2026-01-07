@@ -56,9 +56,11 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	all := store.InitAll(metrics, suite.db, flow.Emulator)
+	all, err := store.InitAll(metrics, suite.db, flow.Emulator)
+	require.NoError(suite.T(), err)
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
-	clusterHeaders := store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+	clusterHeaders, err := store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+	require.NoError(suite.T(), err)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()

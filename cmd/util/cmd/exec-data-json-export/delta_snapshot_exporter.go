@@ -33,7 +33,10 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 		}
 
 		cacheMetrics := &metrics.NoopCollector{}
-		headers := store.NewHeaders(cacheMetrics, db, chainID)
+		headers, err := store.NewHeaders(cacheMetrics, db, chainID)
+		if err != nil {
+			return err
+		}
 
 		activeBlockID := blockID
 		outputFile := filepath.Join(outputPath, "delta.jsonl")

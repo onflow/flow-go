@@ -33,7 +33,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 		db := pebbleimpl.ToDB(pdb)
 		ctx, cancel := context.WithCancel(context.Background())
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db, flow.Emulator)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		headers := all.Headers
 		blockstore := all.Blocks
 		results := all.Results
@@ -48,7 +49,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 		// indexed by height
 		chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 		parentID := genesis.ID()
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blockstore.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})

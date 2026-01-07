@@ -20,11 +20,13 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		cacheMetrics := &metrics.NoopCollector{}
 		// verify after storing a block should be able to retrieve it back
-		blocks := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
+		all, err := store.InitAll(cacheMetrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocks := all.Blocks
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, prop)
 			})
@@ -47,7 +49,9 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 
 		// verify after a restart, the block stored in the database is the same
 		// as the original
-		blocksAfterRestart := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
+		allAfterRestart, err := store.InitAll(cacheMetrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocksAfterRestart := allAfterRestart.Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)
@@ -58,12 +62,14 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		cacheMetrics := &metrics.NoopCollector{}
-		blocks := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
+		all, err := store.InitAll(cacheMetrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocks := all.Blocks
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
 		// First store the block
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, prop)
 			})
@@ -103,7 +109,9 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// Verify after a restart, the block indexed by height is still retrievable
-		blocksAfterRestart := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
+		allAfterRestart, err := store.InitAll(cacheMetrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocksAfterRestart := allAfterRestart.Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)
@@ -114,12 +122,14 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		cacheMetrics := &metrics.NoopCollector{}
-		blocks := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
+		all, err := store.InitAll(cacheMetrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocks := all.Blocks
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
 		// First store the block and index by view
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := blocks.BatchStore(lctx, rw, prop)
 				if err != nil {
@@ -154,7 +164,9 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// Verify after a restart, the block indexed by view is still retrievable
-		blocksAfterRestart := store.InitAll(cacheMetrics, db, flow.Emulator).Blocks
+		allAfterRestart, err := store.InitAll(cacheMetrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocksAfterRestart := allAfterRestart.Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByView(block.View)
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)

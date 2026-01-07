@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
@@ -30,9 +31,10 @@ var _ storage.Headers = (*Headers)(nil)
 // NewHeaders creates a Headers instance, which manages block headers of the main consensus (not cluster consensus).
 // It supports storing, caching and retrieving by block ID, and additionally indexes by header height and view.
 // Must be initialized with a non-cluster chainID; see [flow.AllChainIDs] and [cluster.IsCanonicalClusterID].
-func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
+// No errors are expected during normal operations.
+func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) (*Headers, error) {
 	if cluster.IsCanonicalClusterID(chainID) {
-		panic("NewHeaders called on cluster chain ID - use NewClusterHeaders instead")
+		return nil, irrecoverable.NewExceptionf("NewHeaders called on cluster chain ID %s - use NewClusterHeaders instead", chainID)
 	}
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
 		if header.ChainID != chainID {
@@ -53,16 +55,17 @@ func NewHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.Chain
 		err := operation.LookupCertifiedBlockByView(r, view, &id)
 		return id, err
 	}
-	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView)
+	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView), nil
 }
 
 // NewClusterHeaders creates a Headers instance for a collection cluster chain, which stores block headers for cluster blocks.
 // It supports storing, caching and retrieving by block ID, and additionally an index by header height.
 // It does NOT support retrieving by view.
 // Must be initialized with a valid cluster chain ID; see [cluster.IsCanonicalClusterID]
-func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) *Headers {
+// No errors are expected during normal operations.
+func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flow.ChainID) (*Headers, error) {
 	if !cluster.IsCanonicalClusterID(chainID) {
-		panic("NewClusterHeaders called on non-cluster chain ID - use NewHeaders instead")
+		return nil, irrecoverable.NewExceptionf("NewClusterHeaders called on non-cluster chain ID %s - use NewHeaders instead", chainID)
 	}
 	storeWithLock := func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, header *flow.Header) error {
 		if header.ChainID != chainID {
@@ -82,7 +85,7 @@ func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flo
 		var id flow.Identifier
 		return id, storage.ErrNotAvailableForClusterConsensus
 	}
-	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView)
+	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView), nil
 }
 
 // newHeaders contains shared logic for Header storage, including storing and retrieving by block ID

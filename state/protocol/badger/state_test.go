@@ -55,7 +55,8 @@ func TestBootstrapAndOpen(t *testing.T) {
 			epoch.DKGPhase1FinalView(), epoch.DKGPhase2FinalView(), epoch.DKGPhase3FinalView()).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := store.InitAll(noopMetrics, db, flow.Emulator)
+		all, err := store.InitAll(noopMetrics, db, flow.Emulator)
+		require.NoError(t, err)
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
@@ -135,7 +136,8 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.On("BlockSealed", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := store.InitAll(noopMetrics, db, flow.Emulator)
+		all, err := store.InitAll(noopMetrics, db, flow.Emulator)
+		require.NoError(t, err)
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
 			db,
@@ -850,7 +852,8 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	db := pebbleimpl.ToDB(pdb)
 	lockManager := storage.NewTestingLockManager()
 	defer db.Close()
-	all := store.InitAll(metrics, db, flow.Emulator)
+	all, err := store.InitAll(metrics, db, flow.Emulator)
+	require.NoError(t, err)
 	state, err := bprotocol.Bootstrap(
 		metrics,
 		db,

@@ -11,9 +11,12 @@ import (
 )
 
 // deprecated: use [store.InitAll] instead
-func InitAll(metrics module.CacheMetrics, db *badger.DB, chainID flow.ChainID) *storage.All {
+func InitAll(metrics module.CacheMetrics, db *badger.DB, chainID flow.ChainID) (*storage.All, error) {
 	sdb := badgerimpl.ToDB(db)
-	headers := store.NewHeaders(metrics, sdb, chainID)
+	headers, err := store.NewHeaders(metrics, sdb, chainID)
+	if err != nil {
+		return nil, err
+	}
 	guarantees := store.NewGuarantees(metrics, sdb, DefaultCacheSize, DefaultCacheSize)
 	seals := store.NewSeals(metrics, sdb)
 	index := store.NewIndex(metrics, sdb)
@@ -49,5 +52,5 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB, chainID flow.ChainID) *
 		Receipts:                  receipts,
 		Transactions:              transactions,
 		Collections:               collections,
-	}
+	}, nil
 }

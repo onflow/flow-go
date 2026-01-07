@@ -1221,7 +1221,10 @@ func (fnb *FlowNodeBuilder) determineChainID() error {
 }
 
 func (fnb *FlowNodeBuilder) initStorage() error {
-	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.RootChainID)
+	headers, err := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.RootChainID)
+	if err != nil {
+		return err
+	}
 	guarantees := store.NewGuarantees(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.BaseConfig.guaranteesCacheSize,
 		store.DefaultCacheSize)
 	seals := store.NewSeals(fnb.Metrics.Cache, fnb.ProtocolDB)

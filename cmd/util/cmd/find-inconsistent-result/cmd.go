@@ -100,7 +100,10 @@ func createStorages(db storage.DB, lockManager lockctx.Manager) (
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	storages := common.InitStorages(db, chainID)
+	storages, err := common.InitStorages(db, chainID)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %v", err)

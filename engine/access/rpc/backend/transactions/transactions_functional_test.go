@@ -121,7 +121,8 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.db = pebbleimpl.ToDB(pdb)
 
 	// Instantiate storages
-	all := store.InitAll(metrics, s.db, flow.Emulator)
+	all, err := store.InitAll(metrics, s.db, flow.Emulator)
+	s.Require().NoError(err)
 
 	s.blocks = all.Blocks
 	s.collections = all.Collections
@@ -135,7 +136,7 @@ func (s *TransactionsFunctionalSuite) SetupTest() {
 	s.reporter = syncmock.NewIndexReporter(s.T())
 
 	reporter := index.NewReporter()
-	err := reporter.Initialize(s.reporter)
+	err = reporter.Initialize(s.reporter)
 	s.Require().NoError(err)
 
 	s.eventsIndex = index.NewEventsIndex(reporter, s.events)

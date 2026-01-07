@@ -387,7 +387,8 @@ func createNode(
 	db := pebbleimpl.ToDB(pdb)
 	lockManager := fstorage.NewTestingLockManager()
 
-	headersDB := store.NewHeaders(metricsCollector, db, rootSnapshot.Params().ChainID())
+	headersDB, err := store.NewHeaders(metricsCollector, db, rootSnapshot.Params().ChainID())
+	require.NoError(t, err)
 	guaranteesDB := store.NewGuarantees(metricsCollector, db, store.DefaultCacheSize, store.DefaultCacheSize)
 	sealsDB := store.NewSeals(metricsCollector, db)
 	indexDB := store.NewIndex(metricsCollector, db)

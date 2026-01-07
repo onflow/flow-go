@@ -96,10 +96,12 @@ func (suite *BuilderSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
 
-	all := store.InitAll(metrics, suite.db, flow.Emulator)
+	all, err := store.InitAll(metrics, suite.db, flow.Emulator)
+	require.NoError(suite.T(), err)
 	consumer := events.NewNoop()
 
-	suite.clusterHeaders = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+	suite.clusterHeaders, err = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+	require.NoError(suite.T(), err)
 	suite.clusterPayloads = store.NewClusterPayloads(metrics, suite.db)
 	suite.consensusHeaders = all.Headers
 
@@ -1489,8 +1491,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		all := store.InitAll(metrics, suite.db, flow.Emulator)
-		suite.clusterHeaders = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+		all, err := store.InitAll(metrics, suite.db, flow.Emulator)
+		require.NoError(b, err)
+		suite.clusterHeaders, err = store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+		require.NoError(b, err)
 		suite.clusterPayloads = store.NewClusterPayloads(metrics, suite.db)
 		suite.consensusHeaders = all.Headers
 

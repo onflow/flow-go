@@ -19,7 +19,8 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 
-		all := store.InitAll(metrics, db, flow.Emulator)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		payloads := all.Payloads
 		blocks := all.Blocks
 
@@ -29,7 +30,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		require.Equal(t, expected, block.Payload)
 		blockID := block.ID()
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})

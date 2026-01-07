@@ -35,7 +35,10 @@ func ExportResults(blockID flow.Identifier, dbPath string, outputPath string) er
 		}
 
 		cacheMetrics := &metrics.NoopCollector{}
-		headers := store.NewHeaders(cacheMetrics, db, chainID)
+		headers, err := store.NewHeaders(cacheMetrics, db, chainID)
+		if err != nil {
+			return err
+		}
 		results := store.NewExecutionResults(cacheMetrics, db)
 		activeBlockID := blockID
 

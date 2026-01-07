@@ -72,7 +72,10 @@ func ExportTransactions(lockManager lockctx.Manager, dataDir string, outputDir s
 		if err != nil {
 			return err
 		}
-		storages := common.InitStorages(db, chainID)
+		storages, err := common.InitStorages(db, chainID)
+		if err != nil {
+			return err
+		}
 
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {

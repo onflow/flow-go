@@ -61,7 +61,10 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	results := store.NewExecutionResults(cacheMetrics, db)
 	receipts := store.NewExecutionReceipts(cacheMetrics, db, results, store.DefaultCacheSize)
 	transactions := store.NewTransactions(cacheMetrics, db)
-	headers := store.NewHeaders(cacheMetrics, db, chainID)
+	headers, err := store.NewHeaders(cacheMetrics, db, chainID)
+	if err != nil {
+		return err
+	}
 	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := store.NewBlocks(db, headers, payloads)
 	collections := store.NewCollections(db, transactions)

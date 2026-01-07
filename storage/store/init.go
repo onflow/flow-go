@@ -31,8 +31,12 @@ type All struct {
 // InitAll initializes the common storage abstractions used by all node roles (with default cache sizes
 // suitable for mainnet). The chain ID indicates which Flow network the node is operating on and references
 // the ID of the main consensus (not the chains built by collector clusters)
-func InitAll(metrics module.CacheMetrics, db storage.DB, chainID flow.ChainID) *All {
-	headers := NewHeaders(metrics, db, chainID)
+// No errors are expected during normal operations.
+func InitAll(metrics module.CacheMetrics, db storage.DB, chainID flow.ChainID) (*All, error) {
+	headers, err := NewHeaders(metrics, db, chainID)
+	if err != nil {
+		return nil, err
+	}
 	guarantees := NewGuarantees(metrics, db, DefaultCacheSize, DefaultCacheSize)
 	seals := NewSeals(metrics, db)
 	index := NewIndex(metrics, db)
@@ -72,5 +76,5 @@ func InitAll(metrics module.CacheMetrics, db storage.DB, chainID flow.ChainID) *
 
 		Transactions: transactions,
 		Collections:  collections,
-	}
+	}, nil
 }

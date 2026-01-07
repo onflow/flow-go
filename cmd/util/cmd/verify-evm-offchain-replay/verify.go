@@ -149,7 +149,10 @@ func initStorages(db storage.DB, executionDataDir string) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	storages := common.InitStorages(db, chainID)
+	storages, err := common.InitStorages(db, chainID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	datastoreDir := filepath.Join(executionDataDir, "blobstore")
 	err = os.MkdirAll(datastoreDir, 0700)

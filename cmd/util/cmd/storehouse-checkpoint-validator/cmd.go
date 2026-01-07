@@ -99,7 +99,10 @@ func runE(*cobra.Command, []string) error {
 	if err != nil {
 		return err
 	}
-	storages := store.InitAll(metricsCollector, protocolDB, chainID)
+	storages, err := store.InitAll(metricsCollector, protocolDB, chainID)
+	if err != nil {
+		return err
+	}
 
 	// Validate checkpoint
 	ctx := context.Background()

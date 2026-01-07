@@ -52,11 +52,12 @@ func TestReadClusterRange(t *testing.T) {
 			})
 			require.NoError(t, err)
 		}
-
+		clusterHeaders, err := store.NewClusterHeaders(metrics.NewNoopCollector(), db, blocks[0].ChainID)
+		require.NoError(t, err)
 		clusterBlocks := store.NewClusterBlocks(
 			db,
 			blocks[0].ChainID,
-			store.NewClusterHeaders(metrics.NewNoopCollector(), db, blocks[0].ChainID),
+			clusterHeaders,
 			store.NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 

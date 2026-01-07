@@ -44,7 +44,10 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 		}
 
 		cacheMetrics := &metrics.NoopCollector{}
-		headers := store.NewHeaders(cacheMetrics, db, chainID)
+		headers, err := store.NewHeaders(cacheMetrics, db, chainID)
+		if err != nil {
+			return err
+		}
 		index := store.NewIndex(cacheMetrics, db)
 		guarantees := store.NewGuarantees(cacheMetrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
 		seals := store.NewSeals(cacheMetrics, db)

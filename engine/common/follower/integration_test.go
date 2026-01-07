@@ -51,7 +51,8 @@ func TestFollowerHappyPath(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		all := store.InitAll(metrics, pebbleimpl.ToDB(pdb), flow.Emulator)
+		all, err := store.InitAll(metrics, pebbleimpl.ToDB(pdb), flow.Emulator)
+		require.NoError(t, err)
 
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(

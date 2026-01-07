@@ -124,7 +124,8 @@ func (p *PipelineFunctionalSuite) SetupTest() {
 	p.Require().NoError(err)
 
 	// store and index the root header
-	p.headers = store.NewHeaders(p.metrics, p.db, g.ChainID())
+	p.headers, err = store.NewHeaders(p.metrics, p.db, g.ChainID())
+	p.Require().NoError(err)
 
 	err = unittest.WithLock(t, p.lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 		return p.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

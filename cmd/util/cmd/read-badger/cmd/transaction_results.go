@@ -34,7 +34,10 @@ var transactionResultsCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			storages := common.InitStorages(db, chainID)
+			storages, err := common.InitStorages(db, chainID)
+			if err != nil {
+				return err
+			}
 			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
