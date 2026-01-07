@@ -94,4 +94,3 @@ func RemoveLockFile(lockDir string) error {
 	}
 	return os.Remove(lockPath)
 }
-

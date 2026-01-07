@@ -54,7 +54,7 @@ func TestProtobufNilVsEmptySlice(t *testing.T) {
 	// This is what the server sees after gRPC decodes the protobuf message.
 	t.Log("\nServer side - What server receives after protobuf encoding/decoding:")
 	t.Log("  (In real gRPC, this happens automatically during transmission)")
-	
+
 	// The key insight: protobuf treats empty bytes fields as optional
 	// When []byte{} is encoded and decoded, it becomes nil
 	// We can simulate this by checking what happens when we set Data to []byte{}
@@ -64,7 +64,7 @@ func TestProtobufNilVsEmptySlice(t *testing.T) {
 		// This is the behavior we're testing
 		var typeStr string
 		var serverSees []byte
-		
+
 		// Simulate protobuf behavior: empty slice becomes nil after round-trip
 		if protoValue.Data == nil {
 			serverSees = nil
@@ -77,7 +77,7 @@ func TestProtobufNilVsEmptySlice(t *testing.T) {
 			serverSees = protoValue.Data
 			typeStr = "NON_EMPTY"
 		}
-		
+
 		serverSeesTypes[typeStr]++
 		t.Logf("  [%d] %s: server sees %s (len=%d, isNil=%v)",
 			i, values[i].name, typeStr, len(serverSees), serverSees == nil)
@@ -97,7 +97,7 @@ func TestProtobufNilVsEmptySlice(t *testing.T) {
 		"Expected 2 distinct types after protobuf round-trip (NIL and NON_EMPTY), "+
 			"but got %d. This proves protobuf loses the nil vs []byte{} distinction.",
 		len(serverSeesTypes))
-	
+
 	assert.Equal(t, 2, serverSeesTypes["NIL"],
 		"Both nil and []byte{} become NIL on the server (lost distinction)")
 	assert.Equal(t, 1, serverSeesTypes["NON_EMPTY"],
@@ -135,7 +135,7 @@ func TestProtobufEncodingDemonstratesIssue(t *testing.T) {
 	// In protobuf, empty bytes fields are optional and can be represented as nil
 	// When []byte{} is encoded, it becomes an empty bytes field
 	// When decoded, empty bytes fields become nil
-	
+
 	// Step 3: Server receives and decodes (what LedgerService does)
 	// After gRPC decodes, both nil and []byte{} become nil
 	t.Log("\nStep 2-3 - After gRPC encoding/decoding (what server sees):")
@@ -144,7 +144,7 @@ func TestProtobufEncodingDemonstratesIssue(t *testing.T) {
 		// Simulate what gRPC/protobuf does: []byte{} becomes nil after round-trip
 		var serverSees []byte
 		var typeStr string
-		
+
 		if protoValue.Data == nil {
 			serverSees = nil
 			typeStr = "NIL"
@@ -156,7 +156,7 @@ func TestProtobufEncodingDemonstratesIssue(t *testing.T) {
 			serverSees = protoValue.Data
 			typeStr = "NON_EMPTY"
 		}
-		
+
 		serverSeesTypes[typeStr]++
 		t.Logf("  [%d] %s: server sees %s (len=%d, isNil=%v)",
 			i, originalValues[i].name, typeStr, len(serverSees), serverSees == nil)
@@ -215,7 +215,7 @@ func TestProtobufIsNilFieldPreservesDistinction(t *testing.T) {
 		// Simulate what happens: Data becomes nil, but IsNil is preserved
 		var serverSees []byte
 		var typeStr string
-		
+
 		// Simulate protobuf behavior: empty Data becomes nil after round-trip
 		if protoValue.Data == nil || len(protoValue.Data) == 0 {
 			// Use IsNil to reconstruct original value type
@@ -230,7 +230,7 @@ func TestProtobufIsNilFieldPreservesDistinction(t *testing.T) {
 			serverSees = protoValue.Data
 			typeStr = "NON_EMPTY"
 		}
-		
+
 		serverReconstructsTypes[typeStr]++
 		t.Logf("  [%d] %s: server reconstructs %s (len=%d, isNil=%v, IsNil=%v)",
 			i, originalValues[i].name, typeStr, len(serverSees), serverSees == nil, protoValue.IsNil)
@@ -255,4 +255,3 @@ func TestProtobufIsNilFieldPreservesDistinction(t *testing.T) {
 	t.Log("  - All 3 types are now distinguishable!")
 	t.Log("  - This preserves the distinction needed for deterministic CBOR encoding")
 }
-
