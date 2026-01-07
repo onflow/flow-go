@@ -434,6 +434,9 @@ func (p *Payload) DeepCopy() *Payload {
 // NewPayload returns a new payload
 func NewPayload(key Key, value Value) *Payload {
 	ek := encodeKey(&key, PayloadVersion)
+	if value == nil {
+		value = Value{}
+	}
 	return &Payload{encKey: ek, value: value}
 }
 
