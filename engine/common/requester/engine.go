@@ -498,11 +498,9 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	}
 	e.requests[req.Nonce] = req
 
-	// NOTE: we forget about requests after the expiry of the shortest retry time
-	// from the entities in the list; this means that we purge requests aggressively.
-	// However, most requests should be responded to on the first attempt and clearing
-	// these up only removes the ability to instantly retry upon partial responses, so
-	// it won't affect much.
+	// NOTE: we forget about open requests after the default expiry duration; i.e. we purge the set of requests for which
+	// we accept answer for aggressively. However, most requests should be responded to on the first attempt and clearing
+	// these up only removes the ability to instantly retry upon partial responses, so it won't affect much.
 	go func() {
 		<-time.After(e.cfg.RetryInitial)
 
@@ -524,10 +522,12 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	return true, nil
 }
 
-// onEntityResponse handles response for request that was originally made by the engine.
-// For each successful response this function spawns a dedicated go routine to perform handling of the parsed response.
-// Considering the fact we process only responses that we have previously requested it's impossible to force this function to
-// spawn arbitrary number of goroutines.
+// onEntityResponse handles response for requests that were originally made by the engine (and have not yet expired).
+// For each successful response, this function spawns a dedicated go routine to perform handling of the parsed response.
+//
+// IMPORTANT BFT consideration: We process only responses that we have previously requested. Hence, it's impossible to
+// force this function to spawn arbitrary number of goroutines (resource exhaustion attack).
+//
 // Expected errors during normal operations:
 //   - [engine.InvalidInputError] if the provided response is malformed
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResponse) error {
