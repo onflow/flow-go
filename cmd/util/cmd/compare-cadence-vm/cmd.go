@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/kr/pretty"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -16,11 +18,15 @@ import (
 	"github.com/spf13/cobra"
 	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/grpcclient"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/debug"
 )
 
@@ -35,6 +41,8 @@ var (
 	flagLogTraces           bool
 	flagWriteTraces         bool
 	flagParallel            int
+	flagSubscribe           bool
+	flagSubscriptionDelay   time.Duration
 )
 
 var Cmd = &cobra.Command{
@@ -58,12 +66,11 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node (required if --use-execution-data-api is false)")
 
-	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", 9999, "transaction compute limit")
+	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", flow.DefaultMaxTransactionGasLimit, "transaction compute limit")
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
 	Cmd.Flags().StringVar(&flagBlockIDs, "block-ids", "", "block IDs, comma-separated. if --block-count > 1 is used, provide a single block ID")
-	_ = Cmd.MarkFlagRequired("block-id")
 
 	Cmd.Flags().IntVar(&flagBlockCount, "block-count", 1, "number of blocks to process (default: 1). if > 1, provide a single block ID with --block-ids")
 
@@ -72,6 +79,10 @@ func init() {
 	Cmd.Flags().BoolVar(&flagWriteTraces, "write-traces", false, "write traces for mismatched transactions")
 
 	Cmd.Flags().IntVar(&flagParallel, "parallel", 1, "number of blocks to process in parallel (default: 1)")
+
+	Cmd.Flags().BoolVar(&flagSubscribe, "subscribe", false, "subscribe to new sealed blocks and compare them as they arrive")
+
+	Cmd.Flags().DurationVar(&flagSubscriptionDelay, "subscription-delay", 1*time.Minute, "delay after receiving a new sealed block before comparing it")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -79,15 +90,17 @@ func run(_ *cobra.Command, args []string) {
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
 
-	config, err := grpcclient.NewFlowClientConfig(flagAccessAddress, "", flow.ZeroID, true)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create flow client config")
-	}
-
-	flowClient, err := grpcclient.FlowClient(config)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create client")
-	}
+	flowClient, err := client.NewClient(
+		flagAccessAddress,
+		client.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(commonrpc.DefaultAccessMaxResponseSize)),
+			//grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			//	Time:    10 * time.Second,
+			//	Timeout: 1 * time.Hour,
+			//}),
+		),
+	)
 
 	var remoteClient debug.RemoteClient
 	if flagUseExecutionDataAPI {
@@ -104,6 +117,10 @@ func run(_ *cobra.Command, args []string) {
 
 	var blockIDs []flow.Identifier
 	for _, rawBlockID := range strings.Split(flagBlockIDs, ",") {
+		if rawBlockID == "" {
+			continue
+		}
+
 		blockID, err := flow.HexStringToIdentifier(rawBlockID)
 		if err != nil {
 			log.Fatal().Err(err).Str("ID", rawBlockID).Msg("failed to parse block ID")
@@ -112,6 +129,98 @@ func run(_ *cobra.Command, args []string) {
 		blockIDs = append(blockIDs, blockID)
 	}
 
+	if flagSubscribe {
+		if len(blockIDs) > 1 {
+			log.Fatal().Msg("when using --subscribe, provide a single block ID to start from, or none to start from latest")
+		}
+
+		compareNewBlocks(blockIDs, flowClient, remoteClient, chain)
+	} else {
+		if len(blockIDs) == 0 {
+			log.Fatal().Msg("at least one block ID must be provided")
+		}
+		compareBlocks(blockIDs, flowClient, remoteClient, chain)
+	}
+}
+
+func compareNewBlocks(blockIDs []flow.Identifier, flowClient *client.Client, remoteClient debug.RemoteClient, chain flow.Chain) {
+
+	var (
+		blocksMismatched int64
+		blocksMatched    int64
+		txMismatched     int64
+		txMatched        int64
+	)
+
+	g, _ := errgroup.WithContext(context.Background())
+	g.SetLimit(flagParallel)
+
+	var lastBlockID flow.Identifier
+
+	if len(blockIDs) > 0 {
+		lastBlockID = blockIDs[0]
+	}
+
+reconnect:
+	for {
+		const blockStatus = flow.BlockStatusSealed
+		var getBlockHeader func() (*flow.Header, error)
+		if lastBlockID != flow.ZeroID {
+			getBlockHeader = debug_tx.SubscribeBlockHeadersFromStartBlockID(flowClient, lastBlockID, blockStatus)
+		} else {
+			getBlockHeader = debug_tx.SubscribeBlockHeadersFromLatest(flowClient, blockStatus)
+		}
+
+		for {
+			log.Info().Msg("Waiting for new sealed block ...")
+			header, err := getBlockHeader()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to receive new block header")
+				continue reconnect
+			}
+
+			log.Info().Msgf("New sealed block received: %s (height %d)", header.ID(), header.Height)
+
+			lastBlockID = header.ID()
+
+			g.Go(func() error {
+
+				time.Sleep(flagSubscriptionDelay)
+
+				result := compareBlock(
+					header.ID(),
+					header,
+					remoteClient,
+					flowClient,
+					chain,
+				)
+
+				atomic.AddInt64(&txMismatched, int64(result.mismatches))
+				atomic.AddInt64(&txMatched, int64(result.matches))
+				if result.mismatches > 0 {
+					atomic.AddInt64(&blocksMismatched, 1)
+				} else {
+					atomic.AddInt64(&blocksMatched, 1)
+				}
+
+				log.Info().Msgf("Compared %d blocks: %d matched, %d mismatched", blocksMatched+blocksMismatched, blocksMatched, blocksMismatched)
+				log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
+
+				return nil
+			})
+		}
+	}
+}
+
+func compareBlocks(
+	blockIDs []flow.Identifier,
+	flowClient *client.Client,
+	remoteClient debug.RemoteClient,
+	chain flow.Chain,
+) {
 	type block struct {
 		id     flow.Identifier
 		header *flow.Header
@@ -124,6 +233,16 @@ func run(_ *cobra.Command, args []string) {
 			log.Fatal().Msg("either provide a single block ID and use --block-count, or provide multiple block IDs and do not use --block-count")
 		}
 
+		blockHeaderProgress := util.LogProgress(
+			log.Logger,
+			util.NewLogProgressConfig(
+				"fetching block headers",
+				flagBlockCount,
+				1*time.Second,
+				100/5, // log every 5%
+			),
+		)
+
 		blockID := blockIDs[0]
 		for i := 0; i < flagBlockCount; i++ {
 			header := debug_tx.FetchBlockHeader(blockID, flowClient)
@@ -133,8 +252,11 @@ func run(_ *cobra.Command, args []string) {
 				header: header,
 			})
 
+			blockHeaderProgress(1)
+
 			blockID = header.ParentID
 		}
+
 	} else {
 		for _, blockID := range blockIDs {
 			header := debug_tx.FetchBlockHeader(blockID, flowClient)
@@ -145,6 +267,16 @@ func run(_ *cobra.Command, args []string) {
 			})
 		}
 	}
+
+	blockProgress := util.LogProgress(
+		log.Logger,
+		util.NewLogProgressConfig(
+			"executing blocks",
+			flagBlockCount,
+			1*time.Second,
+			100/5, // log every 5%
+		),
+	)
 
 	var (
 		blocksMismatched int64
@@ -174,6 +306,8 @@ func run(_ *cobra.Command, args []string) {
 			} else {
 				atomic.AddInt64(&blocksMatched, 1)
 			}
+
+			blockProgress(1)
 
 			return nil
 		})
@@ -340,11 +474,30 @@ func compareResults(txID flow.Identifier, interResult debug.Result, vmResult deb
 	vmErr := vmResult.Output.Err
 
 	if interErr == nil && vmErr != nil {
-		log.Error().Msgf("VM failed but interpreter succeeded")
+
+		if vmErr.Code() == errors.ErrCodeComputationLimitExceededError {
+			log.Warn().Msg("VM exceeded computation limit but interpreter succeeded. Ignoring")
+			return true
+		}
+
+		log.Error().Msg("VM failed but interpreter succeeded")
 		mismatch = true
+
 	} else if interErr != nil && vmErr == nil {
-		log.Error().Msgf("Interpreter failed but VM succeeded")
+		if interErr.Code() == errors.ErrCodeComputationLimitExceededError {
+			log.Warn().Msg("Interpreter exceeded computation limit but VM succeeded. Ignoring")
+			return true
+		}
+
+		log.Error().Msg("Interpreter failed but VM succeeded")
 		mismatch = true
+	} else if interErr != nil &&
+		vmErr != nil &&
+		interErr.Code() == errors.ErrCodeComputationLimitExceededError &&
+		vmErr.Code() == errors.ErrCodeComputationLimitExceededError {
+
+		log.Warn().Msg("Both interpreter and VM exceeded computation limit. Ignoring")
+		return true
 	}
 
 	// Compare events

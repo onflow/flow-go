@@ -57,7 +57,7 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node (required if --use-execution-data-api is false)")
 
-	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", 9999, "transaction compute limit")
+	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", flow.DefaultMaxTransactionGasLimit, "transaction compute limit")
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
@@ -341,6 +341,50 @@ func FetchBlockHeader(
 	return
 }
 
+func SubscribeBlockHeadersFromStartBlockID(
+	flowClient *client.Client,
+	startBlockID flow.Identifier,
+	blockStatus flow.BlockStatus,
+) (get func() (*flow.Header, error)) {
+	log.Info().Msg("Subscribing to block headers ...")
+
+	var err error
+	get, err = debug.SubscribeAccessAPIBlockHeadersFromStartBlockID(
+		context.Background(),
+		flowClient.RPCClient(),
+		startBlockID,
+		blockStatus,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+	}
+
+	log.Info().Msg("Subscribed to block headers")
+
+	return
+}
+
+func SubscribeBlockHeadersFromLatest(
+	flowClient *client.Client,
+	blockStatus flow.BlockStatus,
+) (get func() (*flow.Header, error)) {
+	log.Info().Msg("Subscribing to block headers ...")
+
+	var err error
+	get, err = debug.SubscribeAccessAPIBlockHeadersFromLatest(
+		context.Background(),
+		flowClient.RPCClient(),
+		blockStatus,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+	}
+
+	log.Info().Msg("Subscribed to block headers")
+
+	return
+}
+
 func FetchBlockTransactions(
 	blockID flow.Identifier,
 	flowClient *client.Client,
@@ -456,6 +500,7 @@ func RunTransaction(
 
 	fvmOptions := []fvm.Option{
 		fvm.WithCadenceVMEnabled(useVM),
+		fvm.WithComputationLimit(computeLimit),
 	}
 
 	if spanExporter != nil {
@@ -497,7 +542,6 @@ func RunTransaction(
 		tx,
 		snapshot,
 		header,
-		computeLimit,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Transaction execution failed")
