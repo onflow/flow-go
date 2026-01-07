@@ -18,7 +18,7 @@ const (
 	accountPublicKeyCountsSize = 4
 	addressIdCounterSize       = 8
 
-	accountStatusSizeV3 = flagSize +
+	accountStatusMinSize = flagSize +
 		storageUsedSize +
 		storageIndexSize +
 		accountPublicKeyCountsSize +
@@ -35,7 +35,7 @@ const (
 
 	accountStatusV4DefaultVersionAndFlag = 0x40
 
-	AccountStatusMinSizeV4 = accountStatusSizeV3
+	AccountStatusMinSizeV4 = accountStatusMinSize
 )
 
 const (
@@ -50,7 +50,7 @@ const (
 // the next 8 bytes (big-endian) captures the storage index of an account
 // the next 4 bytes (big-endian) captures the number of public keys stored on this account
 // the next 8 bytes (big-endian) captures the current address id counter
-type accountStatusV3 [accountStatusSizeV3]byte
+type accountStatusV3 [accountStatusMinSize]byte
 
 type AccountStatus struct {
 	accountStatusV3
@@ -99,11 +99,11 @@ func AccountStatusFromBytes(inp []byte) (*AccountStatus, error) {
 }
 
 func accountStatusV3FromBytes(inp []byte) (accountStatusV3, []byte, error) {
-	if len(inp) < accountStatusSizeV3 {
+	if len(inp) < accountStatusMinSize {
 		return accountStatusV3{}, nil, errors.NewValueErrorf(hex.EncodeToString(inp), "invalid account status size")
 	}
 
-	inp, rest := inp[:accountStatusSizeV3], inp[accountStatusSizeV3:]
+	inp, rest := inp[:accountStatusMinSize], inp[accountStatusMinSize:]
 	var as accountStatusV3
 	copy(as[:], inp)
 
