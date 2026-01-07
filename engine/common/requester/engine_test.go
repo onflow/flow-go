@@ -70,10 +70,10 @@ func (s *RequesterEngineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
+// TestEntityByID verifies that calling EntityByID adds the correct entry
+// to the requester's internal map of entities to be requested.
 func (s *RequesterEngineSuite) TestEntityByID() {
-
 	now := time.Now().UTC()
-
 	entityID := unittest.IdentifierFixture()
 	selector := filter.Any
 	s.engine.EntityByID(entityID, selector)
@@ -88,6 +88,8 @@ func (s *RequesterEngineSuite) TestEntityByID() {
 	}
 }
 
+// TestDispatchRequestVarious verifies that we only dispatch requests for items
+// that are eligible based on their retry policy.
 func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
 	synctest.Test(s.T(), func(t *testing.T) {
 		identities := unittest.IdentityListFixture(16)
@@ -182,8 +184,8 @@ func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
 	})
 }
 
+// TestDispatchRequestBatchSize verifies that we respect the batch size limit when dispatching requests.
 func (s *RequesterEngineSuite) TestDispatchRequestBatchSize() {
-
 	batchLimit := uint(16)
 	totalItems := uint(99)
 
@@ -228,8 +230,13 @@ func (s *RequesterEngineSuite) TestDispatchRequestBatchSize() {
 	require.True(s.T(), dispatched)
 }
 
+// TestOnEntityResponseValid verifies that we correctly process a valid entity response, even if
+// (i) they only contain a subset of the requested entities.
+// (ii) contain extra entities that were not requested.
+// Specifically, we expect that only requested entities are processed and removed from the pending items.
+// Furthermore, we expect that missing entities are not removed from the pending items, and their
+// last requested timestamp is reset to allow for immediate re-requesting.
 func (s *RequesterEngineSuite) TestOnEntityResponseValid() {
-
 	identities := unittest.IdentityListFixture(16)
 	targetID := identities[0].NodeID
 
@@ -269,15 +276,15 @@ func (s *RequesterEngineSuite) TestOnEntityResponseValid() {
 	bwanted2, _ := msgpack.Marshal(wanted2)
 	bunwanted, _ := msgpack.Marshal(unwanted)
 
+	req := &messages.EntityRequest{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unavailable.ID()},
+	}
+
 	res := &flow.EntityResponse{
 		Nonce:     nonce,
 		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unwanted.ID()},
 		Blobs:     [][]byte{bwanted1, bwanted2, bunwanted},
-	}
-
-	req := &messages.EntityRequest{
-		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unavailable.ID()},
 	}
 
 	done := make(chan struct{})
@@ -307,13 +314,17 @@ func (s *RequesterEngineSuite) TestOnEntityResponseValid() {
 	// check that the missing item is still there
 	assert.Contains(s.T(), s.engine.items, unavailable.ID())
 
-	// make sure we processed two items
+	// make sure we processed only two items: this indicates that the unwanted item was ignored
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 
 	// check that the missing items timestamp was reset
 	assert.Equal(s.T(), iunavailable.LastRequested, time.Time{})
 }
 
+// TestOnEntityIntegrityCheck verifies that
+// (i) the structural integrity of received [flow.EntityResponse] messages is properly checked against the hash by which the
+// item was requested. This check should be performed if and only if `queryByContentHash` is set to `true` for a requested item.
+// (ii) If and only if `queryByContentHash` is `false`, the received entity should not be compared against the requested key.
 func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 	identities := unittest.IdentityListFixture(16)
 	targetID := identities[0].NodeID
@@ -326,10 +337,8 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 	)
 
 	nonce := rand.Uint64()
-
 	wanted := unittest.CollectionFixture(1)
 	wanted2 := unittest.CollectionFixture(2)
-
 	now := time.Now()
 
 	iwanted := &Item{
@@ -339,38 +348,39 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 		queryByContentHash: true,
 	}
 
-	assert.NotEqual(s.T(), wanted, wanted2)
-
-	// prepare payload from different entity
-	bwanted, _ := msgpack.Marshal(wanted2)
-
-	res := &flow.EntityResponse{
-		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted.ID()},
-		Blobs:     [][]byte{bwanted},
-	}
+	assert.NotEqual(s.T(), wanted, wanted2) // sanity check
 
 	req := &messages.EntityRequest{
 		Nonce:     nonce,
 		EntityIDs: []flow.Identifier{wanted.ID()},
 	}
 
+	// prepare payload from different entity
+	bwanted, _ := msgpack.Marshal(wanted2)
+	res := &flow.EntityResponse{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+		Blobs:     [][]byte{bwanted},
+	}
+
 	called := make(chan struct{})
 	s.engine.WithHandle(func(flow.Identifier, flow.Entity) { close(called) })
 
+	// PART (i)
 	s.engine.items[iwanted.EntityID] = iwanted
-
 	s.engine.requests[req.Nonce] = req
 
 	err := s.engine.onEntityResponse(targetID, res)
 	assert.NoError(s.T(), err)
 
-	// check that the request was removed
+	// check that the request was removed, because it was answered by the selected provider
 	assert.NotContains(s.T(), s.engine.requests, nonce)
 
-	// check that the provided item wasn't removed
+	// However, since the provider sent an entity that does not match the requested content hash, the
+	// request should not be considered fulfilled. Instead, the item should remain in the pending `items` map.
 	assert.Contains(s.T(), s.engine.items, wanted.ID())
 
+	// PART (ii)
 	iwanted.queryByContentHash = false
 	s.engine.items[iwanted.EntityID] = iwanted
 	s.engine.requests[req.Nonce] = req
@@ -378,11 +388,12 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 	err = s.engine.onEntityResponse(targetID, res)
 	assert.NoError(s.T(), err)
 
-	// make sure we process item without checking integrity
+	// Since `queryByContentHash` is `false`, the entity should be propagated to the handler,
+	// despite its hash not matching the requested key.
 	unittest.AssertClosesBefore(s.T(), called, time.Second)
 }
 
-// Verify that the origin should not be checked when ValidateStaking config is set to false
+// TestOriginValidation verifies that responses from unexpected origins are rejected.
 func (s *RequesterEngineSuite) TestOriginValidation() {
 	identities := unittest.IdentityListFixture(16)
 	targetID := identities[0].NodeID
@@ -394,12 +405,10 @@ func (s *RequesterEngineSuite) TestOriginValidation() {
 		},
 		nil,
 	)
+
 	nonce := rand.Uint64()
-
 	wanted := unittest.CollectionFixture(1)
-
 	now := time.Now()
-
 	iwanted := &Item{
 		EntityID:           wanted.ID(),
 		LastRequested:      now,
@@ -407,25 +416,23 @@ func (s *RequesterEngineSuite) TestOriginValidation() {
 		queryByContentHash: true,
 	}
 
-	// prepare payload
-	bwanted, _ := msgpack.Marshal(wanted)
+	req := &messages.EntityRequest{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+	}
 
+	// prepare byzantine response: it contains the correct entity, but is from an invalid data source (e.g. ejected peer)
+	bwanted, _ := msgpack.Marshal(wanted)
 	res := &flow.EntityResponse{
 		Nonce:     nonce,
 		EntityIDs: []flow.Identifier{wanted.ID()},
 		Blobs:     [][]byte{bwanted},
 	}
 
-	req := &messages.EntityRequest{
-		Nonce:     nonce,
-		EntityIDs: []flow.Identifier{wanted.ID()},
-	}
-
 	network := &mocknetwork.EngineRegistry{}
 	network.On("Register", mock.Anything, mock.Anything).Return(nil, nil)
 
 	called := make(chan struct{})
-
 	s.engine.WithHandle(func(origin flow.Identifier, _ flow.Entity) {
 		// we expect wrong origin to propagate here with validation disabled
 		assert.Equal(s.T(), wrongID, origin)
