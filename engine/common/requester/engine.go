@@ -69,7 +69,7 @@ var _ network.MessageProcessor = (*Engine)(nil)
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
-// No errors are expected during normal operations.
+// No error returns are expected during normal operations.
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
@@ -373,7 +373,7 @@ func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 // if and only if there is something to request. In other words it cannot happen that
 // `dispatchRequest` sends no request, but there is something to be requested.
 // The boolean return value indicates whether a request was dispatched at all.
-// No errors are expected during normal operations.
+// No error returns are expected during normal operations.
 func (e *Engine) dispatchRequest() (bool, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
