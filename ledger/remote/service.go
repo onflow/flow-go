@@ -2,7 +2,6 @@ package remote
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -176,72 +175,6 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 	newState, trieUpdate, err := s.ledger.Set(update)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// Now we have trieRootHash, log all the debug information with it
-	trieRootHash := trieUpdate.RootHash
-
-	// Log received values from client (with trieRootHash for filtering)
-	for i, protoValue := range req.Values {
-		var receivedValueType string
-		var receivedValueLen int
-		if protoValue.Data == nil {
-			receivedValueType = "NIL"
-			receivedValueLen = 0
-		} else {
-			receivedValueLen = len(protoValue.Data)
-			if receivedValueLen == 0 {
-				receivedValueType = "EMPTY_SLICE"
-			} else {
-				receivedValueType = fmt.Sprintf("LEN_%d", receivedValueLen)
-			}
-		}
-		keyBytes := keys[i].CanonicalForm()
-		fmt.Printf("[DEBUG LedgerService RECEIVED] trieRootHash=%x key[%d]=%x receivedValueType=%s receivedValueLen=%d\n",
-			trieRootHash[:], i, keyBytes, receivedValueType, receivedValueLen)
-	}
-
-	// Log values being passed to ledger.Set (with trieRootHash for filtering)
-	for i := range values {
-		var passedValueType string
-		var passedValueLen int
-		if values[i] == nil {
-			passedValueType = "NIL"
-			passedValueLen = 0
-		} else {
-			passedValueLen = len(values[i])
-			if passedValueLen == 0 {
-				passedValueType = "EMPTY_SLICE"
-			} else {
-				passedValueType = fmt.Sprintf("LEN_%d", passedValueLen)
-			}
-		}
-		keyBytes := keys[i].CanonicalForm()
-		fmt.Printf("[DEBUG LedgerService TO_SET] trieRootHash=%x key[%d]=%x passedValueType=%s passedValueLen=%d\n",
-			trieRootHash[:], i, keyBytes, passedValueType, passedValueLen)
-	}
-
-	// Debug log payload value types (before encoding)
-	for i, payload := range trieUpdate.Payloads {
-		if payload != nil {
-			val := payload.Value()
-			var valType string
-			var valLen int
-			if val == nil {
-				valType = "NIL"
-				valLen = 0
-			} else {
-				valLen = len(val)
-				if valLen == 0 {
-					valType = "EMPTY_SLICE"
-				} else {
-					valType = fmt.Sprintf("LEN_%d", valLen)
-				}
-			}
-			path := trieUpdate.Paths[i]
-			fmt.Printf("[DEBUG LedgerService FROM_SET] trieRootHash=%x path[%d]=%x valueType=%s valueLen=%d\n",
-				trieRootHash[:], i, path[:], valType, valLen)
-		}
 	}
 
 	// Encode trie update using the ledger's encoding function
