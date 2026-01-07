@@ -64,7 +64,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
-	ledgerpkg "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
@@ -899,7 +898,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		}
 
 		checkpointHeight := sealedRoot.Height
-		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
+		rootHash := ledger.RootHash(rootSeal.FinalState)
 
 		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
 		if err != nil {
@@ -1397,7 +1396,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			node.Logger,
 			path.Join(node.BootstrapDir, modelbootstrap.DirnameExecutionState),
 			modelbootstrap.FilenameWALRootCheckpoint,
-			ledgerpkg.RootHash(node.RootSeal.FinalState),
+			ledger.RootHash(node.RootSeal.FinalState),
 		)
 		if err != nil {
 			return err

@@ -112,7 +112,7 @@ func (c *Client) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, e
 
 	// Reconstruct the original value type using is_nil flag
 	// This preserves the distinction between nil and []byte{} that protobuf loses
-	if resp.Value.Data == nil || len(resp.Value.Data) == 0 {
+	if len(resp.Value.Data) == 0 {
 		if resp.Value.IsNil {
 			return nil, nil
 		}
@@ -145,7 +145,7 @@ func (c *Client) Get(query *ledger.Query) ([]ledger.Value, error) {
 	for i, protoValue := range resp.Values {
 		// Reconstruct the original value type using is_nil flag
 		// This preserves the distinction between nil and []byte{} that protobuf loses
-		if protoValue.Data == nil || len(protoValue.Data) == 0 {
+		if len(protoValue.Data) == 0 {
 			if protoValue.IsNil {
 				values[i] = nil
 			} else {
@@ -198,6 +198,9 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 
 	// Decode trie update if present
 	trieUpdate, err := ledger.DecodeTrieUpdate(resp.TrieUpdate)
+	if err != nil {
+		return ledger.DummyState, nil, fmt.Errorf("failed to decode trie update: %w", err)
+	}
 
 	return newState, trieUpdate, nil
 }

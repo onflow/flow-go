@@ -152,7 +152,7 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 		var value ledger.Value
 		// Reconstruct the original value type using is_nil flag
 		// This preserves the distinction between nil and []byte{} that protobuf loses
-		if protoValue.Data == nil || len(protoValue.Data) == 0 {
+		if len(protoValue.Data) == 0 {
 			if protoValue.IsNil {
 				// Original value was nil
 				value = nil
