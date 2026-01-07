@@ -97,6 +97,30 @@ func (suite *PendingBlocksSuite) TestAddBelowFinalizedView() {
 	suite.Assert().Equal(uint(0), buffer.Size())
 }
 
+// TestAddSameView verities that adding multiple blocks with the same view stores only the first instance.
+func (suite *PendingBlocksSuite) TestAddSameView() {
+	block := suite.block()
+
+	anotherBlock := suite.block()
+	anotherBlock.Message.Block.ParentView = block.Message.Block.ParentView
+	anotherBlock.Message.Block.View = block.Message.Block.View
+
+	suite.Require().NoError(suite.buffer.Add(block))
+	suite.Require().NoError(suite.buffer.Add(anotherBlock))
+
+	// Should still only have one block
+	suite.Assert().Equal(uint(1), suite.buffer.Size())
+
+	// Should still be retrievable
+	retrieved, ok := suite.buffer.ByID(block.Message.Block.ID())
+	suite.Assert().True(ok)
+	suite.Assert().Equal(block.Message.Block.ID(), retrieved.Message.Block.ID())
+
+	// Other block should not be stored
+	_, ok = suite.buffer.ByID(anotherBlock.Message.Block.ID())
+	suite.Assert().False(ok)
+}
+
 // TestAddExceedsActiveViewRangeSize verifies that adding blocks that exceed the active view range size returns an error.
 func (suite *PendingBlocksSuite) TestAddExceedsActiveViewRangeSize() {
 	finalizedView := uint64(1000)
