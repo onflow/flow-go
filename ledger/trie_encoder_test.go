@@ -640,7 +640,7 @@ func TestTrieUpdateNilVsEmptySlice(t *testing.T) {
 	}
 
 	// Step 1: Verify original distinction
-	require.NotNil(t, tu.Payloads[0].Value(), "Payload 0 should have no-nil value after normalized")
+	require.NotNil(t, tu.Payloads[0].Value(), "Payload 0 should have non-nil value after normalized")
 	require.NotNil(t, tu.Payloads[1].Value(), "Payload 1 should have non-nil value")
 	require.Equal(t, 0, len(tu.Payloads[0].Value()), "Payload 0 should have 0 length")
 	require.Equal(t, 0, len(tu.Payloads[1].Value()), "Payload 1 should have 0 length")
