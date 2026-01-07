@@ -217,7 +217,7 @@ func TestProtobufIsNilFieldPreservesDistinction(t *testing.T) {
 		var typeStr string
 
 		// Simulate protobuf behavior: empty Data becomes nil after round-trip
-		if protoValue.Data == nil || len(protoValue.Data) == 0 {
+		if len(protoValue.Data) == 0 {
 			// Use IsNil to reconstruct original value type
 			if protoValue.IsNil {
 				serverSees = nil
