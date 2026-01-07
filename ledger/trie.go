@@ -434,6 +434,13 @@ func (p *Payload) DeepCopy() *Payload {
 // NewPayload returns a new payload
 func NewPayload(key Key, value Value) *Payload {
 	ek := encodeKey(&key, PayloadVersion)
+	// Normalize nil payload values to empty slice (Value{}) to ensure consistency
+	// across all serialization formats (checkpoint files, WAL files, and execution data).
+	// This eliminates the distinction between nil and empty slice values, as both represent
+	// the removal of a register from the execution state. When an execution node loads a trie,
+	// it first reads checkpoint files and then WAL files, during which nil values are normalized
+	// to []byte{}. By normalizing at payload creation time, we ensure all code paths produce
+	// consistent encoded data regardless of whether the original value was nil or []byte{}.
 	if value == nil {
 		value = Value{}
 	}
