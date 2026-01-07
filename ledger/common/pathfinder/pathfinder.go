@@ -114,15 +114,17 @@ func PathsFromPayloads(payloads []*ledger.Payload, version uint8) ([]ledger.Path
 	return paths, nil
 }
 
-// UpdateToPayloads constructs an slice of payloads given ledger update
+// UpdateToPayloads constructs an slice of payloads given ledger update.
+// It normalizes all values by replacing nil with []byte{} to ensure
+// consistency across all serialization formats (WAL, checkpoints, execution data).
 func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 	keys := update.Keys()
 	values := update.Values()
 	payloads := make([]*ledger.Payload, len(keys))
 	for i := range keys {
 		val := values[i]
-		// Normalize nil to empty slice for consistency across local/remote ledgers
-		// and deterministic CBOR serialization.
+		// Normalize nil to empty slice at the root: replace nil with []byte{}
+		// This ensures consistency across all serialization formats
 		if val == nil {
 			val = []byte{}
 		}
