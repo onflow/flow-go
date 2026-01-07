@@ -272,7 +272,12 @@ func (p Payload) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	sp := serializablePayload{Key: k, Value: p.value}
+	// Normalize nil value to empty slice for consistent encoding
+	value := p.value
+	if value == nil {
+		value = Value{}
+	}
+	sp := serializablePayload{Key: k, Value: value}
 	return json.Marshal(sp)
 }
 
@@ -296,7 +301,12 @@ func (p Payload) MarshalCBOR() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	sp := serializablePayload{Key: k, Value: p.value}
+	// Normalize nil value to empty slice for consistent encoding
+	value := p.value
+	if value == nil {
+		value = Value{}
+	}
+	sp := serializablePayload{Key: k, Value: value}
 	return cbor.Marshal(sp)
 }
 
@@ -449,7 +459,7 @@ func NewPayload(key Key, value Value) *Payload {
 
 // EmptyPayload returns an empty payload
 func EmptyPayload() *Payload {
-	return &Payload{}
+	return &Payload{value: Value{}}
 }
 
 // TrieProof includes all the information needed to walk

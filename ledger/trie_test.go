@@ -537,7 +537,7 @@ func TestPayloadCBORSerialization(t *testing.T) {
 			0xf6,                         // null
 			0x65,                         // text(5)
 			0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-			0xf6, // null
+			0x40, // null will be normalized to []byte{}
 		}
 
 		var p Payload
