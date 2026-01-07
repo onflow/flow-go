@@ -81,7 +81,7 @@ func (s *RequesterEngineSuite) TestEntityByID() {
 	assert.Len(s.T(), s.engine.items, 1)
 	item, contains := s.engine.items[entityID]
 	if assert.True(s.T(), contains) {
-		assert.Equal(s.T(), item.EntityID, entityID)
+		assert.Equal(s.T(), item.QueryKey, entityID)
 		assert.Equal(s.T(), item.NumAttempts, uint(0))
 		cutoff := item.LastRequested.Add(item.RetryAfter)
 		assert.True(s.T(), cutoff.Before(now)) // make sure we push out immediately
@@ -112,8 +112,8 @@ func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
 		}
 
 		// item that has just been added, should be included
-		justAdded := &Item{
-			EntityID:      unittest.IdentifierFixture(),
+		justAdded := &Request{
+			QueryKey:      unittest.IdentifierFixture(),
 			NumAttempts:   0,
 			LastRequested: time.Time{},
 			RetryAfter:    cfg.RetryInitial,
@@ -121,8 +121,8 @@ func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
 		}
 
 		// item was tried long time ago, should be included
-		triedAnciently := &Item{
-			EntityID:      unittest.IdentifierFixture(),
+		triedAnciently := &Request{
+			QueryKey:      unittest.IdentifierFixture(),
 			NumAttempts:   1,
 			LastRequested: time.Now().UTC().Add(-cfg.RetryMaximum),
 			RetryAfter:    cfg.RetryFunction(cfg.RetryInitial),
@@ -130,27 +130,27 @@ func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
 		}
 
 		// item that was just tried, should be excluded
-		triedRecently := &Item{
-			EntityID:      unittest.IdentifierFixture(),
+		triedRecently := &Request{
+			QueryKey:      unittest.IdentifierFixture(),
 			NumAttempts:   1,
 			LastRequested: time.Now().UTC(),
 			RetryAfter:    cfg.RetryFunction(cfg.RetryInitial),
 		}
 
 		// item was tried twice, should be excluded
-		triedTwice := &Item{
-			EntityID:      unittest.IdentifierFixture(),
+		triedTwice := &Request{
+			QueryKey:      unittest.IdentifierFixture(),
 			NumAttempts:   2,
 			LastRequested: time.Time{},
 			RetryAfter:    cfg.RetryInitial,
 			ExtraSelector: filter.Any,
 		}
 
-		items := make(map[flow.Identifier]*Item)
-		items[justAdded.EntityID] = justAdded
-		items[triedAnciently.EntityID] = triedAnciently
-		items[triedRecently.EntityID] = triedRecently
-		items[triedTwice.EntityID] = triedTwice
+		items := make(map[flow.Identifier]*Request)
+		items[justAdded.QueryKey] = justAdded
+		items[triedAnciently.QueryKey] = triedAnciently
+		items[triedRecently.QueryKey] = triedRecently
+		items[triedTwice.QueryKey] = triedTwice
 		s.engine.cfg = cfg
 		s.engine.items = items
 		s.engine.selector = filter.HasNodeID[flow.Identity](targetID)
@@ -163,7 +163,7 @@ func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
 				originID := args.Get(1).(flow.Identifier)
 				nonce = request.Nonce
 				assert.Equal(s.T(), originID, targetID)
-				assert.ElementsMatch(s.T(), request.EntityIDs, []flow.Identifier{justAdded.EntityID, triedAnciently.EntityID})
+				assert.ElementsMatch(s.T(), request.EntityIDs, []flow.Identifier{justAdded.QueryKey, triedAnciently.QueryKey})
 			},
 		).Return(nil).Once()
 
@@ -208,14 +208,14 @@ func (s *RequesterEngineSuite) TestDispatchRequestBatchSize() {
 
 	// item that has just been added, should be included
 	for i := uint(0); i < totalItems; i++ {
-		item := &Item{
-			EntityID:      unittest.IdentifierFixture(),
+		item := &Request{
+			QueryKey:      unittest.IdentifierFixture(),
 			NumAttempts:   0,
 			LastRequested: time.Time{},
 			RetryAfter:    s.engine.cfg.RetryInitial,
 			ExtraSelector: filter.Any,
 		}
-		s.engine.items[item.EntityID] = item
+		s.engine.items[item.QueryKey] = item
 	}
 
 	s.con.On("Unicast", mock.Anything, mock.Anything).Run(
@@ -256,18 +256,18 @@ func (s *RequesterEngineSuite) TestOnEntityResponseValid() {
 
 	now := time.Now()
 
-	iwanted1 := &Item{
-		EntityID:      wanted1.ID(),
+	iwanted1 := &Request{
+		QueryKey:      wanted1.ID(),
 		LastRequested: now,
 		ExtraSelector: filter.Any,
 	}
-	iwanted2 := &Item{
-		EntityID:      wanted2.ID(),
+	iwanted2 := &Request{
+		QueryKey:      wanted2.ID(),
 		LastRequested: now,
 		ExtraSelector: filter.Any,
 	}
-	iunavailable := &Item{
-		EntityID:      unavailable.ID(),
+	iunavailable := &Request{
+		QueryKey:      unavailable.ID(),
 		LastRequested: now,
 		ExtraSelector: filter.Any,
 	}
@@ -295,9 +295,9 @@ func (s *RequesterEngineSuite) TestOnEntityResponseValid() {
 		}
 	})
 
-	s.engine.items[iwanted1.EntityID] = iwanted1
-	s.engine.items[iwanted2.EntityID] = iwanted2
-	s.engine.items[iunavailable.EntityID] = iunavailable
+	s.engine.items[iwanted1.QueryKey] = iwanted1
+	s.engine.items[iwanted2.QueryKey] = iwanted2
+	s.engine.items[iunavailable.QueryKey] = iunavailable
 
 	s.engine.requests[req.Nonce] = req
 
@@ -341,8 +341,8 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 	wanted2 := unittest.CollectionFixture(2)
 	now := time.Now()
 
-	iwanted := &Item{
-		EntityID:           wanted.ID(),
+	iwanted := &Request{
+		QueryKey:           wanted.ID(),
 		LastRequested:      now,
 		ExtraSelector:      filter.Any,
 		queryByContentHash: true,
@@ -367,7 +367,7 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 	s.engine.WithHandle(func(flow.Identifier, flow.Entity) { close(called) })
 
 	// PART (i)
-	s.engine.items[iwanted.EntityID] = iwanted
+	s.engine.items[iwanted.QueryKey] = iwanted
 	s.engine.requests[req.Nonce] = req
 
 	err := s.engine.onEntityResponse(targetID, res)
@@ -382,7 +382,7 @@ func (s *RequesterEngineSuite) TestOnEntityIntegrityCheck() {
 
 	// PART (ii)
 	iwanted.queryByContentHash = false
-	s.engine.items[iwanted.EntityID] = iwanted
+	s.engine.items[iwanted.QueryKey] = iwanted
 	s.engine.requests[req.Nonce] = req
 
 	err = s.engine.onEntityResponse(targetID, res)
@@ -409,8 +409,8 @@ func (s *RequesterEngineSuite) TestOriginValidation() {
 	nonce := rand.Uint64()
 	wanted := unittest.CollectionFixture(1)
 	now := time.Now()
-	iwanted := &Item{
-		EntityID:           wanted.ID(),
+	iwanted := &Request{
+		QueryKey:           wanted.ID(),
 		LastRequested:      now,
 		ExtraSelector:      filter.HasNodeID[flow.Identity](targetID),
 		queryByContentHash: true,
@@ -439,7 +439,7 @@ func (s *RequesterEngineSuite) TestOriginValidation() {
 		close(called)
 	})
 
-	s.engine.items[iwanted.EntityID] = iwanted
+	s.engine.items[iwanted.QueryKey] = iwanted
 	s.engine.requests[req.Nonce] = req
 
 	err := s.engine.onEntityResponse(wrongID, res)

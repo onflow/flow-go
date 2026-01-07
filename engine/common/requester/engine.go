@@ -29,7 +29,7 @@ import (
 // This equates to ~5GB of memory usage with a full queue (10M*500)
 const DefaultEntityRequestCacheSize = 500
 
-// HandleFunc is a function provided to the requester engine to handle an entity
+// HandleFunc is a function provided to the requester engine to entityConsumer an entity
 // once it has been retrieved from a provider. The function should be non-blocking
 // and errors should be handled internally within the function.
 type HandleFunc func(originID flow.Identifier, entity flow.Entity)
@@ -56,10 +56,10 @@ type Engine struct {
 	requestQueue   engine.MessageStore
 	selector       flow.IdentityFilter[flow.Identity]
 	create         CreateFunc
-	handle         HandleFunc
+	entityConsumer HandleFunc
 
 	// changing the following state variables must be guarded by mu.Lock()
-	items                 map[flow.Identifier]*Item
+	items                 map[flow.Identifier]*Request
 	requests              map[uint64]*messages.EntityRequest
 	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
 }
@@ -119,22 +119,21 @@ func New(
 		return nil, fmt.Errorf("invalid retry maximum (must not be smaller than initial interval)")
 	}
 
-	// make sure we don't send requests from self
+	// This node may request data from and node that
+	//  1. has positive weight in the current epoch (ignoring observer variants of roles)
+	//  2. and is not ejected
+	//  3. and is not the requester itself
+	// Note: we allow requesting data from joining or leaving nodes. This is important during grace periods
+	// before and after the cluster switchover, where the joining and leaving nodes (e.g. collectors part of
+	// a cluster) must still be able to communicate with each other including requesting data.
 	selector = filter.And(
 		selector,
-		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
-		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
-	)
-
-	// make sure we only send requests to nodes that are active in the current epoch and have positive weight
-	selector = filter.And(
-		selector,
-		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
-		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
 		filter.HasInitialWeight[flow.Identity](true),
+		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
+		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
 	)
 
-	handler := engine.NewMessageHandler(
+	requestHandler := engine.NewMessageHandler(
 		log,
 		engine.NewNotifier(),
 		engine.Pattern{
@@ -155,13 +154,13 @@ func New(
 		metrics:               metrics,
 		me:                    me,
 		state:                 state,
-		requestHandler:        handler,
+		requestHandler:        requestHandler,
 		requestQueue:          requestQueue,
 		channel:               channel,
 		selector:              selector,
 		create:                create,
-		handle:                nil,
-		items:                 make(map[flow.Identifier]*Item),          // holds all pending items
+		entityConsumer:        nil,
+		items:                 make(map[flow.Identifier]*Request),       // holds all pending items
 		requests:              make(map[uint64]*messages.EntityRequest), // holds all sent requests
 		forcedDispatchOngoing: atomic.NewBool(false),
 	}
@@ -175,19 +174,19 @@ func New(
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.poll).
-		AddWorker(e.processQueuedRequestsShovellerWorker).
+		AddWorker(e.processInboundEntityResponses).
 		Build()
 
 	return e, nil
 }
 
-// WithHandle sets the handle function of the requester, which is how it processes
-// returned entities. The engine can not be started without setting the handle
+// WithHandle sets the entityConsumer function of the requester, which is how it processes
+// returned entities. The engine can not be started without setting the entityConsumer
 // function. It is done in a separate call so that the requester can be injected
-// into engines upon construction, and then provide a handle function to the
+// into engines upon construction, and then provide a entityConsumer function to the
 // requester from that engine itself.
 func (e *Engine) WithHandle(handle HandleFunc) {
-	e.handle = handle
+	e.entityConsumer = handle
 }
 
 // Process queues the given message from the node with the given origin ID for asynchronous processing.
@@ -222,27 +221,26 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 	return nil
 }
 
-// processQueuedRequestsShovellerWorker requires a dedicated worker from the [component.ComponentManager].
+// processInboundEntityResponses requires a dedicated worker from the [component.ComponentManager].
 // It tracks when there is available work and performs dispatch of incoming messages.
-func (e *Engine) processQueuedRequestsShovellerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) processInboundEntityResponses(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
-
 	e.log.Debug().Msg("process entity request shoveller worker started")
 
 	for {
 		select {
 		case <-e.requestHandler.GetNotifier():
 			// there is at least a single request in the queue, so we try to process it.
-			e.processAvailableMessages(ctx)
+			e.onQueuedEntityResponses(ctx)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-// processAvailableMessages consumes all messages from the `requestQueue` waiting to be processed (or aborts in case 
+// onQueuedEntityResponses consumes all messages from the `requestQueue` waiting to be processed (or aborts in case
 // of shutdown). All unexpected errors are reported to the SignalerContext.
-func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
+func (e *Engine) onQueuedEntityResponses(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -258,7 +256,7 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) {
 
 		res, ok := msg.Payload.(*flow.EntityResponse)
 		if !ok {
-			// should never happen, as we only put EntityRequest in the queue,
+			// should never happen, as we only put *flow.EntityResponse in the queue,
 			// if it does happen, it means there is a bug in the queue implementation.
 			ctx.Throw(fmt.Errorf("invalid message type in entity request queue: %T", msg.Payload))
 		}
@@ -300,10 +298,10 @@ func (e *Engine) EntityBySecondaryKey(key flow.Identifier, selector flow.Identit
 }
 
 // addEntityRequest adds the entity identified by `queryKey` to the pool of data to be requested.
-// Items to be requested are held in memory and forgotten during a restart.  
+// Items to be requested are held in memory and forgotten during a restart.
 // Idempotent w.r.t. `queryKey` (if prior request is still ongoing, we just continue trying). Aside
 // from acquiring a lock, this function returns almost immediately. The actual requests are done
-// asynchronously.  
+// asynchronously.
 // ATTENTION: If `queryKeyIsContentHash` is `false`, it is the CALLER's RESPONSIBILITY to verify
 // integrity (and authenticity if applicable) of the received data!
 // Concurrency safe.
@@ -318,8 +316,8 @@ func (e *Engine) addEntityRequest(queryKey flow.Identifier, selector flow.Identi
 	}
 
 	// otherwise, add a new item to the list
-	item := &Item{
-		EntityID:           queryKey,
+	item := &Request{
+		QueryKey:           queryKey,
 		NumAttempts:        0,
 		LastRequested:      time.Time{},
 		RetryAfter:         e.cfg.RetryInitial,
@@ -329,16 +327,17 @@ func (e *Engine) addEntityRequest(queryKey flow.Identifier, selector flow.Identi
 	e.items[queryKey] = item
 }
 
-// Force will force the requester engine to dispatch all currently
-// valid batch requests.
+// Force will force the requester engine to dispatch all currently valid batch requests.
+// This method does not block; requests are checked asynchronously. Repeated calls are
+// no-ops as long as once forced request is ongoing.
 func (e *Engine) Force() {
 	// exit early in case a forced dispatch is currently ongoing
 	if e.forcedDispatchOngoing.Load() {
 		return
 	}
 
-	// Go routine ensures that the caller won't be blocked. At most one goroutine will be consumed, 
-	// because if another goroutine is already active, a newly spawned routine will immediately be done. 
+	// Go routine ensures that the caller won't be blocked. At most one goroutine will be consumed,
+	// because if another goroutine is already active, a newly spawned routine will immediately be done.
 	go func() {
 		// using atomic bool to ensure there is at most one caller would trigger dispatching requests
 		if e.forcedDispatchOngoing.CompareAndSwap(false, true) {
@@ -362,7 +361,7 @@ func (e *Engine) Force() {
 
 // poll runs inside a dedicated worker owned by the [component.ComponentManager]. It performs dispatch of pending requests using a timer.
 func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if e.handle == nil {
+	if e.entityConsumer == nil {
 		ctx.Throw(fmt.Errorf("must initialize requester engine with handler"))
 	}
 
@@ -637,9 +636,9 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *flow.EntityResp
 		delete(e.items, entityID)
 
 		// process the entity
-		// TODO: We should update users of requester engine to uniformly pass in a non-blocking `handle` function
+		// TODO: We should update users of requester engine to uniformly pass in a non-blocking `entityConsumer` function
 		// (Currently all users except the execution ingestion engine have non-blocking handlers: https://github.com/onflow/flow-go/blob/be489481bff28f42bc887fe26fe19476585ab6aa/engine/execution/ingestion/machine.go#L99)
-		go e.handle(originID, entity)
+		go e.entityConsumer(originID, entity)
 	}
 
 	// requeue requested entities that have not been delivered in the response
