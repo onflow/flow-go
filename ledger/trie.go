@@ -443,7 +443,7 @@ func NewPayload(key Key, value Value) *Payload {
 
 // EmptyPayload returns an empty payload
 func EmptyPayload() *Payload {
-	return &Payload{}
+	return &Payload{value: Value{}}
 }
 
 // TrieProof includes all the information needed to walk
