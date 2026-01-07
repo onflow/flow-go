@@ -260,6 +260,8 @@ func New(params Params) (*Backend, error) {
 		Collections:                 params.Collections,
 		Transactions:                params.Transactions,
 		ScheduledTransactions:       params.ScheduledTransactions,
+		ExecutionStateCache:         params.ExecutionStateCache,
+		ExecutionResultProvider:     params.ExecutionResultInfoProvider,
 		TxResultCache:               txResCache,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,

@@ -105,6 +105,7 @@ type Suite struct {
 	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache         *osyncmock.ExecutionStateCache
 	executionDataSnapshot       *osyncmock.Snapshot
+	executionResultInfo         *optimistic_sync.ExecutionResultInfo
 	criteria                    optimistic_sync.Criteria
 }
 
@@ -160,6 +161,13 @@ func (suite *Suite) SetupTest() {
 	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
 	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
 	suite.criteria = optimistic_sync.Criteria{}
+
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	executionResult := unittest.ExecutionResultFixture()
+	suite.executionResultInfo = &optimistic_sync.ExecutionResultInfo{
+		ExecutionResultID: executionResult.ID(),
+		ExecutionNodes:    executionNodes.ToSkeleton(),
+	}
 }
 
 // TearDownTest cleans up the db
@@ -1004,6 +1012,11 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		result, resMetadata, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
@@ -1018,11 +1031,12 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
-		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
-		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
 
-		actual, resMetadata, err := backend.GetTransactionResultByIndex(signalerCtx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
+		actual, resMetadata, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Nil(actual)
 		suite.Require().Nil(resMetadata)
@@ -1047,7 +1061,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
@@ -1081,6 +1094,11 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.Run("GetTransactionResultsByBlockID - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		result, resMetadata, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
@@ -1094,11 +1112,12 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
-		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
-		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
 
-		actual, resMetadata, err := backend.GetTransactionResultsByBlockID(signalerCtx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
+		actual, resMetadata, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Nil(actual)
 		suite.Require().Nil(resMetadata)
@@ -1170,6 +1189,11 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
+
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", flow.ZeroID, suite.criteria).
+		Return(suite.executionResultInfo, nil).
+		Once()
 
 	// Successfully return empty event list
 	suite.execClient.
