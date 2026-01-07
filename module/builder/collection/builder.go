@@ -634,18 +634,35 @@ func (b *Builder) buildHeader(
 	}, nil
 }
 
-// findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference
-// block heights of ancestor blocks which could possibly contain transactions
-// duplicating those in our collection under construction, based on the range of
-// reference heights of transactions in the collection under construction.
+// findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference block heights of ancestor blocks
+// which could possibly contain transactions duplicating those in our collection under construction, based on the range
+// of reference heights of transactions in the collection under construction.
+// Input range is the (inclusive) range of reference heights of transactions eligible for inclusion in the collection
+// under construction. Output range is the (inclusive) range of reference heights which need to be searched in order to
+// avoid transaction repeats.
 //
-// Input range is the (inclusive) range of reference heights of transactions included
-// in the collection under construction. Output range is the (inclusive) range of
-// reference heights which need to be searched.
+// Within a single epoch, we have argued that for a set of transactions, with `minRefHeight` (`maxRefHeight`) being
+// the smallest (largest) reference block height, we only need to inspect collections with reference block heights
+// c ∈ (minRefHeight-E, maxRefHeight]. Note that the lower bound is exclusive, while the upper bound is inclusive,
+// which we transform to an inclusive range:
+//
+//	   c ∈ (minRefHeight-E, maxRefHeight]
+//	⇔  c ∈ [minRefHeight-E+1, maxRefHeight]
+//
+// In order to take epoch boundaries into account, we note: A collector cluster is only responsible for transactions whose
+// reference blocks are within the cluster's operating epoch. Thus, we can bound the lower end of the search range by the
+// height of the first block in the epoch. Formally, we only need to inspect collections with reference block height
+//
+//	c ∈ [max{minRefHeight-E+1, epochFirstHeight}, maxRefHeight]
 func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64, ctx *blockBuildContext) (start, end uint64) {
-	delta := uint64(flow.DefaultTransactionExpiry + 1)
-	if minRefHeight <= ctx.refEpochFirstHeight+delta {
-		return ctx.refEpochFirstHeight, maxRefHeight // bound at start of epoch
+	// in order to avoid underflow, we rewrite the lower-bound equation entirely without subtraction:
+	//     max{minRefHeight-E+1, epochFirstHeight} == epochFirstHeight
+	//  ⇔  minRefHeight - E + 1 ≤ epochFirstHeight
+	//  ⇔      minRefHeight - E < epochFirstHeight
+	//  ⇔          minRefHeight < epochFirstHeight + E
+	if minRefHeight < ctx.refEpochFirstHeight+flow.DefaultTransactionExpiry {
+		return ctx.refEpochFirstHeight, maxRefHeight
 	}
-	return minRefHeight - delta, maxRefHeight
+	// We reach the following line only if minRefHeight-E+1 > epochFirstHeight ≥ 0. Hence, an underflow is impossible.
+	return minRefHeight + 1 - flow.DefaultTransactionExpiry, maxRefHeight
 }
