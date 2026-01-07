@@ -334,56 +334,6 @@ func CommitDelta(
 
 	newCommit := flow.StateCommitment(newState)
 
-	// Debug log input update keys and values
-	if update != nil {
-		keys := update.Keys()
-		values := update.Values()
-		for i := 0; i < len(keys) && i < len(values); i++ {
-			val := values[i]
-			var valueType string
-			var valueLen int
-			if val == nil {
-				valueType = "NIL"
-				valueLen = 0
-			} else {
-				valueLen = len(val)
-				if valueLen == 0 {
-					valueType = "EMPTY_SLICE"
-				} else {
-					valueType = "NON_EMPTY"
-				}
-			}
-			keyBytes := keys[i].CanonicalForm()
-			fmt.Printf("[DEBUG CommitDelta INPUT] trieRootHash=%x stateCommitment=%x key[%d]=%x valueType=%s valueLen=%d\n",
-				newCommit[:], newCommit[:], i, keyBytes, valueType, valueLen)
-		}
-	}
-
-	// Debug log each payload's path and value details
-	if trieUpdate != nil {
-		for i, payload := range trieUpdate.Payloads {
-			if payload != nil {
-				val := payload.Value()
-				var valueType string
-				var valueLen int
-				if val == nil {
-					valueType = "NIL"
-					valueLen = 0
-				} else {
-					valueLen = len(val)
-					if valueLen == 0 {
-						valueType = "EMPTY_SLICE"
-					} else {
-						valueType = "NON_EMPTY"
-					}
-				}
-				path := trieUpdate.Paths[i]
-				fmt.Printf("[DEBUG CommitDelta OUTPUT] trieRootHash=%x stateCommitment=%x path[%d]=%x valueType=%s valueLen=%d\n",
-					trieUpdate.RootHash[:], newCommit[:], i, path[:], valueType, valueLen)
-			}
-		}
-	}
-
 	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, ruh.UpdatedRegisterSet())
 
 	return newCommit, trieUpdate, newStorageSnapshot, nil
