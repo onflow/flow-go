@@ -418,11 +418,12 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			}
 		}
 
-		// if no provider has been chosen yet, choose from restricted set
-		// NOTE: a single item can not permanently block requests going
-		// out when no providers are available for it, because the iteration
-		// order is random and will skip the item most of the times
-		// when other items are available
+		// If no provider has been chosen yet, select one that:
+		// - is part of the previously determined `providers` set (staked, non-ejected nodes)
+		// - and matches the item's specific requirements (as per ExtraSelector)
+		// NOTE: a single item can not permanently block requests going out when no providers are available for it,
+		// because the iteration order is random. The `ExtraSelector` of the item that is iterated over first (at
+		// random) will determine the selected provider.
 		if providerID == flow.ZeroID {
 			filteredProviders := providers.Filter(item.ExtraSelector)
 			if len(filteredProviders) == 0 {
