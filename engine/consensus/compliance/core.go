@@ -241,6 +241,15 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
+	// Each proposal is validated before being cached or processed, this results in a statement:
+	// - cache stores only valid proposals(from hotstuff's perspective).
+	// A malicious leader might try to send many proposals both valid and invalid to drain CPU resources
+	// by validating proposals. Consider two cases:
+	// 1. Leader sends multiple invalid blocks: this is a one time attack since it's even one block provides a slashing evidence
+	// 	  which results in immediate slashing. This attack is very short living and expensive.
+	// 2. Leader sends multiple valid blocks: this is prevented by storing single block per view and accepting proposals in
+	//    specific view range. This attack has a very limited surface and power.
+
 	hotstuffProposal := model.SignedProposalFromBlock(proposal.Message)
 	err = c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
@@ -265,16 +274,9 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 			return nil
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			// We have received a proposal, but we don't know the epoch its view is within.
-			// We know:
-			//  - the parent of this block is valid and was appended to the state (ie. we knew the epoch for it)
-			//  - if we then see this for the child, one of two things must have happened:
-			//    1. the proposer maliciously created the block for a view very far in the future (it's invalid)
-			//      -> in this case we can disregard the block
-			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
-			//       (breaking a critical assumption - see FinalizationSafetyThreshold in protocol.Params for details)
-			//      -> in this case, the network has encountered a critical failure
-			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
+			// generally speaking we shouldn't get to this point as SkipNewProposalsThreshold controls
+			// how many views in advance we accept a block, but in case it's very large we might get into a situation
+			// where we don't anything about the epoch.
 			return nil
 		}
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
@@ -310,7 +312,6 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 			c.sync.RequestBlock(header.ParentID, header.Height-1)
 			log.Debug().Msg("requesting missing parent for proposal")
 		}
-
 		return nil
 	}
 
