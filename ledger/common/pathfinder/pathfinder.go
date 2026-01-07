@@ -65,7 +65,7 @@ func UpdateToTrieUpdate(u *ledger.Update, version uint8) (*ledger.TrieUpdate, er
 		return nil, err
 	}
 
-	payloads, err := UpdateToPayloads(u, version)
+	payloads, err := UpdateToPayloads(u)
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +115,7 @@ func PathsFromPayloads(payloads []*ledger.Payload, version uint8) ([]ledger.Path
 }
 
 // UpdateToPayloads constructs an slice of payloads given ledger update.
-// It normalizes all values by replacing nil with []byte{} to ensure
-// consistency across all serialization formats (WAL, checkpoints, execution data).
-// When normalization triggers, it logs the key, owner, and payload path using the default zerolog logger.
-func UpdateToPayloads(update *ledger.Update, pathFinderVersion uint8) ([]*ledger.Payload, error) {
+func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 	keys := update.Keys()
 	values := update.Values()
 	payloads := make([]*ledger.Payload, len(keys))
