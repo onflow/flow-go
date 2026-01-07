@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -105,6 +106,10 @@ func main() {
 	var nilCount, emptySliceCount, nonEmptyCount int
 	var blocksProcessed, chunksProcessed int
 
+	// Store keys for nil and empty slice values
+	var nilKeys []string
+	var emptySliceKeys []string
+
 	ctx := context.Background()
 
 	// Process each height
@@ -124,7 +129,7 @@ func main() {
 		blocksProcessed++
 
 		// Process each chunk's TrieUpdate
-		for _, chunkData := range execDataEntity.BlockExecutionData.ChunkExecutionDatas {
+		for chunkIdx, chunkData := range execDataEntity.BlockExecutionData.ChunkExecutionDatas {
 			if chunkData.TrieUpdate == nil {
 				continue
 			}
@@ -132,16 +137,26 @@ func main() {
 			chunksProcessed++
 
 			// Check all payloads in the TrieUpdate
-			for _, payload := range chunkData.TrieUpdate.Payloads {
+			for payloadIdx, payload := range chunkData.TrieUpdate.Payloads {
 				if payload == nil {
 					continue
 				}
 
+				// Get the key for this payload
+				key, err := payload.Key()
+				if err != nil {
+					logger.Warn().Err(err).Uint64("height", height).Int("chunk", chunkIdx).Int("payload", payloadIdx).Msg("Failed to get payload key")
+					continue
+				}
+				keyStr := hex.EncodeToString(key.CanonicalForm())
+
 				value := payload.Value()
 				if value == nil {
 					nilCount++
+					nilKeys = append(nilKeys, fmt.Sprintf("height=%d chunk=%d key=%s", height, chunkIdx, keyStr))
 				} else if len(value) == 0 {
 					emptySliceCount++
+					emptySliceKeys = append(emptySliceKeys, fmt.Sprintf("height=%d chunk=%d key=%s", height, chunkIdx, keyStr))
 				} else {
 					nonEmptyCount++
 				}
@@ -162,4 +177,20 @@ func main() {
 	fmt.Printf("  empty slice []byte{}: %d\n", emptySliceCount)
 	fmt.Printf("  non-empty values:  %d\n", nonEmptyCount)
 	fmt.Printf("  total payloads:    %d\n", nilCount+emptySliceCount+nonEmptyCount)
+
+	// Print keys for nil values
+	if len(nilKeys) > 0 {
+		fmt.Printf("\nKeys with nil values (%d):\n", len(nilKeys))
+		for _, key := range nilKeys {
+			fmt.Printf("  %s\n", key)
+		}
+	}
+
+	// Print keys for empty slice values
+	if len(emptySliceKeys) > 0 {
+		fmt.Printf("\nKeys with empty slice []byte{} values (%d):\n", len(emptySliceKeys))
+		for _, key := range emptySliceKeys {
+			fmt.Printf("  %s\n", key)
+		}
+	}
 }
