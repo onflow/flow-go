@@ -95,7 +95,7 @@ func TestClusterHeaderInsertWrongLock(t *testing.T) {
 		// without any locks
 		err := unittest.WithLocks(t, lockManager, []string{}, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+				return operation.InsertClusterHeader(lctx, rw, expected.ID(), expected)
 			})
 		})
 		require.Error(t, err)

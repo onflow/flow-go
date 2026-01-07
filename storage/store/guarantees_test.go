@@ -38,7 +38,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		proposal := unittest.ProposalFromBlock(block)
 
 		// attempt to retrieve (still) unknown guarantee
-		_, err := s.ByCollectionID(guarantee1.ID())
+		_, err := s.ByCollectionID(guarantee1.CollectionID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
