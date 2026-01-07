@@ -9,8 +9,6 @@ import (
 
 type Mock struct {
 	events                         storage.EventsReader
-	collections                    storage.CollectionsReader
-	transactions                   storage.TransactionsReader
 	lightTransactionResults        storage.LightTransactionResultsReader
 	transactionResultErrorMessages storage.TransactionResultErrorMessagesReader
 	registersAsyncStore            *execution.RegistersAsyncStore

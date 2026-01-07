@@ -585,7 +585,6 @@ func (h *Handler) GetTransactionResultByIndex(
 	if err != nil {
 		return nil, err
 	}
-	
 	if executionState.GetIncludeExecutorMetadata() {
 		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}

@@ -3,8 +3,6 @@ package stream
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
-	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"os"
 	"testing"
 	"time"
@@ -42,6 +40,8 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -732,7 +732,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentExecut
 
 	transaction := s.createSendTransaction()
 	txId := transaction.ID()
-	
+
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
 

@@ -292,6 +292,7 @@ func New(params Params) (*Backend, error) {
 		params.Transactions,
 		failoverTxProvider,
 		txStatusDeriver,
+		params.ExecutionResultInfoProvider,
 	)
 
 	subscribeBlocksBackend := blockstream.NewSubscribeBlocks(
