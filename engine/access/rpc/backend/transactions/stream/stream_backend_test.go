@@ -3,6 +3,8 @@ package stream
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"os"
 	"testing"
 	"time"
@@ -26,7 +28,6 @@ import (
 	access "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -89,6 +90,11 @@ type TransactionStreamSuite struct {
 	eventIndex    *index.EventsIndex
 	txResultIndex *index.TransactionResultsIndex
 
+	executionResultProvider *osyncmock.ExecutionResultProvider
+	executionStateCache     *osyncmock.ExecutionStateCache
+	executionResultInfo     *optimistic_sync.ExecutionResultInfo
+	executionDataSnapshot   *osyncmock.Snapshot
+
 	chainID flow.ChainID
 
 	broadcaster    *engine.Broadcaster
@@ -149,6 +155,17 @@ func (s *TransactionStreamSuite) SetupTest() {
 	require.NoError(s.T(), err)
 	s.eventIndex = index.NewEventsIndex(s.indexReporter, s.events)
 	s.txResultIndex = index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults)
+
+	s.executionResultProvider = osyncmock.NewExecutionResultProvider(s.T())
+	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
+	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
+
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	executionResult := unittest.ExecutionResultFixture()
+	s.executionResultInfo = &optimistic_sync.ExecutionResultInfo{
+		ExecutionResultID: executionResult.ID(),
+		ExecutionNodes:    executionNodes.ToSkeleton(),
+	}
 
 	s.systemCollections, err = systemcollection.NewVersioned(s.chainID.Chain(), systemcollection.Default(s.chainID))
 	s.Require().NoError(err)
@@ -228,14 +245,14 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.fixedExecutionNodeIDs,
 	)
 
-	errorMessageProvider := error_messages.NewTxErrorMessageProvider(
-		s.log,
-		nil,
-		s.txResultIndex,
-		s.connectionFactory,
-		nodeCommunicator,
-		execNodeProvider,
-	)
+	//errorMessageProvider := error_messages.NewTxErrorMessageProvider(
+	//	s.log,
+	//	nil,
+	//	s.txResultIndex,
+	//	s.connectionFactory,
+	//	nodeCommunicator,
+	//	execNodeProvider,
+	//)
 
 	var systemCollections *systemcollection.Versioned
 	localTxProvider := provider.NewLocalTransactionProvider(
@@ -243,11 +260,10 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.collections,
 		s.blocks,
 		s.eventIndex,
-		s.txResultIndex,
-		errorMessageProvider,
 		systemCollections,
 		txStatusDeriver,
 		s.chainID,
+		s.executionStateCache,
 	)
 
 	execNodeTxProvider := provider.NewENTransactionProvider(
@@ -321,13 +337,15 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Blocks:                      s.blocks,
 		Collections:                 s.collections,
 		Transactions:                s.transactions,
-		TxErrorMessageProvider:      errorMessageProvider,
-		TxResultCache:               txResCache,
-		TxProvider:                  txProvider,
-		TxValidator:                 txValidator,
-		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 s.eventIndex,
-		TxResultsIndex:              s.txResultIndex,
+		//TxErrorMessageProvider:      errorMessageProvider,
+		TxResultCache:           txResCache,
+		TxProvider:              txProvider,
+		TxValidator:             txValidator,
+		TxStatusDeriver:         txStatusDeriver,
+		ExecutionStateCache:     s.executionStateCache,
+		ExecutionResultProvider: s.executionResultProvider,
+		//EventsIndex:                 s.eventIndex,
+		//TxResultsIndex:              s.txResultIndex,
 	}
 	txBackend, err := transactions.NewTransactionsBackend(txParams)
 	s.Require().NoError(err)
@@ -343,6 +361,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.transactions,
 		txProvider,
 		txStatusDeriver,
+		s.executionResultProvider,
 	)
 }
 
@@ -427,6 +446,26 @@ func (s *TransactionStreamSuite) initializeHappyCaseMockInstructions() {
 	for j, event := range eventsForTx {
 		eventMessages[j] = convert.EventToMessage(event)
 	}
+
+	s.executionResultProvider.
+		On("ExecutionResultInfo", mock.Anything, optimistic_sync.Criteria{}).
+		Return(s.executionResultInfo, nil)
+
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionDataSnapshot, nil)
+
+	s.executionDataSnapshot.
+		On("LightTransactionResults").
+		Return(s.transactionResults, nil)
+
+	s.executionDataSnapshot.
+		On("Events").
+		Return(s.events, nil)
+
+	s.executionDataSnapshot.
+		On("BlockStatus").
+		Return(flow.BlockStatusUnknown, nil)
 
 	s.events.On(
 		"ByBlockIDTransactionID",
@@ -693,7 +732,7 @@ func (s *TransactionStreamSuite) TestSubscribeTransactionStatusWithCurrentExecut
 
 	transaction := s.createSendTransaction()
 	txId := transaction.ID()
-
+	
 	hasTransactionResultInStorage := false
 	s.mockTransactionResult(&txId, &hasTransactionResultInStorage)
 

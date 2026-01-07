@@ -1394,13 +1394,17 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 			Return(nil, storage.ErrNotFound).
 			Once()
 
-		suite.blocks.
-			On("ByID", blockID).
-			Return(block, nil).
-			Once()
+		//suite.blocks.
+		//	On("ByID", blockID).
+		//	Return(block, nil).
+		//	Once()
+
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(finalizedBlock.ToHeader(), nil)
+		suite.state.On("Final").Return(finalSnapshot, nil)
 
 		suite.executionResultProvider.
-			On("ExecutionResultInfo", blockID, suite.criteria).
+			On("ExecutionResultInfo", finalizedBlock.ID(), suite.criteria).
 			Return(suite.executionResultInfo, nil).
 			Once()
 
@@ -1415,7 +1419,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_Unknown() {
 			Status:        flow.TransactionStatusUnknown,
 		}
 
-		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, blockID, flow.ZeroID, encodingVersion, suite.criteria)
+		res, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedResult, res)
 		suite.Require().Nil(resMetadata)
@@ -1568,6 +1572,14 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 			Return(foundResponse, nil).
 			Once()
 
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.On("Final").Return(finalSnapshot, nil).Twice()
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxResultCache = new(NoopTxResultCache)
 		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
@@ -1577,13 +1589,21 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 		resp, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedFoundResponse, resp)
-		suite.Require().NotNil(resMetadata)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("result not found", func() {
 		suite.historicalAccessAPIClient.
 			On("GetTransactionResult", mock.Anything, expectedRequest).
 			Return(nil, status.Error(codes.Internal, "some other error")).
+			Once()
+
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.On("Final").Return(finalSnapshot, nil).Twice()
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil).
 			Once()
 
 		params := suite.defaultTransactionsParams()
@@ -1595,7 +1615,7 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 		resp, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedNotFoundResponse, resp)
-		suite.Require().NotNil(resMetadata)
+		suite.Require().Nil(resMetadata)
 	})
 
 	suite.Run("success result is cached", func() {
@@ -1645,6 +1665,13 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 			Return(nil, status.Error(codes.Internal, "some other error")).
 			Once()
 
+		finalSnapshot := protocolmock.NewSnapshot(suite.T())
+		finalSnapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.On("Final").Return(finalSnapshot, nil).Maybe()
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, suite.criteria).
+			Return(suite.executionResultInfo, nil)
+
 		params := suite.defaultTransactionsParams()
 		// use real cache (used by default)
 		params.HistoricalAccessNodeClients = []access.AccessAPIClient{suite.historicalAccessAPIClient}
@@ -1655,13 +1682,13 @@ func (suite *Suite) TestGetTransactionResult_SubmittedTx_HistoricalNodes() {
 		resp, resMetadata, err := txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedNotFoundResponse, resp)
-		suite.Require().NotNil(resMetadata)
+		suite.Require().Nil(resMetadata)
 
 		// second call should return the cached result
 		resp, resMetadata, err = txBackend.GetTransactionResult(ctxNoErr, txID, flow.ZeroID, flow.ZeroID, encodingVersion, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedNotFoundResponse, resp)
-		suite.Require().NotNil(resMetadata)
+		suite.Require().Nil(resMetadata)
 	})
 }
 
@@ -2307,6 +2334,12 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
 		snapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.On("Final").Return(snapshot, nil)
+
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, optimistic_sync.DefaultCriteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
 
 		suite.state.
 			On("AtBlockID", blockID).
@@ -2315,8 +2348,8 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
-			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion).
-			Return(expectedResult, nil)
+			On("TransactionResult", mock.Anything, block.ToHeader(), txID, flow.ZeroID, encodingVersion, suite.executionResultInfo).
+			Return(expectedResult, suite.expectedMetadata, nil)
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = provider
@@ -2360,6 +2393,15 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 			Return(flow.ZeroID, expectedErr).
 			Once()
 
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.On("Final").Return(snapshot, nil)
+
+		suite.executionResultProvider.
+			On("ExecutionResultInfo", blockID, optimistic_sync.DefaultCriteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
 
@@ -2384,12 +2426,17 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 			Once()
 
 		snapshot := protocolmock.NewSnapshot(suite.T())
-		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+		//snapshot.On("Head").Return(nil, storage.ErrNotFound)
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+		suite.state.On("Final").Return(snapshot, nil)
 
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
 			Once()
+
+		snapshot.On("Head").Return(block.ToHeader(), nil).Unset()
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
 
 		params := suite.defaultTransactionsParams()
 		params.TxProvider = providermock.NewTransactionProvider(suite.T())
@@ -2402,7 +2449,7 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), ctx)
 
 		res, err := txBackend.GetScheduledTransactionResult(signalerCtx, scheduledTxID, encodingVersion)
-		suite.Require().Error(err) // specific error doen't matter since it's thrown
+		suite.Require().Error(err) // specific error doesn't matter since it's thrown
 		suite.Require().Nil(res)
 	})
 

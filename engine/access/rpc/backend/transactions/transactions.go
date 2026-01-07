@@ -592,9 +592,6 @@ func (t *Transactions) getUnknownUserTransactionResult(
 
 	// The transaction does not exist locally, so check if the block or collection help identify its status.
 	// If we know the queried block or collection exist locally, then we can avoid querying historical Access Node.
-
-	//t.state.Final().Head()
-
 	latestFinalizedHeader, err := t.state.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup latest finalized header: %w", err)
