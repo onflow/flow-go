@@ -233,7 +233,7 @@ func (v *TransactionValidator) initValidationSteps() {
 		{v.checkCanBeParsed, metrics.InvalidScript},
 		{v.checkAddresses, metrics.InvalidAddresses},
 		{v.checkSignatureFormat, metrics.InvalidSignature},
-		{v.checkSignatureDuplications, metrics.DuplicatedSignature},
+		{v.checkAccounts, metrics.DuplicatedSignature},
 	}
 }
 
@@ -264,9 +264,6 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		v.transactionValidationMetrics.TransactionValidationSkipped()
 		log.Info().Err(err).Msg("check payer validation skipped due to error")
 	}
-
-	// TODO replace checkSignatureFormat by verifying the account/payer signatures
-
 	v.transactionValidationMetrics.TransactionValidated()
 
 	return nil
@@ -415,8 +412,11 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 	return nil
 }
 
-// every key (account, key index combination) can only be used once for signing
-func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBody) error {
+// Checks related to the accounts used in the transaction:
+//   - no duplicate account keys signing
+//   - no unrelated account signatures (from accounts that are neither proposer, payer, nor authorizers)
+func (v *TransactionValidator) checkAccounts(tx *flow.TransactionBody) error {
+	// check for duplicate account key
 	type uniqueKey struct {
 		address flow.Address
 		index   uint32
@@ -428,9 +428,28 @@ func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBo
 		}
 		observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] = true
 	}
+	// check for unrelated account signatures
+	relatedAccounts := make(map[flow.Address]struct{})
+	relatedAccounts[tx.Payer] = struct{}{}
+	relatedAccounts[tx.ProposalKey.Address] = struct{}{}
+	for _, authorizer := range tx.Authorizers {
+		relatedAccounts[authorizer] = struct{}{}
+	}
+	for _, sig := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
+		if _, ok := relatedAccounts[sig.Address]; !ok {
+			return UnrelatedAccountSignatureError{Address: sig.Address}
+		}
+	}
 	return nil
 }
 
+// checkSignatureFormat checks the format of each transaction signature idependently.
+// The current checks are:
+//   - the format is correct with regards to the authentication scheme
+//   - sanity check that the cryptographic signature can be an ECDSA signature of either P-256 or secp256k1 curve
+//
+// TODO replace checkSignatureFormat with verifying the account/payer signatures when
+// collection nodes can access the account public keys.
 func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) error {
 	for _, signature := range tx.PayloadSignatures {
 		valid, _ := signature.ValidateExtensionDataAndReconstructMessage(tx.PayloadMessage())

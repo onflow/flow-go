@@ -77,6 +77,16 @@ func (e DuplicatedSignatureError) Error() string {
 	return fmt.Sprintf("duplicated signature for key (address: %s, index: %d)", e.Address.String(), e.KeyIndex)
 }
 
+// UnrelatedAccountSignatureError indicates that a signature has been provided by an account
+// that is neither the proposer, payer, nor an authorizer of the transaction.
+type UnrelatedAccountSignatureError struct {
+	Address flow.Address
+}
+
+func (e UnrelatedAccountSignatureError) Error() string {
+	return fmt.Sprintf("unrelated account signature from address: %s", e.Address.String())
+}
+
 // InvalidRawSignatureError indicates that a transaction contains a cryptographic raw signature
 // with a wrong format.
 type InvalidRawSignatureError struct {
