@@ -224,10 +224,11 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	// 2. blocks already in the cache, that were already processed: they will be eventually pruned by view.
 	// 3. blocks already on disk: they were processed and await finalization
 
-	// 1,2. Ignore proposals that are already cached
-	_, cached := c.pending.ByID(blockID)
-	if cached {
-		log.Debug().Msg("skipping already cached proposal")
+	// 1,2. To prevent memory exhaustion attacks we store single proposal per view, so we can ignore
+	// all other proposals if we have already cached something.
+	blocksByView := c.pending.ByView(block.View)
+	if len(blocksByView) > 1 {
+		log.Debug().Msg("skipping proposal since we have already processed one for given view")
 		return nil
 	}
 
@@ -249,7 +250,6 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	// 	  which results in immediate slashing. This attack is very short living and expensive.
 	// 2. Leader sends multiple valid blocks: this is prevented by storing single block per view and accepting proposals in
 	//    specific view range. This attack has a very limited surface and power.
-
 	hotstuffProposal := model.SignedProposalFromBlock(proposal.Message)
 	err = c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {

@@ -132,6 +132,19 @@ func (b *GenericPendingBlocks[T]) ByID(blockID flow.Identifier) (flow.Slashable[
 	return vertex.(proposalVertex[T]).proposal, true
 }
 
+// ByView returns all stored blocks with the given view.
+// If none are found an empty array is returned
+func (b *GenericPendingBlocks[T]) ByView(view uint64) []flow.Slashable[*flow.GenericProposal[T]] {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	iter := b.forest.GetVerticesAtLevel(view)
+	var result []flow.Slashable[*flow.GenericProposal[T]]
+	for iter.HasNext() {
+		result = append(result, iter.NextVertex().(proposalVertex[T]).proposal)
+	}
+	return result
+}
+
 // ByParentID returns all direct children of the given block.
 // If no children with the given parent exist, returns (nil, false)
 func (b *GenericPendingBlocks[T]) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[T]], bool) {

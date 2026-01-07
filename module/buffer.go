@@ -22,6 +22,10 @@ type GenericPendingBlockBuffer[T flow.HashablePayload] interface {
 	// Otherwise returns (nil, false)
 	ByID(blockID flow.Identifier) (flow.Slashable[*flow.GenericProposal[T]], bool)
 
+	// ByView returns all stored blocks with the given view.
+	// If none are found an empty array is returned
+	ByView(view uint64) []flow.Slashable[*flow.GenericProposal[T]]
+
 	// ByParentID returns all direct children of the given block.
 	// If no children with the given parent exist, returns (nil, false)
 	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[T]], bool)
