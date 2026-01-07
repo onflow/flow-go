@@ -560,6 +560,41 @@ docker-native-build-ghost-debug:
 		-t "$(CONTAINER_REGISTRY)/ghost-debug:latest" \
 		-t "$(CONTAINER_REGISTRY)/ghost-debug:$(IMAGE_TAG)" .
 
+.PHONY: docker-native-build-ledger
+docker-native-build-ledger:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/ledger:latest" \
+		-t "$(CONTAINER_REGISTRY)/ledger:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-ledger-with-adx
+docker-build-ledger-with-adx:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=amd64 --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG)" \
+		-t "$(CONTAINER_REGISTRY)/ledger:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-ledger-without-adx
+docker-build-ledger-without-adx:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_ADX) --build-arg GOARCH=amd64 --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_ADX)" \
+		-t "$(CONTAINER_REGISTRY)/ledger:$(IMAGE_TAG_NO_ADX)" .
+
+.PHONY: docker-cross-build-ledger-arm
+docker-cross-build-ledger-arm:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_ARM) --build-arg GOARCH=arm64 --build-arg CC=aarch64-linux-gnu-gcc --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
+		-t "$(CONTAINER_REGISTRY)/ledger:$(IMAGE_TAG_ARM)" .
+
+.PHONY: docker-native-build-ledger-debug
+docker-native-build-ledger-debug:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
+		-t "$(CONTAINER_REGISTRY)/ledger-debug:latest" \
+		-t "$(CONTAINER_REGISTRY)/ledger-debug:$(IMAGE_TAG)" .
+
 PHONY: docker-build-bootstrap
 docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
@@ -754,6 +789,14 @@ docker-push-ghost:
 .PHONY: docker-push-ghost-latest
 docker-push-ghost-latest: docker-push-ghost
 	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
+
+.PHONY: docker-push-ledger
+docker-push-ledger:
+	docker push "$(CONTAINER_REGISTRY)/ledger:$(IMAGE_TAG)"
+
+.PHONY: docker-push-ledger-latest
+docker-push-ledger-latest: docker-push-ledger
+	docker push "$(CONTAINER_REGISTRY)/ledger:latest"
 
 .PHONY: docker-push-loader
 docker-push-loader:
