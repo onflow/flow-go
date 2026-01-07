@@ -80,7 +80,7 @@ func createAccount(
 
 	event := data.(cadence.Event)
 
-	address := flow.ConvertAddress(
+	address := flow.Address(
 		cadence.SearchFieldByName(
 			event,
 			stdlib.AccountEventAddressParameter.Identifier,
@@ -360,6 +360,8 @@ func newAccountKey(
 
 func TestCreateAccount(t *testing.T) {
 
+	t.Parallel()
+
 	options := []fvm.Option{
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -399,7 +401,7 @@ func TestCreateAccount(t *testing.T) {
 
 				event := data.(cadence.Event)
 
-				address := flow.ConvertAddress(
+				address := flow.Address(
 					cadence.SearchFieldByName(
 						event,
 						stdlib.AccountEventAddressParameter.Identifier,
@@ -452,7 +454,7 @@ func TestCreateAccount(t *testing.T) {
 
 					event := data.(cadence.Event)
 
-					address := flow.ConvertAddress(
+					address := flow.Address(
 						cadence.SearchFieldByName(
 							event,
 							stdlib.AccountEventAddressParameter.Identifier,
@@ -468,6 +470,8 @@ func TestCreateAccount(t *testing.T) {
 }
 
 func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
+
+	t.Parallel()
 
 	options := []fvm.Option{
 		fvm.WithAuthorizationChecksEnabled(false),
@@ -613,6 +617,8 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 }
 
 func TestAddAccountKey(t *testing.T) {
+
+	t.Parallel()
 
 	options := []fvm.Option{
 		fvm.WithAuthorizationChecksEnabled(false),
@@ -932,6 +938,8 @@ func TestAddAccountKey(t *testing.T) {
 
 func TestRemoveAccountKey(t *testing.T) {
 
+	t.Parallel()
+
 	options := []fvm.Option{
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -1211,6 +1219,8 @@ func TestRemoveAccountKey(t *testing.T) {
 
 func TestGetAccountKey(t *testing.T) {
 
+	t.Parallel()
+
 	options := []fvm.Option{
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -1483,6 +1493,9 @@ func byteSliceToCadenceArrayLiteral(bytes []byte) string {
 }
 
 func TestAccountBalanceFields(t *testing.T) {
+
+	t.Parallel()
+
 	t.Run("Get balance works",
 		newVMTest().withContextOptions(
 			fvm.WithAuthorizationChecksEnabled(false),
@@ -1725,6 +1738,9 @@ func TestAccountBalanceFields(t *testing.T) {
 }
 
 func TestGetStorageCapacity(t *testing.T) {
+
+	t.Parallel()
+
 	t.Run("Get storage capacity",
 		newVMTest().withContextOptions(
 			fvm.WithAuthorizationChecksEnabled(false),

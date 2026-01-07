@@ -9,7 +9,7 @@ import (
 // ExecutionReceipts holds and indexes Execution Receipts. The storage-layer
 // abstraction is from the viewpoint of the network: there are multiple
 // execution nodes which produce several receipts for each block. By default,
-// there is no distinguished execution node (the are all equal).
+// there is no distinguished execution node (they are all equal).
 type ExecutionReceipts interface {
 
 	// Store stores an execution receipt.
@@ -32,13 +32,18 @@ type ExecutionReceipts interface {
 // them. Instead, it includes the "My" in the method name in order to highlight the notion
 // of "MY execution receipt", from the viewpoint of an individual Execution Node.
 type MyExecutionReceipts interface {
-	// BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
+
+	// BatchStoreMyReceipt stores the receipt by its ID and populates the index blockID → receiptID in the provided batch.
 	//
-	// If entity fails marshalling, the error is wrapped in a generic error and returned.
-	// If database unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	// CAUTION: By persisting the receipt, the Execution Node is effectively committing to this being the correct result.
+	// Changing data could cause the node to publish inconsistent commitments and to be slashed, or the protocol to be
+	// compromised as a whole. Therefore, the function checks upfront that we are not changing a previously stored
+	// commitment. This function is idempotent, i.e. repeated calls with the *initially* indexed result are no-ops.
+	// To guarantee atomicity of existence-check plus database write, we require the caller to acquire
+	// the [storage.LockInsertMyReceipt] lock and hold it until the database write has been committed.
 	//
 	// Expected error returns during *normal* operations:
-	//   - `storage.ErrDataMismatch` if a *different* receipt has already been indexed for the same block
+	//   - [storage.ErrDataMismatch] if a *different* receipt has already been indexed for the same block
 	BatchStoreMyReceipt(lctx lockctx.Proof, receipt *flow.ExecutionReceipt, batch ReaderBatchWriter) error
 
 	// MyReceipt retrieves my receipt for the given block.

@@ -124,7 +124,7 @@ func (coordinator *transactionCoordinator) NewTransaction(
 	return &transaction{
 		request:            request,
 		coordinator:        coordinator,
-		numConflictRetries: attempt,
+		numConflictRetries: attempt - 1,
 		startedAt:          time.Now(),
 		Transaction:        txn,
 		ProcedureExecutor: coordinator.vm.NewExecutor(

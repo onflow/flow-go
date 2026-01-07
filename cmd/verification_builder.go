@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
-	followereng "github.com/onflow/flow-go/engine/common/follower"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/verification/assigner"
@@ -54,8 +53,8 @@ type VerificationConfig struct {
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
-	stopAtHeight              uint64 // height to stop the node on
-	scheduledCallbacksEnabled bool   // enable execution of scheduled callbacks
+	stopAtHeight                 uint64 // height to stop the node on
+	scheduledTransactionsEnabled bool   // enable execution of scheduled transactions
 }
 
 type VerificationNodeBuilder struct {
@@ -83,7 +82,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
-			flags.BoolVar(&v.verConf.scheduledCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledCallbacksEnabled, "enable execution of scheduled callbacks")
+			flags.BoolVar(&v.verConf.scheduledTransactionsEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "enable execution of scheduled transactions")
 		})
 }
 
@@ -211,7 +210,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				computation.DefaultFVMOptions(
 					node.RootChainID,
 					false,
-					v.verConf.scheduledCallbacksEnabled,
+					v.verConf.scheduledTransactionsEnabled,
 				)...,
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)
@@ -322,7 +321,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Blocks,
 				node.State,
 				assignerEngine,
-				v.verConf.blockWorkers)
+				v.verConf.blockWorkers,
+				followerDistributor)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
@@ -359,8 +359,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
-			followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
-
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
 			followerCore, err = flowconsensus.NewFollower(
@@ -391,7 +389,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 			}
 
-			core, err := followereng.NewComplianceCore(
+			core, err := follower.NewComplianceCore(
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
@@ -406,7 +404,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
 			}
 
-			followerEng, err = followereng.NewComplianceLayer(
+			followerEng, err = follower.NewComplianceLayer(
 				node.Logger,
 				node.EngineRegistry,
 				node.Me,
@@ -414,12 +412,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				node.LastFinalizedHeader,
 				core,
+				followerDistributor,
 				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
@@ -440,11 +438,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				syncCore,
 				node.SyncEngineIdentifierProvider,
 				spamConfig,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		})

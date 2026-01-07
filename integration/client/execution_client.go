@@ -15,7 +15,7 @@ type ExecutionClient struct {
 	close     func() error
 }
 
-// NewExecutionClient initializes an execution client client with the default gRPC provider.
+// NewExecutionClient initializes an execution client with the default gRPC provider.
 //
 // An error will be returned if the host is unreachable.
 func NewExecutionClient(addr string) (*ExecutionClient, error) {

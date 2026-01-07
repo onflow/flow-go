@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/module/block_iterator/executor"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,33 +27,39 @@ func TestExecute(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		blockCount := 10
 
-		// prepare data
-		cdps := make([]*flow.ChunkDataPack, 0, blockCount)
+		// prepare data - create execution receipts for blocks
+		receipts := make([]*flow.ExecutionReceipt, 0, blockCount)
 		bs := make([]flow.Identifier, 0, blockCount)
 		for i := 0; i < blockCount; i++ {
-			cdp := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
-			cdps = append(cdps, cdp)
-			bs = append(bs, cdp.ChunkID)
+			block := unittest.BlockFixture()
+			receipt := unittest.ReceiptForBlockFixture(block)
+			receipts = append(receipts, receipt)
+			bs = append(bs, block.ID())
 		}
 
 		pdb := pebbleimpl.ToDB(db)
 
-		// store the chunk data packs to be pruned later
-		for _, cdp := range cdps {
-			sc := storage.ToStoredChunkDataPack(cdp)
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		// create my execution receipts storage
+		metrics := metrics.NewNoopCollector()
+		results := store.NewExecutionResults(metrics, pdb)
+		executionReceipts := store.NewExecutionReceipts(metrics, pdb, results, 100)
+		myReceipts := store.NewMyExecutionReceipts(metrics, pdb, executionReceipts)
+
+		// store the execution receipts to be pruned later
+		for _, receipt := range receipts {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertMyReceipt, func(lctx lockctx.Context) error {
 				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPack(lctx, rw, sc)
+					return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
 				})
 			}))
 		}
 
-		// it's ok the chunk ids is used as block ids, because the iterator
+		// it's ok the block ids are used as identifiers, because the iterator
 		// basically just iterate over identifiers
 		iter := &iterator{blocks: bs}
 		pr := &testExecutor{
 			executeByBlockID: func(id flow.Identifier, batch storage.ReaderBatchWriter) error {
-				return operation.RemoveChunkDataPack(batch.Writer(), id)
+				return myReceipts.BatchRemoveIndexByBlockID(id, batch)
 			},
 		}
 
@@ -61,13 +67,12 @@ func TestExecute(t *testing.T) {
 		batchSize := uint(3)
 		nosleep := time.Duration(0)
 		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
-			context.Background(), unittest.Logger(), metrics.NewNoopCollector(), iter, pr, pdb, batchSize, nosleep))
+			context.Background(), unittest.Logger(), metrics, iter, pr, pdb, batchSize, nosleep))
 
 		// expect all blocks are pruned
 		for _, b := range bs {
 			// verify they are pruned
-			var c storage.StoredChunkDataPack
-			err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+			_, err := myReceipts.MyReceipt(b)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound but got %v", err)
 		}
 	})
@@ -79,27 +84,34 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		blockCount := 10
 
-		cdps := make([]*flow.ChunkDataPack, 0, blockCount)
+		// prepare data - create execution receipts for blocks
+		receipts := make([]*flow.ExecutionReceipt, 0, blockCount)
 		bs := make([]flow.Identifier, 0, blockCount)
 		for i := 0; i < blockCount; i++ {
-			cdp := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
-			cdps = append(cdps, cdp)
-			bs = append(bs, cdp.ChunkID)
+			block := unittest.BlockFixture()
+			receipt := unittest.ReceiptForBlockFixture(block)
+			receipts = append(receipts, receipt)
+			bs = append(bs, block.ID())
 		}
 
 		pdb := pebbleimpl.ToDB(db)
 
-		// store the chunk data packs to be pruned later
-		for _, cdp := range cdps {
-			sc := storage.ToStoredChunkDataPack(cdp)
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
+		// create my execution receipts storage
+		metrics := metrics.NewNoopCollector()
+		results := store.NewExecutionResults(metrics, pdb)
+		executionReceipts := store.NewExecutionReceipts(metrics, pdb, results, 100)
+		myReceipts := store.NewMyExecutionReceipts(metrics, pdb, executionReceipts)
+
+		// store the execution receipts to be pruned later
+		for _, receipt := range receipts {
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertMyReceipt, func(lctx lockctx.Context) error {
 				return pdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertChunkDataPack(lctx, rw, sc)
+					return myReceipts.BatchStoreMyReceipt(lctx, receipt, rw)
 				})
 			}))
 		}
 
-		// it's ok the chunk ids is used as block ids, because the iterator
+		// it's ok the block ids are used as identifiers, because the iterator
 		// basically just iterate over identifiers
 		iter := &iterator{blocks: bs}
 		interrupted := fmt.Errorf("interrupted")
@@ -112,7 +124,7 @@ func TestExecuteCanBeResumed(t *testing.T) {
 				if id == bs[5] {
 					return interrupted // return sentinel error to interrupt the pruning
 				}
-				return operation.RemoveChunkDataPack(batch.Writer(), id)
+				return myReceipts.BatchRemoveIndexByBlockID(id, batch)
 			},
 		}
 
@@ -120,24 +132,22 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		batchSize := uint(3)
 		nosleep := time.Duration(0)
 		err := executor.IterateExecuteAndCommitInBatch(
-			context.Background(), unittest.Logger(), metrics.NewNoopCollector(), iter, pruneUntilInterrupted, pdb, batchSize, nosleep)
+			context.Background(), unittest.Logger(), metrics, iter, pruneUntilInterrupted, pdb, batchSize, nosleep)
 		require.True(t, errors.Is(err, interrupted), fmt.Errorf("expected %v but got %v", interrupted, err))
 
 		// expect all blocks are pruned
 		for i, b := range bs {
 
-			// verify they are pruned
-			var c storage.StoredChunkDataPack
-
 			if i < 3 {
 				// the first 3 blocks in the first batch are pruned
-				err = operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+				_, err := myReceipts.MyReceipt(b)
 				require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound for block %v but got %v", i, err)
 				continue
 			}
 
 			// verify the remaining blocks are not pruned yet
-			require.NoError(t, operation.RetrieveChunkDataPack(pdb.Reader(), b, &c))
+			_, err := myReceipts.MyReceipt(b)
+			require.NoError(t, err)
 		}
 
 		// now resume the pruning
@@ -145,18 +155,17 @@ func TestExecuteCanBeResumed(t *testing.T) {
 
 		pr := &testExecutor{
 			executeByBlockID: func(id flow.Identifier, batch storage.ReaderBatchWriter) error {
-				return operation.RemoveChunkDataPack(batch.Writer(), id)
+				return myReceipts.BatchRemoveIndexByBlockID(id, batch)
 			},
 		}
 
 		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
-			context.Background(), unittest.Logger(), metrics.NewNoopCollector(), iterToAll, pr, pdb, batchSize, nosleep))
+			context.Background(), unittest.Logger(), metrics, iterToAll, pr, pdb, batchSize, nosleep))
 
 		// verify all blocks are pruned
 		for _, b := range bs {
-			var c storage.StoredChunkDataPack
 			// the first 5 blocks are pruned
-			err = operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
+			_, err := myReceipts.MyReceipt(b)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound but got %v", err)
 		}
 	})

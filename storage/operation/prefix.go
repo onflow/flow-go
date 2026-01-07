@@ -63,7 +63,7 @@ const (
 	_                          = 51 // DEPRECATED: 51 was used for identity indexes before epochs
 	codePayloadGuarantees      = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals           = 53 // index mapping block ID to payload seals
-	codeCollectionBlock        = 54 // index mapping collection ID to block ID
+	codeGuaranteeBlock         = 54 // index mapping guarantee ID to block ID
 	codeOwnBlockReceipt        = 55 // index mapping block ID to execution receipt ID for execution nodes
 	_                          = 56 // DEPRECATED: 56 was used for block->epoch status prior to Dynamic Protocol State in Mainnet25
 	codePayloadReceipts        = 57 // index mapping block ID to payload receipts
@@ -98,8 +98,15 @@ const (
 	codeTransactionIDByScheduledTransactionID = 82 // index of transaction ID by scheduled transaction ID
 	codeBlockIDByScheduledTransactionID       = 83 // index of block ID by scheduled transaction ID
 
+	// The storage prefixes `codeChunkDataPack` and `codeIndexChunkDataPackByChunkID` are used primarily by execution nodes
+	// to persist their own results for chunks they executed.
+	//  - `codeIndexChunkDataPackByChunkID` stores the chunkID → chunkDataPackID index, and
+	//  - `codeChunkDataPack` stores the chunk data pack by its own ID.
+	// This breakup allows us to store chunk data packs in a different database in a concurrent safe way.
+	codeIndexChunkDataPackByChunkID = 99
+	codeChunkDataPack               = 100
+
 	// legacy codes (should be cleaned up)
-	codeChunkDataPack                      = 100
 	codeCommit                             = 101
 	codeEvent                              = 102
 	codeExecutionStateInteractions         = 103

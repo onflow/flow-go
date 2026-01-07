@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/jordanschalm/lockctx"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -127,23 +129,17 @@ func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transac
 	}, nil
 }
 
-// BatchStore will store the transaction results for the given block ID in a batch
-func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
-	w := batch.Writer()
-
-	for i, result := range transactionResults {
-		err := operation.InsertTransactionResult(w, blockID, &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert tx result: %w", err)
-		}
-
-		err = operation.IndexTransactionResult(w, blockID, uint32(i), &result)
-		if err != nil {
-			return fmt.Errorf("cannot batch index tx result: %w", err)
-		}
+// BatchStore will store the transaction results for the given block ID in a batch.
+// Conceptually, for a block this data should be written once and never changed. This is enforced by the
+// implementation, for which reason the caller must hold the [storage.LockInsertAndIndexTxResult] lock.
+// It returns [storage.ErrAlreadyExists] if transaction results for the block already exist.
+func (tr *TransactionResults) BatchStore(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
+	err := operation.InsertAndIndexTransactionResults(lctx, rw, blockID, transactionResults)
+	if err != nil {
+		return fmt.Errorf("cannot batch insert and index tx results: %w", err)
 	}
 
-	storage.OnCommitSucceed(batch, func() {
+	storage.OnCommitSucceed(rw, func() {
 		for i, result := range transactionResults {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
@@ -233,7 +229,7 @@ func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batc
 
 	saveBlockIDInBatchData(batch, batchDataKey, blockID)
 
-	return operation.BatchRemoveTransactionResultsByBlockID(blockID, batch)
+	return operation.RemoveTransactionResultsByBlockID(blockID, batch)
 }
 
 func saveBlockIDInBatchData(batch storage.ReaderBatchWriter, batchDataKey string, blockID flow.Identifier) {

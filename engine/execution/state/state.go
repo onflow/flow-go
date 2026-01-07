@@ -346,7 +346,7 @@ func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCom
 func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve chunk data pack: %w", err)
+		return nil, fmt.Errorf("could not retrieve chunk data pack for chunk ID %v: %w", chunkID, err)
 	}
 
 	return chunkDataPack, nil
@@ -356,13 +356,16 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
 	defer span.End()
 
-	result, err := s.results.ByBlockID(blockID)
+	resultID, err := s.results.IDByBlockID(blockID)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return result.ID(), nil
+	return resultID, nil
 }
 
+// SaveExecutionResults saves all data related to the execution of a block.
+// It is concurrent safe because chunk data packs store is conflict-free (storing data by hash), and protocol data requires a lock to store, which will be synchronized.
+// It returns [storage.ErrDataMismatch] if there is data already stored for the same block ID but with different content.
 func (s *state) SaveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
@@ -410,58 +413,79 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not retrieve chunk data packs: %w", err)
 	}
 
-	// Acquire both locks to ensure it's concurrent safe when inserting the execution results and chunk data packs.
-	return storage.WithLocks(s.lockManager, []string{storage.LockInsertOwnReceipt, storage.LockInsertChunkDataPack}, func(lctx lockctx.Context) error {
-		err := s.chunkDataPacks.StoreByChunkID(lctx, chunks)
-		if err != nil {
-			return fmt.Errorf("can not store multiple chunk data pack: %w", err)
-		}
+	// Within the following `Store` call, the chunk data packs themselves are going to be persisted into their
+	// dedicated database. However, we have not yet persisted that this execution node is committing to the
+	// result represented by the chunk data packs. Populating the index from chunk ID to chunk data pack ID
+	// in the protocol database (signifying the node's slashable commitment to the respective result) is
+	// done by the functor returned by `Store`.
+	// The functor's is invoked as part of the atomic batch update of the protocol database below
+	// and requires the lock [storage.LockIndexChunkDataPackByChunkID].
+	storeChunkDataPacksFunc, err := s.chunkDataPacks.Store(chunks)
+	if err != nil {
+		return fmt.Errorf("can not store chunk data packs for block ID: %v: %w", blockID, err)
+	}
 
-		// Save entire execution result (including all chunk data packs) within one batch to minimize
-		// the number of database interactions.
-		return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-			batch.AddCallback(func(err error) {
-				// Rollback if an error occurs during batch operations
-				// Chunk data packs are saved in a separate database, there is a chance
-				// that execution result was failed to save, but chunk data packs was saved and
-				// didnt get removed.
-				// TODO(leo): when retrieving chunk data packs, we need to add a check to ensure the block
-				// has been executed before returning chunk data packs
-				if err != nil {
-					chunkIDs := make([]flow.Identifier, 0, len(chunks))
-					for _, chunk := range chunks {
-						chunkIDs = append(chunkIDs, chunk.ChunkID)
-					}
-					_ = s.chunkDataPacks.Remove(chunkIDs)
-				}
-			})
+	return storage.WithLocks(s.lockManager, storage.LockGroupExecutionSaveExecutionResult, func(lctx lockctx.Context) error {
+		// The batch update writes all execution result data (except chunk data pack!) atomically.
+		// Since the chunk data pack itself was already stored in a separate database (s.chunkDataPacks)
+		// during the previous step, this step stores only the mapping between chunk ID
+		// and chunk data pack ID together with the execution result data in the same batch.
+		//
+		// This design guarantees consistency in two scenarios:
+		//
+		// Case 1: If the batch update is interrupted, the mapping has not yet been saved.
+		// Later, if we attempt to store another execution result that references a different
+		// chunk data pack but the same chunk ID, there is no conflict, because no previous mapping
+		// exists. By convention, a node should only share information once it has persisted its
+		// commitment in the database. Therefore, if the database write was interrupted, none of the
+		// information is stored and no binding commitment to a different result could have been made.
+		//
+		// Case 2: If the batch update succeeds, the mapping is saved. Later, if we
+		// attempt to store another execution result that references a different
+		// chunk data pack with the same chunk ID, the conflict is detected, preventing
+		// overwriting of the previously stored mapping.
+		err := s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
+			// store the ChunkID -> StoredChunkDataPack.ID() mapping
+			// in protocol database along with other execution data in a single batch
+			// requires [storage.LockIndexChunkDataPackByChunkID]
+			err := storeChunkDataPacksFunc(lctx, batch)
+			if err != nil {
+				return fmt.Errorf("cannot store chunk data packs: %w", err)
+			}
 
-			err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+			// requires [storage.LockInsertEvent]
+			err = s.events.BatchStore(lctx, blockID, []flow.EventsList{result.AllEvents()}, batch)
 			if err != nil {
 				return fmt.Errorf("cannot store events: %w", err)
 			}
 
-			err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
+			// requires [storage.LockInsertServiceEvent]
+			err = s.serviceEvents.BatchStore(lctx, blockID, result.AllServiceEvents(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store service events: %w", err)
 			}
 
+			// requires [storage.LockInsertAndIndexTxResult]
 			err = s.transactionResults.BatchStore(
+				lctx,
+				batch,
 				blockID,
 				result.AllTransactionResults(),
-				batch)
+			)
 			if err != nil {
 				return fmt.Errorf("cannot store transaction result: %w", err)
 			}
 
 			executionResult := &result.ExecutionReceipt.ExecutionResult
 			// saving my receipts will also save the execution result
+			// requires [storage.LockInsertMyReceipt] lock
 			err = s.myReceipts.BatchStoreMyReceipt(lctx, result.ExecutionReceipt, batch)
 			if err != nil {
 				return fmt.Errorf("could not persist execution result: %w", err)
 			}
 
-			err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+			// requires [storage.LockIndexExecutionResult] lock
+			err = s.results.BatchIndex(lctx, batch, blockID, executionResult.ID())
 			if err != nil {
 				return fmt.Errorf("cannot index execution result: %w", err)
 			}
@@ -469,6 +493,7 @@ func (s *state) saveExecutionResults(
 			// the state commitment is the last data item to be stored, so that
 			// IsBlockExecuted can be implemented by checking whether state commitment exists
 			// in the database
+			// requires [storage.LockIndexStateCommitment] lock
 			err = s.commits.BatchStore(lctx, blockID, result.CurrentEndState(), batch)
 			if err != nil {
 				return fmt.Errorf("cannot store state commitment: %w", err)
@@ -476,6 +501,11 @@ func (s *state) saveExecutionResults(
 
 			return nil
 		})
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
+		}
+
+		return err
 	})
 }
 

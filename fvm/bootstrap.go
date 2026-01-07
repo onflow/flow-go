@@ -85,7 +85,6 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
-	setupEVMEnabled                  cadence.Bool
 	setupVMBridgeEnabled             cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
@@ -222,13 +221,6 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 	}
 }
 
-func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
-	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.setupEVMEnabled = enabled
-		return bp
-	}
-}
-
 // Option to deploy and setup the Flow VM bridge during bootstrapping
 // so that assets can be bridged between Flow-Cadence and Flow-EVM
 func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
@@ -257,12 +249,12 @@ func Bootstrap(
 				ServiceAccountPublicKeys:       []flow.AccountPublicKey{serviceAccountPublicKey},
 				FungibleTokenAccountPublicKeys: []flow.AccountPublicKey{serviceAccountPublicKey},
 				FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
+				FlowFeesAccountPublicKeys:      []flow.AccountPublicKey{serviceAccountPublicKey},
 				NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
 			},
 			transactionFees:     BootstrapProcedureFeeParameters{0, 0, 0},
 			epochConfig:         epochs.DefaultEpochConfig(),
 			versionFreezePeriod: DefaultVersionFreezePeriod,
-			setupEVMEnabled:     true,
 		},
 	}
 
@@ -453,18 +445,6 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployRandomBeaconHistory(service, &env)
 
-	// deploy staking proxy contract to the service account
-	b.deployStakingProxyContract(service, &env)
-
-	// deploy locked tokens contract to the service account
-	b.deployLockedTokensContract(service, &env)
-
-	// deploy staking collection contract to the service account
-	b.deployStakingCollection(service, &env)
-
-	// deploy flow transaction scheduler contract to the service account
-	b.deployFlowTransactionScheduler(service, &env)
-
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
 	b.setupVMBridge(service, &env)
@@ -475,6 +455,23 @@ func (b *bootstrapExecutor) Execute() error {
 	if err != nil {
 		return err
 	}
+
+	// deploy flow transaction scheduler contract to the service account
+	b.deployFlowTransactionScheduler(service, &env)
+
+	err = expectAccounts(systemcontracts.ScheduledTransactionExecutorAccountIndex)
+	if err != nil {
+		return err
+	}
+
+	// deploy staking proxy contract to the service account
+	b.deployStakingProxyContract(service, &env)
+
+	// deploy locked tokens contract to the service account
+	b.deployLockedTokensContract(service, &env)
+
+	// deploy staking collection contract to the service account
+	b.deployStakingCollection(service, &env)
 
 	b.registerNodes(service, fungibleToken, flowToken)
 
@@ -624,8 +621,7 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 }
 
 func (b *bootstrapExecutor) deployCrossVMMetadataViews(nonFungibleToken flow.Address, env *templates.Environment) {
-	if !bool(b.setupEVMEnabled) ||
-		!bool(b.setupVMBridgeEnabled) ||
+	if !bool(b.setupVMBridgeEnabled) ||
 		!b.ctx.Chain.ChainID().Transient() {
 		return
 	}
@@ -827,6 +823,21 @@ func (b *bootstrapExecutor) deployFlowTransactionScheduler(deployTo flow.Address
 
 	env.FlowTransactionSchedulerUtilsAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowTransactionSchedulerUtils contract: %s", txError, err)
+
+	// scheduled transactions wont work on newly bootstrapped non-transient networks
+	// TODO: JanezP this could be controlled by a flag instead of a hidden check here
+	if b.ctx.Chain.ChainID().Transient() {
+		sc := systemcontracts.SystemContractsForChain(b.ctx.Chain.ChainID())
+		txBody, err = blueprints.IssueScheduledTransactionExecutorTransaction(b.ctx.Chain, sc.ScheduledTransactionExecutor.Address)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create scheduled transaction executor transaction: %s", err))
+		}
+		txError, err = b.invokeMetaTransaction(
+			b.ctx,
+			Transaction(txBody, 0),
+		)
+		panicOnMetaInvokeErrf("failed to create scheduled transaction executor: %s", txError, err)
+	}
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(
@@ -997,31 +1008,29 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 }
 
 func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address, env *templates.Environment) {
-	if b.setupEVMEnabled {
-		// account for storage
-		// we dont need to deploy anything to this account, but it needs to exist
-		// so that we can store the EVM state on it
-		evmAcc := b.createAccount(nil)
-		b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
+	// account for storage
+	// we dont need to deploy anything to this account, but it needs to exist
+	// so that we can store the EVM state on it
+	evmAcc := b.createAccount(nil)
+	b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
 
-		// deploy the EVM contract to the service account
-		txBody, err := blueprints.DeployContractTransaction(
-			serviceAddress,
-			stdlib.ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress),
-			stdlib.ContractName,
-		).Build()
-		if err != nil {
-			panic(fmt.Sprintf("failed to build EVM transaction %s", err.Error()))
-		}
-		// WithEVMEnabled should only be used after we create an account for storage
-		txError, err := b.invokeMetaTransaction(
-			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
-			Transaction(txBody, 0),
-		)
-		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
-
-		env.EVMAddress = env.ServiceAccountAddress
+	// deploy the EVM contract to the service account
+	txBody, err := blueprints.DeployContractTransaction(
+		serviceAddress,
+		stdlib.ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress),
+		stdlib.ContractName,
+	).Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to build EVM transaction %s", err.Error()))
 	}
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(txBody, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
+
+	env.EVMAddress = env.ServiceAccountAddress
 }
 
 type stubEntropyProvider struct{}
@@ -1033,8 +1042,7 @@ func (stubEntropyProvider) RandomSource() ([]byte, error) {
 func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *templates.Environment) {
 	// only setup VM bridge for transient networks
 	// this is because the evm storage account for testnet and mainnet do not exist yet after boostrapping
-	if !bool(b.setupEVMEnabled) ||
-		!bool(b.setupVMBridgeEnabled) ||
+	if !bool(b.setupVMBridgeEnabled) ||
 		!b.ctx.Chain.ChainID().Transient() {
 		return
 	}
@@ -1069,7 +1077,6 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	ctx := NewContextFromParent(b.ctx,
 		WithBlockHeader(b.rootHeader),
 		WithEntropyProvider(stubEntropyProvider{}),
-		WithEVMEnabled(true),
 	)
 
 	txIndex := uint32(0)

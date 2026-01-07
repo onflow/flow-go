@@ -40,7 +40,8 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, 1000)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, db, 1000)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, db, storedChunkDataPacks, collections, 1000)
 
 		lastSealedHeight := 30
 		lastFinalizedHeight := lastSealedHeight + 2 // 2 finalized but unsealed
@@ -73,10 +74,25 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				})
 			})
 			require.NoError(t, err)
-			require.NoError(t, results.Store(chunk.Result))
-			require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
-			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockInsertChunkDataPack, func(lctx lockctx.Context) error {
-				return chunkDataPacks.StoreByChunkID(lctx, []*flow.ChunkDataPack{chunk.ChunkDataPack})
+			err = unittest.WithLock(t, lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					err := results.BatchStore(chunk.Result, rw)
+					require.NoError(t, err)
+
+					err = results.BatchIndex(lctx, rw, chunk.Result.BlockID, chunk.Result.ID())
+					require.NoError(t, err)
+					return nil
+				})
+			})
+			require.NoError(t, err)
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
+				storeFunc, err := chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack})
+				if err != nil {
+					return err
+				}
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return storeFunc(lctx, rw)
+				})
 			}))
 			_, storeErr := collections.Store(chunk.ChunkDataPack.Collection)
 			require.NoError(t, storeErr)

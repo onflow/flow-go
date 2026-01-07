@@ -257,12 +257,25 @@ var (
 		common.MemoryKindContractVariable: 17,
 		common.MemoryKindGoSliceLength:    17,
 
-		common.MemoryKindCompiler:         17,
-		common.MemoryKindCompilerGlobal:   17,
-		common.MemoryKindCompilerConstant: 17,
-
-		common.MemoryKindBoundFunctionVMValue:     17,
+		common.MemoryKindBoundFunctionVMValue:     57,
 		common.MemoryKindImplicitReferenceVMValue: 17,
+
+		common.MemoryKindArrayIterator:         49,
+		common.MemoryKindDictionaryKeyIterator: 17,
+		common.MemoryKindStringIterator:        17,
+
+		common.MemoryKindCompiler:            489,
+		common.MemoryKindCompilerLocal:       5,
+		common.MemoryKindCompilerGlobal:      65,
+		common.MemoryKindCompilerConstant:    33,
+		common.MemoryKindCompilerFunction:    169,
+		common.MemoryKindCompilerInstruction: 17,
+		common.MemoryKindCompilerBBQProgram:  169,
+		common.MemoryKindCompilerBBQConstant: 25,
+		common.MemoryKindCompilerBBQFunction: 89,
+		common.MemoryKindCompilerBBQVariable: 25,
+		common.MemoryKindCompilerBBQImport:   33,
+		common.MemoryKindCompilerBBQContract: 33,
 	}
 )
 

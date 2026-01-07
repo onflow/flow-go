@@ -177,7 +177,7 @@ func Test_AccountContractInteraction(t *testing.T) {
 			// create a contract
 			contractAddr := tester.newAddress()
 			state.AddBalance(contractAddr, uint256.NewInt(uint64(i)), tracing.BalanceChangeUnspecified)
-			state.SetCode(contractAddr, code)
+			state.SetCode(contractAddr, code, tracing.CodeChangeContractCreation)
 
 			for k, v := range contractState {
 				state.SetState(contractAddr, k, v)

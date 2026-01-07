@@ -37,7 +37,6 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 
-	"github.com/onflow/flow-go-sdk"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
@@ -1445,7 +1444,7 @@ func TestGetTxByBlockIDMethods(t *testing.T) {
 		assert.NoError(t, err)
 
 		// added to fix tx matching (nil vs empty slice)
-		tx.PayloadSignatures = []flow.TransactionSignature{}
+		tx.PayloadSignatures = []flowsdk.TransactionSignature{}
 
 		submittedTx = append(submittedTx, tx)
 
@@ -1847,7 +1846,7 @@ func TestTransactionExecutionLimit(t *testing.T) {
 
 		t.Parallel()
 
-		const limit = 19000
+		const limit = 25000
 
 		b, adapter := setupTransactionTests(
 			t,

@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -18,6 +19,7 @@ import (
 // TestRetrieveEventByBlockIDTxID tests event insertion, event retrieval by block id, block id and transaction id,
 // and block id and event type
 func TestRetrieveEventByBlockIDTxID(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
 		// create block ids, transaction ids and event types slices
@@ -34,6 +36,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 		for _, b := range blockIDs {
 
 			bEvents := make([]flow.Event, 0)
+			allEventsForBlock := make([]flow.Event, 0)
 
 			// all blocks share the same transactions
 			for i, tx := range txIDs {
@@ -52,13 +55,8 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 						unittest.Event.WithTransactionID(tx),
 					)
 
-					// insert event into the db
-					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return operation.InsertEvent(rw.Writer(), b, event)
-					})
-					require.Nil(t, err)
-
-					// update event arrays in the maps
+					// collect events for batch insertion
+					allEventsForBlock = append(allEventsForBlock, event)
 					bEvents = append(bEvents, event)
 					tEvents = append(tEvents, event)
 					eEvents = append(eEvents, event)
@@ -72,6 +70,15 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 				}
 				txMap[b.String()+"_"+tx.String()] = tEvents
 			}
+
+			// insert all events for this block in one batch
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertBlockEvents(lctx, rw, b, []flow.EventsList{allEventsForBlock})
+				})
+			})
+			require.NoError(t, err)
+
 			blockMap[b.String()] = bEvents
 		}
 
@@ -125,7 +132,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 }
 
 // Event retrieval does not guarantee any order,
-// Hence, we a sort the events for comparing the expected and actual events.
+// Hence, we sort the events for comparing the expected and actual events.
 func sortEvent(events []flow.Event) {
 	slices.SortFunc(events, func(i, j flow.Event) int {
 		tComp := bytes.Compare(i.TransactionID[:], j.TransactionID[:])

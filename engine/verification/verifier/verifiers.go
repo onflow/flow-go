@@ -40,9 +40,9 @@ func VerifyLastKHeight(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledTransactionsEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -96,9 +96,9 @@ func VerifyRange(
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (err error) {
-	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledCallbacksEnabled)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(lockManager, chainID, protocolDataDir, chunkDataPackDir, transactionFeesDisabled, scheduledTransactionsEnabled)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
@@ -227,7 +227,7 @@ func initStorages(
 	dataDir string,
 	chunkDataPackDir string,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) (
 	func() error,
 	*store.All,
@@ -253,10 +253,11 @@ func initStorages(
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}
+	storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics.NewNoopCollector(), pebbleimpl.ToDB(chunkDataPackDB), 1000)
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
-		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
+		db, storedChunkDataPacks, storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledCallbacksEnabled)
+	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledTransactionsEnabled)
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 
@@ -329,7 +330,7 @@ func makeVerifier(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	transactionFeesDisabled bool,
-	scheduledCallbacksEnabled bool,
+	scheduledTransactionsEnabled bool,
 ) module.ChunkVerifier {
 
 	vm := fvm.NewVirtualMachine()
@@ -349,7 +350,7 @@ func makeVerifier(
 		computation.DefaultFVMOptions(
 			chainID,
 			false,
-			scheduledCallbacksEnabled,
+			scheduledTransactionsEnabled,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)

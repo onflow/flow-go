@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -474,6 +475,8 @@ func TestWithServiceAccount(t *testing.T) {
 }
 
 func TestEventLimits(t *testing.T) {
+	t.Parallel()
+
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
@@ -579,6 +582,7 @@ func TestEventLimits(t *testing.T) {
 // TestHappyPathSigning checks that a signing a transaction with `Sign` doesn't produce an error.
 // Transaction verification tests are in `TestVerifySignatureFromTransaction`.
 func TestHappyPathTransactionSigning(t *testing.T) {
+	t.Parallel()
 
 	newVMTest().run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
@@ -620,6 +624,8 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
+	t.Parallel()
+
 	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, address flow.Address) uint64 {
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		code := []byte(fmt.Sprintf(
@@ -986,7 +992,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
 
-			address := flow.ConvertAddress(
+			address := flow.Address(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
 					cadenceStdlib.AccountEventAddressParameter.Identifier,
@@ -1098,6 +1104,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 }
 
 func TestSettingExecutionWeights(t *testing.T) {
+	t.Parallel()
 
 	// change the chain so that the metering settings are read from the service account
 	chain := flow.Emulator.Chain()
@@ -1837,6 +1844,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 }
 
 func TestStorageCapacity(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Storage capacity updates on FLOW transfer", newVMTest().
 		withContextOptions(
 			fvm.WithAuthorizationChecksEnabled(false),
@@ -2300,7 +2309,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 				require.True(t, errors.IsComputationLimitExceededError(output.Err))
 				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
 				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
-				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(456687216))
 			},
 		),
 	)
@@ -2311,7 +2320,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
-			fvm.WithComputationLimit(20000),
+			fvm.WithComputationLimit(25000),
 			fvm.WithChain(chain),
 		).run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
@@ -2328,6 +2337,9 @@ func TestScriptExecutionLimit(t *testing.T) {
 }
 
 func TestInteractionLimit(t *testing.T) {
+
+	t.Parallel()
+
 	type testCase struct {
 		name             string
 		interactionLimit uint64
@@ -2421,7 +2433,7 @@ func TestInteractionLimit(t *testing.T) {
 				return snapshotTree, err
 			}
 
-			address = flow.ConvertAddress(
+			address = flow.Address(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
 					cadenceStdlib.AccountEventAddressParameter.Identifier,
@@ -2497,6 +2509,7 @@ func TestInteractionLimit(t *testing.T) {
 }
 
 func TestAttachments(t *testing.T) {
+	t.Parallel()
 
 	newVMTest().
 		withBootstrapProcedureOptions().
@@ -2531,6 +2544,8 @@ func TestAttachments(t *testing.T) {
 }
 
 func TestCapabilityControllers(t *testing.T) {
+	t.Parallel()
+
 	test := func(t *testing.T) {
 		newVMTest().
 			withBootstrapProcedureOptions().
@@ -2800,6 +2815,8 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 }
 
 func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
+	t.Parallel()
+
 	source := testutil.EntropyProviderFixture(nil)
 
 	test := func(t *testing.T, allowed bool) {
@@ -2859,6 +2876,8 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 }
 
 func TestEntropyCallExpectsNoParameters(t *testing.T) {
+	t.Parallel()
+
 	source := testutil.EntropyProviderFixture(nil)
 	newVMTest().
 		withBootstrapProcedureOptions().
@@ -2902,6 +2921,7 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 }
 
 func TestTransientNetworkCoreContractAddresses(t *testing.T) {
+	t.Parallel()
 
 	// This test ensures that the transient networks have the correct core contract addresses.
 	newVMTest().
@@ -2927,8 +2947,13 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 }
 
 func TestFlowCallbackScheduler(t *testing.T) {
+	t.Parallel()
+
 	ctxOpts := []fvm.Option{
-		fvm.WithScheduleCallbacksEnabled(true),
+		fvm.WithScheduledTransactionsEnabled(true),
+		// use localnet to ensure the scheduled transaction executor account
+		// is created during bootstrap, since testnet is manually created
+		fvm.WithChain(flow.Localnet.Chain()),
 	}
 
 	newVMTest().
@@ -2941,17 +2966,41 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-			require.NotNil(t, sc.FlowCallbackScheduler.Address)
-			require.NotNil(t, sc.FlowCallbackScheduler.Name)
+			require.NotNil(t, sc.FlowTransactionScheduler.Address)
+			require.NotNil(t, sc.FlowTransactionScheduler.Name)
+			require.NotNil(t, sc.ScheduledTransactionExecutor.Address)
 
+			_, err := fvm.GetAccount(ctx, sc.ScheduledTransactionExecutor.Address, snapshotTree)
+			require.NoError(t, err)
+
+			// Verify that the capability was stored in the executor account
 			script := fvm.Script([]byte(fmt.Sprintf(`
+			import FlowTransactionScheduler from %s
+
+			access(all) fun main(executorAddress: Address): Bool {
+				let executorAccount = getAccount(executorAddress)
+				return executorAccount.storage.check<Capability<auth(FlowTransactionScheduler.Execute) &FlowTransactionScheduler.SharedScheduler>>(
+					from: /storage/executeScheduledTransactionsCapability
+				)
+			}
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
+
+			executorAddressArg, err := jsoncdc.Encode(cadence.Address(sc.ScheduledTransactionExecutor.Address))
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(ctx, script.WithArguments(executorAddressArg), snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Equal(t, cadence.Bool(true), output.Value)
+
+			script = fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): FlowTransactionScheduler.Status? {
 					return FlowTransactionScheduler.getStatus(id: 1)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
-			_, output, err := vm.Run(ctx, script, snapshotTree)
+			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 			require.NotNil(t, output.Value)
@@ -2962,9 +3011,9 @@ func TestFlowCallbackScheduler(t *testing.T) {
 				access(all) fun main(): UInt64 {
 					return FlowTransactionScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowTransactionScheduler.Priority.High)
 				}
-			`, sc.FlowCallbackScheduler.Address.HexWithPrefix())))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
-			const maxEffortAvailable = 30_000 // FLIP 330
+			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
@@ -2975,6 +3024,8 @@ func TestFlowCallbackScheduler(t *testing.T) {
 }
 
 func TestEVM(t *testing.T) {
+	t.Parallel()
+
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
@@ -2987,14 +3038,12 @@ func TestEVM(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
 	}
 
 	t.Run("successful transaction", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3053,7 +3102,6 @@ func TestEVM(t *testing.T) {
 
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3091,7 +3139,6 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the EVM error is correctly returned as an error and has a correct type
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3146,7 +3193,6 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3196,7 +3242,6 @@ func TestEVM(t *testing.T) {
 			txBody, err := txBodyBuilder.Build()
 			require.NoError(t, err)
 
-			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
@@ -3244,6 +3289,8 @@ func TestEVM(t *testing.T) {
 }
 
 func TestVMBridge(t *testing.T) {
+	t.Parallel()
+
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()
 	blocks.On("ByHeightFrom",
@@ -3256,7 +3303,6 @@ func TestVMBridge(t *testing.T) {
 		// so we have to use emulator here so that the EVM storage contract is deployed
 		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
-		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
 		fvm.WithBlockHeader(block1.ToHeader()),
 		fvm.WithCadenceLogging(true),
@@ -3264,7 +3310,7 @@ func TestVMBridge(t *testing.T) {
 	}
 
 	t.Run("successful FT Type Onboarding and Bridging", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withBootstrapProcedureOptions(fvm.WithSetupVMBridgeEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3502,7 +3548,7 @@ func TestVMBridge(t *testing.T) {
 	)
 
 	t.Run("successful NFT Type Onboarding and Bridging", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true), fvm.WithSetupVMBridgeEnabled(true)).
+		withBootstrapProcedureOptions(fvm.WithSetupVMBridgeEnabled(true)).
 		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
@@ -3812,6 +3858,7 @@ func TestVMBridge(t *testing.T) {
 }
 
 func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
+	t.Parallel()
 
 	// Note: This cannot be tested anymore using a transaction,
 	// because publish method also aborts when trying to publish an entitled capability.
@@ -3828,7 +3875,6 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 
 		valid, err := env.ValidateAccountCapabilitiesGet(
 			nil,
-			interpreter.EmptyLocationRange,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
 			sema.NewReferenceType(
@@ -3858,7 +3904,6 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 
 		valid, err := env.ValidateAccountCapabilitiesGet(
 			nil,
-			interpreter.EmptyLocationRange,
 			interpreter.AddressValue(common.ZeroAddress),
 			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
 			sema.NewReferenceType(
@@ -3874,6 +3919,7 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 }
 
 func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
+	t.Parallel()
 
 	t.Run("entitled capability", newVMTest().
 		run(func(
@@ -4131,6 +4177,7 @@ func TestCrypto(t *testing.T) {
 }
 
 func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
+	t.Parallel()
 
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -4148,7 +4195,6 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 	t.Run("block hash list write on push", newVMTest().
 		withContextOptions(
 			fvm.WithChain(chain),
-			fvm.WithEVMEnabled(true),
 		).
 		run(func(
 			t *testing.T,
@@ -4231,4 +4277,83 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expectedBlockHashListBucket, newBlockHashListBucket)
 		}))
+}
+
+func TestTransactionIndexCall(t *testing.T) {
+	t.Parallel()
+
+	t.Run("in transactions",
+		newVMTest().
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					snapshotTree snapshot.SnapshotTree,
+				) {
+					txBodyBuilder := flow.NewTransactionBodyBuilder().
+						SetScript([]byte(`
+						transaction {
+						  prepare() {
+							let idx = getTransactionIndex()
+							log(idx)
+						  }
+						}
+					`)).
+						SetProposalKey(chain.ServiceAddress(), 0, 0).
+						SetPayer(chain.ServiceAddress())
+
+					err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+					require.NoError(t, err)
+
+					txBody, err := txBodyBuilder.Build()
+					require.NoError(t, err)
+
+					ctx = fvm.NewContextFromParent(ctx, fvm.WithCadenceLogging(true))
+
+					txIndex := uint32(3)
+
+					_, output, err := vm.Run(
+						ctx,
+						fvm.Transaction(txBody, txIndex),
+						snapshotTree)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
+					require.Len(t, output.Logs, 1)
+
+					idx, err := strconv.Atoi(output.Logs[0])
+					require.NoError(t, err)
+					require.Equal(t, txIndex, uint32(idx))
+				},
+			),
+	)
+
+	t.Run("in scripts",
+		newVMTest().
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					snapshotTree snapshot.SnapshotTree,
+				) {
+					script := fvm.Script(
+						[]byte(`
+							access(all) fun main(): UInt32 {
+								return getTransactionIndex()
+							}`))
+
+					_, output, err := vm.Run(
+						ctx,
+						script,
+						snapshotTree)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
+
+					require.Equal(t, cadence.UInt32(0), output.Value)
+				},
+			),
+	)
 }

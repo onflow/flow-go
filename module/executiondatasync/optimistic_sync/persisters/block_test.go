@@ -111,7 +111,7 @@ func (p *PersisterSuite) testWithDatabase() {
 				stores.NewEventsStore(p.indexerData.Events, events, p.executionResult.BlockID),
 				stores.NewResultsStore(p.indexerData.Results, results, p.executionResult.BlockID),
 				stores.NewCollectionsStore(p.indexerData.Collections, collections),
-				stores.NewTxResultErrMsgStore(p.txErrMsgs, txResultErrMsg, p.executionResult.BlockID),
+				stores.NewTxResultErrMsgStore(p.txErrMsgs, txResultErrMsg, p.executionResult.BlockID, lockManager),
 				stores.NewLatestSealedResultStore(latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
 			},
 		)
@@ -176,13 +176,19 @@ func (p *PersisterSuite) TestPersister_ErrorHandling() {
 			Once()
 
 		collections := storagemock.NewCollections(p.T())
-		collections.
-			On("BatchStoreAndIndexByTransaction", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil, nil).
-			Times(len(p.indexerData.Collections))
+		for _, collection := range p.indexerData.Collections {
+			collections.
+				On("BatchStoreAndIndexByTransaction",
+					mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertCollection) }),
+					collection, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).
+				Return(nil, nil).
+				Once()
+		}
 
 		events := storagemock.NewEvents(p.T())
-		events.On("BatchStore", p.executionResult.BlockID, mock.Anything, mock.Anything).Return(expectedErr).Once()
+		events.On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			p.executionResult.BlockID, []flow.EventsList{p.indexerData.Events}, mock.MatchedBy(func(batch storage.ReaderBatchWriter) bool { return batch != nil })).Return(expectedErr).Once()
 
 		persister := NewBlockPersister(
 			unittest.Logger(),
