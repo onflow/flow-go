@@ -430,8 +430,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 				e.log.Error().Msgf("could not dispatch requests: no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
 				return false, nil
 			}
-			// ramdonly select a provider from the filtered set
-			// to send as many item requests as possible.
+			// Randomly select a provider from the eligible set. We will ask this data provider for all entities, whose `ExtraSelector`
+			// matches this provider. Thereby, we maximize the batch size, requesting as many entities as possible via a single message.
 			id, err := filteredProviders.Sample(1)
 			if err != nil {
 				return false, fmt.Errorf("sampling failed: %w", err)
@@ -440,7 +440,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			providers = filteredProviders
 		}
 
-		// add item to list and set retry parameters
+		// Add item to list and update the retry parameters.
 		// NOTE: we add the retry interval to the last requested timestamp,
 		// rather than using the current timestamp, in order to conserve a
 		// more even distribution of timestamps over time, which should lead
