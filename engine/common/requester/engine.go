@@ -26,7 +26,10 @@ import (
 )
 
 // DefaultEntityRequestCacheSize is the default max message queue size for the provider engine.
-// This equates to ~5GB of memory usage with a full queue (10M*500)
+// Assuming a maximum size 10MB per message, a full queue would consume ~5GB of memory (10M*500).
+// While most messages (such as execution receipts) are significantly smaller than 10MB, some
+// messages like chunk data packs can be significantly larger.  The user should properly tune
+// this parameter based on their use case and ensure enough memory is available.
 const DefaultEntityRequestCacheSize = 500
 
 // HandleFunc is a function provided to the requester engine to entityConsumer an entity
@@ -364,7 +367,6 @@ func (e *Engine) poll(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 	if e.entityConsumer == nil {
 		ctx.Throw(fmt.Errorf("must initialize requester engine with handler"))
 	}
-
 	ready()
 
 	ticker := time.NewTicker(e.cfg.BatchInterval)
@@ -410,7 +412,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
-	var providerID flow.Identifier
+	var provider *flow.Identity
 	var entityIDs []flow.Identifier
 	for entityID, item := range e.items {
 
@@ -427,30 +429,17 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			continue
 		}
 
-		// if the provider has already been chosen, check if this item
-		// can be requested from the same provider; otherwise skip it
-		// for now, so it will be part of the next batch request
-		if providerID != flow.ZeroID {
-			overlap := providers.Filter(filter.And(
-				filter.HasNodeID[flow.Identity](providerID),
-				item.ExtraSelector,
-			))
-			if len(overlap) == 0 {
-				continue
-			}
-		}
-
 		// If no provider has been chosen yet, select one that:
 		// - is part of the previously determined `providers` set (staked, non-ejected nodes)
 		// - and matches the item's specific requirements (as per ExtraSelector)
 		// NOTE: a single item can not permanently block requests going out when no providers are available for it,
 		// because the iteration order is random. The `ExtraSelector` of the item that is iterated over first (at
 		// random) will determine the selected provider.
-		if providerID == flow.ZeroID {
+		if provider == nil {
 			filteredProviders := providers.Filter(item.ExtraSelector)
+			// if we failed to select a provider for given item instead of aborting we will try the same for the next item in the queue.
 			if len(filteredProviders) == 0 {
-				e.log.Error().Msgf("could not dispatch requests: no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
-				return false, nil
+				continue
 			}
 			// Randomly select a provider from the eligible set. We will ask this data provider for all entities, whose `ExtraSelector`
 			// matches this provider. Thereby, we maximize the batch size, requesting as many entities as possible via a single message.
@@ -458,8 +447,15 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			if err != nil {
 				return false, fmt.Errorf("sampling failed: %w", err)
 			}
-			providerID = id[0].NodeID
+			provider = id[0]
 			providers = filteredProviders
+		}
+
+		// if the provider has already been chosen, check if this item
+		// can be requested from the same provider; otherwise skip it
+		// for now, so it will be part of the next batch request
+		if !item.ExtraSelector(provider) {
+			continue
 		}
 
 		// Add item to list and update the retry parameters.
@@ -506,14 +502,14 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	if e.log.Debug().Enabled() {
 		e.log.Debug().
-			Hex("provider", logging.ID(providerID)).
+			Hex("provider", logging.ID(provider.NodeID)).
 			Uint64("nonce", req.Nonce).
 			Int("num_selected", len(entityIDs)).
 			Strs("entities", logging.IDs(entityIDs)).
 			Msg("sending entity request")
 	}
 
-	err = e.con.Unicast(req, providerID)
+	err = e.con.Unicast(req, provider.NodeID)
 	if err != nil {
 		e.log.Error().Err(err).Msgf("could not dispatch requests: could not send request for entities %v", logging.IDs(entityIDs))
 		return false, nil
@@ -533,7 +529,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	if e.log.Debug().Enabled() {
 		e.log.Debug().
-			Hex("provider", logging.ID(providerID)).
+			Hex("provider", logging.ID(provider.NodeID)).
 			Uint64("nonce", req.Nonce).
 			Strs("entities", logging.IDs(entityIDs)).
 			TimeDiff("duration", time.Now(), requestStart).
