@@ -29,11 +29,9 @@ var (
 )
 
 // List of EOAs with restricted access to EVM, due to malicious activity.
-var restrictedEOAs = []gethCommon.Address{
+var RestrictedEOAs = []gethCommon.Address{
 	gethCommon.HexToAddress("0x2e7C4b71397f10c93dC0C2ba6f8f179A47F994e1"),
 	gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6"),
-	// This is only a test EOA, used during tests
-	gethCommon.HexToAddress("0xad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4"),
 }
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)

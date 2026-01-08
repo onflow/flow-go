@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -352,12 +353,21 @@ func TestEVMRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
+				// This is only a test EOA, used during tests
+				// address: 0xad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4
 				restrictedEOA := GetTestEOAAccount(t, RestrictedEOATestAccount1KeyHex)
+				emulator.RestrictedEOAs = append(
+					emulator.RestrictedEOAs,
+					restrictedEOA.Address().ToCommon(),
+				)
+				defer func() {
+					emulator.RestrictedEOAs = emulator.RestrictedEOAs[:len(emulator.RestrictedEOAs)-1]
+				}()
 
 				num := int64(12)
 				innerTxBytes := restrictedEOA.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "storeButRevert", big.NewInt(num)),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
 					uint64(100_000),
 					big.NewInt(0),
@@ -1351,12 +1361,22 @@ func TestEVMBatchRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
+				// This is only a test EOA, used during tests
+				// address: 0xad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4
+				restrictedEOA := GetTestEOAAccount(t, RestrictedEOATestAccount1KeyHex)
+				emulator.RestrictedEOAs = append(
+					emulator.RestrictedEOAs,
+					restrictedEOA.Address().ToCommon(),
+				)
+				defer func() {
+					emulator.RestrictedEOAs = emulator.RestrictedEOAs[:len(emulator.RestrictedEOAs)-1]
+				}()
+
 				batchCount := 6
 				var num int64
 				txBytes := make([]cadence.Value, batchCount)
 				for i := 0; i < batchCount; i++ {
 					num = int64(i)
-					restrictedEOA := GetTestEOAAccount(t, RestrictedEOATestAccount1KeyHex)
 
 					// prepare batch of transaction payloads
 					tx := restrictedEOA.PrepareSignAndEncodeTx(t,

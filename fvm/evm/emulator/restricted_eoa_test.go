@@ -10,7 +10,7 @@ import (
 
 func TestIsRestrictedEOA(t *testing.T) {
 	config := NewConfig(
-		WithRestrictedEOAs(restrictedEOAs),
+		WithRestrictedEOAs(RestrictedEOAs),
 	)
 
 	t.Run("restricted address 1 should return true", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestIsRestrictedEOA(t *testing.T) {
 	})
 
 	t.Run("all addresses in restrictedEOAs list should be detected", func(t *testing.T) {
-		for _, addr := range restrictedEOAs {
+		for _, addr := range RestrictedEOAs {
 			result := config.IsRestrictedEOA(addr)
 			assert.True(t, result, "address %s should be detected as restricted", addr.Hex())
 		}
@@ -69,7 +69,7 @@ func TestIsRestrictedEOA(t *testing.T) {
 		for _, addr := range testAddresses {
 			// Skip if the address is actually in the restricted list
 			isInList := false
-			for _, restrictedAddr := range restrictedEOAs {
+			for _, restrictedAddr := range RestrictedEOAs {
 				if addr == restrictedAddr {
 					isInList = true
 					break

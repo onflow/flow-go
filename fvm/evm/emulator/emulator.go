@@ -54,7 +54,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithTransactionTracer(ctx.Tracer),
 		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
 		WithBlockTxCountSoFar(ctx.TxCountSoFar),
-		WithRestrictedEOAs(restrictedEOAs),
+		WithRestrictedEOAs(RestrictedEOAs),
 	)
 }
 
