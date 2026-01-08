@@ -690,8 +690,8 @@ access(all) contract EVM {
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
         return InternalEVM.run(
-                tx: tx,
-                coinbase: coinbase.bytes
+            tx: tx,
+            coinbase: coinbase.bytes
         ) as! Result
     }
 
