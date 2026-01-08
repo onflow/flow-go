@@ -574,7 +574,7 @@ func checkAccountPublicKeys(
 		}
 	}
 
-	// NOTE: don't need to check unreachable keys because it is checked in ValidateAccountPublicKeyV4().
+	// NOTE: don't need to check unreachable keys because it is checked in validateAccountPublicKey().
 
 	return nil
 }
