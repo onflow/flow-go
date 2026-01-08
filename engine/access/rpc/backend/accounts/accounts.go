@@ -125,7 +125,7 @@ func (a *Accounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Add
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -185,7 +185,7 @@ func (a *Accounts) GetAccountAtBlockHeight(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -241,7 +241,7 @@ func (a *Accounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address f
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return 0, nil, access.NewInvalidRequestError(err)
@@ -301,7 +301,7 @@ func (a *Accounts) GetAccountBalanceAtBlockHeight(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return 0, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return 0, nil, access.NewInvalidRequestError(err)
@@ -361,7 +361,7 @@ func (a *Accounts) GetAccountKeyAtLatestBlock(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -422,7 +422,7 @@ func (a *Accounts) GetAccountKeyAtBlockHeight(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -481,7 +481,7 @@ func (a *Accounts) GetAccountKeysAtLatestBlock(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -541,7 +541,7 @@ func (a *Accounts) GetAccountKeysAtBlockHeight(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)

@@ -295,6 +295,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.executionDataTracker,
 		suite.executionResultInfoProvider,
 		suite.executionStateCache,
+		rootBlock,
 	)
 	assert.NoError(suite.T(), err)
 

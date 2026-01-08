@@ -135,7 +135,7 @@ func (e *ProviderImpl) ErrorMessageByTransactionID(
 		blockID,
 	)
 	if err != nil {
-		if errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
@@ -190,7 +190,7 @@ func (e *ProviderImpl) ErrorMessageByIndex(
 		blockID,
 	)
 	if err != nil {
-		if errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
@@ -250,7 +250,7 @@ func (e *ProviderImpl) ErrorMessagesByBlockID(
 		blockID,
 	)
 	if err != nil {
-		if errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)

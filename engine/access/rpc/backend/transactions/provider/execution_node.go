@@ -92,7 +92,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
-		if errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, err
@@ -191,7 +191,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 		blockID,
 	)
 	if err != nil {
-		if errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -248,7 +248,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		blockID,
 	)
 	if err != nil {
-		if errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -483,7 +483,7 @@ func (e *ENTransactionProvider) getBlockEvents(
 		blockID,
 	)
 	if err != nil {
-		if errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)

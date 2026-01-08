@@ -1676,6 +1676,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				executionDataTracker,
 				builder.executionResultInfoProvider,
 				builder.executionStateCache,
+				builder.State.Params().SporkRootBlock(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)

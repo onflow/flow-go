@@ -161,7 +161,7 @@ func (b *Scripts) ExecuteScriptAtLatestBlock(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -225,7 +225,7 @@ func (b *Scripts) ExecuteScriptAtBlockID(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -294,7 +294,7 @@ func (b *Scripts) ExecuteScriptAtBlockHeight(
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors):
+		case optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
