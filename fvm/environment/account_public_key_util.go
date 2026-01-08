@@ -388,7 +388,7 @@ func DecodeBatchPublicKeys(b []byte) ([][]byte, error) {
 		return nil, errors.NewCodedFailuref(
 			errors.FailureCodeBatchPublicKeyDecodingFailure,
 			"failed to decode batch public key",
-			"batch public key data has trailiing data (%d bytes): %x",
+			"batch public key data has trailing data (%d bytes): %x",
 			len(b)-off,
 			b,
 		)
