@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 
@@ -101,50 +102,100 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 	return addr, cleanup
 }
 
+// TestRemoteLedgerClient creates a local ledger and a remote ledger client,
+// and tests that they behave identically for various operations.
 func TestRemoteLedgerClient(t *testing.T) {
+	// Create temporary directories for WALs
+	tempDir := t.TempDir()
+	remoteWalDir := filepath.Join(tempDir, "remote_wal")
+	localWalDir := filepath.Join(tempDir, "local_wal")
 
-	// Create temporary directory for WAL
-	walDir := filepath.Join(t.TempDir(), "wal")
-	err := os.MkdirAll(walDir, 0755)
+	err := os.MkdirAll(remoteWalDir, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(localWalDir, 0755)
 	require.NoError(t, err)
 
 	// Start ledger server
-	serverAddr, cleanup := startLedgerServer(t, walDir)
+	serverAddr, cleanup := startLedgerServer(t, remoteWalDir)
 	defer cleanup()
 
-	// Create remote client using factory
 	logger := zerolog.Nop()
-	result, err := NewLedger(Config{
+	metricsCollector := &metrics.NoopCollector{}
+
+	// Create local ledger using factory
+	localResult, err := NewLedger(Config{
+		Triedir:                              localWalDir,
+		MTrieCacheSize:                       100,
+		CheckpointDistance:                   1000,
+		CheckpointsToKeep:                    10,
+		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
+		MetricsRegisterer:                    nil,
+		WALMetrics:                           metricsCollector,
+		LedgerMetrics:                        metricsCollector,
+		Logger:                               logger,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, localResult)
+	localLedger := localResult.Ledger
+	require.NotNil(t, localLedger)
+	defer func() {
+		if localResult.WAL != nil {
+			<-localResult.WAL.Done()
+		}
+		<-localLedger.Done()
+	}()
+
+	// Create remote client using factory
+	remoteResult, err := NewLedger(Config{
 		LedgerServiceAddr: serverAddr,
 		Logger:            logger,
 	})
 	require.NoError(t, err)
-	require.NotNil(t, result)
-
-	remoteLedger := result.Ledger
+	require.NotNil(t, remoteResult)
+	remoteLedger := remoteResult.Ledger
 	require.NotNil(t, remoteLedger)
+	defer func() {
+		<-remoteLedger.Done()
+	}()
 
-	// Wait for client to be ready
+	// Wait for both to be ready
+	<-localLedger.Ready()
 	<-remoteLedger.Ready()
 
 	t.Run("InitialState", func(t *testing.T) {
-		state := remoteLedger.InitialState()
-		assert.NotEqual(t, ledger.DummyState, state)
+		localState := localLedger.InitialState()
+		remoteState := remoteLedger.InitialState()
+
+		// Both should return the same initial state
+		assert.Equal(t, localState, remoteState, "InitialState should be the same for local and remote ledger")
+		assert.NotEqual(t, ledger.DummyState, localState)
+		assert.NotEqual(t, ledger.DummyState, remoteState)
 	})
 
 	t.Run("HasState", func(t *testing.T) {
-		initialState := remoteLedger.InitialState()
-		hasState := remoteLedger.HasState(initialState)
-		assert.True(t, hasState)
+		localInitialState := localLedger.InitialState()
+		remoteInitialState := remoteLedger.InitialState()
+
+		// Both should have the same initial state
+		assert.Equal(t, localInitialState, remoteInitialState)
+
+		localHasState := localLedger.HasState(localInitialState)
+		remoteHasState := remoteLedger.HasState(remoteInitialState)
+		assert.Equal(t, localHasState, remoteHasState, "HasState should return the same result for local and remote ledger")
+		assert.True(t, localHasState)
 
 		// Test with non-existent state
 		dummyState := ledger.DummyState
-		hasState = remoteLedger.HasState(dummyState)
-		assert.False(t, hasState)
+		localHasState = localLedger.HasState(dummyState)
+		remoteHasState = remoteLedger.HasState(dummyState)
+		assert.Equal(t, localHasState, remoteHasState, "HasState for non-existent state should return the same result")
+		assert.False(t, localHasState)
 	})
 
 	t.Run("GetSingleValue", func(t *testing.T) {
-		initialState := remoteLedger.InitialState()
+		localInitialState := localLedger.InitialState()
+		remoteInitialState := remoteLedger.InitialState()
+		assert.Equal(t, localInitialState, remoteInitialState)
 
 		// Create a test key
 		key := ledger.NewKey([]ledger.KeyPart{
@@ -152,17 +203,26 @@ func TestRemoteLedgerClient(t *testing.T) {
 			ledger.NewKeyPart(ledger.KeyPartKey, []byte("test-key")),
 		})
 
-		query, err := ledger.NewQuerySingleValue(initialState, key)
+		localQuery, err := ledger.NewQuerySingleValue(localInitialState, key)
+		require.NoError(t, err)
+		remoteQuery, err := ledger.NewQuerySingleValue(remoteInitialState, key)
 		require.NoError(t, err)
 
-		value, err := remoteLedger.GetSingleValue(query)
+		localValue, err := localLedger.GetSingleValue(localQuery)
 		require.NoError(t, err)
-		// Empty ledger should return empty value
-		assert.Equal(t, ledger.Value(nil), value)
+		remoteValue, err := remoteLedger.GetSingleValue(remoteQuery)
+		require.NoError(t, err)
+
+		// Both should return the same value
+		assert.Equal(t, localValue, remoteValue, "GetSingleValue should return the same value for local and remote ledger")
+		assert.Equal(t, ledger.Value([]byte{}), localValue)
+		assert.Equal(t, 0, len(localValue))
 	})
 
 	t.Run("Get", func(t *testing.T) {
-		initialState := remoteLedger.InitialState()
+		localInitialState := localLedger.InitialState()
+		remoteInitialState := remoteLedger.InitialState()
+		assert.Equal(t, localInitialState, remoteInitialState)
 
 		// Create test keys
 		keys := []ledger.Key{
@@ -176,19 +236,28 @@ func TestRemoteLedgerClient(t *testing.T) {
 			}),
 		}
 
-		query, err := ledger.NewQuery(initialState, keys)
+		localQuery, err := ledger.NewQuery(localInitialState, keys)
+		require.NoError(t, err)
+		remoteQuery, err := ledger.NewQuery(remoteInitialState, keys)
 		require.NoError(t, err)
 
-		values, err := remoteLedger.Get(query)
+		localValues, err := localLedger.Get(localQuery)
 		require.NoError(t, err)
-		require.Len(t, values, 2)
-		// Empty ledger should return empty values
-		assert.Equal(t, ledger.Value(nil), values[0])
-		assert.Equal(t, ledger.Value(nil), values[1])
+		remoteValues, err := remoteLedger.Get(remoteQuery)
+		require.NoError(t, err)
+
+		// Both should return the same values
+		require.Len(t, localValues, 2)
+		require.Len(t, remoteValues, 2)
+		assert.Equal(t, localValues, remoteValues, "Get should return the same values for local and remote ledger")
+		assert.Equal(t, ledger.Value([]byte{}), localValues[0])
+		assert.Equal(t, 0, len(localValues[0]))
 	})
 
 	t.Run("Set", func(t *testing.T) {
-		initialState := remoteLedger.InitialState()
+		localInitialState := localLedger.InitialState()
+		remoteInitialState := remoteLedger.InitialState()
+		assert.Equal(t, localInitialState, remoteInitialState)
 
 		// Create test keys and values
 		keys := []ledger.Key{
@@ -201,26 +270,45 @@ func TestRemoteLedgerClient(t *testing.T) {
 			ledger.Value("test-value"),
 		}
 
-		update, err := ledger.NewUpdate(initialState, keys, values)
+		localUpdate, err := ledger.NewUpdate(localInitialState, keys, values)
+		require.NoError(t, err)
+		remoteUpdate, err := ledger.NewUpdate(remoteInitialState, keys, values)
 		require.NoError(t, err)
 
-		newState, trieUpdate, err := remoteLedger.Set(update)
+		localNewState, localTrieUpdate, err := localLedger.Set(localUpdate)
 		require.NoError(t, err)
-		assert.NotEqual(t, ledger.DummyState, newState)
-		assert.NotEqual(t, initialState, newState)
-		assert.NotNil(t, trieUpdate)
-
-		// Verify we can read back the value
-		query, err := ledger.NewQuerySingleValue(newState, keys[0])
+		remoteNewState, remoteTrieUpdate, err := remoteLedger.Set(remoteUpdate)
 		require.NoError(t, err)
 
-		value, err := remoteLedger.GetSingleValue(query)
+		// Both should return the same new state
+		assert.Equal(t, localNewState, remoteNewState, "Set should return the same new state for local and remote ledger")
+		assert.NotEqual(t, ledger.DummyState, localNewState)
+		assert.NotEqual(t, localInitialState, localNewState)
+
+		// Both should return non-nil trie updates
+		assert.NotNil(t, localTrieUpdate)
+		assert.NotNil(t, remoteTrieUpdate)
+
+		// Verify we can read back the value from both
+		localQuery, err := ledger.NewQuerySingleValue(localNewState, keys[0])
 		require.NoError(t, err)
-		assert.Equal(t, ledger.Value("test-value"), value)
+		remoteQuery, err := ledger.NewQuerySingleValue(remoteNewState, keys[0])
+		require.NoError(t, err)
+
+		localValue, err := localLedger.GetSingleValue(localQuery)
+		require.NoError(t, err)
+		remoteValue, err := remoteLedger.GetSingleValue(remoteQuery)
+		require.NoError(t, err)
+
+		// Both should return the same value
+		assert.Equal(t, localValue, remoteValue, "GetSingleValue after Set should return the same value")
+		assert.Equal(t, ledger.Value("test-value"), localValue)
 	})
 
 	t.Run("Prove", func(t *testing.T) {
-		initialState := remoteLedger.InitialState()
+		localInitialState := localLedger.InitialState()
+		remoteInitialState := remoteLedger.InitialState()
+		assert.Equal(t, localInitialState, remoteInitialState)
 
 		// Create test key
 		key := ledger.NewKey([]ledger.KeyPart{
@@ -228,16 +316,20 @@ func TestRemoteLedgerClient(t *testing.T) {
 			ledger.NewKeyPart(ledger.KeyPartKey, []byte("test-key")),
 		})
 
-		query, err := ledger.NewQuery(initialState, []ledger.Key{key})
+		localQuery, err := ledger.NewQuery(localInitialState, []ledger.Key{key})
+		require.NoError(t, err)
+		remoteQuery, err := ledger.NewQuery(remoteInitialState, []ledger.Key{key})
 		require.NoError(t, err)
 
-		proof, err := remoteLedger.Prove(query)
+		localProof, err := localLedger.Prove(localQuery)
 		require.NoError(t, err)
-		assert.NotNil(t, proof)
-		assert.Greater(t, len(proof), 0)
+		remoteProof, err := remoteLedger.Prove(remoteQuery)
+		require.NoError(t, err)
+
+		// Both should return proofs of the same length
+		assert.NotNil(t, localProof)
+		assert.NotNil(t, remoteProof)
+		assert.Equal(t, len(localProof), len(remoteProof), "Prove should return proofs of the same length")
+		assert.Greater(t, len(localProof), 0)
 	})
-
-	// Cleanup client - Done() is called automatically by defer cleanup
-	// but we can test it explicitly if needed
-	<-remoteLedger.Done()
 }
