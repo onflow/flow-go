@@ -54,6 +54,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithTransactionTracer(ctx.Tracer),
 		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
 		WithBlockTxCountSoFar(ctx.TxCountSoFar),
+		WithRestrictedEOAs(RestrictedEOAs),
 	)
 }
 
@@ -189,7 +190,11 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return types.NewInvalidResult(tx, err), nil
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), err), nil
+	}
+
+	if bl.config.IsRestrictedEOA(msg.From) {
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA), nil
 	}
 
 	// call tracer
@@ -244,7 +249,12 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			GetSigner(bl.config),
 			proc.config.BlockContext.BaseFee)
 		if err != nil {
-			batchResults[i] = types.NewInvalidResult(tx, err)
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), err)
+			continue
+		}
+
+		if bl.config.IsRestrictedEOA(msg.From) {
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA)
 			continue
 		}
 
@@ -385,7 +395,8 @@ func (proc *procedure) mintTo(
 	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrInvalidBalance,
 		), nil
 	}
@@ -430,7 +441,8 @@ func (proc *procedure) withdrawFrom(
 	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrInvalidBalance,
 		), nil
 	}
@@ -438,7 +450,8 @@ func (proc *procedure) withdrawFrom(
 	// check balance is not prone to rounding error
 	if !types.AttoFlowBalanceIsValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrWithdrawBalanceRounding,
 		), nil
 	}
@@ -486,7 +499,8 @@ func (proc *procedure) deployAt(
 	castedValue, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
+			call.Type,
+			call.Hash(),
 			types.ErrInvalidBalance,
 		), nil
 	}
