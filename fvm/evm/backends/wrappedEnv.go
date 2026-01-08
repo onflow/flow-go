@@ -24,11 +24,17 @@ type WrappedEnvironment struct {
 }
 
 // NewWrappedEnvironment constructs a new wrapped environment
-func NewWrappedEnvironment(env environment.Environment) types.Backend {
+func NewWrappedEnvironment(env environment.Environment) *WrappedEnvironment {
 	return &WrappedEnvironment{env}
 }
 
 var _ types.Backend = &WrappedEnvironment{}
+
+// SetEnv allows replacing the underlying environment.Environment and reusing
+// the WrappedEnvironment object.
+func (we *WrappedEnvironment) SetEnv(env environment.Environment) {
+	we.env = env
+}
 
 // GetValue gets a value from the storage for the given owner and key pair,
 // if value not found empty slice and no error is returned.

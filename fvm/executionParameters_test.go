@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestGetExecutionMemoryWeights(t *testing.T) {
@@ -35,6 +36,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 				&testutil.TestRuntime{
 					ReadStoredFunc: readStored,
 				},
+				flow.Mainnet.Chain(),
 				runtime.Config{},
 			),
 		)
@@ -165,6 +167,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 				&testutil.TestRuntime{
 					ReadStoredFunc: readStored,
 				},
+				flow.Mainnet.Chain(),
 				runtime.Config{},
 			),
 		)
