@@ -227,7 +227,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*flow.Proposal]) error {
 	// 1,2. To prevent memory exhaustion attacks we store single proposal per view, so we can ignore
 	// all other proposals if we have already cached something.
 	blocksByView := c.pending.ByView(block.View)
-	if len(blocksByView) > 1 {
+	if len(blocksByView) > 0 {
 		log.Debug().Msg("skipping proposal since we have already processed one for given view")
 		return nil
 	}
