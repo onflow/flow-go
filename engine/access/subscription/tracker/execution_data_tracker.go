@@ -113,7 +113,11 @@ func NewExecutionDataTracker(
 // if the start height is out of bounds based on indexed heights (when index is used).
 // - codes.NotFound        - if a block is provided and does not exist.
 // - codes.Internal        - if there is an internal error.
-func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+func (e *ExecutionDataTrackerImpl) GetStartHeight(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	startHeight uint64,
+) (uint64, error) {
 	if startBlockID != flow.ZeroID && startHeight > 0 {
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
 	}

@@ -1094,6 +1094,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				executionDataTracker,
 				notNil(builder.executionResultInfoProvider),
 				builder.executionStateCache, // might be nil
+				builder.State.Params().SporkRootBlock(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1775,6 +1776,8 @@ func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAc
 			RequiredExecutors:      requiredENIdentifiers,
 		}
 
+		resolver := execution_result.NewSealingStatusResolver(node.Storage.Headers, node.State)
+
 		builder.executionResultInfoProvider = execution_result.NewExecutionResultInfoProvider(
 			node.Logger,
 			node.State,
@@ -1782,6 +1785,7 @@ func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAc
 			node.Storage.Headers,
 			execNodeSelector,
 			operatorCriteria,
+			resolver,
 		)
 
 		return nil

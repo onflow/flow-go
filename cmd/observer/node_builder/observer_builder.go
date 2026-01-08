@@ -1137,6 +1137,8 @@ func (builder *ObserverServiceBuilder) buildExecutionResultInfoProvider() *Obser
 			fixedENIdentifiers,
 		)
 
+		resolver := execution_result.NewSealingStatusResolver(node.Storage.Headers, node.State)
+
 		builder.executionResultInfoProvider = execution_result.NewExecutionResultInfoProvider(
 			node.Logger,
 			node.State,
@@ -1144,6 +1146,7 @@ func (builder *ObserverServiceBuilder) buildExecutionResultInfoProvider() *Obser
 			node.Storage.Headers,
 			execNodeSelector,
 			operatorCriteria,
+			resolver,
 		)
 
 		return nil

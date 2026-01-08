@@ -273,6 +273,7 @@ func (s *LegacyBackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
+		s.rootBlock,
 	)
 	require.NoError(s.T(), err)
 
@@ -948,7 +949,7 @@ func (s *LegacyBackendExecutionDataSuite) TestGetRegisterValues() {
 	s.Run("returns error if failed to get execution result info for block - insufficient receipts", func() {
 		s.executionResultProvider.
 			On("ExecutionResultInfo", block.ToHeader().ID(), mock.Anything).
-			Return(nil, optimistic_sync.ErrNotEnoughAgreeingExecutors).Once()
+			Return(nil, optimistic_sync.NewExecutionResultNotReadyError("not enough agreeing executors")).Once()
 
 		res, metadata, err := s.backend.GetRegisterValues(ctx, flow.RegisterIDs{s.registerID}, block.Height, s.criteria)
 		require.Nil(s.T(), res)

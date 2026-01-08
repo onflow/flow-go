@@ -13,8 +13,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -29,9 +31,10 @@ type ExecutionDataResponse struct {
 
 // ExecutionDataBackend exposes read-only access to execution data.
 type ExecutionDataBackend struct {
-	log     zerolog.Logger
-	state   protocol.State
-	headers storage.Headers
+	log            zerolog.Logger
+	state          protocol.State
+	headers        storage.Headers
+	sporkRootBlock *flow.Block
 
 	subscriptionFactory  *subscription.SubscriptionHandler
 	executionDataTracker tracker.ExecutionDataTracker
@@ -48,11 +51,13 @@ func NewExecutionDataBackend(
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
+	sporkRootBlock *flow.Block,
 ) *ExecutionDataBackend {
 	return &ExecutionDataBackend{
 		log:                     log.With().Str("module", "execution_data_backend").Logger(),
 		state:                   state,
 		headers:                 headers,
+		sporkRootBlock:          sporkRootBlock,
 		subscriptionFactory:     subscriptionHandler,
 		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
@@ -79,9 +84,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 		switch {
 		case errors.Is(err, storage.ErrNotFound) ||
 			errors.Is(err, optimistic_sync.ErrBlockBeforeNodeHistory) ||
-			errors.Is(err, optimistic_sync.ErrNotEnoughAgreeingExecutors) ||
-			errors.Is(err, optimistic_sync.ErrRequiredExecutorNotFound) ||
-			errors.Is(err, optimistic_sync.ErrForkAbandoned):
+			optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
 		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
@@ -142,25 +145,42 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 func (b *ExecutionDataBackend) SubscribeExecutionData(
 	ctx context.Context,
 	startBlockID flow.Identifier,
-	startHeight uint64,
+	startBlockHeight uint64,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
+	if startBlockID != flow.ZeroID && startBlockHeight == 0 {
+		return b.SubscribeExecutionDataFromStartBlockID(ctx, startBlockID, criteria)
 	}
 
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
-		b.headers,
-		b.executionDataTracker,
-		b.executionResultProvider,
-		b.executionStateCache,
-		criteria,
-		nextHeight,
-	)
+	if startBlockHeight > 0 && startBlockID == flow.ZeroID {
+		return b.SubscribeExecutionDataFromStartBlockHeight(ctx, startBlockHeight, criteria)
+	}
 
-	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
+	return subscription.NewFailedSubscription(nil, "one of start block ID and start block height must be provided")
+}
+
+// SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
+// Once the latest is reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+//
+// Parameters:
+// - ctx: Context for the operation.
+//
+// If invalid parameters are provided, failed subscription will be returned.
+func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
+	ctx context.Context,
+	criteria optimistic_sync.Criteria,
+) subscription.Subscription {
+	header, err := b.state.Sealed().Head()
+	if err != nil {
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return subscription.NewFailedSubscription(err, "failed to lookup sealed header")
+	}
+
+	return b.SubscribeExecutionDataFromStartBlockHeight(ctx, header.Height, criteria)
 }
 
 // SubscribeExecutionDataFromStartBlockID streams execution data for all blocks starting at the specified block ID
@@ -177,9 +197,25 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 	startBlockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
+	// check if the block header for the given block ID is available in the storage
+	header, err := b.headers.ByBlockID(startBlockID)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
+		return subscription.NewFailedSubscription(err, "could not get header for block height")
+	}
+
+	if header.Height < b.sporkRootBlock.Height {
+		return subscription.NewFailedSubscription(err, "block height is less than the spork root block")
+	}
+
+	availableExecutors, err :=
+		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
+	}
+
+	err = criteria.Validate(availableExecutors)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
 	executionDataProvider := newExecutionDataProvider(
@@ -189,7 +225,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,
-		nextHeight,
+		header.Height,
 	)
 
 	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
@@ -209,9 +245,26 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	startBlockHeight uint64,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startBlockHeight)
+	if startBlockHeight < b.sporkRootBlock.Height {
+		return subscription.NewFailedSubscription(nil,
+			"start height must be greater than or equal to the spork root height")
+	}
+
+	// check if the block header for the given height is available in the storage
+	header, err := b.headers.ByHeight(startBlockHeight)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
+		return subscription.NewFailedSubscription(err, "error getting block header by height")
+	}
+
+	availableExecutors, err :=
+		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
+	}
+
+	err = criteria.Validate(availableExecutors)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
 	executionDataProvider := newExecutionDataProvider(
@@ -221,37 +274,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,
-		nextHeight,
-	)
-
-	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
-}
-
-// SubscribeExecutionDataFromLatest streams execution data starting at the latest block.
-// Once the latest is reached, the stream will remain open and responses are sent for each new
-// block as it becomes available.
-//
-// Parameters:
-// - ctx: Context for the operation.
-//
-// If invalid parameters are provided, failed subscription will be returned.
-func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
-	ctx context.Context,
-	criteria optimistic_sync.Criteria,
-) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start block height")
-	}
-
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
-		b.headers,
-		b.executionDataTracker,
-		b.executionResultProvider,
-		b.executionStateCache,
-		criteria,
-		nextHeight,
+		header.Height,
 	)
 
 	return b.subscriptionFactory.Subscribe(ctx, executionDataProvider)
