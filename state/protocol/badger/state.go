@@ -990,10 +990,20 @@ func IsBootstrapped(db storage.DB) (bool, error) {
 	return true, nil
 }
 
-// GetChainID attempts to retrieve the consensus chainID
-// from the latest finalized header in the database, before storage or protocol state have been initialized.
-// This should ONLY be called on a bootstrapped node, determined by [IsBootstrapped].
-// No errors expected during normal operations.
+// GetChainID retrieves the consensus chainID from the latest finalized block in the database. This
+// function reads directly from the database, without instantiating high-level storage abstractions
+// or the protocol state struct.
+//
+// During bootstrapping, the latest finalized block and its height are indexed and thereafter the
+// latest finalized height is only updated (but never removed). Hence, for a properly bootstrapped node,
+// this function should _always_ return a proper value (constant throughout the lifetime of the node).
+//
+// Note: This function should only be called on properly bootstrapped nodes. If the state is corrupted
+// or the node is not properly bootstrapped, this function may return [operation.IncompleteStateError].
+// The reason for not returning [storage.ErrNotFound] directly is to avoid confusion between an often
+// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present./
+//
+// No error returns expected during normal operations.
 func GetChainID(db storage.DB) (flow.ChainID, error) {
 	h, err := GetLatestFinalizedHeader(db)
 	if err != nil {
@@ -1002,9 +1012,19 @@ func GetChainID(db storage.DB) (flow.ChainID, error) {
 	return h.ChainID, nil
 }
 
-// GetLatestFinalizedHeader attempts to retrieve the latest finalized header
-// without going through the storage.Headers interface.
-// No errors expected during normal operations.
+// GetLatestFinalizedHeader retrieves the header of the latest finalized block. This function reads directly
+// from the database, without instantiating high-level storage abstractions or the protocol state struct.
+//
+// During bootstrapping, the latest finalized block and its height are indexed and thereafter the latest
+// finalized height is only updated (but never removed). Hence, for a properly bootstrapped node, this
+// function should _always_ return a proper value.
+//
+// Note: This function should only be called on properly bootstrapped nodes. If the state is corrupted
+// or the node is not properly bootstrapped, this function may return [operation.IncompleteStateError].
+// The reason for not returning [storage.ErrNotFound] directly is to avoid confusion between an often
+// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present.
+//
+// No error returns are expected during normal operations.
 func GetLatestFinalizedHeader(db storage.DB) (*flow.Header, error) {
 	var finalized uint64
 	r := db.Reader()
