@@ -537,7 +537,7 @@ func (t *Transactions) lookupScheduledTransactionResult(
 		return nil, nil, false, status.Errorf(codes.NotFound, "scheduled transaction found in block %s, but %s was provided", scheduledTxBlockID, blockID)
 	}
 
-	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(scheduledTxBlockID, criteria)
 	if err != nil {
 		return nil, nil, false, status.Errorf(codes.NotFound, "failed to get execution result for block: %v", err)
 	}
