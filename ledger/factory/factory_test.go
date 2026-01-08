@@ -137,11 +137,21 @@ func TestRemoteLedgerClient(t *testing.T) {
 			keys := []ledger.Key{
 				ledger.NewKey([]ledger.KeyPart{
 					ledger.NewKeyPart(ledger.KeyPartOwner, []byte("test-owner")),
-					ledger.NewKeyPart(ledger.KeyPartKey, []byte("test-key")),
+					ledger.NewKeyPart(ledger.KeyPartKey, []byte("test-key-non-empty")),
+				}),
+				ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(ledger.KeyPartOwner, []byte("test-owner-1")),
+					ledger.NewKeyPart(ledger.KeyPartKey, []byte("test-key-empty-slice")),
+				}),
+				ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(ledger.KeyPartOwner, []byte("test-owner-2")),
+					ledger.NewKeyPart(ledger.KeyPartKey, []byte("test-key-nil")),
 				}),
 			}
 			values := []ledger.Value{
 				ledger.Value("test-value"),
+				ledger.Value([]byte{}),
+				ledger.Value(nil),
 			}
 
 			localUpdate, err := ledger.NewUpdate(localInitialState, keys, values)
@@ -162,6 +172,16 @@ func TestRemoteLedgerClient(t *testing.T) {
 			// Both should return non-nil trie updates
 			assert.NotNil(t, localTrieUpdate)
 			assert.NotNil(t, remoteTrieUpdate)
+
+			// Verify that both trie updates produce identical CBOR encodings
+			// This ensures that nil vs empty slice distinction is preserved correctly
+			// through the remote ledger's protobuf encoding/decoding cycle
+			localTrieUpdateCBOR := ledger.EncodeTrieUpdateCBOR(localTrieUpdate)
+			remoteTrieUpdateCBOR := ledger.EncodeTrieUpdateCBOR(remoteTrieUpdate)
+			assert.Equal(t, localTrieUpdateCBOR, remoteTrieUpdateCBOR,
+				"Trie updates must produce identical CBOR encodings. "+
+					"Local CBOR length: %d, Remote CBOR length: %d",
+				len(localTrieUpdateCBOR), len(remoteTrieUpdateCBOR))
 
 			// Verify we can read back the value from both
 			localQuery, err := ledger.NewQuerySingleValue(localNewState, keys[0])
