@@ -1170,7 +1170,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	blockID := block.ID()
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1191,9 +1190,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.Require().NoError(err)
 
 	suite.executionResultInfoProvider.
-		On("ExecutionResultInfo", flow.ZeroID, suite.criteria).
-		Return(suite.executionResultInfo, nil).
-		Once()
+		On("ExecutionResultInfo", blockID, suite.criteria).
+		Return(suite.executionResultInfo, nil)
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -1205,7 +1203,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
-	suite.Require().NotNil(resMetadata)
+	suite.Require().Nil(resMetadata)
 
 	// status should be finalized since the sealed Blocks is smaller in height
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
@@ -1313,7 +1311,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
-		suite.Require().NotNil(resMetadata)
+		suite.Require().Nil(resMetadata)
 
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 	})
@@ -1332,7 +1330,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
-			suite.Require().NotNil(resMetadata)
+			suite.Require().Nil(resMetadata)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
 
@@ -1348,7 +1346,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
-			suite.Require().NotNil(resMetadata)
+			suite.Require().Nil(resMetadata)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
 
@@ -1361,7 +1359,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
-			suite.Require().NotNil(resMetadata)
+			suite.Require().Nil(resMetadata)
 			suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
 		})
 	})
@@ -1406,7 +1404,10 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	_, enIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockID, suite.criteria).
+		Return(suite.executionResultInfo, nil).
+		Once()
 
 	suite.state.
 		On("AtBlockID", refBlockID).
@@ -1469,7 +1470,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
-		suite.Require().NotNil(resMetadata)
+		suite.Require().Nil(resMetadata)
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		// assert that no call to an execution node is made
 		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
@@ -1482,7 +1483,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
-		suite.Require().NotNil(resMetadata)
+		suite.Require().Nil(resMetadata)
 		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 	})
 
@@ -1513,7 +1514,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 	result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
-	suite.Require().NotNil(resMetadata)
+	suite.Require().Nil(resMetadata)
 
 	// status should be reported as unknown
 	suite.Assert().Equal(flow.TransactionStatusUnknown, result.Status)
@@ -1916,6 +1917,10 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockID, suite.criteria).
+		Return(suite.executionResultInfo, nil)
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
@@ -1978,6 +1983,10 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockId, suite.criteria).
+		Return(suite.executionResultInfo, nil)
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
@@ -2111,6 +2120,11 @@ func (suite *Suite) TestNodeCommunicator() {
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
 		Return(nil, gobreaker.ErrOpenState)
+
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockId, suite.criteria).
+		Return(suite.executionResultInfo, nil).
+		Once()
 
 	result, resMetadata, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Assert().Nil(result)
