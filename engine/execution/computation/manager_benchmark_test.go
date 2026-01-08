@@ -155,7 +155,7 @@ func benchmarkComputeBlock(
 
 	const chainID = flow.Emulator
 	execCtx := fvm.NewContext(
-		fvm.WithChain(chainID.Chain()),
+		chainID.Chain(),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),

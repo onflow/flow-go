@@ -267,11 +267,7 @@ func ExecutionResultFixture(t *testing.T,
 
 		blocks := new(envMock.Blocks)
 
-		execCtx := fvm.NewContext(
-			fvm.WithLogger(log),
-			fvm.WithChain(chain),
-			fvm.WithBlocks(blocks),
-		)
+		execCtx := fvm.NewContext(chain, fvm.WithLogger(log), fvm.WithBlocks(blocks))
 
 		// create state.View
 		snapshot := exstate.NewLedgerStorageSnapshot(
