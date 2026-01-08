@@ -3,6 +3,7 @@ package ledger
 import (
 	"fmt"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -692,6 +693,39 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 		payloads[i] = payload
 	}
 	return &TrieUpdate{RootHash: rh, Paths: paths, Payloads: payloads}, nil
+}
+
+// EncodeTrieUpdateCBOR encodes a trie update struct using CBOR encoding.
+// CBOR encoding preserves the distinction between nil and []byte{} values in payloads
+// because Payload has MarshalCBOR/UnmarshalCBOR methods that handle this correctly.
+func EncodeTrieUpdateCBOR(t *TrieUpdate) []byte {
+	if t == nil {
+		return []byte{}
+	}
+
+	encoded, err := cbor.Marshal(t)
+	if err != nil {
+		// This should not happen in normal operation
+		panic(fmt.Errorf("failed to encode trie update with CBOR: %w", err))
+	}
+
+	return encoded
+}
+
+// DecodeTrieUpdateCBOR constructs a trie update from a CBOR-encoded byte slice.
+// CBOR encoding preserves the distinction between nil and []byte{} values in payloads
+// because Payload has MarshalCBOR/UnmarshalCBOR methods that handle this correctly.
+func DecodeTrieUpdateCBOR(encodedTrieUpdate []byte) (*TrieUpdate, error) {
+	if len(encodedTrieUpdate) == 0 {
+		return nil, nil
+	}
+
+	var tu TrieUpdate
+	if err := cbor.Unmarshal(encodedTrieUpdate, &tu); err != nil {
+		return nil, fmt.Errorf("error decoding trie update with CBOR: %w", err)
+	}
+
+	return &tu, nil
 }
 
 // EncodeTrieProof encodes the content of a proof into a byte slice

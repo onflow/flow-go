@@ -196,8 +196,8 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 	}
 	copy(newState[:], resp.NewState.Hash)
 
-	// Decode trie update if present
-	trieUpdate, err := ledger.DecodeTrieUpdate(resp.TrieUpdate)
+	// Decode trie update if present using CBOR decoding to preserve nil vs []byte{} distinction
+	trieUpdate, err := ledger.DecodeTrieUpdateCBOR(resp.TrieUpdate)
 	if err != nil {
 		return ledger.DummyState, nil, fmt.Errorf("failed to decode trie update: %w", err)
 	}
