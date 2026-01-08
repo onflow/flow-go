@@ -1227,7 +1227,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockId:      blockId[:],
 				CollectionId: collectionIdNegative[:],
 			}
-			
+
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)
