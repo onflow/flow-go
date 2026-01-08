@@ -14,10 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const (
-	legacyAccountPublicKeyRegisterKeyPrefix = "public_key_"
-)
-
 func validateAccountPublicKey(
 	address common.Address,
 	accountRegisters *registers.AccountRegisters,
@@ -47,9 +43,7 @@ func validateAccountPublicKey(
 	batchPublicKeyRegisters := make(map[string][]byte)
 
 	err = accountRegisters.ForEach(func(_ string, key string, value []byte) error {
-		if strings.HasPrefix(key, legacyAccountPublicKeyRegisterKeyPrefix) {
-			return fmt.Errorf("found legacy account public key register %s", key)
-		} else if key == flow.AccountPublicKey0RegisterKey {
+		if key == flow.AccountPublicKey0RegisterKey {
 			foundAccountPublicKey0 = true
 		} else if strings.HasPrefix(key, flow.BatchPublicKeyRegisterKeyPrefix) {
 			batchPublicKeyRegisters[key] = value
