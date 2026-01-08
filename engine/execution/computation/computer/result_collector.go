@@ -11,7 +11,6 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -72,8 +71,7 @@ type resultCollector struct {
 
 	parentBlockExecutionResultID flow.Identifier
 
-	result    *execution.ComputationResult
-	consumers []result.ExecutedCollectionConsumer
+	result *execution.ComputationResult
 
 	spockSignatures []crypto.Signature
 
@@ -99,7 +97,6 @@ func newResultCollector(
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	inputChannelSize int,
-	consumers []result.ExecutedCollectionConsumer,
 	previousBlockSnapshot snapshot.StorageSnapshot,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
@@ -117,7 +114,6 @@ func newResultCollector(
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
-		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
 		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
@@ -208,13 +204,6 @@ func (collector *resultCollector) commitCollection(
 	collector.currentCollectionStartTime = time.Now()
 	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
 	collector.currentCollectionStats = module.CollectionExecutionResultStats{}
-
-	for _, consumer := range collector.consumers {
-		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
-		if err != nil {
-			return fmt.Errorf("consumer failed: %w", err)
-		}
-	}
 
 	return nil
 }
