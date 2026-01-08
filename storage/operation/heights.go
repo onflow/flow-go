@@ -6,6 +6,7 @@ import (
 
 	"github.com/jordanschalm/lockctx"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -46,8 +47,11 @@ func RetrieveFinalizedHeight(r storage.Reader, height *uint64) error {
 	var h uint64
 	err := RetrieveByKey(r, MakePrefix(codeFinalizedHeight), &h)
 	if err != nil {
-		// mask the lower-level error to prevent confusion with the often benign `storage.ErrNotFound`:
-		return fmt.Errorf("latest finalized height could not be read, which should never happen for bootstrapped nodes: %w", IncompleteStateError)
+		if errors.Is(err, storage.ErrNotFound) {
+			// mask the lower-level error to prevent confusion with the often benign `storage.ErrNotFound`:
+			return fmt.Errorf("latest finalized height could not be read, which should never happen for bootstrapped nodes: %w", IncompleteStateError)
+		}
+		return irrecoverable.NewExceptionf("latest finalized height could not be read, which should never happen for bootstrapped nodes: %w", err)
 	}
 	*height = h
 	return nil
@@ -79,8 +83,11 @@ func RetrieveSealedHeight(r storage.Reader, height *uint64) error {
 	var h uint64
 	err := RetrieveByKey(r, MakePrefix(codeSealedHeight), &h)
 	if err != nil {
-		// mask the lower-level error to prevent confusion with the often benign `storage.ErrNotFound`:
-		return fmt.Errorf("latest sealed height could not be read, which should never happen for bootstrapped nodes: %w", IncompleteStateError)
+		if errors.Is(err, storage.ErrNotFound) {
+			// mask the lower-level error to prevent confusion with the often benign `storage.ErrNotFound`:
+			return fmt.Errorf("latest sealed height could not be read, which should never happen for bootstrapped nodes: %w", IncompleteStateError)
+		}
+		return irrecoverable.NewExceptionf("latest sealed height could not be read, which should never happen for bootstrapped nodes: %w", err)
 	}
 	*height = h
 	return nil
