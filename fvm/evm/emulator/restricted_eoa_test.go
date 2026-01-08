@@ -9,27 +9,31 @@ import (
 )
 
 func TestIsRestrictedEOA(t *testing.T) {
+	config := NewConfig(
+		WithRestrictedEOAs(RestrictedEOAs),
+	)
+
 	t.Run("restricted address 1 should return true", func(t *testing.T) {
 		addr := gethCommon.HexToAddress("0x2e7C4b71397f10c93dC0C2ba6f8f179A47F994e1")
-		result := isRestrictedEOA(addr)
+		result := config.IsRestrictedEOA(addr)
 		assert.True(t, result, "first restricted address should be detected as restricted")
 	})
 
 	t.Run("restricted address 2 should return true", func(t *testing.T) {
 		addr := gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6")
-		result := isRestrictedEOA(addr)
+		result := config.IsRestrictedEOA(addr)
 		assert.True(t, result, "second restricted address should be detected as restricted")
 	})
 
 	t.Run("non-restricted address should return false", func(t *testing.T) {
 		addr := gethCommon.HexToAddress("0x1234567890123456789012345678901234567890")
-		result := isRestrictedEOA(addr)
+		result := config.IsRestrictedEOA(addr)
 		assert.False(t, result, "non-restricted address should return false")
 	})
 
 	t.Run("empty address should return false", func(t *testing.T) {
 		addr := gethCommon.Address{}
-		result := isRestrictedEOA(addr)
+		result := config.IsRestrictedEOA(addr)
 		assert.False(t, result, "empty address should return false")
 	})
 
@@ -40,15 +44,15 @@ func TestIsRestrictedEOA(t *testing.T) {
 		addr2 := gethCommon.HexToAddress("0x2e7c4b71397f10c93dc0c2ba6f8f179a47f994e1")
 		require.Equal(t, addr1, addr2, "addresses should be equal regardless of case")
 
-		result1 := isRestrictedEOA(addr1)
-		result2 := isRestrictedEOA(addr2)
+		result1 := config.IsRestrictedEOA(addr1)
+		result2 := config.IsRestrictedEOA(addr2)
 		assert.Equal(t, result1, result2, "results should be the same for same address")
 		assert.True(t, result1, "both should be detected as restricted")
 	})
 
 	t.Run("all addresses in restrictedEOAs list should be detected", func(t *testing.T) {
-		for _, addr := range restrictedEOAs {
-			result := isRestrictedEOA(addr)
+		for _, addr := range RestrictedEOAs {
+			result := config.IsRestrictedEOA(addr)
 			assert.True(t, result, "address %s should be detected as restricted", addr.Hex())
 		}
 	})
@@ -65,7 +69,7 @@ func TestIsRestrictedEOA(t *testing.T) {
 		for _, addr := range testAddresses {
 			// Skip if the address is actually in the restricted list
 			isInList := false
-			for _, restrictedAddr := range restrictedEOAs {
+			for _, restrictedAddr := range RestrictedEOAs {
 				if addr == restrictedAddr {
 					isInList = true
 					break
@@ -75,7 +79,7 @@ func TestIsRestrictedEOA(t *testing.T) {
 				continue
 			}
 
-			result := isRestrictedEOA(addr)
+			result := config.IsRestrictedEOA(addr)
 			assert.False(t, result, "address %s should not be detected as restricted", addr.Hex())
 		}
 	})
