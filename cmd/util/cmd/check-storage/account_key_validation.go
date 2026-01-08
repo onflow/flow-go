@@ -1,4 +1,4 @@
-package migrations
+package check_storage
 
 import (
 	"fmt"
@@ -10,10 +10,15 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
+	accountkeymetadata "github.com/onflow/flow-go/fvm/environment/account-key-metadata"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func ValidateAccountPublicKeyV4(
+const (
+	legacyAccountPublicKeyRegisterKeyPrefix = "public_key_"
+)
+
+func validateAccountPublicKey(
 	address common.Address,
 	accountRegisters *registers.AccountRegisters,
 ) error {
@@ -23,7 +28,7 @@ func ValidateAccountPublicKeyV4(
 	}
 
 	// Validate account status register
-	accountPublicKeyCount, storedKeyCount, deduplicated, err := validateAccountStatusV4Register(address, accountRegisters)
+	accountPublicKeyCount, storedKeyCount, deduplicated, err := validateAccountStatusRegister(address, accountRegisters)
 	if err != nil {
 		return err
 	}
@@ -85,7 +90,7 @@ func ValidateAccountPublicKeyV4(
 	return validateBatchPublicKeyRegisters(storedKeyCount, batchPublicKeyRegisters)
 }
 
-func validateAccountStatusV4Register(
+func validateAccountStatusRegister(
 	address common.Address,
 	accountRegisters *registers.AccountRegisters,
 ) (
@@ -131,7 +136,7 @@ func validateAccountStatusV4Register(
 		return
 	}
 
-	weightAndRevokedStatus, startKeyIndexForMapping, accountPublicKeyMappings, startKeyIndexForDigests, digests, err := decodeAccountStatusKeyMetadata(
+	weightAndRevokedStatus, startKeyIndexForMapping, accountPublicKeyMappings, startKeyIndexForDigests, digests, err := accountkeymetadata.DecodeKeyMetadata(
 		encodedAccountStatus[environment.AccountStatusMinSizeV4:],
 		deduplicated,
 	)
@@ -214,7 +219,7 @@ func validateBatchPublicKeyRegisters(
 			return fmt.Errorf("failed to find batch public key %s", key)
 		}
 
-		encodedKeys, err := decodeBatchPublicKey(encoded)
+		encodedKeys, err := environment.DecodeBatchPublicKeys(encoded)
 		if err != nil {
 			return fmt.Errorf("failed to decode batch public key register %s, %x: %s", key, encoded, err)
 		}
@@ -245,7 +250,7 @@ func validateBatchPublicKeyRegisters(
 			}
 		}
 
-		if batchCount < maxPublicKeyCountInBatch && batchNum != len(batchPublicKeyRegisters)-1 {
+		if batchCount < environment.MaxPublicKeyCountInBatch && batchNum != len(batchPublicKeyRegisters)-1 {
 			return fmt.Errorf("batch public key %s has less than max count in a batch: got %d keys, %d batches in total", key, batchCount, len(batchPublicKeyRegisters))
 		}
 	}
@@ -260,7 +265,7 @@ func validateBatchPublicKeyRegisters(
 func validateKeyMetadata(
 	deduplicated bool,
 	accountPublicKeyCount uint32,
-	weightAndRevokedStatus []accountPublicKeyWeightAndRevokedStatus,
+	weightAndRevokedStatus []accountkeymetadata.WeightAndRevokedStatus,
 	startKeyIndexForDigests uint32,
 	digests []uint64,
 	startKeyIndexForMapping uint32,
@@ -270,8 +275,8 @@ func validateKeyMetadata(
 		return fmt.Errorf("found %d weight and revoked status, expect %d", len(weightAndRevokedStatus), accountPublicKeyCount-1)
 	}
 
-	if len(digests) > maxStoredDigests {
-		return fmt.Errorf("found %d digests, expect max %d digests", len(digests), maxStoredDigests)
+	if len(digests) > environment.MaxStoredDigests {
+		return fmt.Errorf("found %d digests, expect max %d digests", len(digests), environment.MaxStoredDigests)
 	}
 
 	if len(digests) > int(accountPublicKeyCount) {
