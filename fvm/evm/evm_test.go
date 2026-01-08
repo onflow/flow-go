@@ -354,12 +354,14 @@ func TestEVMRun(t *testing.T) {
 				// This is only a test EOA, used during tests
 				// address: 0xad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4
 				restrictedEOA := GetTestEOAAccount(t, RestrictedEOATestAccount1KeyHex)
+				restrictedEOAs := make([]common.Address, len(emulator.RestrictedEOAs))
+				copy(restrictedEOAs, emulator.RestrictedEOAs)
 				emulator.RestrictedEOAs = append(
 					emulator.RestrictedEOAs,
 					restrictedEOA.Address().ToCommon(),
 				)
 				defer func() {
-					emulator.RestrictedEOAs = emulator.RestrictedEOAs[:len(emulator.RestrictedEOAs)-1]
+					emulator.RestrictedEOAs = restrictedEOAs
 				}()
 
 				num := int64(12)
@@ -1359,12 +1361,14 @@ func TestEVMBatchRun(t *testing.T) {
 				// This is only a test EOA, used during tests
 				// address: 0xad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4
 				restrictedEOA := GetTestEOAAccount(t, RestrictedEOATestAccount1KeyHex)
+				restrictedEOAs := make([]common.Address, len(emulator.RestrictedEOAs))
+				copy(restrictedEOAs, emulator.RestrictedEOAs)
 				emulator.RestrictedEOAs = append(
 					emulator.RestrictedEOAs,
 					restrictedEOA.Address().ToCommon(),
 				)
 				defer func() {
-					emulator.RestrictedEOAs = emulator.RestrictedEOAs[:len(emulator.RestrictedEOAs)-1]
+					emulator.RestrictedEOAs = restrictedEOAs
 				}()
 
 				batchCount := 6
