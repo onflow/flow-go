@@ -15,7 +15,6 @@ import (
 
 	"github.com/docker/go-units"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/ledger"
@@ -439,7 +438,7 @@ func StoreCheckpointV5(dir string, fileName string, logger zerolog.Logger, tries
 		// Index 0 is a special case with nil node.
 		traversedSubtrieNodes[nil] = 0
 
-		logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, log.Logger)
+		logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, logger)
 		for _, root := range subTrieRoot {
 			// Empty trie is always added to forest as starting point and
 			// empty trie's root is nil. It remains in the forest until evicted
