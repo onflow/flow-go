@@ -291,7 +291,10 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.refChainFinalizedHeight = mainChainFinalizedHeader.Height
 	ctx.refChainFinalizedID = mainChainFinalizedHeader.ID()
 
-	// If we don't have the epoch boundaries (first/final height ON MAIN CHAIN) cached, try retrieve and cache them
+	// We can't specify the height of the epoch's first consensus block (height ON MAIN CHAIN) during which this cluster is
+	// active, because the builder is typically _instantiated_ before the epoch starts. However, the builder should only be
+	// called once the epoch has started, i.e. consensus has finalized the first block in the epoch. Consequently, we
+	// retrieve the epoch's first height on the first call of the builder, and cache it for future calls.
 	r := b.db.Reader()
 	if b.epochFirstHeight != nil {
 		ctx.refEpochFirstHeight = *b.epochFirstHeight
@@ -324,6 +327,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 
 	err = operation.RetrieveEpochLastHeight(r, b.clusterEpoch, &refEpochFinalHeight)
 	if err != nil {
+		// If the epoch has not yet ended, the final height is not available
 		if errors.Is(err, storage.ErrNotFound) {
 			return ctx, nil
 		}
