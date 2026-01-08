@@ -88,6 +88,26 @@ func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]flow.Slash
 	return r0, r1
 }
 
+// ByView provides a mock function with given fields: view
+func (_m *PendingBlockBuffer) ByView(view uint64) []flow.Slashable[*flow.GenericProposal[flow.Payload]] {
+	ret := _m.Called(view)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByView")
+	}
+
+	var r0 []flow.Slashable[*flow.GenericProposal[flow.Payload]]
+	if rf, ok := ret.Get(0).(func(uint64) []flow.Slashable[*flow.GenericProposal[flow.Payload]]); ok {
+		r0 = rf(view)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.Slashable[*flow.GenericProposal[flow.Payload]])
+		}
+	}
+
+	return r0
+}
+
 // PruneByView provides a mock function with given fields: view
 func (_m *PendingBlockBuffer) PruneByView(view uint64) error {
 	ret := _m.Called(view)
