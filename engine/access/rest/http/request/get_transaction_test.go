@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
@@ -31,17 +32,16 @@ func TestGetTransactionResult_InvalidParse(t *testing.T) {
 		includeExecutorMetadata string
 		err                     string
 	}{
-		// TODO: check this test case
-		//{
-		//	"parse with invalid tx ID",
-		//	"invalid-id",
-		//	"",
-		//	"",
-		//	"2",
-		//	validRequiredExecutorsIds,
-		//	"false",
-		//	"invalid ID format",
-		//},
+		{
+			"parse with invalid tx ID",
+			invalidID,
+			"",
+			"",
+			"2",
+			validRequiredExecutorsIds,
+			"false",
+			"invalid ID format",
+		},
 		{
 			"parse with invalid block ID",
 			validTxID,
@@ -115,6 +115,9 @@ func TestGetTransactionResult_InvalidParse(t *testing.T) {
 			test.includeExecutorMetadata,
 		)
 		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req = mux.SetURLVars(req, map[string]string{
+			idQuery: test.txID,
+		})
 		r := common.Decorate(req, flow.Testnet.Chain())
 		getTransactionResult, err := parseGetTransactionResult(
 			r,
@@ -142,6 +145,9 @@ func TestGetTransactionResult_ValidParse(t *testing.T) {
 	includeExecutorMetadataStr := "true"
 	url := transactionResultURL(txID.String(), blockID.String(), collectionID.String(), agreeingExecutorsCountStr, validAgreeingExecutorsIdsStr, includeExecutorMetadataStr)
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	req = mux.SetURLVars(req, map[string]string{
+		idQuery: txID.String(),
+	})
 	r := common.Decorate(req, flow.Testnet.Chain())
 
 	getTransactionResult, err := parseGetTransactionResult(
@@ -152,9 +158,7 @@ func TestGetTransactionResult_ValidParse(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, getTransactionResult)
-
-	// TODO: check
-	//require.Equal(t, getTransactionResult.GetByIDRequest.ID, txID)
+	require.Equal(t, getTransactionResult.GetByIDRequest.ID, txID)
 	require.Equal(t, getTransactionResult.TransactionOptionals.BlockID, blockID)
 	require.Equal(t, getTransactionResult.TransactionOptionals.CollectionID, collectionID)
 	require.Equal(t, getTransactionResult.ExecutionState.AgreeingExecutorsCount, agreeingExecutorsCount)
