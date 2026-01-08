@@ -111,3 +111,53 @@ func TestFindDuplicateKey(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeDigests(t *testing.T) {
+	testcases := []struct {
+		name           string
+		encodedDigests []byte
+		digests        []uint64
+		hasError       bool
+	}{
+		{
+			name:           "nil encoded digests",
+			encodedDigests: nil,
+			digests:        []uint64{},
+		},
+		{
+			name:           "empty encoded digests",
+			encodedDigests: []byte{},
+			digests:        []uint64{},
+		},
+		{
+			name:           "truncated encoded digests",
+			encodedDigests: []byte{0},
+			hasError:       true,
+		},
+		{
+			name:           "1 digests",
+			encodedDigests: []byte{0, 0, 0, 0, 0, 0, 0, 1},
+			digests:        []uint64{1},
+		},
+		{
+			name: "2 digests",
+			encodedDigests: []byte{
+				0, 0, 0, 0, 0, 0, 0, 1,
+				0, 0, 0, 0, 0, 0, 0, 2,
+			},
+			digests: []uint64{1, 2},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			decoded, err := DecodeDigests(tc.encodedDigests)
+			if tc.hasError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.digests, decoded)
+		})
+	}
+}
