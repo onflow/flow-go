@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
+
 	"github.com/onflow/flow-go/fvm/environment"
 )
 
