@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -34,7 +35,7 @@ type mockedCollectorWrapper struct {
 }
 
 type AssignmentCollectorTreeSuite struct {
-	approvals.BaseAssignmentCollectorTestSuite
+	testutil.BaseAssignmentCollectorTestSuite
 
 	collectorTree    *approvals.AssignmentCollectorTree
 	factoryMethod    approvals.NewCollectorFactoryMethod

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -40,7 +41,7 @@ func TestApprovalProcessingCore(t *testing.T) {
 const RequiredApprovalsForSealConstructionTestingValue = 1
 
 type ApprovalProcessingCoreTestSuite struct {
-	approvals.BaseAssignmentCollectorTestSuite
+	testutil.BaseAssignmentCollectorTestSuite
 
 	sealsDB             *storage.Seals
 	finalizedRootHeader *flow.Header

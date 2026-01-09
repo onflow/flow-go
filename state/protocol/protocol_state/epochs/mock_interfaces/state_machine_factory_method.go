@@ -1,4 +1,4 @@
-package mockinterfaces
+package mock_interfaces
 
 import (
 	"github.com/onflow/flow-go/model/flow"
