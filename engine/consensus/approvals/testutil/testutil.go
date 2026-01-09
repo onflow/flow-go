@@ -1,8 +1,9 @@
-package approvals
+package testutil
 
 import (
 	"github.com/gammazero/workerpool"
 	"github.com/onflow/crypto/hash"
+	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -95,7 +96,7 @@ type BaseAssignmentCollectorTestSuite struct {
 	Conduit           *mocknetwork.Conduit
 	FinalizedAtHeight map[uint64]*flow.Header
 	IdentitiesCache   map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	RequestTracker    *RequestTracker
+	RequestTracker    *approvals.RequestTracker
 }
 
 func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
@@ -108,7 +109,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.Conduit = &mocknetwork.Conduit{}
 	s.Headers = &storage.Headers{}
 
-	s.RequestTracker = NewRequestTracker(s.Headers, 1, 3)
+	s.RequestTracker = approvals.NewRequestTracker(s.Headers, 1, 3)
 
 	s.FinalizedAtHeight = make(map[uint64]*flow.Header)
 	s.FinalizedAtHeight[s.ParentBlock.Height] = s.ParentBlock
