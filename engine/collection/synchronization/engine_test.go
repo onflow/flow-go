@@ -41,6 +41,7 @@ type SyncSuite struct {
 	myID         flow.Identifier
 	participants flow.IdentityList
 	head         *flow.Header
+	qc           *flow.QuorumCertificate
 	heights      map[uint64]*clustermodel.Proposal
 	blockIDs     map[flow.Identifier]*clustermodel.Proposal
 	net          *mocknetwork.EngineRegistry
@@ -64,6 +65,8 @@ func (ss *SyncSuite) SetupTest() {
 	// generate a header for the final state
 	header := unittest.BlockHeaderFixture()
 	ss.head = header
+	// generate a QC certifying the header
+	ss.qc = unittest.CertifyBlock(ss.head)
 
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*clustermodel.Proposal)
@@ -112,6 +115,12 @@ func (ss *SyncSuite) SetupTest() {
 	ss.snapshot.On("Head").Return(
 		func() *flow.Header {
 			return ss.head
+		},
+		nil,
+	)
+	ss.snapshot.On("QuorumCertificate").Return(
+		func() *flow.QuorumCertificate {
+			return ss.qc
 		},
 		nil,
 	)
@@ -187,8 +196,10 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.SyncResponse)
-			assert.Equal(ss.T(), ss.head.Height, res.Header.Height, "response should contain head height")
+			assert.Equal(ss.T(), ss.head, res.Header, "response should contain header")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			assert.Equal(ss.T(), ss.qc, res.CertifyingQC, "response should contain QC")
+			assert.Equal(ss.T(), res.Header.ID(), res.CertifyingQC.BlockID, "response QC should correspond to response Header")
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},

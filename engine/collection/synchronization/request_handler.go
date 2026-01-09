@@ -171,7 +171,8 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow.SyncRequest) error {
-	final, err := r.state.Final().Head()
+	finalizedState := r.state.Final()
+	final, err := finalizedState.Head()
 	if err != nil {
 		return fmt.Errorf("could not get last finalized header: %w", err)
 	}
@@ -186,7 +187,7 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow
 		return nil
 	}
 
-	qc, err := r.state.Final().QuorumCertificate()
+	qc, err := finalizedState.QuorumCertificate()
 	if err != nil {
 		return fmt.Errorf("could not get QC for last finalized header: %w", err)
 	}

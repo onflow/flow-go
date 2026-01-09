@@ -81,13 +81,13 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
 		// possible here.
 	}
+	// at least one child exists (pendingIDs[0])
 	var child flow.Header
 	err = operation.RetrieveHeader(s.state.db.Reader(), pendingIDs[0], &child)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve header for unfinalized child %v: %w", pendingIDs[0], err)
 	}
 	return child.ParentQC(), nil
-
 }
 
 // Pending returns the IDs of all collections descending from the snapshot's head collection.

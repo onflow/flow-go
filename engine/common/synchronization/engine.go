@@ -117,7 +117,7 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
-	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, finalizedHeaderCache, blocks, core, true)
+	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, state, finalizedHeaderCache, blocks, core, true)
 
 	// set up worker routines
 	builder := component.NewComponentManagerBuilder().

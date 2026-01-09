@@ -84,8 +84,10 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.SyncResponse)
-			assert.Equal(ss.T(), ss.head, res.Header, "response should contain head")
+			assert.Equal(ss.T(), ss.head, res.Header, "response should contain header")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			assert.Equal(ss.T(), ss.qc, res.CertifyingQC, "response should contain QC")
+			assert.Equal(ss.T(), ss.head.ID(), res.CertifyingQC.BlockID, "response QC should correspond to response Header")
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},
@@ -116,6 +118,27 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 
 	// the height should be handled
 	ss.core.On("HandleHeight", ss.head, res.Header.Height)
+	ss.e.onSyncResponse(originID, res)
+	ss.core.AssertExpectations(ss.T())
+}
+
+func (ss *SyncSuite) TestInvalidSyncResponse() {
+	ss.T().Skip() // TODO(8174) - implement this test
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
+
+	height, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate height")
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
+
+	// generate origin ID and response message
+	originID := unittest.IdentifierFixture()
+	res := &flow.SyncResponse{
+		Nonce:        nonce,
+		Header:       header,
+		CertifyingQC: nil,
+	}
+	// TODO(8174): the response should be rejected and/or a violation should be logged
 	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
