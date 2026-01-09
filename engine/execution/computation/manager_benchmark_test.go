@@ -162,6 +162,7 @@ func benchmarkComputeBlock(
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
+				chainID.Chain(),
 				runtime.Config{},
 			)),
 	)
@@ -203,7 +204,6 @@ func benchmarkComputeBlock(
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		maxConcurrency)
 	require.NoError(b, err)

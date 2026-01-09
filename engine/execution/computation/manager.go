@@ -118,7 +118,6 @@ func New(
 		committer,
 		me,
 		executionDataProvider,
-		nil, // TODO(ramtin): update me with proper consumers
 		protoState,
 		params.MaxConcurrency,
 	)
@@ -229,6 +228,7 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCall
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
+				chainID.Chain(),
 				runtime.Config{},
 			),
 		),

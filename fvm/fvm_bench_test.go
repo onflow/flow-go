@@ -167,6 +167,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
+				chain,
 				runtime.Config{},
 			),
 		),
@@ -236,7 +237,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		ledgerCommitter,
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		1) // We're interested in fvm's serial execution time
 	require.NoError(tb, err)

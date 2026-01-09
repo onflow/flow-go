@@ -135,7 +135,7 @@ func TestDecodeDigests(t *testing.T) {
 			hasError:       true,
 		},
 		{
-			name:           "1 digests",
+			name:           "1 digest",
 			encodedDigests: []byte{0, 0, 0, 0, 0, 0, 0, 1},
 			digests:        []uint64{1},
 		},
