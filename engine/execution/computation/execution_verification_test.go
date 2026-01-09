@@ -817,7 +817,6 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		ledgerCommiter,
 		me,
 		prov,
-		nil,
 		stateForRandomSource,
 		testVerifyMaxConcurrency)
 	require.NoError(t, err)

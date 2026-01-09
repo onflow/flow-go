@@ -149,7 +149,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
@@ -858,7 +857,6 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)

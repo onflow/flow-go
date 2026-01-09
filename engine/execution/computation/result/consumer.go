@@ -39,12 +39,6 @@ type ExecutedCollection interface {
 	ExecutionSnapshot() *snapshot.ExecutionSnapshot
 }
 
-// ExecutedCollectionConsumer consumes ExecutedCollections
-type ExecutedCollectionConsumer interface {
-	module.ReadyDoneAware
-	OnExecutedCollection(res ExecutedCollection) error
-}
-
 // AttestedCollection holds results of a collection attestation
 type AttestedCollection interface {
 	ExecutedCollection
