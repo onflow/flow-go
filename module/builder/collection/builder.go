@@ -23,6 +23,13 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+var (
+	// ErrNotEnoughHistory represents a state in which the node cannot propose a regular collection
+	// because it does not have enough blocks of history (to deduplicate transactions that may have
+	// been included in previous finalized collections).
+	ErrNotEnoughHistory = errors.New("not enough history")
+)
+
 // Builder is the builder for collection block payloads. Upon providing a
 // payload hash, it also memorizes the payload contents.
 //
@@ -190,17 +197,24 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnFinalizedLookup)
 	err = b.populateFinalizedAncestryLookup(lctx, buildCtx)
 	span.End()
-	if err != nil {
-		return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
-	}
 
-	// STEP 2: build a payload of valid transactions, while at the same
-	// time figuring out the correct reference block ID for the collection.
-	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreatePayload)
-	payload, priorityTransactionsCount, err := b.buildPayload(buildCtx)
-	span.End()
+	var payload *cluster.Payload
+	var priorityTransactionsCount uint
 	if err != nil {
-		return nil, fmt.Errorf("could not build payload: %w", err)
+		if !errors.Is(err, ErrNotEnoughHistory) {
+			return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
+		}
+		// STEP 2b: if we don't have enough history to propose a valid regular collection, build an empty payload
+		payload = cluster.NewEmptyPayload(buildCtx.highestPossibleReferenceBlockID())
+	} else {
+		// STEP 2: build a payload of valid transactions, while at the same
+		// time figuring out the correct reference block ID for the collection.
+		span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreatePayload)
+		payload, priorityTransactionsCount, err = b.buildPayload(buildCtx)
+		span.End()
+		if err != nil {
+			return nil, fmt.Errorf("could not build payload: %w", err)
+		}
 	}
 
 	// STEP 3: we have a set of transactions that are valid to include on this fork.
@@ -381,6 +395,9 @@ func (b *Builder) populateUnfinalizedAncestryLookup(ctx *blockBuildContext) erro
 // The traversal is structured so that we check every collection whose reference
 // block height translates to a possible constituent transaction which could also
 // appear in the collection we are building.
+//
+// Error returns:
+// - [ErrNotEnoughHistory] if the node does not have enough history to definitively avoid duplicate transactions
 func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *blockBuildContext) error {
 	minRefHeight := ctx.lowestPossibleReferenceBlockHeight()
 	maxRefHeight := ctx.highestPossibleReferenceBlockHeight()
@@ -409,6 +426,10 @@ func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *block
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
 	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight, ctx)
+	refHeightAvailable := b.protoState.Params().FinalizedRoot().Height
+	if start < refHeightAvailable {
+		return fmt.Errorf("cannot deduplicate transactions: need heights from %d (bootstrapped from %d): %w", start, refHeightAvailable, ErrNotEnoughHistory)
+	}
 	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, b.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
