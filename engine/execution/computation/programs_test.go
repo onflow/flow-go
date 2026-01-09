@@ -151,7 +151,6 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
@@ -264,7 +263,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)

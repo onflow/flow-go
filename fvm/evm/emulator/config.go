@@ -2,6 +2,7 @@ package emulator
 
 import (
 	"math/big"
+	"slices"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
@@ -26,6 +27,12 @@ var (
 	TestnetOsakaActivation    = uint64(1763575200) // Wednesday, November 19, 2025 18:00:00 GMT+0000
 	MainnetOsakaActivation    = uint64(1764784800) // Wednesday, December 03, 2025 18:00:00 GMT+0000
 )
+
+// List of EOAs with restricted access to EVM, due to malicious activity.
+var RestrictedEOAs = []gethCommon.Address{
+	gethCommon.HexToAddress("0x2e7C4b71397f10c93dC0C2ba6f8f179A47F994e1"),
+	gethCommon.HexToAddress("0x9D9247F5C3F3B78F7EE2C480B9CDaB91393Bf4D6"),
+}
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
 // needed during executing a transaction.
@@ -52,6 +59,9 @@ type Config struct {
 	// for the current chain rules, as well as any extra precompiled
 	// contracts, such as Cadence Arch etc
 	PrecompiledContracts gethVM.PrecompiledContracts
+	// RestrictedEOAs holds a list of EOAs with restricted access to EVM,
+	// due to malicious activity
+	RestrictedEOAs []gethCommon.Address
 }
 
 // ChainRules returns the chain rules
@@ -61,6 +71,11 @@ func (c *Config) ChainRules() gethParams.Rules {
 		true, // we are already on Merge
 		c.BlockContext.Time,
 	)
+}
+
+// IsRestrictedEOA checks if the given address is in the restricted EOAs list
+func (c *Config) IsRestrictedEOA(addr gethCommon.Address) bool {
+	return slices.Contains(c.RestrictedEOAs, addr)
 }
 
 // PreviewNetChainConfig is the chain config used by the previewnet
@@ -288,6 +303,15 @@ func WithBlockTxCountSoFar(txCount uint) Option {
 func WithBlockTotalGasUsedSoFar(gasUsed uint64) Option {
 	return func(c *Config) *Config {
 		c.BlockTotalGasUsedSoFar = gasUsed
+		return c
+	}
+}
+
+// WithRestrictedEOAs sets the list of EOAs with restricted access to EVM,
+// due to malicious activity.
+func WithRestrictedEOAs(restrictedEOAs []gethCommon.Address) Option {
+	return func(c *Config) *Config {
+		c.RestrictedEOAs = restrictedEOAs
 		return c
 	}
 }

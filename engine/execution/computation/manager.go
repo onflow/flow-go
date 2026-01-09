@@ -118,7 +118,6 @@ func New(
 		committer,
 		me,
 		executionDataProvider,
-		nil, // TODO(ramtin): update me with proper consumers
 		protoState,
 		params.MaxConcurrency,
 	)

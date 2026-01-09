@@ -203,7 +203,6 @@ func benchmarkComputeBlock(
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		maxConcurrency)
 	require.NoError(b, err)
