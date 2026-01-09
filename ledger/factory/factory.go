@@ -47,7 +47,7 @@ func NewLedger(config Config) (*Result, error) {
 
 	// Check if remote ledger service is configured
 	if config.LedgerServiceAddr != "" {
-		// Use remote ledger service
+		// the remote ledger service is for execution to connect to a remote ledger service
 		config.Logger.Info().
 			Str("ledger_service_addr", config.LedgerServiceAddr).
 			Msg("using remote ledger service")
@@ -57,7 +57,10 @@ func NewLedger(config Config) (*Result, error) {
 			config.Logger.With().Str("subcomponent", "ledger").Logger(),
 		)
 	} else {
-		// Use local ledger with WAL
+		// the local ledger service is used when:
+		// 1. execution node is running ledger in local
+		// 2. the standalone ledger service is running it in local
+
 		config.Logger.Info().
 			Str("triedir", config.Triedir).
 			Msg("using local ledger")

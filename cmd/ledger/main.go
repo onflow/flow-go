@@ -36,7 +36,7 @@ func main() {
 	flag.Parse()
 
 	if *walDir == "" {
-		fmt.Fprintf(os.Stderr, "error: -wal-dir is required\n")
+		fmt.Fprintf(os.Stderr, "error: --wal-dir is required\n")
 		os.Exit(1)
 	}
 
@@ -60,6 +60,7 @@ func main() {
 		Msg("starting ledger service")
 
 	// Create ledger using factory
+	// TODO(leo): to use real metrics collector
 	metricsCollector := &metrics.NoopCollector{}
 	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		Triedir:                              *walDir,
