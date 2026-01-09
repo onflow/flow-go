@@ -20,7 +20,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *accessmodel.Transacti
 	// if transaction result is provided then add that to the response, else add the result link to the expandable
 	t.Expandable = &TransactionExpandable{}
 	if txr != nil {
-		txResult := NewTransactionResult(txr, tx.ID(), link, nil, false) // TODO(Uliana): Should tx result in tx transaction include the metadata
+		txResult := NewTransactionResult(txr, tx.ID(), link, nil, false)
 		t.Result = &txResult
 	} else {
 		resultLink, _ := link.TransactionResultLink(tx.ID())

@@ -43,8 +43,7 @@ func NewTransactionOptionals(r *common.Request) (*TransactionOptionals, error) {
 type GetTransaction struct {
 	GetByIDRequest
 	TransactionOptionals
-	ExpandsResult bool
-	// TODO(Uliana): add this to the openapi
+	ExpandsResult  bool
 	ExecutionState models.ExecutionStateQuery
 }
 
@@ -103,7 +102,6 @@ func parseGetTransactionRequest(
 type GetTransactionResult struct {
 	GetByIDRequest
 	TransactionOptionals
-	// TODO(Uliana): add this to the openapi
 	ExecutionState models.ExecutionStateQuery
 }
 
