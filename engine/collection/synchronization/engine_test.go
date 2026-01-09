@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -608,18 +607,14 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	ss.metrics.AssertExpectations(ss.T())
 }
 
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// TestProcessUnsupportedMessageType tests that Process correctly handles a case where invalid message type
 // was submitted from network layer.
 func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
 	invalidEvent := uint64(42)
-	engines := []netint.Engine{ss.e, ss.e.requestHandler}
+	engines := []netint.MessageProcessor{ss.e, ss.e.requestHandler}
 	for _, e := range engines {
 		err := e.Process("ch", unittest.IdentifierFixture(), invalidEvent)
 		// shouldn't result in error since byzantine inputs are expected
 		require.NoError(ss.T(), err)
-		// in case of local processing error cannot be consumed since all inputs are trusted
-		err = e.ProcessLocal(invalidEvent)
-		require.Error(ss.T(), err)
-		require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 	}
 }
