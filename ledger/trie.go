@@ -266,18 +266,32 @@ type serializablePayload struct {
 	Value Value
 }
 
+func (p Payload) seralizable() (serializablePayload, error) {
+	k, err := p.Key()
+	if err != nil {
+		return serializablePayload{}, err
+	}
+
+	v := p.value
+	if v == nil {
+		// Normalize nil payload values to empty slice (Value{}) to ensure consistency
+		// across all serialization formats (checkpoint files, WAL files, and execution data).
+		// This eliminates the distinction between nil and empty slice values, as both represent
+		// the removal of a register from the execution state. When an execution node loads a trie,
+		// it first reads checkpoint files and then WAL files, during which nil values are normalized
+		// to []byte{}. By normalizing at payload encoding time, we ensure all code paths produce
+		// consistent encoded data regardless of whether the original value was nil or []byte{}.
+		v = Value{}
+	}
+	return serializablePayload{Key: k, Value: v}, nil
+}
+
 // MarshalJSON returns JSON encoding of p.
 func (p Payload) MarshalJSON() ([]byte, error) {
-	k, err := p.Key()
+	sp, err := p.seralizable()
 	if err != nil {
 		return nil, err
 	}
-	// Normalize nil value to empty slice for consistent encoding
-	value := p.value
-	if value == nil {
-		value = Value{}
-	}
-	sp := serializablePayload{Key: k, Value: value}
 	return json.Marshal(sp)
 }
 
@@ -297,16 +311,10 @@ func (p *Payload) UnmarshalJSON(b []byte) error {
 
 // MarshalCBOR returns CBOR encoding of p.
 func (p Payload) MarshalCBOR() ([]byte, error) {
-	k, err := p.Key()
+	sp, err := p.seralizable()
 	if err != nil {
 		return nil, err
 	}
-	// Normalize nil value to empty slice for consistent encoding
-	value := p.value
-	if value == nil {
-		value = Value{}
-	}
-	sp := serializablePayload{Key: k, Value: value}
 	return cbor.Marshal(sp)
 }
 
@@ -373,6 +381,8 @@ func (p *Payload) Address() (flow.Address, error) {
 
 // Value returns payload value.
 // CAUTION: do not modify returned value because it shares underlying data with payload value.
+// CAUTION: to check wheather the payload value is empty, use len(payload.Value()) == 0,
+// due to normalization of nil and empty slice values in payloads during serialization.
 func (p *Payload) Value() Value {
 	if p == nil {
 		return Value{}
@@ -444,22 +454,12 @@ func (p *Payload) DeepCopy() *Payload {
 // NewPayload returns a new payload
 func NewPayload(key Key, value Value) *Payload {
 	ek := encodeKey(&key, PayloadVersion)
-	// Normalize nil payload values to empty slice (Value{}) to ensure consistency
-	// across all serialization formats (checkpoint files, WAL files, and execution data).
-	// This eliminates the distinction between nil and empty slice values, as both represent
-	// the removal of a register from the execution state. When an execution node loads a trie,
-	// it first reads checkpoint files and then WAL files, during which nil values are normalized
-	// to []byte{}. By normalizing at payload creation time, we ensure all code paths produce
-	// consistent encoded data regardless of whether the original value was nil or []byte{}.
-	if value == nil {
-		value = Value{}
-	}
 	return &Payload{encKey: ek, value: value}
 }
 
 // EmptyPayload returns an empty payload
 func EmptyPayload() *Payload {
-	return &Payload{value: Value{}}
+	return &Payload{}
 }
 
 // TrieProof includes all the information needed to walk

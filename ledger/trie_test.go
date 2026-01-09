@@ -421,6 +421,11 @@ func TestPayloadJSONSerialization(t *testing.T) {
 
 		v2 := p2.Value()
 		require.True(t, v2.Equals(Value{}))
+
+		// after decoding, the value will be normalized to []byte{}
+		// which will be different from the original format
+		require.True(t, p.value == nil)
+		require.True(t, p2.value != nil)
 	})
 
 	t.Run("empty key", func(t *testing.T) {
@@ -543,6 +548,7 @@ func TestPayloadCBORSerialization(t *testing.T) {
 		var p Payload
 		b, err := cbor.Marshal(p)
 		require.NoError(t, err)
+		require.True(t, p.value == nil)
 		require.Equal(t, encoded, b)
 
 		var p2 Payload
@@ -562,6 +568,11 @@ func TestPayloadCBORSerialization(t *testing.T) {
 
 		v2 := p2.Value()
 		require.True(t, v2.Equals(Value{}))
+
+		// after decoding, the value will be normalized to []byte{}
+		// which will be different from the original format
+		require.True(t, p.value == nil)
+		require.True(t, p2.value != nil)
 	})
 
 	t.Run("empty key", func(t *testing.T) {
