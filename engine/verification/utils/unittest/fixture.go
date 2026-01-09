@@ -308,7 +308,6 @@ func ExecutionResultFixture(t *testing.T,
 			committer,
 			me,
 			prov,
-			nil,
 			protocolState,
 			testMaxConcurrency)
 		require.NoError(t, err)
