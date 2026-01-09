@@ -130,6 +130,7 @@ func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				0,
+				b.conf.GetChainID().Chain(),
 				runtime.Config{}),
 		),
 		fvm.WithEntropyProvider(b.entropyProvider),
