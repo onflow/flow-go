@@ -138,8 +138,6 @@ func TestMergeChannels(t *testing.T) {
 		channels := []chan int{make(chan int), make(chan int), make(chan int)}
 		merged := util.MergeChannels(channels).(<-chan int)
 		for i, ch := range channels {
-			i := i
-			ch := ch
 			go func() {
 				ch <- i
 				close(ch)

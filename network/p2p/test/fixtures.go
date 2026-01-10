@@ -752,7 +752,6 @@ func EnsureNoPubsubMessageExchange(t *testing.T,
 
 	wg := &sync.WaitGroup{}
 	for _, node := range from {
-		node := node // capture range variable
 		for i := 0; i < count; i++ {
 			wg.Add(1)
 			go func() {
