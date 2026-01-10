@@ -3,6 +3,7 @@ package complete
 import (
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -40,6 +41,7 @@ type Ledger struct {
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
 	trieUpdateCh      chan *WALTrieUpdate
+	closeTrieUpdateCh sync.Once
 	pathFinderVersion uint8
 }
 
@@ -110,7 +112,9 @@ func (l *Ledger) Done() <-chan struct{} {
 
 		// Ledger is responsible for closing trieUpdateCh channel,
 		// so Compactor can drain and process remaining updates.
-		close(l.trieUpdateCh)
+		l.closeTrieUpdateCh.Do(func() {
+			close(l.trieUpdateCh)
+		})
 	}()
 	return done
 }

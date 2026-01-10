@@ -616,3 +616,202 @@ func TestTrieUpdateSerialization(t *testing.T) {
 		require.True(t, decodedtu.Equals(tu))
 	})
 }
+
+// TestTrieUpdateNilVsEmptySlice verifies that EncodeTrieUpdate/DecodeTrieUpdate
+// does not distinguish between nil and []byte{} values in payloads.
+func TestTrieUpdateNilVsEmptySlice(t *testing.T) {
+	p1 := testutils.PathByUint16(1)
+	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1"))
+	k1 := ledger.NewKey([]ledger.KeyPart{kp1})
+	// Original value is nil
+	pl1 := ledger.NewPayload(k1, nil)
+
+	p2 := testutils.PathByUint16(2)
+	kp2 := ledger.NewKeyPart(uint16(1), []byte("key 2"))
+	k2 := ledger.NewKey([]ledger.KeyPart{kp2})
+	// Original value is []byte{}
+	pl2 := ledger.NewPayload(k2, []byte{})
+
+	tu := &ledger.TrieUpdate{
+		RootHash: testutils.RootHashFixture(),
+		Paths:    []ledger.Path{p1, p2},
+		Payloads: []*ledger.Payload{pl1, pl2},
+	}
+
+	// Step 1: Verify original distinction
+	require.Nil(t, tu.Payloads[0].Value(), "Payload 0 should have nil value")
+	require.NotNil(t, tu.Payloads[1].Value(), "Payload 1 should have non-nil value")
+	require.Equal(t, 0, len(tu.Payloads[1].Value()), "Payload 1 should have 0 length")
+
+	// Step 2: Encode and Decode
+	encoded := ledger.EncodeTrieUpdate(tu)
+	decoded, err := ledger.DecodeTrieUpdate(encoded)
+	require.NoError(t, err)
+
+	// Step 3: Verify distinction is lost
+	// Both will be []byte{} after decode due to normalization in decodePayload.
+	// Even if we removed the normalization, both would be nil because ReadSlice(0) returns nil.
+	// This proves EncodeTrieUpdate/DecodeTrieUpdate does not distinguish between nil and []byte{}.
+	t.Logf("Decoded Payload 0 value: %v (isNil=%v)", decoded.Payloads[0].Value(), decoded.Payloads[0].Value() == nil)
+	t.Logf("Decoded Payload 1 value: %v (isNil=%v)", decoded.Payloads[1].Value(), decoded.Payloads[1].Value() == nil)
+
+	require.Equal(t, 0, len(decoded.Payloads[0].Value()), "Decoded Payload 0 should have 0 length")
+	require.Equal(t, 0, len(decoded.Payloads[1].Value()), "Decoded Payload 1 should have 0 length")
+
+	// The key assertion: they are now identical despite starting differently
+	require.Equal(t, decoded.Payloads[0].Value(), decoded.Payloads[1].Value(),
+		"Decoded nil and []byte{} are now identical (loss of distinction)")
+}
+
+// TestTrieUpdateCBORNilVsEmptySlice verifies that EncodeTrieUpdateCBOR/DecodeTrieUpdateCBOR
+// preserves the distinction between nil and []byte{} values in payloads.
+func TestTrieUpdateCBORNilVsEmptySlice(t *testing.T) {
+	t.Parallel()
+	p1 := testutils.PathByUint16(1)
+	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1"))
+	k1 := ledger.NewKey([]ledger.KeyPart{kp1})
+	// Original value is nil
+	pl1 := ledger.NewPayload(k1, nil)
+
+	p2 := testutils.PathByUint16(2)
+	kp2 := ledger.NewKeyPart(uint16(1), []byte("key 2"))
+	k2 := ledger.NewKey([]ledger.KeyPart{kp2})
+	// Original value is []byte{}
+	pl2 := ledger.NewPayload(k2, []byte{})
+
+	tu := &ledger.TrieUpdate{
+		RootHash: testutils.RootHashFixture(),
+		Paths:    []ledger.Path{p1, p2},
+		Payloads: []*ledger.Payload{pl1, pl2},
+	}
+
+	// Step 1: Verify original distinction
+	require.Nil(t, tu.Payloads[0].Value(), "Payload 0 should have nil value")
+	require.NotNil(t, tu.Payloads[1].Value(), "Payload 1 should have non-nil value")
+	require.Equal(t, 0, len(tu.Payloads[1].Value()), "Payload 1 should have 0 length")
+
+	// Step 2: Encode and Decode using CBOR
+	encoded := ledger.EncodeTrieUpdateCBOR(tu)
+	decoded, err := ledger.DecodeTrieUpdateCBOR(encoded)
+	require.NoError(t, err)
+
+	// Step 3: Verify distinction is preserved with CBOR encoding
+	t.Logf("Decoded Payload 0 value: %v (isNil=%v)", decoded.Payloads[0].Value(), decoded.Payloads[0].Value() == nil)
+	t.Logf("Decoded Payload 1 value: %v (isNil=%v)", decoded.Payloads[1].Value(), decoded.Payloads[1].Value() == nil)
+
+	// Verify that nil is preserved as nil
+	require.Nil(t, decoded.Payloads[0].Value(), "Decoded Payload 0 should have nil value")
+	// Verify that []byte{} is preserved as []byte{}
+	require.NotNil(t, decoded.Payloads[1].Value(), "Decoded Payload 1 should have non-nil value")
+	require.Equal(t, 0, len(decoded.Payloads[1].Value()), "Decoded Payload 1 should have 0 length")
+
+	// The key assertion: they should remain distinct after encoding/decoding
+	require.NotEqual(t, decoded.Payloads[0].Value(), decoded.Payloads[1].Value(),
+		"Decoded nil and []byte{} should remain distinct with CBOR encoding")
+}
+
+// TestTrieUpdateCBORRoundTrip tests that EncodeTrieUpdateCBOR and DecodeTrieUpdateCBOR
+// correctly round-trip various TrieUpdate configurations.
+func TestTrieUpdateCBORRoundTrip(t *testing.T) {
+	t.Parallel()
+	t.Run("empty trie update", func(t *testing.T) {
+		t.Parallel()
+		tu := &ledger.TrieUpdate{
+			RootHash: testutils.RootHashFixture(),
+			Paths:    []ledger.Path{},
+			Payloads: []*ledger.Payload{},
+		}
+
+		encoded := ledger.EncodeTrieUpdateCBOR(tu)
+		decoded, err := ledger.DecodeTrieUpdateCBOR(encoded)
+		require.NoError(t, err)
+		require.True(t, tu.Equals(decoded))
+	})
+
+	t.Run("single payload with nil value", func(t *testing.T) {
+		t.Parallel()
+		p1 := testutils.PathByUint16(1)
+		kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1"))
+		k1 := ledger.NewKey([]ledger.KeyPart{kp1})
+		pl1 := ledger.NewPayload(k1, nil)
+
+		tu := &ledger.TrieUpdate{
+			RootHash: testutils.RootHashFixture(),
+			Paths:    []ledger.Path{p1},
+			Payloads: []*ledger.Payload{pl1},
+		}
+
+		encoded := ledger.EncodeTrieUpdateCBOR(tu)
+		decoded, err := ledger.DecodeTrieUpdateCBOR(encoded)
+		require.NoError(t, err)
+		require.True(t, tu.Equals(decoded))
+		require.Nil(t, decoded.Payloads[0].Value(), "Nil value should be preserved")
+	})
+
+	t.Run("single payload with empty slice value", func(t *testing.T) {
+		t.Parallel()
+		p1 := testutils.PathByUint16(1)
+		kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1"))
+		k1 := ledger.NewKey([]ledger.KeyPart{kp1})
+		pl1 := ledger.NewPayload(k1, []byte{})
+
+		tu := &ledger.TrieUpdate{
+			RootHash: testutils.RootHashFixture(),
+			Paths:    []ledger.Path{p1},
+			Payloads: []*ledger.Payload{pl1},
+		}
+
+		encoded := ledger.EncodeTrieUpdateCBOR(tu)
+		decoded, err := ledger.DecodeTrieUpdateCBOR(encoded)
+		require.NoError(t, err)
+		require.True(t, tu.Equals(decoded))
+		require.NotNil(t, decoded.Payloads[0].Value(), "Empty slice value should be preserved as non-nil")
+		require.Equal(t, 0, len(decoded.Payloads[0].Value()), "Empty slice should have 0 length")
+	})
+
+	t.Run("multiple payloads with mixed nil and non-nil values", func(t *testing.T) {
+		t.Parallel()
+		p1 := testutils.PathByUint16(1)
+		kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1"))
+		k1 := ledger.NewKey([]ledger.KeyPart{kp1})
+		pl1 := ledger.NewPayload(k1, nil)
+
+		p2 := testutils.PathByUint16(2)
+		kp2 := ledger.NewKeyPart(uint16(1), []byte("key 2"))
+		k2 := ledger.NewKey([]ledger.KeyPart{kp2})
+		pl2 := ledger.NewPayload(k2, []byte{})
+
+		p3 := testutils.PathByUint16(3)
+		kp3 := ledger.NewKeyPart(uint16(1), []byte("key 3"))
+		k3 := ledger.NewKey([]ledger.KeyPart{kp3})
+		pl3 := ledger.NewPayload(k3, []byte{1, 2, 3})
+
+		tu := &ledger.TrieUpdate{
+			RootHash: testutils.RootHashFixture(),
+			Paths:    []ledger.Path{p1, p2, p3},
+			Payloads: []*ledger.Payload{pl1, pl2, pl3},
+		}
+
+		encoded := ledger.EncodeTrieUpdateCBOR(tu)
+		decoded, err := ledger.DecodeTrieUpdateCBOR(encoded)
+		require.NoError(t, err)
+		require.True(t, tu.Equals(decoded))
+
+		// Verify each value type is preserved
+		require.Nil(t, decoded.Payloads[0].Value(), "First payload should have nil value")
+		require.NotNil(t, decoded.Payloads[1].Value(), "Second payload should have non-nil empty slice")
+		require.Equal(t, 0, len(decoded.Payloads[1].Value()), "Second payload should have 0 length")
+		require.NotNil(t, decoded.Payloads[2].Value(), "Third payload should have non-nil value")
+		require.Equal(t, ledger.Value([]byte{1, 2, 3}), decoded.Payloads[2].Value(), "Third payload should have correct value")
+	})
+
+	t.Run("nil trie update", func(t *testing.T) {
+		t.Parallel()
+		encoded := ledger.EncodeTrieUpdateCBOR(nil)
+		require.Equal(t, []byte{}, encoded)
+
+		decoded, err := ledger.DecodeTrieUpdateCBOR([]byte{})
+		require.NoError(t, err)
+		require.Nil(t, decoded)
+	})
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 const SegmentSize = 32 * 1024 * 1024 // 32 MB
@@ -23,21 +24,37 @@ type DiskWAL struct {
 	pathByteSize   int
 	log            zerolog.Logger
 	dir            string
+	fileLock       *utilsio.FileLock
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
 func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module.WALMetrics, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*DiskWAL, error) {
+	// Acquire exclusive file lock to ensure only one process can write to this WAL directory
+	fileLock := utilsio.NewFileLock(dir)
+	if err := fileLock.Lock(); err != nil {
+		// If we cannot acquire the lock, another process is already using this WAL directory.
+		// This is a fatal error - the process should crash.
+		panic(fmt.Sprintf("FATAL: Cannot acquire exclusive lock on WAL directory %s: %v. Another process is already using this directory. Terminating.", dir, err))
+	}
+
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
+		// Release the lock if WAL creation fails
+		_ = fileLock.Unlock()
 		return nil, fmt.Errorf("could not create disk wal from dir %v, segmentSize %v: %w", dir, segmentSize, err)
 	}
+
+	log := logger.With().Str("ledger_mod", "diskwal").Logger()
+	log.Info().Str("lock_path", fileLock.Path()).Msg("acquired exclusive lock on WAL directory")
+
 	return &DiskWAL{
 		wal:            w,
 		paused:         false,
 		forestCapacity: forestCapacity,
 		pathByteSize:   pathByteSize,
-		log:            logger.With().Str("ledger_mod", "diskwal").Logger(),
+		log:            log,
 		dir:            dir,
+		fileLock:       fileLock,
 	}, nil
 }
 
@@ -341,12 +358,22 @@ func (w *DiskWAL) Ready() <-chan struct{} {
 }
 
 // Done implements interface module.ReadyDoneAware
-// it closes all the open write-ahead log files.
+// it closes all the open write-ahead log files and releases the file lock.
 func (w *DiskWAL) Done() <-chan struct{} {
 	err := w.wal.Close()
 	if err != nil {
 		w.log.Err(err).Msg("error while closing WAL")
 	}
+
+	// Release the file lock
+	if w.fileLock != nil {
+		if err := w.fileLock.Unlock(); err != nil {
+			w.log.Err(err).Msg("error while releasing file lock")
+		} else {
+			w.log.Info().Str("lock_path", w.fileLock.Path()).Msg("released exclusive lock on WAL directory")
+		}
+	}
+
 	done := make(chan struct{})
 	close(done)
 	return done

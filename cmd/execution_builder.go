@@ -63,11 +63,9 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	ledgerpkg "github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
-	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -133,7 +131,7 @@ type ExecutionNode struct {
 	executionState state.ExecutionState
 	followerState  protocol.FollowerState
 	committee      hotstuff.DynamicCommittee
-	ledgerStorage  *ledger.Ledger
+	ledgerStorage  ledger.Ledger
 	registerStore  *storehouse.RegisterStore
 
 	// storage
@@ -239,7 +237,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				"chunk_data_pack", exeNode.chunkDataPackDB)
 		}).
 		Component("stop control", exeNode.LoadStopControl).
-		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		// disable execution data pruner for now, since storehouse is going to need the execution data
 		// for recovery,
 		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
@@ -656,11 +653,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		tries, _ := exeNode.ledgerStorage.Tries()
-		trieInfo := "empty"
-		if len(tries) > 0 {
-			trieInfo = fmt.Sprintf("length: %v, 1st: %v, last: %v", len(tries), tries[0].RootHash(), tries[len(tries)-1].RootHash())
-		}
+		// Note: Tries() is an implementation detail, not part of the interface
+		// This is only used for debugging/logging purposes - skip for now
+		trieInfo := "unavailable (ledger abstraction)"
 
 		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v, trie: %s: %w", blockID,
 			height, trieInfo, err)
@@ -904,7 +899,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		}
 
 		checkpointHeight := sealedRoot.Height
-		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
+		rootHash := ledger.RootHash(rootSeal.FinalState)
 
 		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
 		if err != nil {
@@ -944,36 +939,27 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	module.ReadyDoneAware,
 	error,
 ) {
-	// DiskWal is a dependent component because we need to ensure
-	// that all WAL updates are completed before closing opened WAL segment.
-	var err error
-	exeNode.diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
-		node.MetricsRegisterer, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+	// Create ledger using factory
+	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
+		LedgerServiceAddr:                    exeNode.exeConf.ledgerServiceAddr,
+		Triedir:                              exeNode.exeConf.triedir,
+		MTrieCacheSize:                       exeNode.exeConf.mTrieCacheSize,
+		CheckpointDistance:                   exeNode.exeConf.checkpointDistance,
+		CheckpointsToKeep:                    exeNode.exeConf.checkpointsToKeep,
+		TriggerCheckpointOnNextSegmentFinish: exeNode.toTriggerCheckpoint,
+		MetricsRegisterer:                    node.MetricsRegisterer,
+		WALMetrics:                           exeNode.collector,
+		LedgerMetrics:                        exeNode.collector,
+		Logger:                               node.Logger,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize wal: %w", err)
+		return nil, err
 	}
 
-	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
-		"ledger").Logger(), ledger.DefaultPathFinderVersion)
-	return exeNode.ledgerStorage, err
-}
+	exeNode.ledgerStorage = result.Ledger
+	exeNode.diskWAL = result.WAL
 
-func (exeNode *ExecutionNode) LoadExecutionStateLedgerWALCompactor(
-	node *NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	return ledger.NewCompactor(
-		exeNode.ledgerStorage,
-		exeNode.diskWAL,
-		node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
-		uint(exeNode.exeConf.mTrieCacheSize),
-		exeNode.exeConf.checkpointDistance,
-		exeNode.exeConf.checkpointsToKeep,
-		exeNode.toTriggerCheckpoint, // compactor will listen to the signal from admin tool for force triggering checkpointing
-		exeNode.collector,
-	)
+	return exeNode.ledgerStorage, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionDataPruner(
@@ -1409,9 +1395,9 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		err := wal.CheckpointHasRootHash(
 			node.Logger,
-			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
-			bootstrapFilenames.FilenameWALRootCheckpoint,
-			ledgerpkg.RootHash(node.RootSeal.FinalState),
+			path.Join(node.BootstrapDir, modelbootstrap.DirnameExecutionState),
+			modelbootstrap.FilenameWALRootCheckpoint,
+			ledger.RootHash(node.RootSeal.FinalState),
 		)
 		if err != nil {
 			return err
@@ -1488,18 +1474,18 @@ func copyBootstrapState(dir, trie string) error {
 	firstCheckpointFilename := "00000000"
 
 	fileExists := func(fileName string) bool {
-		_, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, fileName))
+		_, err := os.Stat(filepath.Join(dir, modelbootstrap.DirnameExecutionState, fileName))
 		return err == nil
 	}
 
 	// if there is a root checkpoint file, then copy that file over
-	if fileExists(bootstrapFilenames.FilenameWALRootCheckpoint) {
-		filename = bootstrapFilenames.FilenameWALRootCheckpoint
+	if fileExists(modelbootstrap.FilenameWALRootCheckpoint) {
+		filename = modelbootstrap.FilenameWALRootCheckpoint
 	} else if fileExists(firstCheckpointFilename) {
 		// else if there is a checkpoint file, then copy that file over
 		filename = firstCheckpointFilename
 	} else {
-		filePath := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, firstCheckpointFilename)
+		filePath := filepath.Join(dir, modelbootstrap.DirnameExecutionState, firstCheckpointFilename)
 
 		// include absolute path of the missing file in the error message
 		absPath, err := filepath.Abs(filePath)
@@ -1511,7 +1497,7 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// copy from the bootstrap folder to the execution state folder
-	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+	from, to := path.Join(dir, modelbootstrap.DirnameExecutionState), trie
 
 	log.Info().Str("dir", dir).Str("trie", trie).
 		Msgf("linking checkpoint file %v from directory: %v, to: %v", filename, from, to)
