@@ -18,7 +18,7 @@ const (
 	accountPublicKeyCountsSize = 4
 	addressIdCounterSize       = 8
 
-	accountStatusMinSize = flagSize +
+	AccountStatusMinSize = flagSize +
 		storageUsedSize +
 		storageIndexSize +
 		accountPublicKeyCountsSize +
@@ -34,8 +34,6 @@ const (
 	deduplicationFlagMask = 0x01
 
 	accountStatusV4DefaultVersionAndFlag = 0x40
-
-	AccountStatusMinSizeV4 = accountStatusMinSize
 )
 
 const (
@@ -50,17 +48,17 @@ const (
 // the next 8 bytes (big-endian) captures the storage index of an account
 // the next 4 bytes (big-endian) captures the number of public keys stored on this account
 // the next 8 bytes (big-endian) captures the current address id counter
-type accountStatusV3 [accountStatusMinSize]byte
+type accountStatusPacked [AccountStatusMinSize]byte
 
 type AccountStatus struct {
-	accountStatusV3
+	accountStatusPacked
 	keyMetadataBytes []byte
 }
 
 // NewAccountStatus returns a new AccountStatus
 // sets the storage index to the init value
 func NewAccountStatus() *AccountStatus {
-	as := accountStatusV3{
+	as := accountStatusPacked{
 		accountStatusV4DefaultVersionAndFlag, // initial empty flags
 		0, 0, 0, 0, 0, 0, 0, 0,               // init value for storage used
 		0, 0, 0, 0, 0, 0, 0, 1, // init value for storage index
@@ -68,7 +66,7 @@ func NewAccountStatus() *AccountStatus {
 		0, 0, 0, 0, 0, 0, 0, 0, // init value for address id counter
 	}
 	return &AccountStatus{
-		accountStatusV3: as,
+		accountStatusPacked: as,
 	}
 }
 
@@ -79,88 +77,88 @@ func NewAccountStatus() *AccountStatus {
 // account status.
 func (a *AccountStatus) ToBytes() []byte {
 	if len(a.keyMetadataBytes) == 0 {
-		return a.accountStatusV3[:]
+		return a.accountStatusPacked[:]
 	}
-	return append(a.accountStatusV3[:], a.keyMetadataBytes...)
+	return append(a.accountStatusPacked[:], a.keyMetadataBytes...)
 }
 
 // AccountStatusFromBytes constructs an AccountStatus from the given byte slice
 func AccountStatusFromBytes(inp []byte) (*AccountStatus, error) {
-	asv3, rest, err := accountStatusV3FromBytes(inp)
+	as, rest, err := accountStatusFromBytes(inp)
 	if err != nil {
 		return nil, err
 	}
 
-	// NOTE: both accountStatusV3 and keyMetadataBytes are copies.
+	// NOTE: both accountStatusPacked and keyMetadataBytes are copies.
 	return &AccountStatus{
-		accountStatusV3:  asv3,
-		keyMetadataBytes: append([]byte(nil), rest...),
+		accountStatusPacked: as,
+		keyMetadataBytes:    append([]byte(nil), rest...),
 	}, nil
 }
 
-func accountStatusV3FromBytes(inp []byte) (accountStatusV3, []byte, error) {
-	if len(inp) < accountStatusMinSize {
-		return accountStatusV3{}, nil, errors.NewValueErrorf(hex.EncodeToString(inp), "invalid account status size")
+func accountStatusFromBytes(inp []byte) (accountStatusPacked, []byte, error) {
+	if len(inp) < AccountStatusMinSize {
+		return accountStatusPacked{}, nil, errors.NewValueErrorf(hex.EncodeToString(inp), "invalid account status size")
 	}
 
-	inp, rest := inp[:accountStatusMinSize], inp[accountStatusMinSize:]
-	var as accountStatusV3
+	inp, rest := inp[:AccountStatusMinSize], inp[AccountStatusMinSize:]
+	var as accountStatusPacked
 	copy(as[:], inp)
 
 	return as, rest, nil
 }
 
-func (a *accountStatusV3) Version() uint8 {
+func (a *accountStatusPacked) Version() uint8 {
 	return (a[0] & versionMask) >> 4
 }
 
-func (a *accountStatusV3) IsAccountKeyDeduplicated() bool {
+func (a *accountStatusPacked) IsAccountKeyDeduplicated() bool {
 	return (a[0] & deduplicationFlagMask) != 0
 }
 
-func (a *accountStatusV3) setAccountKeyDeduplicationFlag() {
+func (a *accountStatusPacked) setAccountKeyDeduplicationFlag() {
 	a[0] |= deduplicationFlagMask
 }
 
 // SetStorageUsed updates the storage used by the account
-func (a *accountStatusV3) SetStorageUsed(used uint64) {
+func (a *accountStatusPacked) SetStorageUsed(used uint64) {
 	binary.BigEndian.PutUint64(a[storageUsedStartIndex:storageUsedStartIndex+storageUsedSize], used)
 }
 
 // StorageUsed returns the storage used by the account
-func (a *accountStatusV3) StorageUsed() uint64 {
+func (a *accountStatusPacked) StorageUsed() uint64 {
 	return binary.BigEndian.Uint64(a[storageUsedStartIndex : storageUsedStartIndex+storageUsedSize])
 }
 
 // SetStorageIndex updates the storage index of the account
-func (a *accountStatusV3) SetStorageIndex(index atree.SlabIndex) {
+func (a *accountStatusPacked) SetStorageIndex(index atree.SlabIndex) {
 	copy(a[storageIndexStartIndex:storageIndexStartIndex+storageIndexSize], index[:storageIndexSize])
 }
 
 // SlabIndex returns the storage index of the account
-func (a *accountStatusV3) SlabIndex() atree.SlabIndex {
+func (a *accountStatusPacked) SlabIndex() atree.SlabIndex {
 	var index atree.SlabIndex
 	copy(index[:], a[storageIndexStartIndex:storageIndexStartIndex+storageIndexSize])
 	return index
 }
 
 // SetAccountPublicKeyCount updates the account public key count of the account
-func (a *accountStatusV3) SetAccountPublicKeyCount(count uint32) {
+func (a *accountStatusPacked) SetAccountPublicKeyCount(count uint32) {
 	binary.BigEndian.PutUint32(a[accountPublicKeyCountsStartIndex:accountPublicKeyCountsStartIndex+accountPublicKeyCountsSize], count)
 }
 
 // AccountPublicKeyCount returns the account public key count of the account
-func (a *accountStatusV3) AccountPublicKeyCount() uint32 {
+func (a *accountStatusPacked) AccountPublicKeyCount() uint32 {
 	return binary.BigEndian.Uint32(a[accountPublicKeyCountsStartIndex : accountPublicKeyCountsStartIndex+accountPublicKeyCountsSize])
 }
 
 // SetAccountIdCounter updates id counter of the account
-func (a *accountStatusV3) SetAccountIdCounter(id uint64) {
+func (a *accountStatusPacked) SetAccountIdCounter(id uint64) {
 	binary.BigEndian.PutUint64(a[addressIdCounterStartIndex:addressIdCounterStartIndex+addressIdCounterSize], id)
 }
 
 // AccountIdCounter returns id counter of the account
-func (a *accountStatusV3) AccountIdCounter() uint64 {
+func (a *accountStatusPacked) AccountIdCounter() uint64 {
 	return binary.BigEndian.Uint64(a[addressIdCounterStartIndex : addressIdCounterStartIndex+addressIdCounterSize])
 }
 
