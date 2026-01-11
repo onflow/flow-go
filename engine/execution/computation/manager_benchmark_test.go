@@ -162,6 +162,7 @@ func benchmarkComputeBlock(
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
+				chainID.Chain(),
 				runtime.Config{},
 			)),
 	)

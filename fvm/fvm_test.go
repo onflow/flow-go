@@ -78,13 +78,15 @@ func createChainAndVm(chainID flow.ChainID) (flow.Chain, fvm.VM) {
 	return chainID.Chain(), fvm.NewVirtualMachine()
 }
 
+var vmTestDefaultChain = flow.Testnet.Chain()
+
 func (vmt vmTest) run(
 	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		baseOpts := []fvm.Option{
 			// default chain is Testnet
-			fvm.WithChain(flow.Testnet.Chain()),
+			fvm.WithChain(vmTestDefaultChain),
 			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 		}
 
@@ -122,7 +124,7 @@ func (vmt vmTest) bootstrapWith(
 
 	baseOpts := []fvm.Option{
 		// default chain is Testnet
-		fvm.WithChain(flow.Testnet.Chain()),
+		fvm.WithChain(vmTestDefaultChain),
 	}
 
 	opts := append(baseOpts, vmt.contextOptions...)
@@ -2553,6 +2555,7 @@ func TestCapabilityControllers(t *testing.T) {
 				fvm.WithReusableCadenceRuntimePool(
 					reusableRuntime.NewReusableCadenceRuntimePool(
 						1,
+						vmTestDefaultChain,
 						runtime.Config{},
 					),
 				),
@@ -2610,6 +2613,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewReusableCadenceRuntimePool(
 					1,
+					vmTestDefaultChain,
 					runtime.Config{},
 				),
 			),

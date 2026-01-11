@@ -39,7 +39,7 @@ const (
 )
 
 const (
-	maxStoredDigests = 2 // Account status register stores up to 2 digests from last 2 stored keys.
+	MaxStoredDigests = 2 // Account status register stores up to 2 digests from last 2 stored keys.
 )
 
 // AccountStatus holds meta information about an account
@@ -277,10 +277,10 @@ func (a *AccountStatus) appendAccountPublicKeyMetadata(
 		key0Digest := getKeyDigest(key0)
 
 		// Create empty KeyMetadataAppender with key 0 digest.
-		keyMetadata = accountkeymetadata.NewKeyMetadataAppender(key0Digest, maxStoredDigests)
+		keyMetadata = accountkeymetadata.NewKeyMetadataAppender(key0Digest, MaxStoredDigests)
 	} else {
 		// Create KeyMetadataAppender with stored key metadata bytes.
-		keyMetadata, err = accountkeymetadata.NewKeyMetadataAppenderFromBytes(a.keyMetadataBytes, a.IsAccountKeyDeduplicated(), maxStoredDigests)
+		keyMetadata, err = accountkeymetadata.NewKeyMetadataAppenderFromBytes(a.keyMetadataBytes, a.IsAccountKeyDeduplicated(), MaxStoredDigests)
 		if err != nil {
 			return nil, 0, false, err
 		}

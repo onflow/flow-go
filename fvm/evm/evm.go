@@ -25,7 +25,7 @@ func StorageAccountAddress(chainID flow.ChainID) flow.Address {
 func SetupEnvironment(
 	chainID flow.ChainID,
 	fvmEnv environment.Environment,
-	runtimeEnv runtime.Environment,
+	cadenceEnv runtime.Environment,
 ) error {
 	sc := systemcontracts.SystemContractsForChain(chainID)
 	randomBeaconAddress := sc.RandomBeaconHistory.Address
@@ -56,7 +56,7 @@ func SetupEnvironment(
 	)
 
 	stdlib.SetupEnvironment(
-		runtimeEnv,
+		cadenceEnv,
 		internalEVMContractValue,
 		evmContractAddress,
 	)
