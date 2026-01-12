@@ -1,6 +1,7 @@
 package io
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,15 +40,25 @@ func (fl *FileLock) Lock() error {
 	// Ensure the directory exists before trying to create the lock file
 	dir := filepath.Dir(fl.path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
+		// Check if the error is due to permission denied
+		if os.IsPermission(err) {
+			return fmt.Errorf("FATAL: Cannot acquire exclusive lock on WAL directory %s: failed to create directory for lock file %s: %v. Permission denied. Terminating.", dir, fl.path, err)
+		}
 		return fmt.Errorf("failed to create directory for lock file %s: %w", fl.path, err)
 	}
 
 	locked, err := fl.lockFile.TryLock()
 	if err != nil {
+		// Check if the error is due to permission denied
+		var pathErr *os.PathError
+		if errors.Is(err, os.ErrPermission) || (errors.As(err, &pathErr) && os.IsPermission(pathErr.Err)) {
+			return fmt.Errorf("FATAL: Cannot acquire exclusive lock on WAL directory %s: failed to acquire file lock at %s: %v. Permission denied. Terminating.", dir, fl.path, err)
+		}
 		return fmt.Errorf("failed to acquire file lock at %s: %w", fl.path, err)
 	}
 	if !locked {
-		return fmt.Errorf("cannot acquire exclusive lock on %s: another process is already using this resource", fl.path)
+		// Lock file exists and is held by another process
+		return fmt.Errorf("FATAL: Cannot acquire exclusive lock on WAL directory %s: cannot acquire exclusive lock on %s: another process is already using this directory. Terminating.", dir, fl.path)
 	}
 	return nil
 }

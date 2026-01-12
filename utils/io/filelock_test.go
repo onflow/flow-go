@@ -43,7 +43,9 @@ func TestFileLock(t *testing.T) {
 			// Second lock should fail
 			err = lock2.Lock()
 			require.Error(t, err)
-			require.Contains(t, err.Error(), "another process is already using this resource")
+			require.Contains(t, err.Error(), "another process is already using this directory")
+			require.Contains(t, err.Error(), "FATAL:")
+			require.Contains(t, err.Error(), "Terminating.")
 
 			// Release first lock
 			err = lock1.Unlock()
@@ -273,7 +275,9 @@ func TestFileLock(t *testing.T) {
 			err = lock2.Lock()
 			require.Error(t, err)
 			require.Contains(t, err.Error(), lock2.Path())
-			require.Contains(t, err.Error(), "another process is already using this resource")
+			require.Contains(t, err.Error(), "another process is already using this directory")
+			require.Contains(t, err.Error(), "FATAL:")
+			require.Contains(t, err.Error(), "Terminating.")
 
 			err = lock1.Unlock()
 			require.NoError(t, err)
@@ -373,6 +377,91 @@ func TestFileLock(t *testing.T) {
 			err = RemoveLockFile(dir)
 			require.NoError(t, err)
 			require.False(t, FileExists(lockPath), "lock file should be removed")
+		})
+	})
+
+	t.Run("lock error message for permission denied on directory creation", func(t *testing.T) {
+		// This test may not work on all systems, especially Windows
+		// Skip if we can't create a read-only parent directory
+		unittest.RunWithTempDir(t, func(baseDir string) {
+			// Create a subdirectory that we'll make read-only
+			restrictedDir := filepath.Join(baseDir, "restricted")
+			err := os.MkdirAll(restrictedDir, 0755)
+			require.NoError(t, err)
+
+			// Create a subdirectory inside that we'll try to lock
+			// But first make the parent read-only so we can't create subdirectories
+			lockTargetDir := filepath.Join(restrictedDir, "wal")
+			
+			// Make the restricted directory read-only (remove write permission)
+			err = os.Chmod(restrictedDir, 0555)
+			require.NoError(t, err)
+			defer func() {
+				// Restore permissions for cleanup
+				_ = os.Chmod(restrictedDir, 0755)
+			}()
+
+			lock := NewFileLock(lockTargetDir)
+			err = lock.Lock()
+			require.Error(t, err)
+			
+			// Verify the error message contains the expected permission denied message
+			require.Contains(t, err.Error(), "FATAL:")
+			require.Contains(t, err.Error(), "Permission denied")
+			require.Contains(t, err.Error(), "Terminating.")
+			require.Contains(t, err.Error(), lockTargetDir)
+			require.NotContains(t, err.Error(), "another process is already using this directory")
+		})
+	})
+
+	t.Run("lock error message for permission denied on lock file creation", func(t *testing.T) {
+		// This test may not work on all systems, especially Windows
+		unittest.RunWithTempDir(t, func(baseDir string) {
+			// Create the WAL directory
+			walDir := filepath.Join(baseDir, "wal")
+			err := os.MkdirAll(walDir, 0755)
+			require.NoError(t, err)
+
+			// Make the directory read-only so we can't create the lock file
+			err = os.Chmod(walDir, 0555)
+			require.NoError(t, err)
+			defer func() {
+				// Restore permissions for cleanup
+				_ = os.Chmod(walDir, 0755)
+			}()
+
+			lock := NewFileLock(walDir)
+			err = lock.Lock()
+			require.Error(t, err)
+			
+			// Verify the error message contains the expected permission denied message
+			require.Contains(t, err.Error(), "FATAL:")
+			require.Contains(t, err.Error(), "Permission denied")
+			require.Contains(t, err.Error(), "Terminating.")
+			require.Contains(t, err.Error(), walDir)
+			require.NotContains(t, err.Error(), "another process is already using this directory")
+		})
+	})
+
+	t.Run("lock error message distinguishes permission denied from lock conflict", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			lock1 := NewFileLock(dir)
+			lock2 := NewFileLock(dir)
+
+			// Acquire first lock
+			err := lock1.Lock()
+			require.NoError(t, err)
+
+			// Try to acquire second lock - should get lock conflict, not permission denied
+			err = lock2.Lock()
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "FATAL:")
+			require.Contains(t, err.Error(), "another process is already using this directory")
+			require.Contains(t, err.Error(), "Terminating.")
+			require.NotContains(t, err.Error(), "Permission denied")
+
+			err = lock1.Unlock()
+			require.NoError(t, err)
 		})
 	})
 }
