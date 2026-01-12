@@ -6,7 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
 	mockAC "github.com/onflow/flow-go/engine/consensus/approvals/mock"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )

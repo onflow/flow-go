@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/engine/consensus/approvals"
-	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,6 +15,8 @@ import (
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -371,6 +371,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	requestCount, err = s.collector.RequestMissingApprovals(&tracker.NoopSealingTracker{}, lastHeight)
 	s.Require().NoError(err)
 
+	require.NotNil(s.T(), requestCount)
 	//require.Equal(s.T(), int(requestCount), s.Chunks.Len()*len(s.collector.collectors))
 	//require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
 

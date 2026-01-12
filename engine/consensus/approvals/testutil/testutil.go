@@ -3,11 +3,11 @@ package testutil
 import (
 	"github.com/gammazero/workerpool"
 	"github.com/onflow/crypto/hash"
-	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
