@@ -652,12 +652,8 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		// Note: Tries() is an implementation detail, not part of the interface
-		// This is only used for debugging/logging purposes - skip for now
-		trieInfo := "unavailable (ledger abstraction)"
-
-		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v, trie: %s: %w", blockID,
-			height, trieInfo, err)
+		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v : %w", blockID,
+			height, err)
 	}
 
 	// Get the epoch counter from the smart contract at the last executed block.
