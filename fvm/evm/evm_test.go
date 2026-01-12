@@ -4631,7 +4631,6 @@ func RunWithNewEnvironment(
 				).Return(block1.ToHeader(), nil)
 
 				opts := []fvm.Option{
-					fvm.WithChain(chain),
 					fvm.WithBlockHeader(block1.ToHeader()),
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -4640,7 +4639,7 @@ func RunWithNewEnvironment(
 					fvm.WithBlocks(blocks),
 					fvm.WithCadenceLogging(true),
 				}
-				ctx := fvm.NewContext(opts...)
+				ctx := fvm.NewContext(chain, opts...)
 
 				vm := fvm.NewVirtualMachine()
 				snapshotTree := snapshot.NewSnapshotTree(backend)
@@ -4691,7 +4690,6 @@ func RunContractWithNewEnvironment(
 				).Return(header1, nil)
 
 				opts := []fvm.Option{
-					fvm.WithChain(chain),
 					fvm.WithBlockHeader(header1),
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -4700,7 +4698,7 @@ func RunContractWithNewEnvironment(
 					fvm.WithBlocks(blocks),
 					fvm.WithCadenceLogging(true),
 				}
-				ctx := fvm.NewContext(opts...)
+				ctx := fvm.NewContext(chain, opts...)
 
 				vm := fvm.NewVirtualMachine()
 				snapshotTree := snapshot.NewSnapshotTree(backend)
