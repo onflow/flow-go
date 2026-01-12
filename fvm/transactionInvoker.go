@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -70,7 +69,7 @@ type transactionExecutor struct {
 	// writes to any of those registers
 	executionStateRead *snapshot.ExecutionSnapshot
 
-	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
+	cadenceRuntime  environment.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
 
 	output ProcedureOutput
@@ -192,7 +191,7 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	err := evm.SetupEnvironment(
 		chainID,
 		executor.env,
-		executor.cadenceRuntime.TxRuntimeEnv,
+		executor.cadenceRuntime.CadenceTXEnv(),
 	)
 	if err != nil {
 		return err
@@ -259,7 +258,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 	err := evm.SetupEnvironment(
 		chainID,
 		executor.env,
-		executor.cadenceRuntime.TxRuntimeEnv,
+		executor.cadenceRuntime.CadenceTXEnv(),
 	)
 	if err != nil {
 		return err
