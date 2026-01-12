@@ -13,6 +13,7 @@ type SyncRequest struct {
 // of the responding node, via the finalized header and QC certifying that header.
 type SyncResponse struct {
 	Nonce        uint64
+	Height       uint64 // retained for backwards compatibility
 	Header       Header
 	CertifyingQC QuorumCertificate
 }

@@ -119,6 +119,14 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 	// the height should be handled
 	ss.core.On("HandleHeight", ss.head, res.Header.Height)
 	ss.e.onSyncResponse(originID, res)
+
+	// Backwards Compatibility - message with only Height should also be handled
+	res = &flow.SyncResponse{
+		Nonce:  nonce + 1,
+		Height: header.Height + 1,
+	}
+	ss.core.On("HandleHeight", ss.head, res.Height)
+	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
 

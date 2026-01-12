@@ -186,6 +186,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *flow.SyncR
 	}
 	res := &messages.SyncResponse{
 		Nonce:        req.Nonce,
+		Height:       finalizedHeader.Height,
 		Header:       *finalizedHeader,
 		CertifyingQC: *qcForFinalizedHeader,
 	}

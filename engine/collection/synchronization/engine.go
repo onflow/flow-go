@@ -264,7 +264,12 @@ func (e *Engine) onSyncResponse(_ flow.Identifier, res *flow.SyncResponse) {
 		e.log.Error().Err(err).Msg("could not get last finalized header")
 		return
 	}
-	e.core.HandleHeight(final, res.Header.Height)
+	// backwards compatibility - ignore the Header/QC if they are not present, and use Height field instead
+	if res.Header.Height == 0 {
+		e.core.HandleHeight(final, res.Height)
+	} else {
+		e.core.HandleHeight(final, res.Header.Height)
+	}
 }
 
 // onBlockResponse processes a slice of requested block proposals.
