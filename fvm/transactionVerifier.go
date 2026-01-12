@@ -21,7 +21,6 @@ type signatureType struct {
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
-	// TODO(tarak): duplicate use - remove?
 	aggregateWeights map[flow.Address]int
 }
 
@@ -98,7 +97,6 @@ func newSignatureEntries(
 	map[flow.Address]int,
 	error,
 ) {
-	// TODO(tarak): allocations are returned empty maps - move the key weight aggregation here?
 	payloadWeights := make(map[flow.Address]int, len(payloadSignatures))
 	envelopeWeights := make(map[flow.Address]int, len(envelopeSignatures))
 
@@ -369,7 +367,6 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 			break
 		}
 
-		// TODO(tarak): should be moved to "newSignatureEntries" ?
 		entry.aggregateWeights[entry.Address] += entry.accountKey.Weight
 	}
 
