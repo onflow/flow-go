@@ -18,7 +18,9 @@ import (
 // Config holds configuration for creating a ledger instance.
 type Config struct {
 	// Remote ledger service configuration
-	LedgerServiceAddr string // gRPC address for remote ledger service (empty means use local ledger)
+	LedgerServiceAddr     string // gRPC address for remote ledger service (empty means use local ledger)
+	LedgerMaxRequestSize  uint   // Maximum request message size in bytes for remote ledger client (0 = default 1 GiB)
+	LedgerMaxResponseSize uint   // Maximum response message size in bytes for remote ledger client (0 = default 1 GiB)
 
 	// Local ledger configuration
 	Triedir                              string
@@ -55,6 +57,8 @@ func NewLedger(config Config) (*Result, error) {
 		factory = remote.NewRemoteLedgerFactory(
 			config.LedgerServiceAddr,
 			config.Logger.With().Str("subcomponent", "ledger").Logger(),
+			config.LedgerMaxRequestSize,
+			config.LedgerMaxResponseSize,
 		)
 	} else {
 		// the local ledger service is used when:

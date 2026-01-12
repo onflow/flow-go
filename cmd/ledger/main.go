@@ -30,6 +30,8 @@ var (
 	checkpointDist    = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
 	logLevel          = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
+	maxRequestSize    = flag.Uint("max-request-size", 1<<30, "Maximum request message size in bytes (default: 1 GiB)")
+	maxResponseSize   = flag.Uint("max-response-size", 1<<30, "Maximum response message size in bytes (default: 1 GiB)")
 )
 
 func main() {
@@ -84,8 +86,14 @@ func main() {
 	<-ledgerStorage.Ready()
 	logger.Info().Msg("ledger ready")
 
-	// Create gRPC server
-	grpcServer := grpc.NewServer()
+	// Create gRPC server with max message size configuration.
+	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
+	// This was increased to fix "grpc: received message larger than max" errors when generating
+	// proofs for blocks with many state changes.
+	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(int(*maxRequestSize)),
+		grpc.MaxSendMsgSize(int(*maxResponseSize)),
+	)
 
 	// Create and register ledger service
 	ledgerService := remote.NewService(ledgerStorage, logger)
