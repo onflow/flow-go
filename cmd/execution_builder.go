@@ -579,7 +579,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		)...,
 	)
 
-	vmCtx := fvm.NewContext(opts...)
+	vmCtx := fvm.NewContext(node.RootChainID.Chain(), opts...)
 
 	var collector module.ExecutionMetrics
 	collector = exeNode.collector

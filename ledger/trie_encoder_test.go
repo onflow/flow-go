@@ -623,7 +623,7 @@ func TestTrieUpdateNilVsEmptySlice(t *testing.T) {
 	p1 := testutils.PathByUint16(1)
 	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1"))
 	k1 := ledger.NewKey([]ledger.KeyPart{kp1})
-	// Original value is nil
+	// Original value is nil, but will be normalized to []byte{}
 	pl1 := ledger.NewPayload(k1, nil)
 
 	p2 := testutils.PathByUint16(2)
