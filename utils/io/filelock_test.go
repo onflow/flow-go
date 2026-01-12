@@ -392,7 +392,7 @@ func TestFileLock(t *testing.T) {
 			// Create a subdirectory inside that we'll try to lock
 			// But first make the parent read-only so we can't create subdirectories
 			lockTargetDir := filepath.Join(restrictedDir, "wal")
-			
+
 			// Make the restricted directory read-only (remove write permission)
 			err = os.Chmod(restrictedDir, 0555)
 			require.NoError(t, err)
@@ -404,7 +404,7 @@ func TestFileLock(t *testing.T) {
 			lock := NewFileLock(lockTargetDir)
 			err = lock.Lock()
 			require.Error(t, err)
-			
+
 			// Verify the error message contains the expected permission denied message
 			require.Contains(t, err.Error(), "FATAL:")
 			require.Contains(t, err.Error(), "Permission denied")
@@ -433,7 +433,7 @@ func TestFileLock(t *testing.T) {
 			lock := NewFileLock(walDir)
 			err = lock.Lock()
 			require.Error(t, err)
-			
+
 			// Verify the error message contains the expected permission denied message
 			require.Contains(t, err.Error(), "FATAL:")
 			require.Contains(t, err.Error(), "Permission denied")

@@ -407,8 +407,8 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 	// Create gRPC server with max message size configuration
 	// Use large limits to match production defaults (1 GiB for both)
 	grpcServer := grpc.NewServer(
-		grpc.MaxRecvMsgSize(1<<30),  // 1 GiB for requests
-		grpc.MaxSendMsgSize(1<<30),  // 1 GiB for responses
+		grpc.MaxRecvMsgSize(1<<30), // 1 GiB for requests
+		grpc.MaxSendMsgSize(1<<30), // 1 GiB for responses
 	)
 
 	// Create and register ledger service
