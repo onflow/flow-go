@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -508,6 +509,15 @@ func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 		},
 	}
 	s.Require().Len(listOfSubscriptionResponse.Subscriptions, len(expectedSubscriptions))
+
+	// sort expected and actual subscriptions by ID to ensure deterministic comparison,
+	// as the server returns subscriptions in random order.
+	sort.Slice(expectedSubscriptions, func(i, j int) bool {
+		return expectedSubscriptions[i].SubscriptionID < expectedSubscriptions[j].SubscriptionID
+	})
+	sort.Slice(listOfSubscriptionResponse.Subscriptions, func(i, j int) bool {
+		return listOfSubscriptionResponse.Subscriptions[i].SubscriptionID < listOfSubscriptionResponse.Subscriptions[j].SubscriptionID
+	})
 
 	for i, expected := range expectedSubscriptions {
 		actual := listOfSubscriptionResponse.Subscriptions[i]
