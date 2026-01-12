@@ -123,10 +123,10 @@ type ReusableCadenceRuntime interface {
 		error,
 	)
 
-	// CadenceTXEnv returns a a cadence runtime.Environment set up for use in transactions
+	// CadenceTXEnv returns a cadence runtime.Environment set up for use in transactions
 	CadenceTXEnv() runtime.Environment
 
-	// CadenceScriptEnv returns a a cadence runtime.Environment set up for use in scripts
+	// CadenceScriptEnv returns a cadence runtime.Environment set up for use in scripts
 	CadenceScriptEnv() runtime.Environment
 
 	// SetFvmEnvironment sets the underlying Environment for the cadence runtime to use
