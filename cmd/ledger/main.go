@@ -9,15 +9,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
-	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
-
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
