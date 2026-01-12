@@ -32,9 +32,9 @@ func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module
 	// Acquire exclusive file lock to ensure only one process can write to this WAL directory
 	fileLock := utilsio.NewFileLock(dir)
 	if err := fileLock.Lock(); err != nil {
-		// If we cannot acquire the lock, another process is already using this WAL directory.
-		// This is a fatal error - the process should crash.
-		panic(fmt.Sprintf("FATAL: Cannot acquire exclusive lock on WAL directory %s: %v. Another process is already using this directory. Terminating.", dir, err))
+		// The Lock() method returns a complete error message that distinguishes between
+		// permission denied and lock conflicts. This is a fatal error - the process should crash.
+		panic(err.Error())
 	}
 
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
