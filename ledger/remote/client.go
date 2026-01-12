@@ -25,13 +25,30 @@ type Client struct {
 }
 
 // NewClient creates a new remote ledger client.
-func NewClient(grpcAddr string, logger zerolog.Logger) (*Client, error) {
+// maxRequestSize and maxResponseSize specify the maximum message sizes in bytes.
+// If both are 0, defaults to 1 GiB for both requests and responses.
+func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxResponseSize uint) (*Client, error) {
 	logger = logger.With().Str("component", "remote_ledger_client").Logger()
 
-	// Create gRPC connection
+	// Use defaults if not specified
+	if maxRequestSize == 0 {
+		maxRequestSize = 1 << 30 // 1 GiB
+	}
+	if maxResponseSize == 0 {
+		maxResponseSize = 1 << 30 // 1 GiB
+	}
+
+	// Create gRPC connection with max message size configuration.
+	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
+	// This was increased to fix "grpc: received message larger than max" errors when generating
+	// proofs for blocks with many state changes.
 	conn, err := grpc.NewClient(
 		grpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
+			grpc.MaxCallSendMsgSize(int(maxRequestSize)),
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to ledger service: %w", err)
