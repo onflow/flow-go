@@ -215,3 +215,36 @@ func parseMappingStoredKeyIndex(b []byte, off int) uint32 {
 	_ = b[off+3] // bounds check
 	return binary.BigEndian.Uint32(b[off : off+storedKeyIndexSize])
 }
+
+// Utility functions for tests and validation
+
+// DecodeMappings decodes raw bytes of account public key mappings in account key metadata.
+func DecodeMappings(b []byte) ([]uint32, error) {
+	if len(b)%mappingGroupSize != 0 {
+		return nil, errors.NewKeyMetadataUnexpectedLengthError(
+			"failed to decode key mappings",
+			mappingGroupSize,
+			len(b),
+		)
+	}
+
+	mapping := make([]uint32, 0, len(b)/mappingGroupSize)
+
+	for i := 0; i < len(b); i += mappingGroupSize {
+
+		isConsecutiveGroup, runLength := parseMappingRunLength(b, i)
+		storedKeyIndex := binary.BigEndian.Uint32(b[i+runLengthSize:])
+
+		if isConsecutiveGroup {
+			for index := range runLength {
+				mapping = append(mapping, storedKeyIndex+uint32(index))
+			}
+		} else {
+			for range runLength {
+				mapping = append(mapping, storedKeyIndex)
+			}
+		}
+	}
+
+	return mapping, nil
+}
