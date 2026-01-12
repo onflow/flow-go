@@ -3,6 +3,7 @@ package provider
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -164,7 +165,7 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 
 		g.Go(func() error {
 			logger.Debug().Int("chunk_index", i).Msg("adding chunk execution data")
-			cedID, err := p.cidsProvider.addChunkExecutionData(executionData.BlockID, chunkExecutionData, blobCh)
+			cedID, err := p.cidsProvider.addChunkExecutionData(chunkExecutionData, blobCh)
 			if err != nil {
 				return fmt.Errorf("failed to add chunk execution data at index %d: %w", i, err)
 			}
@@ -217,7 +218,7 @@ func (p *ExecutionDataCIDProvider) GenerateExecutionDataRoot(
 ) (flow.Identifier, *flow.BlockExecutionDataRoot, error) {
 	chunkDataIDs := make([]cid.Cid, len(executionData.ChunkExecutionDatas))
 	for i, chunkExecutionData := range executionData.ChunkExecutionDatas {
-		cedID, err := p.addChunkExecutionData(executionData.BlockID, chunkExecutionData, nil)
+		cedID, err := p.addChunkExecutionData(chunkExecutionData, nil)
 		if err != nil {
 			return flow.ZeroID, nil, fmt.Errorf("failed to add chunk execution data at index %d: %w", i, err)
 		}
@@ -254,7 +255,7 @@ func (p *ExecutionDataCIDProvider) CalculateExecutionDataRootID(
 func (p *ExecutionDataCIDProvider) CalculateChunkExecutionDataID(
 	ced execution_data.ChunkExecutionData,
 ) (cid.Cid, error) {
-	return p.addChunkExecutionData(flow.ZeroID, &ced, nil)
+	return p.addChunkExecutionData(&ced, nil)
 }
 
 func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
@@ -264,6 +265,10 @@ func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
 	buf := new(bytes.Buffer)
 	if err := p.serializer.Serialize(buf, edRoot); err != nil {
 		return flow.ZeroID, fmt.Errorf("failed to serialize execution data root: %w", err)
+	}
+
+	if buf.Len() > p.maxBlobSize {
+		return flow.ZeroID, errors.New("execution data root blob exceeds maximum allowed size")
 	}
 
 	rootBlob := blobs.NewBlob(buf.Bytes())
@@ -280,7 +285,6 @@ func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
 }
 
 func (p *ExecutionDataCIDProvider) addChunkExecutionData(
-	blockID flow.Identifier,
 	ced *execution_data.ChunkExecutionData,
 	blobCh chan<- blobs.Blob,
 ) (cid.Cid, error) {
