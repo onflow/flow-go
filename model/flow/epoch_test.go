@@ -671,6 +671,20 @@ func TestNewEpochCommit(t *testing.T) {
 		require.Contains(t, err.Error(), "DKG group key must not be nil")
 	})
 
+	t.Run("nil DKGIndexMap", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         validClusterQCs,
+			DKGGroupKey:        validDKGGroupKey,
+			DKGParticipantKeys: make([]crypto.PublicKey, 0),
+			DKGIndexMap:        nil,
+		}
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.Error(t, err)
+		require.Nil(t, commit)
+		require.Contains(t, err.Error(), "DKG index map must not be nil")
+	})
+
 	t.Run("empty list of cluster QCs", func(t *testing.T) {
 		untrusted := flow.UntrustedEpochCommit{
 			Counter:            1,

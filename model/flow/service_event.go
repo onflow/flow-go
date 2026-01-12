@@ -186,7 +186,7 @@ func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEv
 	if err != nil {
 		return ServiceEvent{},
 			fmt.Errorf(
-				"failed to unmarshal to service event ot type %s: %w",
+				"failed to unmarshal to service event of type %s: %w",
 				eventType,
 				err,
 			)
