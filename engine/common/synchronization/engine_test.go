@@ -84,9 +84,9 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.SyncResponse)
-			assert.Equal(ss.T(), ss.head, res.Header, "response should contain header")
+			assert.Equal(ss.T(), *ss.head, res.Header, "response should contain header")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
-			assert.Equal(ss.T(), ss.qc, res.CertifyingQC, "response should contain QC")
+			assert.Equal(ss.T(), *ss.qc, res.CertifyingQC, "response should contain QC")
 			assert.Equal(ss.T(), ss.head.ID(), res.CertifyingQC.BlockID, "response QC should correspond to response Header")
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
