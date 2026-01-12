@@ -205,7 +205,7 @@ func (executor *scriptExecutor) executeScript() error {
 	err := evm.SetupEnvironment(
 		chainID,
 		executor.env,
-		rt.ScriptRuntimeEnv,
+		rt.CadenceScriptEnv(),
 	)
 	if err != nil {
 		return err

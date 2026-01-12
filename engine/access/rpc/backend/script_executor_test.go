@@ -115,7 +115,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	s.snapshot = snapshot.NewSnapshotTree(nil)
 	s.vm = fvm.NewVirtualMachine()
 	s.vmCtx = fvm.NewContext(
-		fvm.WithChain(s.chain),
+		s.chain,
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)

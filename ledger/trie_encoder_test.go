@@ -616,3 +616,48 @@ func TestTrieUpdateSerialization(t *testing.T) {
 		require.True(t, decodedtu.Equals(tu))
 	})
 }
+
+// TestTrieUpdateNilVsEmptySlice verifies that EncodeTrieUpdate/DecodeTrieUpdate
+// for payloads created with nil vs empty []byte values results in both being treated
+// as empty []byte{} after decoding, due to normalization in NewPayload.
+func TestTrieUpdateNilVsEmptySlice(t *testing.T) {
+	p1 := testutils.PathByUint16(1)
+	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1"))
+	k1 := ledger.NewKey([]ledger.KeyPart{kp1})
+	// Original value is nil, but will be normalized to []byte{}
+	pl1 := ledger.NewPayload(k1, nil)
+
+	p2 := testutils.PathByUint16(2)
+	kp2 := ledger.NewKeyPart(uint16(1), []byte("key 2"))
+	k2 := ledger.NewKey([]ledger.KeyPart{kp2})
+	// Original value is []byte{}
+	pl2 := ledger.NewPayload(k2, []byte{})
+
+	tu := &ledger.TrieUpdate{
+		RootHash: testutils.RootHashFixture(),
+		Paths:    []ledger.Path{p1, p2},
+		Payloads: []*ledger.Payload{pl1, pl2},
+	}
+
+	// Step 1: Verify original distinction
+	require.Nil(t, tu.Payloads[0].Value(), "Payload 0 should have nil value (we don't normalize at creation time, only encoding time)")
+	require.NotNil(t, tu.Payloads[1].Value(), "Payload 1 should have non-nil value")
+	require.Equal(t, 0, len(tu.Payloads[0].Value()), "Payload 0 should have 0 length")
+	require.Equal(t, 0, len(tu.Payloads[1].Value()), "Payload 1 should have 0 length")
+
+	// Step 2: Encode and Decode
+	encoded := ledger.EncodeTrieUpdate(tu)
+	decoded, err := ledger.DecodeTrieUpdate(encoded)
+	require.NoError(t, err)
+
+	// Both will be []byte{} after decode due to normalization in NewPayload.
+	t.Logf("Decoded Payload 0 value: %v (isNil=%v)", decoded.Payloads[0].Value(), decoded.Payloads[0].Value() == nil)
+	t.Logf("Decoded Payload 1 value: %v (isNil=%v)", decoded.Payloads[1].Value(), decoded.Payloads[1].Value() == nil)
+
+	require.Equal(t, 0, len(decoded.Payloads[0].Value()), "Decoded Payload 0 should have 0 length")
+	require.Equal(t, 0, len(decoded.Payloads[1].Value()), "Decoded Payload 1 should have 0 length")
+
+	// The key assertion: they are now identical despite starting differently
+	require.Equal(t, decoded.Payloads[0].Value(), decoded.Payloads[1].Value(),
+		"Decoded nil and []byte{} are identical")
+}

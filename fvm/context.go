@@ -54,8 +54,8 @@ type Context struct {
 }
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(opts ...Option) Context {
-	return newContext(defaultContext(), opts...)
+func NewContext(chain flow.Chain, opts ...Option) Context {
+	return newContext(defaultContext(chain), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -71,7 +71,7 @@ func newContext(ctx Context, opts ...Option) Context {
 	return ctx
 }
 
-func defaultContext() Context {
+func defaultContext(chain flow.Chain) Context {
 	ctx := Context{
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
@@ -80,30 +80,29 @@ func defaultContext() Context {
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
 		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
-		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
+		EnvironmentParams:                 DefaultEnvironmentParams(chain),
 	}
 	return ctx
 }
 
+// DefaultEnvironmentParams creates environment.EnvironmentParams that serve as base settings
+// for EnvironmentParams and can be used as is for tests.
+func DefaultEnvironmentParams(chain flow.Chain) environment.EnvironmentParams {
+	return environment.EnvironmentParams{
+		Chain:                    chain,
+		ServiceAccountEnabled:    true,
+		RuntimeParams:            reusableRuntime.DefaultRuntimeParams(chain),
+		ProgramLoggerParams:      environment.DefaultProgramLoggerParams(),
+		EventEmitterParams:       environment.DefaultEventEmitterParams(),
+		BlockInfoParams:          environment.DefaultBlockInfoParams(),
+		TransactionInfoParams:    environment.DefaultTransactionInfoParams(),
+		ContractUpdaterParams:    environment.DefaultContractUpdaterParams(),
+		ExecutionVersionProvider: environment.ZeroExecutionVersionProvider{},
+	}
+}
+
 // An Option sets a configuration parameter for a virtual machine context.
 type Option func(ctx Context) Context
-
-// WithChain sets the chain parameters for a virtual machine context.
-func WithChain(chain flow.Chain) Option {
-	return func(ctx Context) Context {
-		ctx.Chain = chain
-		return ctx
-	}
-}
-
-// Deprecated: WithGasLimit sets the computation limit for a virtual machine context.
-// Use WithComputationLimit instead.
-func WithGasLimit(limit uint64) Option {
-	return func(ctx Context) Context {
-		ctx.ComputationLimit = limit
-		return ctx
-	}
-}
 
 // WithMemoryAndInteractionLimitsDisabled will override memory and interaction
 // limits and set them to MaxUint64, effectively disabling these limits.
