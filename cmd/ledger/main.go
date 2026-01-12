@@ -17,6 +17,8 @@ import (
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/ledger/remote"
@@ -62,15 +64,14 @@ func main() {
 		Msg("starting ledger service")
 
 	// Create ledger using factory
-	// TODO(leo): to use real metrics collector
-	metricsCollector := &metrics.NoopCollector{}
+	metricsCollector := metrics.NewLedgerCollector("ledger", "wal")
 	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		Triedir:                              *walDir,
 		MTrieCacheSize:                       uint32(*capacity),
 		CheckpointDistance:                   *checkpointDist,
 		CheckpointsToKeep:                    *checkpointsToKeep,
 		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
-		MetricsRegisterer:                    nil,
+		MetricsRegisterer:                    prometheus.DefaultRegisterer,
 		WALMetrics:                           metricsCollector,
 		LedgerMetrics:                        metricsCollector,
 		Logger:                               logger,
