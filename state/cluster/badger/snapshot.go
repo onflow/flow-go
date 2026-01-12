@@ -68,7 +68,14 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return &head, err
 }
 
+// QuorumCertificate returns a valid quorum certificate for the header at this snapshot, if one exists.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] is returned if the QC is unknown.
 func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
+	// Implementation detail: QuorumCertificates storage / operation.RetrieveQuorumCertificate only indexes QCs
+	// for main consensus blocks, not cluster blocks, so we directly check for any children that would have a
+	// QC for the cluster header.
 	var pendingIDs flow.IdentifierList
 	err := operation.RetrieveBlockChildren(s.state.db.Reader(), s.blockID, &pendingIDs)
 	if err != nil {

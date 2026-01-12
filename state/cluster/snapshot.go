@@ -23,9 +23,10 @@ type Snapshot interface {
 	//  - If the snapshot is for an unknown collection [state.ErrUnknownSnapshotReference]
 	Head() (*flow.Header, error)
 
-	// QuorumCertificate returns a valid quorum certificate pointing to the header at this snapshot.
+	// QuorumCertificate returns a valid quorum certificate for the header at this snapshot, if one exists.
 	//
 	// Expected error returns during normal operations:
+	//  - [storage.ErrNotFound] is returned if the QC is unknown.
 	//  - If the snapshot is for an unknown collection [state.ErrUnknownSnapshotReference]
 	QuorumCertificate() (*flow.QuorumCertificate, error)
 
