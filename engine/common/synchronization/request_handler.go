@@ -186,8 +186,8 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *flow.SyncR
 	}
 	res := &messages.SyncResponse{
 		Nonce:        req.Nonce,
-		Header:       finalizedHeader,
-		CertifyingQC: qcForFinalizedHeader,
+		Header:       *finalizedHeader,
+		CertifyingQC: *qcForFinalizedHeader,
 	}
 	err = r.responseSender.SendResponse(res, originID)
 	if err != nil {

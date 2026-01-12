@@ -217,8 +217,8 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(rand.Uint64()))
 	res := &flow.SyncResponse{
 		Nonce:        rand.Uint64(),
-		Header:       header,
-		CertifyingQC: unittest.CertifyBlock(header),
+		Header:       *header,
+		CertifyingQC: *unittest.CertifyBlock(header),
 	}
 
 	// the height should be handled
@@ -574,8 +574,8 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(1000 + i)))
 		msg := &flow.SyncResponse{
 			Nonce:        uint64(i),
-			Header:       header,
-			CertifyingQC: unittest.CertifyBlock(header),
+			Header:       *header,
+			CertifyingQC: *unittest.CertifyBlock(header),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Header.Height).Once()
 		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()

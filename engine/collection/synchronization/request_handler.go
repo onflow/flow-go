@@ -172,8 +172,8 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow
 	// if we're sufficiently ahead of the requester, send a response
 	res := &messages.SyncResponse{
 		Nonce:        req.Nonce,
-		Header:       final,
-		CertifyingQC: qc,
+		Header:       *final,
+		CertifyingQC: *qc,
 	}
 	err = r.con.Unicast(res, originID)
 	if err != nil {

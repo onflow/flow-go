@@ -13,8 +13,8 @@ type SyncRequest struct {
 // of the responding node, via the finalized header and QC certifying that header.
 type SyncResponse struct {
 	Nonce        uint64
-	Header       *Header
-	CertifyingQC *QuorumCertificate
+	Header       Header
+	CertifyingQC QuorumCertificate
 }
 
 // BatchRequest is part of the synchronization protocol and represents an active

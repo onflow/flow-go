@@ -112,8 +112,8 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &flow.SyncResponse{
 		Nonce:        nonce,
-		Header:       header,
-		CertifyingQC: unittest.CertifyBlock(header),
+		Header:       *header,
+		CertifyingQC: *unittest.CertifyBlock(header),
 	}
 
 	// the height should be handled
@@ -135,8 +135,8 @@ func (ss *SyncSuite) TestInvalidSyncResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &flow.SyncResponse{
 		Nonce:        nonce,
-		Header:       header,
-		CertifyingQC: nil,
+		Header:       *header,
+		CertifyingQC: flow.QuorumCertificate{},
 	}
 	// TODO(8174): the response should be rejected and/or a violation should be logged
 	ss.e.onSyncResponse(originID, res)
@@ -494,8 +494,8 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(1000 + i)))
 		msg := &flow.SyncResponse{
 			Nonce:        uint64(i),
-			Header:       header,
-			CertifyingQC: unittest.CertifyBlock(header),
+			Header:       *header,
+			CertifyingQC: *unittest.CertifyBlock(header),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Header.Height).Once()
 		ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncResponse).Once()
