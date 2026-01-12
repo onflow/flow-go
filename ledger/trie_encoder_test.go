@@ -664,7 +664,7 @@ func TestTrieUpdateNilVsEmptySlice(t *testing.T) {
 }
 
 // TestTrieUpdateCBORNilVsEmptySlice verifies that EncodeTrieUpdateCBOR/DecodeTrieUpdateCBOR
-// preserves the distinction between nil and []byte{} values in payloads.
+// does not distinction between nil and []byte{} values in payloads after normalization
 func TestTrieUpdateCBORNilVsEmptySlice(t *testing.T) {
 	t.Parallel()
 	p1 := testutils.PathByUint16(1)
@@ -699,14 +699,14 @@ func TestTrieUpdateCBORNilVsEmptySlice(t *testing.T) {
 	t.Logf("Decoded Payload 0 value: %v (isNil=%v)", decoded.Payloads[0].Value(), decoded.Payloads[0].Value() == nil)
 	t.Logf("Decoded Payload 1 value: %v (isNil=%v)", decoded.Payloads[1].Value(), decoded.Payloads[1].Value() == nil)
 
-	// Verify that nil is preserved as nil
-	require.Nil(t, decoded.Payloads[0].Value(), "Decoded Payload 0 should have nil value")
 	// Verify that []byte{} is preserved as []byte{}
+	require.NotNil(t, decoded.Payloads[0].Value(), "Decoded Payload 0 should have nil value")
+	require.Equal(t, 0, len(decoded.Payloads[0].Value()), "Decoded Payload 0 should have 0 length")
 	require.NotNil(t, decoded.Payloads[1].Value(), "Decoded Payload 1 should have non-nil value")
 	require.Equal(t, 0, len(decoded.Payloads[1].Value()), "Decoded Payload 1 should have 0 length")
 
-	// The key assertion: they should remain distinct after encoding/decoding
-	require.NotEqual(t, decoded.Payloads[0].Value(), decoded.Payloads[1].Value(),
+	// The key assertion: they should be the same after encoding/decoding due to normalization in encoding
+	require.Equal(t, decoded.Payloads[0].Value(), decoded.Payloads[1].Value(),
 		"Decoded nil and []byte{} should remain distinct with CBOR encoding")
 }
 
@@ -745,7 +745,7 @@ func TestTrieUpdateCBORRoundTrip(t *testing.T) {
 		decoded, err := ledger.DecodeTrieUpdateCBOR(encoded)
 		require.NoError(t, err)
 		require.True(t, tu.Equals(decoded))
-		require.Nil(t, decoded.Payloads[0].Value(), "Nil value should be preserved")
+		require.NotNil(t, decoded.Payloads[0].Value(), "Nil value should be normalized to empty slice")
 	})
 
 	t.Run("single payload with empty slice value", func(t *testing.T) {
@@ -798,7 +798,8 @@ func TestTrieUpdateCBORRoundTrip(t *testing.T) {
 		require.True(t, tu.Equals(decoded))
 
 		// Verify each value type is preserved
-		require.Nil(t, decoded.Payloads[0].Value(), "First payload should have nil value")
+		require.NotNil(t, decoded.Payloads[0].Value(), "First payload should have no-nil empty slice after normalization")
+		require.Equal(t, 0, len(decoded.Payloads[0].Value()), "First payload should have 0 length")
 		require.NotNil(t, decoded.Payloads[1].Value(), "Second payload should have non-nil empty slice")
 		require.Equal(t, 0, len(decoded.Payloads[1].Value()), "Second payload should have 0 length")
 		require.NotNil(t, decoded.Payloads[2].Value(), "Third payload should have non-nil value")
