@@ -9,8 +9,8 @@ type SyncRequest struct {
 }
 
 // SyncResponse is part of the synchronization protocol and represents the reply
-// to a synchronization request that contains the latest finalized block height
-// of the responding node.
+// to a synchronization request. It contains the latest finalized block height
+// of the responding node, via the finalized header and QC certifying that header.
 type SyncResponse struct {
 	Nonce        uint64
 	Header       *Header
