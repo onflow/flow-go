@@ -367,6 +367,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 			break
 		}
 
+		// TODO(tarak): should be moved to "newSignatureEntries" ?
 		entry.aggregateWeights[entry.Address] += entry.accountKey.Weight
 	}
 
@@ -393,6 +394,5 @@ func (v *TransactionVerifier) hasSufficientKeyWeight(
 	address flow.Address,
 	keyWeightThreshold int,
 ) bool {
-	fmt.Println(weights[address], keyWeightThreshold)
 	return weights[address] >= keyWeightThreshold
 }
