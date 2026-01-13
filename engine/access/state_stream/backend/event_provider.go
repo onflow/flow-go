@@ -29,7 +29,7 @@ func (e *eventProvider) NextData(ctx context.Context) (any, error) {
 		return nil, err
 	}
 
-	executionData, ok := executionDataRaw.(ExecutionDataResponse)
+	executionData, ok := executionDataRaw.(*ExecutionDataResponse)
 	if !ok {
 		return nil, fmt.Errorf("unexpected execution data type: %T", executionDataRaw)
 	}
