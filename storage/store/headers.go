@@ -82,8 +82,7 @@ func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flo
 		return id, err
 	}
 	retrieveView := func(r storage.Reader, height uint64) (flow.Identifier, error) {
-		var id flow.Identifier
-		return id, storage.ErrNotAvailableForClusterConsensus
+		return flow.ZeroID, storage.ErrNotAvailableForClusterConsensus
 	}
 	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView), nil
 }

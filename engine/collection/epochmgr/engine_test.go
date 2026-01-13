@@ -165,7 +165,7 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Final").Return(suite.snap)
 	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap).Maybe()
 	params := protocol.NewParams(suite.T())
-	params.On("ChainID").Return(flow.ChainID("chain-id")).Maybe()
+	params.On("ChainID").Return(flow.ChainID("Consensus-Chain-ID")).Maybe()
 	suite.state.On("Params").Return(params)
 	suite.snap.On("Epochs").Return(suite.epochQuery)
 	suite.snap.On("Head").Return(

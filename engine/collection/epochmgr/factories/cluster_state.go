@@ -45,13 +45,13 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, consensusCh
 
 	clusterHeaders, err := store.NewClusterHeaders(f.metrics, f.db, stateRoot.ClusterID())
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create storage abstraction for cluster headers: %w", err)
 	}
 	clusterPayloads := store.NewClusterPayloads(f.metrics, f.db)
 	clusterBlocks := store.NewClusterBlocks(f.db, stateRoot.ClusterID(), clusterHeaders, clusterPayloads)
 	consensusHeaders, err := store.NewHeaders(f.metrics, f.db, consensusChainID) // for reference blocks
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create storage abstraction for consensus headers: %w", err)
 	}
 
 	isBootStrapped, err := clusterkv.IsBootstrapped(f.db, stateRoot.ClusterID())

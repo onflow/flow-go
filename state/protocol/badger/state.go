@@ -978,6 +978,7 @@ func newState(
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state
+// No errors expected during normal operation. Any error is a symptom of a bug or state corruption.
 func IsBootstrapped(db storage.DB) (bool, error) {
 	var finalized uint64
 	err := operation.RetrieveFinalizedHeight(db.Reader(), &finalized)

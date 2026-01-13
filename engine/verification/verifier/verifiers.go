@@ -243,7 +243,7 @@ func initStorages(
 
 	storages, err := common.InitStorages(db, chainID)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not init storages: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not init common storage abstractions: %w", err)
 	}
 	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
