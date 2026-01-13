@@ -189,8 +189,13 @@ func (h *Headers) retrieveProposalTx(blockID flow.Identifier) (*flow.ProposalHea
 	return &flow.ProposalHeader{Header: header, ProposerSigData: sig}, nil
 }
 
-// results in [storage.ErrNotFound] for unknown height
+// Retrieves the block ID for the given finalized height.
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no finalized block is known (for the chain this Headers instance is bound to)
 func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {
+	// This method can only return IDs for the desired chain. This is because the height cache is populated
+	// on retrieval, using a chain-specific database index `height` -> `ID`. Only blocks of the respective chain
+	// are added to the index. Hence, only blocks of the respective chain are put into the cache on retrieval.
 	blockID, err := h.heightCache.Get(h.db.Reader(), height)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, err)
@@ -322,6 +327,7 @@ func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {
 	return blockID, nil
 }
 
+// Deprecated: Undocumented, hence unsafe for public use.
 func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Header, error) {
 	blocks := make([]flow.Header, 0, 1)
 	err := operation.FindHeaders(h.db.Reader(), filter, &blocks)
