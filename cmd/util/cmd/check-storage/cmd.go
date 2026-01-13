@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -420,7 +419,7 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 
 	if flagIsAccountStatusV4 {
 		// Validate account public key storage
-		err = migrations.ValidateAccountPublicKeyV4(address, accountRegisters)
+		err = validateAccountPublicKey(address, accountRegisters)
 		if err != nil {
 			issues = append(
 				issues,
@@ -575,7 +574,7 @@ func checkAccountPublicKeys(
 		}
 	}
 
-	// NOTE: don't need to check unreachable keys because it is checked in ValidateAccountPublicKeyV4().
+	// NOTE: don't need to check unreachable keys because it is checked in validateAccountPublicKey().
 
 	return nil
 }

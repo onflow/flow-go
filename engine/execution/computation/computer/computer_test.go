@@ -201,7 +201,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -340,7 +339,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -441,7 +439,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			comm,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -506,7 +503,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -734,7 +730,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				committer.NewNoopViewCommitter(),
 				me,
 				prov,
-				nil,
 				testutil.ProtocolStateWithSourceFixture(nil),
 				testMaxConcurrency)
 			require.NoError(t, err)
@@ -847,7 +842,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -963,7 +957,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -1008,7 +1001,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -1347,7 +1339,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		committer,
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(constRandomSource),
 		testMaxConcurrency)
 	require.NoError(t, err)
@@ -1594,7 +1585,6 @@ func testScheduledTransactionsWithError(
 		committer,
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
