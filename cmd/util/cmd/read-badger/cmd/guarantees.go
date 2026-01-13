@@ -25,7 +25,7 @@ var guaranteesCmd = &cobra.Command{
 	Short: "get guarantees by collection ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			guarantees := store.NewGuarantees(&metrics.NoopCollector{}, db, store.DefaultCacheSize, store.DefaultCacheSize)
+			guarantees := store.NewGuarantees(metrics.NewNoopCollector(), db, store.DefaultCacheSize, store.DefaultCacheSize)
 
 			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)

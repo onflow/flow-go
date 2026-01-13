@@ -27,7 +27,7 @@ var epochCommitCmd = &cobra.Command{
 	Short: "get epoch commit by ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			epochCommits := store.NewEpochCommits(&metrics.NoopCollector{}, db)
+			epochCommits := store.NewEpochCommits(metrics.NewNoopCollector(), db)
 
 			log.Info().Msgf("got flag commit id: %s", flagEpochCommitID)
 			commitID, err := flow.HexStringToIdentifier(flagEpochCommitID)

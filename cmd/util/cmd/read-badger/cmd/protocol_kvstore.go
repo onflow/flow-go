@@ -32,7 +32,7 @@ var protocolStateKVStore = &cobra.Command{
 	Short: "get protocol state kvstore by block ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			protocolKVStore := store.NewProtocolKVStore(&metrics.NoopCollector{}, db, store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
+			protocolKVStore := store.NewProtocolKVStore(metrics.NewNoopCollector(), db, store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 
 			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
