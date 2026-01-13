@@ -1,7 +1,6 @@
 package move_wal
 
 import (
-	"math"
 	"os"
 
 	prometheusWAL "github.com/onflow/wal/wal"
@@ -25,7 +24,9 @@ var Cmd = &cobra.Command{
 
 func init() {
 	Cmd.Flags().IntVar(&flagFrom, "from", 0, "from segment number (inclusive)")
-	Cmd.Flags().IntVar(&flagTo, "to", math.MaxInt32, "to segment number (inclusive)")
+	_ = Cmd.MarkFlagRequired("from")
+
+	Cmd.Flags().IntVar(&flagTo, "to", -1, "to segment number (inclusive, optional - if not set, moves all files from --from)")
 
 	Cmd.Flags().StringVar(&flagMoveFrom, "move-from", "",
 		"source directory containing WAL files")
@@ -87,13 +88,23 @@ func run(*cobra.Command, []string) {
 
 	// Determine the actual range to move
 	actualFrom := flagFrom
-	actualTo := flagTo
+	var actualTo int
 
+	// If --to is not set (still -1), use the last available segment
+	if flagTo == -1 {
+		actualTo = toSegment
+		log.Info().Int("from", actualFrom).Int("to", actualTo).Msg("--to not specified, will move all files from --from to last available segment")
+	} else {
+		actualTo = flagTo
+	}
+
+	// Validate and adjust --from if needed
 	if actualFrom < fromSegment {
 		log.Info().Int("requested", actualFrom).Int("available", fromSegment).Msg("adjusting --from to first available segment")
 		actualFrom = fromSegment
 	}
 
+	// Validate and adjust --to if needed
 	if actualTo > toSegment {
 		log.Info().Int("requested", actualTo).Int("available", toSegment).Msg("adjusting --to to last available segment")
 		actualTo = toSegment
