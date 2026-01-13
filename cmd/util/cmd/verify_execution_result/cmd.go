@@ -25,6 +25,7 @@ var (
 	flagStopOnMismatch               bool
 	flagTransactionFeesDisabled      bool
 	flagScheduledTransactionsEnabled bool
+	flagAccessAddress                string
 )
 
 // # verify the last 100 sealed blocks
@@ -61,6 +62,9 @@ func init() {
 	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
 	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
+
+	Cmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "address of the access node")
+	_ = Cmd.MarkFlagRequired("access-address")
 }
 
 func run(*cobra.Command, []string) {
@@ -88,6 +92,8 @@ func run(*cobra.Command, []string) {
 		lg.Info().Msgf("look for 'could not verify' in the log for any mismatch, or try again with --stop_on_mismatch true to stop on first mismatch")
 	}
 
+	var totalStats verifier.BlockVerificationStats
+
 	if flagFromTo != "" {
 		from, to, err := parseFromTo(flagFromTo)
 		if err != nil {
@@ -96,7 +102,7 @@ func run(*cobra.Command, []string) {
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
 
-		err = verifier.VerifyRange(
+		totalStats, err = verifier.VerifyRange(
 			lockManager,
 			from,
 			to,
@@ -107,14 +113,17 @@ func run(*cobra.Command, []string) {
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
 			flagScheduledTransactionsEnabled,
+			flagAccessAddress,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
-		lg.Info().Msgf("finished verified range from %d to %d", from, to)
+		lg.Info().Msgf("finished verifying range from %d to %d", from, to)
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(
+
+		var err error
+		totalStats, err = verifier.VerifyLastKHeight(
 			lockManager,
 			flagLastK,
 			chainID,
@@ -124,13 +133,21 @@ func run(*cobra.Command, []string) {
 			flagStopOnMismatch,
 			flagTransactionFeesDisabled,
 			flagScheduledTransactionsEnabled,
+			flagAccessAddress,
 		)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}
 
-		lg.Info().Msgf("finished verified last %d sealed blocks", flagLastK)
+		lg.Info().Msgf("finished verifying last %d sealed blocks", flagLastK)
 	}
+
+	lg.Info().Msgf("matching chunks: %d/%d. matching transactions: %d/%d",
+		totalStats.MatchedChunkCount,
+		totalStats.MatchedChunkCount+totalStats.MismatchedChunkCount,
+		totalStats.MatchedTransactionCount,
+		totalStats.MatchedTransactionCount+totalStats.MismatchedTransactionCount,
+	)
 }
 
 func parseFromTo(fromTo string) (from, to uint64, err error) {

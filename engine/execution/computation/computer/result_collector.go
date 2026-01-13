@@ -261,9 +261,10 @@ func (collector *resultCollector) processTransactionResult(
 	)
 
 	txnResult := flow.TransactionResult{
-		TransactionID:   txn.ID,
-		ComputationUsed: output.ComputationUsed,
-		MemoryUsed:      output.MemoryEstimate,
+		TransactionID: txn.ID,
+		// NOTE: ignored for the purposes of comparing Cadence VM and interpreter
+		//ComputationUsed: output.ComputationUsed,
+		MemoryUsed: output.MemoryEstimate,
 	}
 	if output.Err != nil {
 		txnResult.ErrorMessage = output.Err.Error()

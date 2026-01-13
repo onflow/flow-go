@@ -291,7 +291,7 @@ func compareBlocks(
 	for _, block := range blocks {
 
 		g.Go(func() error {
-			result := compareBlock(
+			result := CompareBlock(
 				block.id,
 				block.header,
 				remoteClient,
@@ -299,9 +299,9 @@ func compareBlocks(
 				chain,
 			)
 
-			atomic.AddInt64(&txMismatched, int64(result.mismatches))
-			atomic.AddInt64(&txMatched, int64(result.matches))
-			if result.mismatches > 0 {
+			atomic.AddInt64(&txMismatched, int64(result.Mismatches))
+			atomic.AddInt64(&txMatched, int64(result.Matches))
+			if result.Mismatches > 0 {
 				atomic.AddInt64(&blocksMismatched, 1)
 			} else {
 				atomic.AddInt64(&blocksMatched, 1)
@@ -321,19 +321,19 @@ func compareBlocks(
 	log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
 }
 
-type blockResult struct {
-	mismatches int
-	matches    int
+type BlockResult struct {
+	Mismatches int
+	Matches    int
 }
 
-func compareBlock(
+func CompareBlock(
 	blockID flow.Identifier,
 	header *flow.Header,
 	remoteClient debug.RemoteClient,
 	flowClient *client.Client,
 	chain flow.Chain,
 ) (
-	result blockResult,
+	result BlockResult,
 ) {
 
 	var (
@@ -429,14 +429,14 @@ func compareBlock(
 		) {
 			mismatch = true
 
-			result.mismatches++
+			result.Mismatches++
 
 			if flagWriteTraces {
 				writeTraces(txID, "inter", interSpanExporters[i])
 				writeTraces(txID, "vm", vmSpanExporters[i])
 			}
 		} else {
-			result.matches++
+			result.Matches++
 		}
 	}
 
