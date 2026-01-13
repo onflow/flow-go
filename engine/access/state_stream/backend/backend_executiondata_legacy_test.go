@@ -249,10 +249,10 @@ func (s *LegacyBackendExecutionDataSuite) SetupTestMocks() {
 		),
 	).Maybe()
 
-	s.SetupBackend(false)
+	s.SetupBackend()
 }
 
-func (s *LegacyBackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
+func (s *LegacyBackendExecutionDataSuite) SetupBackend() {
 	var err error
 	s.backend, err = New(
 		s.logger,
@@ -260,8 +260,6 @@ func (s *LegacyBackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		s.headers,
 		s.seals,
 		s.registersAsync,
-		s.eventsIndex,
-		useEventsIndex,
 		state_stream.DefaultRegisterIDsRequestLimit,
 		subscription.NewSubscriptionHandler(
 			s.logger,

@@ -19,7 +19,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -271,8 +270,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		subscription.DefaultSendBufferSize,
 	)
 
-	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)
-
 	suite.executionDataTracker = tracker.NewExecutionDataTracker(
 		suite.log,
 		suite.state,
@@ -288,8 +285,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.headers,
 		suite.seals,
 		suite.registers,
-		eventIndexer,
-		false,
 		state_stream.DefaultRegisterIDsRequestLimit,
 		subscriptionHandler,
 		suite.executionDataTracker,
