@@ -17,7 +17,7 @@ type ClusterBlocks interface {
 	// of the known forks) no matter whether the collection has been finalized or not.
 	//
 	// Error returns:
-	//   - storage.ErrNotFound if the block ID was not found
+	//   - [storage.ErrNotFound] if the block ID was not found
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
 	ProposalByID(blockID flow.Identifier) (*cluster.Proposal, error)
@@ -26,7 +26,7 @@ type ClusterBlocks interface {
 	// signature on it. It is only available for finalized collections.
 	//
 	// Error returns:
-	//   - storage.ErrNotFound if the block height or block ID was not found
+	//   - [storage.ErrNotFound] if the block height or block ID was not found
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
 	ProposalByHeight(height uint64) (*cluster.Proposal, error)

@@ -124,11 +124,9 @@ func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, erro
 // ByID returns the block with the given hash. It is available for all incorporated blocks (validated blocks
 // that have been appended to any of the known forks) no matter whether the block has been finalized or not.
 //
-// Error returns:
+// Expected errors returns during normal operations:
 //   - [storage.ErrNotFound] if no block with the corresponding ID was found
 //   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return b.retrieve(blockID)
 }
@@ -137,11 +135,9 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 // It is available for all incorporated blocks (validated blocks that have been appended to any
 // of the known forks) no matter whether the block has been finalized or not.
 //
-// Error returns:
+// Expected errors returns during normal operations:
 //   - [storage.ErrNotFound] if no block with the corresponding ID was found
 //   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
 func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
 	return b.retrieveProposal(blockID)
 }
@@ -150,8 +146,8 @@ func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
 // certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
 // at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 // even for non-finalized blocks.
-// Expected errors during normal operations:
-//   - `storage.ErrNotFound` if no certified block is known at given view.
+// Expected errors returns during normal operations:
+//   - [storage.ErrNotFound] if no certified block is known at given view.
 func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
 	blockID, err := b.headers.BlockIDByView(view)
 	if err != nil {
@@ -163,7 +159,7 @@ func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
 // ProposalByView returns the block proposal with the given view. It is only available for certified blocks.
 //
 // Expected errors during normal operations:
-//   - `storage.ErrNotFound` if no certified block is known at given view.
+//   - [storage.ErrNotFound] if no certified block is known at given view.
 func (b *Blocks) ProposalByView(view uint64) (*flow.Proposal, error) {
 	blockID, err := b.headers.BlockIDByView(view)
 	if err != nil {
@@ -175,10 +171,8 @@ func (b *Blocks) ProposalByView(view uint64) (*flow.Proposal, error) {
 // ByHeight returns the block at the given height. It is only available
 // for finalized blocks.
 //
-// Error returns:
+// Expected errors returns during normal operations:
 //   - [storage.ErrNotFound] if no block for the corresponding height was found
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -190,10 +184,8 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 // ProposalByHeight returns the block at the given height, along with the proposer's
 // signature on it. It is only available for finalized blocks.
 //
-// Error returns:
+// Expected errors returns during normal operations:
 //   - [storage.ErrNotFound] if no block proposal for the corresponding height was found
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
 func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
 	if err != nil {
@@ -209,10 +201,8 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 // finality.
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
-// Error returns:
+// Expected errors returns during normal operations:
 //   - [storage.ErrNotFound] if the collection ID was not found
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	blockID, err := b.BlockIDByCollectionID(collID)
 	if err != nil {
@@ -231,10 +221,8 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // finality.
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
-// Error returns:
+// Expected errors returns during normal operations:
 //   - [storage.ErrNotFound] if no FINALIZED block exists containing the expected collection guarantee
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
 func (b *Blocks) BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error) {
 	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
 	if err != nil {
