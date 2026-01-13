@@ -21,7 +21,6 @@ type signatureType struct {
 
 	errorBuilder func(flow.TransactionSignature, error) errors.CodedError
 
-	// TODO(tarak): duplicate use - remove?
 	aggregateWeights map[flow.Address]int
 }
 
@@ -98,7 +97,6 @@ func newSignatureEntries(
 	map[flow.Address]int,
 	error,
 ) {
-	// TODO(tarak): allocations are returned empty maps - move the key weight aggregation here?
 	payloadWeights := make(map[flow.Address]int, len(payloadSignatures))
 	envelopeWeights := make(map[flow.Address]int, len(envelopeSignatures))
 
@@ -174,7 +172,6 @@ type TransactionVerifier struct {
 
 func (v *TransactionVerifier) CheckAuthorization(
 	tracer tracing.TracerSpan,
-	chain flow.Chain,
 	proc *TransactionProcedure,
 	txnState storage.TransactionPreparer,
 	keyWeightThreshold int,
@@ -182,7 +179,7 @@ func (v *TransactionVerifier) CheckAuthorization(
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
 	txnState.RunWithMeteringDisabled(func() {
-		err = v.verifyTransaction(tracer, chain, proc, txnState, keyWeightThreshold)
+		err = v.verifyTransaction(tracer, proc, txnState, keyWeightThreshold)
 	})
 	if err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
@@ -195,7 +192,6 @@ func (v *TransactionVerifier) CheckAuthorization(
 // and check the Authorizers have enough weights.
 func (v *TransactionVerifier) verifyTransaction(
 	tracer tracing.TracerSpan,
-	chain flow.Chain,
 	proc *TransactionProcedure,
 	txnState storage.TransactionPreparer,
 	keyWeightThreshold int,
@@ -211,61 +207,12 @@ func (v *TransactionVerifier) verifyTransaction(
 		return errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 	}
 
-	serviceAddress := chain.ServiceAddress()
-
-	var signatures []*signatureContinuation
-	var payloadWeights map[flow.Address]int
-	var envelopeWeights map[flow.Address]int
-	var err error
-
-	// the following logic adds a special override for the service account that allows it to modify accounts
-	// on behalf of transaction authorizers without requiring their signatures. this is an extra
-	// ordinary update that is added for the specific purpose of unwinding the impacts of the fraudulent
-	// transactions executed during the incident window.
-	serviceAccountOveride := false
-	if len(tx.Authorizers) >= 1 &&
-		// first authorizer
-		tx.Authorizers[0] == serviceAddress &&
-		// payer and proposer
-		tx.Payer == serviceAddress &&
-		tx.ProposalKey.Address == serviceAddress {
-
-		// special case
-		// only the service account signatures need to be valid
-		serviceAccountOveride = true
-
-		payloadSignatures := make([]flow.TransactionSignature, 0, len(tx.PayloadSignatures))
-
-		for _, entry := range tx.PayloadSignatures {
-			if entry.Address != serviceAddress {
-				continue
-			}
-			payloadSignatures = append(payloadSignatures, entry)
-		}
-
-		envelopeSignatures := make([]flow.TransactionSignature, 0, len(tx.EnvelopeSignatures))
-		for _, entry := range tx.EnvelopeSignatures {
-			if entry.Address != serviceAddress {
-				continue
-			}
-			envelopeSignatures = append(envelopeSignatures, entry)
-		}
-
-		signatures, payloadWeights, envelopeWeights, err = newSignatureEntries(
-			payloadSignatures,
-			tx.PayloadMessage(),
-			envelopeSignatures,
-			tx.EnvelopeMessage(),
-		)
-	} else {
-		signatures, payloadWeights, envelopeWeights, err = newSignatureEntries(
-			tx.PayloadSignatures,
-			tx.PayloadMessage(),
-			tx.EnvelopeSignatures,
-			tx.EnvelopeMessage(),
-		)
-	}
-
+	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(
+		tx.PayloadSignatures,
+		tx.PayloadMessage(),
+		tx.EnvelopeSignatures,
+		tx.EnvelopeMessage(),
+	)
 	if err != nil {
 		return err
 	}
@@ -293,20 +240,6 @@ func (v *TransactionVerifier) verifyTransaction(
 		if addr == tx.Payer {
 			continue
 		}
-
-		// if the special service account override is enabled, other authorizers than the serveice account
-		// are not checked for weights
-		if serviceAccountOveride && addr != serviceAddress {
-			exists, err := accounts.Exists(addr)
-			if err != nil {
-				return err
-			}
-			if !exists {
-				return errors.NewInvalidProposalSignatureError(tx.ProposalKey, fmt.Errorf("account %s does not exist", addr))
-			}
-			continue
-		}
-
 		// hasSufficientKeyWeight
 		if !v.hasSufficientKeyWeight(payloadWeights, addr, keyWeightThreshold) {
 			return errors.NewAccountAuthorizationErrorf(
