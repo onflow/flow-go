@@ -854,7 +854,7 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		Command: []string{
 			"--triedir=/trie",
 			fmt.Sprintf("--grpc-addr=0.0.0.0:%s", testnet.GRPCPort),
-			"--capacity=100",
+			"--mtrie-cache-size=100",
 			"--checkpoint-distance=100",
 			"--checkpoints-to-keep=3",
 			fmt.Sprintf("--loglevel=%s", logLevel),
