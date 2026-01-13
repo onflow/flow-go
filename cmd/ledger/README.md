@@ -23,7 +23,7 @@ go build -o flow-ledger-service ./cmd/ledger
 ./flow-ledger-service \
   -triedir /path/to/trie \
   -grpc-addr 0.0.0.0:9000 \
-  -capacity 100 \
+  -mtrie-cache-size 500 \
   -checkpoint-distance 100 \
   -checkpoints-to-keep 3
 ```
@@ -32,7 +32,7 @@ go build -o flow-ledger-service ./cmd/ledger
 
 - `-triedir`: Directory for trie files (required)
 - `-grpc-addr`: gRPC server listen address (default: 0.0.0.0:9000)
-- `-capacity`: Ledger capacity - number of tries (default: 100)
+- `-mtrie-cache-size`: MTrie cache size - number of tries (default: 500)
 - `-checkpoint-distance`: Checkpoint distance (default: 100)
 - `-checkpoints-to-keep`: Number of checkpoints to keep (default: 3)
 

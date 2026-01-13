@@ -26,7 +26,7 @@ import (
 var (
 	triedir           = flag.String("triedir", "", "Directory for trie files (required)")
 	grpcListenAddr    = flag.String("grpc-addr", "0.0.0.0:9000", "gRPC server listen address")
-	capacity          = flag.Int("mtrie-cache-size", 500, "Ledger capacity (number of tries)")
+	mtrieCacheSize    = flag.Int("mtrie-cache-size", 500, "MTrie cache size (number of tries)")
 	checkpointDist    = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
 	logLevel          = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
@@ -58,7 +58,7 @@ func main() {
 	logger.Info().
 		Str("triedir", *triedir).
 		Str("grpc_addr", *grpcListenAddr).
-		Int("capacity", *capacity).
+		Int("mtrie_cache_size", *mtrieCacheSize).
 		Msg("starting ledger service")
 
 	// Create ledger using factory
@@ -66,7 +66,7 @@ func main() {
 	metricsCollector := &metrics.NoopCollector{}
 	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		Triedir:                              *triedir,
-		MTrieCacheSize:                       uint32(*capacity),
+		MTrieCacheSize:                       uint32(*mtrieCacheSize),
 		CheckpointDistance:                   *checkpointDist,
 		CheckpointsToKeep:                    *checkpointsToKeep,
 		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
