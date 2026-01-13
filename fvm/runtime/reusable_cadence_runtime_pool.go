@@ -95,6 +95,7 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 			WrappedCadenceRuntime{
 				pool.newRuntime(),
 			},
+			pool.chain,
 			pool.runtimeConfig,
 		)
 	}

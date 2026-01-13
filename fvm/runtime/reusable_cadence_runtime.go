@@ -7,24 +7,38 @@ import (
 	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/backends"
+	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/impl"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
+
+	chain flow.Chain
+
 	TxRuntimeEnv     runtime.Environment
 	ScriptRuntimeEnv runtime.Environment
 
-	fvmEnv environment.Environment
+	fvmEnv     environment.Environment
+	evmBackend *backends.WrappedEnvironment
 }
 
 var _ environment.ReusableCadenceRuntime = (*ReusableCadenceRuntime)(nil)
 
 func NewReusableCadenceRuntime(
 	rt runtime.Runtime,
+	chain flow.Chain,
 	config runtime.Config,
 ) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:          rt,
+		chain:            chain,
 		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
 		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
 	}
@@ -35,16 +49,63 @@ func NewReusableCadenceRuntime(
 }
 
 func (reusable *ReusableCadenceRuntime) declareStandardLibraryFunctions() {
+	// random source for transactions
 	reusable.TxRuntimeEnv.DeclareValue(blockRandomSourceDeclaration(reusable), nil)
 
+	// transaction index
 	declaration := transactionIndexDeclaration(reusable)
 	reusable.TxRuntimeEnv.DeclareValue(declaration, nil)
 	reusable.ScriptRuntimeEnv.DeclareValue(declaration, nil)
 
+	reusable.declareEVM()
+}
+
+func (reusable *ReusableCadenceRuntime) declareEVM() {
+	chainID := reusable.chain.ChainID()
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	randomBeaconAddress := sc.RandomBeaconHistory.Address
+	flowTokenAddress := sc.FlowToken.Address
+
+	reusable.evmBackend = backends.NewWrappedEnvironment(reusable.fvmEnv)
+	evmEmulator := emulator.NewEmulator(reusable.evmBackend, evm.StorageAccountAddress(chainID))
+	blockStore := handler.NewBlockStore(chainID, reusable.evmBackend, evm.StorageAccountAddress(chainID))
+	addressAllocator := handler.NewAddressAllocator()
+
+	evmContractAddress := evm.ContractAccountAddress(chainID)
+
+	contractHandler := handler.NewContractHandler(
+		chainID,
+		evmContractAddress,
+		common.Address(flowTokenAddress),
+		randomBeaconAddress,
+		blockStore,
+		addressAllocator,
+		reusable.evmBackend,
+		evmEmulator,
+	)
+
+	internalEVMContractValue := impl.NewInternalEVMContractValue(
+		nil,
+		contractHandler,
+		evmContractAddress,
+	)
+
+	stdlib.SetupEnvironment(
+		reusable.TxRuntimeEnv,
+		internalEVMContractValue,
+		evmContractAddress,
+	)
+
+	stdlib.SetupEnvironment(
+		reusable.ScriptRuntimeEnv,
+		internalEVMContractValue,
+		evmContractAddress,
+	)
 }
 
 func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv environment.Environment) {
 	reusable.fvmEnv = fvmEnv
+	reusable.evmBackend.SetEnv(fvmEnv)
 }
 
 func (reusable *ReusableCadenceRuntime) CadenceTXEnv() runtime.Environment {
