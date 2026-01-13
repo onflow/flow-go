@@ -411,8 +411,8 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 	})
 
 	ec := &ExecutionCollector{
-		tracer:         tracer,
-		ledgerCollector: ledgerCollector,
+		tracer:                                  tracer,
+		ledgerCollector:                         ledgerCollector,
 		blockExecutionTime:                      blockExecutionTime,
 		blockComputationUsed:                    blockComputationUsed,
 		blockComputationVector:                  blockComputationVector,
@@ -531,7 +531,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Name:      "commitment_size_bytes",
 			Help:      "the storage size of a state commitment in bytes",
 		}),
-
 
 		stateSyncActive: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,

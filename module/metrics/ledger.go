@@ -17,8 +17,8 @@ const (
 // LedgerCollector implements both module.LedgerMetrics and module.WALMetrics.
 // It can be reused by both the standalone ledger service and execution nodes.
 type LedgerCollector struct {
-	namespace      string
-	walSubsystem   string
+	namespace    string
+	walSubsystem string
 	// LedgerMetrics
 	forestApproxMemorySize    prometheus.Gauge
 	forestNumberOfTrees       prometheus.Gauge
@@ -32,7 +32,7 @@ type LedgerCollector struct {
 	updateValuesNumber        prometheus.Counter
 	updateValuesSize          prometheus.Gauge
 	updateDuration            prometheus.Histogram
-	updateDurationPerItem      prometheus.Histogram
+	updateDurationPerItem     prometheus.Histogram
 	readValuesNumber          prometheus.Counter
 	readValuesSize            prometheus.Gauge
 	readDuration              prometheus.Histogram
@@ -250,4 +250,3 @@ func (lc *LedgerCollector) ReadDurationPerItem(duration time.Duration) {
 func (lc *LedgerCollector) ExecutionCheckpointSize(bytes uint64) {
 	lc.checkpointSize.Set(float64(bytes))
 }
-
