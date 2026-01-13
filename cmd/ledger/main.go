@@ -24,9 +24,9 @@ import (
 )
 
 var (
-	walDir            = flag.String("wal-dir", "", "Directory for WAL files (required)")
+	triedir           = flag.String("triedir", "", "Directory for trie files (required)")
 	grpcListenAddr    = flag.String("grpc-addr", "0.0.0.0:9000", "gRPC server listen address")
-	capacity          = flag.Int("capacity", 100, "Ledger capacity (number of tries)")
+	capacity          = flag.Int("mtrie-cache-size", 500, "Ledger capacity (number of tries)")
 	checkpointDist    = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
 	logLevel          = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
@@ -37,8 +37,8 @@ var (
 func main() {
 	flag.Parse()
 
-	if *walDir == "" {
-		fmt.Fprintf(os.Stderr, "error: --wal-dir is required\n")
+	if *triedir == "" {
+		fmt.Fprintf(os.Stderr, "error: --triedir is required\n")
 		os.Exit(1)
 	}
 
@@ -56,7 +56,7 @@ func main() {
 		Logger()
 
 	logger.Info().
-		Str("wal_dir", *walDir).
+		Str("triedir", *triedir).
 		Str("grpc_addr", *grpcListenAddr).
 		Int("capacity", *capacity).
 		Msg("starting ledger service")
@@ -65,7 +65,7 @@ func main() {
 	// TODO(leo): to use real metrics collector
 	metricsCollector := &metrics.NoopCollector{}
 	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
-		Triedir:                              *walDir,
+		Triedir:                              *triedir,
 		MTrieCacheSize:                       uint32(*capacity),
 		CheckpointDistance:                   *checkpointDist,
 		CheckpointsToKeep:                    *checkpointsToKeep,

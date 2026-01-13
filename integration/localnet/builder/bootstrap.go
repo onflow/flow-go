@@ -852,7 +852,7 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		name:  ledgerServiceName,
 		Image: "localnet-ledger",
 		Command: []string{
-			"--wal-dir=/trie",
+			"--triedir=/trie",
 			fmt.Sprintf("--grpc-addr=0.0.0.0:%s", testnet.GRPCPort),
 			"--capacity=100",
 			"--checkpoint-distance=100",

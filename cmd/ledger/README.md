@@ -21,7 +21,7 @@ go build -o flow-ledger-service ./cmd/ledger
 
 ```bash
 ./flow-ledger-service \
-  -wal-dir /path/to/wal \
+  -triedir /path/to/trie \
   -grpc-addr 0.0.0.0:9000 \
   -capacity 100 \
   -checkpoint-distance 100 \
@@ -30,7 +30,7 @@ go build -o flow-ledger-service ./cmd/ledger
 
 ## Flags
 
-- `-wal-dir`: Directory for WAL files (required)
+- `-triedir`: Directory for trie files (required)
 - `-grpc-addr`: gRPC server listen address (default: 0.0.0.0:9000)
 - `-capacity`: Ledger capacity - number of tries (default: 100)
 - `-checkpoint-distance`: Checkpoint distance (default: 100)
