@@ -22,14 +22,7 @@ type ExecutionResultInfoProvider interface {
 	//
 	// Expected errors during normal operations:
 	//   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for data before the node's root block.
-	//   - [optimistic_sync.ErrParentMismatch]: If the execution fork of an execution node from which we were getting the
-	//     execution results was abandoned.
-	//   - [optimistic_sync.ErrNotEnoughAgreeingExecutors]: If there are not enough execution nodes that produced the
-	//     execution result.
-	//   - [optimistic_sync.ErrRequiredExecutorNotFound]: If the criteria's required executor is not in the group of
-	//     execution nodes that produced the execution result.
-	//   - [optimistic_sync.AgreeingExecutorsCountExceededError]: Agreeing executors count exceeds available executors.
-	//   - [optimistic_sync.UnknownRequiredExecutorError]: A required executor ID is not in the available set.
+	//   - [optimistic_sync.ErrExecutionResultNotReady]: If criteria cannot be satisfied at the moment.
 	//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
 	//     sealed but no execution result can satisfy the provided criteria.
 	ExecutionResultInfo(blockID flow.Identifier, criteria Criteria) (*ExecutionResultInfo, error)

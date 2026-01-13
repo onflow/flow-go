@@ -82,14 +82,9 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block %s: %w", blockID, err)
 		switch {
-		case errors.Is(err, storage.ErrNotFound) ||
-			errors.Is(err, optimistic_sync.ErrBlockBeforeNodeHistory) ||
+		case errors.Is(err, optimistic_sync.ErrBlockBeforeNodeHistory) ||
 			optimistic_sync.IsExecutionResultNotReadyError(err):
 			return nil, nil, access.NewDataNotFoundError("execution data", err)
-		case optimistic_sync.IsAgreeingExecutorsCountExceededError(err):
-			return nil, nil, access.NewInvalidRequestError(err)
-		case optimistic_sync.IsUnknownRequiredExecutorError(err):
-			return nil, nil, access.NewInvalidRequestError(err)
 		case optimistic_sync.IsCriteriaNotMetError(err):
 			return nil, nil, access.NewInvalidRequestError(err)
 		default:

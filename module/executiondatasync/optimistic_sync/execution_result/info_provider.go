@@ -56,7 +56,6 @@ func NewExecutionResultInfoProvider(
 // based on the provided criteria.
 //
 // Expected errors during normal operations:
-//   - [storage.ErrNotFound]: If the execution receipts for the block ID are not found.
 //   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for data before the node's root block.
 //   - [optimistic_sync.ErrExecutionResultNotReady]: If criteria cannot be satisfied at the moment.
 //   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already
