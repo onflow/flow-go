@@ -22,7 +22,13 @@ import (
 
 // ReusableCadenceRuntime is a wrapper around cadence Runtime and cadence Environment
 // with pre-injected cadence context for: EVM, getTransactionIndex, ...
-// it can be reused by changing the fvmEnv.
+// it can be reused by changing the fvmEnv. The reuse happens accross blocks and between scripts and transactions
+//
+// This exists because creating and setting up a cadence runtime and environment is a costly operation.
+// This assumes that the following objects are safe to reuse across blocks:
+// - cadence runtime
+// - cadence environment
+// - evm emulator (and related objects)
 //
 // because the cadence environment differs between scripts and transactions there are 2
 // wrapper structs for ReusableCadenceRuntime that change what env ReadStored
@@ -159,6 +165,9 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	)
 }
 
+// ReusableCadenceTransactionRuntime is a wrapper around ReusableCadenceRuntime
+// that is ment to be used in transactions.
+// see: ReusableCadenceRuntime
 type ReusableCadenceTransactionRuntime struct {
 	*ReusableCadenceRuntime
 }
@@ -207,6 +216,9 @@ func (reusable ReusableCadenceTransactionRuntime) InvokeContractFunction(
 	)
 }
 
+// ReusableCadenceScriptRuntime is a wrapper around ReusableCadenceRuntime
+// that is ment to be used in scripts.
+// see: ReusableCadenceRuntime
 type ReusableCadenceScriptRuntime struct {
 	*ReusableCadenceRuntime
 }

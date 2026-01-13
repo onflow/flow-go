@@ -19,7 +19,7 @@ var _ Environment = &facadeEnvironment{}
 
 // facadeEnvironment exposes various fvm business logic as a single interface.
 type facadeEnvironment struct {
-	CadenceRuntime
+	CadenceRuntimeProvider
 
 	tracing.TracerSpan
 	Meter
@@ -61,7 +61,7 @@ func newFacadeEnvironment(
 	params EnvironmentParams,
 	txnState storage.TransactionPreparer,
 	meter Meter,
-	runtime CadenceRuntime,
+	runtime CadenceRuntimeProvider,
 ) *facadeEnvironment {
 	accounts := NewAccounts(txnState)
 	logger := NewProgramLogger(tracer, params.ProgramLoggerParams)
@@ -75,7 +75,7 @@ func newFacadeEnvironment(
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	env := &facadeEnvironment{
-		CadenceRuntime: runtime,
+		CadenceRuntimeProvider: runtime,
 
 		TracerSpan: tracer,
 		Meter:      meter,
@@ -152,7 +152,7 @@ func newFacadeEnvironment(
 		txnState: txnState,
 	}
 
-	env.CadenceRuntime.SetEnvironment(env)
+	env.CadenceRuntimeProvider.SetEnvironment(env)
 
 	return env
 }

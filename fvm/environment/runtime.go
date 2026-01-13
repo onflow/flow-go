@@ -16,17 +16,23 @@ type RuntimeParams struct {
 	ReusableCadenceRuntimePool
 }
 
-type cadenceRuntime struct {
+type cadenceRuntimeProvider struct {
 	RuntimeParams
 
 	env         Environment
 	runtimeType CadenceRuntimeType
 }
 
-// CadenceRuntime exposes the cadence runtime to the rest of the environment package.
-type CadenceRuntime interface {
+// CadenceRuntimeProvider exposes the cadence runtime to the rest of the environment package.
+type CadenceRuntimeProvider interface {
+	// SetEnvironment sets the fvm Environment that will be injected into a ReusableCadenceRuntime
+	// when it is borrowed
 	SetEnvironment(env Environment)
+	// BorrowCadenceRuntime borrows a runtime from the ReusableCadenceRuntimePool moving it so its only used in
+	// this procedure until returned
 	BorrowCadenceRuntime() ReusableCadenceRuntime
+	// ReturnCadenceRuntime returns a runtime from the ReusableCadenceRuntimePool so that it can be reused
+	// for a different procedure later.
 	ReturnCadenceRuntime(reusable ReusableCadenceRuntime)
 }
 
@@ -35,27 +41,27 @@ type CadenceRuntimeType int
 
 const (
 	// CadenceScriptRuntime is a marker to indicate to use the cadence runtime set up for scripts
-	CadenceScriptRuntime = iota
+	CadenceScriptRuntime CadenceRuntimeType = iota
 	// CadenceTransactionRuntime is a marker to indicate to use the cadence runtime set up for transactions
 	CadenceTransactionRuntime
 )
 
-func NewRuntime(params RuntimeParams, runtimeType CadenceRuntimeType) *cadenceRuntime {
-	return &cadenceRuntime{
+func NewRuntime(params RuntimeParams, runtimeType CadenceRuntimeType) *cadenceRuntimeProvider {
+	return &cadenceRuntimeProvider{
 		RuntimeParams: params,
 		runtimeType:   runtimeType,
 	}
 }
 
-func (runtime *cadenceRuntime) SetEnvironment(env Environment) {
+func (runtime *cadenceRuntimeProvider) SetEnvironment(env Environment) {
 	runtime.env = env
 }
 
-func (runtime *cadenceRuntime) BorrowCadenceRuntime() ReusableCadenceRuntime {
+func (runtime *cadenceRuntimeProvider) BorrowCadenceRuntime() ReusableCadenceRuntime {
 	return runtime.ReusableCadenceRuntimePool.Borrow(runtime.env, runtime.runtimeType)
 }
 
-func (runtime *cadenceRuntime) ReturnCadenceRuntime(
+func (runtime *cadenceRuntimeProvider) ReturnCadenceRuntime(
 	reusable ReusableCadenceRuntime,
 ) {
 	runtime.ReusableCadenceRuntimePool.Return(reusable)

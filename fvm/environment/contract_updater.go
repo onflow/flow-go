@@ -164,7 +164,7 @@ type contractUpdaterStubsImpl struct {
 
 	logger          *ProgramLogger
 	systemContracts *SystemContracts
-	runtime         CadenceRuntime
+	runtime         CadenceRuntimeProvider
 }
 
 func (impl *contractUpdaterStubsImpl) RestrictedDeploymentEnabled() bool {
@@ -296,7 +296,7 @@ func NewContractUpdater(
 	params ContractUpdaterParams,
 	logger *ProgramLogger,
 	systemContracts *SystemContracts,
-	runtime CadenceRuntime,
+	runtime CadenceRuntimeProvider,
 ) *ContractUpdaterImpl {
 	updater := &ContractUpdaterImpl{
 		tracer:          tracer,
