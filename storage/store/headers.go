@@ -172,7 +172,7 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
 	return val, nil
 }
 
-// retrieveTx returns a proposal header of the block with the given ID.
+// retrieveProposalTx returns a proposal header of the block with the given ID.
 // Essentially, this is the header, along with the proposer's signature.
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if no block header with the given ID exists
@@ -189,7 +189,7 @@ func (h *Headers) retrieveProposalTx(blockID flow.Identifier) (*flow.ProposalHea
 	return &flow.ProposalHeader{Header: header, ProposerSigData: sig}, nil
 }
 
-// Retrieves the block ID for the given finalized height.
+// retrieveIdByHeightTx returns the block ID for the given finalized height.
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if no finalized block is known (for the chain this Headers instance is bound to)
 func (h *Headers) retrieveIdByHeightTx(height uint64) (flow.Identifier, error) {

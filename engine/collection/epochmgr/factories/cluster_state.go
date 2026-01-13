@@ -34,7 +34,7 @@ func NewClusterStateFactory(
 	return factory, nil
 }
 
-func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flow.ChainID) (
+func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, consensusChainID flow.ChainID) (
 	*clusterkv.MutableState,
 	*store.Headers,
 	storage.ClusterPayloads,
@@ -49,7 +49,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flo
 	}
 	clusterPayloads := store.NewClusterPayloads(f.metrics, f.db)
 	clusterBlocks := store.NewClusterBlocks(f.db, stateRoot.ClusterID(), clusterHeaders, clusterPayloads)
-	consensusHeaders, err := store.NewHeaders(f.metrics, f.db, chainID) // for reference blocks
+	consensusHeaders, err := store.NewHeaders(f.metrics, f.db, consensusChainID) // for reference blocks
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
