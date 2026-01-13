@@ -22,6 +22,7 @@ const fullWeight = 1000
 
 func newContext() fvm.Context {
 	return fvm.NewContext(
+		flow.Mainnet.Chain(),
 		fvm.WithAuthorizationChecksEnabled(true),
 		fvm.WithAccountKeyWeightThreshold(fullWeight),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),

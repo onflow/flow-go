@@ -213,7 +213,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 					v.verConf.scheduledTransactionsEnabled,
 				)...,
 			)
-			vmCtx := fvm.NewContext(fvmOptions...)
+			vmCtx := fvm.NewContext(node.RootChainID.Chain(), fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 

@@ -54,6 +54,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithTransactionTracer(ctx.Tracer),
 		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
 		WithBlockTxCountSoFar(ctx.TxCountSoFar),
+		WithRestrictedEOAs(RestrictedEOAs),
 	)
 }
 
@@ -189,7 +190,11 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return types.NewInvalidResult(tx, err), nil
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), err), nil
+	}
+
+	if bl.config.IsRestrictedEOA(msg.From) {
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA), nil
 	}
 
 	// call tracer
@@ -244,7 +249,12 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			GetSigner(bl.config),
 			proc.config.BlockContext.BaseFee)
 		if err != nil {
-			batchResults[i] = types.NewInvalidResult(tx, err)
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), err)
+			continue
+		}
+
+		if bl.config.IsRestrictedEOA(msg.From) {
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA)
 			continue
 		}
 
@@ -381,12 +391,14 @@ func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
 func (proc *procedure) mintTo(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, value := convertAndCheckValue(call.Value)
+	// check and convert value
+	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			call.Type,
+			call.Hash(),
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	// create bridge account if not exist
@@ -425,19 +437,23 @@ func (proc *procedure) mintTo(
 func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, value := convertAndCheckValue(call.Value)
+	// check and convert value
+	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			call.Type,
+			call.Hash(),
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	// check balance is not prone to rounding error
-	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+	if !types.AttoFlowBalanceIsValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrWithdrawBalanceRounding), nil
+			call.Type,
+			call.Hash(),
+			types.ErrWithdrawBalanceRounding,
+		), nil
 	}
 
 	// create bridge account if not exist
@@ -479,12 +495,14 @@ func (proc *procedure) withdrawFrom(
 func (proc *procedure) deployAt(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, castedValue := convertAndCheckValue(call.Value)
+	// check and convert value
+	castedValue, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			call.Type,
+			call.Hash(),
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	txHash := call.Hash()
@@ -729,15 +747,15 @@ func (proc *procedure) run(
 	return &res, nil
 }
 
-func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int) {
+func checkAndConvertValue(input *big.Int) (converted *uint256.Int, isValid bool) {
 	// check for negative input
 	if input.Sign() < 0 {
-		return false, nil
+		return nil, false
 	}
 	// convert value into uint256
 	value, overflow := uint256.FromBig(input)
 	if overflow {
-		return true, nil
+		return nil, false
 	}
-	return true, value
+	return value, true
 }

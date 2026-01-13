@@ -150,7 +150,7 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithBlockHeader(block1.ToHeader()),
 	)
 
-	ctx := fvm.NewContext(opts...)
+	ctx := fvm.NewContext(chain, opts...)
 
 	vm := fvm.NewVirtualMachine()
 	snapshotTree := snapshot.NewSnapshotTree(nil)

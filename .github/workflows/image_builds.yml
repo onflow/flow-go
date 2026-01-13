@@ -128,7 +128,7 @@ jobs:
           private-key: ${{ secrets.DEPLOYMENT_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
-      - uses: convictional/trigger-workflow-and-wait@v1.6.1
+      - uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:
           client_payload: '{"role": "${{ matrix.role }}", "tag": "${{ inputs.tag }}"}'
           github_token: ${{ steps.app-token.outputs.token }}
