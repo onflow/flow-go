@@ -667,9 +667,6 @@ func (b *Builder) buildHeader(
 	}, nil
 }
 
-// findRefHeightSearchRangeForConflictingClusterBlocks computes the height range of main consensus blocks that have to
-// be scanned, to find all finalized cluster blocks that could possibly contain transactions still eligible for inclusion
-
 // findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference block heights
 // which could possibly contain transactions duplicating those in our collection under construction, based on the range
 // of reference heights of transactions in the collection under construction.
