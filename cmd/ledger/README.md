@@ -35,6 +35,8 @@ go build -o flow-ledger-service ./cmd/ledger
 - `-mtrie-cache-size`: MTrie cache size - number of tries (default: 500)
 - `-checkpoint-distance`: Checkpoint distance (default: 100)
 - `-checkpoints-to-keep`: Number of checkpoints to keep (default: 3)
+- `-max-request-size`: Maximum request message size in bytes (default: 1 GiB)
+- `-max-response-size`: Maximum response message size in bytes (default: 10 GiB)
 
 ## API
 
