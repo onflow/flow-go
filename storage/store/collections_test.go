@@ -187,3 +187,64 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		assert.True(t, indexedCollection.ID() == col1.ID() || indexedCollection.ID() == col2.ID(), "Expected one of the collections to be indexed")
 	})
 }
+
+// TestCollections_BatchStoreAndIndexByTransaction_EarlyAbort verifies that
+// BatchStoreAndIndexByTransaction aborts early when all transactions are already
+// indexed and point to the same collection, avoiding redundant database writes.
+func TestCollections_BatchStoreAndIndexByTransaction_EarlyAbort(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		transactions := store.NewTransactions(metrics, db)
+		collections := store.NewCollections(db, transactions)
+
+		// Create a collection with multiple transactions
+		collection := unittest.CollectionFixture(3)
+		expectedLight := collection.Light()
+
+		// First, store the collection and index it by transaction
+		err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				_, err := collections.BatchStoreAndIndexByTransaction(lctx, &collection, rw)
+				return err
+			})
+		})
+		require.NoError(t, err)
+
+		// Verify the collection was stored
+		actualLight, err := collections.LightByID(collection.ID())
+		require.NoError(t, err)
+		assert.Equal(t, expectedLight, actualLight)
+
+		// Verify all transactions are indexed
+		for _, tx := range collection.Transactions {
+			collLight, err := collections.LightByTransactionID(tx.ID())
+			require.NoError(t, err)
+			assert.Equal(t, collection.ID(), collLight.ID())
+		}
+
+		// Try to store the same collection again - should abort early
+		err = unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				light, err := collections.BatchStoreAndIndexByTransaction(lctx, &collection, rw)
+				require.NoError(t, err)
+				// Should return the light collection without error
+				assert.Equal(t, expectedLight, light)
+				return err
+			})
+		})
+		require.NoError(t, err)
+
+		// Verify the collection still exists and is unchanged
+		actualLight, err = collections.LightByID(collection.ID())
+		require.NoError(t, err)
+		assert.Equal(t, expectedLight, actualLight)
+
+		// Verify all transactions are still indexed correctly
+		for _, tx := range collection.Transactions {
+			collLight, err := collections.LightByTransactionID(tx.ID())
+			require.NoError(t, err)
+			assert.Equal(t, collection.ID(), collLight.ID())
+		}
+	})
+}
