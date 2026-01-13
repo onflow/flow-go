@@ -15,13 +15,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-var _ optimistic_sync.Pipeline = (*Pipeline)(nil)
-
 // worker implements a single worker goroutine that processes tasks submitted to it.
-// It supports submission of context-based tasks that return an error.
-// Each error that occurs during task execution is sent to a dedicated error channel.
-// The primary purpose of the worker is to handle tasks in a non-blocking manner, while still allowing the parent thread
-// to observe and handle errors that occur during task execution.
+// It supports context-based tasks that return an error. Each error that occurs during
+// task execution is sent to a dedicated error channel.
+// The primary purpose of the worker is to handle tasks in a non-blocking manner, while
+// still allowing the parent thread to observe and handle errors that occur during task execution.
 type worker struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -74,7 +72,10 @@ func (w *worker) StopWait() error {
 	}
 }
 
-// Pipeline implements the Pipeline interface
+// Pipeline represents a pipelined state machine for a processing single ExecutionResult.
+// The state machine is initialized in the Pending state.
+//
+// The state machine is designed to be run in a single goroutine. The Run method must only be called once.
 type Pipeline struct {
 	log                  zerolog.Logger
 	stateConsumer        optimistic_sync.PipelineStateConsumer
@@ -91,12 +92,13 @@ type Pipeline struct {
 	isIndexed        *atomic.Bool
 }
 
+var _ optimistic_sync.Pipeline = (*Pipeline)(nil)
+
 // NewPipeline creates a new processing pipeline.
 // The pipeline is initialized in the Pending state.
 func NewPipeline(
 	log zerolog.Logger,
 	executionResult *flow.ExecutionResult,
-	isSealed bool,
 	stateReceiver optimistic_sync.PipelineStateConsumer,
 ) *Pipeline {
 	log = log.With().
@@ -111,7 +113,7 @@ func NewPipeline(
 		worker:               newWorker(),
 		state:                atomic.NewInt32(int32(optimistic_sync.StatePending)),
 		parentStateCache:     atomic.NewInt32(int32(optimistic_sync.StatePending)),
-		isSealed:             atomic.NewBool(isSealed),
+		isSealed:             atomic.NewBool(false),
 		isAbandoned:          atomic.NewBool(false),
 		isIndexed:            atomic.NewBool(false),
 		stateChangedNotifier: engine.NewNotifier(),
@@ -121,9 +123,8 @@ func NewPipeline(
 // Run starts the pipeline processing and blocks until completion or context cancellation.
 // CAUTION: not concurrency safe! Run must only be called once.
 //
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+// Expected error returns during normal operations:
+//   - [context.Canceled]: when the context is canceled
 func (p *Pipeline) Run(ctx context.Context, core optimistic_sync.Core, parentState optimistic_sync.State) error {
 	if p.core != nil {
 		return irrecoverable.NewExceptionf("pipeline has been already started, it is not designed to be run again")
@@ -147,9 +148,9 @@ func (p *Pipeline) Run(ctx context.Context, core optimistic_sync.Core, parentSta
 // to the caller.
 // 3. Pipeline has successfully entered terminal state.
 // Pipeline won't and shouldn't perform any state transitions after returning from this function.
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//
+// Expected error returns during normal operations:
+//   - [context.Canceled]: when the context is canceled
 func (p *Pipeline) loop(ctx context.Context) error {
 	// try to start processing in case we are able to.
 	p.stateChangedNotifier.Notify()
@@ -203,7 +204,8 @@ func (p *Pipeline) loop(ctx context.Context) error {
 // onStartProcessing performs the initial state transitions depending on the parent state:
 // - Pending -> Processing
 // - Pending -> Abandoned
-// No errors are expected during normal operations.
+//
+// No error returns are expected during normal operation.
 func (p *Pipeline) onStartProcessing() error {
 	switch p.parentState() {
 	case optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist, optimistic_sync.StateComplete:
@@ -225,7 +227,8 @@ func (p *Pipeline) onStartProcessing() error {
 
 // onProcessing performs the state transitions when the pipeline is in the Processing state.
 // When data has been successfully indexed, we can transition to StateWaitingPersist.
-// No errors are expected during normal operations.
+//
+// No error returns are expected during normal operation.
 func (p *Pipeline) onProcessing() error {
 	if p.isIndexed.Load() {
 		return p.transitionTo(optimistic_sync.StateWaitingPersist)
@@ -236,7 +239,8 @@ func (p *Pipeline) onProcessing() error {
 // onPersistChanges performs the state transitions when the pipeline is in the WaitingPersist state.
 // When the execution result has been sealed and the parent has already transitioned to StateComplete then
 // we can persist the data and transition to StateComplete.
-// No errors are expected during normal operations.
+//
+// No error returns are expected during normal operation.
 func (p *Pipeline) onPersistChanges() error {
 	if p.isSealed.Load() && p.parentState() == optimistic_sync.StateComplete {
 		if err := p.core.Persist(); err != nil {
@@ -298,9 +302,9 @@ func (p *Pipeline) Abandon() {
 // performDownload performs the processing step of the pipeline by downloading and indexing data.
 // It uses an atomic flag to indicate whether the operation has been completed successfully which
 // informs the state machine that eventually it can transition to the next state.
-// Expected Errors:
-//   - context.Canceled: when the context is canceled
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+//
+// Expected error returns during normal operations:
+//   - [context.Canceled]: when the context is canceled
 func (p *Pipeline) performDownload(ctx context.Context) error {
 	if err := p.core.Download(ctx); err != nil {
 		return fmt.Errorf("could not perform download: %w", err)
@@ -317,9 +321,8 @@ func (p *Pipeline) performDownload(ctx context.Context) error {
 // transitionTo transitions the pipeline to the given state and broadcasts
 // the state change to children pipelines.
 //
-// Expected Errors:
-//   - ErrInvalidTransition: when the transition is invalid
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+// Expected error returns during normal operations:
+//   - [optimistic_sync.ErrInvalidTransition]: when the transition is invalid
 func (p *Pipeline) transitionTo(newState optimistic_sync.State) error {
 	hasChange, err := p.setState(newState)
 	if err != nil {
@@ -339,9 +342,8 @@ func (p *Pipeline) transitionTo(newState optimistic_sync.State) error {
 // setState sets the state of the pipeline and logs the transition.
 // Returns true if the state was changed, false otherwise.
 //
-// Expected Errors:
-//   - ErrInvalidTransition: when the state transition is invalid
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+// Expected error returns during normal operations:
+//   - [optimistic_sync.ErrInvalidTransition]: when the state transition is invalid
 func (p *Pipeline) setState(newState optimistic_sync.State) (bool, error) {
 	currentState := p.GetState()
 
@@ -369,9 +371,8 @@ func (p *Pipeline) setState(newState optimistic_sync.State) (bool, error) {
 
 // validateTransition validates the transition from the current state to the new state.
 //
-// Expected Errors:
-//   - ErrInvalidTransition: when the transition is invalid
-//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+// Expected error returns during normal operations:
+//   - [optimistic_sync.ErrInvalidTransition]: when the transition is invalid
 func (p *Pipeline) validateTransition(currentState optimistic_sync.State, newState optimistic_sync.State) error {
 	switch newState {
 	case optimistic_sync.StateProcessing:

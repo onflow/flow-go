@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	txerrmsgsmock "github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages/mock"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
@@ -19,15 +21,18 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/fixtures"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 // CoreSuite is a test suite for testing the Core.
 type CoreSuite struct {
 	suite.Suite
+	logger                        zerolog.Logger
 	execDataRequester             *reqestermock.ExecutionDataRequester
 	txResultErrMsgsRequester      *txerrmsgsmock.Requester
 	txResultErrMsgsRequestTimeout time.Duration
 	db                            *storagemock.DB
+	lockManager                   lockctx.Manager
 	persistentRegisters           *storagemock.RegisterIndex
 	persistentEvents              *storagemock.Events
 	persistentCollections         *storagemock.Collections
@@ -98,7 +103,7 @@ func generateFixture(g *fixtures.GeneratorSuite) *testFixture {
 		chunkData := g.ChunkExecutionDatas().Fixture(
 			fixtures.ChunkExecutionData.WithCollection(collection),
 		)
-		// use the same path fo the first ledger payload in each chunk. the indexer should chose the
+		// use the same path for the first ledger payload in each chunk. the indexer should chose the
 		// last value in the register entry.
 		chunkData.TrieUpdate.Paths[0] = path
 		chunkExecutionDatas[i] = chunkData
@@ -545,4 +550,125 @@ func (c *CoreSuite) TestCore_Persist() {
 		err := core.Persist()
 		c.ErrorContains(err, "indexing is not complete")
 	})
+}
+
+// TestCore_Abandon tests the Abandon method which clears all references for garbage collection.
+func (c *CoreSuite) TestCore_Abandon() {
+	g := fixtures.NewGeneratorSuite()
+	tf := generateFixture(g)
+	core := c.createTestCore(tf)
+
+	core.workingData.executionData = tf.execData
+	core.workingData.txResultErrMsgsData = unittest.TransactionResultErrorMessagesFixture(1)
+
+	core.Abandon()
+	c.Assert().Nil(core.workingData)
+}
+
+// TestCore_IntegrationWorkflow tests the complete workflow of download -> index -> persist operations.
+func (c *CoreSuite) TestCore_IntegrationWorkflow() {
+	t := c.T()
+
+	g := fixtures.NewGeneratorSuite()
+	tf := generateFixture(g)
+	expected := c.getExpectedData(tf)
+
+	// Set up mocks with proper expectations
+	c.db = storagemock.NewDB(t)
+	c.db.On("WithReaderBatchWriter", mock.Anything).Return(
+		func(fn func(storage.ReaderBatchWriter) error) error {
+			return fn(storagemock.NewBatch(t))
+		},
+	).Maybe()
+
+	c.persistentRegisters = storagemock.NewRegisterIndex(t)
+	c.persistentRegisters.
+		On("Store", mock.Anything, tf.block.Height).
+		Run(func(args mock.Arguments) {
+			entries := args[0].(flow.RegisterEntries)
+			c.Assert().ElementsMatch(expected.registerEntries, entries)
+		}).
+		Return(nil).
+		Once()
+
+	c.persistentEvents = storagemock.NewEvents(t)
+	c.persistentEvents.
+		On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), tf.block.ID(), []flow.EventsList{expected.events}, mock.Anything).
+		Return(nil).
+		Once()
+
+	c.persistentCollections = storagemock.NewCollections(t)
+	for _, collection := range expected.collections {
+		c.persistentCollections.
+			On("BatchStoreAndIndexByTransaction", mocks.MatchLock(storage.LockInsertCollection), collection, mock.Anything).
+			Return(nil, nil).
+			Once()
+	}
+
+	c.persistentResults = storagemock.NewLightTransactionResults(t)
+	c.persistentResults.
+		On("BatchStore", mocks.MatchLock(storage.LockInsertLightTransactionResult), mock.Anything, tf.block.ID(), expected.results).
+		Return(nil).
+		Once()
+
+	c.persistentTxResultErrMsg = storagemock.NewTransactionResultErrorMessages(t)
+	c.persistentTxResultErrMsg.
+		On("BatchStore", mocks.MatchLock(storage.LockInsertTransactionResultErrMessage), mock.Anything, tf.block.ID(), tf.txErrMsgs).
+		Return(nil).
+		Once()
+
+	c.latestPersistedSealedResult = storagemock.NewLatestPersistedSealedResult(t)
+	c.latestPersistedSealedResult.On("BatchSet", tf.exeResult.ID(), tf.block.Height, mock.Anything).Return(nil).Once()
+
+	core := c.createTestCore(tf)
+	ctx := context.Background()
+
+	c.execDataRequester.On("RequestExecutionData", mock.Anything).Return(tf.execData, nil).Once()
+	c.txResultErrMsgsRequester.On("Request", mock.Anything).Return(tf.txErrMsgs, nil).Once()
+
+	err := core.Download(ctx)
+	c.Require().NoError(err)
+
+	err = core.Index()
+	c.Require().NoError(err)
+
+	err = core.Persist()
+	c.Require().NoError(err)
+
+	c.Assert().NotNil(core.workingData.executionData)
+	c.Assert().Equal(tf.execData, core.workingData.executionData)
+	c.Assert().Equal(tf.txErrMsgs, core.workingData.txResultErrMsgsData)
+}
+
+func (c *CoreSuite) getExpectedData(tf *testFixture) *expectedData {
+	var events []flow.Event
+	var results []flow.LightTransactionResult
+	var registerEntries []flow.RegisterEntry
+
+	for i, chunkData := range tf.execData.ChunkExecutionDatas {
+		events = append(events, chunkData.Events...)
+		results = append(results, chunkData.TransactionResults...)
+
+		for j, payload := range chunkData.TrieUpdate.Payloads {
+			// the first key is repeated in each chunk, so only keep the last one.
+			if j == 0 && i < len(tf.execData.ChunkExecutionDatas)-1 {
+				continue
+			}
+
+			key, value, err := convert.PayloadToRegister(payload)
+			c.Require().NoError(err)
+
+			registerEntries = append(registerEntries, flow.RegisterEntry{
+				Key:   key,
+				Value: value,
+			})
+		}
+	}
+
+	return &expectedData{
+		events:          events,
+		results:         results,
+		collections:     tf.execData.StandardCollections(),
+		registerEntries: registerEntries,
+	}
 }
