@@ -33,6 +33,7 @@ import (
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
 	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
+	move_wal "github.com/onflow/flow-go/cmd/util/cmd/move-wal"
 	pebble_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/pebble-checkpoint"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
@@ -108,6 +109,7 @@ func addCommands() {
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
 	rootCmd.AddCommand(leaders.Cmd)
+	rootCmd.AddCommand(move_wal.Cmd)
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
 	rootCmd.AddCommand(rollback_executed_height.Cmd)
