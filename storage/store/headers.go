@@ -160,6 +160,10 @@ func (h *Headers) storeTx(
 	return h.sigs.storeTx(lctx, rw, blockID, proposalSig)
 }
 
+// retrieveTx returns the header with the given ID.
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no block header with the given ID exists
+//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
 	val, err := h.cache.Get(h.db.Reader(), blockID)
 	if err != nil {
@@ -168,6 +172,11 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) (*flow.Header, error) {
 	return val, nil
 }
 
+// retrieveTx returns a proposal header of the block with the given ID.
+// Essentially, this is the header, along with the proposer's signature.
+// Expected error returns during normal operations:
+//   - [storage.ErrNotFound] if no block header with the given ID exists
+//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 func (h *Headers) retrieveProposalTx(blockID flow.Identifier) (*flow.ProposalHeader, error) {
 	header, err := h.cache.Get(h.db.Reader(), blockID)
 	if err != nil {
