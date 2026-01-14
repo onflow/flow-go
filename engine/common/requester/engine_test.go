@@ -443,6 +443,5 @@ func (s *RequesterEngineSuite) TestOriginValidation() {
 	s.engine.requests[req.Nonce] = req
 
 	err := s.engine.onEntityResponse(wrongID, res)
-	assert.Error(s.T(), err)
-	assert.IsType(s.T(), engine.InvalidInputError{}, err)
+	assert.True(s.T(), engine.IsInvalidInputError(err))
 }
